@@ -1,4 +1,12 @@
-import { Annotation, StateEffect, StateField, Transaction, type EditorState, type Extension, type Range } from '@codemirror/state';
+import {
+  Annotation,
+  StateEffect,
+  StateField,
+  Transaction,
+  type EditorState,
+  type Extension,
+  type Range,
+} from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import { invertedEffects } from '@codemirror/commands';
 import { buttonVariants } from '@/components/ui/button';
@@ -30,24 +38,35 @@ export const setMarks = StateEffect.define<AuthorMark[]>();
 const restoreMarks = StateEffect.define<AuthorMark[]>({
   map: (marks, change) =>
     marks
-      .map((mark) => ({ ...mark, from: change.mapPos(mark.from, 1), to: change.mapPos(mark.to, -1) }))
+      .map((mark) => ({
+        ...mark,
+        from: change.mapPos(mark.from, 1),
+        to: change.mapPos(mark.to, -1),
+      }))
       .filter((mark) => mark.to > mark.from),
 });
 
 export const authorMarks = StateField.define<AuthorMark[]>({
   create: () => [],
   update(marks, tr) {
-    let next = tr.docChanged ? mapMarks(marks, tr.changes, tr.annotation(insertedBy) ?? null) : marks;
+    let next = tr.docChanged
+      ? mapMarks(marks, tr.changes, tr.annotation(insertedBy) ?? null)
+      : marks;
     for (const effect of tr.effects) {
       if (effect.is(setMarks)) next = normaliseMarks(effect.value, tr.newDoc.length);
-      else if (effect.is(restoreMarks)) next = normaliseMarks([...next, ...effect.value], tr.newDoc.length);
+      else if (effect.is(restoreMarks))
+        next = normaliseMarks([...next, ...effect.value], tr.newDoc.length);
     }
     return next;
   },
   provide: (field) =>
     EditorView.decorations.from(field, (marks) => {
       const dash = Decoration.mark({ class: 'cm-essay-dash' });
-      return Decoration.set(marks.filter((mark) => mark.author === 'dash').map((mark) => dash.range(mark.from, mark.to)));
+      return Decoration.set(
+        marks
+          .filter((mark) => mark.author === 'dash')
+          .map((mark) => dash.range(mark.from, mark.to)),
+      );
     }),
 });
 
@@ -115,7 +134,11 @@ class SuggestionBar extends WidgetType {
       });
       return el;
     };
-    bar.append(label, button('Accept', true, acceptSuggestion), button('Reject', false, rejectSuggestion));
+    bar.append(
+      label,
+      button('Accept', true, acceptSuggestion),
+      button('Reject', false, rejectSuggestion),
+    );
     return bar;
   }
   ignoreEvent() {
@@ -127,11 +150,20 @@ function suggestionDecorations(state: EditorState, suggestion: Suggestion | null
   if (!suggestion) return Decoration.none;
   const ranges: Range<Decoration>[] = [];
   if (suggestion.to > suggestion.from) {
-    ranges.push(Decoration.mark({ class: 'cm-essay-struck', tagName: 'del' }).range(suggestion.from, suggestion.to));
+    ranges.push(
+      Decoration.mark({ class: 'cm-essay-struck', tagName: 'del' }).range(
+        suggestion.from,
+        suggestion.to,
+      ),
+    );
   }
-  ranges.push(Decoration.widget({ widget: new SuggestedText(suggestion.text), side: 1 }).range(suggestion.to));
+  ranges.push(
+    Decoration.widget({ widget: new SuggestedText(suggestion.text), side: 1 }).range(suggestion.to),
+  );
   const lineEnd = state.doc.lineAt(suggestion.to).to;
-  ranges.push(Decoration.widget({ widget: new SuggestionBar(), block: true, side: 1 }).range(lineEnd));
+  ranges.push(
+    Decoration.widget({ widget: new SuggestionBar(), block: true, side: 1 }).range(lineEnd),
+  );
   return Decoration.set(ranges, true);
 }
 
@@ -145,9 +177,16 @@ export const suggestionField = StateField.define<Suggestion | null>({
       if (fromA <= value.to && toA >= value.from) touched = true;
     });
     if (touched) return null;
-    return { ...value, from: tr.changes.mapPos(value.from, 1), to: tr.changes.mapPos(value.to, -1) };
+    return {
+      ...value,
+      from: tr.changes.mapPos(value.from, 1),
+      to: tr.changes.mapPos(value.to, -1),
+    };
   },
-  provide: (field) => EditorView.decorations.compute([field], (state) => suggestionDecorations(state, state.field(field))),
+  provide: (field) =>
+    EditorView.decorations.compute([field], (state) =>
+      suggestionDecorations(state, state.field(field)),
+    ),
 });
 
 /** Put Dash's wording in place of the selected text, marked as Dash's. */
@@ -158,7 +197,10 @@ export function acceptSuggestion(view: EditorView): boolean {
     changes: { from: suggestion.from, to: suggestion.to, insert: suggestion.text },
     selection: { anchor: suggestion.from + suggestion.text.length },
     effects: showSuggestion.of(null),
-    annotations: [insertedBy.of({ author: 'dash', name: suggestion.name }), Transaction.userEvent.of('rephrase')],
+    annotations: [
+      insertedBy.of({ author: 'dash', name: suggestion.name }),
+      Transaction.userEvent.of('rephrase'),
+    ],
   });
   return true;
 }
@@ -194,7 +236,10 @@ export const authorshipTheme = EditorView.theme({
 });
 
 /** Everything the editor needs for authorship and rung 4; `suggestion` is for the gallery. */
-export function authorship(initial: readonly AuthorMark[], suggestion: Suggestion | null = null): Extension {
+export function authorship(
+  initial: readonly AuthorMark[],
+  suggestion: Suggestion | null = null,
+): Extension {
   return [
     authorMarks.init((state) => normaliseMarks(initial, state.doc.length)),
     rememberRemoved,

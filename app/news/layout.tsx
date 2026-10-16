@@ -1,4 +1,5 @@
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Shell for the news workspace.
@@ -23,19 +24,7 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
      * is where you go back to, after reading. Daily review sits beside Quick
      * read (plan #1616): the evening's review of the same stories.
      */
-    sections: [
-      { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-      { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-      { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
-      {
-        href: '/news/all',
-        label: 'Newsletters',
-        icon: 'newsletters',
-        exact: true,
-        alsoMatches: ['/news/i/'],
-      },
-      { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
-    ],
+    sections: ({ owner }) => tabsFor('news', owner),
     settingsHref: '/news/settings',
     settingsLabel: 'News settings',
     children,

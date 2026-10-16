@@ -12,6 +12,10 @@ import {
 } from '@/lib/ask/changes';
 import { readSubject } from '@/lib/core/dash-actions';
 import { executeProposal } from '@/lib/ask/propose';
+import { estimatePaidActions } from '@/lib/core/spend/paid-actions';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { queuePaidPress, type PaidEstimator } from '@/lib/dash/paid';
+import { dashTool, type DashPaidTool } from '@/lib/dash/registry';
 import { executeAskTool, lookupInScope } from '@/lib/ask/tools';
 import { HIT_TABLES } from '@/lib/ask/lookups';
 import type { ModuleId } from '@/lib/modules';
@@ -31,6 +35,7 @@ import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { fileVaultNote, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
+import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
@@ -42,6 +47,7 @@ import {
   discardProposals,
   insertMadeChange,
   insertProposal,
+  insertThreadProposal,
   loadChanges,
   loadMadeChanges,
   type DashChange,
@@ -146,6 +152,9 @@ export async function askDashInRequest(input: {
           { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, fileQuickNote: (text) => fileVaultNote(user.id, text) },
           args,
         ),
+      // A paid press is checked and priced as the person, and only queued (plan #2228.1).
+      queue: (tool, args, seen) =>
+        queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, user.id)),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
@@ -228,7 +237,20 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
         args,
       ),
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
+    queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
+    saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
   };
+}
+
+/** Prices a paid press by its button's key, as its $ hint does, against the person's own ledger. */
+function paidEstimator(core: CoreSupabaseClient, userId: string): PaidEstimator {
+  return async (action) => (await estimatePaidActions(core, userId, [action]))[action] ?? null;
+}
+
+/** The paid tool of that name in Dash's registry, for an approval to run (plan #2228.1). */
+function paidToolNamed(name: string): DashPaidTool | undefined {
+  const tool = dashTool(name);
+  return tool?.kind === 'paid' ? tool : undefined;
 }
 
 /**
@@ -272,6 +294,7 @@ function askContext(
     // Gmail as it is now, through the person's own mailboxes; nothing is kept.
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
     readMail: async (message) => readMail(await createCoreClient(), userId, message),
+    readJobBoard,
   };
 }
 
@@ -394,6 +417,7 @@ async function changeDeps(): Promise<ChangeDeps> {
     createTask,
     // A quick note's file comes out of the vault too (plan #1894.2).
     undoVaultNote: (action) => undoVaultCapture({ userId: user.id, core, db: requestAskDb() }, action),
+    paidTool: paidToolNamed,
   };
 }
 

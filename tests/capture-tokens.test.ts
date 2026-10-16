@@ -134,3 +134,47 @@ describe('a capture token', () => {
     ).rejects.toThrow();
   });
 });
+
+/** core.use_dash_token as the ask address runs it. */
+async function useAs(hash: string, kind: string): Promise<Use> {
+  return sql.begin(async (tx) => {
+    await tx.unsafe('set local role service_role');
+    const [row] = await tx<Use[]>`select * from core.use_dash_token(${hash}, ${kind}, 3, 5)`;
+    return row;
+  }) as Promise<Use>;
+}
+
+describe('an ask token', () => {
+  it('is made by its owner and asks, and the two kinds refuse each other uncounted', async () => {
+    const { token, hash } = makeCaptureToken();
+    const [made] = await asUser(
+      me,
+      (tx) => tx<{ id: string }[]>`
+        insert into capture_tokens (user_id, label, token_hash, kind)
+        values (${me}, 'iPhone: Ask Dash', ${hash}, 'ask')
+        returning id`,
+    );
+    const [listed] = await asUser(me, (tx) => tx<{ kind: string }[]>`select kind from capture_tokens where id = ${made.id}`);
+    expect(listed.kind).toBe('ask');
+
+    expect(await useAs(hashCaptureToken(token), 'ask')).toMatchObject({ outcome: 'ok', user_id: me, token_id: made.id });
+    expect(await use(hash)).toMatchObject({ outcome: 'other_kind', user_id: null });
+
+    const capture = await make(me, 'Adds only');
+    expect(await useAs(capture.hash, 'ask')).toMatchObject({ outcome: 'other_kind', user_id: null });
+
+    const [counts] = await admin<{ day_count: number }[]>`select day_count from capture_tokens where id = ${capture.id}`;
+    expect(counts.day_count).toBe(0);
+  });
+
+  it('cannot be made of a kind that does not exist', async () => {
+    await expect(
+      asUser(me, (tx) => tx`insert into capture_tokens (user_id, label, token_hash, kind)
+        values (${me}, 'Odd', ${makeCaptureToken().hash}, 'admin')`),
+    ).rejects.toThrow();
+  });
+
+  it('cannot be checked by a signed-in person', async () => {
+    await expect(asUser(me, (tx) => tx`select * from core.use_dash_token(${makeCaptureToken().hash}, 'ask', 3, 5)`)).rejects.toThrow();
+  });
+});

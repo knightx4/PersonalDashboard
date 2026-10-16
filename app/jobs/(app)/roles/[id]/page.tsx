@@ -37,7 +37,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
-import { loadThread } from '@/lib/thread/store';
+import { loadThread, loadThreads } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { loadDrafts } from '@/lib/jobs/drafting/store';
 import { coverLetterView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
@@ -127,7 +128,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, needs_review, created_by, cover_letter, ready_to_apply, has_cover_letter, referral_contact_id`,
+       excitement, needs_review, created_by, cover_letter, ready_to_apply, all_questions_added, has_cover_letter, referral_contact_id`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -274,6 +275,14 @@ export default async function RoleDetailPage({
         .in('group_id', groupIds)
     : { data: [] };
 
+  // The threads under each answer and under the cover letter (note
+  // be3c6616): a second read too, since the answer ids come out of the batch.
+  // A failed read leaves the threads empty rather than the page.
+  const answerThreads = await loadThreads(supabase, [
+    ...(answers ?? []).map((answer) => threadRef('answer', answer.id as string)),
+    threadRef('application', current.id as string),
+  ]).catch(() => new Map());
+
   const messageIdsByGroup = new Map<string, string[]>();
   for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
     const key = link.group_id as string;
@@ -393,6 +402,7 @@ export default async function RoleDetailPage({
           everSubmitted: current.submitted_at !== null,
           closedOn: current.closed_at ? formatDateInline(current.closed_at as string, timezone) : null,
           interviewCount: (interviews ?? []).length,
+          allQuestionsAdded: current.all_questions_added === true,
         })
       : null;
 
@@ -691,6 +701,7 @@ export default async function RoleDetailPage({
             bannedOrDefault(profile?.banned_constructions),
           )}
           thread={notes ?? []}
+          answerThreads={Object.fromEntries(answerThreads)}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
             id: group.id as string,
             label: (group.label as string | null) ?? null,

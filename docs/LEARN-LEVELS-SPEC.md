@@ -52,8 +52,10 @@ Taken with the person on 9 October 2026:
 
 A topic is something you would name when saying what you know: Return, Beta,
 CAPM, DCF, WACC, Braess's paradox, single-stair buildings. There is one map of
-topics per account. A subject does not contain topics; it is a view over them
-(see "Lenses" below).
+topics, shared by every account, as the catalogue and the frame are (decided on
+plan #2138.9). What you know about a topic is yours; the topic is not. A topic
+written for one account alone is still possible and is marked personal. A
+subject does not contain topics; it is a view over them (see "Lenses" below).
 
 A topic carries:
 
@@ -65,6 +67,12 @@ A topic carries:
   return is" has nothing at level 10. CAPM does. Levels above the ceiling do
   not exist for that topic, and nothing counts them.
 - Ten `cells`, one per level up to the ceiling, described next.
+- A `source`, saying where it came from (a syllabus, a textbook, an exam
+  body's outcome list, the requirement lines of a role), and a
+  `canonicality`: canonical, practitioner, emerging or personal. Cells and
+  links carry the same two.
+- Optionally the frame topic it refines (`refines_article_id`, a row of
+  `area_check_articles` from LEARN-AREAS-SPEC).
 
 Topics form no hierarchy. There is no parent topic and no category tree, for
 the reason the map spec gives: a stored hierarchy has to be maintained and
@@ -289,6 +297,21 @@ Practice Flow already uses. Re-checks are one in five. The track weights in
 `lib/learn/flow/interest.ts` decide which topic each ordinary question comes
 from.
 
+As built (plan #2138.6, `lib/learn/levels/pick.ts`), each question is the
+first of these that has one:
+
+1. On every fifth answer, a re-check that is due.
+2. Placement on a topic not yet placed, the topic already under way first, so
+   one topic is placed before the next starts.
+3. The top of the fringe.
+4. The most-settling cell on a topic, when the fringe is empty.
+
+A cell answered in the last twelve hours rests and is not asked, so a level
+just missed does not come straight back. Level 10 is not asked until the
+defence question exists. The track weights are not read yet: a flow focused on
+a subject keeps to the topics of that subject's lens, and otherwise the lens
+targets and the unlock count order the fringe.
+
 ## What to learn next: the fringe
 
 The **fringe** is every open or missed cell whose level below is held and
@@ -305,11 +328,15 @@ The fringe has two directions, and the screen names which a row is:
 
 Ranking within the fringe, in order:
 
-1. Cells inside a lens you are working towards, below its target (see
+1. **Misses first.** A cell with a not-met answer comes before one nothing
+   has touched (idea eacdd0c9). Counting a miss as settled would let the part
+   you got wrong drift behind new material. Held cells are not on the fringe,
+   so they come last by construction.
+2. Cells inside a lens you are working towards, below its target (see
    "Lenses").
-2. The interest weights the flow already keeps per track, and the vault
+3. The interest weights the flow already keeps per track, and the vault
    theme strengths from KNOWLEDGE-SPEC.
-3. **Unlock count:** how many other cells would join the fringe if this one
+4. **Unlock count:** how many other cells would join the fringe if this one
    were held. A cell that opens eight others outranks one that opens none.
 
 Every fringe row says in one line why it is there, as every row on Learn's
@@ -360,10 +387,48 @@ evidence between two topics. Most of the cost of getting this wrong falls on
 the inference rules, so the decision is the person's and is never made
 automatically.
 
+A draft is compiled from sources you give. Edit sources, beside the goal,
+takes the goal's performances (the three to five things being able to do it
+means), pasted sources such as a table of contents, a syllabus or an exam
+body's outcome list, and a phrase naming the roles in `job_search` whose
+requirement lines join them. Sources are numbered S1, S2, their lines S1.1,
+S1.2, and performances P1 to P5. The call cites those ids on the topic, on
+every level and on every link, and says how settled each cited row is. A row
+it cannot cite comes back with no source.
+
+The call runs twice, side by side, and the draft more of whose rows cite a
+source is kept. Both calls go to the ledger under `draft-topic`, so a draft
+costs two calls. Before Approve, the draft's page shows five checks:
+
+- **Coverage**: of the source lines that belong to this topic, how many a row
+  cites. Lines the call puts with a neighbouring topic are not counted.
+- **Structure**: no requirement loops, and every level is on a path to a
+  performance. A level above the highest level any performance needs is on
+  none.
+- **Stability**: how far the two drafts overlap, from the words of each
+  level, the topics linked and the lines cited.
+- **Provenance**: how many rows name a source.
+- **Practitioner checklist**: three to five questions to read the top levels
+  against.
+
+A row with no source cannot be approved until you mark it personal. The
+trigger `topics_cited_on_approve` (learn 0149) refuses the move from draft to
+approved while one is left, whoever writes it. The first four checks are kept
+on the topic as `drafting`; provenance is read from the rows.
+
 Nothing is asked about a drafted topic until it is approved, the same as for
 the claims graph now. Each call's cost goes to the spend ledger in `core`.
 The first twenty drafts are the measurement for the cost line this spec does
 not yet have.
+
+A **territory** is a list of topics drafted together from one set of sources
+(plan #2172.6). Its definition sits in `lib/learn/levels/territories/`: the
+texts as published, the role phrases, the performances, and each topic with
+the source lines that put it on the list, the Level 4 frame topic it refines
+and its target. `/api/cron/territory-draft?territory=<key>` drafts the topics
+not yet drafted, a few a call, each with the same two-draft call and checks
+as above, then sets the frame topic and adds the target to the subject's
+lens. It is fired by hand, since every call spends, and approves nothing.
 
 ## Migration from the claims graph
 
@@ -390,27 +455,70 @@ enough to migrate in one pass, with the person reviewing the result.
 5. **Probes stay.** `probes` gains a `cell_id`, and every graded answer from
    now on also writes its `cell_evidence` rows.
 
+   A question written about a cell rather than a concept is not a probe. It
+   has no concept, and the claims graph's readers take every probe row as
+   one of theirs, so it goes in `cell_questions`, and its evidence names the
+   question instead of a probe.
+
 The old tables are kept read-only until the new screens have replaced every
 read of them. Then a later migration drops them. That drop is destructive,
 so it waits for the person's go-ahead.
 
 ## Tables
 
-In `learn`, with RLS on every table and composite foreign keys carrying
-`user_id`, as in the rest of the schema.
+In `learn`, with RLS on every table.
+
+The territory is `topics`, `topic_cells` and `cell_links`. Their `user_id` may
+be null, and null means shared: every signed-in account reads a shared row,
+and only the service role writes one. A row with an owner is that account's,
+for reading and writing. A row keeps the owner it was written with.
+
+Everything else is per account, with `user_id` not null, and may point at a
+shared row of the territory or at a row of its own account. A shared row
+points only at shared rows, and a cell always has its topic's owner. Keys into
+the territory are on `id` alone, and a trigger (`territory_owner_check`) keeps
+that rule; other keys stay composite with `user_id`, as in the rest of the
+schema.
 
 | table | holds | source for Goals? |
 | --- | --- | --- |
-| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved | yes: what the person studies |
-| `topic_cells` | one row per topic and level: the descriptor, when it was rewritten by hand | no: part of the topic |
-| `cell_links` | requiring cell → required cell, the sentence why, acyclic | no: structure |
+| `topics` | name, scope, ceiling, fields, scope embedding, draft or approved, source, canonicality, the frame topic it refines, what it was drafted from and its checks; shared or one account's | yes: what the person studies |
+| `topic_cells` | one row per topic and level: the descriptor, its version, when it was rewritten by hand, source, canonicality | no: part of the topic |
+| `cell_links` | requiring cell → required cell, the sentence why, source, canonicality, acyclic | no: structure |
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |
-| `cell_evidence` | met, not met or declared, the probe it came from, the verified quote, the date | yes: what the person did |
+| `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date, the cell version it was given against | yes: what the person did |
+| `cell_questions` | a question asked about one cell, its format, the answer and every verdict the grader returned | no: read through `cell_evidence` |
 | `lenses` | a named set of targets, and whether it was a subject or a goal | yes: what the person wants |
 | `lens_targets` | lens, topic, target level | no: part of the lens |
 | `link_reviews` | a link in question, the two answers that put it there, and what the person decided | no: bookkeeping |
 
+**Versions.** A cell's `version` starts at 1 and rises by one each time its
+descriptor is reworded. Each evidence row records the version it was given
+against, stamped from the cell when the row is written, so evidence given
+against an earlier wording reads as such.
+
+**Source and canonicality** are null until a draft cites a row. The drafting
+call fills them, and a row with no source is shown as uncited.
+
+**The cycle check** walks shared links and the writer's own links, which is
+the map that writer reads.
+
 Statuses, levels, the fringe and lens progress are computed and never stored.
+
+### How counts are reported
+
+Anything above a cell (a topic, a lens, a frame topic with the topics that
+refine it) is reported as two numbers, never folded into one:
+
+- **breadth**: how many of its children are touched, out of how many. A
+  topic's children are its cells; a group's are its topics.
+- **depth**: the best level beneath it.
+
+Both are given per kind of evidence: tested (shown by a graded answer),
+inferred (implied by a cell that was) and declared. Every count keeps the
+three apart, and lens progress returns held-tested, held-inferred and declared
+separately. `topicReach`, `groupReach` and `lensProgress` in
+`lib/learn/levels/model.ts` compute them.
 
 ## Screens
 
@@ -422,7 +530,10 @@ Statuses, levels, the fringe and lens progress are computed and never stored.
 | `/learn/now?practice=1` | Practice Flow, now asking placement, fringe and re-check questions, with the answer screen listing every cell an answer reached |
 
 At the end of a practice run, the flow lists what moved: cells newly shown,
-cells newly implied, misses found, and any link put in doubt.
+cells newly implied, misses found, and any link put in doubt. A run is the
+questions answered since it began; the flow carries the start time in its
+links, and End run, or running out of questions, shows the list. Nothing
+about a run is stored.
 
 ## Rules
 
@@ -484,9 +595,6 @@ Each slice is usable before the next starts.
   If the link reviews show distant implications failing more often than
   near ones, implication should stop after two links. That needs real data.
 - **Writing the level-10 objection.** Carried over from the graph spec.
-- **Topic definitions shared between accounts.** Descriptors for DCF are not
-  personal, and the catalogue already carries no `user_id`. Topics stay per
-  account until a second account exists to share with.
 - **Life goals as lenses.** A goal on `/goals` that needs knowledge, such as
   a job move into FP&A, could name a lens. Whether the goals routine should
   draft that lens itself is for the goals spec to decide.

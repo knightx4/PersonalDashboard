@@ -34,7 +34,9 @@ NEVER
 
 Reply with the reworded text alone.`;
 
-export type RephraseResult = { ok: true; text: string; model: string } | { ok: false; detail: string };
+export type RephraseResult =
+  | { ok: true; text: string; model: string }
+  | { ok: false; detail: string };
 
 export async function rephraseSelection(input: {
   selection: string;
@@ -67,5 +69,7 @@ export async function rephraseSelection(input: {
     .map((part) => (part.type === 'text' ? part.text : ''))
     .join('');
   const text = usableRephrase(reply, input.selection);
-  return text ? { ok: true, text, model: REPHRASE_MODEL } : { ok: false, detail: 'The rewording came back in a form Rephrase does not use.' };
+  return text
+    ? { ok: true, text, model: REPHRASE_MODEL }
+    : { ok: false, detail: 'The rewording came back in a form Rephrase does not use.' };
 }

@@ -12,7 +12,7 @@ export const jobsActions: ModuleActions = {
     renameCompany: tool('change_company'),
     proposeCompanyEnrichment: none('page'),
     applyCompanyEnrichment: none('theirs'),
-    proposeAiCompanyEnrichment: none('spends'),
+    proposeAiCompanyEnrichment: none('spends', 'Shows a proposal on the page and keeps nothing, so a run by Dash would spend and leave nothing; the person applies it with applyAiCompanyEnrichment.'),
     applyAiCompanyEnrichment: none('theirs'),
     mergeRoles: tool('merge_roles'),
   },
@@ -25,7 +25,7 @@ export const jobsActions: ModuleActions = {
     restoreWaiting: none('theirs', 'Undo: takes back their own Done or Later.'),
   },
   'app/jobs/(app)/_home/prepare-actions.ts': {
-    prepareWithDash: none('spends'),
+    prepareWithDash: none('spends', "Asks Dash on the role's thread as a comment tagged @dash does; Dash answering in Ask or the thread is the same help without a second Dash run."),
   },
   'app/jobs/(app)/review/actions.ts': {
     linkMessage: tool('change_role_email'),
@@ -69,7 +69,7 @@ export const jobsActions: ModuleActions = {
     deleteEvidence: none('deletes'),
     addResumeVersion: tool('add_resume_version'),
     attachResumePdf: tool('attach_resume_pdf'),
-    proposeEvidence: none('spends'),
+    proposeEvidence: none('spends', 'Shows candidate evidence on the page and keeps nothing until the person accepts it, so a run by Dash would spend and leave nothing.'),
     acceptEvidence: none('theirs'),
   },
   'app/jobs/(app)/material/actions.ts': {
@@ -82,12 +82,12 @@ export const jobsActions: ModuleActions = {
   },
   'app/jobs/(app)/find/actions.ts': {
     saveAim: none('setting'),
-    findStartups: none('spends'),
+    findStartups: tool('find_startups'),
     addDiscoveredCompany: tool('add_discovered_company'),
   },
   'app/jobs/(app)/find/recommend-actions.ts': {
-    suggestPeople: none('spends'),
-    suggestOpenings: none('spends'),
+    suggestPeople: tool('suggest_people'),
+    suggestOpenings: tool('find_openings'),
     dismissSuggestion: none('theirs'),
     reopenSuggestion: none('theirs', 'Undo: takes back their own decline.'),
     dismissOpening: none('theirs'),
@@ -101,8 +101,8 @@ export const jobsActions: ModuleActions = {
     promoteToCanonical: tool('set_default_answer'),
     removeAnswer: none('deletes'),
     lookUpJobDescription: none('page'),
-    draftAnswerFromEvidence: none('spends'),
-    draftApplication: none('spends'),
+    draftAnswerFromEvidence: tool('draft_answer'),
+    draftApplication: tool('draft_application_answers'),
     saveAnswerReplies: none('theirs'),
     dropAnswerDraft: none('theirs'),
     saveDraftedAnswer: tool('save_answer'),
@@ -110,7 +110,7 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/roles/[id]/actions.ts': {
     addNote: tool('add_role_note'),
     saveCoverLetter: tool('write_cover_letter'),
-    draftCoverLetter: none('spends'),
+    draftCoverLetter: tool('draft_cover_letter'),
     saveCoverLetterReplies: none('theirs'),
     dropCoverLetterDraft: none('theirs'),
     renameRole: tool('change_role'),
@@ -139,8 +139,8 @@ export const jobsActions: ModuleActions = {
     searchUnlinkedMessages: none('page'),
   },
   'app/jobs/(app)/roles/[id]/posting-actions.ts': {
-    rebuildRequirementMap: none('spends'),
-    matchRoleRequirements: none('spends'),
+    rebuildRequirementMap: none('page', 'Reads the description again with the parser: no model call and nothing spent. The match that follows is match_role_requirements.'),
+    matchRoleRequirements: tool('match_role_requirements'),
   },
   'app/jobs/(app)/roles/[id]/prep-actions.ts': {
     writeRoundPrepNote: tool('write_prep_note'),

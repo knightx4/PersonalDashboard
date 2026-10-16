@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
+import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
+import { EVIDENCE_CEILING } from '@/lib/learn/strength';
 
 vi.mock('server-only', () => ({}));
 
@@ -73,7 +75,7 @@ describe('loadIdeaMap evidence (plan #2006.6)', () => {
       source_kind: 'note',
       source_id: id,
       similarity,
-      weight,
+      ...kindAndCeiling({ source_kind: 'note', weight }),
       basis: `you wrote about this in ${id}`,
       found_at: '2026-10-01T00:00:00Z',
     });
@@ -84,7 +86,8 @@ describe('loadIdeaMap evidence (plan #2006.6)', () => {
     const view = await loadIdeaMap(client, undefined, new Date('2026-10-14T00:00:00Z'));
     const retention = view.ideas.find((i) => i.id === 'i2')!;
     expect(retention.state).toBe('unknown');
-    expect(retention.strength).toBeCloseTo(0.275);
+    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling.
+    expect(retention.strength).toBeCloseTo((1 - 0.85 * 0.65) * EVIDENCE_CEILING);
     expect(retention.evidence.map((e) => e.id)).toEqual(['own', 'clip']);
     expect(view.ideas.find((i) => i.id === 'i3')!.evidence).toEqual([]);
   });

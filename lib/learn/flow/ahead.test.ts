@@ -35,21 +35,28 @@ type Row = {
   id: string;
   concept_id: string;
   question: string;
-  options: string[];
+  options: string[] | null;
   picked_state: string;
-  picked_recheck: null;
+  picked_recheck: 'tested' | 'declared' | null;
   shown_at: string | null;
+  rung: 'recognise' | 'defend';
 };
 
+/**
+ * A queued question. One about a goal's idea (a `g` concept here) is an
+ * explain question, with no options (plan #2164.2); the rest pick from four.
+ */
 function row(id: string, conceptId: string, shownAt: string | null = null): Row {
+  const explain = conceptId.startsWith('g');
   return {
     id,
     concept_id: conceptId,
     question: `question ${id}`,
-    options: ['a', 'b', 'c', 'd'],
+    options: explain ? null : ['a', 'b', 'c', 'd'],
     picked_state: 'unknown',
     picked_recheck: null,
     shown_at: shownAt,
+    rung: explain ? 'defend' : 'recognise',
   };
 }
 
@@ -210,6 +217,18 @@ describe('takeWaiting with goal questions', () => {
       aimName: 'Startup finance for founders',
     });
     expect(question?.survey).toBeUndefined();
+    expect(question?.explain).toBe(true);
+    expect(question?.options).toEqual([]);
+  });
+
+  it('throws away a multiple-choice goal question unless it is a re-check (plan #2164.2)', async () => {
+    const choice: Row = { ...row('p1', 'g1'), options: ['a', 'b'], rung: 'recognise' };
+    const recheck: Row = { ...choice, id: 'p3', picked_recheck: 'tested' };
+    const { client, taken } = fakeClient([choice, recheck, row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null });
+    expect(question?.probeId).toBe('p3');
+    expect(question?.explain).toBeUndefined();
+    expect(taken).toEqual(['p3']);
   });
 
   it('leaves goal questions waiting for Tracks only and when focused', async () => {
@@ -248,6 +267,13 @@ describe('takeWaiting for Goals only and one goal', () => {
     expect(question?.probeId).toBe('p1');
     expect(question?.goal?.aimId).toBe('aim-finance');
     expect(taken).toEqual(['p1']);
+  });
+
+  it('passes over a waiting survey question with the goals-only setting on (plan #2164.1)', async () => {
+    const { client, taken } = fakeClient([row('p3', 's3'), row('p2', 'c2')], homes);
+    const question = await takeWaiting(client, { resume: false, track: null, noSurvey: true });
+    expect(question?.probeId).toBe('p2');
+    expect(taken).toEqual(['p2']);
   });
 
   it('finds nothing for Goals only when only other questions wait', async () => {

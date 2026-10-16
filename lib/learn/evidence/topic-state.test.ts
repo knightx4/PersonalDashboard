@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readCells, type TopicMap } from '@/lib/learn/levels/model';
 import { EVIDENCE_CEILING, strength, type StrengthInput } from '@/lib/learn/strength';
-import { LIT_MIN, topicStates, type TopicIdea, type TopicLink, type TopicNode } from './topic-state';
+import { LIT_MIN, topicStates, type TopicIdea, type TopicLevels, type TopicLink, type TopicNode } from './topic-state';
 
 const T0 = '2026-01-01T00:00:00Z';
 const on = new Date(T0);
@@ -22,7 +23,8 @@ const tested = (state: StrengthInput['state']): StrengthInput => ({
 });
 const idea = (id: string, topicId: string, state: StrengthInput | null): TopicIdea => ({ id, topicId, state });
 const link = (extra: Partial<TopicLink> = {}): TopicLink => ({
-  weight: 1,
+  kind: 'work',
+  ceiling: 1,
   similarity: 0.8,
   foundAt: T0,
   matchedBy: 'similarity',
@@ -40,16 +42,16 @@ describe('topicStates', () => {
   });
 
   it('unlocks a topic with a name-only link too faint to light it', () => {
-    const s = run([], { a: [link({ matchedBy: 'name', similarity: 0, weight: 0.5 })] });
+    const s = run([], { a: [link({ matchedBy: 'name', similarity: 0, kind: 'note', ceiling: 0.5 })] });
     expect(s.get('a')?.state).toBe('unlocked');
     expect(s.get('a')?.strength).toBe(0);
   });
 
   it('counts a name match at half the similarity', () => {
-    const byName = run([], { a: [link({ matchedBy: 'name', similarity: 0.3, weight: 1 })] }).get('a')!;
-    const byVector = run([], { a: [link({ matchedBy: 'similarity', similarity: 0.3, weight: 1 })] }).get('a')!;
-    expect(byName.strength).toBeCloseTo(0.15);
-    expect(byVector.strength).toBeCloseTo(EVIDENCE_CEILING);
+    const byName = run([], { a: [link({ matchedBy: 'name', similarity: 0.9 })] }).get('a')!;
+    const byVector = run([], { a: [link({ matchedBy: 'similarity', similarity: 0.9 })] }).get('a')!;
+    expect(byName.strength).toBeCloseTo(0.45 * EVIDENCE_CEILING);
+    expect(byVector.strength).toBeCloseTo(0.9 * EVIDENCE_CEILING);
   });
 
   it('lights a topic from evidence and caps it at recognised however much there is', () => {
@@ -107,8 +109,61 @@ describe('topicStates', () => {
   });
 
   it('keeps a lit topic at or above the lit minimum', () => {
-    const s = run([], { a: [link({ similarity: 0.12, weight: 1 })] }).get('a')!;
+    const s = run([], { a: [link({ similarity: 0.4 })] }).get('a')!;
     expect(s.state).toBe('lit');
     expect(s.strength).toBeGreaterThanOrEqual(LIT_MIN);
+  });
+
+  it('leaves a mention out: it neither lights nor unlocks', () => {
+    const s = run([], { a: [link({ kind: 'mention', ceiling: 0, similarity: 0.9 })] }).get('a')!;
+    expect(s.state).toBe('hidden');
+    expect(s.linkCount).toBe(0);
+    expect(s.kinds).toEqual([]);
+  });
+
+  it('never reads a kind past its ceiling, however many links it has', () => {
+    const notes = Array.from({ length: 6 }, () => link({ kind: 'note', ceiling: 0.5, similarity: 0.9 }));
+    const s = run([], { a: notes }).get('a')!;
+    expect(s.strength).toBeCloseTo(0.5 * EVIDENCE_CEILING);
+    const clippings = Array.from({ length: 6 }, () => link({ kind: 'clipping', ceiling: 0.25, similarity: 0.9 }));
+    expect(run([], { a: clippings }).get('a')!.state).toBe('unlocked');
+  });
+
+  it('names the kinds that back a topic', () => {
+    const s = run([], { a: [link({ kind: 'note', ceiling: 0.5 }), link({ kind: 'work' }), link({ kind: 'note', ceiling: 0.5 })] });
+    expect(s.get('a')!.kinds).toEqual(['work', 'note']);
+  });
+
+  it('reports breadth and depth from the topics refining it, apart from the strength', () => {
+    const map: TopicMap = {
+      topics: [
+        { id: 'dcf', name: 'DCF', ceiling: 3, approved: true },
+        { id: 'wacc', name: 'WACC', ceiling: 3, approved: true },
+      ],
+      cells: [
+        { id: 'dcf1', topicId: 'dcf', level: 1 },
+        { id: 'dcf2', topicId: 'dcf', level: 2 },
+        { id: 'dcf3', topicId: 'dcf', level: 3 },
+        { id: 'wacc1', topicId: 'wacc', level: 1 },
+      ],
+      links: [],
+      evidence: [
+        { cellId: 'dcf2', verdict: 'met', observedAt: T0 },
+        { cellId: 'wacc1', verdict: 'declared', observedAt: T0 },
+      ],
+    };
+    const levels: TopicLevels = { map, readings: readCells(map), refining: new Map([['a', ['dcf']], ['b', ['wacc']]]) };
+    const s = topicStates(topics, [], new Map(), on, levels);
+    expect(s.get('a')!.reach).toEqual({
+      children: 1,
+      // Level 2 shown implies level 1, which counts as inferred, not tested.
+      breadth: { tested: 1, inferred: 1, declared: 0 },
+      depth: { tested: 2, inferred: 1, declared: 0 },
+    });
+    // The Level 3 topic counts the topics refining its Level 4 topics.
+    expect(s.get('L3')!.reach.children).toBe(2);
+    expect(s.get('L3')!.reach.breadth).toEqual({ tested: 1, inferred: 1, declared: 1 });
+    expect(s.get('c')!.reach.children).toBe(0);
+    expect(s.get('a')!.strength).toBe(0);
   });
 });

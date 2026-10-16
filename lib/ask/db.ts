@@ -6,6 +6,7 @@ import type { QuestionEmbedder } from '@/lib/memory/search';
 import type { SpecDoc } from '@/lib/specs/registry';
 import type { MailSearchInput, MailSearchResult } from '@/lib/inbox/search-mail';
 import type { MailReadInput, MailReadResult } from '@/lib/inbox/read-mail';
+import type { JobBoardResult } from './job-board';
 
 /**
  * What Dash's lookups read with and hand back (plan #1088). No client and no
@@ -63,6 +64,12 @@ export type AskContext = {
    * read, and then read_mail says so.
    */
   readMail?: (input: MailReadInput) => Promise<MailReadResult>;
+  /**
+   * Finds and reads the job board a careers page or company site links to
+   * (lib/ask/job-board.ts). Absent where boards cannot be read, and then
+   * read_job_board says so.
+   */
+  readJobBoard?: (url: string) => Promise<JobBoardResult>;
 };
 
 /**
@@ -101,6 +108,11 @@ export type AskToolResult =
        * such as mail (lib/ask/mail.ts). The rows still become citations.
        */
       kept?: Record<string, unknown>;
+      /**
+       * What a lookup read outside the app, which opens nowhere in it and so
+       * is not a row: a company's open roles (lib/ask/job-board.ts).
+       */
+      found?: unknown[];
     }
   | { ok: false; error: string };
 

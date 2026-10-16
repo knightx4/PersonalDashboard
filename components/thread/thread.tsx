@@ -19,6 +19,10 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { PaidCard } from '@/components/talk/paid-card';
+import { paidCardHosts } from '@/lib/dash/paid-card';
+import type { ChangePresses } from '@/components/talk/dash-changes';
+import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/ask/actions';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
@@ -405,6 +409,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   spec: DEV_STORE,
   takeaway: DEV_STORE,
   change: DEV_STORE,
+  post: DEV_STORE,
   goal: GOALS_STORE,
   role: ROLE_STORE,
   file: ROW_STORE,
@@ -414,6 +419,10 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   story: ROW_STORE,
   vault_note: ROW_STORE,
   reading: READING_STORE,
+  topic: ROW_STORE,
+  lens: ROW_STORE,
+  answer: ROW_STORE,
+  application: ROW_STORE,
 };
 
 function DeleteComment({
@@ -460,6 +469,7 @@ function Message({
   remove,
   grouped,
   titles,
+  below,
 }: {
   comment: DevComment;
   target: ThreadTarget;
@@ -468,6 +478,8 @@ function Message({
   grouped: boolean;
   /** What each step number in the body is called, for the hover text. */
   titles?: PlanRefTitles;
+  /** Drawn under the words: the approval card for what a comment queued (plan #2228.2). */
+  below?: React.ReactNode;
 }) {
   const now = useClockNow();
   // A comment that has not been written yet has no id to delete by, so the
@@ -516,6 +528,7 @@ function Message({
           </time>
         </p>
       )}
+      {below}
     </ThreadTurn>
   );
 }
@@ -532,6 +545,14 @@ export type CommentSubmit = {
   action: (prev: CommentActionState, formData: FormData) => Promise<CommentActionState>;
   /** What the trigger and the save button say. */
   label: string;
+};
+
+/** A thread's approval card presses: the same server actions Ask's cards use. */
+const PAID_PRESSES: ChangePresses = {
+  confirm: confirmDashChange,
+  decline: declineDashChange,
+  reopen: reopenDashChange,
+  undo: undoDashChange,
 };
 
 type RowThreadProps = {
@@ -625,6 +646,7 @@ function RowThread({
   const asking = !seen && (awaitingReply || (!submit && awaitingDash(shown, target, now)));
   const tagged = reaches(draft);
   const last = shown[shown.length - 1];
+  const cards = useMemo(() => paidCardHosts(shown), [shown]);
 
   const messages = (
     <>
@@ -638,6 +660,7 @@ function RowThread({
               remove={writes.remove}
               grouped={shown[index - 1]?.author === comment.author}
               titles={titles}
+              below={cards.has(comment.id) ? <PaidCard changes={cards.get(comment.id)!} presses={PAID_PRESSES} /> : undefined}
             />
           ))}
 
@@ -1253,7 +1276,10 @@ function TalkThread({
   useEffect(() => {
     if (!ask || asked.current) return;
     asked.current = true;
-    submit(ask);
+    // Off the effect, as a press would send it: sent from the effect itself,
+    // the question was held back with the reply's transition and the thread
+    // showed the waiting line under nothing.
+    setTimeout(() => submit(ask), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sent once, on arrival
   }, []);
 

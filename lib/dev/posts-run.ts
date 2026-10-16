@@ -14,6 +14,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
 import { startRoutineRun } from '@/lib/plan/runs';
+import { loadPostWants } from './posts-page';
 import { loadLastPostsRun, postsRunState, postsRunText, type PostsRunFocus } from './posts';
 
 export type StartPostsRunResult = { ok: true; message: string } | { ok: false; error: string };
@@ -32,12 +33,14 @@ export async function startPostsRun(input: {
     return { ok: false, error: 'Dash is already drafting posts. They will appear here when it is done.' };
   }
 
+  const wants = await loadPostWants(input.supabase, input.userId);
+
   const result = await startRoutineRun({
     supabase: input.supabase,
     userId: input.userId,
     job: 'posts',
     routine: planRoutine(),
-    text: postsRunText({ userId: input.userId, focus: input.focus ?? null }),
+    text: postsRunText({ userId: input.userId, focus: input.focus ?? null, wants: wants.text }),
     fetch: input.fetch,
   });
   if (!result.ok) return { ok: false, error: result.error };

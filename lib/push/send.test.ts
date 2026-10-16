@@ -33,6 +33,23 @@ describe('the brief notification', () => {
     });
   });
 
+  it('opens Now on the first Learn card when one is waiting, and the day still marks the press', () => {
+    const card = '0b0c63c5-5b1e-4f0a-9d53-6a4f7f1b2c11';
+    const payload = briefPayload({ ...BRIEF, picks: [{ kind: 'reply' }], learnCardId: card });
+    expect(payload.url).toBe(`/learn/now?card=${card}&brief=2026-09-28`);
+    expect(payload.tag).toBe('day-brief-2026-09-28');
+  });
+
+  it('keeps the home page for a day whose first pick cannot move, and for no card', () => {
+    const card = '0b0c63c5-5b1e-4f0a-9d53-6a4f7f1b2c11';
+    for (const kind of ['interview', 'deadline', 'bill'] as const) {
+      expect(briefPayload({ ...BRIEF, picks: [{ kind }], learnCardId: card }).url).toBe('/home?brief=2026-09-28#brief');
+    }
+    expect(briefPayload({ ...BRIEF, picks: [{ kind: 'reply' }], learnCardId: null }).url).toBe(
+      '/home?brief=2026-09-28#brief',
+    );
+  });
+
   it('says "Your day" for a row written before titles, and never sends past a lock screen', () => {
     const payload = briefPayload({ day: '2026-09-28', title: null, body: 'word '.repeat(100) });
     expect(payload.title).toBe('Your day');

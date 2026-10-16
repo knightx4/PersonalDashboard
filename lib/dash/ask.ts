@@ -15,6 +15,7 @@ import {
   type DashExecutor,
   type DashLookupEvent,
   type DashProposer,
+  type DashQueuer,
   type DashSeen,
   type DashStop,
   type DashVoice,
@@ -22,7 +23,8 @@ import {
 } from './loop';
 import { lookupInScope } from '@/lib/ask/tools';
 import { moduleById, type ModuleId } from '@/lib/modules';
-import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import type { PaidQueued } from './paid';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -104,14 +106,27 @@ who sent it, the day it arrived and its subject, and cite it the same way:
 the person opens it in Gmail from there. When the question is about what an
 email says, find it with search_mail, then open it with read_mail and answer
 from its text. Open only the messages the question is about, and quote no
-more of the text than the answer needs.
+more of the text than the answer needs. When they give a company's careers
+page or site and ask about its roles, read them with read_job_board, and give
+the link with each role you suggest.
 
-A BREAKDOWN CAN BE DRAWN. When they ask how something splits or changes over
-time, such as where their money went, spending by shop or month, or where
-their applications are stuck, and a lookup gives three or more figures to
-compare, call show_chart with those figures exactly as the lookup gave them,
-then answer. It is drawn under your answer, so say in a sentence or two what
-it shows (the largest row, the change) rather than listing every figure.
+A NUMBER CAN BE DRAWN, AND SO CAN WHAT IT IS MADE OF. Call show_chart with
+figures exactly as a lookup gave them, then answer; the chart is drawn under
+your answer, so say in a sentence or two what it shows (the change, the
+largest row) rather than listing every figure again.
+- When they ask for one amount for a period, such as what they spent in
+  September or how many applications they sent this month, draw it as a
+  figure with the usual amount as its reference. For spending, ask
+  spend_by_merchant from three months before the period to its end: its
+  months give both the amount and the usual one, the average of the three
+  months before. Where a note or goal of theirs sets a target, such as a
+  monthly budget, use the target instead and name it.
+- When they ask how an amount changes over time, draw columns, oldest
+  first, with the target as the reference when there is one.
+- When they ask how something splits, such as spending by shop or
+  applications by status, and a lookup gives three or more figures, draw a
+  bar. A figure for the total and a bar for the shops behind it is a good
+  pair; never draw more than two.
 
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. When they ask you to
 add, rename, move or tick off a todo, add a goal under one of their areas,
@@ -154,7 +169,9 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job. When they state a rule for many items or
+or ask to correct one, call save_job. When they ask for one of their X post
+drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
+with the whole new text. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The
@@ -180,6 +197,16 @@ need not repeat either: say only what the card does not, such as how long a
 quiet run has gone without pushing.
 When it is refused, say why in plain words and do not propose anything else.
 
+A DELETE IS PROPOSED, NOT DONE. When they ask you to remove rows, call propose_delete
+with the refs a lookup returned; nothing is deleted until they confirm the card,
+and a confirmed delete can be undone. For repeated application answers ("remove
+my duplicate answers"), call duplicate_answers first and propose only the rows
+with remove true, naming in your answer the copy that stays. Where the copies
+are worded differently, propose nothing: show each wording and ask which to
+keep, then propose the others. A submitted answer is never proposed. Say which
+answers you proposed removing and why, and that nothing is gone until they
+confirm.
+
 ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
 change something none of your tools can (a job application, a contact, a
 vault note, a goal's done-when), or to do work your lookups cannot finish
@@ -189,7 +216,7 @@ for it. A routine does it within a few minutes and its reply appears in this
 conversation. Then say in a sentence that you have passed it on; do not say
 it is done, and do not propose something near it instead. Never hand on a
 question you can answer by looking things up, and never a request to delete
-something, send an email or spend money: for those, say you cannot. Those
+something (application answers are the exception, above: propose_delete), send an email or spend money: for those, say you cannot. Those
 three are the only requests you turn down; anything else is looked up, done
 with a tool, or handed on.
 
@@ -236,6 +263,8 @@ export async function answerQuestion(input: {
   propose?: AskProposer;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /** Absent: every paid tool is refused (plan #2228.1). */
+  queue?: DashQueuer;
   /**
    * Keeps a hand-off and returns what to tell the model. Absent: every
    * hand-off is refused. `seen` says whether Dash has seen the row it names.
@@ -331,6 +360,12 @@ export type AskWriteRunner = (
   seen: DashSeen,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
+/**
+ * Checks and prices a paid press as the person (queuePaidPress in
+ * lib/dash/paid.ts, bound to a request), without keeping it (plan #2228.1).
+ */
+export type AskQueueRunner = (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
+
 /** What the model is told once a change is made and kept. */
 function madeNote(summary: string): string {
   return `Done: ${summary} It shows under your answer with an Undo. Say what you did, and cite the row this returned.`;
@@ -379,6 +414,12 @@ export async function askDash(
      * `saveChange` store: every write is refused.
      */
     write?: AskWriteRunner;
+    /**
+     * Checks and prices a paid press (plan #2228.1); the press is kept as a
+     * proposal with the answer's others, and runs only on an approval.
+     * Absent: every paid tool is refused.
+     */
+    queue?: AskQueueRunner;
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
@@ -485,6 +526,23 @@ export async function askDash(
           return { ok: true, rows: [row], note: madeNote(result.summary) };
         }
       : undefined;
+  // A paid press is checked and priced, then kept as a proposal like any
+  // other: nothing runs until the person approves it (plan #2228.1).
+  const queueRun = input.queue;
+  const queue: DashQueuer | undefined = queueRun
+    ? async (tool, args, seen) => {
+        const queued = await queueRun(tool, args, seen);
+        if (!queued.ok) return { ok: false, error: queued.error };
+        let kept: DashChange;
+        try {
+          kept = await save(queued.change);
+        } catch (error) {
+          console.error(`ask paid tool ${tool.name} was not queued`, error);
+          return { ok: false, error: 'That could not be queued. Tell them nothing was run.' };
+        }
+        return { ok: true, rows: [], totals: { queued: { id: kept.id, kind: kept.kind, input: kept.input } }, note: queued.note };
+      }
+    : undefined;
   const handed: DashHandoff[] = [];
   const saveHandoff = stores.saveHandoff;
   const handOff =
@@ -535,6 +593,7 @@ export async function askDash(
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     write,
+    queue,
     handOff,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,

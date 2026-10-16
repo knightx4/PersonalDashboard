@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MODULES } from '@/lib/modules';
+import { WORKSPACE_TABS } from '@/lib/shell/tabs';
 import {
   catalogueMarkdown,
   NOT_SOURCES,
@@ -66,6 +67,13 @@ describe('the catalogue of sources', () => {
       }
       if (section.href === workspace.settings?.href) {
         expect(section.label, table).toBe('Settings');
+        continue;
+      }
+      // The bars are built from the shared list of tabs (plan #2208.2); a
+      // layout not yet built from it is read as text below.
+      const listed = WORKSPACE_TABS[workspace.id].find((tab) => tab.href === section.href);
+      if (listed) {
+        expect(listed.label, table).toBe(section.label);
         continue;
       }
       const layout = [`app${workspace.prefix}/layout.tsx`, `app${workspace.prefix}/(app)/layout.tsx`].find((f) =>

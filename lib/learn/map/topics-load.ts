@@ -36,8 +36,9 @@ export async function loadTopicRows(learn: LearnSupabaseClient, userId?: string)
     readAll<TopicRows['links'][number]>((from, to) => {
       let q = learn
         .from('evidence_links')
-        .select('target_id, weight, similarity, found_at, matched_by')
-        .eq('target_kind', 'topic');
+        .select('target_id, kind, ceiling, similarity, found_at, matched_by')
+        .eq('target_kind', 'topic')
+        .neq('kind', 'mention');
       if (userId) q = q.eq('user_id', userId);
       return q.order('id').range(from, to) as unknown as Page<TopicRows['links'][number]>;
     }),

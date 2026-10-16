@@ -89,7 +89,10 @@ export function readClaims(reply: string): EssayClaim[] {
  * under the heading's text.
  */
 export function claimNote(claim: EssayClaim, essayTitle: string): string {
-  const from = essayTitle.replace(/[[\]|#^]/g, ' ').replace(/\s+/g, ' ').trim();
+  const from = essayTitle
+    .replace(/[[\]|#^]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const lines = [`# ${claim.name}`, '', claim.claim];
   if (from) lines.push('', `Argued in [[${from}]].`);
   return `${lines.join('\n')}\n`;
@@ -128,7 +131,11 @@ export function essayEvidence(input: {
   const lead = input.claim.trim()
     ? `I wrote an essay arguing that ${lowerFirst(input.claim.trim())}`
     : `I wrote an essay, "${input.title}".`;
-  const body = [lead, points && `The points it makes:\n${points}`, `The essay is at /learn/e/${input.id}.`]
+  const body = [
+    lead,
+    points && `The points it makes:\n${points}`,
+    `The essay is at /learn/e/${input.id}.`,
+  ]
     .filter(Boolean)
     .join('\n\n');
   return {

@@ -20,7 +20,6 @@ import {
   wordCountLabel,
   type Essay,
   type EssayBrief,
-  type EssayInterview,
 } from '@/lib/learn/essays/model';
 import { essayNoteBody, type EssayStage } from '@/lib/learn/essays/note';
 import { essayParagraphs } from '@/lib/learn/essays/checks';
@@ -47,27 +46,21 @@ import {
   type TargetState,
   type VaultSaveResult,
 } from './actions';
-import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
+import { EssayBriefFold } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
-import { EssayResearchCard, ResearchStage, useEssayResearch } from './essay-research';
-import { NextStage, StageGuide, StageStepper, useEssayPlan } from './essay-stages';
-import { DiscoverStage } from './essay-discover';
-import { PlanStage } from './essay-plan';
-import { StructureStage } from './essay-structure';
-import { DevelopStage } from './essay-develop';
-import { EssayPlanCard } from './essay-plan-rail';
+import { EssayResearchCard, useEssayResearch } from './essay-research';
+import { logEssayView } from './guide-actions';
 import {
-  EMPTY_PLAN,
-  headingAbove,
-  openingStage,
-  outlineDraft,
-  pointAtHeading,
-  stageDone,
-  type EssayPlan,
-  type Shape,
-  type Stage,
-} from '@/lib/learn/essays/plan';
+  FromNotesCard,
+  ModelDraftPanel,
+  NoteMapCard,
+  NotesEditor,
+  useEssayPlan,
+} from './essay-notebook';
+import { EMPTY_PLAN } from '@/lib/learn/essays/plan';
+import { Segmented } from '@/components/ui/segmented';
+import { MODELS } from '@/lib/core/models';
 import { EssayFinishCard, type FinishView } from './essay-finish';
 import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
@@ -581,16 +574,14 @@ export function EssayView({
   notes = NO_NOTES,
   initialNoteOpen = null,
   study,
-  originStudy,
   research = NO_RESEARCH,
   researchRunning = null,
   finishView,
   finishStage,
   publishView,
   path: subject,
-  initialStage,
+  initialView,
   planFrozen = false,
-  initialShapes,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -602,8 +593,6 @@ export function EssayView({
   initialNoteOpen?: string | null;
   /** The study panel drawn in this state and never searching, for the gallery. */
   study?: StudyState;
-  /** What the interview's "What made you think this?" offers, for the gallery. */
-  originStudy?: StudyState;
   /** The newest research run of each level (plan #1863.9). */
   research?: EssayResearchRuns;
   /** A level drawn as running, for the gallery. */
@@ -616,12 +605,10 @@ export function EssayView({
   path?: PageSubject;
   /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
   publishView?: PublishView;
-  /** The stage to open on: from the page's `?stage=`, or the gallery's. Worked out from the essay otherwise. */
-  initialStage?: Stage | null;
+  /** The view to open on: from the page's `?view=`, or the gallery's. The draft once there is one, otherwise the notes. */
+  initialView?: EssayMode | null;
   /** The plan drawn and never saved, for the gallery. */
   planFrozen?: boolean;
-  /** Shapes drawn as offered on the Structure step, for the gallery. */
-  initialShapes?: Shape[];
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -656,62 +643,49 @@ export function EssayView({
   const [typing, setTyping] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [brief, setBrief] = useState(essay.brief);
-  const [interview, setInterview] = useState(essay.interview);
-  const onBrief = useCallback((next: EssayBrief, nextInterview: EssayInterview | null) => {
+  const onBrief = useCallback((next: EssayBrief) => {
     setBrief(next);
-    setInterview(nextInterview);
   }, []);
-  const asking = interview?.status === 'asking' ? interview : null;
   const planApi = useEssayPlan(essay.id, essay.plan ?? EMPTY_PLAN, planFrozen);
   const plan = planApi.plan;
-  const done = stageDone({
-    brief,
-    interview,
-    plan,
-    researched: research.first !== null || researchApi.runs.first !== null,
-    words,
-  });
-  const [stage, setStageState] = useState<Stage>(
-    () =>
-      initialStage ??
-      openingStage(done, essay.interview?.status === 'asking', countWords(essay.draftBody)),
+  const notesEditor = useRef<MarkdownEditorHandle>(null);
+  const [mode, setModeState] = useState<EssayMode>(
+    () => initialView ?? (countWords(essay.draftBody) >= 150 ? 'draft' : 'notes'),
   );
-  // What the editor last held, so coming back to Write opens it on the newest text.
+  // What the editor last held, so coming back to the draft opens it on the newest text.
   const latestDoc = useRef<{ text: string; marks: AuthorMark[] }>({
     text: essay.draftBody,
     marks: essay.marks,
   });
-  const setStage = useCallback(
-    (next: Stage) => {
-      if (next === 'write' && stage !== 'write') {
-        setDoc((now) => ({ ...latestDoc.current, version: now.version + 1 }));
-      }
-      setStageState(next);
+  const setMode = useCallback(
+    (next: EssayMode) => {
+      if (next === mode) return;
+      if (next === 'draft') setDoc((now) => ({ ...latestDoc.current, version: now.version + 1 }));
+      setModeState(next);
+      if (!planFrozen) void logEssayView(essay.id, next).catch(() => undefined);
       try {
         const url = new URL(window.location.href);
-        url.searchParams.set('stage', next);
+        url.searchParams.set('view', next);
         window.history.replaceState(window.history.state, '', url);
       } catch {
-        // The address is a convenience; the stage still changes without it.
+        // The address is a convenience; the view still changes without it.
       }
-      window.scrollTo({ top: 0 });
     },
-    [stage],
+    [essay.id, mode, planFrozen],
   );
-  const planRef = useRef<EssayPlan>(plan);
+  // The view the page opened on counts as a visit too.
   useEffect(() => {
-    planRef.current = plan;
-  }, [plan]);
-  const [currentPoint, setCurrentPoint] = useState<string | null>(null);
-  const studyCaret = studyApi.onCaret;
-  const onCaret = useCallback(
-    (pos: number) => {
-      studyCaret(pos);
-      const text = editor.current?.doc() ?? '';
-      setCurrentPoint(pointAtHeading(planRef.current, headingAbove(text, pos))?.id ?? null);
-    },
-    [studyCaret],
-  );
+    if (!planFrozen) void logEssayView(essay.id, mode).catch(() => undefined);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** Text added to the end of the notes goes through the notes editor, so it saves as typing does. */
+  const appendToNotes = useCallback((text: string) => {
+    const handle = notesEditor.current;
+    if (!handle) return;
+    const end = handle.doc().length;
+    handle.replace({ from: end, to: end, insert: text });
+  }, []);
 
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
@@ -800,7 +774,7 @@ export function EssayView({
     };
   }, [typing]);
 
-  const writing = stage === 'write';
+  const writing = mode === 'draft';
   const [renaming, setRenaming] = useState(false);
   // Renaming rewrites the draft's title line (note 1c956878). While writing,
   // the change goes through the editor, which hands the text up as typing
@@ -828,11 +802,13 @@ export function EssayView({
   const crumbs = subject?.path.map((crumb, i, all) =>
     i === all.length - 1 ? { ...crumb, label: title } : crumb,
   );
-  const putOutline = useCallback(() => {
-    const text = outlineDraft(planRef.current, brief.question);
-    setDoc((now) => ({ text, marks: [], version: now.version + 1 }));
-    onChange(text, []);
-  }, [brief.question, onChange]);
+  const onAssemble = useCallback(
+    (next: { text: string; marks: AuthorMark[] }) => {
+      setDoc((now) => ({ text: next.text, marks: next.marks, version: now.version + 1 }));
+      onChange(next.text, next.marks);
+    },
+    [onChange],
+  );
   const quiet = cn(
     'transition-opacity duration-quick focus-within:opacity-100',
     typing && 'pointer-events-none opacity-0 focus-within:pointer-events-auto',
@@ -906,67 +882,26 @@ export function EssayView({
           </div>
         </div>
       </div>
-      <StageStepper
-        stage={stage}
-        done={done}
-        onStage={setStage}
-        className={writing ? quiet : undefined}
+      <Segmented
+        label="Notes or draft"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'notes', label: 'Notes' },
+          { value: 'draft', label: 'Draft' },
+        ]}
+        className={cn('mb-4 self-start', writing && quiet)}
       />
-      {stage === 'discover' &&
-        (asking ? (
-          <EssayInterviewCard
+      {mode === 'notes' && (
+        <>
+          <EssayBriefFold
             essayId={essay.id}
-            interview={asking}
             brief={brief}
             onChange={onBrief}
-            onPlan={planApi.setPlan}
-            initialFound={originStudy}
+            defaultOpen={briefOpen}
           />
-        ) : (
-          <DiscoverStage
-            essayId={essay.id}
-            brief={brief}
-            onBrief={onBrief}
-            api={planApi}
-            onStage={setStage}
-            done={done.discover}
-          />
-        ))}
-      {stage === 'research' && (
-        <ResearchStage
-          api={researchApi}
-          plan={planApi}
-          hasQuestion={Boolean(brief.question.trim())}
-          footer={
-            <NextStage
-              stage="research"
-              onStage={setStage}
-              ready={done.research}
-              hint="You can skip research if you know the subject, and come back to it any time."
-            />
-          }
-        />
-      )}
-      {stage === 'plan' && (
-        <PlanStage
-          essayId={essay.id}
-          brief={brief}
-          api={planApi}
-          onStage={setStage}
-          done={done.plan}
-        />
-      )}
-      {stage === 'structure' && (
-        <StructureStage
-          essayId={essay.id}
-          api={planApi}
-          onStage={setStage}
-          done={done.structure}
-          initialShapes={initialShapes}
-        />
-      )}
-      {stage === 'develop' && (
-        <DevelopStage essayId={essay.id} api={planApi} onStage={setStage} done={done.develop} />
+          <NotesEditor brief={brief} api={planApi} handle={notesEditor} />
+        </>
       )}
       {writing && (
         <>
@@ -1011,12 +946,12 @@ export function EssayView({
               label={`Essay: ${title}`}
               placeholder="Start with a title, like # Why money is the odd good out"
               focusMode={focusMode}
-              autoFocus={doc.version > 0 || (essay.draftBody === '' && !asking)}
+              autoFocus={doc.version > 0}
               onChange={onChange}
               onTyping={onTyping}
               onSaveNow={onSaveNow}
               onSelect={onSelect}
-              onCaret={onCaret}
+              onCaret={studyApi.onCaret}
             />
           </Card>
           {rephrase.kind === 'failed' && (
@@ -1031,6 +966,7 @@ export function EssayView({
             </span>
           </div>
           <VaultSaveError vault={vault} reloadError={reloadError} onReload={reload} />
+          <ModelDraftPanel draft={plan.modelDraft} />
         </>
       )}
     </div>
@@ -1038,16 +974,19 @@ export function EssayView({
 
   const rail = !writing ? (
     <div className="flex flex-col gap-4">
-      <StageGuide stage={stage} brief={brief} plan={plan} />
+      <NoteMapCard essayId={essay.id} api={planApi} append={appendToNotes} />
+      <EssayResearchCard api={researchApi} />
     </div>
   ) : (
     <div className={cn('flex flex-col gap-4', quiet)}>
-      <EssayPlanCard
-        plan={plan}
-        current={currentPoint}
-        canOutline={words === 0}
-        onOutline={putOutline}
-        onEdit={() => setStage(plan.points.length ? 'structure' : 'plan')}
+      <FromNotesCard
+        essayId={essay.id}
+        api={planApi}
+        map={plan.noteMap}
+        draftWords={words}
+        title={brief.question.trim() || title}
+        model={MODELS.learnEssayGuide}
+        onAssemble={onAssemble}
       />
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
       <EssayStudyCard
@@ -1130,3 +1069,6 @@ export function EssayView({
     </PageColumn>
   );
 }
+
+/** The two views of an essay (LEARN-ESSAYS-SPEC, "Notes first"). */
+export type EssayMode = 'notes' | 'draft';

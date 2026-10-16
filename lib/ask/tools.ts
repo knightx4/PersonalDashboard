@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
+import { jobBoardLookup } from './job-board';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -19,6 +20,7 @@ import {
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
 import { applicationAnswersLookup } from './answers';
+import { duplicateAnswersLookup } from './duplicate-answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
 import { withParents } from './parents';
@@ -55,6 +57,7 @@ export const ASK_TOOL_NAMES = [
   'spend_by_merchant',
   'job_applications',
   'application_answers',
+  'duplicate_answers',
   'todos',
   'agenda',
   'goal_status',
@@ -68,6 +71,7 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'search_mail',
   'read_mail',
+  'read_job_board',
   'show_chart',
 ] as const;
 
@@ -77,7 +81,7 @@ export const ASK_TOOL_NAMES = [
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'show_chart'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -310,6 +314,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'duplicate_answers',
+    description:
+      'The application answers that repeat a question already answered on another role, grouped by question ("1. Why are you interested in Rogo?" and "Why are you interested in Rogo?" are one question). Each row is a copy that could go: its answer ref, the question, the role, its status and the first words, with remove true when it is an identical copy of the one kept (and keeps naming that one) and remove false when the copies are worded differently and the person has to say which to keep. Submitted answers are never rows. Use it for "remove my duplicate answers" or "which answers are repeated", then propose_delete for the rows with remove true.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'todos',
     description:
       'The person\'s todos finished between two dates, and the ones still open and past their due date today. Each links to the task on the todo list. Defaults to the last seven days.',
@@ -517,6 +527,22 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'read_job_board',
+    description:
+      'Read the open roles on a company\'s job board, from its careers page or its website: "look at their job board and see if any roles look good for me". It finds the board the page links to (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee, Breezy, BambooHR or Rippling) and returns each open role\'s title, place and link, up to 80. It reads no other page text and cannot browse other sites. Judge the roles against the person\'s job settings and target titles, and give the link with any role you suggest.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The company\'s careers page or website, as the person gave it ("https://www.tenex.co/careers").',
+        },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+  },
   CHART_TOOL_DEFINITION,
 ];
 
@@ -537,6 +563,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   application_answers: { run: applicationAnswersLookup, module: 'jobs' },
+  duplicate_answers: { run: duplicateAnswersLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
   agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
@@ -552,6 +579,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
+  read_job_board: { run: jobBoardLookup, module: 'jobs' },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
 };

@@ -12,8 +12,11 @@ export const vaultActions: ModuleActions = {
     searchTriagePlaces: none('page'),
   },
   'app/vault/map/actions.ts': {
-    startSweep: none('spends'),
-    stopSweep: none('spends'),
+    startSweep: none(
+      'spends',
+      'Marks the map sweep running and returns; the five-minute cron does the paid work across the whole vault, so it has no PAID_ACTIONS key to price a card by.',
+    ),
+    stopSweep: none('spends', 'Stops the sweep Start sweep began, and goes with that press.'),
     undoMerge: none('theirs'),
     renameTheme: tool('rename_theme'),
   },
@@ -22,9 +25,12 @@ export const vaultActions: ModuleActions = {
     renameMayaQuestion: tool('rename_maya_question'),
   },
   'app/vault/n/[...path]/actions.ts': {
-    proposeMap: none('spends'),
+    proposeMap: none(
+      'spends',
+      'Returns a reading of the note the page shows for the person to tick, and keeps nothing until acceptMap, so a run from Dash would spend on a result no one sees.',
+    ),
     acceptMap: none('theirs'),
-    askMaya: none('spends'),
+    askMaya: tool('ask_maya'),
     saveNoteEdit: tool('edit_vault_note'),
     renameNoteAction: tool('rename_vault_note'),
   },

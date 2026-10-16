@@ -74,6 +74,8 @@ export type PipelineParams = {
   sent?: string;
   /** `yes` ready to apply, `no` not marked ready (plan #2102.3). */
   ready?: string;
+  /** `yes` all its questions added, `no` not marked so. */
+  questions?: string;
   /** `yes` has a cover letter, `no` marked as having none; unanswered is neither. */
   letter?: string;
   page?: string;
@@ -95,6 +97,8 @@ export type PipelineState = {
   sentDays: number | null;
   /** Ready to apply (true), not marked ready (false), or either (null). */
   ready: boolean | null;
+  /** All questions added (true), not marked so (false), or either (null). */
+  questions: boolean | null;
   /** Has a cover letter (true), marked as having none (false), or either (null). */
   letter: boolean | null;
   /** One-based. */
@@ -122,6 +126,7 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     stage: PIPELINE_STAGES.find((stage) => stage.key === params.stage) ?? null,
     sentDays: Number.isInteger(sent) && sent >= 1 && sent <= SENT_MAX_DAYS ? sent : null,
     ready: parseYesNo(params.ready),
+    questions: parseYesNo(params.questions),
     letter: parseYesNo(params.letter),
     view,
     scope,
@@ -156,6 +161,7 @@ export function filterPipeline(
       (!state.stage || (state.stage.statuses as readonly ApplicationStatus[]).includes(row.status)) &&
       (state.sentDays === null || sentWithin(row, state.sentDays, now)) &&
       (state.ready === null || row.readyToApply === state.ready) &&
+      (state.questions === null || row.allQuestionsAdded === state.questions) &&
       // Only an answer of no is without a letter: an unanswered role is in neither list.
       (state.letter === null || row.hasCoverLetter === state.letter) &&
       (!state.excitement || (row.excitement ?? 0) >= state.excitement) &&

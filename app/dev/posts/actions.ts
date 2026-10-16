@@ -19,6 +19,8 @@ import {
   POST_IMAGES_BUCKET,
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
+import { POST_WANTS_MAX } from '@/lib/dev/posts-page';
+import { formatNumber } from '@/lib/money';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { freshXAccessToken, hasXMediaScope, hasXWriteScope, loadXAccount, XDisconnectedError } from '@/lib/x/account';
 import { requestOrigin } from '@/lib/auth/origin';
@@ -201,6 +203,34 @@ export async function editPostBody(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Saved.' };
+}
+
+/**
+ * What the person wants from their posts (plan #2227.2): the box under the
+ * heading. The text is trimmed and kept as one row per person; emptied, the
+ * row is deleted, so the next run drafts as it did before anything was said.
+ */
+// latency: pending
+export async function savePostWants(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const raw = formData.get('wants');
+  const wants = typeof raw === 'string' ? raw.trim() : '';
+  if (wants.length > POST_WANTS_MAX) {
+    return { error: `Keep it under ${formatNumber(POST_WANTS_MAX)} characters.` };
+  }
+
+  const { error } = wants
+    ? await supabase.from('post_preferences').upsert({ user_id: user.id, wants }, { onConflict: 'user_id' })
+    : await supabase.from('post_preferences').delete().eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: wants ? 'Saved.' : 'Cleared.' };
 }
 
 /**

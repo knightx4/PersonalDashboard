@@ -1,3 +1,4 @@
+import { KIND_CEILING, type EvidenceKind } from '@/lib/learn/evidence/kinds';
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 
 /**
@@ -142,8 +143,10 @@ export const EVIDENCE_CEILING = LEVEL_WEIGHT.recognised * EVIDENCE_WEIGHT.inferr
 
 /** One link of learn.evidence_links as the score reads it. */
 export type EvidenceWeight = {
-  /** How much the link counts, 0 to 1. */
-  weight: number;
+  /** What kind of evidence it is (plan #2172.2). */
+  kind: EvidenceKind;
+  /** The most the link can count for, 0 to 1: its weight, never past its kind's ceiling. */
+  ceiling: number;
   /** How close the match is, 0 to 1. */
   similarity: number;
   /** When the link was found; a link found after the day asked about does not count. */
@@ -152,23 +155,47 @@ export type EvidenceWeight = {
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
+/** 1 - product(1 - x): each value adds to the rest without the total passing 1. */
+function combined(values: readonly number[]): number {
+  let missing = 1;
+  for (const v of values) missing *= 1 - clamp01(v);
+  return 1 - missing;
+}
+
 /**
- * What an idea's evidence is worth on `on`: the links combined as
- * 1 - product(1 - weight x similarity), so each one adds to the rest without
- * the total passing 1, then capped at EVIDENCE_CEILING. Without `on` every
- * link counts. Evidence does not fade: it carries no day it was shown to you.
+ * What evidence is worth on `on`, 0 to EVIDENCE_CEILING (plan #2172.2).
+ *
+ * Each link counts its ceiling times its similarity. Links of one kind
+ * combine as 1 - product(1 - each), and never read past the highest ceiling
+ * among them: five clippings are still clippings. The kinds then combine the
+ * same way, never past the highest ceiling of any kind present. That share
+ * of EVIDENCE_CEILING is the score, so only work at full weight reaches
+ * recognised, a note at most half of it, a clipping a quarter and a mention
+ * nothing. Without `on` every link counts. Evidence does not fade: it
+ * carries no day it was shown to you.
  */
 export function evidenceStrength(links: readonly EvidenceWeight[], on?: Date): number {
   const cutoff = on?.getTime();
-  let missing = 1;
+  const byKind = new Map<EvidenceKind, { values: number[]; top: number }>();
   for (const link of links) {
     if (cutoff !== undefined && link.foundAt) {
       const found = Date.parse(link.foundAt);
       if (!Number.isNaN(found) && found > cutoff) continue;
     }
-    missing *= 1 - clamp01(link.weight) * clamp01(link.similarity);
+    const ceiling = Math.min(clamp01(link.ceiling), KIND_CEILING[link.kind] ?? 0);
+    if (ceiling <= 0) continue;
+    const group = byKind.get(link.kind) ?? { values: [], top: 0 };
+    group.values.push(ceiling * clamp01(link.similarity));
+    group.top = Math.max(group.top, ceiling);
+    byKind.set(link.kind, group);
   }
-  return Math.min(EVIDENCE_CEILING, 1 - missing);
+  let top = 0;
+  const perKind: number[] = [];
+  for (const group of byKind.values()) {
+    perKind.push(Math.min(group.top, combined(group.values)));
+    top = Math.max(top, group.top);
+  }
+  return EVIDENCE_CEILING * Math.min(top, combined(perKind));
 }
 
 /** An idea no question has been asked about: no state row, or one never tested. */

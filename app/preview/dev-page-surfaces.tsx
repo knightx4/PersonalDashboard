@@ -1057,18 +1057,28 @@ const apps: ConnectedApp[] = [
   },
 ];
 
-/** Capture tokens (plan #1705): one in use, one never used with the longest name, one revoked. */
+/** Tokens (plan #1705): one in use, one that asks Dash, one never used with the longest name, one revoked. */
 const captureTokens: CaptureTokenListing[] = [
   {
     id: 'ct1',
     label: 'iPhone Shortcut',
+    kind: 'capture',
     createdAt: '2026-10-01T09:00:00Z',
     lastUsedAt: '2026-10-08T07:42:00Z',
     revokedAt: null,
   },
   {
+    id: 'ct4',
+    label: 'iPhone: Ask Dash',
+    kind: 'ask',
+    createdAt: '2026-10-12T08:15:00Z',
+    lastUsedAt: '2026-10-14T18:03:00Z',
+    revokedAt: null,
+  },
+  {
     id: 'ct2',
     label: 'Zapier: starred Gmail messages to the vault reading list',
+    kind: 'capture',
     createdAt: '2026-10-05T18:30:00Z',
     lastUsedAt: null,
     revokedAt: null,
@@ -1076,6 +1086,7 @@ const captureTokens: CaptureTokenListing[] = [
   {
     id: 'ct3',
     label: 'Old iPad',
+    kind: 'capture',
     createdAt: '2026-09-02T12:00:00Z',
     lastUsedAt: '2026-09-20T21:10:00Z',
     revokedAt: '2026-10-01T09:01:00Z',
@@ -1115,7 +1126,7 @@ export function AccountSurface({
         isOwner
         vapidPublicKey={null}
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
-        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
+        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture', askAddress: 'https://dash.example.com/api/ask/voice' }}
       />
     </>
   );

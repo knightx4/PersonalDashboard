@@ -31,12 +31,16 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  */
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
-  'app/learn/know/actions.ts#proposeGoal': [
-    'name-opening-claims',
-    'write-opening-question',
-    'generate-chain',
-  ],
-  'app/learn/know/actions.ts#approveChain': ['place-track', 'write-curriculum'],
+  // Naming a goal drafts its topic since the claims graph moved (plan #2138.4).
+  'app/learn/know/actions.ts#proposeGoal': ['draft-topic', 'embed-topic-scope'],
+  // Learn: a topic with ten levels (plan #2138.2). Drafting embeds the scope
+  // in the same press to find a topic it duplicates; a topic the draft's links
+  // need is drafted the same way.
+  'app/learn/topics/actions.ts#draftTopicFromGoal': ['draft-topic', 'embed-topic-scope'],
+  'app/learn/topics/[id]/actions.ts#draftWantedTopic': ['draft-topic', 'embed-topic-scope'],
+  // Moving one subject from the claims graph (plan #2138.4): the call placing
+  // its ideas, and each topic it names that the map lacks, drafted and embedded.
+  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics', 'draft-topic', 'embed-topic-scope'],
   'app/learn/know/actions.ts#proposePrior': ['concepts-from-prior'],
   'app/learn/know/actions.ts#approvePrior': ['place-track'],
   'app/learn/know/actions.ts#proposeBrief': ['concepts-from-brief'],
@@ -44,8 +48,6 @@ export const PAID_ACTIONS = {
   'app/learn/know/actions.ts#proposeFromNote': ['classify-note', 'concepts-from-brief'],
   'app/learn/know/actions.ts#proposeFromCourse': ['concepts-from-course'],
   'app/learn/know/actions.ts#approveFromCourse': ['place-track'],
-  // Learn: an essay's interview, one question per answer (plan #1867)
-  'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question', 'read-essay-brief'],
   // Learn: Rephrase on a selection in an essay (plan #1868)
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
@@ -65,15 +67,12 @@ export const PAID_ACTIONS = {
   // Learn: research on an essay (plan #1863.9), one button per level. The
   // first pass searches the question; the deeper pass gathers pages and
   // marks the draft's claims against them.
-  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question', 'write-essay-research'],
-  // Learn: the guided essay's stages (LEARN-ESSAYS-SPEC, "The stages").
-  // Answering the interview's last question also has Dash read the brief.
-  'app/learn/e/[id]/guide-actions.ts#readEssayBrief': ['read-essay-brief'],
-  'app/learn/e/[id]/guide-actions.ts#findEssayPoints': ['find-essay-points'],
-  'app/learn/e/[id]/guide-actions.ts#shapeEssayPlan': ['shape-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#reviewEssayPlan': ['review-essay-plan'],
-  'app/learn/e/[id]/guide-actions.ts#askEssayPoint': ['word-point-question'],
-  'app/learn/e/[id]/guide-actions.ts#answerEssayPoint': ['word-point-question'],
+  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
+  // Learn: the notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): the map
+  // of the notes, sources for one cluster, and a model draft.
+  'app/learn/e/[id]/guide-actions.ts#updateNoteMap': ['map-essay-notes'],
+  'app/learn/e/[id]/guide-actions.ts#findClusterEvidence': ['find-point-evidence'],
+  'app/learn/e/[id]/guide-actions.ts#writeModelDraft': ['draft-essay-model'],
   'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
   // Learn: Finish on an essay names the claims it argues and looks for the
   // notes that already hold each (plan #1873). Accepting the offers writes
@@ -105,10 +104,18 @@ export const PAID_ACTIONS = {
   'app/learn/now/actions.ts#explainPhrase': ['explain-phrase'],
   'app/learn/now/actions.ts#makePhraseCard': ['write-asked-card'],
   'app/learn/now/actions.ts#explainBack': ['mark-teach-back'],
+  'app/learn/now/piece-talk-actions.ts#talkPiece': [
+    'mark-teach-back',
+    'reply-about-card',
+    'write-piece-check',
+    'mark-piece-check',
+    'write-cell-case',
+    'grade-cell-answer',
+  ],
 
   // Learn: questions
-  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check'],
-  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': ['write-piece-check', 'write-cell-case'],
+  'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': ['mark-piece-check', 'grade-cell-answer'],
   'app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice': ['write-piece-practice'],
   'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': ['mark-piece-practice'],
   'app/learn/s/[id]/project-actions.ts#writePlanProject': ['write-plan-project'],
@@ -120,12 +127,19 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/flow/actions.ts#flowStep:answer': [
+    'name-misconception',
+    'grade-applied-answer',
+    'mark-teach-back',
+  ],
+  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
   'app/learn/flow/actions.ts#flowStep:start-track': [
     'generate-track-from-theme',
     'place-track',
     'write-probe',
   ],
+  // Learn: an explanation graded against the levels of a topic (plan #2138.5)
+  'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
@@ -176,6 +190,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // The one explain prompt on a graded course (plan #2172.4.2)
+  'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it
@@ -239,8 +255,10 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/ask/voice/route.ts#POST':
+    'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
-    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on; no press starts it.',
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
   'app/learn/now/actions.ts#generateSubjectCards':
     "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
   'app/you/personality/actions.ts#restoreTypedAction':
@@ -257,6 +275,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/territory-draft/route.ts#GET':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
+  'app/api/cron/territory-draft/route.ts#POST':
+    'Drafts a territory from its sources (plan #2172.6), fired by hand with the cron secret, never on a clock; no page or button starts it.',
   'app/api/cron/startup-discovery/route.ts#GET':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/startup-discovery/route.ts#POST':

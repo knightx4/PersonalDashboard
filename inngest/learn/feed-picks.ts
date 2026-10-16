@@ -8,6 +8,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { AIM_COLUMNS, cardDepthForAim, toAim, type AimRow } from '@/lib/learn/aims';
 import { loadAimAreaNames } from '@/lib/learn/aims-store';
 import { loadAreas } from '@/lib/learn/areas/load';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { cardTitle, isCardDifficulty } from '@/lib/learn/feed/card';
@@ -209,7 +210,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     segment: { heading: string | null } | null;
   };
 
-  const [placements, themes, cards, tests, { goals, since: goalsSince }] = await Promise.all([
+  const [placements, themes, cards, tests, { goals, since: goalsSince }, goalsOnly] = await Promise.all([
     readAll<Placement>(
       (from, to) =>
         learn
@@ -246,6 +247,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     ),
     learn.rpc('feed_field_tests', { p_user_id: userId }),
     loadGoals(learn, fields, userId),
+    // Goals only (plan #2164.1): no theme or gap is drawn while it is on.
+    goalsOnlyOrDefault(learn, userId),
   ]);
   if (tests.error) throw new Error(`Reading what you have been tested on failed: ${tests.error.message}`);
 
@@ -343,6 +346,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     // Known and review swipes, and the difficulty ratings, set how deep the
     // next picks go (depth.ts).
     progress: progressFrom(swiped),
+    goalsOnly,
     picked,
     articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],
   };

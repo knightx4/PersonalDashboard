@@ -13,7 +13,8 @@
  */
 
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
-import { briefUrl } from '@/lib/day-brief/opens';
+import { briefUrl, learnBriefUrl } from '@/lib/day-brief/opens';
+import type { CandidateKind } from '@/lib/day-brief/facts';
 
 export type PushSubscriptionRow = {
   id: string;
@@ -42,19 +43,34 @@ export type PushPorts = {
 
 export type PushResult = { sent: number; forgotten: number; failed: number };
 
+/** First picks that keep the notification on the home page: they cannot move today. */
+const HOLDS_THE_MORNING: ReadonlySet<CandidateKind> = new Set<CandidateKind>(['interview', 'deadline', 'bill']);
+
 /**
  * The brief as a notification: the title and body stored with the day
  * (plan #1240; lib/day-brief/notification.ts), which the run keeps within
  * what a lock screen shows. Clipped here as well, so a row written some other
  * way cannot send more. A row without a title is one written before #1240.
  */
-export function briefPayload(brief: { day: string; title: string | null; body: string }): PushPayload {
+export function briefPayload(brief: {
+  day: string;
+  title: string | null;
+  body: string;
+  /** The brief's picks; the first decides whether the notification may open Learn. */
+  picks?: readonly { kind: CandidateKind }[] | null;
+  /** The Learn card to open on, when the person has one waiting (plan #2164.7). */
+  learnCardId?: string | null;
+}): PushPayload {
+  const learn = brief.learnCardId && !HOLDS_THE_MORNING.has(brief.picks?.[0]?.kind as CandidateKind);
   return {
     title: clip(brief.title ?? 'Your day', TITLE_MAX),
     body: clip(brief.body, BODY_MAX),
     // The picks under the date on the home page (plan #1241), marked with the
     // day so opening it can be recorded against that day's brief (#1242).
-    url: briefUrl(brief.day),
+    // With a Learn card waiting, the notification opens on it, so a session
+    // starts from the press (plan #2164.7), unless the first pick is
+    // something fixed for today that the home page must show first.
+    url: learn && brief.learnCardId ? learnBriefUrl(brief.day, brief.learnCardId) : briefUrl(brief.day),
     tag: `day-brief-${brief.day}`,
   };
 }

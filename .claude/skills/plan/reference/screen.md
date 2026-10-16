@@ -48,7 +48,12 @@ registered; working offline, read the line and `REFERENCES` yourself.
   surface it is for, with `pictures`, `link`, `why` (what the person likes
   about it, in a sentence, from the step or their note) and `from` (this
   step's outline). Save its pictures under `docs/references/<surface>/` and
-  list them. A link with no pictures is photographed the first time: open it
+  list them. A mockup made in a chat (a `claude.ai/artifact` link) also
+  saves its HTML there, read with the Artifact tool, as the entry's
+  `source`, so you and the critic take its sizes, colours and spacing from
+  the page rather than from pixels. Build from the app's own components and
+  tokens all the same: the source is what to match, never code to paste. The
+  gate fails a chat mockup registered without its source. A link with no pictures is photographed the first time: open it
   at 390 and 1280 wide, as the gallery shots are, save the shots there, and
   list them, so every later round sees the same design whatever the page
   shows by then. A step that names a reference without saying which surface
@@ -58,6 +63,12 @@ registered; working offline, read the line and `REFERENCES` yourself.
 - **Send a registered reference to the critic on every round** on its
   surface, in this step and every later one, as the prompt's `reference`
   (4 below). A surface with none is sent "none".
+- **Never scope the critic away from the reference.** Do not ask it to leave
+  a difference unraised because a shared component draws it or a later step
+  will. A shared component that makes the screen differ from its reference is
+  this step's to change. A difference no law requires and that you cannot
+  close goes in the close note by name, as an open difference from the
+  reference, where the person can overrule it.
 
 **The loop, for each surface:**
 
@@ -177,7 +188,17 @@ changed file serves, so a change to a shared row or folder can name dozens
 of screens nobody sent to the critic. Send the surfaces the step meant to
 change to the critic. Settle the rest with the same command, naming in the
 reason that the step did not set out to change them, and do not block on
-them. Findings the critic makes on a surface the step did not cause are not
+them.
+
+The settle lets one of those through only when it looks the same as on main
+(plan #2215.4). For every surface still waiting that the critic has not
+judged through three rounds, it compares the four shots in `.preview-shots/`
+with main's in `.preview-shots/before/` pixel by pixel, and refuses the whole
+settle, writing and printing nothing, when any shot is missing, has changed
+size, or differs in more than one pixel in ten thousand. So shoot those
+surfaces on main and on the branch first (`npm run shoot` with no id shoots
+every surface, in each checkout). A surface the refusal names has changed:
+it goes to the critic like any other, from round 1. Findings the critic makes on a surface the step did not cause are not
 this step's: file them as a ready step if they are worth doing, and close
 this one.
 

@@ -15,7 +15,10 @@ export type PublishRow = {
   firstPublishedAt: string | null;
 };
 
-export async function loadPublishRow(supabase: LearnSupabaseClient, id: string): Promise<PublishRow | null> {
+export async function loadPublishRow(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<PublishRow | null> {
   const { data, error } = await supabase
     .from('essays')
     .select('path, slug, finished_at, published_at, first_published_at')
@@ -54,7 +57,8 @@ export async function publishedLinkMap(
     .not('slug', 'is', null);
   if (error) throw new Error(`Could not read your published essays: ${error.message}`);
   const map = new Map<string, string>();
-  for (const row of (data ?? []) as { path: string; slug: string }[]) map.set(linkKey(row.path), row.slug);
+  for (const row of (data ?? []) as { path: string; slug: string }[])
+    map.set(linkKey(row.path), row.slug);
   map.set(linkKey(self.path), self.slug);
   return map;
 }
@@ -105,7 +109,10 @@ export async function clearPublished(supabase: LearnSupabaseClient, id: string):
  * snapshot, so none points at an essay the site no longer has (R4). Returns
  * how many snapshots changed.
  */
-export async function unlinkFromPublished(supabase: LearnSupabaseClient, slug: string): Promise<number> {
+export async function unlinkFromPublished(
+  supabase: LearnSupabaseClient,
+  slug: string,
+): Promise<number> {
   const { data, error } = await supabase
     .from('essays')
     .select('id, published_body')

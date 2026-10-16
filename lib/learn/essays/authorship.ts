@@ -30,7 +30,12 @@ export type MarkAuthor = (typeof MARK_AUTHORS)[number];
 export type AuthorMark = { author: MarkAuthor; from: number; to: number; name: string };
 
 /** One range as `learn.essays.authorship` keeps it: graphemes from the start of the file. */
-export type FileRange = { author: 'self' | MarkAuthor; start: number; length: number; name: string };
+export type FileRange = {
+  author: 'self' | MarkAuthor;
+  start: number;
+  length: number;
+  name: string;
+};
 
 /** How many hex characters of the SHA-256 the header carries, as iA Writer and the plugin write it. */
 export const HASH_LENGTH = 32;
@@ -47,7 +52,11 @@ export const DASH_NAME = 'Dash';
 export function normaliseMarks(marks: readonly AuthorMark[], length?: number): AuthorMark[] {
   const max = length ?? Number.POSITIVE_INFINITY;
   const sorted = marks
-    .map((mark) => ({ ...mark, from: Math.max(0, Math.min(mark.from, max)), to: Math.max(0, Math.min(mark.to, max)) }))
+    .map((mark) => ({
+      ...mark,
+      from: Math.max(0, Math.min(mark.from, max)),
+      to: Math.max(0, Math.min(mark.to, max)),
+    }))
     .filter((mark) => mark.to > mark.from)
     .sort((a, b) => a.from - b.from || a.to - b.to);
   const out: AuthorMark[] = [];
@@ -86,13 +95,20 @@ export function readDraftMarks(value: unknown, length: number): AuthorMark[] {
     const from = start as number;
     const to = from + (span as number);
     if (from < 0 || to > length) continue;
-    marks.push({ author: row.author, from, to, name: typeof row.name === 'string' ? row.name : '' });
+    marks.push({
+      author: row.author,
+      from,
+      to,
+      name: typeof row.name === 'string' ? row.name : '',
+    });
   }
   return normaliseMarks(marks, length);
 }
 
 /** The marks as `draft_authorship` keeps them. */
-export function draftMarksJson(marks: readonly AuthorMark[]): { author: MarkAuthor; start: number; length: number; name: string }[] {
+export function draftMarksJson(
+  marks: readonly AuthorMark[],
+): { author: MarkAuthor; start: number; length: number; name: string }[] {
   return normaliseMarks(marks).map((mark) => ({
     author: mark.author,
     start: mark.from,
@@ -104,7 +120,10 @@ export function draftMarksJson(marks: readonly AuthorMark[]): { author: MarkAuth
 /** The parts of a change set the marks are mapped through; CodeMirror's ChangeDesc has both. */
 export type ChangeShape = {
   iterGaps(f: (posA: number, posB: number, length: number) => void): void;
-  iterChangedRanges(f: (fromA: number, toA: number, fromB: number, toB: number) => void, individual?: boolean): void;
+  iterChangedRanges(
+    f: (fromA: number, toA: number, fromB: number, toB: number) => void,
+    individual?: boolean,
+  ): void;
 };
 
 /**
@@ -132,7 +151,8 @@ export function mapMarks(
   }
   if (inserted) {
     changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
-      if (toB > fromB) out.push({ author: inserted.author, name: inserted.name, from: fromB, to: toB });
+      if (toB > fromB)
+        out.push({ author: inserted.author, name: inserted.name, from: fromB, to: toB });
     }, true);
   }
   return normaliseMarks(out);
@@ -143,7 +163,11 @@ export function mapMarks(
  * the new text and placed at the match nearest where it was. A run that is
  * no longer there is dropped, since it has been rewritten.
  */
-export function relocateMarks(oldText: string, marks: readonly AuthorMark[], newText: string): AuthorMark[] {
+export function relocateMarks(
+  oldText: string,
+  marks: readonly AuthorMark[],
+  newText: string,
+): AuthorMark[] {
   const out: AuthorMark[] = [];
   for (const mark of marks) {
     const words = oldText.slice(mark.from, mark.to);
@@ -233,7 +257,16 @@ export function sha256Hex(text: string): string {
       const s1 = rotr(b, 17) ^ rotr(b, 19) ^ (b >>> 10);
       w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
     }
-    let [a, b, c, d, e, f, g, hh] = h as [number, number, number, number, number, number, number, number];
+    let [a, b, c, d, e, f, g, hh] = h as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
     for (let i = 0; i < 64; i += 1) {
       const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
       const ch = (e & f) ^ (~e & g);
@@ -260,7 +293,12 @@ export function sha256Hex(text: string): string {
 
 /** A name as it can stand in an author line: one line, no colon, no angle brackets. */
 function lineName(name: string): string {
-  return name.replace(/[\r\n]+/g, ' ').replace(/:/g, ' -').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+  return name
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/:/g, ' -')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function rangeList(ranges: readonly { start: number; length: number }[]): string {
@@ -329,7 +367,12 @@ export function authorshipBlock(
 }
 
 /** One author line of a block as read. */
-export type BlockAuthor = { prefix: '@' | '&' | '*'; name: string; id: string | null; ranges: { start: number; length: number }[] };
+export type BlockAuthor = {
+  prefix: '@' | '&' | '*';
+  name: string;
+  id: string | null;
+  ranges: { start: number; length: number }[];
+};
 
 export type ParsedBlock = {
   /** The file before the block, trailing newlines removed: the text the ranges count in. */
@@ -376,7 +419,10 @@ export function readAuthorshipBlock(file: string): ParsedBlock | null {
       const id = label.match(/<([^>]*)>\s*$/);
       const ranges: { start: number; length: number }[] = [];
       for (const range of match[3]!.matchAll(/(\d+)(?:,(\d+))?/g)) {
-        ranges.push({ start: Number(range[1]), length: range[2] === undefined ? 1 : Number(range[2]) });
+        ranges.push({
+          start: Number(range[1]),
+          length: range[2] === undefined ? 1 : Number(range[2]),
+        });
       }
       authors.push({
         prefix: match[1] as BlockAuthor['prefix'],
@@ -440,9 +486,11 @@ export function blockMarks(block: ParsedBlock): AuthorMark[] {
 export function blockRanges(block: ParsedBlock): FileRange[] {
   const ranges: FileRange[] = [];
   for (const author of block.authors) {
-    const kind: FileRange['author'] = author.prefix === '@' ? 'self' : author.prefix === '&' ? 'dash' : 'quote';
+    const kind: FileRange['author'] =
+      author.prefix === '@' ? 'self' : author.prefix === '&' ? 'dash' : 'quote';
     const name = kind === 'self' ? '' : kind === 'dash' ? (author.id ?? author.name) : author.name;
-    for (const range of author.ranges) ranges.push({ author: kind, start: range.start, length: range.length, name });
+    for (const range of author.ranges)
+      ranges.push({ author: kind, start: range.start, length: range.length, name });
   }
   return ranges.sort((a, b) => a.start - b.start);
 }
@@ -460,7 +508,10 @@ export const YOUR_WORDS_RULE =
  * left out of both, and the person's share of the two as a whole percentage
  * (null when there is nothing to count).
  */
-export function yourWords(text: string, marks: readonly AuthorMark[]): { yours: number; dash: number; percent: number | null } {
+export function yourWords(
+  text: string,
+  marks: readonly AuthorMark[],
+): { yours: number; dash: number; percent: number | null } {
   segmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   const sorted = normaliseMarks(marks, text.length);
   let yours = 0;
@@ -476,6 +527,7 @@ export function yourWords(text: string, marks: readonly AuthorMark[]): { yours: 
   }
   const total = yours + dash;
   // Floored, so a single accepted word in a long essay never rounds you to 100%.
-  const percent = total === 0 ? null : dash === 0 ? 100 : Math.min(99, Math.floor((yours / total) * 100));
+  const percent =
+    total === 0 ? null : dash === 0 ? 100 : Math.min(99, Math.floor((yours / total) * 100));
   return { yours, dash, percent };
 }

@@ -8,7 +8,8 @@ import { WritePost } from '@/app/dev/posts/write-post';
 import { XConnection } from '@/app/dev/posts/x-connection';
 import { xConnectNotice } from '@/lib/x/account';
 import { socialPostFromRow } from '@/lib/dev/posts';
-import { buildPostsPage, type XStoredPost } from '@/lib/dev/posts-page';
+import { buildPostsPage, POST_WANTS_MAX, type PostWants, type XStoredPost } from '@/lib/dev/posts-page';
+import { PostWantsLine } from '@/app/dev/posts/post-wants';
 import { PageColumn } from '@/components/shell/page-width';
 
 /**
@@ -106,19 +107,64 @@ const STEPS = [
   { id: 's4', number: 1330, title: 'Open every brief with its vision', outline: '1319.6' },
 ];
 
-export function PostsSurface() {
+export function PostsSurface({
+  wants,
+  wantsPreview,
+}: {
+  wants?: PostWants;
+  wantsPreview?: { open?: boolean; pending?: boolean; error?: string };
+} = {}) {
   const page = buildPostsPage({
     posts: ROWS.map((row) => socialPostFromRow(row)),
     steps: STEPS,
     notes: [],
     run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, note: null, drafts: 2 },
     now: NOW,
+    wants,
   });
   return (
     <PostsScreen
       page={page}
+      wantsPreview={wantsPreview}
       x={{ state: 'connected', handle: 'selveybuilds', lastSyncedAt: '2026-10-02T06:00:00Z', canPost: true }}
     />
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * What I want from posts (plan #2227.2)
+ * ---------------------------------------------------------------------- */
+
+/** Saved text longer than one line, as a real preference gets. */
+const WANTS: PostWants = {
+  text:
+    'Posts for people who build software with an AI, not for people who follow AI news. Say what broke and what I changed because of it, with the number when there is one. No hashtags, no emoji, no "excited to share", and never more than two posts in a thread.',
+  updatedAt: '2026-10-01T18:30:00Z',
+};
+
+/** The tab with something saved: the line under the heading, collapsed. */
+export function PostsWantsSurface() {
+  return <PostsSurface wants={WANTS} />;
+}
+
+/** The line pressed: the box open on the saved text. */
+export function PostsWantsEditSurface() {
+  return <PostsSurface wants={WANTS} wantsPreview={{ open: true }} />;
+}
+
+/** Save pressed: the box mid-save, then one the action refused. */
+export function PostsWantsSavingSurface() {
+  return (
+    <PageColumn className="space-y-6">
+      <PostWantsLine text={WANTS.text} day="1 Oct" max={POST_WANTS_MAX} defaultOpen pendingPreview />
+      <PostWantsLine
+        text={WANTS.text}
+        day="1 Oct"
+        max={POST_WANTS_MAX}
+        defaultOpen
+        errorPreview="Keep it under 2,000 characters."
+      />
+    </PageColumn>
   );
 }
 
@@ -310,6 +356,86 @@ export function PostsWriteSurface() {
   return (
     <PageColumn>
       <WritePost defaultOpen />
+    </PageColumn>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Comments on a draft (plan #2202.2)
+ * ---------------------------------------------------------------------- */
+
+/**
+ * A draft's comment thread: a waiting draft Dash shortened when asked, with
+ * a note under it that has no tag and so stays a note, and a posted one
+ * whose tagged comment Dash read and marked seen without replying.
+ */
+export function PostsThreadSurface() {
+  const threads = new Map([
+    [
+      'public.social_posts:p2',
+      [
+        { id: 't1', author: 'me' as const, body: '@dash make this shorter', createdAt: '2026-10-02T10:02:00Z' },
+        {
+          id: 't2',
+          author: 'claude' as const,
+          body: 'Cut the thread to one post. I kept the fourteen hours and the seven failures, and took out how the gate runs.',
+          createdAt: '2026-10-02T10:02:40Z',
+        },
+        { id: 't3', author: 'me' as const, body: 'Better. Post this one on Monday.', createdAt: '2026-10-02T10:05:00Z' },
+      ],
+    ],
+    [
+      'public.social_posts:p3',
+      [
+        {
+          id: 't4',
+          author: 'me' as const,
+          body: '@dash this one did well, keep the next ones this short',
+          createdAt: '2026-10-01T09:00:00Z',
+          acknowledgedAt: '2026-10-01T09:00:30Z',
+        },
+      ],
+    ],
+  ]);
+  const page = buildPostsPage({
+    posts: [
+      socialPostFromRow({
+        ...ROWS[1],
+        body: [
+          'Several Dash sessions merge to main in my app each day. One day main stayed red for fourteen hours through seven failures, and a local check would have caught every one. Now every session runs that check before it pushes.',
+        ],
+      }),
+      socialPostFromRow(ROWS[2]),
+    ],
+    steps: STEPS,
+    notes: [],
+    run: null,
+    now: NOW,
+    threads,
+  });
+  return (
+    <PageColumn>
+      <PostList cards={[...page.suggested, ...page.posted]} />
+    </PageColumn>
+  );
+}
+
+/** Add a comment pressed on a draft with no thread yet: the box, open and empty. */
+export function PostsCommentSurface() {
+  const page = buildPostsPage({
+    posts: [socialPostFromRow({ ...ROWS[0], image_paths: [] })],
+    steps: STEPS,
+    notes: [],
+    run: null,
+    now: NOW,
+  });
+  return (
+    <PageColumn>
+      <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+        {page.suggested.map((card) => (
+          <PostItem key={card.post.id} card={card} postAs="selveybuilds" commentOpen />
+        ))}
+      </ul>
     </PageColumn>
   );
 }

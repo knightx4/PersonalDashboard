@@ -141,6 +141,25 @@ export function operationsReachedBy(
   name: string,
   known: ReadonlySet<string>,
 ): ActionOperations {
+  return walkFrom(file, name, known).result;
+}
+
+/**
+ * Every function `name` in `file` can call, followed the same way, as
+ * `path#name` from the repository root, itself included. `name` may also be a
+ * top-level constant, such as a Dash paid tool declared as an object
+ * (lib/dash/paid-tools.ts), whose methods are walked as its body.
+ */
+export function functionsReachedBy(file: string, name: string): Set<string> {
+  const { visited } = walkFrom(file, name, new Set());
+  return new Set([...visited].map((key) => relative(ROOT, key)));
+}
+
+function walkFrom(
+  file: string,
+  name: string,
+  known: ReadonlySet<string>,
+): { result: ActionOperations; visited: Set<string> } {
   const result: ActionOperations = { operations: new Set(), unread: [] };
   const visited = new Set<string>();
 
@@ -206,8 +225,12 @@ export function operationsReachedBy(
     if (visited.has(key)) return;
     visited.add(key);
     const parsed = parse(file);
-    const declaration = parsed?.functions.get(fn);
-    if (!parsed || !declaration) return;
+    // A constant is walked only as where a walk starts: a paid tool's object.
+    const declaration = parsed?.functions.get(fn) ?? (fn === name && file === start ? parsed?.constants.get(fn) : undefined);
+    if (!parsed || !declaration) {
+      visited.delete(key);
+      return;
+    }
 
     const walk = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
@@ -239,8 +262,39 @@ export function operationsReachedBy(
     walk(declaration);
   }
 
+  const start = file;
   visit(file, name);
-  return result;
+  return { result, visited };
+}
+
+/**
+ * The Dash paid tools a file declares (plan #2228.1): each top-level constant
+ * whose value is an object literal with `kind: 'paid'`, by the tool's `name`.
+ */
+export function paidToolConstants(file: string): { constant: string; tool: string }[] {
+  const parsed = parse(file);
+  if (!parsed) return [];
+  const found: { constant: string; tool: string }[] = [];
+  for (const [constant, init] of parsed.constants) {
+    const node = unwrap(init);
+    if (!ts.isObjectLiteralExpression(node)) continue;
+    const text = (key: string) => {
+      for (const property of node.properties) {
+        if (
+          ts.isPropertyAssignment(property) &&
+          ts.isIdentifier(property.name) &&
+          property.name.text === key &&
+          ts.isStringLiteral(property.initializer)
+        ) {
+          return property.initializer.text;
+        }
+      }
+      return null;
+    };
+    const tool = text('name');
+    if (text('kind') === 'paid' && tool) found.push({ constant, tool });
+  }
+  return found;
 }
 
 /** The exported functions of a server action file or route handler, by name. */

@@ -1,6 +1,7 @@
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTeachBackEvery } from '@/lib/learn/feed/teach-back-store';
+import { loadGoalsOnly } from '@/lib/learn/goals-only-setting';
 import { loadOfferSubjects } from '@/lib/learn/offer-setting';
 import { LearnSettingsView } from './settings-view';
 
@@ -11,9 +12,10 @@ export const dynamic = 'force-dynamic';
 export default async function LearnSettingsPage() {
   const user = await requireUser();
   const learn = await createLearnClient();
-  const [offerSubjects, teachBackEvery] = await Promise.all([
+  const [goalsOnly, offerSubjects, teachBackEvery] = await Promise.all([
+    loadGoalsOnly(learn, user.id),
     loadOfferSubjects(learn, user.id),
     loadTeachBackEvery(learn, user.id),
   ]);
-  return <LearnSettingsView settings={{ offerSubjects, teachBackEvery }} />;
+  return <LearnSettingsView settings={{ goalsOnly, offerSubjects, teachBackEvery }} />;
 }

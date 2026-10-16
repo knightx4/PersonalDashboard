@@ -10,6 +10,7 @@ import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
+import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -89,10 +90,39 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...VAULT_CHANGE_KINDS,
   ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
+  ...POST_CHANGE_KINDS,
 ];
 
 /**
- * Writes and proposals have their cards under the answer, a hand-off says so
+ * The paid tools (lib/dash/paid-tools.ts, plan #2228.1), named here for the
+ * same reason: each queues a press that has its line on the approval card
+ * under the answer (plan #2228.2). A test holds the two lists together.
+ */
+export const PAID_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
+  'write_year_review',
+  'draft_answer',
+  'draft_application_answers',
+  'draft_cover_letter',
+  'find_startups',
+  'suggest_people',
+  'find_openings',
+  'match_role_requirements',
+  'draft_topic',
+  'make_learn_subject',
+  'write_subject_curriculum',
+  'add_plan_unit',
+  'summarize_reading',
+  'retry_research_brief',
+  'write_quiz_questions',
+  'read_personality_again',
+  'read_resume_jobs',
+  'ask_maya',
+  'price_items_for_sale',
+  'remake_newsletter_picks',
+];
+
+/**
+ * Writes, proposals and paid presses have their cards under the answer, a hand-off says so
  * in the answer and a chart is drawn in it (plan #1655), so the lines are the
  * reads alone.
  */
@@ -101,7 +131,8 @@ export function isShownLookup(name: string): boolean {
     !name.startsWith('propose_') &&
     name !== 'hand_off' &&
     name !== CHART_TOOL &&
-    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
+    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name) &&
+    !PAID_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
   );
 }
 
@@ -183,6 +214,8 @@ export function lookupLabel(name: string, input: unknown): string {
     }
     case 'read_mail':
       return 'Reading an email';
+    case 'read_job_board':
+      return 'Reading a job board';
     default:
       return 'Looking something up';
   }
@@ -198,6 +231,7 @@ export function foundCount(result: unknown): number | null {
   if (Array.isArray(r.rows)) return r.rows.length;
   if (typeof r.matched === 'number') return r.matched;
   if (typeof r.opened === 'number') return r.opened;
+  if (typeof r.open_roles === 'number') return r.open_roles;
   return null;
 }
 
