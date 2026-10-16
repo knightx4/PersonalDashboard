@@ -35,6 +35,11 @@ export type MapParams = {
    */
   place: string | null;
   around: string | null;
+  /**
+   * The learning goal chosen in the rail (plan #2187.2), by its lens's id:
+   * its topics are ringed on the sky and joined where one requires another.
+   */
+  goal: string | null;
 };
 
 /**
@@ -48,6 +53,7 @@ export const DEFAULT_PARAMS: MapParams = {
   domain: null,
   place: null,
   around: null,
+  goal: null,
 };
 
 type Search = Record<string, string | string[] | undefined>;
@@ -61,12 +67,14 @@ export function parseMapParams(search: Search): MapParams {
   const domain = one(search.domain)?.trim();
   const place = one(search.place)?.trim();
   const around = one(search.around)?.trim();
+  const goal = one(search.goal)?.trim();
   return {
     layout: one(search.layout) === 'axes' ? 'axes' : 'neighbours',
     idea: idea ? idea : null,
     domain: domain ? domain : null,
     place: place ? place : null,
     around: !place && around ? around : null,
+    goal: goal ? goal : null,
   };
 }
 
@@ -79,6 +87,7 @@ export function mapHref(params: MapParams, change: Partial<MapParams> = {}): str
   if (next.domain) query.set('domain', next.domain);
   if (next.place) query.set('place', next.place);
   else if (next.around) query.set('around', next.around);
+  if (next.goal) query.set('goal', next.goal);
   const text = query.toString();
   return text ? `${SPACE_HREF}?${text}` : SPACE_HREF;
 }

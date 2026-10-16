@@ -12,6 +12,7 @@ import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
+import { goalsFor } from './idea-space-goals';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -754,4 +755,41 @@ export function IdeaSpaceEvidenceSurface() {
  */
 export function IdeaSpaceTopicsSurface() {
   return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" nextTopics={NEXT_TOPICS_FIXTURE} />;
+}
+
+/**
+ * The sky of ten thousand ideas with the three goals of idea-space-goals.tsx
+ * (plan #2187.2), their topics in one region of it, as a goal's topics are
+ * about neighbouring things: ideas round one cluster, kept apart so each
+ * ring reads.
+ */
+function denseWithGoals(): IdeaMapView {
+  const sky = dense(10_000);
+  const middle = sky.ideas[7]!.neighbourMap;
+  const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+  const near: IdeaOnMap[] = [];
+  for (const idea of [...sky.ideas].sort((a, b) => distance(a.neighbourMap, middle) - distance(b.neighbourMap, middle))) {
+    if (near.length >= 18) break;
+    if (near.every((other) => distance(other.neighbourMap, idea.neighbourMap) > 0.09)) near.push(idea);
+  }
+  return { ...sky, goals: goalsFor(near) };
+}
+
+/**
+ * A goal chosen on the sky of ten thousand ideas (plan #2187.2): its twelve
+ * topics ringed at their targets, joined where one needs another, and named,
+ * with the goals in the rail and the chosen one's next rung under it.
+ */
+export function IdeaSpaceGoalSurface() {
+  const view = useMemo(() => denseWithGoals(), []);
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, goal: 'goal-saas' }} />;
+}
+
+/**
+ * The same sky and rail with no goal chosen, so no ring or line is drawn,
+ * and one row's next rung held open as a pointer over it would.
+ */
+export function IdeaSpaceGoalNextSurface() {
+  const view = useMemo(() => denseWithGoals(), []);
+  return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} holdNext="goal-accounts" />;
 }

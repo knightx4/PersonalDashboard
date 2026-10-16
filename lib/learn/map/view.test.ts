@@ -62,6 +62,14 @@ describe('the address', () => {
     expect(mapHref({ ...DEFAULT_PARAMS, place: 'p1' }, { place: null })).toBe('/learn/space');
   });
 
+  it('carries the goal chosen in the rail beside the rest, and drops it when set to null (plan #2187.2)', () => {
+    const href = mapHref({ ...DEFAULT_PARAMS, idea: 'x1' }, { goal: 'lens-1' });
+    expect(href).toBe('/learn/space?idea=x1&goal=lens-1');
+    const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
+    expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, idea: 'x1', goal: 'lens-1' });
+    expect(mapHref({ ...DEFAULT_PARAMS, goal: 'lens-1' }, { goal: null })).toBe('/learn/space');
+  });
+
   it('closes an idea by setting it to null', () => {
     expect(mapHref({ ...DEFAULT_PARAMS, idea: 'x1' }, { idea: null })).toBe('/learn/space');
   });
