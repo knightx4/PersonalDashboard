@@ -9,8 +9,16 @@ import {
   draftingRecord,
   pickDraft,
   type DraftSources,
+  type DraftedFromBrief,
 } from '@/lib/learn/levels/draft-sources';
+import { asEmerging } from '@/lib/learn/briefs/topics';
 import { loadFieldOptions, loadMapTopics, saveDraft } from '@/lib/learn/levels/store';
+import {
+  draftedDocuments,
+  withDocumentCanonicality,
+  type CanonText,
+  type StoredSourceRef,
+} from '@/lib/learn/levels/stored-sources';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 
@@ -31,6 +39,17 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
  * as `drafting`. Both calls go on the ledger under draft-topic, so a draft
  * costs twice what one call did. When one call fails the other is kept and
  * the overlap says why it is missing.
+ *
+ * When some of the sources are stored documents (plan #2247.10), `documents`
+ * says which source ids they are. Both drafts are then read back against
+ * them: the topic row cites every document its levels and links cite, each
+ * row's canonicality follows the count of independent documents it cites, and
+ * the documents and the territory's canon go on the topic's `drafting`.
+ *
+ * When the sources are a research brief's pages (plan #2184.1), `brief` names
+ * the brief and the goal it is drafted under. Every row the pages support is
+ * then emerging, and the brief goes on `drafting`, where approving the topic
+ * reads it to put the topic on the goal's lens.
  */
 export type DraftRunResult = { ok: true; id: string } | { ok: false; detail: string };
 
@@ -48,7 +67,15 @@ export type DraftRunOptions = {
 export async function runTopicDraft(
   client: LearnSupabaseClient,
   userId: string,
-  input: { goal: string; scope?: string | null; sources?: DraftSources; anthropicApiKey: string },
+  input: {
+    goal: string;
+    scope?: string | null;
+    sources?: DraftSources;
+    documents?: readonly StoredSourceRef[];
+    canon?: readonly CanonText[];
+    brief?: DraftedFromBrief;
+    anthropicApiKey: string;
+  },
   options: DraftRunOptions = {},
 ): Promise<DraftRunResult> {
   // Each operation spelled out, so the paid-action check can read what this records.
@@ -87,8 +114,18 @@ export async function runTopicDraft(
     };
   }
 
-  const kept = result.other ? pickDraft(result.draft, result.other, given) : result.draft;
-  const record = draftingRecord(kept, kept === result.draft ? result.other : result.draft, result.failed, given);
+  const refs = input.documents ?? [];
+  const settle = <T extends typeof result.draft>(d: T): T =>
+    input.brief ? asEmerging(withDocumentCanonicality(d, refs)) : withDocumentCanonicality(d, refs);
+  const draft = settle(result.draft);
+  const other = result.other ? settle(result.other) : null;
+  const kept = other ? pickDraft(draft, other, given) : draft;
+  const record = draftingRecord(kept, kept === draft ? other : draft, result.failed, given);
+  if (refs.length > 0) {
+    record.documents = draftedDocuments(kept, refs);
+    record.canon = [...(input.canon ?? [])];
+  }
+  if (input.brief) record.brief = input.brief;
 
   const embedding = collectSpend();
   const embedded = await embedOne(kept.scope, { inputType: 'document', onSpend: embedding.sink });

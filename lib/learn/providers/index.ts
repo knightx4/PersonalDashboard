@@ -63,3 +63,19 @@ export {
   parseTranscriptResponse,
 } from './transcriptapi';
 export type { TranscriptFailure, TranscriptOutcome, TranscriptResult } from './transcriptapi';
+
+export {
+  ARXIV_PROVIDER_SLUG,
+  arxivPdfUrl,
+  fetchArxivStructure,
+  parseArxivId,
+} from './arxiv';
+export type { ArxivFailure, ArxivResult } from './arxiv';
+
+export {
+  OPENSTAX_LICENCE_MODE,
+  OPENSTAX_PROVIDER_SLUG,
+  fetchOpenstaxStructure,
+  parseOpenstaxSlug,
+} from './openstax';
+export type { OpenstaxFailure, OpenstaxResult } from './openstax';

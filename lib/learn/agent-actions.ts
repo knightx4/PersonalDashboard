@@ -68,6 +68,7 @@ export const learnActions: ModuleActions = {
     setBriefArchived: none('own'),
     retryBrief: tool('retry_research_brief'),
     startEssayOnBrief: none('own'),
+    draftBriefTopics: none('theirs', 'Which goal a research brief feeds is the person’s to choose, and the draft is read and approved on its page (plan #2184.1).'),
   },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
@@ -281,5 +282,10 @@ export const learnActions: ModuleActions = {
     setGoalsOnly: none('setting'),
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
+  },
+  'app/learn/settings/external/actions.ts': {
+    startExternalCheck: none('own', 'Pasting a published set to sit once is the person starting their own measurement.'),
+    answerExternal: none('own', 'The answers are the person\'s own, given blind; marking one spends.'),
+    skipExternal: none('own'),
   },
 };

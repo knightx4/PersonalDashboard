@@ -69,6 +69,7 @@ describe('the operation names', () => {
       'grade-applied-answer',
       'grade-cell-answer',
       'write-cell-case',
+      'write-goal-case',
       'embed-catalogue',
       'embed-claim',
       'judge-segment',
@@ -78,6 +79,7 @@ describe('the operation names', () => {
       'place-themes',
       'place-track',
       'place-aim',
+      'classify-goal-kind',
       'name-feed-material',
       'write-feed-card',
       'embed-feed-ideas',
@@ -154,6 +156,9 @@ describe('the operation names', () => {
       'assign-topics',
       'name-course-topics',
       'grade-course-explain',
+      'propose-structure-sources',
+      'match-structure-units',
+      'pull-lit-topic-structure',
     ]);
   });
 });

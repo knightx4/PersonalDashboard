@@ -1,0 +1,23 @@
+{
+    "meta": {
+        "total_count": 1
+    },
+    "items": [
+        {
+            "id": 622,
+            "meta": {
+                "slug": "principles-macroeconomics-3e",
+                "type": "books.Book",
+                "detail_url": "https://openstax.org/apps/cms/api/v2/pages/622/",
+                "html_url": "https://openstax.org/details/books/principles-macroeconomics-3e",
+                "first_published_at": "2022-12-01T17:04:42.990000-06:00",
+                "locale": "en"
+            },
+            "title": "Principles of Macroeconomics 3e",
+            "book_state": "live",
+            "cnx_id": "aff0c733-b223-4dfb-aad6-297bd361bdcf",
+            "license_name": "Creative Commons Attribution-NonCommercial-ShareAlike License",
+            "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+        }
+    ]
+}

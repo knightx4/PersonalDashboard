@@ -12,6 +12,8 @@ import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
+import { TERRITORY_GOAL, TERRITORY_OPEN, TERRITORY_POINTED, territoryFixture, territoryLevels } from './idea-space-territory';
+import { goalsFor } from './idea-space-goals';
 
 /**
  * Fixtures for the Idea Space page (plan #1857).
@@ -354,6 +356,7 @@ function fixture(): IdeaMapView {
         stateRow: stateRowFor(state, random),
         strength: 0,
         haze: 0,
+        exposure: 0,
         placeId: null,
       createdAt: null,
         evidence: [],
@@ -377,6 +380,7 @@ function fixture(): IdeaMapView {
       stateRow: null,
       strength: 0,
       haze: 0,
+      exposure: 0,
       placeId: null,
       createdAt: null,
       evidence: [],
@@ -487,7 +491,12 @@ const OPEN = VIEW.ideas.find((idea) => idea.name === 'Price elasticity of demand
 
 /** The neighbour map with its places named, one idea open with its nearest six. */
 export function IdeaSpaceSurface() {
-  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
+  // The open idea was tested, and a note and a piece of work touch it too.
+  const view = {
+    ...VIEW,
+    ideas: VIEW.ideas.map((idea) => (idea.id === OPEN ? { ...idea, evidence: linksFor(idea.id, 1, 2) } : idea)),
+  };
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, idea: OPEN }} nextTopics={NEXT_TOPICS_FIXTURE} />;
 }
 
 /**
@@ -537,6 +546,7 @@ function dense(count: number): IdeaMapView {
       stateRow: stateRowFor(state, random),
       strength: 0,
       haze: 0,
+      exposure: 0,
       placeId: null,
       createdAt: null,
       evidence: [],
@@ -596,6 +606,110 @@ export function IdeaSpaceReplaySurface() {
 export function IdeaSpaceAroundSurface() {
   const loose = VIEW.ideas.find((idea) => idea.name === 'Write the summary before the detail')!.id;
   return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, around: loose }} />;
+}
+
+/**
+ * A goal's territory opened on one of its topics (plan #2187.3): the topics as
+ * stars with their arcs and target rings, requirement links with arrowheads,
+ * and the ideas next door round the edge.
+ */
+const TERRITORY_VIEW = { ...VIEW, territories: [territoryFixture(VIEW.ideas)] };
+const TERRITORY_PARAMS = { ...DEFAULT_PARAMS, goal: TERRITORY_GOAL, topic: TERRITORY_OPEN };
+
+export function IdeaSpaceTerritorySurface() {
+  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} />;
+}
+
+/**
+ * A territory as thin as the live one (plan #2187.7): topics with nothing
+ * held yet, one requirement between them, and nothing ready, so no route.
+ */
+const THIN = territoryFixture(VIEW.ideas);
+const THIN_VIEW = {
+  ...VIEW,
+  territories: [
+    {
+      ...THIN,
+      topics: THIN.topics.map((topic) => ({ ...topic, tested: 0, held: 0, missed: [] })),
+      links: THIN.links.slice(0, 1),
+      ready: [],
+      standing: [],
+    },
+  ],
+};
+
+export function IdeaSpaceTerritoryThinSurface() {
+  return <IdeaSpaceView view={THIN_VIEW} params={TERRITORY_PARAMS} />;
+}
+
+/** The same territory with its most linked star pointed at: every link it has, the level each needs, and its level line. */
+export function IdeaSpaceTerritoryHoverSurface() {
+  return (
+    <IdeaSpaceView
+      view={TERRITORY_VIEW}
+      params={{ ...TERRITORY_PARAMS, topic: TERRITORY_POINTED }}
+      pointingAt={TERRITORY_POINTED}
+    />
+  );
+}
+
+/**
+ * The open topic's words (plan #2187.5): the quote of the answer that showed
+ * the level, folded in the rail until tapped, drawn open here.
+ */
+export function IdeaSpaceTerritoryQuoteSurface() {
+  return <IdeaSpaceView view={TERRITORY_VIEW} params={TERRITORY_PARAMS} holdQuote />;
+}
+
+/**
+ * The panels under the map (plan #2187.6), on the territory opened: what
+ * will fade, the gaps to a target and then and now, each its own tab.
+ */
+const PANELS_VIEW = { ...TERRITORY_VIEW, levels: territoryLevels(VIEW.asOf) };
+/** As thin as the live goal: drafts with nothing held, one link, and none of the ideas round it held. */
+const THIN_PANELS_VIEW = {
+  ...THIN_VIEW,
+  territories: THIN_VIEW.territories.map((t) => ({
+    ...t,
+    topics: t.topics.map((topic) => ({
+      ...topic,
+      ideaIds: topic.ideaIds.filter((id) => VIEW.ideas.find((idea) => idea.id === id)?.stateRow === null),
+    })),
+  })),
+  levels: territoryLevels(VIEW.asOf, { thin: true }),
+};
+
+export function IdeaSpaceFadeSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'fade' }} />;
+}
+
+export function IdeaSpaceFadeEmptySurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'fade' }} />;
+}
+
+export function IdeaSpaceGapsSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'gaps' }} />;
+}
+
+export function IdeaSpaceGapsThinSurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'gaps' }} />;
+}
+
+/** No goal chosen: the gaps tab says to choose one. */
+export function IdeaSpaceGapsEmptySurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...DEFAULT_PARAMS, panel: 'gaps' }} />;
+}
+
+export function IdeaSpaceThenSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} />;
+}
+
+export function IdeaSpaceThenPickSurface() {
+  return <IdeaSpaceView view={PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} pickThen />;
+}
+
+export function IdeaSpaceThenThinSurface() {
+  return <IdeaSpaceView view={THIN_PANELS_VIEW} params={{ ...TERRITORY_PARAMS, panel: 'then' }} />;
 }
 
 export function IdeaSpaceDenseSurface() {
@@ -741,7 +855,7 @@ const EVIDENCE_FIXTURE: IdeaMapView = (() => {
 
 export function IdeaSpaceEvidenceSurface() {
   const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
-  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} />;
+  return <IdeaSpaceView view={EVIDENCE_FIXTURE} params={{ ...DEFAULT_PARAMS, idea: open }} pointingAt={open} holdMore />;
 }
 
 /**
@@ -751,4 +865,57 @@ export function IdeaSpaceEvidenceSurface() {
  */
 export function IdeaSpaceTopicsSurface() {
   return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} zoomOn="t3-f-econ-0" nextTopics={NEXT_TOPICS_FIXTURE} />;
+}
+
+/**
+ * The sky of ten thousand ideas with the three goals of idea-space-goals.tsx
+ * (plan #2187.2), their topics in one region of it, as a goal's topics are
+ * about neighbouring things: ideas round one cluster, kept apart so each
+ * ring reads.
+ */
+function denseWithGoals(): IdeaMapView {
+  const sky = dense(10_000);
+  const middle = sky.ideas[7]!.neighbourMap;
+  const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+  const near: IdeaOnMap[] = [];
+  for (const idea of [...sky.ideas].sort((a, b) => distance(a.neighbourMap, middle) - distance(b.neighbourMap, middle))) {
+    if (near.length >= 18) break;
+    if (near.every((other) => distance(other.neighbourMap, idea.neighbourMap) > 0.09)) near.push(idea);
+  }
+  return { ...sky, goals: goalsFor(near) };
+}
+
+/**
+ * A goal chosen on the sky of ten thousand ideas (plan #2187.2): its twelve
+ * topics ringed at their targets, joined where one needs another, and named,
+ * with the goals in the rail and the chosen one's next rung under it.
+ */
+export function IdeaSpaceGoalSurface() {
+  const view = useMemo(() => denseWithGoals(), []);
+  return <IdeaSpaceView view={view} params={{ ...DEFAULT_PARAMS, goal: 'goal-saas' }} />;
+}
+
+/**
+ * The same sky and rail with no goal chosen, so no ring or line is drawn,
+ * and one row's next rung held open as a pointer over it would.
+ */
+export function IdeaSpaceGoalNextSurface() {
+  const view = useMemo(() => denseWithGoals(), []);
+  return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} holdNext="goal-accounts" />;
+}
+
+/**
+ * The layer switch (plan #2187.5) with courses and work turned off: the idea
+ * no question has been asked about loses the ring those gave it, the ones
+ * your notes back keep theirs, and its list says only what is on.
+ */
+export function IdeaSpaceLayersSurface() {
+  const open = EVIDENCE_FIXTURE.ideas.find((idea) => idea.name === EVIDENCE_OPEN_NAME)!.id;
+  return (
+    <IdeaSpaceView
+      view={EVIDENCE_FIXTURE}
+      params={{ ...DEFAULT_PARAMS, idea: open }}
+      layersOn={{ answers: true, courses: false, writing: true }}
+    />
+  );
 }

@@ -24,7 +24,12 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { useClockNow } from '@/lib/use-clock-now';
 import { useOptimisticWrite, writeError } from '@/lib/use-optimistic-write';
 import { useToast } from '@/components/ui/toast';
-import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
+import {
+  applyRowChange,
+  type RowChange,
+  type RowFields,
+  type SiblingMove,
+} from '@/lib/plan/optimistic';
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
@@ -67,14 +72,7 @@ import {
   TheQuestion,
   useAnswerDraft,
 } from '@/components/dev/question';
-import {
-  CheckMark,
-  LastRunLine,
-  RunWork,
-  RunningFor,
-  Underway,
-  when,
-} from './plan-run-status';
+import { CheckMark, LastRunLine, RunWork, RunningFor, Underway, when } from './plan-run-status';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
@@ -236,7 +234,10 @@ function SetupJob({
         <div className="space-y-0.5">
           <QuestionPartLabel>What to set up</QuestionPartLabel>
           <p className="whitespace-pre-wrap text-ui text-ink">
-            <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} refs="all" />
+            <LinkedText
+              text={readableRefs(node.detail?.trim() || node.title, outlines)}
+              refs="all"
+            />
           </p>
         </div>
         <form action={action} className="space-y-2">
@@ -476,22 +477,54 @@ function SendToClaude({
   );
 }
 
+/**
+ * What a row waits on. A row with nothing of its own to wait on reports the
+ * waits of the open rows beneath it that are waiting, so a feature whose only
+ * open step waits for a check-back draws the same clock that step does.
+ */
+function waitsOf(node: PlanNode, liveness: PlanLiveness | undefined) {
+  if (node.waitingOn.length > 0 || node.waitsUntil.length > 0 || node.children.length === 0) {
+    return { waitingOn: node.waitingOn, waitsUntil: node.waitsUntil };
+  }
+  const waiting = flatten(node.children).filter(
+    (child) => !isClosed(child.status) && planHealthOf(child, liveness) === 'waiting',
+  );
+  const beneath = new Set(flatten(node.children).map((child) => child.id));
+  const waitingOn = new Map<string, PlanNode['waitingOn'][number]>();
+  const waitsUntil = new Map<string, PlanNode['waitsUntil'][number]>();
+  for (const child of waiting) {
+    // A step waiting on another step under the same row is not something the
+    // row waits on: that wait clears inside it.
+    for (const ref of child.waitingOn) if (!beneath.has(ref.id)) waitingOn.set(ref.id, ref);
+    for (const check of child.waitsUntil) waitsUntil.set(check.id, check);
+  }
+  return {
+    waitingOn: [...waitingOn.values()],
+    waitsUntil: [...waitsUntil.values()].sort((x, y) => x.dueAt.localeCompare(y.dueAt)),
+  };
+}
+
 /** The facts a health tooltip needs, read off a plan row. */
-function healthFactsOf(node: PlanNode, outlines: OutlineIndex): HealthFacts {
+function healthFactsOf(
+  node: PlanNode,
+  outlines: OutlineIndex,
+  liveness: PlanLiveness | undefined,
+): HealthFacts {
   const readable = (text: string | null) => (text === null ? null : readableRefs(text, outlines));
+  const waits = waitsOf(node, liveness);
   return {
     closed: isClosed(node.status),
     openBeneath: flatten(node.children).filter((child) => !isClosed(child.status)),
     resolution: readable(node.resolution),
     blockAsk: readable(node.blockAsk),
     comment: readable(node.comment),
-    waitingOn: node.waitingOn,
-    waitsUntil: node.waitsUntil,
+    waitingOn: waits.waitingOn,
+    waitsUntil: waits.waitsUntil,
   };
 }
 
 function healthOf(node: PlanNode, liveness: PlanLiveness | undefined, outlines: OutlineIndex) {
-  return healthWordsOf(planHealthOf(node, liveness), healthFactsOf(node, outlines));
+  return healthWordsOf(planHealthOf(node, liveness), healthFactsOf(node, outlines, liveness));
 }
 
 function moveFor(node: PlanNode, context?: MoveContext) {
@@ -561,7 +594,10 @@ export function withSessionDrop(
   drop: () => void,
 ): ActionMenuItem[] {
   if (isClosed(node.status) || !sessionOrigin(node.comment)) return menu;
-  return [{ id: 'drop-session-step', label: 'Drop', lifecycle: 'dropped', onSelect: drop }, ...menu];
+  return [
+    { id: 'drop-session-step', label: 'Drop', lifecycle: 'dropped', onSelect: drop },
+    ...menu,
+  ];
 }
 
 function useResolving(
@@ -981,86 +1017,90 @@ export function usePlanRow({
   const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
   const assignValue = mine ? '' : 'me';
 
-  const menu: ActionMenuItem[] = withSessionDrop(node, [
-    {
-      // First, because keeping a step back is the move this page exists to make
-      // and it should not need the step opened first.
-      id: 'assign',
-      label: assignLabel,
-      onSelect: () => changeRow({ kind: 'assignee', assignee: assignValue || null }),
-    },
-    // The quick icons are only there from sm up and only under a pointer, so
-    // the menu carries the same two actions for a phone and for a keyboard.
-    // An overhaul is sent by its own press below, never to the plan routine.
-    ...(closed || node.track === 'overhaul'
-      ? []
-      : [
-          {
-            id: 'send',
-            label: sendLabel(node),
-            // Shut for the same reason the button beside it is: the menu is
-            // the phone's copy of that button, not a way round it.
-            disabled: beingResolved,
-            // A quiet run is asked about here with the menu's own confirm,
-            // which arms on the first press and does it on the second -- the
-            // same shape the question on the row takes, so the two doors ask
-            // the same thing. The flag rides on the item, because the menu
-            // sends the fields it is given and the guard refuses the press
-            // without it anyway.
-            ...(quietAsk ? { confirm: quietAsk } : {}),
-            formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
-            formFields: quietAsk ? { id: node.id, confirm: 'quiet' } : { id: node.id },
-          },
-        ]),
-    // The return trip, beside the two hand-overs. Only on a feature: a leaf
-    // step has nothing beneath it to re-read, and the action says so if it is
-    // reached anyway.
-    ...(hasChildren && !closed && node.status !== 'proposed'
-      ? [
-          {
-            id: 'reshape',
-            label: 'Re-shape against what is decided',
-            formAction: (formData: FormData) => reshapePlanFeature({}, formData),
-            formFields: { id: node.id },
-          },
-        ]
-      : []),
-    // The overhaul press, for a phone and a keyboard as the others are.
-    ...(node.track === 'overhaul' && !closed && node.status !== 'proposed'
-      ? [
-          {
-            id: 'overhaul',
-            label: 'Work this overhaul',
-            disabled: beingResolved || run?.status === 'started',
-            formAction: (formData: FormData) => workPlanOverhaul({}, formData),
-            formFields: { id: node.id },
-          },
-        ]
-      : []),
-    { id: 'add-child', label: addChildLabel, onSelect: row.addChild },
-    { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
-    {
-      id: 'up',
-      label: 'Move up',
-      onSelect: () => moveSelf('up'),
-    },
-    {
-      id: 'down',
-      label: 'Move down',
-      onSelect: () => moveSelf('down'),
-    },
-    {
-      id: 'delete',
-      label: 'Delete',
-      destructive: true,
-      confirm:
-        descendants > 0
-          ? `Delete ${stepRef(node)} and the ${descendants} step${descendants === 1 ? '' : 's'} beneath it? This cannot be undone.`
-          : `Delete ${stepRef(node)}? This cannot be undone.`,
-      formAction: (formData: FormData) => deletePlanItem({}, formData),
-      formFields: { id: node.id },
-    },
-  ], () => changeRow({ kind: 'status', status: 'dropped' }));
+  const menu: ActionMenuItem[] = withSessionDrop(
+    node,
+    [
+      {
+        // First, because keeping a step back is the move this page exists to make
+        // and it should not need the step opened first.
+        id: 'assign',
+        label: assignLabel,
+        onSelect: () => changeRow({ kind: 'assignee', assignee: assignValue || null }),
+      },
+      // The quick icons are only there from sm up and only under a pointer, so
+      // the menu carries the same two actions for a phone and for a keyboard.
+      // An overhaul is sent by its own press below, never to the plan routine.
+      ...(closed || node.track === 'overhaul'
+        ? []
+        : [
+            {
+              id: 'send',
+              label: sendLabel(node),
+              // Shut for the same reason the button beside it is: the menu is
+              // the phone's copy of that button, not a way round it.
+              disabled: beingResolved,
+              // A quiet run is asked about here with the menu's own confirm,
+              // which arms on the first press and does it on the second -- the
+              // same shape the question on the row takes, so the two doors ask
+              // the same thing. The flag rides on the item, because the menu
+              // sends the fields it is given and the guard refuses the press
+              // without it anyway.
+              ...(quietAsk ? { confirm: quietAsk } : {}),
+              formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
+              formFields: quietAsk ? { id: node.id, confirm: 'quiet' } : { id: node.id },
+            },
+          ]),
+      // The return trip, beside the two hand-overs. Only on a feature: a leaf
+      // step has nothing beneath it to re-read, and the action says so if it is
+      // reached anyway.
+      ...(hasChildren && !closed && node.status !== 'proposed'
+        ? [
+            {
+              id: 'reshape',
+              label: 'Re-shape against what is decided',
+              formAction: (formData: FormData) => reshapePlanFeature({}, formData),
+              formFields: { id: node.id },
+            },
+          ]
+        : []),
+      // The overhaul press, for a phone and a keyboard as the others are.
+      ...(node.track === 'overhaul' && !closed && node.status !== 'proposed'
+        ? [
+            {
+              id: 'overhaul',
+              label: 'Work this overhaul',
+              disabled: beingResolved || run?.status === 'started',
+              formAction: (formData: FormData) => workPlanOverhaul({}, formData),
+              formFields: { id: node.id },
+            },
+          ]
+        : []),
+      { id: 'add-child', label: addChildLabel, onSelect: row.addChild },
+      { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
+      {
+        id: 'up',
+        label: 'Move up',
+        onSelect: () => moveSelf('up'),
+      },
+      {
+        id: 'down',
+        label: 'Move down',
+        onSelect: () => moveSelf('down'),
+      },
+      {
+        id: 'delete',
+        label: 'Delete',
+        destructive: true,
+        confirm:
+          descendants > 0
+            ? `Delete ${stepRef(node)} and the ${descendants} step${descendants === 1 ? '' : 's'} beneath it? This cannot be undone.`
+            : `Delete ${stepRef(node)}? This cannot be undone.`,
+        formAction: (formData: FormData) => deletePlanItem({}, formData),
+        formFields: { id: node.id },
+      },
+    ],
+    () => changeRow({ kind: 'status', status: 'dropped' }),
+  );
 
   const actionError =
     sendState.error ??
@@ -1082,103 +1122,97 @@ export function usePlanRow({
   const confirmNotice =
     confirmingSend && quietAsk && !sendState.error && !sendState.message ? (
       <>
-              <p className="text-ink-muted">{quietAsk}</p>
-              <div className="mt-1 flex items-center gap-2">
-                {/* Cancel first and plain, because doing nothing is the safe half
+        <p className="text-ink-muted">{quietAsk}</p>
+        <div className="mt-1 flex items-center gap-2">
+          {/* Cancel first and plain, because doing nothing is the safe half
                     of this and the press that sends should be the deliberate one. */}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmingSend(false)}
-                >
-                  Cancel
-                </Button>
-                <form action={sendAction}>
-                  <input type="hidden" name="id" value={node.id} />
-                  {/* The answer, and the only thing that carries it. The guard
+          <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmingSend(false)}>
+            Cancel
+          </Button>
+          <form action={sendAction}>
+            <input type="hidden" name="id" value={node.id} />
+            {/* The answer, and the only thing that carries it. The guard
                       refuses the press without it. */}
-                  <input type="hidden" name="confirm" value="quiet" />
-                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
-                    {sendPending ? 'Sending…' : 'Send it anyway'}
-                  </Button>
-                </form>
-              </div>
+            <input type="hidden" name="confirm" value="quiet" />
+            <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+              {sendPending ? 'Sending…' : 'Send it anyway'}
+            </Button>
+          </form>
+        </div>
       </>
     ) : null;
   /* Cancel first and plain, because doing nothing is the safe half
                     of this and the press that sends should be the deliberate one. */
-  const resultNotice = (actionError ?? actionMessage) ? (
+  const resultNotice =
+    (actionError ?? actionMessage) ? (
       <>
-              <FieldError>{actionError}</FieldError>
-              {!actionError && (
-                // Ink, not green. The tones above are a status system where
-                // positive means done; this is a transient "Assigned" or "Sent"
-                // from the action that just ran, which is the system reporting
-                // itself and is not a claim about money (law 4).
-                <span className="text-ink-muted">{actionMessage}</span>
-              )}
+        <FieldError>{actionError}</FieldError>
+        {!actionError && (
+          // Ink, not green. The tones above are a status system where
+          // positive means done; this is a transient "Assigned" or "Sent"
+          // from the action that just ran, which is the system reporting
+          // itself and is not a claim about money (law 4).
+          <span className="text-ink-muted">{actionMessage}</span>
+        )}
       </>
     ) : null;
   const marks = (
     <>
-          {/* The steps you kept, on the row.
-           * The runner takes anything approved that is not yours, so the
-           * fact worth reading off a resting row is which steps it will
-           * skip. The row's Mine press carries the same fact in its accented
-           * icon, but that icon is drawn only under the pointer and not at
-           * all below sm, so this is the only place a plan at rest says it.
-           * Steps still holding the old 'claude' value are not read here and
-           * nothing clears them. A mark, not a column: it appears on the few
-           * steps you held back, which is what makes it worth reading. */}
-          {mine && (
-            <Tooltip
-              label="Yours, so the runner will not take it. Press Not mine to give it back."
-              className="shrink-0"
-            >
-              <span className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'px-1')}>
-                {/* The head-and-shoulders from the assignee picker, the same
+      {/* The steps you kept, on the row.
+       * The runner takes anything approved that is not yours, so the
+       * fact worth reading off a resting row is which steps it will
+       * skip. The row's Mine press carries the same fact in its accented
+       * icon, but that icon is drawn only under the pointer and not at
+       * all below sm, so this is the only place a plan at rest says it.
+       * Steps still holding the old 'claude' value are not read here and
+       * nothing clears them. A mark, not a column: it appears on the few
+       * steps you held back, which is what makes it worth reading. */}
+      {mine && (
+        <Tooltip
+          label="Yours, so the runner will not take it. Press Not mine to give it back."
+          className="shrink-0"
+        >
+          <span className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'px-1')}>
+            {/* The head-and-shoulders from the assignee picker, the same
                     icon the Mine press uses, so the mark and the press that
                     sets it are recognisably one thing. */}
-                <CircleUser strokeWidth={1.75} aria-hidden />
-                <span className="sr-only">Marked yours</span>
-              </span>
-            </Tooltip>
-          )}
-          {/* An overhaul, on its feature row. It is built in its own order
-           * by its own routine and the runner never fires it, which is the
-           * one thing about it a resting plan would otherwise hide: its ready
-           * steps look like any other's. A word rather than an icon, because
-           * there is no glyph that already means "replaces how this works".
-           * Not on a phone, where it took the title's width beside it and a
-           * title of six words ran to three lines (plan #1688); an overhaul's
-           * summary line under the title says what it is. */}
-          {node.track === 'overhaul' && (
-            <Tooltip
-              label="An overhaul: built in order by its own routine, which Work this overhaul starts. The runner will not take it."
-              className="shrink-0 max-sm:hidden"
-            >
-              <span className={chipVariants({ tone: 'accent', size: 'sm' })}>
-                Overhaul
-              </span>
-            </Tooltip>
-          )}
-          {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
-          {/* And whether the checks passed on what it shipped in. */}
-          {node.status === 'done' && node.commitSha && (
-            <CheckMark check={commitChecks[node.commitSha]} />
-          )}
-          {/* And how long it has been going.
-           * "In progress" in the health column is a state; this is the
-           * thing you actually want to know about a step Claude is on --
-           * whether it started four minutes ago or has been sitting at
-           * "in progress" since yesterday, which is what a stuck routine
-           * looks like from here. The dot pulses because the one fact it
-           * carries is that something is happening right now. */}
-          {node.status === 'in_progress' && node.startedAt && (
-            <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
-          )}
-        </>
+            <CircleUser strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Marked yours</span>
+          </span>
+        </Tooltip>
+      )}
+      {/* An overhaul, on its feature row. It is built in its own order
+       * by its own routine and the runner never fires it, which is the
+       * one thing about it a resting plan would otherwise hide: its ready
+       * steps look like any other's. A word rather than an icon, because
+       * there is no glyph that already means "replaces how this works".
+       * Not on a phone, where it took the title's width beside it and a
+       * title of six words ran to three lines (plan #1688); an overhaul's
+       * summary line under the title says what it is. */}
+      {node.track === 'overhaul' && (
+        <Tooltip
+          label="An overhaul: built in order by its own routine, which Work this overhaul starts. The runner will not take it."
+          className="shrink-0 max-sm:hidden"
+        >
+          <span className={chipVariants({ tone: 'accent', size: 'sm' })}>Overhaul</span>
+        </Tooltip>
+      )}
+      {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
+      {/* And whether the checks passed on what it shipped in. */}
+      {node.status === 'done' && node.commitSha && (
+        <CheckMark check={commitChecks[node.commitSha]} />
+      )}
+      {/* And how long it has been going.
+       * "In progress" in the health column is a state; this is the
+       * thing you actually want to know about a step Claude is on --
+       * whether it started four minutes ago or has been sitting at
+       * "in progress" since yesterday, which is what a stuck routine
+       * looks like from here. The dot pulses because the one fact it
+       * carries is that something is happening right now. */}
+      {node.status === 'in_progress' && node.startedAt && (
+        <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
+      )}
+    </>
   );
   const priority = (
     /* Priority, and only when it says something. Nearly every step is at
@@ -1192,230 +1226,234 @@ export function usePlanRow({
            itself, drawn only while the row is under the pointer or the menu
            is being reached by keyboard: the resting row still says nothing,
            which is the whole reason Normal is silent. */
-        <span className="whitespace-nowrap">
-          {/* At Normal the size leads, so it sits where Next or Someday would
+    <span className="whitespace-nowrap">
+      {/* At Normal the size leads, so it sits where Next or Someday would
               rather than after a word that is not drawn (plan #1747). */}
-          {node.priority === 2 && node.size && (
-            <>
-              <Tooltip label={SIZE_TIP[node.size]}>
-                <span className="text-ink-muted">{node.size.toUpperCase()}</span>
-              </Tooltip>{' '}
-            </>
-          )}
-          <ActionMenu
-            label={`Priority of ${stepRef(node)} ${node.title}`}
-            items={priorityMenu}
-            align="start"
-            // Inline in the column too, so the word and the size after it stay
-            // on one line ("Next · M") rather than the size dropping under
-            // the menu's block (plan #1688).
-            className="inline-block align-baseline"
-            triggerClassName={cn(
-              'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
-              node.priority === 2 &&
-                'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
+      {node.priority === 2 && node.size && (
+        <>
+          <Tooltip label={SIZE_TIP[node.size]}>
+            <span className="text-ink-muted">{node.size.toUpperCase()}</span>
+          </Tooltip>{' '}
+        </>
+      )}
+      <ActionMenu
+        label={`Priority of ${stepRef(node)} ${node.title}`}
+        items={priorityMenu}
+        align="start"
+        // Inline in the column too, so the word and the size after it stay
+        // on one line ("Next · M") rather than the size dropping under
+        // the menu's block (plan #1688).
+        className="inline-block align-baseline"
+        triggerClassName={cn(
+          'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
+          node.priority === 2 &&
+            'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
+        )}
+        trigger={
+          <span
+            className={cn(
+              node.priority === 1 && 'text-accent',
+              node.priority === 3 && 'text-ink-ghost',
             )}
-            trigger={
-              <span
-                className={cn(
-                  node.priority === 1 && 'text-accent',
-                  node.priority === 3 && 'text-ink-ghost',
-                )}
-              >
-                {PLAN_PRIORITY_LABEL[node.priority]}
-              </span>
-            }
-          />
-          {node.priority !== 2 && node.size && (
-            <>
-              <span className="text-ink-muted">{' · '}</span>
-              <Tooltip label={SIZE_TIP[node.size]}>
-                <span className="text-ink-muted">{node.size.toUpperCase()}</span>
-              </Tooltip>
-            </>
-          )}
-        </span>
+          >
+            {PLAN_PRIORITY_LABEL[node.priority]}
+          </span>
+        }
+      />
+      {node.priority !== 2 && node.size && (
+        <>
+          <span className="text-ink-muted">{' · '}</span>
+          <Tooltip label={SIZE_TIP[node.size]}>
+            <span className="text-ink-muted">{node.size.toUpperCase()}</span>
+          </Tooltip>
+        </>
+      )}
+    </span>
   );
   const quickActions = (
     <>
-          {!closed &&
-            (quietAsk ? (
-              // Nothing is sent from here while the run is quiet: the press
-              // puts the question on the row instead, and the answer to it
-              // is what sends. The icon has no room for a question of its
-              // own, and a confirmation that appeared under the pointer and
-              // vanished with it would be no confirmation at all.
-              <RowIconButton label={sendLabel(node)} tip={sendTip(node)} onClick={() => setConfirmingSend(true)}>
-                <DashMark size="2xs" tone="brand" decorative />
-              </RowIconButton>
-            ) : (
-              <form action={sendAction}>
-                <input type="hidden" name="id" value={node.id} />
-                <RowIconButton
-                  type="submit"
-                  label={sendGoing ? MOVE_WORD.dash_working : sendLabel(node)}
-                  tip={sendGoing ? MOVE_TITLE.dash_working : sendTip(node)}
-                  pending={sendPending || sendGoing}
-                >
-                  <DashMark
-                    size="2xs"
-                    tone="brand"
-                    state={sendPending || sendGoing ? 'working' : 'idle'}
-                    decorative
-                  />
-                </RowIconButton>
-              </form>
-            ))}
-          <>
+      {!closed &&
+        (quietAsk ? (
+          // Nothing is sent from here while the run is quiet: the press
+          // puts the question on the row instead, and the answer to it
+          // is what sends. The icon has no room for a question of its
+          // own, and a confirmation that appeared under the pointer and
+          // vanished with it would be no confirmation at all.
+          <RowIconButton
+            label={sendLabel(node)}
+            tip={sendTip(node)}
+            onClick={() => setConfirmingSend(true)}
+          >
+            <DashMark size="2xs" tone="brand" decorative />
+          </RowIconButton>
+        ) : (
+          <form action={sendAction}>
+            <input type="hidden" name="id" value={node.id} />
             <RowIconButton
-              type="button"
-              label={assignLabel}
-              tip={
-                mine
-                  ? `Give this back to Dash${beneath ? ', and the steps beneath it' : ''}, so the runner can take it again.`
-                  : `Keep this for yourself${beneath ? ', and the steps beneath it' : ''}, so the runner leaves it alone.`
-              }
-              onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+              type="submit"
+              label={sendGoing ? MOVE_WORD.dash_working : sendLabel(node)}
+              tip={sendGoing ? MOVE_TITLE.dash_working : sendTip(node)}
+              pending={sendPending || sendGoing}
             >
-              {/* The head-and-shoulders the assignee picker uses for Me, and
-                  accented while the step is yours, so the icon says which way
-                  the next press goes. */}
-              <CircleUser
-                className={cn('size-3.5', mine && 'text-accent')}
-                strokeWidth={1.75}
-                aria-hidden
+              <DashMark
+                size="2xs"
+                tone="brand"
+                state={sendPending || sendGoing ? 'working' : 'idle'}
+                decorative
               />
             </RowIconButton>
-          </>
-          <RowIconButton label="Edit" tip="Edit this step's title, detail and done-when." onClick={() => setEditing(true)}>
-            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </RowIconButton>
-        </>
+          </form>
+        ))}
+      <>
+        <RowIconButton
+          type="button"
+          label={assignLabel}
+          tip={
+            mine
+              ? `Give this back to Dash${beneath ? ', and the steps beneath it' : ''}, so the runner can take it again.`
+              : `Keep this for yourself${beneath ? ', and the steps beneath it' : ''}, so the runner leaves it alone.`
+          }
+          onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+        >
+          {/* The head-and-shoulders the assignee picker uses for Me, and
+                  accented while the step is yours, so the icon says which way
+                  the next press goes. */}
+          <CircleUser
+            className={cn('size-3.5', mine && 'text-accent')}
+            strokeWidth={1.75}
+            aria-hidden
+          />
+        </RowIconButton>
+      </>
+      <RowIconButton
+        label="Edit"
+        tip="Edit this step's title, detail and done-when."
+        onClick={() => setEditing(true)}
+      >
+        <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+      </RowIconButton>
+    </>
   );
-  const edit = (
-    <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
-  );
+  const edit = <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />;
   const body = (
     <>
-          {/* What its run has done, above the questions and the thread: on a
+      {/* What its run has done, above the questions and the thread: on a
               step you opened because it says somebody is working it, this is
               the thing you opened it to find out. */}
-          {accountForRun && run && (
-            <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
-          )}
+      {accountForRun && run && (
+        <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
+      )}
 
-          {isDecision && (
-            <AnswerDecision
-              node={node}
-              action={answerAction}
-              pending={answerPending}
-              autoFocus={row.answering}
-              outlines={outlines}
-            />
-          )}
+      {isDecision && (
+        <AnswerDecision
+          node={node}
+          action={answerAction}
+          pending={answerPending}
+          autoFocus={row.answering}
+          outlines={outlines}
+        />
+      )}
 
-          {/* The drawn options on a proposal or decision, before anything
+      {/* The drawn options on a proposal or decision, before anything
               is built: what the person is being asked to approve or choose. */}
-          <PlanPictures pictures={pictures[node.id] ?? []} />
+      <PlanPictures pictures={pictures[node.id] ?? []} />
 
-          {/* A screen the critic stopped after its last round: its fixes and
+      {/* A screen the critic stopped after its last round: its fixes and
               shots, and the two ways on (plan #1610). */}
-          {criticStop && <CriticStop id={node.id} view={criticStop} />}
+      {criticStop && <CriticStop id={node.id} view={criticStop} />}
 
-          {/* The screens this step changed, before and after, as the critic
+      {/* The screens this step changed, before and after, as the critic
               passed them (plan #1541), each with a thumbs-down that reopens
               a finished step with your words on it (plan #1542). */}
-          <ScreenChanges
-            changes={screenChanges[node.number] ?? []}
-            footer={
-              node.status === 'done'
-                ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
-                : undefined
-            }
-          />
+      <ScreenChanges
+        changes={screenChanges[node.number] ?? []}
+        footer={
+          node.status === 'done'
+            ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
+            : undefined
+        }
+      />
 
-          {setupOpen && (
-            <SetupJob
-              node={node}
-              action={setupAction}
-              pending={setupPending}
-              error={setupState.error}
-              outlines={outlines}
-            />
-          )}
-        </>
+      {setupOpen && (
+        <SetupJob
+          node={node}
+          action={setupAction}
+          pending={setupPending}
+          error={setupState.error}
+          outlines={outlines}
+        />
+      )}
+    </>
   );
   const meta = (
     <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
-          <span>{scopeLabel(node.module)}</span>
-          {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
-          {node.size && <span>{SIZE_LABEL[node.size]}</span>}
-          {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
-          {when(node.startedAt) && (
-            <span>
-              Started {when(node.startedAt)}
-              {node.status === 'in_progress' && node.startedAt && (
-                <RunningFor startedAt={node.startedAt} claim={claim} />
-              )}
-            </span>
+      <span>{scopeLabel(node.module)}</span>
+      {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
+      {node.size && <span>{SIZE_LABEL[node.size]}</span>}
+      {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
+      {when(node.startedAt) && (
+        <span>
+          Started {when(node.startedAt)}
+          {node.status === 'in_progress' && node.startedAt && (
+            <RunningFor startedAt={node.startedAt} claim={claim} />
           )}
-          {when(node.completedAt) && (
-            <span>
-              {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
-            </span>
-          )}
-          {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
-          {node.status === 'done' && node.commitSha && (
-            <span
-              className={
-                commitChecks[node.commitSha]?.conclusion === 'failed' ||
-                commitChecks[node.commitSha]?.conclusion === 'unmerged'
-                  ? 'text-caution'
-                  : undefined
-              }
-            >
-              {checkLine(commitChecks[node.commitSha])}
-            </span>
-          )}
-          {/* Only where the block above is not already accounting for
+        </span>
+      )}
+      {when(node.completedAt) && (
+        <span>
+          {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
+        </span>
+      )}
+      {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
+      {node.status === 'done' && node.commitSha && (
+        <span
+          className={
+            commitChecks[node.commitSha]?.conclusion === 'failed' ||
+            commitChecks[node.commitSha]?.conclusion === 'unmerged'
+              ? 'text-caution'
+              : undefined
+          }
+        >
+          {checkLine(commitChecks[node.commitSha])}
+        </span>
+      )}
+      {/* Only where the block above is not already accounting for
               this run: two sentences about the same run on one opened row
               is one of them too many. */}
-          {run && !accountForRun && <LastRunLine run={run} />}
-        </p>
+      {run && !accountForRun && <LastRunLine run={run} />}
+    </p>
   );
   const panelActions = (
     <>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
-          >
-            {assignLabel}
-          </Button>
-          {!closed && (
-            <SendToClaude
-              node={node}
-              canSend={canSend}
-              action={sendAction}
-              pending={sendPending}
-              batchAction={batchAction}
-              batchPending={batchPending}
-              reshapeAction={reshapeAction}
-              reshapePending={reshapePending}
-              overhaulAction={overhaulAction}
-              overhaulPending={overhaulPending}
-              running={run?.status === 'started'}
-              run={run}
-              resolving={beingResolved}
-              quietAsk={quietAsk}
-              onAskQuiet={() => setConfirmingSend(true)}
-              quiet={
-                !sendState.error && !sendState.message && !batchState.error && !batchState.message
-              }
-            />
-          )}
-        </>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+      >
+        {assignLabel}
+      </Button>
+      {!closed && (
+        <SendToClaude
+          node={node}
+          canSend={canSend}
+          action={sendAction}
+          pending={sendPending}
+          batchAction={batchAction}
+          batchPending={batchPending}
+          reshapeAction={reshapeAction}
+          reshapePending={reshapePending}
+          overhaulAction={overhaulAction}
+          overhaulPending={overhaulPending}
+          running={run?.status === 'started'}
+          run={run}
+          resolving={beingResolved}
+          quietAsk={quietAsk}
+          onAskQuiet={() => setConfirmingSend(true)}
+          quiet={!sendState.error && !sendState.message && !batchState.error && !batchState.message}
+        />
+      )}
+    </>
   );
   const addChild = (
     <AddStep parentId={node.id} parentTitle={node.title} onDone={() => row.setAddingChild(false)} />
@@ -1470,11 +1508,7 @@ export function usePlanRow({
     health,
     need: waitNeed(node, resolving),
     assignee: (
-      <AssigneeCell
-        who={assignee.who}
-        working={assignee.working}
-        title={assigneeTitle(assignee)}
-      />
+      <AssigneeCell who={assignee.who} working={assignee.working} title={assigneeTitle(assignee)} />
     ),
     move: move.move ? (
       moveAfter && afterWord(move.move) ? (
@@ -1501,7 +1535,12 @@ export function usePlanRow({
           />
         )
       ) : (
-        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
+        <MoveLabel
+          move={move.move}
+          title={move.title}
+          className="max-w-full"
+          wordClassName="whitespace-normal"
+        />
       )
     ) : null,
     statusMenu,
@@ -1548,66 +1587,66 @@ export function PlanRow(props: PlanRowProps) {
   const feature = trail.length === 0 && !props.asStep && own.kind === 'build';
   return (
     <SiblingMoveProvider move={parts.moveChildren}>
-    <TreeRow
-      node={parts.node}
-      trail={trail}
-      row={parts.row}
-      health={parts.health}
-      assignee={parts.assignee}
-      need={parts.need}
-      statusMenu={parts.statusMenu}
-      menu={parts.menu}
-      actions={PLAN_TREE_ACTIONS}
-      origin={parts.origin}
-      addedBy={parts.addedBy}
-      titles={parts.refTitles}
-      titleHref={feature ? featureHref(own.number) : undefined}
-      source={props.source}
-      dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
-      marks={parts.marks}
-      priority={parts.priority}
-      quickActions={parts.quickActions}
-      notices={
-        <>
-          {parts.confirmNotice && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              {parts.confirmNotice}
-            </li>
-          )}
-          {parts.resultNotice && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              {parts.resultNotice}
-            </li>
-          )}
-        </>
-      }
-      edit={parts.edit}
-      body={parts.body}
-      meta={parts.meta}
-      panelActions={parts.panelActions}
-      addChild={parts.addChild}
-      renderChild={(child, childTrail) => (
-        <PlanRow
-          // The shared row hands back the node it was given, so this is one.
-          node={child as PlanNode}
-          trail={childTrail}
-          catalog={props.catalog}
-          canSend={props.canSend}
-          lastRuns={props.lastRuns}
-          runRaises={props.runRaises}
-          liveness={props.liveness}
-          commitChecks={props.commitChecks}
-          overhaulProgress={props.overhaulProgress}
-          criticStops={props.criticStops}
-          screenChanges={props.screenChanges}
-          pictures={props.pictures}
-          view={view}
-          searching={searching}
-          unfolded={unfolded}
-          opened={opened}
-        />
-      )}
-    />
+      <TreeRow
+        node={parts.node}
+        trail={trail}
+        row={parts.row}
+        health={parts.health}
+        assignee={parts.assignee}
+        need={parts.need}
+        statusMenu={parts.statusMenu}
+        menu={parts.menu}
+        actions={PLAN_TREE_ACTIONS}
+        origin={parts.origin}
+        addedBy={parts.addedBy}
+        titles={parts.refTitles}
+        titleHref={feature ? featureHref(own.number) : undefined}
+        source={props.source}
+        dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
+        marks={parts.marks}
+        priority={parts.priority}
+        quickActions={parts.quickActions}
+        notices={
+          <>
+            {parts.confirmNotice && (
+              <li style={inset} className="pb-1.5 pr-3 text-small">
+                {parts.confirmNotice}
+              </li>
+            )}
+            {parts.resultNotice && (
+              <li style={inset} className="pb-1.5 pr-3 text-small">
+                {parts.resultNotice}
+              </li>
+            )}
+          </>
+        }
+        edit={parts.edit}
+        body={parts.body}
+        meta={parts.meta}
+        panelActions={parts.panelActions}
+        addChild={parts.addChild}
+        renderChild={(child, childTrail) => (
+          <PlanRow
+            // The shared row hands back the node it was given, so this is one.
+            node={child as PlanNode}
+            trail={childTrail}
+            catalog={props.catalog}
+            canSend={props.canSend}
+            lastRuns={props.lastRuns}
+            runRaises={props.runRaises}
+            liveness={props.liveness}
+            commitChecks={props.commitChecks}
+            overhaulProgress={props.overhaulProgress}
+            criticStops={props.criticStops}
+            screenChanges={props.screenChanges}
+            pictures={props.pictures}
+            view={view}
+            searching={searching}
+            unfolded={unfolded}
+            opened={opened}
+          />
+        )}
+      />
     </SiblingMoveProvider>
   );
 }
@@ -1630,14 +1669,20 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   const placeholder = 'hidden shrink-0 text-micro text-ink-muted sm:inline';
   if (!progress || progress.state === 'no-spec') {
     return (
-      <Tooltip className={placeholder} label="Its detail names no spec, so there are no rule counts to show.">
+      <Tooltip
+        className={placeholder}
+        label="Its detail names no spec, so there are no rule counts to show."
+      >
         <span>No rule counts yet</span>
       </Tooltip>
     );
   }
   if (progress.state === 'missing') {
     return (
-      <Tooltip className={placeholder} label={`${progress.spec} could not be read, so its counts cannot be shown.`}>
+      <Tooltip
+        className={placeholder}
+        label={`${progress.spec} could not be read, so its counts cannot be shown.`}
+      >
         <span>No rule counts yet</span>
       </Tooltip>
     );
@@ -1668,9 +1713,12 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
         </Tooltip>
       ))}
       {progress.counts.length === 0 && (
-        <Tooltip className={placeholder} label={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
-        <span>No rule counts yet</span>
-      </Tooltip>
+        <Tooltip
+          className={placeholder}
+          label={`${progress.spec}'s Contract names no rule the row can count.${unread}`}
+        >
+          <span>No rule counts yet</span>
+        </Tooltip>
       )}
     </>
   );

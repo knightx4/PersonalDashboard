@@ -1,3 +1,4 @@
+import { isHeld, type CellStatus } from '@/lib/learn/levels/model';
 import type { Point } from './layout';
 
 /**
@@ -18,7 +19,11 @@ import type { Point } from './layout';
  */
 
 /** What is opened: a named place by its id, or the neighbourhood of an idea by the idea's id. */
-export type Opened = { kind: 'place'; id: string } | { kind: 'around'; id: string };
+export type Opened =
+  | { kind: 'place'; id: string }
+  | { kind: 'around'; id: string }
+  /** A goal's territory (plan #2187.3), by the lens's id, opened on one of its topics. */
+  | { kind: 'territory'; id: string; topic: string };
 
 export type GraphIdea = {
   id: string;
@@ -35,6 +40,8 @@ export type GraphEdge = {
   out: boolean;
   /** Drawn at rest; the others show only while one of their ends is pointed at. */
   drawn: boolean;
+  /** In a territory, a requirement: `a` requires `b`, at the levels it binds. */
+  requires?: Requirement;
 };
 
 export type IdeaGraph = {
@@ -50,6 +57,20 @@ export type IdeaGraph = {
   /** Where a tap on each idea next door goes: its place, or its neighbourhood when it is in none. */
   doors: Map<string, { opened: Opened; placeName: string | null }>;
   edges: GraphEdge[];
+  /** In a territory, each topic's ladder: its stars are topics, not ideas. */
+  ladders?: Map<string, Ladder>;
+  /** In a territory, the route through the stars you are ready for, in the order to take them. */
+  route?: RouteStep[];
+};
+
+/** One stop on a territory's route (plan #2187.4): the star, the level to take there, and its cell. */
+export type RouteStep = {
+  /** Its place on the route, from 1. */
+  n: number;
+  topicId: string;
+  level: number;
+  /** The cell Start here asks about on the first stop. */
+  cellId: string;
 };
 
 /** How many ideas next door a place shows, and a neighbourhood. */
@@ -58,17 +79,34 @@ export const NEXT_DOOR_AROUND = 6;
 /** Links drawn at rest from each idea inside the graph. */
 export const LINKS_INSIDE = 3;
 
-export function openedFrom(params: { place: string | null; around: string | null }): Opened | null {
+export function openedFrom(params: {
+  place: string | null;
+  around: string | null;
+  goal?: string | null;
+  topic?: string | null;
+}): Opened | null {
+  if (params.goal && params.topic) return { kind: 'territory', id: params.goal, topic: params.topic };
   if (params.place) return { kind: 'place', id: params.place };
   if (params.around) return { kind: 'around', id: params.around };
   return null;
 }
 
-/** The change of address that opens `to`, letting go of the idea open in the rail. */
-export function paramsFor(to: Opened): { place: string | null; around: string | null; idea: null } {
+/**
+ * The change of address that opens `to`, letting go of the idea open in the
+ * rail. Leaving a territory for a place keeps the goal chosen.
+ */
+export function paramsFor(to: Opened): {
+  place: string | null;
+  around: string | null;
+  topic: string | null;
+  idea: null;
+  goal?: string;
+} {
+  if (to.kind === 'territory') return { place: null, around: null, goal: to.id, topic: to.topic, idea: null };
   return {
     place: to.kind === 'place' ? to.id : null,
     around: to.kind === 'around' ? to.id : null,
+    topic: null,
     idea: null,
   };
 }
@@ -93,6 +131,7 @@ export function ideaGraph(
   places: readonly { id: string; name: string }[],
   opened: Opened,
 ): IdeaGraph | null {
+  if (opened.kind === 'territory') return null;
   const byId = new Map(ideas.map((idea) => [idea.id, idea]));
   const placeName = new Map(places.map((place) => [place.id, place.name]));
   const named = new Set(placeName.keys());
@@ -167,6 +206,269 @@ export function ideaGraph(
   }
 
   return { key: `${opened.kind}:${opened.id}`, opened, title, core, next, doors, edges: all };
+}
+
+// -- A territory's graph (plan #2187.3) -------------------------------------------
+
+/**
+ * One topic of a territory as its popup draws it: a star whose arc says how
+ * far up its ladder you are and whose dashed ring says where the goal wants
+ * you. Tested and held are kept apart (docs/LEARN-LEVELS-SPEC.md, "How counts
+ * are reported"): the arc is solid as far as a graded answer showed and
+ * fainter beyond it, as far as you hold by inference or declaration.
+ */
+export type Ladder = {
+  id: string;
+  name: string;
+  /** Where the sky puts the topic, in the layout's units: its frame topic's place. */
+  at: Point;
+  /** The highest level with content. */
+  ceiling: number;
+  /** The highest level a graded answer showed, 0 for none. */
+  tested: number;
+  /** The highest level held at all (shown, implied or declared), never below `tested`. */
+  held: number;
+  /** The level the goal asks for, or null when the topic is in the territory without a target. */
+  target: number | null;
+  /** Levels whose latest answer missed, lowest first. */
+  missed: number[];
+  /** The domain's colour slot, as a star's. */
+  slot: number | 'other' | 'none';
+};
+
+/**
+ * A territory's topic as the page hands it over: its ladder, where it sits
+ * in each layout (its frame topic's place on the sky), and the ideas under it.
+ */
+export type TerritoryTopicIn = Omit<Ladder, 'at'> & {
+  pca: Point;
+  neighbourMap: Point;
+  /** The ideas on the map under the topic's frame topic, which the ideas next door are drawn from. */
+  ideaIds: readonly string[];
+};
+
+/** One requirement between cells, read at topic level: `requiring` at a level needs `required` at a level. */
+export type TerritoryLinkIn = {
+  requiringTopicId: string;
+  requiringLevel: number;
+  requiredTopicId: string;
+  requiredLevel: number;
+};
+
+/** A cell inside the goal that you are ready for: one row of the fringe (lib/learn/levels/model.ts `fringe`). */
+export type TerritoryReadyIn = {
+  topicId: string;
+  level: number;
+  cellId: string;
+  /** Why it is ready, in a sentence (`fringeWhy`), where the loader wrote it (plan #2187.5). */
+  why?: string;
+};
+
+/**
+ * Why a territory's topic stands where it does (plan #2187.5): the highest
+ * level held on it, how it is held, since when, the quote of the answer that
+ * shows it, and the day it falls due a re-check. `via` names the answer that
+ * implies a level held by inference.
+ */
+export type TerritoryStanding = {
+  topicId: string;
+  level: number;
+  how: 'tested' | 'inferred' | 'declared';
+  /** The cell at that level, which a re-check asks about. */
+  cellId: string;
+  since: string;
+  dueOn: string;
+  quote: string | null;
+  via: { topicName: string; level: number } | null;
+};
+
+/** A goal's territory: its topics and the requirement links between their cells. */
+export type SkyTerritory = {
+  /** The lens the territory is the targets of. */
+  id: string;
+  name: string;
+  topics: readonly TerritoryTopicIn[];
+  links: readonly TerritoryLinkIn[];
+  /**
+   * The cells at or below the goal's targets that you are ready for, in the
+   * order the engine would ask them: the fringe, misses first, then what
+   * settles most. Absent when the loader has not read it.
+   */
+  ready?: readonly TerritoryReadyIn[];
+  /** Why each topic with a level held stands there (plan #2187.5). */
+  standing?: readonly TerritoryStanding[];
+};
+
+/** What a requirement line carries: every pair of levels it binds, lowest required level first. */
+export type Requirement = { binds: { at: number; needs: number }[] };
+
+/** How many ideas next door a territory shows round its edge. */
+export const NEXT_DOOR_TERRITORY = NEXT_DOOR_PLACE;
+/** The weight a requirement line pulls with when the graph is spread, on the similarity scale. */
+const REQUIRES_PULL = 0.8;
+/** The weight a line to an idea next door pulls with. */
+const NEXT_DOOR_PULL = 0.5;
+
+/**
+ * The route through a territory: each star you are ready for once, at the
+ * cell the engine would ask first on it, numbered in the engine's order.
+ */
+export function routeFrom(
+  ready: readonly TerritoryReadyIn[] | undefined,
+  topics: ReadonlySet<string>,
+): RouteStep[] {
+  const seen = new Set<string>();
+  const route: RouteStep[] = [];
+  for (const cell of ready ?? []) {
+    if (!topics.has(cell.topicId) || seen.has(cell.topicId)) continue;
+    seen.add(cell.topicId);
+    route.push({ n: route.length + 1, topicId: cell.topicId, level: cell.level, cellId: cell.cellId });
+  }
+  return route;
+}
+
+/** The ladder a topic shows, read off the cells' statuses (lib/learn/levels/model.ts `readCells`). */
+export function ladderFrom(cells: readonly { level: number; status: CellStatus }[]): Pick<Ladder, 'tested' | 'held' | 'missed'> {
+  let tested = 0;
+  let held = 0;
+  const missed: number[] = [];
+  for (const cell of cells) {
+    if (cell.status === 'shown') tested = Math.max(tested, cell.level);
+    if (isHeld(cell.status)) held = Math.max(held, cell.level);
+    if (cell.status === 'missed') missed.push(cell.level);
+  }
+  return { tested, held: Math.max(held, tested), missed: missed.sort((a, b) => a - b) };
+}
+
+/**
+ * The graph a territory opens as when one of its topics is tapped, or null
+ * when the territory or the topic is not on the page, so a stale link shows
+ * the whole map.
+ *
+ * - Its stars are the territory's topics, each with its ladder.
+ * - Its lines are requirement links, one per pair of topics, pointing from
+ *   the topic that requires to the topic it requires (`a` requires `b`),
+ *   carrying every level pair the cell links bind. A link within a topic is
+ *   the ladder itself and is never drawn.
+ * - At rest only the links no longer path already says are drawn, so a chain
+ *   reads as a chain; pointing at a star shows all of its links.
+ * - Round the edge, as in a place, sit the ideas next door: the ideas under
+ *   the most of the territory's topics, each joined to one topic it sits under.
+ */
+export function territoryGraph(
+  territory: SkyTerritory,
+  topicId: string,
+  ideas: readonly GraphIdea[],
+  places: readonly { id: string; name: string }[],
+  layout: 'neighbours' | 'axes' = 'neighbours',
+): IdeaGraph | null {
+  const ladders = new Map<string, Ladder>();
+  for (const t of territory.topics) {
+    ladders.set(t.id, {
+      id: t.id,
+      name: t.name,
+      at: layout === 'axes' ? t.pca : t.neighbourMap,
+      ceiling: t.ceiling,
+      tested: t.tested,
+      held: t.held,
+      target: t.target,
+      missed: t.missed,
+      slot: t.slot,
+    });
+  }
+  if (!ladders.has(topicId)) return null;
+  const core = [...ladders.keys()];
+
+  // One line per pair, requiring first.
+  const pairs = new Map<string, { a: string; b: string; binds: { at: number; needs: number }[] }>();
+  for (const link of territory.links) {
+    const { requiringTopicId: a, requiredTopicId: b } = link;
+    if (a === b || !ladders.has(a) || !ladders.has(b)) continue;
+    const key = `${a}>${b}`;
+    const pair = pairs.get(key) ?? { a, b, binds: [] };
+    if (!pair.binds.some((x) => x.at === link.requiringLevel && x.needs === link.requiredLevel)) {
+      pair.binds.push({ at: link.requiringLevel, needs: link.requiredLevel });
+    }
+    pairs.set(key, pair);
+  }
+  const requires = new Map<string, string[]>();
+  for (const { a, b } of pairs.values()) requires.set(a, [...(requires.get(a) ?? []), b]);
+  // A link is implied when another way round reaches its end.
+  const reachesOtherwise = (from: string, to: string): boolean => {
+    const seen = new Set<string>([from]);
+    const stack = (requires.get(from) ?? []).filter((n) => n !== to);
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (id === to) return true;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      stack.push(...(requires.get(id) ?? []));
+    }
+    return false;
+  };
+  const edges: GraphEdge[] = [...pairs.values()]
+    .sort((x, y) => x.a.localeCompare(y.a) || x.b.localeCompare(y.b))
+    .map(({ a, b, binds }) => ({
+      a,
+      b,
+      similarity: REQUIRES_PULL,
+      out: false,
+      drawn: !reachesOtherwise(a, b),
+      requires: { binds: binds.sort((x, y) => x.needs - y.needs || x.at - y.at) },
+    }));
+
+  // Next door: the ideas under the most topics, then the first named.
+  const byId = new Map(ideas.map((idea) => [idea.id, idea]));
+  const under = new Map<string, string[]>();
+  for (const topic of territory.topics) {
+    for (const id of topic.ideaIds) {
+      if (!byId.has(id) || ladders.has(id)) continue;
+      const list = under.get(id) ?? [];
+      if (!list.includes(topic.id)) list.push(topic.id);
+      under.set(id, list);
+    }
+  }
+  const next = [...under.entries()]
+    .sort((x, y) => y[1].length - x[1].length)
+    .slice(0, NEXT_DOOR_TERRITORY)
+    .map(([id]) => id);
+  for (const id of next) {
+    edges.push({ a: under.get(id)![0]!, b: id, similarity: NEXT_DOOR_PULL, out: true, drawn: true });
+  }
+
+  const placeName = new Map(places.map((place) => [place.id, place.name]));
+  const named = new Set(placeName.keys());
+  const doors = new Map<string, { opened: Opened; placeName: string | null }>();
+  for (const id of next) {
+    const to = openFor(byId.get(id)!, named);
+    doors.set(id, { opened: to, placeName: to.kind === 'place' ? placeName.get(to.id)! : null });
+  }
+
+  return {
+    key: `territory:${territory.id}`,
+    opened: { kind: 'territory', id: territory.id, topic: topicId },
+    title: territory.name,
+    core,
+    next,
+    doors,
+    edges,
+    ladders,
+    route: routeFrom(territory.ready, new Set(ladders.keys())),
+  };
+}
+
+/** A requirement line's label, shown while one of its ends is pointed at: the level it needs. */
+export function requirementText(requirement: Requirement): string {
+  const needs = [...new Set(requirement.binds.map((x) => x.needs))];
+  return `needs ${needs.join(', ')}`;
+}
+
+/** A star's level line, shown while it is pointed at. */
+export function ladderText(ladder: Ladder): string {
+  const parts = [`Level ${ladder.held} of ${ladder.ceiling}`];
+  if (ladder.held > ladder.tested) parts.push(ladder.tested > 0 ? `${ladder.tested} tested` : 'none tested');
+  if (ladder.target !== null) parts.push(`target ${ladder.target}`);
+  return parts.join(', ');
 }
 
 // -- Spreading it out ------------------------------------------------------------

@@ -7,6 +7,7 @@ import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { pickAhead, pickOneToAsk, type NothingToAsk, type PickedToAsk } from '@/lib/learn/graph/pick';
 import { READY_LIMIT } from '@/lib/learn/graph/ready';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
+import { predictedStrength } from '@/lib/learn/predicted';
 import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -175,6 +176,11 @@ export type FlowQuestion = {
    * marked the way a teach-back is, rather than picked from `options`.
    */
   explain?: true;
+  /**
+   * Set on a worked case (plan #2164.3): figures and a task, answered with a
+   * number or two sentences and graded as the applied rung.
+   */
+  case?: true;
 };
 
 export type SurveyAbout = { themeName: string; fieldName: string };
@@ -203,6 +209,11 @@ const QUEUED_COLUMNS =
 /** An explain question: no options, at the rung the teach-back marks at. */
 function isExplain(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
   return row.options === null && row.rung === 'defend';
+}
+
+/** A worked case on a goal's idea: no options, at the applied rung. */
+function isCase(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
+  return row.options === null && row.rung === 'apply';
 }
 
 function fail(action: string, error: { message: string }): Error {
@@ -412,7 +423,8 @@ async function claimsNow(
 
 function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
   const explain = isExplain(row);
-  if (!row.options && !explain) return null;
+  const worked = isCase(row);
+  if (!row.options && !explain && !worked) return null;
   return {
     probeId: row.id,
     conceptId: row.concept_id,
@@ -425,6 +437,7 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
     question: row.question,
     options: row.options ?? [],
     ...(explain ? { explain: true as const } : {}),
+    ...(worked ? { case: true as const } : {}),
   };
 }
 
@@ -436,7 +449,7 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
 function holds(row: QueuedRow, claims: Map<string, ClaimNow>): boolean {
   const claim = claims.get(row.concept_id);
   if (claim === undefined || claim.state !== row.picked_state) return false;
-  if (isExplain(row)) return true;
+  if (isExplain(row) || isCase(row)) return true;
   if (row.options === null) return false;
   return claim.goal === null || row.picked_recheck !== null;
 }
@@ -545,11 +558,16 @@ export async function takeWaiting(
   }
 
   for (const { row, claim } of valid.filter(({ claim }) => fits(claim, options))) {
-    // Conditional on it still being unshown, so two presses at once cannot
-    // both take the same question.
+    // Keep what Learn believes of the idea at this moment with the question
+    // (plan #2179.1). Conditional on it still being unshown, so two presses at
+    // once cannot both take the same question.
+    const now = new Date();
     const { data, error } = await supabase
       .from('probes')
-      .update({ shown_at: new Date().toISOString() })
+      .update({
+        shown_at: now.toISOString(),
+        predicted_strength: await predictedStrength(supabase, row.concept_id, now),
+      })
       .eq('id', row.id)
       .is('shown_at', null)
       .select('id');
@@ -576,7 +594,7 @@ export async function takeWaiting(
 export async function putBack(supabase: LearnSupabaseClient, probeId: string): Promise<void> {
   const { error } = await supabase
     .from('probes')
-    .update({ shown_at: null, created_at: new Date().toISOString() })
+    .update({ shown_at: null, predicted_strength: null, created_at: new Date().toISOString() })
     .eq('id', probeId)
     .not('picked_state', 'is', null)
     .is('answered_at', null);
@@ -779,6 +797,7 @@ async function writeGoals(input: {
 
   // The idea is a model call; the question is not (plan #2164.2).
   const ideaSpend = collectSpend();
+  const caseSpend = collectSpend();
   try {
     // Rotated after each question, so the next goal turn goes to the next
     // goal. A goal that cannot be written for is dropped for this round.
@@ -795,6 +814,7 @@ async function writeGoals(input: {
         anthropicApiKey: input.apiKey,
         flow: { shownAt: input.shownAt },
         onIdeaSpend: ideaSpend.sink,
+        onCaseSpend: caseSpend.sink,
       });
       if (!result.ok) {
         if (result.reason === 'error') console.error('[learn flow] goal question', result.detail);
@@ -811,13 +831,16 @@ async function writeGoals(input: {
         goal: { aimId: question.aimId, aimName: question.aimName },
         question: question.question,
         options: question.options,
-        explain: true,
+        ...(question.case ? { case: true as const } : { explain: true as const }),
       });
     }
   } catch (error) {
     console.error('[learn flow] goal question', error instanceof Error ? error.message : error);
   }
-  await recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports);
+  await Promise.all([
+    recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports),
+    recordLearnSpend(input.userId, 'write-goal-case', caseSpend.reports),
+  ]);
   return written;
 }
 

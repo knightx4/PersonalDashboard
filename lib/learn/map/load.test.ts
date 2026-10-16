@@ -67,7 +67,7 @@ const ROWS = {
 };
 
 describe('loadIdeaMap evidence (plan #2006.6)', () => {
-  it('lights an untested idea from its evidence, capped, and keeps its links strongest first', async () => {
+  it('gives an untested idea a halo from its evidence, never brightness, and keeps its links strongest first', async () => {
     const link = (id: string, weight: number, similarity: number) => ({
       id,
       target_kind: 'idea',
@@ -86,8 +86,9 @@ describe('loadIdeaMap evidence (plan #2006.6)', () => {
     const view = await loadIdeaMap(client, undefined, new Date('2026-10-14T00:00:00Z'));
     const retention = view.ideas.find((i) => i.id === 'i2')!;
     expect(retention.state).toBe('unknown');
-    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling.
-    expect(retention.strength).toBeCloseTo((1 - 0.85 * 0.65) * EVIDENCE_CEILING);
+    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling (plan #2187.1).
+    expect(retention.strength).toBe(0);
+    expect(retention.exposure).toBeCloseTo(((1 - 0.85 * 0.65) * EVIDENCE_CEILING) / EVIDENCE_CEILING);
     expect(retention.evidence.map((e) => e.id)).toEqual(['own', 'clip']);
     expect(view.ideas.find((i) => i.id === 'i3')!.evidence).toEqual([]);
   });
@@ -142,6 +143,31 @@ describe('loadIdeaMap', () => {
         'idea_topic_parents',
       ]),
     );
+  });
+
+  it('places each goal topic among the ideas its scope is about (plan #2187.2)', async () => {
+    const { client } = fakeClient({
+      ...ROWS,
+      lenses: [
+        { id: 'g', name: 'SaaS metrics goal', origin: 'goal', subject_id: null, aim_id: 'a', created_at: '2026-10-01T00:00:00Z' },
+        { id: 's', name: 'A subject', origin: 'subject', subject_id: 's1', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
+      ],
+      lens_targets: [{ lens_id: 'g', topic_id: 't1', target_level: 5, created_at: '2026-10-01T00:00:00Z' }],
+      topics: [{ id: 't1', name: 'Churn maths', ceiling: 10, status: 'approved', scope_embedding: stored(0, 0.05) }],
+    });
+    const view = await loadIdeaMap(client);
+    expect(view.goals!.map((g) => g.id)).toEqual(['g']);
+    const [star] = view.goals![0]!.stars;
+    expect(star).toMatchObject({ topicId: 't1', name: 'Churn maths', targetLevel: 5 });
+    const churn = view.ideas.find((i) => i.id === 'i1')!;
+    const ranges = view.ideas.find((i) => i.id === 'i3')!;
+    const d = (p: { x: number; y: number }) => Math.hypot(p.x - star!.neighbourMap.x, p.y - star!.neighbourMap.y);
+    expect(d(churn.neighbourMap)).toBeLessThan(d(ranges.neighbourMap));
+  });
+
+  it('reads no goals under the service role', async () => {
+    const { client } = fakeClient(ROWS);
+    expect((await loadIdeaMap(client, USER)).goals).toBeUndefined();
   });
 
   it('draws an empty map when nothing is embedded', async () => {

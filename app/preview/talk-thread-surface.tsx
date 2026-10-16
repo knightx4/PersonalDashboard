@@ -11,6 +11,7 @@ import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
 import type { TalkToolCall, TalkTurn } from '@/lib/talk/talk';
 import { PageColumn } from '@/components/shell/page-width';
+import { AskDashProvider, AskThread, type AskSource } from '@/components/shell/ask-dash';
 
 /**
  * The Ask Dash thread on its own (plan #1708): components/thread/thread.tsx
@@ -303,5 +304,51 @@ export function TalkThreadFilesSurface() {
         />
       </Card>
     </PageColumn>
+  );
+}
+
+/** Nothing in the gallery answers: every call waits, so the chat stays mid-answer. */
+const never = () => new Promise<never>(() => {});
+const WAITING_SOURCE: AskSource = {
+  ask: never,
+  recent: never,
+  open: never,
+  poll: never,
+  costs: never,
+  label: never,
+  confirm: never,
+  decline: never,
+  undo: never,
+  save: never,
+};
+
+/**
+ * A chat in the middle of an answer (plan #2262.2): Dash's earlier message
+ * once, the follow-up just sent, and the loading line under it. The loading
+ * state is the surface itself; nothing is hovered or open.
+ */
+export function TalkThreadWaitingSurface() {
+  return (
+    <AskDashProvider source={WAITING_SOURCE}>
+      <PageColumn className="py-4">
+        <Card padding="standard">
+          <AskThread
+            id="talk-thread-waiting-preview"
+            conversationRef="00000000-0000-4000-8000-000000000062"
+            turns={[
+              { id: 'q1', role: 'user', body: 'What did I spend on food delivery in July?', createdAt: at(11) },
+              {
+                id: 'a1',
+                role: 'assistant',
+                body: 'You spent $299.40 on food delivery in July across 14 orders, which is close to your usual $300 a month.',
+                createdAt: at(11),
+              },
+            ]}
+            label="Ask a follow-up"
+            pendingQuestion="And in August?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
   );
 }

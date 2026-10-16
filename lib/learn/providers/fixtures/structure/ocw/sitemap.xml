@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- https://ocw.mit.edu/sitemap.xml fetched live 2026-10-16. Excerpt: 15 of the index's 2,590 entries (15.43x, 11.00x, the 18.06 family and the three 6.006 offerings), each as served. -->
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://ocw.mit.edu/sitemap-www.xml</loc>
+  </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-001j-introduction-to-urban-design-and-development-spring-2006/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-002j-making-public-policy-fall-2014/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-003j-methods-of-policy-analysis-spring-2016/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-005-introduction-to-international-development-spring-2015/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-006-poverty-and-economic-security-fall-2016/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/11-007-resolving-public-disputes-spring-2005/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/15-431-entrepreneurial-finance-spring-2011/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/15-433-investments-spring-2003/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/18-065-matrix-methods-in-data-analysis-signal-processing-and-machine-learning-spring-2018/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/18-06ci-linear-algebra-communications-intensive-spring-2004/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/18-06sc-linear-algebra-fall-2011/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-fall-2011/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2008/sitemap.xml</loc>
+      </sitemap><sitemap>
+        <loc>https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/sitemap.xml</loc>
+      </sitemap>
+</sitemapindex>

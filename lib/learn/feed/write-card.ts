@@ -187,7 +187,11 @@ export function whyLine(
   >,
 ): string {
   if (card.reason === 'video') return 'From a video on your playlist.';
-  if (card.reason === 'researched' && card.research) return researchWhy(card.research.question);
+  if (card.reason === 'researched' && card.research) {
+    // A brief under a goal (plan #2184.1) says so, the way a goal's own cards do.
+    const why = researchWhy(card.research.question);
+    return card.aimName?.trim() ? `${why} For your goal: ${card.aimName.trim()}.` : why;
+  }
   if (card.reason === 'goal' && card.aimName && card.besideTopic?.trim()) {
     return `${besideLine(card.besideTopic)} For your goal: ${card.aimName.trim()}.`;
   }

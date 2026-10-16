@@ -50,6 +50,7 @@ export const goalsActions: ModuleActions = {
   },
   'app/goals/[goalId]/learn-actions.ts': {
     setLearnDepth: none('setting'),
+    setLearnKind: none('setting', 'Which kind of goal it is steers which sources a draft pulls; Dash sorts it on save and the person corrects it here.'),
   },
   'app/goals/[goalId]/document-actions.ts': {
     readIntoFormAction: none(

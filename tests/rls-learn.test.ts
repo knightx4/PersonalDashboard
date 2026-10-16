@@ -114,6 +114,7 @@ describe('RLS coverage', () => {
       'catalogue_passages',
       'catalogue_providers',
       'catalogue_segments',
+      'catalogue_structures',
       'cell_claims',
       'cell_evidence',
       'cell_links',
@@ -133,6 +134,7 @@ describe('RLS coverage', () => {
       'essay_research',
       'essays',
       'evidence_links',
+      'external_checks',
       'feed_cards',
       'goals',
       'graph_moves',
@@ -170,6 +172,7 @@ describe('RLS coverage', () => {
       'subjects',
       'theme_fields',
       'topic_cells',
+      'topic_structure_pulls',
       'topics',
       'track_offers',
       'tracks',
@@ -428,7 +431,15 @@ describe('the catalogue, which belongs to nobody', () => {
   // one person's graph -- and it gets the usual treatment.
   // catalogue_passages (learn 0070) is shared the same way: paragraph cuts of
   // article sections, searched but never anybody's.
-  const SHARED = ['catalogue_providers', 'catalogue_items', 'catalogue_segments', 'catalogue_passages'];
+  // catalogue_structures (learn 0160) holds what a syllabus or table of
+  // contents carries beyond its units, shared the same way.
+  const SHARED = [
+    'catalogue_providers',
+    'catalogue_items',
+    'catalogue_segments',
+    'catalogue_passages',
+    'catalogue_structures',
+  ];
 
   it('lets any signed-in user read the shared catalogue', async () => {
     await admin`

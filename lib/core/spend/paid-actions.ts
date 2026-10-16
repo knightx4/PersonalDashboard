@@ -52,6 +52,8 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
   'app/learn/b/[id]/actions.ts#retryBrief': ['research-topic'],
+  // Learn: a research brief's topic drafted under a goal (plan #2184.1)
+  'app/learn/b/[id]/actions.ts#draftBriefTopics': ['draft-topic', 'embed-topic-scope'],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
   // Learn: a question in the chat on a reading's page (plan #1876.5)
@@ -143,6 +145,7 @@ export const PAID_ACTIONS = {
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
   'app/learn/quiz/[id]/actions.ts#writeQuestions': ['write-quiz-questions'],
   'app/learn/quiz/[id]/take/actions.ts#answerQuiz': ['grade-quiz-answer'],
+  'app/learn/settings/external/actions.ts#answerExternal': ['grade-quiz-answer'],
 
   // Learn: reading lists
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],
@@ -218,7 +221,7 @@ export const PAID_ACTIONS = {
   // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
   // placed and given a plan after the response (plan #1490), as one added
   // from the old New goal form was.
-  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'write-curriculum'],
+  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
   // The header's notes button (plan #1950.5): the note is triaged once it
   // has saved (plan #1179), as it was from the old popover.
   'app/capture-actions.ts#makeAimedCapture:dev-note': ['triage-note'],
@@ -233,7 +236,7 @@ export const PAID_ACTIONS = {
   'app/goals/home-actions.ts#askDashAction': ['reply-to-goal-comment'],
   // A new goal from Ask Dash in the Learn area is placed and given a plan, as
   // Add goal's is (plan #1490). The hint shows for that area alone.
-  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim', 'write-curriculum'],
+  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
 
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)

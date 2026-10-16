@@ -188,7 +188,7 @@ export const MOMENTS: readonly Moment[] = [
   {
     workspace: 'learn',
     name: 'An idea lights up',
-    trigger: 'Opening Idea Space after being tested on an idea, or saying you know one, in the last two days.',
+    trigger: 'Opening Idea Space after being tested on an idea in the last two days.',
     sees: 'Those ideas, up to three, start dark and brighten together to the strength each is known at, while the rest of the sky holds still. A line under the map names them.',
     reducedMotion: 'The sky is lit as it stands at once, and the line under the map names the same ideas.',
     state: {

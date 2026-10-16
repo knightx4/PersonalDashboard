@@ -4,14 +4,22 @@ import {
   NEXT_DOOR_PLACE,
   graphHeight,
   ideaGraph,
+  ladderFrom,
+  ladderText,
   nodeBox,
   openFor,
   openedFrom,
+  paramsFor,
   readableName,
+  routeFrom,
+  requirementText,
   spreadGraph,
+  territoryGraph,
   wrapName,
   type GraphIdea,
+  type SkyTerritory,
   type SpreadNode,
+  type TerritoryTopicIn,
 } from './place-graph';
 import { overlaps } from './sky';
 
@@ -189,5 +197,143 @@ describe('names in full', () => {
     expect(readableName('net_interest_margin')).toBe('Net interest margin');
     expect(readableName('Already words_here and spaced')).toBe('Already words_here and spaced');
     expect(readableName('Plain')).toBe('Plain');
+  });
+});
+
+describe('a territory as a graph (plan #2187.3)', () => {
+  const ladder = (id: string, extra: Partial<TerritoryTopicIn> = {}): TerritoryTopicIn => ({
+    id,
+    name: `Topic ${id}`,
+    pca: { x: 0, y: 0 },
+    neighbourMap: { x: id.charCodeAt(0) / 100, y: 0 },
+    ceiling: 8,
+    tested: 0,
+    held: 0,
+    target: 5,
+    missed: [],
+    slot: 0,
+    ideaIds: [],
+    ...extra,
+  });
+  const link = (a: string, at: number, b: string, needs: number) => ({
+    requiringTopicId: a,
+    requiringLevel: at,
+    requiredTopicId: b,
+    requiredLevel: needs,
+  });
+  const territory: SkyTerritory = {
+    id: 'g',
+    name: 'A goal',
+    topics: [
+      ladder('a', { ideaIds: ['a1', 'a2'] }),
+      ladder('b', { ideaIds: ['a2', 'b1'] }),
+      ladder('c', { ideaIds: ['a2'] }),
+    ],
+    // c requires b, b requires a, and c requires a directly too; a link within a topic is its ladder.
+    links: [
+      link('c', 3, 'b', 2),
+      link('c', 5, 'b', 4),
+      link('b', 2, 'a', 3),
+      link('c', 2, 'a', 1),
+      link('a', 2, 'a', 1),
+    ],
+  };
+
+  it('draws its topics as the stars, opened on the topic tapped', () => {
+    const graph = territoryGraph(territory, 'b', fixture(), PLACES)!;
+    expect(graph.key).toBe('territory:g');
+    expect(graph.opened).toEqual({ kind: 'territory', id: 'g', topic: 'b' });
+    expect(graph.title).toBe('A goal');
+    expect(graph.core).toEqual(['a', 'b', 'c']);
+    expect(graph.ladders!.get('a')!.at).toEqual({ x: 0.97, y: 0 });
+    const axes = territoryGraph(territory, 'b', fixture(), PLACES, 'axes')!;
+    expect(axes.ladders!.get('a')!.at).toEqual({ x: 0, y: 0 });
+  });
+
+  it('makes each line a requirement pointing at the topic required, with every level pair it binds', () => {
+    const graph = territoryGraph(territory, 'a', fixture(), PLACES)!;
+    const requires = graph.edges.filter((x) => x.requires);
+    expect(requires.map((x) => `${x.a}>${x.b}`)).toEqual(['b>a', 'c>a', 'c>b']);
+    const cb = requires.find((x) => x.a === 'c' && x.b === 'b')!;
+    expect(cb.requires!.binds).toEqual([
+      { at: 3, needs: 2 },
+      { at: 5, needs: 4 },
+    ]);
+    expect(requirementText(cb.requires!)).toBe('needs 2, 4');
+  });
+
+  it('leaves a link a longer path already says off at rest, and shows it while pointed at', () => {
+    const graph = territoryGraph(territory, 'a', fixture(), PLACES)!;
+    const drawn = (a: string, b: string) => graph.edges.find((x) => x.a === a && x.b === b)!.drawn;
+    expect(drawn('c', 'b')).toBe(true);
+    expect(drawn('b', 'a')).toBe(true);
+    expect(drawn('c', 'a')).toBe(false);
+  });
+
+  it('puts the ideas under the most topics next door, each with one line out', () => {
+    const graph = territoryGraph(territory, 'a', fixture(), PLACES)!;
+    expect(graph.next[0]).toBe('a2');
+    expect(new Set(graph.next)).toEqual(new Set(['a1', 'a2', 'b1']));
+    const out = graph.edges.filter((x) => x.out);
+    expect(out).toHaveLength(3);
+    expect(out.every((x) => x.drawn && !x.requires)).toBe(true);
+    expect(graph.doors.get('b1')).toEqual({ opened: { kind: 'place', id: 'B' }, placeName: 'Place B' });
+  });
+
+  it('shows the whole map for a topic not in the territory', () => {
+    expect(territoryGraph(territory, 'zz', fixture(), PLACES)).toBeNull();
+    expect(ideaGraph(fixture(), PLACES, { kind: 'territory', id: 'g', topic: 'a' })).toBeNull();
+  });
+
+  it('reads the address of a territory before a place, and leaves it keeping the goal', () => {
+    expect(openedFrom({ place: 'A', around: null, goal: 'g', topic: 't' })).toEqual({
+      kind: 'territory',
+      id: 'g',
+      topic: 't',
+    });
+    expect(openedFrom({ place: 'A', around: null, goal: 'g', topic: null })).toEqual({ kind: 'place', id: 'A' });
+    expect(paramsFor({ kind: 'territory', id: 'g', topic: 't' })).toEqual({
+      place: null,
+      around: null,
+      goal: 'g',
+      topic: 't',
+      idea: null,
+    });
+    expect(paramsFor({ kind: 'place', id: 'A' })).toEqual({ place: 'A', around: null, topic: null, idea: null });
+  });
+
+  it('reads a ladder off the cells, keeping tested apart from held', () => {
+    expect(
+      ladderFrom([
+        { level: 1, status: 'implied' },
+        { level: 2, status: 'shown' },
+        { level: 3, status: 'implied' },
+        { level: 4, status: 'missed' },
+        { level: 5, status: 'declared' },
+        { level: 6, status: 'open' },
+      ]),
+    ).toEqual({ tested: 2, held: 5, missed: [4] });
+    expect(ladderFrom([])).toEqual({ tested: 0, held: 0, missed: [] });
+  });
+
+  it('says a star level line with tested apart and the target', () => {
+    const base = { id: 'x', name: 'X', at: { x: 0, y: 0 }, ceiling: 8, missed: [], slot: 0 };
+    expect(ladderText({ ...base, tested: 2, held: 5, target: 6 })).toBe('Level 5 of 8, 2 tested, target 6');
+    expect(ladderText({ ...base, tested: 0, held: 3, target: null })).toBe('Level 3 of 8, none tested');
+    expect(ladderText({ ...base, tested: 4, held: 4, target: 4 })).toBe('Level 4 of 8, target 4');
+  });
+
+  it('numbers the route one star at a time, in the order given, leaving out stars that are not in the territory', () => {
+    const ready = [
+      { topicId: 'b', level: 4, cellId: 'c1' },
+      { topicId: 'zz', level: 1, cellId: 'c2' },
+      { topicId: 'a', level: 2, cellId: 'c3' },
+      { topicId: 'b', level: 5, cellId: 'c4' },
+    ];
+    expect(routeFrom(ready, new Set(['a', 'b']))).toEqual([
+      { n: 1, topicId: 'b', level: 4, cellId: 'c1' },
+      { n: 2, topicId: 'a', level: 2, cellId: 'c3' },
+    ]);
+    expect(routeFrom(undefined, new Set(['a']))).toEqual([]);
   });
 });

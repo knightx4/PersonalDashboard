@@ -209,6 +209,7 @@ export async function writeLevel3Question(input: {
       question: asked.question,
       options: [],
       explain: true,
+      case: false,
     },
   };
 }
