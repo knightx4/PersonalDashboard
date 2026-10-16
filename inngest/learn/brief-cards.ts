@@ -2,8 +2,10 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { CardToWrite, WriteResult } from '@/lib/learn/feed/write-card';
+import { readSections, readSubQuestions } from '@/lib/learn/briefs/model';
 import {
   briefCardToWrite,
+  briefSectionSources,
   planBriefCards,
   type BriefCardJob,
   type BriefSource,
@@ -19,6 +21,9 @@ import {
  * the idea as a concept and fills the row in. A write that fails leaves the
  * row picked, and the hourly top-up writes it.
  *
+ * A brief under a goal (plan #2184.1) also has a card for each answered
+ * sub-question, from its section, and every card it claims carries the goal.
+ *
  * Runs with the service client, so every read and write names the person.
  */
 
@@ -31,7 +36,17 @@ export type BriefCardPassResult = {
   stopped: string | null;
 };
 
-type BriefJoin = { question: string; angle: string | null; status: string; archived_at: string | null };
+type BriefJoin = {
+  id: string;
+  question: string;
+  angle: string | null;
+  status: string;
+  archived_at: string | null;
+  aim_id: string | null;
+  sub_questions: unknown;
+  sections: unknown;
+  aim: { name: string } | { name: string }[] | null;
+};
 type ReadingRow = {
   id: string;
   user_id: string;
@@ -63,44 +78,71 @@ async function readSources(
     .from('readings')
     .select(
       'id, user_id, brief_id, title, open_url, given_text, summary, ' +
-        'brief:briefs!readings_brief_fk(question, angle, status, archived_at)',
+        'brief:briefs!readings_brief_fk(id, question, angle, status, archived_at, aim_id, sub_questions, sections, ' +
+        'aim:aims!briefs_aim_fk(name))',
     )
     .not('brief_id', 'is', null);
   if (scope.userId) query = query.eq('user_id', scope.userId);
   if (scope.briefId) query = query.eq('brief_id', scope.briefId);
   const { data, error } = await query;
   if (error) throw new Error(`Reading the briefs' sources failed: ${error.message}`);
-  return ((data ?? []) as unknown as ReadingRow[]).flatMap((row): BriefSource[] => {
+  const rows = (data ?? []) as unknown as ReadingRow[];
+  const pages: BriefSource[] = [];
+  const briefs = new Map<string, { brief: BriefJoin; userId: string; titles: Map<string, string> }>();
+  for (const row of rows) {
     const brief = one(row.brief);
-    if (!brief || brief.status !== 'ready' || brief.archived_at) return [];
+    if (!brief || brief.status !== 'ready' || brief.archived_at) continue;
     const title = row.title?.trim() || hostOf(row.open_url) || 'A source';
-    return [
+    const aimName = one(brief.aim)?.name ?? null;
+    const aim = brief.aim_id && aimName ? { id: brief.aim_id, name: aimName } : null;
+    pages.push({
+      readingId: row.id,
+      userId: row.user_id,
+      briefId: row.brief_id,
+      question: brief.question,
+      angle: brief.angle ?? '',
+      title,
+      givenText: row.given_text,
+      summary: row.summary,
+      aim,
+    });
+    if (!aim) continue;
+    const held = briefs.get(row.brief_id) ?? { brief, userId: row.user_id, titles: new Map<string, string>() };
+    held.titles.set(row.id, title);
+    briefs.set(row.brief_id, held);
+  }
+  const sections = [...briefs.values()].flatMap(({ brief, userId, titles }) => {
+    const aimName = one(brief.aim)?.name ?? '';
+    return briefSectionSources(
       {
-        readingId: row.id,
-        userId: row.user_id,
-        briefId: row.brief_id,
+        id: brief.id,
+        userId,
         question: brief.question,
         angle: brief.angle ?? '',
-        title,
-        givenText: row.given_text,
-        summary: row.summary,
+        aim: { id: brief.aim_id!, name: aimName },
+        subQuestions: readSubQuestions(brief.sub_questions),
+        sections: readSections(brief.sections),
       },
-    ];
+      titles,
+    );
   });
+  // A goal's section cards first: they are the next cards on the goal.
+  return [...sections, ...pages];
 }
 
 async function readStored(learn: LearnSupabaseClient, readingIds: string[]): Promise<StoredBriefCard[]> {
   if (readingIds.length === 0) return [];
   const { data, error } = await learn
     .from('feed_cards')
-    .select('id, reading_id, status')
+    .select('id, reading_id, status, idea_index')
     .eq('reason', 'researched')
     .in('reading_id', readingIds);
   if (error) throw new Error(`Reading the briefs' cards failed: ${error.message}`);
-  return ((data ?? []) as { id: string; reading_id: string; status: string }[]).map((row) => ({
+  return ((data ?? []) as { id: string; reading_id: string; status: string; idea_index: number }[]).map((row) => ({
     id: row.id,
     readingId: row.reading_id,
     status: row.status,
+    ideaIndex: row.idea_index,
   }));
 }
 
@@ -112,9 +154,13 @@ async function claim(learn: LearnSupabaseClient, source: BriefSource): Promise<s
       user_id: source.userId,
       reason: 'researched',
       reading_id: source.readingId,
-      idea_index: 0,
+      idea_index: source.ideaIndex ?? 0,
       named_article: source.title,
-      pick_basis: `A source found researching "${source.question.slice(0, 300)}".`,
+      aim_id: source.aim?.id ?? null,
+      aim_name: source.aim?.name ?? null,
+      pick_basis: source.section
+        ? `An answer from researching "${source.question.slice(0, 300)}": ${source.section.subQuestion.slice(0, 300)}`
+        : `A source found researching "${source.question.slice(0, 300)}".`,
     })
     .select('id')
     .single();
@@ -140,7 +186,7 @@ export async function writeBriefCards(
 ): Promise<BriefCardPassResult> {
   const result: BriefCardPassResult = { written: 0, dropped: 0, failed: 0, stopped: null };
   const sources = await readSources(learn, { userId: options.userId, briefId: options.briefId });
-  const jobs = planBriefCards(sources, await readStored(learn, sources.map((source) => source.readingId)));
+  const jobs = planBriefCards(sources, await readStored(learn, [...new Set(sources.map((source) => source.readingId))]));
 
   const writeOne = async (job: BriefCardJob) => {
     const cardId = job.cardId ?? (await claim(learn, job.source));

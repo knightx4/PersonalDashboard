@@ -52,6 +52,8 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
   'app/learn/b/[id]/actions.ts#retryBrief': ['research-topic'],
+  // Learn: a research brief's topic drafted under a goal (plan #2184.1)
+  'app/learn/b/[id]/actions.ts#draftBriefTopics': ['draft-topic', 'embed-topic-scope'],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
   // Learn: a question in the chat on a reading's page (plan #1876.5)

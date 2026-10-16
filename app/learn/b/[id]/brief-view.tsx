@@ -31,6 +31,8 @@ import {
 } from '@/lib/learn/briefs/view';
 import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
+import { GoalPanel } from './goal-panel';
+import type { BriefGoalPanel } from '@/lib/learn/briefs/topics';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
 import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
@@ -311,7 +313,17 @@ function NewSince({ sources }: { sources: BriefSource[] }) {
   );
 }
 
-function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
+function Rail({
+  brief,
+  sourcesFound,
+  goal,
+  goalShown,
+}: {
+  brief: BriefOnPage;
+  sourcesFound: number;
+  goal?: BriefGoalPanel;
+  goalShown?: { pending?: boolean; error?: string };
+}) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
   const toast = useToast();
@@ -338,6 +350,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
           </span>
         </p>
       </CardSection>
+      {goal && brief.status === 'ready' && <GoalPanel briefId={brief.id} panel={goal} shown={goalShown} />}
       <CardSection title="New sources">
         <label htmlFor={switchId} className="flex min-h-11 items-center justify-between gap-3 lg:min-h-8">
           <span>
@@ -425,7 +438,8 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
  *
  * `live` is off in the gallery; `openQuote` and `editing` draw a hidden part
  * open there (a quote's source as `<sub-question id>:<index>`, and the short
- * answer's editor).
+ * answer's editor). `goal` is the rail's goal section (plan #2184.1), and
+ * `goalShown` draws its press mid-draft or failed.
  */
 export function BriefView({
   page,
@@ -433,8 +447,13 @@ export function BriefView({
   openQuote,
   editing = false,
   path,
+  goal,
+  goalShown,
 }: {
   page: BriefPage;
+  /** The goals to put the brief under and the topics drafted from it; absent when they could not be read. */
+  goal?: BriefGoalPanel;
+  goalShown?: { pending?: boolean; error?: string };
   live?: boolean;
   openQuote?: string;
   editing?: boolean;
@@ -485,5 +504,5 @@ export function BriefView({
     </div>
   );
 
-  return <MainRail main={main} rail={<Rail brief={brief} sourcesFound={sourcesFound} />} />;
+  return <MainRail main={main} rail={<Rail brief={brief} sourcesFound={sourcesFound} goal={goal} goalShown={goalShown} />} />;
 }

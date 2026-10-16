@@ -446,6 +446,23 @@ territory's canon. On the first tick, when fewer than two documents about the
 goal are stored, the providers the goal's kind names are run first
 (`lib/learn/catalogue/structure-pull-for-goal.ts`).
 
+A **research brief** (`learn.briefs`) can be drafted from too (plan #2184.1).
+On a ready brief's page, the person chooses the learning goal the question
+belongs to and presses Draft its topic. Each page the brief quotes becomes one
+source, labelled with the brief's question and the page's title, and the
+quoted words are its lines. The goal's performances are the ones its newest
+drafted topic was given, since a goal keeps none of its own. The draft is the
+topic the question is about, and the topics its links need are drafted from
+the same pages on its page. A web page is not a syllabus, so every row the
+pages support is emerging, and a row they do not support is marked personal
+before approval as above. The draft keeps the brief and the goal on
+`topics.drafting.brief`. Approving it adds the topic to the goal's lens at the
+goal's depth and records the goal on the brief (`briefs.aim_id`, learn 0163).
+From then on, every card written from the brief carries the goal, and each
+answered sub-question gets a card of its own, written from the brief's section
+(Dash's answer and the words it quotes). Those cards are written as soon as
+the topic is approved.
+
 ## Migration from the claims graph
 
 On 9 October 2026 the live data held 106 subjects, 384 concepts, 158 edges,
