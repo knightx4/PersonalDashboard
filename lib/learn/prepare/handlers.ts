@@ -20,7 +20,8 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { CURRICULUM_MODEL, writeCurriculum } from '@/lib/learn/graph/curriculum';
 import { draftTopicsStep, writeUnitsStep, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
-import { finishStep, type StepHandler } from './run';
+import { finishPreparationStep } from './finish-step';
+import type { StepHandler } from './run';
 import { loadRunTerritory, saveRunTerritory } from './store';
 import type { PreparationStepKey } from './steps';
 import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKindRow } from './structure-steps';
@@ -31,7 +32,7 @@ import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKin
  * A key missing here is skipped by the runner with the plan step that builds
  * it, so the run still reaches its end. classify, pull_documents and
  * match_weeks are here from #2276.3, compile_territory from #2276.4,
- * draft_topics and write_units from #2276.5.
+ * draft_topics and write_units from #2276.5, and finish from #2276.6.
  */
 export type PreparationDeps = {
   learn: LearnSupabaseClient;
@@ -363,6 +364,43 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     },
   });
 
+  const finish = finishPreparationStep({
+    territory: (runId) => loadRunTerritory(learn, userId, runId),
+    async firstUnit(subjectId) {
+      const { data, error } = await learn
+        .from('curriculum_units')
+        .select('title')
+        .eq('user_id', userId)
+        .eq('subject_id', subjectId)
+        .order('ordinal', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`Reading the first unit failed: ${error.message}`);
+      return (data as { title: string } | null)?.title ?? null;
+    },
+    async drafted(asks) {
+      const { data, error } = await learn.from('topics').select('id, asked, name').eq('user_id', userId).in('asked', [...asks]);
+      if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
+      return new Map(
+        ((data ?? []) as { id: string; asked: string; name: string }[]).map((t) => [t.asked.trim().toLowerCase(), { id: t.id, name: t.name }]),
+      );
+    },
+    async catalogue(itemIds) {
+      const rows = await sql()<
+        { item_id: string; provider: string; licence_mode: string | null; rights: string | null; units: number }[]
+      >`
+        select i.id as item_id, p.name as provider, c.licence_mode, coalesce(i.licence, p.licence) as rights,
+               (select count(*)::int from learn.catalogue_segments s where s.item_id = i.id) as units
+          from learn.catalogue_items i
+          join learn.catalogue_providers p on p.id = i.provider_id
+          left join learn.catalogue_structures c on c.item_id = i.id
+         where i.id = any(${[...itemIds]}::uuid[])`;
+      return new Map(
+        rows.map((r) => [r.item_id, { provider: r.provider, licence: r.licence_mode, rights: r.rights, units: r.units }]),
+      );
+    },
+  });
+
   return {
     classify,
     pull_documents: pull,
@@ -370,6 +408,6 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     compile_territory: compile,
     draft_topics: draftTopics,
     write_units: writeUnits,
-    finish: finishStep,
+    finish,
   };
 }

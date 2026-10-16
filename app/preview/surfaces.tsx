@@ -264,7 +264,10 @@ import {
   LearnSubjectPrepareEmptySurface,
   LearnSubjectPrepareFailedSurface,
   LearnSubjectPrepareFinishedSurface,
+  LearnSubjectPrepareSourcesEmptySurface,
+  LearnSubjectPrepareSourcesFoldedSurface,
   LearnSubjectPrepareStartingSurface,
+  LearnSubjectPrepareStartSurface,
   LearnSubjectPrepareSurface,
 } from './learn-prepare-surfaces';
 import {
@@ -9191,6 +9194,27 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareEmptySurface />,
+  },
+  {
+    id: 'learn-subject-prepare-start',
+    label: 'Subject · Prepared, Start here and Sources',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-sources-empty',
+    label: 'Subject · Prepared with no documents, topic still a draft',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSourcesEmptySurface />,
+  },
+  {
+    id: 'learn-subject-prepare-sources-folded',
+    label: 'Subject · Sources folded once read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

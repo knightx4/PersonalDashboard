@@ -34,8 +34,10 @@ import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
 import { PullCourse } from './pull-course';
 import { PreparationBlock } from './prepare';
+import { SourcesSection, StartHere } from './sources';
 import { loadPreparation } from '@/lib/learn/prepare/store';
-import { preparationView } from '@/lib/learn/prepare/view';
+import { loadStartTopic } from '@/lib/learn/prepare/start-load';
+import { preparationSources, preparationView } from '@/lib/learn/prepare/view';
 import {
   countStates,
   learningOrder,
@@ -306,6 +308,16 @@ export default async function SubjectPage({
     : null;
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
+  // Where a finished preparation says to start, and what it came from (plan
+  // #2276.6). The topic is read as it stands, since it is approved after the
+  // run; one that cannot be read leaves the name the run recorded.
+  const sources = preparation ? preparationSources(preparation) : null;
+  const startTopic = sources?.start.topic
+    ? await loadStartTopic(supabase, user.id, sources.start.topic.id).catch(() => null)
+    : null;
+  // The card stays until the first unit is done; the curriculum's Next takes over from there.
+  const firstRow = unitRows[0] ?? null;
+  const showStart = sources !== null && (firstRow === null || firstRow.state !== 'done');
   const live =
     units.length > 0
       ? outside
@@ -405,8 +417,17 @@ export default async function SubjectPage({
 
       {/* While the subject is being prepared this leads the page; once the run
           is finished it is one line (plan #2276.2). */}
-      {preparation !== undefined && !showEverything && (
+      {/* Finished, it gives way to the Start here card, and its line opens
+          the Sources section under the curriculum (plan #2276.6). */}
+      {preparation !== undefined && !showEverything && !sources && (
         <PreparationBlock subjectId={id} view={preparationView(preparation)} />
+      )}
+      {sources && showStart && !showEverything && (
+        <StartHere
+          unit={firstRow ? { ordinal: firstRow.unit.ordinal, title: firstRow.unit.title, covers: firstRow.unit.covers } : null}
+          topic={startTopic}
+          draftedName={sources.start.topic?.name ?? null}
+        />
       )}
 
       {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
@@ -509,6 +530,8 @@ export default async function SubjectPage({
           />
         ))
       )}
+
+      {sources && !showEverything && <SourcesSection subjectId={id} sources={sources} readings={learning.readings} />}
 
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}

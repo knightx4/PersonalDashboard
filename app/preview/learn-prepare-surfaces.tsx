@@ -1,11 +1,14 @@
 'use client';
 
 import { PreparationBlock } from '@/app/learn/s/[id]/prepare';
+import { SourcesSection, StartHere } from '@/app/learn/s/[id]/sources';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import type { SubjectReading } from '@/lib/learn/chat/subject-load';
+import type { FinishDetail } from '@/lib/learn/prepare/finish-step';
 import type { PreparationRow, PreparationStepRow } from '@/lib/learn/prepare/run';
 import { PREPARATION_STEPS, type PreparationStepKey } from '@/lib/learn/prepare/steps';
-import { preparationView } from '@/lib/learn/prepare/view';
+import { preparationSources, preparationView } from '@/lib/learn/prepare/view';
 
 /**
  * A subject's preparation on its page (plan #2276.2), drawn at each stage of
@@ -176,5 +179,179 @@ export function LearnSubjectPrepareEmptySurface() {
     <Page>
       <PreparationBlock live={false} subjectId={SUBJECT_ID} view={preparationView(null)} />
     </Page>
+  );
+}
+
+// Finished: Start here and Sources (plan #2276.6) -------------------------
+
+const START_TOPIC_ID = '00000000-0000-4000-8000-00000000e276';
+
+const FINISH_DETAIL: FinishDetail = {
+  start: {
+    unit: 'Recurring revenue and how it is counted',
+    topic: { id: START_TOPIC_ID, name: 'Monthly recurring revenue', ask: 'monthly recurring revenue' },
+  },
+  documents: [
+    {
+      itemId: 'a1',
+      title: 'MGT 452: Metrics and Unit Economics for Subscription Businesses, Spring 2025 syllabus',
+      provider: 'Open Syllabus',
+      url: 'https://example.edu/mgt452',
+      licence: 'structure_only',
+      rights: 'Copyright of the instructor; structure only',
+      units: 14,
+      used: true,
+    },
+    {
+      itemId: 'a2',
+      title: 'Principles of Accounting, Volume 1: Revenue recognition',
+      provider: 'OpenStax',
+      url: 'https://openstax.org/books/principles-financial-accounting',
+      licence: 'never_feed',
+      rights: 'CC BY 4.0; headings only',
+      units: 9,
+      used: true,
+    },
+    {
+      itemId: 'a3',
+      title: 'Software as a service',
+      provider: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Software_as_a_service',
+      licence: 'show',
+      rights: 'CC BY-SA 4.0',
+      units: 6,
+      used: true,
+    },
+    {
+      itemId: 'a4',
+      title: 'Customer acquisition cost',
+      provider: 'Wikipedia',
+      url: 'https://en.wikipedia.org/wiki/Customer_acquisition_cost',
+      licence: 'show',
+      rights: 'CC BY-SA 4.0',
+      units: 3,
+      used: false,
+    },
+    {
+      itemId: 'a5',
+      title: 'ECON 310 Industrial Organisation reading list',
+      provider: 'Open Syllabus',
+      url: 'https://example.edu/econ310',
+      licence: 'structure_only',
+      rights: null,
+      units: 10,
+      used: true,
+    },
+  ],
+  frames: ['Revenue recognition', 'Customer lifetime value', 'Unit economics', 'Cohort analysis', 'Pricing strategy'],
+};
+
+const READINGS: SubjectReading[] = [
+  { id: 'r1', title: 'The SaaS metrics that matter, and the ones that mislead', status: 'reading', why: null, pending: false },
+  { id: 'r2', title: 'Why net revenue retention above 100% changes the maths of growth', status: 'queued', why: null, pending: false },
+  { id: 'r3', title: 'Bessemer: State of the Cloud 2025', status: 'read', why: null, pending: false },
+];
+
+function finishedSources(detail: FinishDetail) {
+  const sources = preparationSources(
+    prep(
+      { status: 'done', finishedAt: '2026-10-16T09:07:20Z' },
+      {
+        classify: CLASSIFIED,
+        pull_documents: { ...PULLED, counts: { documents: detail.documents.length } },
+        match_weeks: MATCHED,
+        compile_territory: { status: 'done' },
+        draft_topics: { status: 'done', counts: { topics: 31 } },
+        write_units: { status: 'done', counts: { units: 4 } },
+        finish: { status: 'done', counts: { seconds: 440 }, detail },
+      },
+    ),
+  );
+  if (!sources) throw new Error('A finished run has sources.');
+  return sources;
+}
+
+const UNIT = {
+  ordinal: 1,
+  title: 'Recurring revenue and how it is counted',
+  covers: 'What counts as recurring, how monthly and annual figures relate, and where bookings and revenue part ways.',
+};
+
+const UNIT_TITLES = [
+  'Recurring revenue and how it is counted',
+  'Churn, retention and expansion',
+  'What a customer costs to win',
+  'Reading a board deck',
+];
+
+function Curriculum() {
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum · 0 of 4 units done</h2>
+      <ol className={cn(cardVariants(), 'divide-y divide-border')}>
+        {UNIT_TITLES.map((title, i) => (
+          <li key={title} className="card-pad text-body font-semibold text-ink">
+            <span className="mr-1.5 text-ink-muted tabular-nums">{i + 1}.</span>
+            {title}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** A prepared subject opening on Start here, with every source listed under the curriculum. */
+export function LearnSubjectPrepareStartSurface() {
+  return (
+    <div>
+      <StartHere
+        unit={UNIT}
+        topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: true, cellId: '00000000-0000-4000-8000-00000000f276' }}
+        draftedName="Monthly recurring revenue"
+      />
+      <Curriculum />
+      <SourcesSection live={false} subjectId={SUBJECT_ID} sources={finishedSources(FINISH_DETAIL)} readings={READINGS} />
+    </div>
+  );
+}
+
+/** No documents stored, and the first topic still a draft. */
+export function LearnSubjectPrepareSourcesEmptySurface() {
+  return (
+    <div>
+      <StartHere
+        unit={UNIT}
+        topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: false, cellId: null }}
+        draftedName="Monthly recurring revenue"
+      />
+      <Curriculum />
+      <SourcesSection
+        live={false}
+        subjectId={SUBJECT_ID}
+        sources={finishedSources({ ...FINISH_DETAIL, documents: [] })}
+        readings={[]}
+      />
+    </div>
+  );
+}
+
+/** A later visit, once the section has been read: folded to its count. */
+export function LearnSubjectPrepareSourcesFoldedSurface() {
+  return (
+    <div>
+      <StartHere
+        unit={UNIT}
+        topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: true, cellId: '00000000-0000-4000-8000-00000000f276' }}
+        draftedName="Monthly recurring revenue"
+      />
+      <Curriculum />
+      <SourcesSection
+        live={false}
+        defaultOpen={false}
+        subjectId={SUBJECT_ID}
+        sources={finishedSources(FINISH_DETAIL)}
+        readings={READINGS}
+      />
+    </div>
   );
 }
