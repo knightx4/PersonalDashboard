@@ -51,6 +51,9 @@ export function changeHref(change: DashChange): string {
       return noteHref(change.input.path);
     case 'start_build':
       return planRefHref(change.input.number);
+    // A paid press (plan #2228.1): the page it writes on.
+    case 'paid_action':
+      return change.input.paths[0] ?? '/home';
   }
 }
 
@@ -243,6 +246,9 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: `#${change.input.outline} ${change.input.title}`,
         rest: '',
       };
+    // The tool wrote the whole line when it queued the press (plan #2228.1).
+    case 'paid_action':
+      return { verb: done ? 'Ran:' : 'Will run:', what: change.input.line, rest: '' };
   }
 }
 
@@ -294,5 +300,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the note';
     case 'start_build':
       return 'Open the step';
+    case 'paid_action':
+      return 'Open the page';
   }
 }

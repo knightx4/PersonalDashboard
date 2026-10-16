@@ -1,20 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { recordSessionSpend } from '@/lib/core/spend/session';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { detectPosting } from '@/lib/jobs/ats';
-import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
-import { scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
-import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
+import { startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
 import { isDismissReason } from '@/lib/jobs/suggest/feedback';
-import { loadLatestRun, recordRuns, startRun } from '@/lib/jobs/suggest/search-runs';
-import { createCoreClient } from '@/lib/core/auth/server';
-import { jevEnabledFor } from '@/lib/jev/enabled';
-import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * Dash's recommendations (job_search.suggestions, 0028): the roles and the
@@ -36,29 +28,14 @@ export type SuggestState = { error: string | null; message?: string };
 
 const SuggestionId = z.string().uuid();
 
-function suggestMessage(written: number, what: string): SuggestState {
-  if (written === 0) return { error: null, message: `Dash found no ${what} worth suggesting right now.` };
-  return { error: null };
-}
-
 // latency: pending -- a model call; the button says it is working
 export async function suggestPeople(): Promise<SuggestState> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Suggestions are not configured.' };
   const user = await requireUser();
-  const supabase = await createClient();
-
-  let result;
-  try {
-    result = await runSuggestionsFor(supabase, user.id, { apiKey, kinds: ['reach_out'], force: true });
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'The suggestions could not be made.' };
-  }
-  await recordSessionSpend(user.id, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
+  const result = await suggestPeopleFor(user.id, apiKey);
   revalidatePaths();
-  if (result.reach_out.error) return { error: result.reach_out.error };
-  if (!result.reach_out.ran) return { error: null, message: 'Write a career goals entry or add a role first.' };
-  return suggestMessage(result.reach_out.written, 'new people');
+  return result.error ? { error: result.error } : result.message ? { error: null, message: result.message } : { error: null };
 }
 
 /**
@@ -74,83 +51,9 @@ export async function suggestOpenings(): Promise<SuggestState> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Suggestions are not configured.' };
   const user = await requireUser();
-  const supabase = await createClient();
-
-  const latest = await loadLatestRun(supabase, user.id, 'apply');
-  if (latest?.state === 'running') return { error: null, message: 'A search is already running.' };
-  const runId = await startRun(supabase, user.id, 'apply', 'button');
-  if (!runId) return { error: 'The search could not be started.' };
-  const progress = recordRuns(supabase, user.id, 'button', { apply: runId });
-  const began = Date.now();
-
-  after(async () => {
-    let result;
-    // Roles at discovered startups are scored before they are written when
-    // Jev is on, and what that costs is recorded as scoring.
-    const discoveredSpend: SpendReport[] = [];
-    const jev = (await jevEnabledFor(await createCoreClient(), user.id))
-      ? { onSpend: (report: SpendReport) => discoveredSpend.push(report) }
-      : null;
-    try {
-      result = await runSuggestionsFor(supabase, user.id, {
-        apiKey,
-        kinds: ['apply'],
-        force: true,
-        progress,
-        // The search gets what is left of the page's five minutes; past this
-        // it goes on as a Message Batch (lib/jobs/suggest/search-batch.ts).
-        deadline: began + SEARCH_BUDGET_MS,
-        jev,
-      });
-    } catch (error) {
-      await progress.finish('apply', {
-        written: 0,
-        error: error instanceof Error ? error.message : 'The search could not be made.',
-      });
-      return;
-    }
-    const outcome = result.apply;
-    await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, outcome.spend);
-    await recordSessionSpend(user.id, { module: 'jobs', operation: 'score-openings' }, discoveredSpend);
-    if (!outcome.ran) {
-      await progress.finish('apply', { written: 0, error: 'Write a career goals entry or add a role first.' });
-      return;
-    }
-    // Carried on as a batch: the run stays queued, and the collector stores
-    // what it finds and closes it.
-    if (outcome.queued) return;
-    if (outcome.error || outcome.written === 0) {
-      await progress.finish('apply', { written: outcome.written, error: outcome.error });
-      return;
-    }
-
-    // Read and score the new roles now with what is left of the five
-    // minutes; whatever does not fit is done by tomorrow's daily run.
-    const left = () => AFTER_BUDGET_MS - (Date.now() - began);
-    if (left() > 30_000) {
-      await progress.stage('apply', 'postings', { written: outcome.written });
-      await checkOpeningPostings(supabase, user.id, { budgetMs: Math.min(60_000, left() - 25_000) }).catch((err) =>
-        console.error('[jobs suggestions] posting check', err instanceof Error ? err.message : err),
-      );
-    }
-    if (left() > 20_000 && (await jevEnabledFor(await createCoreClient(), user.id))) {
-      await progress.stage('apply', 'scoring');
-      const scoreSpend: SpendReport[] = [];
-      await scoreOpeningsFor(supabase, user.id, { onSpend: (report) => scoreSpend.push(report), limit: 20 }).catch(
-        (err) => console.error('[jobs suggestions] score', err instanceof Error ? err.message : err),
-      );
-      await recordSessionSpend(user.id, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
-    }
-    await progress.finish('apply', { written: outcome.written, error: null });
-  });
-
-  return { error: null };
+  const started = await startOpeningSearchFor(user.id, apiKey);
+  return started.error ? { error: started.error } : started.message ? { error: null, message: started.message } : { error: null };
 }
-
-/** How long the run after the response may take, inside the Find page's maxDuration of 300 seconds. */
-const AFTER_BUDGET_MS = 270_000;
-/** The part of it the board reads and the web search may use; the rest stores what they found. */
-const SEARCH_BUDGET_MS = 255_000;
 
 async function closeSuggestion(
   id: string,

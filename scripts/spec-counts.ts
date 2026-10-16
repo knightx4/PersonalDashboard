@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { actionGaps } from '../lib/agent-actions/catalogue';
+import { actionGaps, unconvertedPaidButtons } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
@@ -619,6 +619,15 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'server actions an agent should be able to do and has no tool for',
     target: 0,
     measure: () => actionGaps(),
+  },
+  {
+    // Plan #2228.6: the paid buttons Dash cannot yet press. Plan #2228 gives
+    // each one a paid tool or a stated reason; this counts the ones with
+    // neither, and a new paid button must start with one of the two.
+    name: 'unconverted-paid-buttons',
+    counts: "paid buttons catalogued as none('spends') with no reason and no tool",
+    target: 0,
+    measure: () => unconvertedPaidButtons(),
   },
   {
     name: 'ai-on-controls',
