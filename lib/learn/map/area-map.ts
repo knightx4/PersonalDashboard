@@ -73,6 +73,27 @@ function weightedNearest(
 }
 
 /**
+ * Places any vectors on a map already built from `ideas`, as a field is
+ * placed: projected onto the axes, and pulled to its six nearest ideas on the
+ * neighbour map. Learn's topics go on the sky this way from their scope's
+ * embedding (plan #2187.2). With no ideas nothing can be placed, and the
+ * result is empty.
+ */
+export function placeVectors(
+  ideas: readonly IdeaVector[],
+  map: IdeaMap,
+  vectors: readonly { id: string; vector: readonly number[] }[],
+): AreaPlacement[] {
+  if (ideas.length === 0) return [];
+  const positions = new Map(map.ideas.map((idea) => [idea.id, idea.neighbourMap]));
+  return vectors.map((v) => ({
+    id: v.id,
+    pca: project(v.vector, map.projection),
+    neighbourMap: weightedNearest(v.vector, ideas, positions),
+  }));
+}
+
+/**
  * Places `fields` and `domains` on a map already built from `ideas`. `map`
  * must be `buildIdeaMap(ideas)`; ideas and fields must share a vector width.
  */

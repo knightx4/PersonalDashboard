@@ -145,6 +145,31 @@ describe('loadIdeaMap', () => {
     );
   });
 
+  it('places each goal topic among the ideas its scope is about (plan #2187.2)', async () => {
+    const { client } = fakeClient({
+      ...ROWS,
+      lenses: [
+        { id: 'g', name: 'SaaS metrics goal', origin: 'goal', subject_id: null, aim_id: 'a', created_at: '2026-10-01T00:00:00Z' },
+        { id: 's', name: 'A subject', origin: 'subject', subject_id: 's1', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
+      ],
+      lens_targets: [{ lens_id: 'g', topic_id: 't1', target_level: 5, created_at: '2026-10-01T00:00:00Z' }],
+      topics: [{ id: 't1', name: 'Churn maths', ceiling: 10, status: 'approved', scope_embedding: stored(0, 0.05) }],
+    });
+    const view = await loadIdeaMap(client);
+    expect(view.goals!.map((g) => g.id)).toEqual(['g']);
+    const [star] = view.goals![0]!.stars;
+    expect(star).toMatchObject({ topicId: 't1', name: 'Churn maths', targetLevel: 5 });
+    const churn = view.ideas.find((i) => i.id === 'i1')!;
+    const ranges = view.ideas.find((i) => i.id === 'i3')!;
+    const d = (p: { x: number; y: number }) => Math.hypot(p.x - star!.neighbourMap.x, p.y - star!.neighbourMap.y);
+    expect(d(churn.neighbourMap)).toBeLessThan(d(ranges.neighbourMap));
+  });
+
+  it('reads no goals under the service role', async () => {
+    const { client } = fakeClient(ROWS);
+    expect((await loadIdeaMap(client, USER)).goals).toBeUndefined();
+  });
+
   it('draws an empty map when nothing is embedded', async () => {
     const { client } = fakeClient({});
     const view = await loadIdeaMap(client);

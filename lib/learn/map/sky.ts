@@ -77,6 +77,12 @@ export const SKY = {
   /** The lines and rings that join an idea to its six nearest. */
   thread: 'rgba(255, 255, 255, 0.5)',
   ring: 'rgba(255, 255, 255, 0.8)',
+  /**
+   * A chosen goal (plan #2187.2): the faint lines where one of its topics
+   * requires another, and the thin dashed ring round each topic at its target.
+   */
+  constellation: 'rgba(214, 222, 255, 0.38)',
+  target: 'rgba(232, 236, 255, 0.85)',
   /** A star with no domain colour. */
   plain: '#c9cfe6',
   /** The zoom buttons and the hover card, which sit on the sky in every theme. */

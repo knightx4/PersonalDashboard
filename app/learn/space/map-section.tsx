@@ -23,7 +23,8 @@ import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/le
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
-import { StarSky, type SkyName, type SkyTopic, type Star } from './star-sky';
+import { StarSky, type Constellation, type SkyName, type SkyTopic, type Star } from './star-sky';
+import { ringRadius } from '@/lib/learn/map/goals';
 import { StarSwatch, TopicSwatch } from './swatch';
 import { MapTimeline } from './timeline';
 import { backedByText } from '@/lib/learn/evidence/model';
@@ -96,6 +97,21 @@ export function MapSection({
     [view.topics, layout],
   );
   const graph = useOpenGraph(view);
+  // The goal chosen in the rail, as lines and rings (plan #2187.2).
+  const constellation: Constellation | null = useMemo(() => {
+    const goal = params.goal ? view.goals?.find((g) => g.id === params.goal) : undefined;
+    if (!goal) return null;
+    const at = (star: (typeof goal.stars)[number]) => (layout === 'axes' ? star.pca : star.neighbourMap);
+    const byId = new Map(goal.stars.map((star) => [star.topicId, at(star)]));
+    return {
+      stars: goal.stars.map((star) => ({ id: star.topicId, name: star.name, at: at(star), ring: ringRadius(star.targetLevel) })),
+      lines: goal.links.flatMap((link) => {
+        const from = byId.get(link.from);
+        const to = byId.get(link.to);
+        return from && to ? [{ from, to }] : [];
+      }),
+    };
+  }, [params.goal, view.goals, layout]);
 
   // The timeline: the day shown, and the map relit as it stood then.
   const today = useMemo(() => new Date(view.asOf), [view.asOf]);
@@ -182,6 +198,7 @@ export function MapSection({
             label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as your answers say you know it`}
             pointingAt={pointingAt}
             graph={graph}
+            constellation={constellation}
           />
           {!graph && <AxisEndsBelow axes={axes} />}
         </div>

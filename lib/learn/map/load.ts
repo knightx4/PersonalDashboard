@@ -10,6 +10,10 @@ import { EVIDENCE_COLUMNS } from '@/lib/learn/evidence/links';
 import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from '@/lib/learn/evidence/model';
 import type { SkyTerritory } from './place-graph';
 import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
+import { readCells } from '@/lib/learn/levels/model';
+import { placeAreas, placeVectors, type DomainPlacement, type FieldPlacement } from './area-map';
+import { goalsOnMap, type GoalOnMap, type TopicPlacement } from './goals';
+import { loadGoalRows } from './goals-load';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 import type { Point } from './layout';
 import { lightOn } from './sky';
@@ -96,6 +100,11 @@ export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
    * the graph a chosen goal's topic opens. Undefined where nothing loads them.
    */
   territories?: SkyTerritory[];
+   * Your open learning goals, each with its topics placed on the sky and the
+   * requirements between them (plan #2187.2). Null when they could not be
+   * read; left out where nothing reads them, as in most gallery entries.
+   */
+  goals?: GoalOnMap[] | null;
 };
 
 type ConceptRow = {
@@ -149,7 +158,7 @@ export async function loadIdeaMap(
       return query.order(order).range(from, to) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
     };
 
-  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows, topicRows] = await Promise.all([
+  const [concepts, states, subjects, fields, domains, placeRead, dustRows, evidenceRows, topicRows, goalRows] = await Promise.all([
     readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding, created_at', 'id')),
     readAll<StateRow>(
       own(
@@ -185,6 +194,14 @@ export async function loadIdeaMap(
       console.error('[learn idea map] topics', error instanceof Error ? error.message : error);
       return null;
     }),
+    // Your goals (plan #2187.2), read through the session only. Without them
+    // the rail has no goals to choose and the sky draws as before.
+    userId
+      ? Promise.resolve(null)
+      : loadGoalRows(learn).catch((error: unknown) => {
+          console.error('[learn idea map] goals', error instanceof Error ? error.message : error);
+          return null;
+        }),
   ]);
 
   const evidenceOf = new Map<string, EvidenceRow[]>();
@@ -294,9 +311,24 @@ export async function loadIdeaMap(
       )
     : null;
 
+  let goals: GoalOnMap[] | null | undefined;
+  if (goalRows) {
+    const vectors = goalRows.vectors.flatMap((row) => {
+      const vector = parseVector(row.embedding);
+      return vector ? [{ id: row.id, vector }] : [];
+    });
+    const placedTopics = new Map<string, TopicPlacement>(
+      placeVectors(ideaVectors, map, vectors).map((p) => [p.id, { pca: p.pca, neighbourMap: p.neighbourMap }]),
+    );
+    goals = goalsOnMap(goalRows.lenses, goalRows.map, readCells(goalRows.map), placedTopics);
+  } else if (!userId) {
+    goals = null;
+  }
+
   return {
     ...map,
     topics,
+    goals,
     missing: concepts.length - embedded.length,
     asOf: asOf.toISOString(),
     places,

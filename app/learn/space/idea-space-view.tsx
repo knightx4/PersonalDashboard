@@ -18,6 +18,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { PlaceRail } from './place-rail';
 import { RecordingCard } from './recording-card';
 import { TopicRail } from './topic-rail';
+import { GoalRail } from './goal-rail';
 import { NextTopicsCard } from './next-topics-card';
 import type { NextTopic } from '@/lib/learn/map/next-topics';
 import { NOT_RECORDING, viewFor, type Recording } from '@/lib/learn/map/recording';
@@ -52,6 +53,7 @@ export function IdeaSpaceView({
   chooseOpen,
   zoomOn,
   nextTopics,
+  holdNext,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -73,6 +75,8 @@ export function IdeaSpaceView({
    * be read, undefined where nothing loads them.
    */
   nextTopics?: NextTopic[] | null;
+  /** The gallery holds this goal's next rung open in the rail (plan #2187.2). */
+  holdNext?: string | null;
 }) {
   const [recording, setRecording] = useState(saved);
   // Names are made private here, once, so nothing below can draw one.
@@ -138,6 +142,7 @@ export function IdeaSpaceView({
         rail={
           <>
             <ChosenIdea ideas={view.ideas} places={view.places} />
+            <GoalRail goals={view.goals} holdNext={holdNext} />
             <PlaceRail view={view} />
             <TopicRail frame={view.topics} />
             <NextTopicsCard topics={nextTopics} />

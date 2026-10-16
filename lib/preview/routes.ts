@@ -323,6 +323,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-idea-space-recording-choose': ['/learn/space'],
   'learn-idea-space-evidence': ['/learn/space'],
   'learn-idea-space-topics': ['/learn/space'],
+  'learn-idea-space-goal': ['/learn/space'],
+  'learn-idea-space-goal-next': ['/learn/space'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],

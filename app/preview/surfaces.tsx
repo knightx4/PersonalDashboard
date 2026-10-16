@@ -51,6 +51,8 @@ import {
   IdeaSpaceTerritoryHoverSurface,
   IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
+  IdeaSpaceGoalSurface,
+  IdeaSpaceGoalNextSurface,
 } from './idea-space-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
@@ -6776,6 +6778,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceTopicsSurface />,
+  },
+  {
+    /* A learning goal chosen in the rail on the sky of ten thousand ideas
+     * (plan #2187.2): its topics ringed at their targets and joined where
+     * one requires another. Fixtures in idea-space-goals.tsx. */
+    id: 'learn-idea-space-goal',
+    label: 'Learn · Idea Space, a goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalSurface />,
+  },
+  {
+    /* The goals in the rail with none chosen, and one row's next rung held
+     * open as hovering it shows it (plan #2187.2). */
+    id: 'learn-idea-space-goal-next',
+    label: 'Learn · Idea Space, the next rung of a goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalNextSurface />,
   },
   {
     /* Clips before any are cut. */
