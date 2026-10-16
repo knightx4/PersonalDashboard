@@ -156,6 +156,8 @@ describe('the operation names', () => {
       'assign-topics',
       'name-course-topics',
       'grade-course-explain',
+      'propose-structure-sources',
+      'match-structure-units',
     ]);
   });
 });
