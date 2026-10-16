@@ -17,6 +17,7 @@ import {
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
+import { DeleteDialog } from './delete-dialog';
 import { PaidCard, type PaidChange } from './paid-card';
 
 /**
@@ -106,6 +107,8 @@ export function DashChangeRow({
   const [change, setChange] = useState(given);
   const [error, setError] = useState<string | null>(null);
   const [pressing, setPressing] = useState<Press | null>(null);
+  // The "Are you sure?" popup of a proposed delete (plan #2232.2).
+  const [confirming, setConfirming] = useState(false);
   const [, startPress] = useTransition();
   const toast = useToast();
 
@@ -130,6 +133,7 @@ export function DashChangeRow({
         onChanged?.(next);
       }
       if (!outcome.ok) setError(outcome.error);
+      if (outcome.ok) setConfirming(false);
       const reopen = presses.reopen;
       if (outcome.ok && which === 'decline' && reopen) {
         toast({
@@ -194,9 +198,18 @@ export function DashChangeRow({
             size="sm"
             pending={pressing === 'confirm'}
             disabled={pressing !== null}
-            onClick={() => press('confirm')}
+            onClick={() => {
+              if (change.kind === 'delete_rows') {
+                setError(null);
+                setConfirming(true);
+              } else press('confirm');
+            }}
           >
-            {pressing === 'confirm' ? (change.kind === 'start_build' ? 'Starting…' : 'Writing…') : 'Confirm'}
+            {pressing === 'confirm' && !confirming
+              ? change.kind === 'start_build'
+                ? 'Starting…'
+                : 'Writing…'
+              : 'Confirm'}
           </Button>
           <CloseButton
             lifecycle="declined"
@@ -237,7 +250,21 @@ export function DashChangeRow({
 
       {settled && <ChangeStatus change={change} />}
 
-      <FieldError>{error}</FieldError>
+      {change.kind === 'delete_rows' && change.status === 'proposed' && confirming && (
+        <DeleteDialog
+          count={change.input.count}
+          titles={change.input.titles}
+          pending={pressing === 'confirm'}
+          error={error}
+          onDelete={() => press('confirm')}
+          onCancel={() => {
+            setError(null);
+            setConfirming(false);
+          }}
+        />
+      )}
+
+      {!confirming && <FieldError>{error}</FieldError>}
     </div>
   );
 }
