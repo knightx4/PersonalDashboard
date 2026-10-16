@@ -648,33 +648,52 @@ export function planLiveness(
 }
 
 /**
- * Which open state speaks for a subtree, most pressing first.
+ * Which open state speaks for a subtree, first match wins.
  *
- * Only consulted for a closed row that still has open rows beneath it, and
- * only to pick which of them to report. The order is "how much does this stop
- * the work": a question nobody has answered, then a step that said what is
- * holding it up, then a proposal nobody has accepted, and so on down to a step
- * simply not reached yet.
+ * A row with open steps beneath it reports what is left to do there, not what
+ * its own status column says: the column on a feature is set by hand and
+ * mostly never is. Ordered by what the person can do next:
+ *
+ * - Anything ready means work can be picked up, so the row says Ready however
+ *   much else beneath it is stuck.
+ * - Then anything underway, since the subtree is moving.
+ * - Then anything stopped on you: a question, a setup job, a block, a claim
+ *   nobody is working, a proposal nobody has accepted.
+ * - Then anything waiting on another step or a day, which clears itself.
+ * - Last, steps nobody has reached.
  */
 const OPEN_HEALTH_RANK: readonly PlanHealth[] = [
+  'ready',
+  'working',
+  'quiet',
+  'in_progress',
   'unanswered',
-  // Beside the question and above the block, because both are on your desk
-  // and this is the one you can finish tonight: nothing is being worked out,
-  // there is a job with your name on it.
   'setup',
   'blocked',
-  // A claim nobody is working is more pressing than a proposal: the step has
-  // been handed over and stopped, so it needs sending again, and a feature
-  // reporting the proposal beneath it instead would hide that.
   'abandoned',
   'proposed',
   'waiting',
-  'quiet',
-  'working',
-  'in_progress',
-  'ready',
   'not_started',
 ];
+
+/**
+ * What the open rows directly beneath this one say, by `OPEN_HEALTH_RANK`.
+ *
+ * Direct children only: each child's own health is already the rollup of its
+ * subtree, so a grandchild that is ready makes its parent ready, which makes
+ * this row ready. Null when nothing beneath it is open.
+ */
+function openHealthBeneath(
+  node: { children?: readonly PlanNode[] },
+  liveness?: PlanLiveness,
+): PlanHealth | null {
+  const healths = new Set(
+    (node.children ?? [])
+      .filter((child) => !isDismissed(child))
+      .map((child) => healthOf(child, liveness)),
+  );
+  return OPEN_HEALTH_RANK.find((health) => healths.has(health)) ?? null;
+}
 
 /** Every row beneath this one, at any depth. */
 function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
@@ -714,14 +733,8 @@ export function healthOf(
   // Dropped as well as done: a step decided against with live work under it is
   // the same wrong answer, and the open rows are the ones that need seeing.
   if (isClosed(node.status)) {
-    const open = descendantsOf(node).filter(
-      (child) => !isClosed(child.status) && !isDismissed(child),
-    );
-    if (open.length > 0) {
-      const healths = new Set(open.map((child) => healthOf(child, liveness)));
-      const worst = OPEN_HEALTH_RANK.find((health) => healths.has(health));
-      if (worst) return worst;
-    }
+    const beneath = openHealthBeneath(node, liveness);
+    if (beneath) return beneath;
   }
 
   // A decision not yet settled is a question, whatever else is true of it.
@@ -791,31 +804,17 @@ export function healthOf(
       return 'dropped';
     case 'not_started':
       if (isWaiting(node)) return 'waiting';
-      // A feature is blocked when nothing beneath it can move.
-      //
-      // Since `isReady` stopped letting a feature's own blocked column hold
-      // its steps down, that column is no longer where a feature's block
-      // comes from -- it comes from the steps, the same way progress and
-      // "started" already do. A feature whose every open step is blocked has
-      // nothing anybody can pick up, and reading "Not started" over five
-      // stopped steps is the plan describing itself wrongly on the one screen
-      // that is opened to find what is stuck.
-      //
-      // Every open step, not any: one blocked step beside a step that can be
-      // worked leaves the feature open, which is the whole point.
-      if (blockedBeneath(node)) return 'blocked';
-      // Work has plainly started once some of it is finished.
-      //
-      // A feature's own status column is set by hand and mostly never is: it
-      // is created `not_started` and left there while the steps beneath it are
-      // picked up and closed one at a time. So a feature with four of seven
-      // steps done went on reading "Not started", which is the one thing it
-      // demonstrably is not, and the progress bar beside it said so on the
-      // same line.
-      //
-      // Read from the subtree rather than from the row, the same way the
-      // closed-over-open case above is, so it is a fact about the plan instead
-      // of a fact about when somebody last edited a parent.
+      // A feature reports what is left beneath it (`OPEN_HEALTH_RANK`):
+      // Ready if any step can be picked up, then underway, then stopped on
+      // you, then waiting. Its own column is created `not_started` and left
+      // there while the steps are worked, so it says nothing about them.
+      {
+        const beneath = openHealthBeneath(node, liveness);
+        if (beneath && beneath !== 'not_started') return beneath;
+      }
+      // Steps nobody has reached, under a feature some of whose steps are
+      // finished: work has plainly started, and the progress bar beside it
+      // says so on the same line.
       if (startedBeneath(node)) return 'in_progress';
       return node.ready ? 'ready' : 'not_started';
   }
@@ -829,24 +828,6 @@ export function healthOf(
  * Dismissed rows are excluded for the reason they always are -- putting a row
  * aside is how it stops counting.
  */
-/**
- * Every open row beneath this one is blocked, and there is at least one.
- *
- * `isBlocked` rather than the status column, so a step whose block named steps
- * that have all since closed counts as one that can move -- it is about to be
- * offered to the runner, and a feature reading blocked over it would be
- * reporting a wait the plan no longer has a record of.
- *
- * Dismissed rows are out for the reason they always are: putting a row aside
- * is how it stops counting.
- */
-function blockedBeneath(node: { children?: readonly PlanNode[] }): boolean {
-  const open = descendantsOf(node).filter(
-    (child) => !isClosed(child.status) && !isDismissed(child),
-  );
-  return open.length > 0 && open.every((child) => isBlocked(child));
-}
-
 function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
   return descendantsOf(node).some(
     (child) =>

@@ -12,7 +12,7 @@ import { evidenceFromRows, type EvidenceLink, type EvidenceRow } from './model';
  */
 
 export const EVIDENCE_COLUMNS =
-  'id, target_kind, target_id, source_kind, source_id, similarity, weight, basis, found_at, matched_by';
+  'id, target_kind, target_id, source_kind, source_id, similarity, kind, ceiling, basis, found_at, matched_by, band_low, band_high, tested_level';
 
 type LoadOptions = {
   /** Links kept per target. */
@@ -46,7 +46,7 @@ export async function loadEvidenceForTargets(
     .select(EVIDENCE_COLUMNS)
     .eq('target_kind', targetKind)
     .in('target_id', targetIds)
-    .order('weight', { ascending: false });
+    .order('ceiling', { ascending: false });
   if (options.userId) query = query.eq('user_id', options.userId);
 
   const { data, error } = await query;

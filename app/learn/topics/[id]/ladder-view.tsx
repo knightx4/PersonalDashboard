@@ -28,7 +28,8 @@ export const STATUS_GLYPH: Record<CellStatus, GlyphName> = {
   open: 'empty',
 };
 
-export type LadderOpen = { quotes?: number; edit?: number };
+/** `backing` opens the topic page's What backs it fold (plan #2172.2). */
+export type LadderOpen = { quotes?: number; edit?: number; backing?: boolean };
 
 function Evidence({
   row,

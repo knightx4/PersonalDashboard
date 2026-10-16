@@ -421,6 +421,15 @@ the claims graph now. Each call's cost goes to the spend ledger in `core`.
 The first twenty drafts are the measurement for the cost line this spec does
 not yet have.
 
+A **territory** is a list of topics drafted together from one set of sources
+(plan #2172.6). Its definition sits in `lib/learn/levels/territories/`: the
+texts as published, the role phrases, the performances, and each topic with
+the source lines that put it on the list, the Level 4 frame topic it refines
+and its target. `/api/cron/territory-draft?territory=<key>` drafts the topics
+not yet drafted, a few a call, each with the same two-draft call and checks
+as above, then sets the frame topic and adds the target to the subject's
+lens. It is fired by hand, since every call spends, and approves nothing.
+
 ## Migration from the claims graph
 
 On 9 October 2026 the live data held 106 subjects, 384 concepts, 158 edges,

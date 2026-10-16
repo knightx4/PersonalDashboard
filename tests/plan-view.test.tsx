@@ -773,14 +773,14 @@ describe('the Status and Assignee columns', () => {
     expect(html).not.toContain('>Health<');
   });
 
-  // A feature whose first step is done used to go on saying "Not started",
-  // with a progress bar beside it saying otherwise on the same line.
-  it('calls a feature with a finished step in progress, not not-started', () => {
+  // A feature says what is left beneath it: with its first step done and a
+  // step that can be picked up, it is Ready, not "Not started".
+  it('calls a feature with a finished step and a ready one ready', () => {
     const html = render('all');
     const from = html.indexOf('Status of #1 Share links');
     expect(from).toBeGreaterThan(-1);
     const row = html.slice(from, from + 1200);
-    expect(row).toContain('In progress');
+    expect(row).toContain('Ready');
     expect(row).not.toContain('Not started');
   });
 

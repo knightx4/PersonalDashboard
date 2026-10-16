@@ -51,7 +51,8 @@ export type GradeMap = {
 /** How far above and below the asked cell the grader looks on its topic. */
 export const NEARBY_LEVELS = 2;
 
-export type GraderRole = 'asked' | 'nearby' | 'required';
+/** 'course' is a level of a topic a course taught, graded on a prompt about the course (plan #2172.4.2). */
+export type GraderRole = 'asked' | 'nearby' | 'required' | 'course';
 
 /** One cell the grader is shown. `key` is the short name the prompt uses for it. */
 export type GraderCell = {
