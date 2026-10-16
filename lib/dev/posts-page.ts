@@ -91,7 +91,21 @@ export type PostsPage = {
    * the page of them drawn, `total` how many there are in all.
    */
   onX: { posts: XPostView[]; total: number };
+  /** What the person wants from their posts (plan #2227); empty until they write it. */
+  wants: PostWants;
 };
+
+/** The longest "what I want from posts" text (post_preferences_wants_ck). */
+export const POST_WANTS_MAX = 2000;
+
+/** What the person wrote about what they want from posts, and when it last changed. */
+export type PostWants = {
+  text: string;
+  /** ISO time of the last change; null when nothing was ever saved. */
+  updatedAt: string | null;
+};
+
+export const NO_POST_WANTS: PostWants = { text: '', updatedAt: null };
 
 /** A cited step; `outline` is where the plan page places it, `1073.4`, when known. */
 export type PostStepRow = { id: string; number: number; title: string; outline?: string | null };
@@ -111,6 +125,8 @@ export function buildPostsPage(input: {
   x?: { candidates: readonly XStoredPost[]; listed: readonly XStoredPost[]; total: number };
   /** Each draft's thread, keyed by its ref (rowRef(POSTS_TABLE, id)). */
   threads?: ReadonlyMap<string, DevComment[]>;
+  /** What the person wants from posts; absent reads as nothing written. */
+  wants?: PostWants;
 }): PostsPage {
   const steps = new Map(input.steps.map((step) => [step.id, step]));
   const notes = new Map(input.notes.map((note) => [note.id, note]));
@@ -165,6 +181,7 @@ export function buildPostsPage(input: {
     run: input.run,
     runState: postsRunState(input.run, input.now),
     onX: { posts: (input.x?.listed ?? []).map(xView), total: input.x?.total ?? 0 },
+    wants: input.wants ?? NO_POST_WANTS,
   };
 }
 
@@ -251,15 +268,29 @@ async function loadXPosts(
   };
 }
 
+/** The person's "what I want from posts" text; empty when none is saved. */
+export async function loadPostWants(supabase: Db, userId: string): Promise<PostWants> {
+  const { data, error } = await supabase
+    .from('post_preferences')
+    .select('wants, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read what you want from posts: ${error.message}`);
+  if (!data) return NO_POST_WANTS;
+  const row = data as { wants: string | null; updated_at: string | null };
+  return { text: row.wants ?? '', updatedAt: row.updated_at };
+}
+
 export async function loadPostsPage(
   supabase: Db,
   userId: string,
   now: number = Date.now(),
   shown: number = X_POSTS_PAGE,
 ): Promise<PostsPage> {
-  const [posts, run] = await Promise.all([
+  const [posts, run, wants] = await Promise.all([
     loadSocialPosts(supabase, userId),
     loadLastPostsRun(supabase, userId),
+    loadPostWants(supabase, userId),
   ]);
 
   const stepIds = [...new Set(posts.flatMap((post) => post.sourcePlanItemIds))];
@@ -297,5 +328,6 @@ export async function loadPostsPage(
     now,
     x,
     threads,
+    wants,
   });
 }

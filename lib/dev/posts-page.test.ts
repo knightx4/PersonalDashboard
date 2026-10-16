@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanThread, parsePostedUrl, postImageSrc, socialPostFromRow, threadCopyText } from './posts';
-import { buildPostsPage, xPostsShown } from './posts-page';
+import { buildPostsPage, loadPostWants, NO_POST_WANTS, xPostsShown } from './posts-page';
 
 /** The helpers the Posts tab writes through, and the page it draws (plan #1419). */
 
@@ -151,5 +151,28 @@ describe('buildPostsPage', () => {
       now: Date.parse('2026-10-02T12:00:00Z'),
     });
     expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan/1084' });
+  });
+});
+
+describe('loadPostWants', () => {
+  const db = (result: { data: unknown; error: { message: string } | null }) => {
+    const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => result };
+    return { from: () => chain } as never;
+  };
+
+  it('reads nothing written as an empty text', async () => {
+    expect(await loadPostWants(db({ data: null, error: null }), 'u')).toEqual(NO_POST_WANTS);
+  });
+
+  it('returns the saved text and when it changed', async () => {
+    const row = { wants: 'Shorter, no hashtags', updated_at: '2026-10-16T00:00:00Z' };
+    expect(await loadPostWants(db({ data: row, error: null }), 'u')).toEqual({
+      text: 'Shorter, no hashtags',
+      updatedAt: '2026-10-16T00:00:00Z',
+    });
+  });
+
+  it('raises a failed read', async () => {
+    await expect(loadPostWants(db({ data: null, error: { message: 'boom' } }), 'u')).rejects.toThrow('boom');
   });
 });
