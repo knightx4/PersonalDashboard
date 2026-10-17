@@ -17,6 +17,7 @@ import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import { AddUnitForm, UnitMenu } from './plan-edit';
 import { ProjectCard } from './project';
 import { Chip } from '@/components/ui/chip';
+import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 
 /**
@@ -152,7 +153,7 @@ function PlanUnitRow({
           </h3>
           <span className="text-small text-ink-muted tabular-nums">
             {unit.pieces.length === 0
-              ? 'Not split yet'
+              ? 'Not written yet'
               : passed === unit.pieces.length
                 ? 'Done'
                 : `${passed} of ${unit.pieces.length} passed`}
@@ -173,12 +174,22 @@ function PlanUnitRow({
           {unit.outcome}
         </p>
       )}
-      {unit.pieces.length > 0 && (
-        <ol className="mt-2 space-y-1">
-          {unit.pieces.map((piece) => (
-            <PieceRow key={piece.id} piece={piece} href={pieceHref(piece.id)} next={piece.id === nextId} />
-          ))}
-        </ol>
+      {unit.pieces.length > 0 ? (
+        // The unit with the next piece opens on it; the rest stay a line each.
+        <SectionFold
+          title="Pieces"
+          count={unit.pieces.length}
+          defaultOpen={unit.pieces.some((piece) => piece.id === nextId)}
+          className="mt-2"
+        >
+          <ol className="space-y-1">
+            {unit.pieces.map((piece) => (
+              <PieceRow key={piece.id} piece={piece} href={pieceHref(piece.id)} next={piece.id === nextId} />
+            ))}
+          </ol>
+        </SectionFold>
+      ) : (
+        <p className="mt-2 text-ui text-ink-muted">Its pieces are written as you reach it.</p>
       )}
     </li>
   );
@@ -187,7 +198,7 @@ function PlanUnitRow({
 function PieceRow({ piece, href, next }: { piece: PlanPiece; href: string; next: boolean }) {
   const words = PIECE_STATE_WORDS[piece.state];
   return (
-    <li className="flex items-baseline gap-2 text-ui">
+    <li className="flex flex-wrap items-baseline gap-x-2 text-ui">
       <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
       <Link href={href} className={cn('inline-flex min-h-11 min-w-0 items-center lg:min-h-0', linkVariants())}>
         {piece.title}

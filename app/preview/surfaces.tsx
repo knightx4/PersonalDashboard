@@ -255,6 +255,7 @@ import {
   LearnEssayDraftFromNotesSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
+  LearnSubjectPlanSurface,
   LearnSubjectConversationsSurface,
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
@@ -9232,6 +9233,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnPlanFinishedSurface />,
+  },
+  {
+    id: 'learn-subject-plan',
+    label: 'Subject · Plan part-way, units open into their pieces',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPlanSurface />,
   },
   {
     id: 'learn-subject-conversations',

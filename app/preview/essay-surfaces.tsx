@@ -781,6 +781,35 @@ export function LearnPlanFinishedSurface() {
   );
 }
 
+const midUnits: PlanUnit[] = [
+  finishedUnits[0]!,
+  {
+    id: 'u2',
+    ordinal: 2,
+    title: 'Why land near a city centre costs so much more than land at its edge',
+    covers: null,
+    outcome: 'Say what a bid-rent curve is and why it slopes down from the centre.',
+    pieces: [
+      { id: 'p3', ordinal: 1, title: 'A bid-rent curve for one household', state: 'passed' },
+      { id: 'p4', ordinal: 2, title: 'Why offices outbid homes at the centre', state: 'practice' },
+      { id: 'p5', ordinal: 3, title: 'What the curve says about commuting costs', state: 'open' },
+    ],
+  },
+  { id: 'u3', ordinal: 3, title: 'Zoning and the supply of floor space', covers: null, outcome: null, pieces: [] },
+];
+
+/** A subject's plan part-way: the next unit's pieces open, the finished one folded, a unit not yet written (plan #2307.2). */
+export function LearnSubjectPlanSurface() {
+  return (
+    <PlanSection
+      subjectId="00000000-0000-4000-8000-0000000000d1"
+      units={midUnits}
+      project={{ ...passedProject, passed: false }}
+      goal={{ aimId: null, name: 'Urban economics' }}
+    />
+  );
+}
+
 /** A subject's logged conversations, each with "Write about this" (plan #1882). */
 export function LearnSubjectConversationsSurface() {
   return (

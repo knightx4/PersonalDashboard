@@ -93,15 +93,14 @@ track you create now starts with a fixed curriculum.
 - **Fixed once written.** Nothing regenerates, reorders or edits a unit. The
   table takes inserts and reads only, and the units go when the track is
   deleted.
-- **Detail comes per unit.** Opening a unit runs the ordinary goal form with
-  the unit's title and outcome filled in, inside the track. The approved chain
-  is filed under the unit with `goals.unit_id`, and "Go deeper in this unit"
-  adds more goals to it later. This is how the graph gets more granular over
-  time without the top level moving.
-- **On the track page** the curriculum comes first. A unit reads as not
-  opened, in progress (with the ideas left across its goals), or done. The
-  first unit that is not done is marked Next. Goals asked outside the
-  curriculum are listed after it.
+- **Detail comes per unit, as pieces.** A unit opens into the pieces it was
+  split into (LEARN-LESSONS-SPEC), each with its passed mark, and the unit
+  holding the next piece is folded open. A unit not yet split says its pieces
+  are written as you reach it. No goal form stands on the page: the goal form
+  that opened a unit or went deeper in one is gone (plan #2307.2), and the
+  ideas behind a unit are reached from the concept page.
+- **On the track page** the plan comes first, or the curriculum for a track
+  with none: units in order, the first unit with an unpassed piece holding Next.
 - **Making a track by name.** The Tracks page leads with "Make a track": a
   name, optionally what you want out of it, and optionally your own units,
   one per line, up to twelve. The track and its curriculum are written at
