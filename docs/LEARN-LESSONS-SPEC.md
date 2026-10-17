@@ -279,6 +279,31 @@ a right answer to the piece's own question does. A case's expected answer
 stays with the grader and is never shown. A piece with no cells it can ask
 about keeps the check above.
 
+### A placement passes the pieces you already hold
+
+Plan #2292.2. Before a subject's first lesson you can answer a few questions
+so Dash knows where to start you. A placement is a Practice Flow run on the
+subject's lens with `placement=1` in `practiceHref`
+(`app/learn/flow/placement.tsx`). It asks up to eight questions and nothing
+but placement: the lens's topics in the order the laid-out pieces first name
+their cells, then the lens's other topics in the order they joined it, each
+topic's levels bisected by the placement rule in `nextQuestion` before the
+next topic starts (`pickPlacement` in `lib/learn/levels/placement.ts`).
+Answers go through Practice Flow's own action, so they write `cell_evidence`
+and move the lens as any practice answer does.
+
+Every question carries Skip to the lesson where a practice run has End run.
+The placement ends on the eighth answer, when no topic has a level left to
+place, or on Skip. At the end, every piece of the subject's laid-out units
+whose matched cells are all held is passed with `passed_reason = 'placement'`
+(learn 0175); a piece with no cells on the map is never passed this way, and
+its ideas are not put on the review schedule, since nothing here taught them.
+The end page lists each topic answered on with the level it now stands at and
+the pieces passed, and its forward action opens the first piece not passed.
+Skip goes straight to that piece. A piece's own check now writes
+`passed_reason = 'check'`; a piece passed before learn 0175 has no reason and
+was passed by its check.
+
 ### A piece has a practice task
 
 Plan #1142. Between a piece's lessons and its check sits one hands-on task,

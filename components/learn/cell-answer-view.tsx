@@ -41,6 +41,8 @@ export type AskedCellView = {
   format?: 'explain' | 'case';
   /** Why Practice Flow chose this level, opened on tap (plan #2138.6). */
   why?: string;
+  /** Where the question sits in a placement, such as "Question 3 of up to 8" (plan #2292.2). */
+  step?: string;
 };
 
 export type CellAnswerState = {
@@ -158,15 +160,44 @@ function SendButton({ pending: drawnPending }: { pending?: boolean }) {
  */
 const UNDER_DOCK = 'pb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:pb-0';
 
-function ForwardRow({ children, endHref }: { children: React.ReactNode; endHref?: string }) {
+/**
+ * An item at least a screen tall on a phone, so a forward row after a
+ * flexible spacer rests at the foot above the tab bar on every item, however
+ * short the item is (plan #2292.2). Exported for the placement's end.
+ */
+export const HOLD_FORWARD = 'flex min-h-[calc(100dvh-var(--dock-h)-env(safe-area-inset-bottom))] flex-col lg:block lg:min-h-0';
+
+function ForwardRow({
+  children,
+  endHref,
+  endLabel = 'End run',
+  endShort,
+}: {
+  children: React.ReactNode;
+  endHref?: string;
+  endLabel?: string;
+  /** A shorter label for a phone, where the long one would not fit beside the forward action. */
+  endShort?: string;
+}) {
   return (
     <Card
       padding="none"
       className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center justify-end gap-2 px-3 py-2 lg:static"
     >
       {endHref && (
-        <Link href={endHref} className={cn(buttonVariants({ variant: 'ghost', size: 'lg' }), 'mr-auto')}>
-          End run
+        <Link
+          href={endHref}
+          aria-label={endShort ? endLabel : undefined}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'lg' }), 'mr-auto')}
+        >
+          {endShort ? (
+            <>
+              <span className="sm:hidden">{endShort}</span>
+              <span className="hidden sm:inline">{endLabel}</span>
+            </>
+          ) : (
+            endLabel
+          )}
         </Link>
       )}
       {children}
@@ -200,6 +231,9 @@ export function CellAnswerView({
   action,
   nextHref,
   endHref,
+  endLabel,
+  endShort,
+  holdForward,
   pending,
   openFirstQuote,
   openWhy,
@@ -212,6 +246,12 @@ export function CellAnswerView({
   nextHref: string;
   /** Where End run goes: the run's summary. Absent outside a run. */
   endHref?: string;
+  /** What the link to `endHref` says; a placement's is Skip to the lesson (plan #2292.2). */
+  endLabel?: string;
+  /** The same on a phone, when the full label is too long to sit beside the forward action. */
+  endShort?: string;
+  /** Hold the forward row at the foot of a phone screen on every item, as a placement does. */
+  holdForward?: boolean;
   /** Drawn mid-grade by the gallery; the live screen reads it from the form. */
   pending?: boolean;
   /** Draws the first quote open, for the gallery. */
@@ -222,6 +262,7 @@ export function CellAnswerView({
   const head = (
     <>
       <p className="text-small text-ink-muted">
+        {asked.step && <>{asked.step} · </>}
         {asked.topicName} · Level {asked.level} · {asked.format === 'case' ? 'Work this case' : 'Explain in your own words'}
       </p>
       {/* The heaviest text on the card: the question is what the screen is for. */}
@@ -244,7 +285,7 @@ export function CellAnswerView({
     const moved = state.moved;
     const firstShown = moved.reached.findIndex((r) => r.how === 'shown' && r.quote);
     return (
-      <div data-deck-item className={UNDER_DOCK}>
+      <div data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
         <Card padding="standard">
           {head}
           <p className="mt-4 text-ui font-semibold text-ink">{movedSummary(moved, asked)}</p>
@@ -264,7 +305,8 @@ export function CellAnswerView({
             </ul>
           </Card>
         )}
-        <ForwardRow endHref={endHref}>
+        {holdForward && <div className="flex-1" aria-hidden />}
+        <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
           <Link href={nextHref} className={buttonVariants({ size: 'lg' })} data-deck-next>
             Next
             <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
@@ -275,7 +317,7 @@ export function CellAnswerView({
   }
 
   return (
-    <form action={action} data-deck-item className={UNDER_DOCK}>
+    <form action={action} data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
       <input type="hidden" name="questionId" value={asked.questionId} />
       <Card padding="standard">
         {head}
@@ -305,7 +347,8 @@ export function CellAnswerView({
           </p>
         )}
       </Card>
-      <ForwardRow endHref={endHref}>
+      {holdForward && <div className="flex-1" aria-hidden />}
+      <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
         <SendButton pending={pending} />
       </ForwardRow>
     </form>

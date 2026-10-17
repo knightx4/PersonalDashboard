@@ -1,6 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
-import { CellAnswerPreview, PracticeRunPreview } from './cell-answer-surface';
+import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -6101,6 +6101,41 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <PracticeRunPreview state="error" />,
+  },
+  {
+    /* A placement question before a subject's first lesson (plan #2292.2):
+     * where it sits among the eight, why it was chosen, and Skip to the lesson
+     * where End run sits in a practice run. */
+    id: 'learn-placement-question',
+    label: 'Placement · A question, with Skip',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="question" />,
+  },
+  {
+    /* The same question answered: the levels it reached, Next, and Skip. */
+    id: 'learn-placement-answered',
+    label: 'Placement · A question answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="answered" />,
+  },
+  {
+    /* The end: each topic answered on at its level, the pieces passed by
+     * placement, and the lesson the subject now starts on. */
+    id: 'learn-placement-end',
+    label: 'Placement · The end, with pieces passed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="end" />,
+  },
+  {
+    /* An end where nothing was held well enough to pass a piece. */
+    id: 'learn-placement-end-none',
+    label: 'Placement · The end, nothing passed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="end-none" />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything
