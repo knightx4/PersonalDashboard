@@ -91,8 +91,9 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#writeTrackCurriculum': ['write-curriculum'],
   'app/learn/s/[id]/actions.ts#addUnitToPlan': ['write-curriculum'],
   'app/learn/s/[id]/actions.ts#readAboutConcept': ['embed-claim', 'judge-segment'],
-  'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
-  'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
+  // Add a source (plan #2307.4): a phrase is searched with the proposing
+  // call, and the new weeks are embedded and matched to the subject.
+  'app/learn/s/[id]/actions.ts#addSubjectSource': ['propose-structure-sources', 'embed-catalogue', 'match-structure-units'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [

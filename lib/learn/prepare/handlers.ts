@@ -23,6 +23,7 @@ import { approveDraft, uncitedRows } from '@/lib/learn/levels/store';
 import { draftTopicsStep, writeUnitsStep, type KeptDraft, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishPreparationStep } from './finish-step';
+import { addedSourceItems, addedSourceWeeks } from './add-source-run';
 import { firstLessonStep } from './first-lesson-step';
 import { writeLessonCard } from '@/inngest/learn/lesson-top-up';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
@@ -191,6 +192,15 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
           similarity: m.similarity,
         })),
       };
+    },
+    // What the person added with Add a source (plan #2307.4) joins whatever it scores.
+    async added(subject) {
+      const itemIds = await addedSourceItems(learn, userId, subject.id);
+      if (itemIds.length === 0) return { itemIds, weeks: [] };
+      const spent: SpendReport[] = [];
+      const weeks = await addedSourceWeeks(sql(), itemIds, subject, (r) => spent.push(r));
+      await ledger('match-structure-units', spent);
+      return { itemIds, weeks };
     },
   });
 

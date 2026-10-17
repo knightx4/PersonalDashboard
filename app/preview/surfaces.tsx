@@ -274,6 +274,12 @@ import {
   LearnSubjectPrepareSurface,
 } from './learn-prepare-surfaces';
 import {
+  AddSourceErrorSurface,
+  AddSourceFetchingSurface,
+  AddSourceOpenSurface,
+  AddSourceSurface,
+} from './add-source-surfaces';
+import {
   LearnBriefFailedSurface,
   LearnBriefQuoteSourceSurface,
   LearnBriefResearchingSurface,
@@ -410,12 +416,6 @@ import {
   GoalMetricPropsSurface,
 } from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
-import {
-  SubjectArticlesEmptySurface,
-  SubjectArticlesErrorSurface,
-  SubjectArticlesLoadingSurface,
-  SubjectArticlesSurface,
-} from './subject-articles-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -6736,38 +6736,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SubjectClipsEmptySurface />,
   },
   {
-    /* The list after the press: five articles to keep or strike, one with a very long title. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles',
-    label: 'Learn · Find articles, proposed list',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesSurface />,
-  },
-  {
-    /* Mid-lookup, while idea names resolve one at a time. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-loading',
-    label: 'Learn · Find articles, looking up',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesLoadingSurface />,
-  },
-  {
-    /* Every article the ideas name is already in the catalogue. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-empty',
-    label: 'Learn · Find articles, all held',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesEmptySurface />,
-  },
-  {
-    /* Wikipedia did not answer. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-error',
-    label: 'Learn · Find articles, Wikipedia down',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesErrorSurface />,
-  },
-  {
     /* The Big Five test (plan #1632): fifty statements, the first seven
      * answered. Fixtures in personality-surfaces.tsx. */
     id: 'you-personality-test',
@@ -9314,6 +9282,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Add a source (plan #2307.4): the press closed under Sources, with a
+     * document it added listed. Fixtures in add-source-surfaces.tsx. */
+    id: 'learn-subject-add-source',
+    label: 'Subject · Add a source, with one added',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-open',
+    label: 'Subject · Add a source, box open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceOpenSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-fetching',
+    label: 'Subject · Add a source, fetching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceFetchingSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-error',
+    label: 'Subject · Add a source, fetch failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceErrorSurface />,
   },
   {
     id: 'learn-subject-prepare-direction',

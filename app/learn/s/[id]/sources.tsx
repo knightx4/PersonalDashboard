@@ -9,6 +9,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { readFold, rememberFold } from '@/lib/fold-memory';
 import { practiceHref } from '@/lib/learn/flow/href';
+import { licenceLabel } from '@/lib/learn/catalogue/licence-label';
 import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import type { StartTopicNow } from '@/lib/learn/prepare/start-load';
 import type { PreparationSources } from '@/lib/learn/prepare/view';
@@ -31,12 +32,6 @@ import type { SubjectReading } from '@/lib/learn/chat/subject-load';
  */
 
 export const SOURCES_ID = 'sources';
-
-const LICENCE: Record<string, string> = {
-  show: 'Full text',
-  structure_only: 'Outline only',
-  never_feed: 'Headings only',
-};
 
 /** How many readings the section names before pointing at the Reading section. */
 const READINGS_SHOWN = 5;
@@ -150,9 +145,11 @@ export function StartHere({
 
 function DocumentRow({ doc }: { doc: SourceDocument }) {
   // The licence as the catalogue words it, else how the bank may use the document.
-  const licence = doc.rights?.trim() || (doc.licence ? (LICENCE[doc.licence] ?? doc.licence) : 'Licence not recorded');
+  const licence = doc.rights?.trim() || licenceLabel(doc.licence);
   const units = doc.units ? `${doc.units} ${doc.units === 1 ? 'unit' : 'units'}` : null;
-  const facts = [doc.provider ?? 'Already in the bank', licence, units].filter((f): f is string => Boolean(f));
+  const facts = [doc.provider ?? 'Already in the bank', licence, units, doc.added ? 'added by you' : null].filter(
+    (f): f is string => Boolean(f),
+  );
   const body = (
     <>
       <span className="flex items-baseline gap-1.5 text-body text-ink group-hover/doc:text-accent">
@@ -163,7 +160,7 @@ function DocumentRow({ doc }: { doc: SourceDocument }) {
       </span>
       <span className="mt-0.5 block text-small text-ink-muted">
         {facts.join(' · ')}
-        {!doc.used && ' · stored, not used for the topics'}
+        {!doc.used && !doc.added && ' · stored, not used for the topics'}
       </span>
     </>
   );

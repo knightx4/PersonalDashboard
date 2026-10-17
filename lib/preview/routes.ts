@@ -237,10 +237,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-topic-draft-match': ['/learn/topics/[id]'],
   'learn-topic-draft-checks': ['/learn/topics/[id]'],
   'learn-topic-draft-comment': ['/learn/topics/[id]'],
-  'learn-subject-articles': ['/learn/s/[id]'],
-  'learn-subject-articles-loading': ['/learn/s/[id]'],
-  'learn-subject-articles-empty': ['/learn/s/[id]'],
-  'learn-subject-articles-error': ['/learn/s/[id]'],
+  'learn-subject-add-source': ['/learn/s/[id]'],
+  'learn-subject-add-source-open': ['/learn/s/[id]'],
+  'learn-subject-add-source-fetching': ['/learn/s/[id]'],
+  'learn-subject-add-source-error': ['/learn/s/[id]'],
   'jobs-interviews': ['/jobs/interviews'],
   'shell-display-options': [
     '/jobs/pipeline',
@@ -645,6 +645,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-start-pending': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-empty': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-folded': ['app/learn/s/[id]/sources.tsx'],
+  // Add a source (plan #2307.4), closed, open, fetching and failed.
+  'learn-subject-add-source': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-open': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-fetching': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-error': ['app/learn/s/[id]/add-source.tsx'],
   'learn-subject-prepare-direction': ['app/learn/s/[id]/direction.tsx'],
   'learn-subject-prepare-branch': ['app/learn/s/[id]/prepare.tsx'],
   // The one thread (plan #1964.3), with a subject or none: a change to it is

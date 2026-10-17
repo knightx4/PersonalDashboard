@@ -29,23 +29,8 @@ import { directionOffer, storedBranch } from '@/lib/learn/prepare/branch';
 import { loadDirection, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
-import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
-import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
-import { articleKey, proposeArticles, type ProposeReport } from '@/lib/learn/catalogue/propose';
-import { searchWikipediaTitle } from '@/lib/learn/providers/wikipedia-search';
-import {
-  DEFAULT_COURSE_PROVIDER,
-  sweepWikipediaArticle,
-  sweepYouTubeCourse,
-} from '@/lib/learn/catalogue/sweep';
-import { storeMissingPassages, transcriptCutVideos } from '@/lib/learn/catalogue/store';
-import {
-  EMBED_BUDGET_MS,
-  TRANSCRIPT_BUDGET_MS,
-  parsePlaylistId,
-  pullCourse,
-  type CoursePullReport,
-} from '@/lib/learn/catalogue/pull-course';
+import { addSourceToSubject } from '@/lib/learn/prepare/add-source-run';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * Taking a gap to the reading queue, or to what has already been written about
@@ -171,190 +156,63 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   redirect(`/learn/r/${readingId}`);
 }
 
-export type ProposeState = { report?: ProposeReport; error?: string };
+export type AddSourceState = { lines?: string[]; error?: string };
+
+/** How long the press leaves for embedding the new weeks, counted from the press; the page allows 300 seconds. */
+const ADD_SOURCE_EMBED_BUDGET_MS = 200_000;
 
 /**
- * Proposing this subject's Wikipedia articles from the names of its ideas
- * (plan #2157.1). Each idea name goes to Wikipedia's search and the top hit is
- * proposed, minus repeats and articles the catalogue already holds. No model
- * is asked and nothing is written; the person strikes the wrong ones and
- * pulls the rest with pullWikipediaArticles.
+ * Add a source (plan #2307.4): one press that puts a document in the shared
+ * bank the preparation reads, in place of the three pulls the page used to
+ * have. It takes an address or a search phrase, stores what it finds as a
+ * structure document with its licence, records it on the subject, and joins
+ * the document's weeks into the subject's matched weeks
+ * (lib/learn/prepare/add-source-run.ts).
+ *
+ * Everything runs inside the press, so a page that will not load or a search
+ * that finds nothing is said under the box. The search's proposing calls and
+ * the embedding go on the ledger of the account that pressed.
  */
 // latency: pending
-export async function proposeSubjectArticles(
-  _previous: ProposeState,
-  formData: FormData,
-): Promise<ProposeState> {
-  await requireUser();
-  const subjectId = String(formData.get('subjectId') ?? '');
-  if (!subjectId) return { error: 'No subject was named.' };
-
-  const supabase = await createLearnClient();
-  const graph = await loadGraph(supabase, subjectId).catch(() => null);
-  if (!graph) return { error: 'This subject could not be read.' };
-  if (graph.concepts.length === 0) return { error: 'This subject has no ideas to name articles from.' };
-
-  let sql;
-  try {
-    sql = catalogueSql();
-  } catch (error) {
-    return {
-      error: `The catalogue cannot be read from this deployment: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    };
-  }
-
-  try {
-    const report = await proposeArticles(
-      {
-        search: (name) => searchWikipediaTitle(name),
-        held: async (titles) => {
-          const ids = titles.map((title) => title.trim().replace(/\s+/g, '_'));
-          const rows = await sql<{ external_id: string }[]>`
-            select i.external_id
-              from learn.catalogue_items i
-              join learn.catalogue_providers p on p.id = i.provider_id
-             where p.slug = 'wikipedia' and i.external_id in ${sql(ids)}`;
-          const stored = new Set(rows.map((row) => articleKey(row.external_id)));
-          return new Set(titles.filter((title) => stored.has(articleKey(title))));
-        },
-      },
-      graph.concepts.map((concept) => concept.name),
-    );
-    return { report };
-  } catch (error) {
-    return {
-      error: `Wikipedia did not answer (${error instanceof Error ? error.message : String(error)}). Find again in a minute.`,
-    };
-  }
-}
-
-export type PullState = { report?: PullReport; error?: string };
-
-/**
- * Fetching named Wikipedia articles into the catalogue, and embedding them.
- *
- * What `npm run catalogue -- "…" --embed` does, from a subject page, so the
- * deployed app can fill the catalogue with the keys it already holds. The
- * articles are stored first and embedded after, in the same press, and the
- * embedding spend goes on the ledger of the account that pressed, as #741
- * settled.
- *
- * Both passes run inside the action rather than in after(), because a Voyage
- * refusal or a missing key has to be shown on the page, and after() runs once
- * the response has gone. The page sets maxDuration so twenty articles fit.
- *
- * The embedding pass is not limited to the articles this press fetched: it
- * gives a vector to every segment in the catalogue that has none, the same as
- * the script. Before it, any article section that has no passages yet is cut
- * into them (storeMissingPassages, #1133), so those passages are embedded too. Anything an earlier run left unembedded is finished here too,
- * and billed to this account.
- *
- * Pulling an article that is already in the catalogue updates its sections in
- * place. A section whose text is unchanged keeps its vector and the judgements
- * made against it. A section whose text changed loses its vector and is
- * embedded again, and a section the article no longer has is deleted along
- * with its judgements.
- */
-// latency: pending
-export async function pullWikipediaArticles(
-  _previous: PullState,
-  formData: FormData,
-): Promise<PullState> {
-  const user = await requireUser();
-
-  const parsed = parseTitles(String(formData.get('titles') ?? ''));
-  if (!parsed.ok) return { error: parsed.error };
-
-  let sql;
-  try {
-    sql = catalogueSql();
-  } catch (error) {
-    return {
-      error: `The catalogue cannot be written from this deployment: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    };
-  }
-
-  const report = await pullArticles(
-    {
-      sweep: (title) => sweepWikipediaArticle(sql, title),
-      embed: async (limit) => {
-        await storeMissingPassages(sql);
-        return embedCatalogueSegments(sql, { userId: user.id, limit });
-      },
-    },
-    parsed.titles,
-  );
-
-  return { report };
-}
-
-export type CoursePullState = { report?: CoursePullReport; error?: string };
-
-/**
- * Fetching a lecture course from its YouTube playlist into the catalogue, and
- * embedding it.
- *
- * What `npm run catalogue -- --course <playlist> --embed` does, from a subject
- * page, as #789 settled. The course goes under MIT OpenCourseWare, so each
- * lecture's transcript comes from ocw.mit.edu, and the embedding is billed to
- * the account that pressed, as #741 settled.
- *
- * One press has 300 seconds. Past TRANSCRIPT_BUDGET_MS it stops looking up
- * transcripts and stores the remaining lectures with their chapter or
- * whole-video cut, so the course is always stored whole and in order. Past
- * EMBED_BUDGET_MS it stops embedding. The report says how far it got, and a
- * second press finishes: lectures already cut from a transcript are left as
- * they are, so it spends its time on the ones the first press did not reach,
- * and the embedding pass picks up whatever has no vector yet.
- *
- * Pressing again on the same playlist updates the rows in place, keyed on the
- * playlist and video ids, so it never adds a second course or lecture.
- */
-// latency: pending
-export async function pullLectureCourse(
-  _previous: CoursePullState,
-  formData: FormData,
-): Promise<CoursePullState> {
-  const user = await requireUser();
+export async function addSubjectSource(_previous: AddSourceState, formData: FormData): Promise<AddSourceState> {
   const startedAt = Date.now();
-
-  const parsed = parsePlaylistId(String(formData.get('playlist') ?? ''));
-  if (!parsed.ok) return { error: parsed.error };
+  const user = await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
 
   let sql;
   try {
     sql = catalogueSql();
   } catch (error) {
     return {
-      error: `The catalogue cannot be written from this deployment: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      error: `The bank cannot be written from this deployment: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
-  const report = await pullCourse({
-    sweep: () =>
-      sweepYouTubeCourse(sql, {
-        providerSlug: DEFAULT_COURSE_PROVIDER,
-        playlistId: parsed.playlistId,
-        keep: (videoIds) => transcriptCutVideos(sql, DEFAULT_COURSE_PROVIDER, videoIds),
-        deadline: startedAt + TRANSCRIPT_BUDGET_MS,
-      }),
-    embed: async (limit) => {
-      await storeMissingPassages(sql);
-      return embedCatalogueSegments(sql, {
-        userId: user.id,
-        limit,
-        deadline: startedAt + EMBED_BUDGET_MS,
-      });
-    },
-  });
+  const learn = await createLearnClient();
+  const spend = { propose: [] as SpendReport[], match: [] as SpendReport[] };
+  let result;
+  try {
+    result = await addSourceToSubject({
+      learn,
+      sql,
+      userId: user.id,
+      subjectId: subjectId.data,
+      ask: String(formData.get('ask') ?? ''),
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      deadline: startedAt + ADD_SOURCE_EMBED_BUDGET_MS,
+      spend,
+    });
+  } catch (error) {
+    result = { ok: false as const, error: `Adding the source failed: ${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    await recordLearnSpend(user.id, 'propose-structure-sources', spend.propose);
+    await recordLearnSpend(user.id, 'match-structure-units', spend.match);
+  }
 
-  return { report };
+  if (!result.ok) return { error: result.error };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { lines: result.lines };
 }
 
 /**

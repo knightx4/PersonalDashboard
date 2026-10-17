@@ -107,14 +107,17 @@ export function ChannelsSection({
   subjectId,
   channels,
   kept,
+  folded = false,
 }: {
   subjectId: string;
   channels: readonly SubjectChannelView[];
   kept: ReadonlySet<string>;
+  /** Inside a fold that names it (plan #2307.4): no heading or margin of its own. */
+  folded?: boolean;
 }) {
   return (
-    <section className="mt-8">
-      <h2 className="mb-1 text-ui font-semibold text-ink-muted">Channels</h2>
+    <section className={folded ? undefined : 'mt-8'}>
+      {!folded && <h2 className="mb-1 text-ui font-semibold text-ink-muted">Channels</h2>}
       <p className="mb-3 text-ui text-ink-muted">
         {channels.length === 0
           ? 'Dash can look for up to five YouTube channels that teach this subject, judge three videos from each against what you know, and follow the ones worth following.'

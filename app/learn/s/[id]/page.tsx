@@ -31,8 +31,7 @@ import { ChannelsSection } from './channels';
 import { ChatLearningSection } from './chat-learning';
 import { CurriculumComing, WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
-import { PullArticles } from './pull-articles';
-import { PullCourse } from './pull-course';
+import { AddSource } from './add-source';
 import { PreparationBlock } from './prepare';
 import { DirectionOffer } from './direction';
 import { directionOffer } from '@/lib/learn/prepare/branch';
@@ -41,7 +40,16 @@ import { loadPlacementPieces } from '@/lib/learn/levels/placement-store';
 import { firstNotHeld } from '@/lib/learn/levels/placement';
 import { loadDirection, loadPreparation, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { loadStartTopic } from '@/lib/learn/prepare/start-load';
-import { branchPreparationView, preparationSources, preparationView, unitsComeAtStep } from '@/lib/learn/prepare/view';
+import {
+  branchPreparationView,
+  offersWriteCurriculum,
+  preparationSources,
+  preparationView,
+  unitsComeAtStep,
+  withAddedSources,
+} from '@/lib/learn/prepare/view';
+import { loadAddedSources } from '@/lib/learn/prepare/add-source-run';
+import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import {
   countStates,
   learningOrder,
@@ -273,7 +281,8 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added] =
+    await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -298,6 +307,9 @@ export default async function SubjectPage({
     // the Subjects list opens this page now rather than the lens. One that
     // cannot be read leaves the link and the line out.
     loadSubjectLens(supabase, user.id, id).catch(() => null),
+    // What the person added with Add a source (plan #2307.4). Ones that
+    // cannot be read leave the Sources section with the run's documents.
+    loadAddedSources(supabase, user.id, id).catch((): SourceDocument[] => []),
   ]);
   const lensId = lensRead?.id ?? null;
   const held = lensRead?.held ?? null;
@@ -325,6 +337,8 @@ export default async function SubjectPage({
   // #2276.6). The topic is read as it stands, since it is approved after the
   // run; one that cannot be read leaves the name the run recorded.
   const sources = preparation ? preparationSources(preparation) : null;
+  // The Sources section lists what the person added too, finished run or not.
+  const sourceList = withAddedSources(sources, added);
   const startTopic = sources?.start.topic
     ? await loadStartTopic(supabase, user.id, sources.start.topic.id).catch(() => null)
     : null;
@@ -445,7 +459,12 @@ export default async function SubjectPage({
       {units.length === 0 ? (
         // While the run is going its write_units step writes them (plan
         // #2276.9); a run that failed before it, or a subject with none, keeps the card.
-        comingAt ? <CurriculumComing {...comingAt} /> : <WriteCurriculum subjectId={id} />
+        // #2307.4: the card is offered only when the run failed before writing them.
+        comingAt ? (
+          <CurriculumComing {...comingAt} />
+        ) : (
+          offersWriteCurriculum(preparation) && <WriteCurriculum subjectId={id} />
+        )
       ) : (
         !showEverything &&
         (plan ? (
@@ -543,7 +562,11 @@ export default async function SubjectPage({
         ))
       )}
 
-      {sources && !showEverything && <SourcesSection subjectId={id} sources={sources} readings={learning.readings} />}
+      {sourceList && !showEverything && (
+        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} />
+      )}
+      {/* One press feeds the bank the preparation reads (plan #2307.4). */}
+      {!showEverything && <AddSource subjectId={id} />}
 
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
@@ -551,10 +574,12 @@ export default async function SubjectPage({
 
       <ChatLearningSection learning={learning} timezone={settings.timezone} />
 
-      {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
-
-      <PullArticles subjectId={id} ideaCount={graph.concepts.length} />
-      <PullCourse />
+      {/* YouTube channels stay, folded away as a secondary line (plan #2307.4). */}
+      {channels && (
+        <SectionFold title="YouTube channels" defaultOpen={false} className="mt-6">
+          <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} folded />
+        </SectionFold>
+      )}
     </PageColumn>
   );
 }

@@ -248,6 +248,42 @@ export function preparationSources(
 }
 
 /**
+ * The Sources section with the documents added by Add a source (plan
+ * #2307.4) after the ones the preparation stored. A document the run already
+ * lists keeps its row and is marked added. With no finished run, the section
+ * lists the added ones alone; with neither, there is no section.
+ */
+export function withAddedSources(
+  sources: PreparationSources | null,
+  added: readonly SourceDocument[],
+): PreparationSources | null {
+  if (added.length === 0) return sources;
+  const base: PreparationSources = sources ?? {
+    summary: 'The preparation has not finished, so these are the documents you added so far.',
+    start: { unit: null, topic: null },
+    documents: [],
+    frames: [],
+  };
+  const key = (d: SourceDocument) => d.itemId ?? d.url ?? d.title;
+  const addedKeys = new Set(added.map(key));
+  const documents = base.documents.map((d) => (addedKeys.has(key(d)) ? { ...d, added: true } : d));
+  const listed = new Set(documents.map(key));
+  return { ...base, documents: [...documents, ...added.filter((d) => !listed.has(key(d))).map((d) => ({ ...d, added: true }))] };
+}
+
+/**
+ * Whether the Write the curriculum card is offered (plan #2307.4): only when
+ * the preparation stopped on a failed step before write_units had written the
+ * units. A run still going writes them itself, and a subject with no run is
+ * offered Prepare instead.
+ */
+export function offersWriteCurriculum(prep: { run: PreparationRow; steps: PreparationStepRow[] } | null | undefined): boolean {
+  if (!prep || prep.run.status !== 'failed') return false;
+  const write = prep.steps.find((s) => s.key === 'write_units');
+  return write?.status !== 'done';
+}
+
+/**
  * Where the opening units come from while a run is going (plan #2276.9): the
  * position of the write_units step among the run's steps and how many there
  * are, or null when the run is not working or that step has already been and
