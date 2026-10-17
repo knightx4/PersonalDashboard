@@ -7,11 +7,11 @@ import { SUBJECT_GOAL_TARGET, type LensRecord, type TopicName } from '@/lib/lear
  * Reading and writing lenses (learn 0133 and 0137; plan #2138.7).
  *
  * Every subject has one lens, which learn 0137's trigger makes and keeps
- * named, and which goes with the subject (learn 0176). A learning goal has no
+ * named, and which goes with the subject (learn 0177). A learning goal has no
  * lens of its own: it reads the lens of the subject it points at
  * (aims.subject_id; plan #2302.3), through `goalLensId` and `goalsBySubject`.
  * A survey subject's lens is hidden with its subject. Goal lenses made before
- * learn 0176 may remain in other accounts and are skipped. Progress is
+ * learn 0177 may remain in other accounts and are skipped. Progress is
  * computed by lib/learn/levels/lenses.ts on read, never stored here.
  */
 

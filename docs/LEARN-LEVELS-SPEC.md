@@ -358,7 +358,7 @@ A learning goal has no lens of its own. It names a subject (`aims.subject_id`),
 and its progress, its topics and anything added under it are that subject's
 lens. Two goals on one subject read the same lens. The Know page lists each
 subject once and names the goals on its row. A subject's lens goes when the
-subject is deleted (learn 0176).
+subject is deleted (learn 0177).
 
 A lens has no topics of its own. Topics belong to the shared map, so explaining
 CAPM moves every lens that includes CAPM.

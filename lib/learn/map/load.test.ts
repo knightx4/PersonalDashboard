@@ -147,7 +147,7 @@ describe('loadIdeaMap', () => {
 
   it('places each goal topic among the ideas its scope is about (plan #2187.2)', async () => {
     // A goal reads its subject's lens (plan #2302.3): 'g' is the lens of the
-    // subject the goal points at, 'old' a goal lens from before learn 0176,
+    // subject the goal points at, 'old' a goal lens from before learn 0177,
     // and 'n' the lens of a subject no goal points at.
     const { client } = fakeClient({
       ...ROWS,

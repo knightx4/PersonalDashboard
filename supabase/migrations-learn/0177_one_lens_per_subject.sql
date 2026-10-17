@@ -33,7 +33,7 @@ drop function if exists learn.lens_targets_reach_goals();
 drop function if exists learn.fill_goal_lens(uuid);
 
 comment on column learn.lenses.aim_id is
-  'Retired by plan #2302.3: a goal reads its subject''s lens. Set only on goal lenses made before learn 0176, which the app skips.';
+  'Retired by plan #2302.3: a goal reads its subject''s lens. Set only on goal lenses made before learn 0177, which the app skips.';
 
 -- 2. A subject's lens goes with it -----------------------------------------
 alter table learn.lenses drop constraint if exists lenses_subject_fk;
