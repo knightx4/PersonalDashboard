@@ -274,7 +274,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensId] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -295,6 +295,16 @@ export default async function SubjectPage({
     // be read leave the offer and the branch blocks out.
     loadDirection(supabase, user.id, id).catch(() => null),
     loadSubjectTerritory(supabase, user.id, id).catch(() => null),
+    // The subject's lens, for the Levels link: the Subjects list opens this
+    // page now rather than the lens. One that cannot be read leaves the link out.
+    supabase
+      .from('lenses')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('subject_id', id)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => (data as { id: string } | null)?.id ?? null, () => null),
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
@@ -374,6 +384,11 @@ export default async function SubjectPage({
             <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
               Now
             </Link>
+            {lensId && (
+              <Link href={`/learn/lens/${lensId}`} className={buttonVariants({ variant: 'secondary' })}>
+                Levels
+              </Link>
+            )}
             {/* The clips that serve this subject (plan #1697). The owner's
                 alone, like Videos, since they are cut from the owner's
                 YouTube library. Its own empty state says when none serve it. */}

@@ -82,18 +82,28 @@ type PullDetail = {
   failed: { provider: ProviderId; detail: string }[];
   /** Item ids stored so far, in the order found, and the units each has. */
   items: { itemId: string; units: number }[];
+  /** Candidates that were not stored: not confirmed as a match, or confirmed and failed to store. */
+  candidates: PullCandidate[];
+  /** How many candidates the providers proposed, stored or not. */
+  proposed: number;
+  /** Set when the step failed: the detail is kept to read, and a retry searches again from the start. */
+  stopped?: boolean;
   documents?: PulledDocument[];
 };
 
+type PullCandidate = { provider: ProviderId; candidate: string; status: 'not-confirmed' | 'failed'; detail: string };
+
 function readPullDetail(detail: Record<string, unknown> | undefined, kind: GoalKind): PullDetail {
   const d = (detail ?? {}) as Partial<PullDetail>;
-  if (d.kind !== kind) return { kind, providersDone: [], unwired: [], failed: [], items: [] };
+  if (d.kind !== kind || d.stopped) return { kind, providersDone: [], unwired: [], failed: [], items: [], candidates: [], proposed: 0 };
   return {
     kind,
     providersDone: d.providersDone ?? [],
     unwired: d.unwired ?? [],
     failed: d.failed ?? [],
     items: d.items ?? [],
+    candidates: d.candidates ?? [],
+    proposed: d.proposed ?? 0,
   };
 }
 
@@ -116,7 +126,7 @@ export function pullStep(ports: PullPorts, kindOf: (subjectId: string) => Promis
       return {
         state: 'skipped',
         reason: `No source for a ${label} is wired yet, so no documents were pulled. Went on with what the bank already holds.`,
-        detail: { kind, providersDone: [], unwired: [...planned], failed: [], items: [], documents: [] },
+        detail: { kind, providersDone: [], unwired: [...planned], failed: [], items: [], candidates: [], proposed: 0, documents: [] },
       };
     }
 
@@ -139,13 +149,34 @@ export function pullStep(ports: PullPorts, kindOf: (subjectId: string) => Promis
       const run = await ports.run(id, searchSubject(ctx.subject));
       if (run && !run.ok) state.failed.push({ provider: id, detail: run.detail.slice(0, 200) });
       if (run?.ok) {
+        state.proposed += run.lines.length;
         for (const line of run.lines) {
-          if (line.status === 'stored' && !state.items.some((i) => i.itemId === line.itemId)) {
-            state.items.push({ itemId: line.itemId, units: line.units });
+          if (line.status === 'stored') {
+            if (!state.items.some((i) => i.itemId === line.itemId)) state.items.push({ itemId: line.itemId, units: line.units });
+          } else {
+            state.candidates.push({ provider: id, candidate: line.candidate, status: line.status, detail: line.detail.slice(0, 200) });
           }
         }
       }
       state.providersDone.push(id);
+    }
+
+    const storeFailed = state.candidates.filter((c) => c.status === 'failed');
+    const confirmed = state.items.length + storeFailed.length;
+    const candidateNote =
+      state.proposed > 0
+        ? ` ${plural(state.proposed, 'candidate')} proposed, ${confirmed} confirmed` +
+          (storeFailed.length > 0 ? `, ${storeFailed.length} failed to store: ${storeFailed[0].detail}` : '') +
+          '.'
+        : '';
+    // Every confirmed candidate failed to store: that is a fault, not an empty
+    // search, so the run stops here rather than compiling from nothing.
+    if (storeFailed.length > 0 && state.items.length === 0) {
+      return {
+        state: 'failed',
+        error: `Searched ${plural(planned.length - state.unwired.length, 'source')} and stored no documents.${candidateNote}`,
+        detail: { ...state, stopped: true, documents: [] },
+      };
     }
 
     const documents = state.items.length > 0 ? await ports.describe(state.items.map((i) => i.itemId)) : [];
@@ -155,8 +186,8 @@ export function pullStep(ports: PullPorts, kindOf: (subjectId: string) => Promis
     const sources = new Set(documents.map((d) => d.provider)).size;
     const summary =
       documents.length === 0
-        ? `Searched ${plural(searched, 'source')} and stored no documents.${failedNote}`
-        : `Stored ${plural(documents.length, 'document')} from ${plural(sources, 'source')}.${failedNote}`;
+        ? `Searched ${plural(searched, 'source')} and stored no documents.${candidateNote}${failedNote}`
+        : `Stored ${plural(documents.length, 'document')} from ${plural(sources, 'source')}.${candidateNote}${failedNote}`;
     return {
       state: 'done',
       summary,
@@ -165,6 +196,9 @@ export function pullStep(ports: PullPorts, kindOf: (subjectId: string) => Promis
         units: documents.reduce((n, d) => n + d.units, 0),
         searched,
         failed: state.failed.length,
+        proposed: state.proposed,
+        confirmed,
+        storeFailed: storeFailed.length,
       },
       detail: { ...state },
     };

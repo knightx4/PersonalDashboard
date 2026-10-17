@@ -228,6 +228,18 @@ describe('runPreparation', () => {
     expect(m.run).toMatchObject({ status: 'done', error: null, failures: 1 });
   });
 
+  it('fails the run on a step that returns failed, keeping its detail', async () => {
+    const m = memory({
+      classify: async () => ({ state: 'done' }),
+      pull_documents: async () => ({ state: 'failed', error: 'Nothing stored', detail: { candidates: 2 } }),
+      finish: finishStep,
+    });
+    const failed = await runPreparation(m.ports, SUBJECT);
+    expect(failed).toEqual({ outcome: 'failed', step: 'pull_documents', error: 'Nothing stored', ran: ['classify', 'pull_documents'] });
+    expect(m.steps.get('pull_documents')).toMatchObject({ status: 'failed', error: 'Nothing stored', detail: { candidates: 2 } });
+    expect(m.run).toMatchObject({ status: 'failed', failures: 1 });
+  });
+
   it('leaves a run another call holds alone', async () => {
     const m = memory({ finish: finishStep });
     m.holdLease(60_000);

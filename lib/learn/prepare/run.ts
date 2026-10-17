@@ -92,7 +92,9 @@ export type StepOutcome =
        */
       pause?: boolean;
     }
-  | { state: 'skipped'; reason: string; detail?: Record<string, unknown> };
+  | { state: 'skipped'; reason: string; detail?: Record<string, unknown> }
+  /** Stop the run at this step, as a throw does, keeping what the step learned in its detail. */
+  | { state: 'failed'; error: string; detail?: Record<string, unknown> };
 
 export type StepContext = {
   subject: PreparedSubject;
@@ -212,15 +214,26 @@ export async function runPreparation(
     if (!ran.includes(step.key)) ran.push(step.key);
 
     const handler = ports.handlers[step.key];
-    let outcome: StepOutcome;
+    let outcome: Exclude<StepOutcome, { state: 'failed' }> | undefined;
     if (!handler) {
       outcome = { state: 'skipped', reason: notBuiltReason(step.key) };
     } else {
+      let failure: { message: string; detail?: Record<string, unknown> } | null = null;
       try {
-        outcome = await handler({ subject, run, step: { ...step }, steps, deadline, now: ports.now });
+        const out = await handler({ subject, run, step: { ...step }, steps, deadline, now: ports.now });
+        if (out.state === 'failed') failure = { message: out.error, detail: out.detail };
+        else outcome = out;
       } catch (error) {
-        const message = clip(error instanceof Error ? error.message : String(error), ERROR_MAX);
-        const failedStep: StepPatch = { status: 'failed', error: message, calls: step.calls + 1 };
+        failure = { message: error instanceof Error ? error.message : String(error) };
+      }
+      if (failure) {
+        const message = clip(failure.message, ERROR_MAX);
+        const failedStep: StepPatch = {
+          status: 'failed',
+          error: message,
+          calls: step.calls + 1,
+          ...(failure.detail !== undefined ? { detail: failure.detail } : {}),
+        };
         Object.assign(step, failedStep);
         await ports.saveStep(run.id, step.key, failedStep);
         await ports.saveRun(run.id, {
@@ -232,6 +245,7 @@ export async function runPreparation(
         return { outcome: 'failed', step: step.key, error: message, ran };
       }
     }
+    if (!outcome) throw new Error('A step neither finished nor failed.');
 
     const patch: StepPatch =
       outcome.state === 'skipped'
