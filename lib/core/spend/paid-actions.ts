@@ -11,9 +11,9 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  * so a test can find the function and follow it to the ledger writers
  * (paid-actions.test.ts, through action-graph.ts). An action that does
  * different paid work depending on which button sent it gets one key per
- * button, with the button after a colon: the flow's `flowStep` asks, answers
- * and starts offered tracks, and one hint for all three would price an answer
- * at the cost of writing a track.
+ * button, with the button after a colon: an essay's research has a first and
+ * a deeper pass, and one hint for both would price the first at the cost of
+ * the second.
  *
  * The same list prices the hint and is checked against the code, which is
  * what makes "pressing it records what the hint named" true rather than hoped:
@@ -129,18 +129,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#answerQuestion': ['name-misconception', 'grade-applied-answer'],
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
-  'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': [
-    'name-misconception',
-    'grade-applied-answer',
-    'mark-teach-back',
-  ],
-  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
-  'app/learn/flow/actions.ts#flowStep:start-track': [
-    'generate-track-from-theme',
-    'place-track',
-    'write-probe',
-  ],
   // Learn: an explanation graded against the levels of a topic (plan #2138.5)
   'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],
@@ -264,8 +252,6 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
     'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
-  'app/learn/now/actions.ts#generateSubjectCards':
-    "Generate more on an empty subject's Now (note 43b8d7ac). It writes the subject's next lessons while the person waits, the same top-up loading more starts after the response, so what it spends is the top-up's background operations, which a hint does not name; the spend page lists them under the lessons. Its one foreground cost is the related-notes embedding loading the cards makes, as for loadMoreCards.",
   'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':

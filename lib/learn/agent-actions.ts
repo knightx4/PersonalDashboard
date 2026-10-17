@@ -113,8 +113,6 @@ export const learnActions: ModuleActions = {
     logEssayView: none('page'),
   },
   'app/learn/flow/actions.ts': {
-    flowStep: none('page'),
-    fillFlowQueue: none('spends', 'Tops the flow queue up by itself as the page opens; no button presses it.'),
     answerTrackOffer: none('theirs'),
     takeBackOfferAnswer: none('theirs', 'Undo: takes back their own answer.'),
   },
@@ -188,10 +186,6 @@ export const learnActions: ModuleActions = {
     answerRestingTrack: none('theirs'),
     explainBack: none('own'),
     setTeachBackEvery: none('setting'),
-    generateSubjectCards: none(
-      'spends',
-      "Generate more on an empty subject's Now writes its next lessons while the person waits, through the background top-up, which no estimate prices.",
-    ),
   },
   'app/learn/opening/[id]/actions.ts': {
     answerOpening: none('own'),

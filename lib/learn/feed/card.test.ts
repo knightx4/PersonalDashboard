@@ -6,7 +6,6 @@ import {
   bringForward,
   canMakeTrack,
   cardTitle,
-  feedEnd,
   licenceFor,
   OFFER_AFTER,
   offerDue,
@@ -241,11 +240,6 @@ describe('the feed', () => {
     expect(bringForward(deck, 'c').map((card) => card.id)).toEqual(['c', 'a', 'b', 'd']);
     expect(bringForward(deck, 'a')).toBe(deck);
     expect(bringForward(deck, 'missing')).toBe(deck);
-  });
-
-  it('says more are being written only when the ready pool is low', () => {
-    expect(feedEnd(3, 10)).toBe('writing');
-    expect(feedEnd(14, 10)).toBe('passed');
   });
 });
 

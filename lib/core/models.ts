@@ -164,8 +164,6 @@ export const MODELS = {
   learnReadingChat: SONNET,
   /** lib/learn/quiz/generate.ts */
   learnQuiz: HAIKU,
-  /** lib/learn/survey/goal-idea.ts */
-  learnSurveyGoalIdea: HAIKU,
   /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
   learnEssayInterview: SONNET,
   /** lib/learn/essays/guide-model.ts, the guided essay: reading the brief, finding points, shapes, plan notes, questions on a point, and writing up the research */
@@ -190,8 +188,6 @@ export const MODELS = {
   learnBriefSearch: HAIKU,
   /** lib/learn/briefs/research-model.ts, a brief's positions and short answer, cited from the pages read */
   learnBriefWrite: SONNET,
-  /** lib/learn/survey/idea.ts */
-  learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */
   learnVaultClassify: HAIKU,
   /** lib/learn/youtube/channel-search.ts */

@@ -28,20 +28,44 @@ export type LensScope = {
  * points at through `aims.subject_id` (plan #2302.2), which is how a goal names
  * its subject. A hidden survey subject's `subjects.aim_id` is not followed.
  */
-export async function practiceSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+export async function practiceSubjectIds(
+  learn: LearnSupabaseClient,
+  userId: string,
+  only: 'tracks' | 'goals' | null = null,
+): Promise<Set<string>> {
   const [prepared, goals] = await Promise.all([
-    preparedSubjectIds(learn, userId),
-    learn
-      .from('aims')
-      .select('subject_id')
-      .eq('user_id', userId)
-      .is('archived_at', null)
-      .not('subject_id', 'is', null),
+    only === 'goals' ? [] : preparedSubjectIds(learn, userId),
+    only === 'tracks' ? [] : goalSubjectIds(learn, userId),
   ]);
-  if (goals.error) throw new Error(`Reading your goals' subjects failed: ${goals.error.message}`);
-  const ids = new Set(prepared);
-  for (const row of (goals.data ?? []) as { subject_id: string }[]) ids.add(row.subject_id);
-  return ids;
+  return new Set([...prepared, ...goals]);
+}
+
+/** The subjects your open goals point at (`aims.subject_id`), for the Goals only filter. */
+export async function goalSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<string[]> {
+  const { data, error } = await learn
+    .from('aims')
+    .select('subject_id')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .not('subject_id', 'is', null);
+  if (error) throw new Error(`Reading your goals' subjects failed: ${error.message}`);
+  return ((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id);
+}
+
+/**
+ * The subject a goal's Practise link (`?goal=<aim id>`) asks about: the one
+ * the goal points at, or null when the goal is archived, not yours, or points
+ * at none.
+ */
+export async function goalSubjectId(learn: LearnSupabaseClient, aimId: string): Promise<string | null> {
+  const { data, error } = await learn
+    .from('aims')
+    .select('subject_id, archived_at')
+    .eq('id', aimId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading that goal failed: ${error.message}`);
+  const aim = data as { subject_id: string | null; archived_at: string | null } | null;
+  return aim && !aim.archived_at ? aim.subject_id : null;
 }
 
 /**

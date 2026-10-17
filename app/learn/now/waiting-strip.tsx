@@ -4,11 +4,11 @@ import type { WaitingLine } from '@/lib/learn/feed/waiting';
 import { cn } from '@/lib/cn';
 
 /**
- * What is waiting for you, as one short strip at the top of Now (plan #1486):
- * the lines Learn's Home tab listed (plan #1311), minus the cards ready in the
- * feed, which is the page this sits on. With nothing waiting it draws
- * nothing, since the feed below is the next thing either way; when a count
- * could not be read it says so in a line rather than claiming nothing waits.
+ * What is waiting for you, as one short strip at the top of Now's Practice
+ * view (plan #1486): the same lines Now's rail lists (plan #2313.1). With
+ * nothing waiting it draws nothing, since the questions below are the next
+ * thing either way; when a count could not be read it says so in a line
+ * rather than claiming nothing waits.
  */
 export function WaitingStrip({
   lines,

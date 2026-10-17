@@ -4,8 +4,11 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadSurveySubjectIds } from '@/lib/learn/survey/subject';
 import {
+  cellQuestionsBySubject,
   INTEREST_WINDOW_DAYS,
   trackWeights,
+  type CellQuestionRow,
+  type SubjectQuestion,
   type TrackActivity,
   type TrackShare,
   type TrackWeight,
@@ -18,7 +21,9 @@ import {
  * Four reads through the session client: the questions shown or answered in
  * the last twelve weeks, the ideas pushed aside with Not now in the last four,
  * the lessons swiped in Learn now in the last twelve (plan #978), and which
- * track each of those ideas is in. Nothing is written, and a page being opened
+ * track each of those ideas is in. The questions about levels of topics count
+ * too (plan #2313.2), for each subject whose lens holds the topic, since those
+ * are the questions Practice asks now. Nothing is written, and a page being opened
  * counts for nothing; the rows read here are written when a question is shown,
  * when it is answered, when Not now is pressed, and when a lesson is swiped.
  *
@@ -69,6 +74,53 @@ function used(track: TrackActivity, at: string) {
   if (!track.lastUsed || new Date(at).getTime() > new Date(track.lastUsed).getTime()) track.lastUsed = at;
 }
 
+/**
+ * The questions about levels of topics shown or answered since `from`, one
+ * row for each subject whose lens holds the question's topic.
+ */
+async function loadCellQuestions(
+  supabase: LearnSupabaseClient,
+  from: string,
+  userId?: string,
+): Promise<SubjectQuestion[]> {
+  let questionQuery = supabase
+    .from('cell_questions')
+    .select('cell_id, answered_at, shown_at')
+    .or(`answered_at.gte.${from},shown_at.gte.${from}`);
+  let lensQuery = supabase.from('lens_targets').select('topic_id, lens:lenses!inner(subject_id)');
+  if (userId) {
+    questionQuery = questionQuery.eq('user_id', userId);
+    lensQuery = lensQuery.eq('user_id', userId);
+  }
+  const [questions, lenses] = await Promise.all([questionQuery, lensQuery]);
+  assertSchemaExposed(questions.error, LEARN_SCHEMA);
+  if (questions.error) throw fail('Reading the questions about your topics', questions.error);
+  if (lenses.error) throw fail('Reading which subjects your topics are in', lenses.error);
+  const asked = (questions.data ?? []) as CellQuestionRow[];
+  if (asked.length === 0) return [];
+
+  // A hundred ids an `in` filter keeps the query string short.
+  const cellIds = [...new Set(asked.map((row) => row.cell_id))];
+  const topicOf = new Map<string, string>();
+  for (let i = 0; i < cellIds.length; i += 100) {
+    const { data, error } = await supabase
+      .from('topic_cells')
+      .select('id, topic_id')
+      .in('id', cellIds.slice(i, i + 100));
+    if (error) throw fail('Reading which topics those questions are about', error);
+    for (const cell of (data ?? []) as { id: string; topic_id: string }[]) topicOf.set(cell.id, cell.topic_id);
+  }
+
+  return cellQuestionsBySubject(
+    asked,
+    topicOf,
+    ((lenses.data ?? []) as unknown as { topic_id: string; lens: { subject_id: string | null } }[]).map((row) => ({
+      topicId: row.topic_id,
+      subjectId: row.lens.subject_id,
+    })),
+  );
+}
+
 /** Every track's activity, weight and questions asked, as of `now`. */
 export async function loadTrackInterest(
   supabase: LearnSupabaseClient,
@@ -102,7 +154,13 @@ export async function loadTrackInterest(
     asideQuery = asideQuery.eq('user_id', userId);
     lessonQuery = lessonQuery.eq('user_id', userId);
   }
-  const [probes, asides, lessonCards] = await Promise.all([probeQuery, asideQuery, lessonQuery]);
+  const [probes, asides, lessonCards, cellRows, surveyed] = await Promise.all([
+    probeQuery,
+    asideQuery,
+    lessonQuery,
+    loadCellQuestions(supabase, from, userId),
+    loadSurveySubjectIds(supabase, userId),
+  ]);
 
   assertSchemaExposed(probes.error, LEARN_SCHEMA);
   if (probes.error) throw fail('Reading the questions you were asked', probes.error);
@@ -127,10 +185,7 @@ export async function loadTrackInterest(
   if (conceptIds.length > 0) {
     let conceptQuery = supabase.from('concepts').select('id, subject_id').in('id', conceptIds);
     if (userId) conceptQuery = conceptQuery.eq('user_id', userId);
-    const [{ data, error }, surveyed] = await Promise.all([
-      conceptQuery,
-      loadSurveySubjectIds(supabase, userId),
-    ]);
+    const { data, error } = await conceptQuery;
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Reading which subject those ideas are in', error);
     for (const concept of (data ?? []) as { id: string; subject_id: string }[]) {
@@ -141,9 +196,20 @@ export async function loadTrackInterest(
     }
   }
 
+  // A question about a level of a topic (plan #2138) counts for every subject
+  // whose lens holds the topic, as a question about one of its ideas does
+  // (plan #2313.2). Survey subjects stay out here too.
+  const questions: SubjectQuestion[] = [
+    ...rows.flatMap((row) => {
+      const subjectId = subjectOf.get(row.concept_id);
+      return subjectId ? [{ subjectId, answered_at: row.answered_at, shown_at: row.shown_at }] : [];
+    }),
+    ...cellRows.filter((row) => !surveyed.has(row.subjectId)),
+  ];
+
   // The question shown last is the one on the screen, or the one just
   // answered. Any unanswered question shown before it was moved past.
-  const lastShown = rows.reduce<string | null>(
+  const lastShown = [...rows, ...cellRows].reduce<string | null>(
     (latest, row) =>
       row.shown_at !== null && (latest === null || row.shown_at > latest) ? row.shown_at : latest,
     null,
@@ -160,9 +226,8 @@ export async function loadTrackInterest(
   };
   const inWindow = (at: string | null) => at !== null && new Date(at).getTime() >= windowStart;
 
-  for (const row of rows) {
-    const subjectId = subjectOf.get(row.concept_id);
-    if (!subjectId) continue;
+  for (const row of questions) {
+    const subjectId = row.subjectId;
     const track = of(subjectId);
 
     if (row.answered_at !== null) {

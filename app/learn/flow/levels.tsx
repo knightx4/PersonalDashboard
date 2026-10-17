@@ -87,9 +87,15 @@ export async function LevelsFlow({
   try {
     [map, lens] = await Promise.all([
       loadGradeMap(learn, userId),
-      // Not focused: every prepared subject and every goal's subject (plan #2302.1).
+      // Not focused: every prepared subject and every goal's subject (plan
+      // #2302.1), or only one of the two under Subjects only or Goals only.
       (async () =>
-        loadLensScope(learn, userId, subject?.id ?? null, subject ? undefined : await practiceSubjectIds(learn, userId)))(),
+        loadLensScope(
+          learn,
+          userId,
+          subject?.id ?? null,
+          subject ? undefined : await practiceSubjectIds(learn, userId, only === 'tracks' || only === 'goals' ? only : null),
+        ))(),
     ]);
   } catch (error) {
     return (
