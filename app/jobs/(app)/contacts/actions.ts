@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { draftOutreach, type OutreachDraft } from '@/lib/jobs/contacts/draft-outreach';
@@ -146,7 +147,8 @@ export async function updateContact(
 /**
  * Delete a contact (note 8902b443). Their logged sends, notes, reminders and
  * interview places go with them, by the foreign keys; a referral on an
- * application keeps the application and loses the name. The page asks first.
+ * application keeps the application and loses the name. The page asks first,
+ * and goes back to the list once it is gone.
  */
 // latency: pending
 export async function deleteContact(contactId: string): Promise<{ error: string | null }> {
@@ -161,7 +163,7 @@ export async function deleteContact(contactId: string): Promise<{ error: string 
   if (error) return { error: error.message };
   revalidatePath('/jobs/contacts');
   revalidatePath('/jobs/companies/[slug]', 'page');
-  return { error: null };
+  redirect('/jobs/contacts');
 }
 
 const DraftRequest = z.object({

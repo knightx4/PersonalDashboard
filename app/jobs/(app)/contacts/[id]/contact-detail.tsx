@@ -1,7 +1,6 @@
 'use client';
 
 import { ExternalLink, Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -82,7 +81,6 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
 
 /** Delete, asked first, at the foot of the page (note 8902b443). */
 function DeleteContact({ contactId, name }: { contactId: string; name: string }) {
-  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -90,12 +88,9 @@ function DeleteContact({ contactId, name }: { contactId: string; name: string })
   function remove() {
     setError(null);
     startTransition(async () => {
+      // On success the action goes back to the list, so only a failure returns.
       const result = await deleteContact(contactId);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.push('/jobs/contacts');
+      if (result?.error) setError(result.error);
     });
   }
 
