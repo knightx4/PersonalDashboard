@@ -3,7 +3,6 @@ import type { Concept } from '@/lib/learn/graph/model';
 import type { LessonPick, TrackNeed } from './choose';
 import type { AddedFloor, FloorDue } from './add-floor';
 import type { AddedUnit } from './add-unit';
-import type { OutlineOutcome } from './outline';
 import type { LaidOutUnit } from './lay-out-unit';
 import type { UnitCheckDue } from './unit-check';
 import {
@@ -45,7 +44,6 @@ function ports(options: {
   choices: { picks: LessonPick[]; needs: TrackNeed[]; checks?: UnitCheckDue[] }[];
   layOut?: (subjectId: string) => LaidOutUnit;
   addUnit?: (subjectId: string) => AddedUnit;
-  outline?: (subjectId: string) => OutlineOutcome;
   floorsDue?: FloorDue[];
   addFloor?: (due: FloorDue) => AddedFloor;
   write?: (pick: LessonPick) => LessonOutcome;
@@ -56,7 +54,6 @@ function ports(options: {
     choose: 0,
     layOut: [] as string[],
     addUnit: [] as { subjectId: string; lastUnitId: string | null }[],
-    outline: [] as string[],
     hold: [] as { subjectId: string; until: Date }[],
     floorsDue: [] as number[],
     addFloor: [] as string[],
@@ -80,10 +77,6 @@ function ports(options: {
     addUnit: async (_userId, subjectId, lastUnitId) => {
       calls.addUnit.push({ subjectId, lastUnitId });
       return options.addUnit?.(subjectId) ?? { outcome: 'added', unitId: `${subjectId}-new`, title: 'New' };
-    },
-    outline: async (_userId, subjectId) => {
-      calls.outline.push(subjectId);
-      return options.outline?.(subjectId) ?? { outcome: 'written', added: 6 };
     },
     hold: async (_userId, subjectId, until) => {
       calls.hold.push({ subjectId, until });
@@ -250,31 +243,6 @@ describe('writing the next unit', () => {
     const late = ports({ choices: [{ picks: [], needs }] });
     await writeLessonsFor(late.port, { userId: 'u', wanted: 4, deadline: LAYOUT_RESERVE_MS - 1 });
     expect(late.calls.addUnit).toEqual([]);
-  });
-
-  it("writes a goal's whole outline in place of a next unit (plan #1139)", async () => {
-    const { port, calls } = ports({
-      choices: [
-        { picks: [], needs: [need('goal', 'no-outline'), need('other', 'all-units-done'), need('later', 'no-outline')] },
-        { picks: [], needs: [] },
-      ],
-    });
-    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
-    // Two a run, in the order the needs came, so the third waits for the next.
-    expect(calls.outline).toEqual(['goal']);
-    expect(calls.addUnit).toEqual([{ subjectId: 'other', lastUnitId: 'other-u' }]);
-    expect(summary.added).toEqual(['goal', 'other']);
-    expect(calls.choose).toBe(2);
-  });
-
-  it('holds a goal track whose outline could not be written', async () => {
-    const { port, calls } = ports({
-      choices: [{ picks: [], needs: [need('broken', 'no-outline')] }],
-      outline: () => ({ outcome: 'failed', detail: 'No reply.' }),
-    });
-    const summary = await writeLessonsFor(port, { userId: 'u', wanted: 4, deadline: FAR });
-    expect(calls.hold.map((held) => held.subjectId)).toEqual(['broken']);
-    expect(summary.failed).toEqual(['broken: No reply.']);
   });
 
   it('holds a track whose unit could not be written, and leaves one another run already grew', async () => {

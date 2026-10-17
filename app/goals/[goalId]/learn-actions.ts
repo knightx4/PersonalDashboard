@@ -7,7 +7,7 @@ import { AIM_DEPTHS, type AimDepth } from '@/lib/learn/aims';
 import { updateAim } from '@/lib/learn/aims-store';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { GOAL_KINDS } from '@/lib/learn/goal-kind';
-import { setAimKind } from '@/lib/learn/goal-kind-store';
+import { setSubjectKind } from '@/lib/learn/goal-kind-store';
 
 /**
  * How well you want to know a goal in the Learn area (plan #1491), set from
@@ -43,13 +43,15 @@ export async function setLearnDepth(
 }
 
 /**
- * What kind of goal this is (plan #2247.2), changed from the goal's page. The
- * kind decides which sources the next draft tries, and a kind the person sets
- * is kept against the classifying call. Nothing here reaches a model.
+ * What kind of subject the goal points at (plan #2247.2; on the subject since
+ * #2302.2), changed from the goal's page. The kind decides which sources the
+ * subject's preparation tries, and a kind the person sets is kept against the
+ * classify step. Nothing here reaches a model.
  */
 export type LearnKindState = { error?: string; done?: number };
 
 const Kind = z.enum(GOAL_KINDS);
+const SubjectId = z.string().uuid();
 
 // latency: pending
 export async function setLearnKind(
@@ -57,13 +59,13 @@ export async function setLearnKind(
   form: FormData,
 ): Promise<LearnKindState> {
   await requireUser();
-  const id = AimId.safeParse(form.get('aimId'));
-  if (!id.success) return { error: 'Could not tell which learning goal that was.' };
+  const id = SubjectId.safeParse(form.get('subjectId'));
+  if (!id.success) return { error: 'Could not tell which subject that was.' };
   const kind = Kind.safeParse(form.get('kind'));
   if (!kind.success) return { error: 'Pick one of the kinds listed.' };
   try {
-    const changed = await setAimKind(await createLearnClient(), id.data, kind.data);
-    if (!changed) return { error: 'That learning goal is no longer active.' };
+    const changed = await setSubjectKind(await createLearnClient(), id.data, kind.data);
+    if (!changed) return { error: 'That subject is no longer there.' };
   } catch {
     return { error: 'The change could not be saved. Try again.' };
   }
