@@ -785,7 +785,7 @@ export function LearnReadingCheckOwnSurface() {
 // ---- One piece of a learning goal's plan ------------------------------------------
 
 const piecePage: PiecePage = {
-  piece: { id: 'pc2', ordinal: 2, title: 'When a price rise brings in more money', passedAt: null },
+  piece: { id: 'pc2', ordinal: 2, title: 'When a price rise brings in more money', passedAt: null, heldAt: null },
   subject: { id: SUBJECT.id, name: SUBJECT.name },
   unit: {
     id: 'u1',
@@ -823,6 +823,7 @@ const piecePage: PiecePage = {
     { cellId: 'cl3', topicId: 'tp3', topicName: 'Percentage change', level: 2, status: 'shown' },
   ],
   check: null,
+  checkOn: { cellId: 'cl1', topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4, status: 'open' },
 };
 
 const practice: PracticeView = {
@@ -909,6 +910,35 @@ export function LearnPieceCellCheckSurface() {
         }}
         practice={practice}
         standing={{ practicePassed: false, checkPassed: true }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
+  );
+}
+
+/**
+ * A piece the placement found held (plan #2292.5): every cell it teaches is
+ * held, so its lessons open folded to their takeaways and its check asks the
+ * level above, on the same topic.
+ */
+export function LearnPieceHeldSurface() {
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          piece: { ...piecePage.piece, heldAt: '2026-10-17T09:00:00Z' },
+          siblings: piecePage.siblings.map((s) => (s.id === 'pc2' ? { ...s, held: true } : s)),
+          cells: piecePage.cells.map((cell) => ({ ...cell, status: 'shown' })),
+          checkOn: { cellId: 'cl5', topicId: 'tp1', topicName: 'Price elasticity of demand', level: 5, status: 'open' },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
         reviews={[]}
       />
     </PaidCostsProvider>
