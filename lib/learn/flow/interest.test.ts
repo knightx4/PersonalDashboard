@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cellQuestionsBySubject,
   isExploreTurn,
   LEAST_WEIGHT,
   MOST_WEIGHT,
@@ -197,5 +198,54 @@ describe('the lean on new-track offers', () => {
       [{ themeId: 'a', pull: 1, notes: notes('n1') }],
     );
     expect(lean.get('t')).toBe(1);
+  });
+});
+
+describe('cellQuestionsBySubject', () => {
+  const topicOf = new Map([
+    ['cell-1', 'topic-a'],
+    ['cell-2', 'topic-b'],
+    ['cell-3', 'topic-c'],
+  ]);
+  const lenses = [
+    { topicId: 'topic-a', subjectId: 'finance' },
+    { topicId: 'topic-a', subjectId: 'startups' },
+    { topicId: 'topic-a', subjectId: 'finance' },
+    { topicId: 'topic-b', subjectId: 'finance' },
+    { topicId: 'topic-c', subjectId: null },
+  ];
+
+  it('counts a question for every subject whose lens holds its topic, once each', () => {
+    const rows = cellQuestionsBySubject(
+      [{ cell_id: 'cell-1', answered_at: '2026-10-10T09:00:00Z', shown_at: '2026-10-10T08:59:00Z' }],
+      topicOf,
+      lenses,
+    );
+    expect(rows.map((row) => row.subjectId).sort()).toEqual(['finance', 'startups']);
+    expect(rows[0]!.answered_at).toBe('2026-10-10T09:00:00Z');
+  });
+
+  it('counts a question on a topic no subject holds for none', () => {
+    const rows = cellQuestionsBySubject(
+      [
+        { cell_id: 'cell-3', answered_at: null, shown_at: '2026-10-10T08:00:00Z' },
+        { cell_id: 'unknown', answered_at: null, shown_at: null },
+      ],
+      topicOf,
+      lenses,
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it('weighs a subject up as its topic questions are answered', () => {
+    const answered = cellQuestionsBySubject(
+      [0, 1, 2, 3].map((i) => ({ cell_id: 'cell-2', answered_at: `2026-10-1${i}T09:00:00Z`, shown_at: null })),
+      topicOf,
+      lenses,
+    );
+    const activity = new Map<string, TrackActivity>([
+      ['finance', { answered: answered.length, skipped: 0, pushedAside: 0, answeredBefore: 0 }],
+    ]);
+    expect(trackWeights(activity).get('finance')!.weight).toBeGreaterThan(1);
   });
 });
