@@ -59,10 +59,19 @@ export type DraftTopicsPorts = {
   draft: (territory: Territory, budgetMs: number) => Promise<LaneResult>;
   /** Give every drafted territory topic its target on the lens; returns how many it has. */
   targets: (lensId: string, topics: readonly TerritoryTopic[]) => Promise<number>;
+  /**
+   * Approve each drafted territory topic whose rows all cite a source, with the
+   * drafted checks unchanged (plan #2276.10); returns how many of these topics
+   * are approved now and the ones left as drafts, with why.
+   */
+  approve: (topics: readonly TerritoryTopic[]) => Promise<ApprovalResult>;
 };
 
+export type KeptDraft = { ask: string; name: string; reason: string };
+export type ApprovalResult = { approved: number; kept: KeptDraft[] };
+
 type GivenUp = { ask: string; detail: string; tries: number };
-type DraftDetail = { lens?: { id: string; name: string }; failed?: GivenUp[] };
+type DraftDetail = { lens?: { id: string; name: string }; failed?: GivenUp[]; kept?: KeptDraft[] };
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -92,20 +101,27 @@ export function draftTopicsStep(ports: DraftTopicsPorts): StepHandler {
       const drafted = total - left.length;
       return { counts: { topics: total, drafted, remaining: left.length - abandoned, failed: abandoned }, drafted, abandoned };
     };
-    const record = (): Record<string, unknown> => ({ lens, failed: [...failed.values()] });
+    const record = (kept?: KeptDraft[]): Record<string, unknown> => ({
+      lens,
+      failed: [...failed.values()],
+      ...(kept ? { kept } : {}),
+    });
 
     const left = topicsLeft(territory, await ports.asked());
     const todo = left.filter((t) => !gaveUp(t));
     if (todo.length === 0) {
       const { counts, drafted, abandoned } = tally(left);
       const targeted = await ports.targets(lens.id, territory.topics);
+      const { approved, kept } = await ports.approve(territory.topics);
       return {
         state: 'done',
         summary:
           `Drafted ${plural(drafted, 'topic')} with their checks, ${targeted} with a target on the lens.` +
+          ` ${approved} approved` +
+          (kept.length > 0 ? `, ${kept.length} left as ${kept.length === 1 ? 'a draft' : 'drafts'} for a row that cites nothing.` : '.') +
           (abandoned > 0 ? ` ${plural(abandoned, 'topic')} could not be drafted.` : ''),
-        counts: { ...counts, targeted },
-        detail: record(),
+        counts: { ...counts, targeted, approved, kept: kept.length },
+        detail: record(kept),
       };
     }
 
