@@ -4,7 +4,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { PlacementPiece } from '@/lib/learn/levels/placement';
 
 /**
- * The reads and the one write a placement run needs (plan #2292.2). Asking
+ * The reads and the one write a placement run needs (plans #2292.2, #2292.5). Asking
  * and answering are Practice Flow's own (answer-store.ts), so a placement's
  * answers write evidence exactly as a practice run's do.
  */
@@ -31,7 +31,7 @@ export async function loadPlacementPieces(
   const [pieces, units] = await Promise.all([
     learn
       .from('plan_pieces')
-      .select('id, unit_id, ordinal, title, cell_ids, passed_at')
+      .select('id, unit_id, ordinal, title, cell_ids, passed_at, held_at')
       .eq('user_id', userId)
       .eq('subject_id', subjectId),
     learn.from('curriculum_units').select('id, ordinal').eq('user_id', userId).eq('subject_id', subjectId),
@@ -47,6 +47,7 @@ export async function loadPlacementPieces(
       title: string;
       cell_ids: string[] | null;
       passed_at: string | null;
+      held_at: string | null;
     }[]
   )
     .filter((row) => unitOrdinal.has(row.unit_id))
@@ -57,23 +58,26 @@ export async function loadPlacementPieces(
       title: row.title,
       cellIds: row.cell_ids ?? [],
       passed: row.passed_at !== null,
+      held: row.held_at !== null,
     }));
 }
 
 /**
- * Pass the pieces a placement showed you hold, with a reason of placement.
- * A piece passed since it was read keeps its own date and reason. Returns the
- * ids this call passed.
+ * Mark the pieces a placement showed you hold as held, with a reason of
+ * placement (plan #2292.5). Nothing is passed: a held piece still opens, read
+ * short and asked a level higher. A piece passed or held since it was read
+ * keeps what it has. Returns the ids this call marked.
  */
-export async function passPlacedPieces(learn: LearnSupabaseClient, userId: string, pieceIds: readonly string[]): Promise<string[]> {
+export async function holdPlacedPieces(learn: LearnSupabaseClient, userId: string, pieceIds: readonly string[]): Promise<string[]> {
   if (pieceIds.length === 0) return [];
   const { data, error } = await learn
     .from('plan_pieces')
-    .update({ passed_at: new Date().toISOString(), passed_reason: 'placement' })
+    .update({ held_at: new Date().toISOString(), held_reason: 'placement' })
     .eq('user_id', userId)
     .in('id', [...pieceIds])
     .is('passed_at', null)
+    .is('held_at', null)
     .select('id');
-  if (error) throw new Error(`Passing the pieces you already hold failed: ${error.message}`);
+  if (error) throw new Error(`Marking the pieces you already hold failed: ${error.message}`);
   return ((data ?? []) as { id: string }[]).map((row) => row.id);
 }

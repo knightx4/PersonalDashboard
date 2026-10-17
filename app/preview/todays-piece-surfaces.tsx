@@ -217,13 +217,14 @@ function piece(over: { turns?: TalkTurn[]; state?: PieceTalkState | null } = {})
     kind: 'piece',
     goalName: 'SaaS and subscription business metrics',
     page: {
-      piece: { id: PIECE_ID, ordinal: 3, title: 'Retention: who stays and what they pay', passedAt: null },
+      piece: { id: PIECE_ID, ordinal: 3, title: 'Retention: who stays and what they pay', passedAt: null, heldAt: null },
       subject: { id: SUBJECT_ID, name: 'SaaS and subscription business metrics' },
       unit: { id: '5d000000-0000-4000-8000-000000000301', ordinal: 2, title: 'Keeping customers', outcome: null },
       siblings: [],
       ideas,
       cells: [],
       check: null,
+      checkOn: null,
     },
     talk: { turns: over.turns ?? [], state: over.state ?? null, openedAt: OPENED_AT },
   };

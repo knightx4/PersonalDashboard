@@ -19,7 +19,7 @@ import {
   PLACEMENT_QUESTIONS,
   type PlacementPiece,
 } from '@/lib/learn/levels/placement';
-import { loadLensOrder, loadPlacementPieces, passPlacedPieces } from '@/lib/learn/levels/placement-store';
+import { holdPlacedPieces, loadLensOrder, loadPlacementPieces } from '@/lib/learn/levels/placement-store';
 import { countAnswered } from '@/lib/learn/levels/practice-store';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -32,10 +32,12 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  * evidence and move the lens as any practice answer does.
  *
  * Every question carries Skip to the lesson. The end, reached by the eighth
- * answer, by running out of levels to place or by Skip, passes every piece of
- * the laid-out units whose matched cells are all held, with a reason of
- * placement, and opens on the first piece left. Skip goes straight there;
- * the end otherwise shows the levels and the pieces first.
+ * answer, by running out of levels to place or by Skip, marks every piece of
+ * the laid-out units whose matched cells are all held as held (plan
+ * #2292.5): it opens short, its lessons folded, and asks a level higher. No
+ * piece is passed, so the lessons still open on the first piece not passed.
+ * Skip goes straight there; the end otherwise shows the levels and the held
+ * pieces first.
  */
 
 type Learn = Awaited<ReturnType<typeof createLearnClient>>;
@@ -51,13 +53,12 @@ function pieceHref(subjectId: string, pieceId: string): string {
   return `/learn/s/${subjectId}/p/${pieceId}`;
 }
 
-/** Pass the pieces now held, and say where the lessons start. */
+/** Mark the pieces now held, and say where the lessons start. */
 async function finish(learn: Learn, userId: string, subjectId: string, map: GradeMap, pieces: PlacementPiece[]) {
-  const passedIds = new Set(await passPlacedPieces(learn, userId, heldPieces(pieces, readCells(map))));
-  const after = pieces.map((p) => (passedIds.has(p.id) ? { ...p, passed: true } : p));
-  const first = firstNotHeld(after);
+  const heldIds = new Set(await holdPlacedPieces(learn, userId, heldPieces(pieces, readCells(map))));
+  const first = firstNotHeld(pieces);
   return {
-    passed: inTeachingOrder(pieces.filter((p) => passedIds.has(p.id))).map((p) => p.title),
+    held: inTeachingOrder(pieces.filter((p) => heldIds.has(p.id))).map((p) => p.title),
     lesson: first ? { title: first.title, href: pieceHref(subjectId, first.id) } : null,
   };
 }
@@ -123,14 +124,14 @@ export async function PlacementFlow({
     const since = end ?? run ?? now.toISOString();
     const done = await finish(learn, userId, subject.id, map, pieces).then(
       (d) => ({ ok: true as const, ...d }),
-      (error: unknown) => ({ ok: false as const, message: error instanceof Error ? error.message : 'Passing the pieces failed.' }),
+      (error: unknown) => ({ ok: false as const, message: error instanceof Error ? error.message : 'Marking the pieces you hold failed.' }),
     );
     if (!done.ok) return <PracticeError message={done.message} retryHref={practiceHref({ ...scope, end: since })} />;
     if (skip) redirect(done.lesson?.href ?? subjectHref);
     return (
       <PlacementEndView
         topics={placedTopics(map, readCells(map), order, since)}
-        passed={done.passed}
+        held={done.held}
         lesson={done.lesson}
         subjectHref={subjectHref}
       />

@@ -137,3 +137,50 @@ export function checkCell(cells: readonly PieceCellView[]): PieceCellView | null
   const atTop = askable.filter((cell) => cell.level === top);
   return atTop.find((cell) => !isHeld(cell.status)) ?? atTop[0]!;
 }
+
+/**
+ * The cell a held piece's check asks about (plan #2292.5): one level above
+ * what the placement showed. On each topic the piece's cells sit on, the
+ * level above the highest held one; of those, the lowest cell that can be
+ * asked in writing and is not held yet, then the order the piece names its
+ * topics in. `ladder` is every cell of those topics, with where you stand on
+ * each. Null when every topic is held to its top, and the piece asks as any
+ * piece does.
+ */
+export function aboveHeldCell(
+  cells: readonly PieceCellView[],
+  ladder: readonly PieceCellView[],
+): PieceCellView | null {
+  const topics = [...new Set(cells.map((cell) => cell.topicId))];
+  const candidates = topics.flatMap((topicId) => {
+    const own = cells.filter((cell) => cell.topicId === topicId && isHeld(cell.status));
+    if (own.length === 0) return [];
+    const heldTo = Math.max(...own.map((cell) => cell.level));
+    const above = ladder
+      .filter(
+        (cell) =>
+          cell.topicId === topicId &&
+          cell.level > heldTo &&
+          !isHeld(cell.status) &&
+          questionFormat(cell.level) !== 'defend',
+      )
+      .sort((a, b) => a.level - b.level);
+    return above.length > 0 ? [above[0]!] : [];
+  });
+  if (candidates.length === 0) return null;
+  const lowest = Math.min(...candidates.map((cell) => cell.level));
+  return candidates.find((cell) => cell.level === lowest)!;
+}
+
+/**
+ * The cell the piece's check asks about: for a piece a placement found held,
+ * the level above what was shown, falling back to the piece's own cells;
+ * otherwise the level the piece reaches (`checkCell`).
+ */
+export function pieceCheckCell(
+  cells: readonly PieceCellView[],
+  ladder: readonly PieceCellView[],
+  held: boolean,
+): PieceCellView | null {
+  return (held ? aboveHeldCell(cells, ladder) : null) ?? checkCell(cells);
+}

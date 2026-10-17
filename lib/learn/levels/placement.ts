@@ -5,9 +5,11 @@
  * A placement is a Practice Flow run scoped to the subject's lens that asks
  * nothing but placement: up to `PLACEMENT_QUESTIONS` questions, taking the
  * subject's topics in order and bisecting each topic's levels by the rule in
- * model.ts `nextQuestion`, before moving to the next topic. Its end passes
- * every piece of the laid-out units whose matched cells are all held, and
- * the lesson it opens is the first piece left.
+ * model.ts `nextQuestion`, before moving to the next topic. Its end marks
+ * every piece of the laid-out units whose matched cells are all held as held
+ * (plan #2292.5): the piece is not passed or skipped, but opens with its
+ * lessons folded and its check asked a level higher. The lesson it opens is
+ * the first piece not passed, held or not.
  *
  * The order is the one the lessons teach in: topics as the laid-out pieces
  * first name them (unit by unit, piece by piece), then the rest of the lens
@@ -30,6 +32,8 @@ export type PlacementPiece = {
   /** The cells it was matched to teach, in the matcher's order. */
   cellIds: readonly string[];
   passed: boolean;
+  /** A placement showed every cell it teaches as held (plan #2292.5). */
+  held: boolean;
 };
 
 /** Pieces in teaching order: unit by unit, then piece by piece. */
@@ -101,20 +105,25 @@ export function pickPlacement(
 }
 
 /**
- * The pieces not yet passed whose matched cells are all held. A piece with no
- * cells on the map says nothing about what you hold, so it is never passed.
+ * The pieces neither passed nor already held whose matched cells are all
+ * held. A piece with no cells on the map says nothing about what you hold, so
+ * it is never held this way.
  */
 export function heldPieces(pieces: readonly PlacementPiece[], readings: Readings): string[] {
   return pieces
     .filter((piece) => {
-      if (piece.passed) return false;
+      if (piece.passed || piece.held) return false;
       const cells = piece.cellIds.filter((id) => readings.has(id));
       return cells.length > 0 && cells.every((id) => isHeld(readings.get(id)!.status));
     })
     .map((piece) => piece.id);
 }
 
-/** The first piece in teaching order not passed: where the lessons start. */
+/**
+ * The first piece in teaching order not passed, held or not: where the
+ * lessons start. A placement holds pieces rather than passing them, so after
+ * one this is still unit 1's first piece until a check passes it.
+ */
 export function firstNotHeld<T extends Pick<PlacementPiece, 'unitOrdinal' | 'ordinal' | 'passed'>>(
   pieces: readonly T[],
 ): T | null {

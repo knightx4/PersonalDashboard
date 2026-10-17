@@ -219,6 +219,7 @@ import {
   LearnOpeningSurface,
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
+  LearnPieceHeldSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -6133,18 +6134,18 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlacementPreview state="answered" />,
   },
   {
-    /* The end: each topic answered on at its level, the pieces passed by
-     * placement, and the lesson the subject now starts on. */
+    /* The end: each topic answered on at its level, the pieces held, which
+     * are shown short and asked harder (plan #2292.5), and the first lesson. */
     id: 'learn-placement-end',
-    label: 'Placement · The end, with pieces passed',
+    label: 'Placement · The end, with pieces held',
     module: 'learn',
     width: 'narrow',
     render: () => <PlacementPreview state="end" />,
   },
   {
-    /* An end where nothing was held well enough to pass a piece. */
+    /* An end where nothing was held well enough to hold a piece. */
     id: 'learn-placement-end-none',
-    label: 'Placement · The end, nothing passed',
+    label: 'Placement · The end, nothing held',
     module: 'learn',
     width: 'narrow',
     render: () => <PlacementPreview state="end-none" />,
@@ -8985,6 +8986,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceCellCheckSurface />,
+  },
+  {
+    /* A piece the placement found held (plan #2292.5): lessons folded to
+     * their takeaways, the check one level above what was shown. */
+    id: 'learn-piece-held',
+    label: 'Plan · One piece you already hold, read short',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceHeldSurface />,
   },
   {
     id: 'learn-probe',

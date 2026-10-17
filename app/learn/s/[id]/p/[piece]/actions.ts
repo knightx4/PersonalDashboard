@@ -25,8 +25,8 @@ import { markPieceCheck, PIECE_CHECK_MODEL, writePieceCheck } from '@/lib/learn/
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { answerCell, askCell } from '@/lib/learn/levels/answer-store';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
-import { checkCell } from '@/lib/learn/lessons/piece-cells';
-import { loadCellCheck, loadPieceCells } from '@/lib/learn/lessons/piece-cells-store';
+import { pieceCheckCell } from '@/lib/learn/lessons/piece-cells';
+import { loadCellCheck, loadPieceCellsAndLadder } from '@/lib/learn/lessons/piece-cells-store';
 
 /**
  * The presses on a piece's page (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -83,8 +83,10 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
     if (!loaded) return { error: 'This piece has no ideas left to ask about.' };
 
     // A piece that names a cell it can ask about is checked with a cell
-    // question at the level the piece reaches (plan #2138.13).
-    const target = checkCell(await loadPieceCells(learn, user.id, loaded.cellIds));
+    // question at the level the piece reaches (plan #2138.13), or for a piece
+    // a placement found held, the level above what it showed (plan #2292.5).
+    const { cells, ladder } = await loadPieceCellsAndLadder(learn, user.id, loaded.cellIds);
+    const target = pieceCheckCell(cells, ladder, loaded.heldAt !== null);
     if (target) return await askCellCheck(learn, user.id, pieceIdValue, target.cellId);
 
     const { data: open, error: openError } = await learn

@@ -358,8 +358,8 @@ export function PlacementPreview({ state }: { state: 'question' | 'answered' | '
             { topicId: 'agg', name: 'Agglomeration economies and the productivity of dense labour markets', level: 1 },
             { topicId: 'zone', name: 'Zoning', level: 0 },
           ]}
-          passed={['Why land near the centre costs more', 'Drawing the bid-rent curve for offices and homes']}
-          lesson={{ title: 'Why firms cluster: sharing, matching and learning', href: '/learn/s/urban/p/piece-3' }}
+          held={['Why land near the centre costs more', 'Drawing the bid-rent curve for offices and homes']}
+          lesson={{ title: 'Why land near the centre costs more', href: '/learn/s/urban/p/piece-1' }}
           subjectHref="/learn/s/urban"
         />
       );
@@ -367,7 +367,7 @@ export function PlacementPreview({ state }: { state: 'question' | 'answered' | '
       return (
         <PlacementEndView
           topics={[{ topicId: 'rent', name: 'Bid-rent curves', level: 0 }]}
-          passed={[]}
+          held={[]}
           lesson={{ title: 'Why land near the centre costs more', href: '/learn/s/urban/p/piece-1' }}
           subjectHref="/learn/s/urban"
         />
