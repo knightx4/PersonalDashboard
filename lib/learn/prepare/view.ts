@@ -230,3 +230,18 @@ export function preparationSources(
     frames: isStrings(finish.frames) ? finish.frames : [],
   };
 }
+
+/**
+ * Where the opening units come from while a run is going (plan #2276.9): the
+ * position of the write_units step among the run's steps and how many there
+ * are, or null when the run is not working or that step has already been and
+ * gone (a subject left with no units then is offered the card instead).
+ */
+export function unitsComeAtStep(view: PreparationView): { position: number; total: number } | null {
+  if (view.kind !== 'working') return null;
+  const index = view.lines.findIndex((l) => l.key === 'write_units');
+  if (index < 0) return null;
+  const state = view.lines[index].state;
+  if (state !== 'pending' && state !== 'current') return null;
+  return { position: index + 1, total: view.lines.length };
+}
