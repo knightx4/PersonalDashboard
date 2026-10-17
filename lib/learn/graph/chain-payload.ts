@@ -227,6 +227,29 @@ export type ExistingConcept = { id: string; name: string };
 
 const key = (name: string) => name.trim().toLowerCase();
 
+const words = (name: string) => new Set(key(name).split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+
+/**
+ * The node whose name shares the most words with `goal`, else the last node
+ * proposed, else none. Used only when the model's goal_concept matches no
+ * node exactly and nothing existing either.
+ */
+function closestNode<N extends { name: string }>(goal: string, nodes: readonly N[]): N | null {
+  if (nodes.length === 0) return null;
+  const wanted = words(goal);
+  let best: N | null = null;
+  let bestShared = 0;
+  for (const node of nodes) {
+    let shared = 0;
+    for (const w of words(node.name)) if (wanted.has(w)) shared += 1;
+    if (shared > bestShared) {
+      best = node;
+      bestShared = shared;
+    }
+  }
+  return best ?? nodes[nodes.length - 1]!;
+}
+
 /**
  * Two names as one lookup key, in order.
  *
@@ -377,12 +400,18 @@ export function normaliseChain(
 
   // A goal node the model forgot to describe is still the point of the whole
   // chain, so it is looked for among what already exists rather than dropped.
-  const goalKey = key(payload.goal_concept);
+  // A goal the model named differently from its own node (the unit's title
+  // against "Economic reasoning about cities", say) is matched to the node
+  // whose name shares the most words with it, else to the chain's last node:
+  // the chain was written for that goal, and losing it over the wording of
+  // one field is what sank the first prepared subject's lesson.
+  let goalConcept = payload.goal_concept.trim();
+  const goalKey = key(goalConcept);
   if (!seen.has(goalKey)) {
     const existingId = existingByName.get(goalKey);
     if (existingId) {
       nodes.push({
-        name: payload.goal_concept.trim(),
+        name: goalConcept,
         claim: '',
         basis: '',
         mastery: [],
@@ -394,7 +423,9 @@ export function normaliseChain(
       seen.add(goalKey);
       joined += 1;
     } else {
-      return null;
+      const stand = closestNode(goalConcept, nodes);
+      if (!stand) return null;
+      goalConcept = stand.name;
     }
   }
 
@@ -448,7 +479,7 @@ export function normaliseChain(
 
   return {
     subject: payload.subject.trim(),
-    goalConcept: payload.goal_concept.trim(),
+    goalConcept,
     nodes: placed,
     edges: keptEdges,
     mentions: placeMentions(payload.mentions, kept, keptEdges),

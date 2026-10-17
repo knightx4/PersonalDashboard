@@ -334,6 +334,19 @@ export async function generateChain(input: {
 
   const chain = normaliseChain(safe.data, input.existing);
   if (!chain) {
+    // Three ways a payload comes back empty, told apart so the line on the
+    // page says what happened: nothing proposed, nothing linked, or nothing
+    // the subject lacks.
+    if (safe.data.concepts.length === 0) {
+      return { ok: false, reason: 'error', detail: 'The chain came back with no ideas in it. Try again.' };
+    }
+    if (safe.data.edges.length === 0) {
+      return {
+        ok: false,
+        reason: 'error',
+        detail: `The chain came back with ${safe.data.concepts.length} ideas and no links between them, so none could be placed. Try again.`,
+      };
+    }
     return {
       ok: false,
       reason: 'nothing-new',
