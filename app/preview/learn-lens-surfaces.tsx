@@ -2,7 +2,7 @@
 
 import { LensView } from '@/app/learn/lens/[id]/lens-view';
 import { LensSkeleton } from '@/app/learn/lens/[id]/lens-skeleton';
-import { FieldLevels, GoalLenses, SubjectLenses, type SubjectLensRow } from '@/app/learn/know/lens-lists';
+import { FieldLevels, SubjectLenses, type SubjectLensRow } from '@/app/learn/know/lens-lists';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { RouteError } from '@/components/ui/route-error';
@@ -209,7 +209,7 @@ const READINGS = readCells(MAP);
 const SUMMARY = summariseLens(LENS, MAP, READINGS, NAMES);
 
 const SUBJECT_ROWS: SubjectLensRow[] = [
-  { subjectId: 's-corp', name: 'Corporate finance', note: null, lens: SUMMARY, graphLine: '', comments: 1 },
+  { subjectId: 's-corp', name: 'Corporate finance', note: null, lens: SUMMARY, graphLine: '', comments: 1, goals: ['Solid on startup FP&A'] },
   {
     subjectId: 's-housing',
     name: 'Urban economics and the economics of housing supply',
@@ -217,6 +217,7 @@ const SUBJECT_ROWS: SubjectLensRow[] = [
     lens: { ...SUMMARY, id: 'l-housing', name: 'Urban economics', topics: 0, drafts: 0, held: 0, total: 0, fraction: 0 },
     graphLine: '4 of 19 known · 3 getting there · 1 mixed up',
     comments: 0,
+    goals: ['Understand why housing supply lags demand in growing cities', 'Familiar with zoning and land-use economics'],
   },
   {
     subjectId: 's-stats',
@@ -225,13 +226,10 @@ const SUBJECT_ROWS: SubjectLensRow[] = [
     lens: { ...SUMMARY, id: 'l-stats', name: 'Statistics', topics: 0, drafts: 1, held: 0, total: 0, fraction: 0 },
     graphLine: 'No concepts yet.',
     comments: 0,
+    goals: [],
   },
 ];
 
-const GOALS = [
-  { ...SUMMARY, id: 'g1', name: 'Solid on startup FP&A', origin: 'goal' as const, held: 9, total: 22, fraction: 9 / 22, topics: 4, drafts: 0 },
-  { ...SUMMARY, id: 'g2', name: 'Familiar with how central banks set rates', origin: 'goal' as const, topics: 0, drafts: 0, held: 0, total: 0, fraction: 0 },
-];
 
 const FIELD_TAGS = new Map<string, string[]>([
   ['t-dcf', ['f-fin']],
@@ -252,7 +250,6 @@ function KnowLenses({ empty = false }: { empty?: boolean }) {
     <PageColumn>
       <PageHeader subject={{ ref: null, path: [{ label: 'Learn', href: '/learn' }] }} title="Subjects" />
       <SubjectLenses rows={empty ? SUBJECT_ROWS.slice(1, 2) : SUBJECT_ROWS} />
-      <GoalLenses goals={empty ? [] : GOALS} comments={new Map([['g1', 2]])} />
       <FieldLevels fields={empty ? [] : fieldLevels(MAP, READINGS, FIELD_TAGS, FIELDS)} />
     </PageColumn>
   );

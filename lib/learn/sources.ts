@@ -305,7 +305,7 @@ export const learnSources: ModuleSources = {
       href: (id) => `/learn/lens/${id}`,
       parent: parentByFirst(['aim_id', 'learn.aims'], ['subject_id', 'learn.subjects']),
       section: SUBJECTS,
-      note: 'Every subject and every learning goal has one (subject_id or aim_id; learn 0137), and a vault theme can have one made at the end of a practice run (theme_id; learn 0143). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
+      note: 'Every subject has one (subject_id; learn 0137), which its learning goals read rather than keeping one of their own (learn 0177; aim_id is set only on goal lenses made before it), and a vault theme can have one made at the end of a practice run (theme_id; learn 0143). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
     },
   ],
   notSources: [

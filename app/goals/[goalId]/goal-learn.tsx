@@ -2,7 +2,7 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
-import { Gauge, Route, Shapes, Timer } from 'lucide-react';
+import { CircleAlert, Gauge, ListChecks, Route, Shapes, Timer } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ChipSelect } from '@/components/ui/field';
 import { practiceHref } from '@/lib/learn/flow/href';
@@ -21,10 +21,21 @@ export type GoalLearnAim = {
   name: string;
   depth: AimDepth;
   level3: boolean;
-  /** The kind of goal it is (plan #2247.2); null until Dash has sorted it. */
+  /** The subject the goal points at (plan #2302.2); null until it is linked, and for the Level 3 list. */
+  subject: GoalLearnSubject | null;
+};
+
+/** The subject a goal points at: its kind and its preparation, which are the subject's, not the goal's. */
+export type GoalLearnSubject = {
+  id: string;
+  /** What kind of subject it is (plan #2247.2); null until its preparation has sorted it. */
   kind: GoalKind | null;
   kindReason: string | null;
   kindBy: GoalKindBy | null;
+  /** The preparation in one line (`preparationLine`). */
+  preparation: string;
+  /** The preparation stopped on a failed step, which wants the person: drawn with weight. */
+  stopped: boolean;
 };
 
 /** A count with thousands separators: 1,001. */
@@ -33,7 +44,8 @@ const count = (n: number) => formatNumber(n);
 /**
  * What Learn does with a goal in the Learn area (plan #1491), on the goal's
  * own page now that Learn has no Goals tab: how well you want to know it,
- * which the cards and the plan are drawn to, a link to its plan and to
+ * which the cards and the plan are drawn to, the kind and preparation of the
+ * subject it points at (plan #2302.2), a link to its plan and to
  * practise it, and for the Level 3 goal how much of the list you have shown
  * you know. The depth is a chip saved on change (law 12).
  */
@@ -50,6 +62,7 @@ export function GoalLearn({
 }) {
   const [state, save, saving] = useActionState(setLearnDepth, initial);
   const [kindState, saveKind, savingKind] = useActionState(setLearnKind, initialKind);
+  const { subject } = aim;
   return (
     <section aria-labelledby="learn-heading" className="space-y-2">
       <h2 id="learn-heading" className="px-1 text-ui font-semibold text-ink">
@@ -78,22 +91,22 @@ export function GoalLearn({
             Know it {AIM_DEPTH_LABELS[aim.depth].means}.
           </span>
         </form>
-        {!aim.level3 && (
+        {subject && (
           <form action={saveKind} className="space-y-0.5">
-            <input type="hidden" name="aimId" value={aim.id} />
+            <input type="hidden" name="subjectId" value={subject.id} />
             <div className="flex flex-wrap items-center gap-2">
               <ChipSelect
                 touch
                 name="kind"
-                defaultValue={aim.kind ?? ''}
-                key={`kind-${aim.kind ?? 'none'}`}
-                aria-label={`What kind of goal ${aim.name} is`}
+                defaultValue={subject.kind ?? ''}
+                key={`kind-${subject.kind ?? 'none'}`}
+                aria-label={`What kind of subject ${aim.name} is`}
                 icon={<Shapes className="size-3.5" strokeWidth={1.75} />}
                 placeholderValue=""
                 disabled={savingKind}
                 onChange={(event) => event.currentTarget.form?.requestSubmit()}
               >
-                {aim.kind === null && (
+                {subject.kind === null && (
                   <option value="" disabled>
                     Not sorted yet
                   </option>
@@ -105,18 +118,36 @@ export function GoalLearn({
                 ))}
               </ChipSelect>
               <span className="text-small text-ink-muted">
-                {aim.kind
-                  ? `Sources are chosen for ${GOAL_KIND_LABELS[aim.kind].means}.`
-                  : 'Dash sorts it when the goal is next saved.'}
+                {subject.kind
+                  ? `Sources are chosen for ${GOAL_KIND_LABELS[subject.kind].means}.`
+                  : 'Dash sorts it as the subject is prepared.'}
               </span>
             </div>
-            {aim.kind && aim.kindReason && (
+            {subject.kind && subject.kindReason && (
               <p className="text-small text-ink-muted">
-                {aim.kindBy === 'person' ? 'You chose this kind.' : `Why: ${aim.kindReason}`}
+                {subject.kindBy === 'person' ? 'You chose this kind.' : `Why: ${subject.kindReason}`}
               </p>
             )}
             {kindState.error && <p className="text-small text-danger">{kindState.error}</p>}
           </form>
+        )}
+        {subject && (
+          <p
+            className={cn(
+              'flex items-start gap-1 text-small tabular-nums',
+              subject.stopped ? 'font-medium text-caution' : 'text-ink-muted',
+            )}
+          >
+            {subject.stopped ? (
+              <CircleAlert className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+            ) : (
+              <ListChecks className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+            )}
+            {subject.preparation}
+          </p>
+        )}
+        {!subject && !aim.level3 && (
+          <p className="text-small text-ink-muted">Dash links it to a subject when the goal is next saved.</p>
         )}
         {aim.level3 && (
           <p className="text-small tabular-nums text-ink-muted">

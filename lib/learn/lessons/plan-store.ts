@@ -389,37 +389,3 @@ export async function loadPlanLayoutsDue(
     .map(({ subjectId, subjectName }) => ({ subjectId, subjectName }));
 }
 
-/**
- * Goal tracks with no whole outline yet (plan #1139), oldest goal first,
- * leaving out held tracks. For the top-up's outline pass; it names the person
- * on every read.
- */
-export async function loadOutlinesDue(
-  learn: LearnSupabaseClient,
-  userId: string,
-  limit: number,
-  now: Date = new Date(),
-): Promise<PlanLayoutDue[]> {
-  const aims = await goalsWithTracks(learn, userId);
-  const subjectIds = [...new Set(aims.map((aim) => aim.subject_id))];
-  if (subjectIds.length === 0 || limit <= 0) return [];
-
-  const { data, error } = await learn
-    .from('subjects')
-    .select('id, name, lessons_held_until')
-    .eq('user_id', userId)
-    .in('id', subjectIds)
-    .is('outlined_at', null);
-  if (error) throw new Error(`Reading which goal subjects are outlined failed: ${error.message}`);
-  const rows = (data ?? []) as { id: string; name: string; lessons_held_until: string | null }[];
-
-  const due: PlanLayoutDue[] = [];
-  for (const subjectId of subjectIds) {
-    if (due.length >= limit) break;
-    const subject = rows.find((row) => row.id === subjectId);
-    if (!subject) continue;
-    if (subject.lessons_held_until && new Date(subject.lessons_held_until) > now) continue;
-    due.push({ subjectId, subjectName: subject.name });
-  }
-  return due;
-}

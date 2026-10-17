@@ -345,13 +345,20 @@ the reading queue, searched with the cell's descriptor in place of a claim.
 
 ## Lenses: subjects and goals
 
-A **lens** is a named set of topics, each with a target level. Subjects and
-goals both become lenses.
+A **lens** is a named set of topics, each with a target level. Subjects
+become lenses, one each, and a goal reads the lens of the subject it points
+at.
 
 - *Corporate finance*: DCF to 7, WACC to 6, Return to 4, CAPM to 6.
 - *Familiar with all 1,000 level-3 Wikipedia articles*: a thousand topics,
   each to level 2.
 - *Solid on startup FP&A*: a dozen topics, mostly to 5 or 6.
+
+A learning goal has no lens of its own. It names a subject (`aims.subject_id`),
+and its progress, its topics and anything added under it are that subject's
+lens. Two goals on one subject read the same lens. The Know page lists each
+subject once and names the goals on its row. A subject's lens goes when the
+subject is deleted (learn 0177).
 
 A lens has no topics of its own. Topics belong to the shared map, so explaining
 CAPM moves every lens that includes CAPM.
@@ -456,8 +463,8 @@ topic the question is about, and the topics its links need are drafted from
 the same pages on its page. A web page is not a syllabus, so every row the
 pages support is emerging, and a row they do not support is marked personal
 before approval as above. The draft keeps the brief and the goal on
-`topics.drafting.brief`. Approving it adds the topic to the goal's lens at the
-goal's depth and records the goal on the brief (`briefs.aim_id`, learn 0163).
+`topics.drafting.brief`. Approving it adds the topic to the lens the goal reads,
+its subject's, at the goal's depth and records the goal on the brief (`briefs.aim_id`, learn 0163).
 From then on, every card written from the brief carries the goal, and each
 answered sub-question gets a card of its own, written from the brief's section
 (Dash's answer and the words it quotes). Those cards are written as soon as
@@ -521,7 +528,7 @@ schema.
 | `cell_claims` | which claims (concepts, vault positions) are material for a cell | no: join rows |
 | `cell_evidence` | met, not met or declared, the probe or cell question it came from, the verified quote, the date, the cell version it was given against | yes: what the person did |
 | `cell_questions` | a question asked about one cell, its format, the answer and every verdict the grader returned | no: read through `cell_evidence` |
-| `lenses` | a named set of targets, and whether it was a subject or a goal | yes: what the person wants |
+| `lenses` | a named set of targets, one per subject or made from a vault theme; goals read their subject's | yes: what the person wants |
 | `lens_targets` | lens, topic, target level | no: part of the lens |
 | `link_reviews` | a link in question, the two answers that put it there, and what the person decided | no: bookkeeping |
 

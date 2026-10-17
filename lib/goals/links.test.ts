@@ -13,8 +13,9 @@ const aim = (over: Partial<LinkedAim> = {}): LinkedAim => ({
   name: 'Urban planning basics',
   archived: false,
   level3: null,
-  cardsRead: 0,
-  cardsSaved: 0,
+  preparation: 'none',
+  lens: null,
+  nextPiece: null,
   ...over,
 });
 
@@ -33,10 +34,20 @@ describe('weekInstants', () => {
 });
 
 describe('aimProgressLine', () => {
-  it('counts the cards read and saved for an open subject', () => {
-    expect(aimProgressLine(aim())).toBe('No cards read yet');
-    expect(aimProgressLine(aim({ cardsRead: 1 }))).toBe('1 card read');
-    expect(aimProgressLine(aim({ cardsRead: 5, cardsSaved: 2 }))).toBe('5 cards read, 2 saved');
+  const lens = { topics: 6, tested: 3, inferred: 2, declared: 0, total: 40 };
+
+  it('says preparation has not run for a subject with no run', () => {
+    expect(aimProgressLine(aim())).toBe('Preparation has not run');
+  });
+
+  it('reads the subject lens by kind, the preparation and the next piece', () => {
+    expect(aimProgressLine(aim({ preparation: 'done', lens }))).toBe('5 of 40 levels held: 3 tested, 2 inferred');
+    expect(aimProgressLine(aim({ preparation: 'done', lens, nextPiece: 'Reading a budget' }))).toBe(
+      '5 of 40 levels held: 3 tested, 2 inferred. Next: Reading a budget',
+    );
+    expect(aimProgressLine(aim({ preparation: 'working' }))).toBe('Preparing the subject');
+    expect(aimProgressLine(aim({ preparation: 'failed' }))).toBe('Preparation stopped');
+    expect(aimProgressLine(aim({ preparation: 'done' }))).toBe('No topics on the lens yet');
   });
 
   it('gives the Level 3 list its claimed and tested articles', () => {
@@ -47,8 +58,8 @@ describe('aimProgressLine', () => {
 
   it('says when the aim has left Learn or been archived there', () => {
     expect(aimProgressLine(aim({ name: null }))).toBe('No longer in Learn');
-    expect(aimProgressLine(aim({ cardsRead: 3, archived: true }))).toBe(
-      '3 cards read. Archived in Learn',
+    expect(aimProgressLine(aim({ preparation: 'working', archived: true }))).toBe(
+      'Preparing the subject. Archived in Learn',
     );
   });
 });

@@ -3,6 +3,7 @@ import 'server-only';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { GradeMap } from '@/lib/learn/levels/grade';
 import type { RunSummary } from '@/lib/learn/levels/run';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 
 /**
  * The reads Practice Flow needs around the topic map to choose a level and to
@@ -13,15 +14,45 @@ import type { RunSummary } from '@/lib/learn/levels/run';
 export type LensScope = {
   /** The highest target any lens sets on each topic. */
   targets: Map<string, number>;
-  /** The topics of the focused subject's lens; null when the flow is not focused. */
+  /**
+   * The topics of the focused subject's lens, or, with no subject focused, of
+   * the subjects Practice asks about by default (`practiceSubjectIds`); null
+   * only when neither narrows it.
+   */
   topics: Set<string> | null;
 };
 
-/** Every lens target, and the topics of one subject's lens when the flow is focused on it. */
+/**
+ * The subjects Practice Flow asks about when none is focused (plan #2302.1):
+ * every subject whose preparation has finished, and every subject an open goal
+ * points at through `aims.subject_id` (plan #2302.2), which is how a goal names
+ * its subject. A hidden survey subject's `subjects.aim_id` is not followed.
+ */
+export async function practiceSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const [prepared, goals] = await Promise.all([
+    preparedSubjectIds(learn, userId),
+    learn
+      .from('aims')
+      .select('subject_id')
+      .eq('user_id', userId)
+      .is('archived_at', null)
+      .not('subject_id', 'is', null),
+  ]);
+  if (goals.error) throw new Error(`Reading your goals' subjects failed: ${goals.error.message}`);
+  const ids = new Set(prepared);
+  for (const row of (goals.data ?? []) as { subject_id: string }[]) ids.add(row.subject_id);
+  return ids;
+}
+
+/**
+ * Every lens target, and the topics Practice asks about: one subject's lens
+ * when the flow is focused on it, else the lenses of `subjects` when given.
+ */
 export async function loadLensScope(
   learn: LearnSupabaseClient,
   userId: string,
   subjectId: string | null,
+  subjects?: ReadonlySet<string>,
 ): Promise<LensScope> {
   const { data, error } = await learn
     .from('lens_targets')
@@ -34,10 +65,11 @@ export async function loadLensScope(
     lens: { subject_id: string | null };
   }>;
   const targets = new Map<string, number>();
-  const topics = subjectId ? new Set<string>() : null;
+  const topics = subjectId || subjects ? new Set<string>() : null;
   for (const r of rows) {
     targets.set(r.topic_id, Math.max(targets.get(r.topic_id) ?? 0, r.target_level));
-    if (topics && r.lens.subject_id === subjectId) topics.add(r.topic_id);
+    const wanted = subjectId ? r.lens.subject_id === subjectId : r.lens.subject_id !== null && subjects?.has(r.lens.subject_id);
+    if (topics && wanted) topics.add(r.topic_id);
   }
   return { targets, topics };
 }

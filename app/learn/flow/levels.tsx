@@ -14,7 +14,7 @@ import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { pickCell, whyLine } from '@/lib/learn/levels/pick';
 import { roleWhy } from '@/lib/learn/levels/role-line';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
-import { countAnswered, loadLensScope, loadRunDoubts, type LensScope } from '@/lib/learn/levels/practice-store';
+import { countAnswered, loadLensScope, loadRunDoubts, practiceSubjectIds, type LensScope } from '@/lib/learn/levels/practice-store';
 import { runSummary, type RunSummary } from '@/lib/learn/levels/run';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
@@ -85,7 +85,12 @@ export async function LevelsFlow({
   let map: GradeMap;
   let lens: LensScope;
   try {
-    [map, lens] = await Promise.all([loadGradeMap(learn, userId), loadLensScope(learn, userId, subject?.id ?? null)]);
+    [map, lens] = await Promise.all([
+      loadGradeMap(learn, userId),
+      // Not focused: every prepared subject and every goal's subject (plan #2302.1).
+      (async () =>
+        loadLensScope(learn, userId, subject?.id ?? null, subject ? undefined : await practiceSubjectIds(learn, userId)))(),
+    ]);
   } catch (error) {
     return (
       <PracticeError

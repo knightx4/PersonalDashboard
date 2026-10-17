@@ -8836,9 +8836,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnLensErrorPreview />,
   },
   {
-    /* The Know page's lenses and fields (plan #2138.7). */
+    /* The Know page's lenses and fields (plan #2138.7), each subject once with its goals (plan #2302.3). */
     id: 'learn-know-lenses',
-    label: 'Subjects · Lenses, goals and fields by level',
+    label: 'Subjects · Lenses with their goals, and fields by level',
     module: 'learn',
     width: 'page',
     render: () => <LearnKnowLensesPreview />,

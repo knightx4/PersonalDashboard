@@ -169,6 +169,22 @@ export function preparationView(
 }
 
 /** A branch run as the page draws it (plan #2276.7): its name and its lines. */
+/**
+ * The run in one line, for a place that links to the subject rather than
+ * showing the run: a learning goal's page (plan #2302.2). "Prepared in 6
+ * minutes · 31 topics drafted", "Preparing · step 4 of 8, Lay out the
+ * territory", "Preparation stopped · step 2 of 8, Find syllabi and other
+ * structure documents", or "Not prepared yet".
+ */
+export function preparationLine(view: PreparationView): string {
+  if (view.kind === 'none') return 'Not prepared yet';
+  if (view.kind === 'finished') return view.summary;
+  const at = view.lines.find((line) => line.state === (view.kind === 'failed' ? 'failed' : 'current'));
+  const where = `step ${view.position} of ${view.total}${at ? `, ${at.label}` : ''}`;
+  if (view.kind === 'failed') return `Preparation stopped · ${where}`;
+  return view.starting ? 'Preparing · starting in a moment' : `Preparing · ${where}`;
+}
+
 export type BranchPreparationView = { key: string; name: string; view: PreparationView };
 
 export function branchPreparationView(prep: { run: PreparationRow; steps: PreparationStepRow[] }): BranchPreparationView | null {

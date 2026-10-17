@@ -13,7 +13,8 @@ import {
 /**
  * Your learning goals on Idea Space (plan #2187.2).
  *
- * Pure: the goal lenses come from lib/learn/levels/lens-store.ts, the map
+ * Pure: the lenses the goals read (their subjects', plan #2302.3) come from
+ * lib/learn/map/goals-load.ts, which picks them, the map
  * of topics from loadTopicMap, and each topic's place on the sky from its
  * scope's embedding, placed among the ideas as a field is
  * (lib/learn/map/area-map.ts, `placeVectors`).
@@ -89,53 +90,51 @@ export function goalsOnMap(
   const cellTopic = new Map(map.cells.map((cell) => [cell.id, cell.topicId]));
   const day = { today: '', dayOf: () => '-' };
 
-  return lenses
-    .filter((lens) => lens.origin === 'goal')
-    .map((lens) => {
-      const summary = summariseLens(lens, map, readings, names);
-      const detail = lensDetail(lens, map, readings, names, day);
-      const stars: GoalStar[] = detail.topics.flatMap((topic) => {
-        const at = placed.get(topic.topicId);
-        return at
-          ? [{ topicId: topic.topicId, name: topic.name, targetLevel: topic.target, level: topic.level, ...at }]
-          : [];
-      });
-
-      const on = new Set(stars.map((s) => s.topicId));
-      const seen = new Set<string>();
-      const links: GoalLink[] = [];
-      for (const link of map.links) {
-        const from = cellTopic.get(link.requiringCellId);
-        const to = cellTopic.get(link.requiredCellId);
-        if (!from || !to || from === to || !on.has(from) || !on.has(to)) continue;
-        const pair = from < to ? `${from}|${to}` : `${to}|${from}`;
-        if (seen.has(pair)) continue;
-        seen.add(pair);
-        links.push({ from, to });
-      }
-
-      const ready = detail.topics
-        .filter((t) => t.approved)
-        .flatMap((t) => t.fringe.map((cell) => ({ name: t.name, level: cell.level })))
-        .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))[0];
-      const approved = detail.topics.filter((t) => t.approved);
-      const next = ready
-        ? `Next: ${ready.name} at level ${ready.level}, ${canShort(ready.level)}`
-        : approved.length > 0 && approved.every((t) => t.level >= t.target)
-          ? 'Every target held'
-          : null;
-
-      return {
-        id: lens.id,
-        name: lens.name,
-        line: lensLine(summary),
-        held: summary.held,
-        total: summary.total,
-        next,
-        stars,
-        links,
-      };
+  return lenses.map((lens) => {
+    const summary = summariseLens(lens, map, readings, names);
+    const detail = lensDetail(lens, map, readings, names, day);
+    const stars: GoalStar[] = detail.topics.flatMap((topic) => {
+      const at = placed.get(topic.topicId);
+      return at
+        ? [{ topicId: topic.topicId, name: topic.name, targetLevel: topic.target, level: topic.level, ...at }]
+        : [];
     });
+
+    const on = new Set(stars.map((s) => s.topicId));
+    const seen = new Set<string>();
+    const links: GoalLink[] = [];
+    for (const link of map.links) {
+      const from = cellTopic.get(link.requiringCellId);
+      const to = cellTopic.get(link.requiredCellId);
+      if (!from || !to || from === to || !on.has(from) || !on.has(to)) continue;
+      const pair = from < to ? `${from}|${to}` : `${to}|${from}`;
+      if (seen.has(pair)) continue;
+      seen.add(pair);
+      links.push({ from, to });
+    }
+
+    const ready = detail.topics
+      .filter((t) => t.approved)
+      .flatMap((t) => t.fringe.map((cell) => ({ name: t.name, level: cell.level })))
+      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))[0];
+    const approved = detail.topics.filter((t) => t.approved);
+    const next = ready
+      ? `Next: ${ready.name} at level ${ready.level}, ${canShort(ready.level)}`
+      : approved.length > 0 && approved.every((t) => t.level >= t.target)
+        ? 'Every target held'
+        : null;
+
+    return {
+      id: lens.id,
+      name: lens.name,
+      line: lensLine(summary),
+      held: summary.held,
+      total: summary.total,
+      next,
+      stars,
+      links,
+    };
+  });
 }
 
 /** What a territory's topic takes from the sky beyond its place: the ideas it sits among and their colour. */
@@ -167,56 +166,54 @@ export function territoriesOnMap(
   }
   const day = { today: '', dayOf: () => '-' };
 
-  return lenses
-    .filter((lens) => lens.origin === 'goal')
-    .map((lens) => {
-      const detail = lensDetail(lens, map, readings, names, day);
-      const topics: TerritoryTopicIn[] = detail.topics.flatMap((topic) => {
-        const at = placed.get(topic.topicId);
-        if (!at) return [];
-        const near = around.get(topic.topicId);
-        return [
-          {
-            id: topic.topicId,
-            name: topic.name,
-            ceiling: topic.ceiling,
-            ...ladderFrom(cellsOf.get(topic.topicId) ?? []),
-            target: topic.target,
-            slot: near?.slot ?? 'none',
-            pca: at.pca,
-            neighbourMap: at.neighbourMap,
-            ideaIds: near?.ideaIds ?? [],
-          },
-        ];
-      });
-      const on = new Set(topics.map((t) => t.id));
-
-      const links: TerritoryLinkIn[] = [];
-      for (const link of map.links) {
-        const requiring = cellOf.get(link.requiringCellId);
-        const required = cellOf.get(link.requiredCellId);
-        if (!requiring || !required || !on.has(requiring.topicId) || !on.has(required.topicId)) continue;
-        links.push({
-          requiringTopicId: requiring.topicId,
-          requiringLevel: requiring.level,
-          requiredTopicId: required.topicId,
-          requiredLevel: required.level,
-        });
-      }
-
-      const targets = new Map(detail.topics.filter((t) => t.approved).map((t) => [t.topicId, t.target]));
-      const why = new Map(detail.topics.flatMap((t) => t.fringe.map((cell) => [cell.cellId, cell.why] as const)));
-      const ready = fringe(map, readings, { lensTargets: targets })
-        .filter((row) => row.inLens && targets.has(row.topicId) && on.has(row.topicId))
-        .map((row) => ({ topicId: row.topicId, level: row.level, cellId: row.cellId, why: why.get(row.cellId) }));
-
-      const standing = topics.flatMap((topic) => {
-        const one = standingOf(topic.id, map, readings, cellOf, names);
-        return one ? [one] : [];
-      });
-
-      return { id: lens.id, name: lens.name, topics, links, ready, standing };
+  return lenses.map((lens) => {
+    const detail = lensDetail(lens, map, readings, names, day);
+    const topics: TerritoryTopicIn[] = detail.topics.flatMap((topic) => {
+      const at = placed.get(topic.topicId);
+      if (!at) return [];
+      const near = around.get(topic.topicId);
+      return [
+        {
+          id: topic.topicId,
+          name: topic.name,
+          ceiling: topic.ceiling,
+          ...ladderFrom(cellsOf.get(topic.topicId) ?? []),
+          target: topic.target,
+          slot: near?.slot ?? 'none',
+          pca: at.pca,
+          neighbourMap: at.neighbourMap,
+          ideaIds: near?.ideaIds ?? [],
+        },
+      ];
     });
+    const on = new Set(topics.map((t) => t.id));
+
+    const links: TerritoryLinkIn[] = [];
+    for (const link of map.links) {
+      const requiring = cellOf.get(link.requiringCellId);
+      const required = cellOf.get(link.requiredCellId);
+      if (!requiring || !required || !on.has(requiring.topicId) || !on.has(required.topicId)) continue;
+      links.push({
+        requiringTopicId: requiring.topicId,
+        requiringLevel: requiring.level,
+        requiredTopicId: required.topicId,
+        requiredLevel: required.level,
+      });
+    }
+
+    const targets = new Map(detail.topics.filter((t) => t.approved).map((t) => [t.topicId, t.target]));
+    const why = new Map(detail.topics.flatMap((t) => t.fringe.map((cell) => [cell.cellId, cell.why] as const)));
+    const ready = fringe(map, readings, { lensTargets: targets })
+      .filter((row) => row.inLens && targets.has(row.topicId) && on.has(row.topicId))
+      .map((row) => ({ topicId: row.topicId, level: row.level, cellId: row.cellId, why: why.get(row.cellId) }));
+
+    const standing = topics.flatMap((topic) => {
+      const one = standingOf(topic.id, map, readings, cellOf, names);
+      return one ? [one] : [];
+    });
+
+    return { id: lens.id, name: lens.name, topics, links, ready, standing };
+  });
 }
 
 const DAY_MS = 86_400_000;
