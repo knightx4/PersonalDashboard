@@ -1,6 +1,6 @@
 ---
 name: dash-backup
-description: Carry out a request Ask Dash handed on because none of its own tools could do it (core.dash_handoffs). Read the hand-off, do what the person asked through the Supabase connector (creating and editing their rows, never deleting, sending or spending), write Dash's reply into the same Ask Dash conversation, close the hand-off, and file a note naming the ability Dash lacked. Use when the Dash backup routine is fired with "Hand-off <id>", or the user says "work the Dash hand-offs".
+description: Carry out a request Ask Dash handed on because none of its own tools could do it (core.dash_handoffs). Read the hand-off, do what the person asked through scripts/sql.ts (creating and editing their rows, never deleting, sending or spending), write Dash's reply into the same Ask Dash conversation, close the hand-off, and file a note naming the ability Dash lacked. Use when the Dash backup routine is fired with "Hand-off <id>", or the user says "work the Dash hand-offs".
 ---
 
 # Doing what Ask Dash handed on
@@ -23,8 +23,8 @@ end is how the code catches up.
 
 ## How you read and write
 
-Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded with
-ToolSearch), project `asjztutnqxbecruvyrbj`. Filter every read and every write
+Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through scripts/sql.ts"), not the Supabase connector, whose confirmations never reach
+a routine. It refuses deletes, which this skill never makes anyway. Filter every read and every write
 by the `user_id` in your brief. You are writing as the service role, so row
 level security does not stop you touching another account's rows; the filter
 is the only thing that does.

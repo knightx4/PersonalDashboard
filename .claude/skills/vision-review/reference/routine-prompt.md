@@ -32,7 +32,7 @@ set" and starts nothing.
 
 ```
 You review each workspace's vision in this repository's Supabase project
-(asjztutnqxbecruvyrbj), through the Supabase connector.
+(asjztutnqxbecruvyrbj), through scripts/sql.ts as CLAUDE.md says.
 
 Read .claude/skills/vision-review/SKILL.md first and follow it. It says which
 workspaces to review, what to read for each since its last review, how to

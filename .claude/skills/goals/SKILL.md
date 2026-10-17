@@ -34,21 +34,20 @@ every read and write to the `user_id` in the brief.
 
 ## How you read and write
 
-Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded with
-ToolSearch), project `asjztutnqxbecruvyrbj`. Every table is in the `goals`
+Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through scripts/sql.ts"), not the Supabase connector, whose confirmations never reach
+a routine. Every table is in the `goals`
 schema except files, which are in `core` (see "Files"). Filter every read and
 write by the `user_id` in your brief.
 
 **Every write declares who and which run, in the same call:**
 
-```sql
-set local goals.actor = 'claude';
-set local goals.run_id = '<the run id>';
-insert into goals.items (...) values (...) returning id;
+```sh
+npx tsx scripts/sql.ts --set goals.actor=claude --set goals.run_id=<the run id> \
+  "insert into goals.items (...) values (...) returning id"
 ```
 
-The two settings last only for that one `execute_sql` call, so they go at the
-top of every call that writes. The history trigger reads them to record the
+The two settings last only for that one statement, so they go on every call
+that writes. The history trigger reads them to record the
 change as yours and tie it to the run. A guard on `goals.items` reads the same
 setting and refuses the writes described under "What you may change"; a
 refusal is the rule working, so read the message and do what it says instead

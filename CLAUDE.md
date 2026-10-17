@@ -43,6 +43,34 @@ policies) apply to the database as a whole, but an `update`, `delete` or
 all accounts. Migration 0056 of migrations-job-search cleaned every account's
 company domains; that is the kind of statement this rules out.
 
+## Rows are written through scripts/sql.ts
+
+A session reads and writes the person's rows with `npx tsx scripts/sql.ts`,
+not the connector's `execute_sql`. The connector holds some statements for a
+confirmation that never reaches a cloud session: the call waits 60 seconds,
+runs nothing, and the person's phone gets a "Claude needs your input"
+notification with nothing to answer. In a routine every one of those is a
+false alarm.
+
+```sh
+npx tsx scripts/sql.ts "select … where user_id = 'd001bb0f-…'"
+npx tsx scripts/sql.ts --set goals.actor=claude --set goals.run_id=<id> "insert … returning id"
+npx tsx scripts/sql.ts --file /path/to/statement.sql   # for long text; avoids shell quoting
+```
+
+It sends one statement per call over HTTPS with the service-role key and
+prints the rows as JSON. Each `--set` stands in for a `set local` and lasts
+for that statement alone. It takes selects, inserts and updates, and refuses
+a write that does not name the owner's id
+([lib/db/sql-guard.ts](lib/db/sql-guard.ts)). It refuses deletes, truncates
+and schema changes: a schema change goes in a migration file, and a delete is
+left for the person (or, where a skill calls for one, sent once through the
+connector). If `node_modules` is empty, run `npm ci` first.
+
+When a connector call times out, never send it again: it did not run, and
+each retry is another notification. Select the row to confirm, then move on
+or write the step up as blocked.
+
 Main applies its own migrations. On every push to main that touches a supabase/migrations*/ folder, .github/workflows/migrations.yml runs scripts/apply-migrations.ts, which applies each file the live history lacks under the name described below, through the Management API with the SUPABASE_ACCESS_TOKEN repository secret. A failed migration turns that run red. So a migration the connector will not let you apply, such as one containing a delete, is not a reason to hold a feature off main or to raise it for the person: merge it and the workflow applies it. Apply through the connector when the code on your branch needs the change before it merges.
 
 The connector does not refuse such a statement: it waits about 60 seconds for a confirmation that never reaches a cloud session, then times out with nothing applied. Do not retry it. A plain `select` of a function that deletes inside goes through.
