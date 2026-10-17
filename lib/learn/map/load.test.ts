@@ -2,35 +2,43 @@ import { describe, expect, it, vi } from 'vitest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
-import { EVIDENCE_CEILING } from '@/lib/learn/strength';
 
 vi.mock('server-only', () => ({}));
 
 const { loadIdeaMap, parseVector } = await import('./load');
 
-type Call = { table: string; method: string; args: unknown[] };
+type Row = Record<string, unknown>;
 
-/** A client that answers each table with the rows given and keeps each call made on it. */
-function fakeClient(rows: Record<string, unknown[]>): { client: LearnSupabaseClient; calls: Call[] } {
-  const calls: Call[] = [];
+/**
+ * A client that answers each table with the rows given, narrowed by the
+ * filters the code puts on it (eq, neq, in, is) wherever a row has the column.
+ */
+function fakeClient(rows: Record<string, Row[]>): LearnSupabaseClient {
   const builder = (table: string) => {
-    const result = { data: rows[table] ?? [], error: null };
+    let kept = rows[table] ?? [];
+    const narrow = (keep: (row: Row) => boolean) => {
+      kept = kept.filter(keep);
+    };
     const target: Record<string, unknown> = {
-      then: (resolve: (value: typeof result) => unknown) => resolve(result),
+      then: (resolve: (value: { data: Row[]; error: null }) => unknown) => resolve({ data: kept, error: null }),
+      eq: (col: string, value: unknown) => (narrow((r) => r[col] === value), proxy),
+      neq: (col: string, value: unknown) => (narrow((r) => r[col] !== value), proxy),
+      in: (col: string, values: unknown[]) => (narrow((r) => values.includes(r[col])), proxy),
+      is: (col: string, value: unknown) => (narrow((r) => (r[col] ?? null) === value), proxy),
+      range: (from: number, to: number) => {
+        kept = kept.slice(from, to + 1);
+        return proxy;
+      },
     };
     const proxy: object = new Proxy(target, {
       get(own, method: string) {
         if (method in own) return own[method];
-        return (...args: unknown[]) => {
-          calls.push({ table, method, args });
-          return proxy;
-        };
+        return () => proxy;
       },
     });
     return proxy;
   };
-  const client = { from: (table: string) => builder(table) } as unknown as LearnSupabaseClient;
-  return { client, calls };
+  return { from: (table: string) => builder(table) } as unknown as LearnSupabaseClient;
 }
 
 /** A unit vector of the stored width along one axis, leaning a little onto the next. */
@@ -41,21 +49,45 @@ function stored(axis: number, lean = 0): string {
   return JSON.stringify(vector);
 }
 
-const USER = '00000000-0000-4000-8000-000000000001';
+const AT = '2026-10-01T00:00:00Z';
+const topic = (id: string, name: string, embedding: string | null, article: string | null) => ({
+  id,
+  name,
+  scope: `What ${name} covers.`,
+  ceiling: 10,
+  status: 'approved',
+  refines_article_id: article,
+  created_at: AT,
+  scope_embedding: embedding,
+});
 
-const ROWS = {
-  concepts: [
-    { id: 'i1', name: 'Churn', claim: 'Churn compounds.', subject_id: 's1', embedding: stored(0), created_at: '2026-09-24T10:00:00Z' },
-    { id: 'i2', name: 'Net retention', claim: 'Expansion offsets churn.', subject_id: 's1', embedding: stored(0, 0.2) },
-    { id: 'i3', name: 'Named ranges', claim: 'Names make formulas readable.', subject_id: 's2', embedding: stored(10) },
-    { id: 'i4', name: 'Not yet embedded', claim: 'Waiting for the fill.', subject_id: 's2', embedding: null },
-    { id: 'i5', name: 'Wrong width', claim: 'An old vector.', subject_id: null, embedding: '[1,2,3]' },
+const ROWS: Record<string, Row[]> = {
+  lenses: [
+    { id: 'L1', name: 'SaaS metrics', origin: 'subject', subject_id: 's1', aim_id: null, created_at: AT },
+    { id: 'L2', name: 'Excel modelling', origin: 'subject', subject_id: 's2', aim_id: null, created_at: AT },
   ],
-  concept_state: [{ concept_id: 'i1', state: 'known' }],
+  lens_targets: [
+    { lens_id: 'L1', topic_id: 't1', target_level: 5, created_at: AT },
+    { lens_id: 'L1', topic_id: 't2', target_level: 3, created_at: AT },
+    { lens_id: 'L2', topic_id: 't3', target_level: 4, created_at: AT },
+    { lens_id: 'L2', topic_id: 't4', target_level: 4, created_at: AT },
+  ],
   subjects: [
-    { id: 's1', name: 'SaaS metrics', field_id: 'f1', domain_id: null },
-    { id: 's2', name: 'Excel modelling', field_id: null, domain_id: 'd2' },
+    { id: 's1', name: 'SaaS metrics', field_id: 'f1', domain_id: null, survey: false },
+    { id: 's2', name: 'Excel modelling', field_id: null, domain_id: 'd2', survey: false },
   ],
+  topics: [
+    topic('t1', 'Churn maths', stored(0), 'a1'),
+    topic('t2', 'Net retention', stored(0, 0.2), 'a2'),
+    topic('t3', 'Named ranges', stored(10), null),
+    topic('t4', 'Not yet embedded', null, null),
+  ],
+  topic_cells: [
+    { id: 'c1-1', topic_id: 't1', level: 1 },
+    { id: 'c1-2', topic_id: 't1', level: 2 },
+    { id: 'c2-1', topic_id: 't2', level: 1 },
+  ],
+  cell_evidence: [{ cell_id: 'c1-2', verdict: 'met', observed_at: '2026-10-10T00:00:00Z', quote: 'Churn compounds monthly.' }],
   area_fields: [
     { id: 'f1', name: 'Finance', domain_id: 'd1', embedding: stored(0, 0.1) },
     { id: 'f2', name: 'Unembedded', domain_id: 'd2', embedding: null },
@@ -64,124 +96,95 @@ const ROWS = {
     { id: 'd1', name: 'Business' },
     { id: 'd2', name: 'Tools' },
   ],
+  concepts: [
+    { id: 'i1', name: 'Churn compounds' },
+    { id: 'i2', name: 'Expansion offsets churn' },
+  ],
+  idea_topic_parents: [
+    { concept_id: 'i1', topic_id: 'a1' },
+    { concept_id: 'i2', topic_id: 'a9' },
+  ],
 };
 
-describe('loadIdeaMap evidence (plan #2006.6)', () => {
-  it('gives an untested idea a halo from its evidence, never brightness, and keeps its links strongest first', async () => {
-    const link = (id: string, weight: number, similarity: number) => ({
-      id,
-      target_kind: 'idea',
-      target_id: 'i2',
-      source_kind: 'note',
-      source_id: id,
-      similarity,
-      ...kindAndCeiling({ source_kind: 'note', weight }),
-      basis: `you wrote about this in ${id}`,
-      found_at: '2026-10-01T00:00:00Z',
-    });
-    const { client } = fakeClient({
-      ...ROWS,
-      evidence_links: [link('clip', 0.25, 0.6), link('own', 1, 0.7)],
-    });
-    const view = await loadIdeaMap(client, undefined, new Date('2026-10-14T00:00:00Z'));
-    const retention = view.ideas.find((i) => i.id === 'i2')!;
-    expect(retention.state).toBe('unknown');
-    // A clipping (0.25 x 0.6) and a note (0.5 x 0.7), never past the note ceiling (plan #2187.1).
-    expect(retention.strength).toBe(0);
-    expect(retention.exposure).toBeCloseTo(((1 - 0.85 * 0.65) * EVIDENCE_CEILING) / EVIDENCE_CEILING);
-    expect(retention.evidence.map((e) => e.id)).toEqual(['own', 'clip']);
-    expect(view.ideas.find((i) => i.id === 'i3')!.evidence).toEqual([]);
-  });
-});
+const ON = new Date('2026-10-14T00:00:00Z');
 
-describe('loadIdeaMap', () => {
-  it('maps every embedded idea with its state, track, field and domain', async () => {
-    const { client } = fakeClient(ROWS);
-    const view = await loadIdeaMap(client);
-
-    expect(view.ideas.map((i) => i.id)).toEqual(['i1', 'i2', 'i3']);
-    expect(view.missing).toBe(2);
-    expect(view.areas.fields.map((f) => f.id)).toEqual(['f1']);
-    expect(view.areas.fieldsMissing).toBe(1);
-    expect(view.areas.fields[0]).toMatchObject({ name: 'Finance', ideaCount: 2 });
-    expect(view.areas.domains.map((d) => d.id)).toEqual(['d1']);
-
-    const [churn, retention, ranges] = view.ideas;
+describe('loadIdeaMap (plan #2317.2)', () => {
+  it('draws each prepared topic as a star and no claims-graph idea', async () => {
+    const view = await loadIdeaMap(fakeClient(ROWS), ON);
+    expect(view.ideas.map((i) => i.id)).toEqual(['t1', 't2', 't3']);
+    expect(view.missing).toBe(1);
+    const [churn, , ranges] = view.ideas;
     expect(churn).toMatchObject({
-      name: 'Churn',
-      claim: 'Churn compounds.',
-      state: 'known',
+      name: 'Churn maths',
+      claim: 'What Churn maths covers.',
       track: { id: 's1', name: 'SaaS metrics' },
       field: { id: 'f1', name: 'Finance' },
       domain: { id: 'd1', name: 'Business' },
-      createdAt: '2026-09-24T10:00:00Z',
+      placeId: 'L1',
+      createdAt: AT,
     });
-    expect(retention!.createdAt).toBeNull();
-    expect(retention!.state).toBe('unknown');
     expect(ranges).toMatchObject({ track: { id: 's2', name: 'Excel modelling' }, field: null, domain: { id: 'd2', name: 'Tools' } });
-
-    expect(churn!.neighbours[0]!.id).toBe('i2');
-    expect(churn!.neighbours[0]!.similarity).toBeCloseTo(1 / Math.sqrt(1.04), 9);
-    expect(typeof view.variance.first).toBe('number');
+    expect(churn!.neighbours[0]!.id).toBe('t2');
+    expect(view.areas.fields[0]).toMatchObject({ id: 'f1', ideaCount: 2 });
   });
 
-  it("names the person on every read of their own rows when given a user id", async () => {
-    const { client, calls } = fakeClient(ROWS);
-    await loadIdeaMap(client, USER);
-    const narrowed = new Set(
-      calls.filter((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === USER).map((c) => c.table),
-    );
-    expect(narrowed).toEqual(
-      new Set([
-        'concepts',
-        'concept_state',
-        'subjects',
-        'idea_places',
-        'idea_place_members',
-        'vault_dust',
-        'evidence_links',
-        'idea_topic_parents',
-      ]),
-    );
+  it('lights a topic from your answers, with the levels tested and held', async () => {
+    const view = await loadIdeaMap(fakeClient(ROWS), ON);
+    const churn = view.ideas.find((i) => i.id === 't1')!;
+    expect(churn.levels).toEqual({ tested: 2, held: 2, ceiling: 10 });
+    expect(churn.stateRow).toMatchObject({ established: 'tested', tested_at: '2026-10-10T00:00:00Z' });
+    expect(churn.strength).toBeGreaterThan(0);
+    const retention = view.ideas.find((i) => i.id === 't2')!;
+    expect(retention.levels).toEqual({ tested: 0, held: 0, ceiling: 10 });
+    expect(retention.strength).toBe(0);
   });
 
-  it('places each goal topic among the ideas its scope is about (plan #2187.2)', async () => {
-    // A goal reads its subject's lens (plan #2302.3): 'g' is the lens of the
-    // subject the goal points at, 'old' a goal lens from before learn 0177,
-    // and 'n' the lens of a subject no goal points at.
-    const { client } = fakeClient({
-      ...ROWS,
-      aims: [{ id: 'a', goal_id: null, name: 'SaaS metrics goal', subject_id: 's9', archived_at: null }],
-      lenses: [
-        { id: 'g', name: 'SaaS metrics', origin: 'subject', subject_id: 's9', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
-        { id: 'old', name: 'SaaS metrics goal', origin: 'goal', subject_id: null, aim_id: 'a', created_at: '2026-10-01T00:00:00Z' },
-        { id: 'n', name: 'No goal', origin: 'subject', subject_id: 's8', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
-      ],
-      lens_targets: [
-        { lens_id: 'g', topic_id: 't1', target_level: 5, created_at: '2026-10-01T00:00:00Z' },
-        { lens_id: 'old', topic_id: 't1', target_level: 2, created_at: '2026-10-01T00:00:00Z' },
-      ],
-      topics: [{ id: 't1', name: 'Churn maths', ceiling: 10, status: 'approved', scope_embedding: stored(0, 0.05) }],
+  it('rings a topic from the evidence on the Wikipedia topic it refines, never brightening it', async () => {
+    const link = (id: string, weight: number) => ({
+      id,
+      target_kind: 'topic',
+      target_id: 'a2',
+      source_kind: 'note',
+      source_id: id,
+      similarity: 0.7,
+      ...kindAndCeiling({ source_kind: 'note', weight }),
+      basis: `you wrote about this in ${id}`,
+      found_at: '2026-10-01T00:00:00Z',
+      matched_by: 'similarity',
     });
-    const view = await loadIdeaMap(client);
-    expect(view.goals!.map((g) => g.id)).toEqual(['g']);
-    const [star] = view.goals![0]!.stars;
-    expect(star).toMatchObject({ topicId: 't1', name: 'Churn maths', targetLevel: 5 });
-    const churn = view.ideas.find((i) => i.id === 'i1')!;
-    const ranges = view.ideas.find((i) => i.id === 'i3')!;
-    const d = (p: { x: number; y: number }) => Math.hypot(p.x - star!.neighbourMap.x, p.y - star!.neighbourMap.y);
-    expect(d(churn.neighbourMap)).toBeLessThan(d(ranges.neighbourMap));
+    const view = await loadIdeaMap(fakeClient({ ...ROWS, evidence_links: [link('own', 1)] }), ON);
+    const retention = view.ideas.find((i) => i.id === 't2')!;
+    expect(retention.strength).toBe(0);
+    expect(retention.exposure).toBeGreaterThan(0);
+    expect(retention.evidence.map((e) => e.id)).toEqual(['own']);
+    expect(view.ideas.find((i) => i.id === 't3')!.evidence).toEqual([]);
   });
 
-  it('reads no goals under the service role', async () => {
-    const { client } = fakeClient(ROWS);
-    expect((await loadIdeaMap(client, USER)).goals).toBeUndefined();
+  it('lists the ideas under the topic each attaches to', async () => {
+    const view = await loadIdeaMap(fakeClient(ROWS), ON);
+    expect(view.ideas.find((i) => i.id === 't1')!.ideasUnder).toEqual([{ id: 'i1', name: 'Churn compounds' }]);
+    expect(view.ideas.find((i) => i.id === 't3')!.ideasUnder).toEqual([]);
   });
 
-  it('draws an empty map when nothing is embedded', async () => {
-    const { client } = fakeClient({});
-    const view = await loadIdeaMap(client);
+  it('makes each subject a place and a territory of its topics, with nothing next door', async () => {
+    const view = await loadIdeaMap(fakeClient(ROWS), ON);
+    expect(view.places.map((p) => [p.id, p.name, p.ideaCount])).toEqual([
+      ['L1', 'SaaS metrics', 2],
+      ['L2', 'Excel modelling', 1],
+    ]);
+    expect(view.dust).toEqual([]);
+    const saas = view.territories!.find((t) => t.id === 'L1')!;
+    expect(saas.topics.map((t) => t.id).sort()).toEqual(['t1', 't2']);
+    expect(saas.topics.every((t) => t.ideaIds.length === 0)).toBe(true);
+    const churn = view.ideas.find((i) => i.id === 't1')!;
+    expect(saas.topics.find((t) => t.id === 't1')!.neighbourMap).toEqual(churn.neighbourMap);
+    expect(view.goals!.map((g) => g.id).sort()).toEqual(['L1', 'L2']);
+  });
+
+  it('draws an empty map when no subject is prepared', async () => {
+    const view = await loadIdeaMap(fakeClient({}), ON);
     expect(view.ideas).toEqual([]);
+    expect(view.places).toEqual([]);
     expect(view.missing).toBe(0);
   });
 });

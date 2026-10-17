@@ -20,8 +20,8 @@ export const LIT_WINDOW_DAYS = 2;
 export const LIT_AT_ONCE = 3;
 /** Wait before the stars start, so the sky has drawn first. */
 export const LIT_DELAY_MS = 150;
-/** How long each star takes to brighten. */
-export const LIT_MS = 800;
+/** How long each star takes to brighten: done within the first second of the map. */
+export const LIT_MS = 600;
 
 const DAY_MS = 86_400_000;
 

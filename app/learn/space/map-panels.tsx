@@ -44,7 +44,7 @@ import { viewOnClick } from './pick';
  */
 
 const SHOWN = 5;
-const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
+const TOPIC_HREF = (id: string) => `/learn/topics/${id}`;
 const STATUS_TEXT = {
   tested: 'tested',
   declared: 'said you know it',
@@ -92,7 +92,7 @@ export function MapPanels({
   }, [params.panel]);
 
   const ideasOfGoal = useMemo(
-    () => (territory ? new Set(territory.topics.flatMap((topic) => topic.ideaIds)) : null),
+    () => (territory ? new Set(territory.topics.map((topic) => topic.id)) : null),
     [territory],
   );
   const fading = useMemo(
@@ -187,7 +187,7 @@ export function MapPanels({
 function Unread() {
   return (
     <p className="text-ui text-ink-muted">
-      Your goals&rsquo; levels could not be read just now. Reload to try again.
+      Your subjects&rsquo; levels could not be read just now. Reload to try again.
     </p>
   );
 }
@@ -213,11 +213,11 @@ function ChooseGoal({
   set: (change: Partial<MapParams>) => void;
 }) {
   if (goals.length === 0) {
-    return <Quiet>Set a learning goal on Goals to {lead}</Quiet>;
+    return <Quiet>Prepare a subject in Learn to {lead}</Quiet>;
   }
   return (
     <Quiet>
-      <p>Choose a goal to {lead}</p>
+      <p>Choose a subject to {lead}</p>
       <ul className="mt-1 divide-y divide-border">
         {goals.map((goal) => (
           <li key={goal.id}>
@@ -278,8 +278,8 @@ function FadePanel({
     return (
       <Quiet>
         {goalName
-          ? `Nothing round ${goalName} is held yet, so nothing in it fades. An idea starts to fade once a question, or your own word, sets what you know of it.`
-          : 'Nothing you hold is fading yet. An idea starts to fade once a question, or your own word, sets what you know of it.'}
+          ? `Nothing in ${goalName} is held yet, so nothing in it fades. A topic starts to fade once a question, or your own word, sets what you know of it.`
+          : 'Nothing you hold is fading yet. A topic starts to fade once a question, or your own word, sets what you know of it.'}
       </Quiet>
     );
   }
@@ -293,7 +293,7 @@ function FadePanel({
             <li key={idea.id} className="flex items-center gap-3 py-2">
               <span className="min-w-0 flex-1">
                 <Link
-                  href={CONCEPT_HREF(idea.id)}
+                  href={TOPIC_HREF(idea.id)}
                   className="press-area block text-ui text-ink hover:text-accent"
                 >
                   {idea.name}
@@ -316,8 +316,8 @@ function FadePanel({
       </div>
       <p className="mt-2 text-small text-ink-muted">
         {goalName
-          ? `The ideas round ${goalName}, soonest first.`
-          : 'Every idea you hold, soonest first.'}{' '}
+          ? `The topics of ${goalName}, soonest first.`
+          : 'Every topic you hold, soonest first.'}{' '}
         A re-check sets one back to full.
       </p>
     </Card>

@@ -640,6 +640,15 @@ export function graphHeight(width: number, count: number, base: number): number 
 }
 
 /**
+ * How many nodes the frame makes room for. A territory draws no ideas next
+ * door since plan #2317.2, and keeps the room they had, so its ladders, their
+ * labels and Start here stay clear of each other on a phone.
+ */
+export function graphCount(graph: Pick<IdeaGraph, 'core' | 'next' | 'ladders'>): number {
+  return graph.core.length + (graph.ladders ? Math.max(graph.next.length, NEXT_DOOR_TERRITORY) : graph.next.length);
+}
+
+/**
  * A name broken into lines no wider than `max` pixels, every word kept: the
  * graph names each idea in full. `measure` gives a text's width.
  */

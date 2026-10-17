@@ -84,7 +84,7 @@ export function MapTimeline({
         <span className="font-medium">{when}</span>
         <span className="tabular text-ink-muted">
           {': '}
-          {countText(counts.ideas)} {counts.ideas === 1 ? 'idea' : 'ideas'}, {countText(counts.lit)} lit, average
+          {countText(counts.ideas)} {counts.ideas === 1 ? 'topic' : 'topics'}, {countText(counts.lit)} lit, average
           strength {Math.round(counts.averageStrength * 100)}%
         </span>
       </p>

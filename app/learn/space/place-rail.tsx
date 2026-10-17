@@ -19,12 +19,11 @@ import { TopicWhy } from './why-lit';
 import type { Layers } from '@/lib/learn/map/layers';
 
 /**
- * The rail beside Idea Space's places (plan #1997.7): on the whole map, every
- * named place, each opening as a graph; with a place open, its ideas, best
- * known first, and the places next door. The map's places are drawn on a
- * canvas, so this list is also how they are reached from the keyboard.
- * With a goal's territory open (plan #2187.3), its topics, furthest from
- * their target first, each with the level held and the target.
+ * The rail beside an open graph on Idea Space (plan #1997.7): with a
+ * topic's neighbourhood open, its topics, best known first. With a subject's
+ * territory open (plan #2187.3, #2317.2), its topics, furthest from their
+ * target first, each with the level held and the target. On the whole map it
+ * draws nothing: the subjects card lists the subjects, which are the places.
  */
 
 /** How many rows show before the rest fold away. */
@@ -55,7 +54,8 @@ export function PlaceRail({
       />
     );
   }
-  return graph ? <OpenPlace view={view} graph={graph} /> : <Places view={view} />;
+  // The whole map lists no places: a subject is one, and the subjects card above lists them.
+  return graph ? <OpenPlace view={view} graph={graph} /> : null;
 }
 
 /** How far a topic is from its target; a topic with none sorts last. */
@@ -109,6 +109,7 @@ function OpenTerritory({
         <TopicWhy
           territory={territory}
           topicId={opened.topic}
+          star={view.ideas.find((idea) => idea.id === opened.topic)}
           asOf={view.asOf}
           layers={layers}
           onLayers={onLayers}
@@ -117,7 +118,7 @@ function OpenTerritory({
       )}
       <Card padding="standard">
         <h2 className="text-ui font-semibold text-ink">
-          In this goal
+          In this subject
           <span className="tabular ml-2 font-normal text-ink-muted">{topics.length}</span>
         </h2>
         <p className="text-small text-ink-muted">
@@ -131,53 +132,6 @@ function OpenTerritory({
         )}
       </Card>
     </>
-  );
-}
-
-function Places({ view }: { view: IdeaMapView }) {
-  const { params, set } = usePick();
-  if (view.places.length === 0) return null;
-  const strengthOf = new Map(view.ideas.map((idea) => [idea.id, idea.strength]));
-  const knownIn = new Map<string, number>();
-  for (const idea of view.ideas) {
-    if (idea.placeId && (strengthOf.get(idea.id) ?? 0) > 0)
-      knownIn.set(idea.placeId, (knownIn.get(idea.placeId) ?? 0) + 1);
-  }
-  const row = (place: IdeaMapView['places'][number]) => {
-    const change = paramsFor({ kind: 'place', id: place.id });
-    return (
-      <li key={place.id}>
-        <Link
-          href={mapHref(params, change)}
-          scroll={false}
-          onClick={viewOnClick(() => set(change))}
-          className="flex min-h-11 items-center gap-2 py-1.5 text-ui text-ink hover:text-accent"
-        >
-          <span className="min-w-0 flex-1">{place.name}</span>
-          <span className="tabular shrink-0 text-small text-ink-muted">
-            {countText(knownIn.get(place.id) ?? 0)} of {countText(place.ideaCount)} known
-          </span>
-        </Link>
-      </li>
-    );
-  };
-  return (
-    <Card padding="standard">
-      <h2 className="text-ui font-semibold text-ink">
-        Places
-        <span className="tabular ml-2 font-normal text-ink-muted">{view.places.length}</span>
-      </h2>
-      <ul className="mt-1 divide-y divide-border">{view.places.slice(0, SHOWN).map(row)}</ul>
-      {view.places.length > SHOWN && (
-        <Disclosure
-          title={`${view.places.length - SHOWN} more`}
-          className="mt-1"
-          bodyClassName="pl-0"
-        >
-          <ul className="divide-y divide-border">{view.places.slice(SHOWN).map(row)}</ul>
-        </Disclosure>
-      )}
-    </Card>
   );
 }
 
