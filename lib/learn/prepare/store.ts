@@ -237,6 +237,21 @@ export async function loadSubjectTerritory(learn: LearnSupabaseClient, userId: s
   return readTerritory((data as { territory: unknown } | null)?.territory);
 }
 
+/**
+ * The drafted names of a territory's topics, keyed by ask lower-cased: a
+ * drafted topic keeps the ask it was drafted from in `topics.asked`.
+ */
+export async function loadDraftedNames(
+  learn: LearnSupabaseClient,
+  userId: string,
+  asks: readonly string[],
+): Promise<Map<string, string>> {
+  if (asks.length === 0) return new Map();
+  const { data, error } = await learn.from('topics').select('asked, name').eq('user_id', userId).in('asked', [...asks]);
+  if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
+  return new Map(((data ?? []) as { asked: string; name: string }[]).map((t) => [t.asked.trim().toLowerCase(), t.name]));
+}
+
 export async function saveRunTerritory(learn: LearnSupabaseClient, userId: string, runId: string, territory: Territory): Promise<void> {
   const { error } = await learn
     .from('subject_preparations')

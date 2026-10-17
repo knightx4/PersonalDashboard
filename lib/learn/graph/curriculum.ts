@@ -342,14 +342,27 @@ function named(label: string, names: readonly string[]): string[] {
   return [`${label}:`, ...shown.map((name) => `- ${name}`), ...(more > 0 ? [`- and ${more} more`] : [])];
 }
 
-/** The prompt for the next unit. Exported so its content is tested without a model. */
-export function nextUnitPrompt(input: {
+/**
+ * A prepared subject's territory as the next-unit call reads it (plan
+ * #2307.5): the topics no unit teaches yet, in territory order, each with the
+ * document weeks that put it on the list.
+ */
+export type NextUnitTerritory = {
+  topics: readonly { name: string; scope: string; weeks: readonly string[] }[];
+};
+
+export type NextUnitPromptInput = {
   subject: string;
   units: readonly CurriculumUnit[];
   known: readonly string[];
   workingOn: readonly string[];
   tooHard: readonly string[];
-}): string {
+  territory?: NextUnitTerritory;
+};
+
+/** The prompt for the next unit. Exported so its content is tested without a model. */
+export function nextUnitPrompt(input: NextUnitPromptInput): string {
+  const topics = input.territory?.topics ?? [];
   return [
     `The track: ${input.subject}`,
     '',
@@ -368,17 +381,24 @@ export function nextUnitPrompt(input: {
     ...named('Ideas they asked to keep working on', input.workingOn),
     '',
     ...named('Lessons they rated too hard', input.tooHard),
+    ...(topics.length > 0
+      ? [
+          '',
+          'The subject has been laid out from syllabi and course documents, as a list of topics in the order a learner meets them. These are the topics the units so far do not teach yet, in that order, each with the weeks of the documents that teach it:',
+          ...topics.flatMap((topic, index) => [
+            `${index + 1}. ${topic.name}: ${topic.scope}`,
+            ...(topic.weeks.length > 0 ? [`   Taught in: ${topic.weeks.join('; ')}`] : []),
+          ]),
+          '',
+          'Write the next unit from these, so the course keeps the shape the documents give it: teach the first of them, and the ones after it that the documents teach in the same weeks, in their order. In covers, name the topics the unit teaches using their names exactly as listed above.',
+        ]
+      : []),
     '',
     `Call ${NEXT_TOOL_NAME}.`,
   ].join('\n');
 }
 
-export async function writeNextUnit(input: {
-  subject: string;
-  units: readonly CurriculumUnit[];
-  known: readonly string[];
-  workingOn: readonly string[];
-  tooHard: readonly string[];
+export async function writeNextUnit(input: NextUnitPromptInput & {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

@@ -76,7 +76,7 @@ function ports(options: {
     },
     addUnit: async (_userId, subjectId, lastUnitId) => {
       calls.addUnit.push({ subjectId, lastUnitId });
-      return options.addUnit?.(subjectId) ?? { outcome: 'added', unitId: `${subjectId}-new`, title: 'New' };
+      return options.addUnit?.(subjectId) ?? { outcome: 'added', unitId: `${subjectId}-new`, title: 'New', topics: [], weeks: [] };
     },
     hold: async (_userId, subjectId, until) => {
       calls.hold.push({ subjectId, until });
