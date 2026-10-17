@@ -47,3 +47,21 @@ export function WriteCurriculum({ subjectId }: { subjectId: string }) {
     </Card>
   );
 }
+
+/**
+ * Where the curriculum will be while the subject is being prepared: the
+ * preparation writes the opening units at its own step, so there is nothing
+ * to press yet (plan #2276.9).
+ */
+export function CurriculumComing({ position, total }: { position: number; total: number }) {
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum</h2>
+      <Card padding="dense">
+        <p className="text-ui text-ink-muted">
+          The opening units are written at step {position} of {total}, once the topics are drafted.
+        </p>
+      </Card>
+    </section>
+  );
+}

@@ -4,13 +4,14 @@ import { PreparationBlock } from '@/app/learn/s/[id]/prepare';
 import { SourcesSection, StartHere } from '@/app/learn/s/[id]/sources';
 import { DirectionOffer } from '@/app/learn/s/[id]/direction';
 import { BRANCH_STEPS, type DirectionOffer as DirectionOfferData } from '@/lib/learn/prepare/branch';
+import { CurriculumComing } from '@/app/learn/s/[id]/curriculum';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import type { SubjectReading } from '@/lib/learn/chat/subject-load';
 import type { FinishDetail } from '@/lib/learn/prepare/finish-step';
 import type { PreparationRow, PreparationStepRow } from '@/lib/learn/prepare/run';
 import { PREPARATION_STEPS, type PreparationStepKey } from '@/lib/learn/prepare/steps';
-import { branchPreparationView, preparationSources, preparationView } from '@/lib/learn/prepare/view';
+import { branchPreparationView, preparationSources, preparationView, unitsComeAtStep } from '@/lib/learn/prepare/view';
 
 /**
  * A subject's preparation on its page (plan #2276.2), drawn at each stage of
@@ -67,7 +68,7 @@ const PULLED: StepFixture = {
 };
 const MATCHED: StepFixture = { status: 'done', counts: { weeks: 11 } };
 
-function Page({ children }: { children: React.ReactNode }) {
+function Page({ children, tail }: { children: React.ReactNode; tail?: React.ReactNode }) {
   return (
     <div>
       {/* The subject's note as the page draws it. */}
@@ -78,29 +79,38 @@ function Page({ children }: { children: React.ReactNode }) {
         </p>
       </div>
       {children}
-      <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum · 0 of 4 units done</h2>
+      {tail ?? <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum · 0 of 4 units done</h2>}
     </div>
   );
+}
+
+const PARTWAY = preparationView(
+  prep(
+    { currentStep: 'compile_territory' },
+    {
+      classify: CLASSIFIED,
+      pull_documents: PULLED,
+      match_weeks: MATCHED,
+      compile_territory: { status: 'running', summary: 'Merging the outlines of 4 syllabi into one map.' },
+    },
+  ),
+);
+const STARTING = preparationView(prep({ status: 'pending', startedAt: null }, {}));
+
+/** Where the curriculum goes while the run is going: the line the page draws (plan #2276.9). */
+function UnitsComing({ view }: { view: ReturnType<typeof preparationView> }) {
+  const at = unitsComeAtStep(view);
+  return at ? <CurriculumComing {...at} /> : null;
 }
 
 /** Partway: three steps done, the fourth being worked, the rest to come. */
 export function LearnSubjectPrepareSurface() {
   return (
-    <Page>
+    <Page tail={<UnitsComing view={PARTWAY} />}>
       <PreparationBlock
         live={false}
         subjectId={SUBJECT_ID}
-        view={preparationView(
-          prep(
-            { currentStep: 'compile_territory' },
-            {
-              classify: CLASSIFIED,
-              pull_documents: PULLED,
-              match_weeks: MATCHED,
-              compile_territory: { status: 'running', summary: 'Merging the outlines of 4 syllabi into one map.' },
-            },
-          ),
-        )}
+        view={PARTWAY}
       />
     </Page>
   );
@@ -109,11 +119,11 @@ export function LearnSubjectPrepareSurface() {
 /** The moment after adding a subject: the run open, the first step marked. */
 export function LearnSubjectPrepareStartingSurface() {
   return (
-    <Page>
+    <Page tail={<UnitsComing view={STARTING} />}>
       <PreparationBlock
         live={false}
         subjectId={SUBJECT_ID}
-        view={preparationView(prep({ status: 'pending', startedAt: null }, {}))}
+        view={STARTING}
       />
     </Page>
   );

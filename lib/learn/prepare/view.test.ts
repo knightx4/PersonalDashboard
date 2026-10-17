@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { freshSteps, type PreparationRow, type PreparationStepRow } from './run';
 import type { PreparationStepKey } from './steps';
 import { BRANCH_STEPS } from './branch';
-import { branchPreparationView, countsLine, preparationView, tookLine } from './view';
+import { branchPreparationView, countsLine, preparationView, tookLine, unitsComeAtStep } from './view';
 
 function run(patch: Partial<PreparationRow> = {}): PreparationRow {
   return {
@@ -129,5 +129,26 @@ describe('branchPreparationView (plan #2276.7)', () => {
 
   it('is nothing for the subject’s own run', () => {
     expect(branchPreparationView({ run: run(), steps: steps({}) })).toBeNull();
+  });
+});
+
+describe('unitsComeAtStep', () => {
+  it('names the write_units step while the run is working towards it', () => {
+    const view = preparationView({ run: run({ status: 'pending', startedAt: null }), steps: freshSteps() });
+    expect(unitsComeAtStep(view)).toEqual({ position: 6, total: 7 });
+  });
+
+  it('says nothing once that step has gone, or when the run failed or has none', () => {
+    const gone = preparationView({
+      run: run({ currentStep: 'finish' }),
+      steps: steps({ write_units: { status: 'skipped' }, finish: { status: 'running' } }),
+    });
+    expect(unitsComeAtStep(gone)).toBeNull();
+    const failed = preparationView({
+      run: run({ status: 'failed', currentStep: 'draft_topics', error: 'timed out' }),
+      steps: steps({ draft_topics: { status: 'failed' } }),
+    });
+    expect(unitsComeAtStep(failed)).toBeNull();
+    expect(unitsComeAtStep(preparationView(null))).toBeNull();
   });
 });

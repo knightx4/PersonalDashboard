@@ -195,7 +195,11 @@ const makeSubjectTool: DashPaidTool = {
       units: typeof args.units === 'string' ? args.units : '',
     });
     if (!made.ok) return { ok: false, error: made.detail };
-    const written = made.curriculum.ok ? `${made.curriculum.units.length} units` : 'no curriculum yet, which its page offers to write';
+    const written = !made.curriculum.ok
+      ? 'no curriculum yet, which its page offers to write'
+      : made.curriculum.units.length === 0
+        ? 'its opening units to be written as it is prepared'
+        : `${made.curriculum.units.length} units`;
     return {
       ok: true,
       subjectRef: toRef('learn.subjects', made.id),

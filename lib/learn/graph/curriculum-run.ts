@@ -50,7 +50,8 @@ export type CustomSubjectResult =
 /**
  * Make a subject by name with its curriculum (LEARN-GRAPH-SPEC, "The
  * curriculum"): the units the person wrote kept in their order, or written by
- * the model when they gave none. A name they already have goes to that
+ * the model when they gave none (for a new subject, the preparation's
+ * write_units step, so none are written here). A name they already have goes to that
  * subject, and its curriculum stays as it is. A new subject is placed among
  * the areas once the response has gone.
  */
@@ -83,12 +84,20 @@ export async function makeCustomSubject(
     });
   }
 
-  const curriculum = await ensureCurriculum(supabase, userId, { id: subject.id, name }, want, own.titles).catch(
-    (error: unknown) => ({
-      ok: false as const,
-      detail: error instanceof Error ? error.message : 'Could not write the curriculum.',
-    }),
-  );
+  // A subject just made has a preparation run (0167), whose write_units step
+  // writes the opening units from the territory. Writing placeholders now
+  // would only be deleted minutes later (plan #2276.9), so a new subject with
+  // no units of its own gets none here. Units the person typed are still
+  // saved, as their own, and that step keeps them in front.
+  const preparationWillWrite = subject.created && own.titles.length === 0;
+  const curriculum: EnsuredCurriculum = preparationWillWrite
+    ? { ok: true, units: [], goalUnitId: null, written: false }
+    : await ensureCurriculum(supabase, userId, { id: subject.id, name }, want, own.titles).catch(
+        (error: unknown) => ({
+          ok: false as const,
+          detail: error instanceof Error ? error.message : 'Could not write the curriculum.',
+        }),
+      );
   // An existing track with a curriculum already keeps it; say so rather than
   // quietly dropping the units that were typed.
   if (!subject.created && curriculum.ok && !curriculum.written && own.titles.length > 0) {
