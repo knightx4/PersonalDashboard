@@ -29,20 +29,26 @@ import { continuePreparation, type PreparationPressState } from './actions';
 
 /** How often a working run asks the server for what the runner has written. */
 const POLL_MS = 4000;
-/** Stop asking after this long; past it the daily cron or Continue picks the run up. */
-const POLL_FOR_MS = 20 * 60_000;
+/** Ask that often for this long, then more slowly. */
+const POLL_FAST_FOR_MS = 20 * 60_000;
+/**
+ * The slower pace past that. A preparation can take an hour, and a page that
+ * stopped asking kept the block on screen after the run finished (note
+ * 49a6e14d), so it keeps asking until the run is done.
+ */
+const POLL_SLOW_MS = 30_000;
 
 function useLiveWhileWorking(working: boolean) {
   const router = useRouter();
   useEffect(() => {
     if (!working) return;
     const started = Date.now();
+    let last = started;
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      if (Date.now() - started > POLL_FOR_MS) {
-        window.clearInterval(timer);
-        return;
-      }
+      const now = Date.now();
+      if (now - started > POLL_FAST_FOR_MS && now - last < POLL_SLOW_MS) return;
+      last = now;
       router.refresh();
     }, POLL_MS);
     return () => window.clearInterval(timer);

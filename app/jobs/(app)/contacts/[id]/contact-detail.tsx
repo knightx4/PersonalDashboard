@@ -12,6 +12,7 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CopyText } from '../../roles/[id]/copy-text';
 import {
+  deleteContact,
   draftContactMessage,
   logTouch,
   markTouchAnswered,
@@ -73,6 +74,50 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
           }}
         />
       </CardSection>
+      <DeleteContact contactId={contact.id} name={contact.fullName} />
+    </div>
+  );
+}
+
+/** Delete, asked first, at the foot of the page (note 8902b443). */
+function DeleteContact({ contactId, name }: { contactId: string; name: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function remove() {
+    setError(null);
+    startTransition(async () => {
+      // On success the action goes back to the list, so only a failure returns.
+      const result = await deleteContact(contactId);
+      if (result?.error) setError(result.error);
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {confirming ? (
+        <>
+          <span className="text-small text-ink-muted">
+            Delete {name}? Their logged sends and notes go too.
+          </span>
+          <Button type="button" variant="danger" size="xs" pending={pending} onClick={remove}>
+            Delete
+          </Button>
+          <Button type="button" variant="ghost" size="xs" disabled={pending} onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <Button type="button" variant="link" className="hover:text-danger" onClick={() => setConfirming(true)}>
+          Delete contact
+        </Button>
+      )}
+      {error && (
+        <p role="alert" className="w-full text-right text-small text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

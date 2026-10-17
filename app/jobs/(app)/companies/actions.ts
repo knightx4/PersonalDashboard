@@ -19,6 +19,37 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
+
+/**
+ * Add a company by name, from the Companies tab (note 8554f9d8). The same
+ * company already on the list, by name or by the website given, is opened
+ * instead of made twice. Returns the slug the page goes to.
+ */
+// latency: pending
+export async function addCompany(input: {
+  name: string;
+  website?: string;
+}): Promise<{ error: string | null; slug?: string }> {
+  const parsed = z
+    .object({
+      name: z.string().trim().min(1, 'Name the company.').max(200),
+      website: z.string().trim().max(500).optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const company = await ensureCompany(supabase, user.id, parsed.data.name, {
+    website: parsed.data.website || null,
+  });
+  if (company.error) return { error: company.error };
+
+  const { data } = await supabase.from('companies').select('slug').eq('id', company.id).eq('user_id', user.id).maybeSingle();
+  revalidatePath('/jobs/companies');
+  return { error: null, slug: (data?.slug as string | undefined) ?? slugify(parsed.data.name) };
+}
 
 const updateSchema = z.object({
   companyId: z.string().uuid(),
