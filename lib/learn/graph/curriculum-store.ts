@@ -3,7 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
-import { CURRICULUM_MODEL, writeCurriculum } from './curriculum';
+import { CURRICULUM_MODEL, writeCurriculum, type CurriculumTerritory } from './curriculum';
 import type { CurriculumResult } from './curriculum-payload';
 
 /**
@@ -67,6 +67,8 @@ export async function ensureCurriculum(
   asked: string | null,
   /** Units the person wrote for a custom track, in their order. */
   ownUnits?: readonly string[],
+  /** A prepared subject's territory, which the units are read off (plan #2307.5). */
+  territory?: CurriculumTerritory,
 ): Promise<EnsuredCurriculum> {
   const existing = await loadCurriculum(supabase, subject.id);
   if (existing.length > 0) return { ok: true, units: existing, goalUnitId: null, written: false };
@@ -82,6 +84,7 @@ export async function ensureCurriculum(
       subject: subject.name,
       asked,
       units: ownUnits,
+      territory,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -111,8 +114,9 @@ export async function ensureCurriculum(
         outcome: unit.outcome,
         write_model: written ? CURRICULUM_MODEL : null,
         // Written from the name alone, so the preparation may rewrite it from
-        // the territory (plan #2276.5). Units the person typed stay theirs.
-        placeholder: !ownUnits || ownUnits.length === 0,
+        // the territory (plan #2276.5). Units the person typed stay theirs, and
+        // units read off the territory already are what it would write.
+        placeholder: !territory && (!ownUnits || ownUnits.length === 0),
       })),
     )
     .select('id, ordinal, title, covers, outcome');

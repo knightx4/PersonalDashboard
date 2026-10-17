@@ -162,6 +162,14 @@ far, which concepts you know, and which you rated too hard or kept for work,
 so the new unit builds on what you have shown. Tracks written before this keep
 all their units, and new ones are added after the last.
 
+On a prepared subject the call is also given its territory (plan #2307.5): the
+topics no unit names yet, in the order the documents teach them, each with the
+weeks that put it on the list. The unit names in what it covers the topics it
+teaches, and the weeks of those topics are cited after that line ("Follows MIT
+14.01: Week 4: elasticity."), so the course keeps the shape the syllabi gave
+it. Write the curriculum reads a prepared subject's opening units off its
+territory in the same way as the preparation's write_units step.
+
 ### A goal points at a subject
 
 Plan #2302.2, replacing the whole-track outline of plan #1139. Saving a

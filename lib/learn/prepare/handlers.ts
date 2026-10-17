@@ -29,7 +29,7 @@ import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
 import { writeUnitPiecesRecorded } from '@/lib/learn/lessons/pieces';
 import { loadLessons } from '@/lib/learn/lessons/piece-store';
 import type { StepHandler } from './run';
-import { loadRunTerritory, saveRunTerritory } from './store';
+import { loadDraftedNames, loadRunTerritory, saveRunTerritory } from './store';
 import type { PreparationStepKey } from './steps';
 import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKindRow } from './structure-steps';
 
@@ -335,11 +335,7 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
 
   const writeUnits = writeUnitsStep({
     territory: (runId) => loadRunTerritory(learn, userId, runId),
-    async names(asks) {
-      const { data, error } = await learn.from('topics').select('asked, name').eq('user_id', userId).in('asked', [...asks]);
-      if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
-      return new Map(((data ?? []) as { asked: string; name: string }[]).map((t) => [t.asked.trim().toLowerCase(), t.name]));
-    },
+    names: (asks) => loadDraftedNames(learn, userId, asks),
     async units(subjectId) {
       const { data, error } = await learn
         .from('curriculum_units')
