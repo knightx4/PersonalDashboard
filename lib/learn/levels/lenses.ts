@@ -126,6 +126,31 @@ export function lensLine(summary: LensSummary): string {
   return `${topics} · ${summary.held} of ${summary.total} levels held`;
 }
 
+/** A lens's held levels with the kinds kept apart, for a subject's header (plan #2307.1). */
+export type LensHeld = { tested: number; inferred: number; declared: number; total: number };
+
+export function lensHeld(
+  lens: LensRecord,
+  map: TopicMap,
+  readings: Readings,
+  topics: ReadonlyMap<string, TopicName>,
+): LensHeld {
+  const progress = lensProgress(map, readings, approvedTargets(lens, topics));
+  return { ...progress.held, total: progress.total };
+}
+
+/**
+ * What a subject's header says of its territory: levels held by a test and
+ * levels held by inference, as two numbers. Null when the lens has no levels
+ * to reach yet, so the header says nothing rather than "0 of 0".
+ */
+export function heldLine(held: LensHeld): string | null {
+  if (held.total === 0) return null;
+  const parts = [`${held.tested} of ${held.total} levels tested`, `${held.inferred} inferred`];
+  if (held.declared > 0) parts.push(`${held.declared} declared`);
+  return parts.join(' · ');
+}
+
 /** One cell inside a lens that you are ready for, with why it is there. */
 export type LensFringeCell = {
   cellId: string;

@@ -211,6 +211,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-placement-end': ['/learn/now'],
   'learn-placement-end-none': ['/learn/now'],
   'learn-subject-chain': ['/learn/s/[id]'],
+  'learn-subject-header': ['/learn/s/[id]'],
   'learn-lens': ['/learn/lens/[id]'],
   'learn-lens-fringe': ['/learn/lens/[id]'],
   'learn-lens-edit': ['/learn/lens/[id]'],
@@ -633,6 +634,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // A subject's preparation block (plan #2276.2), drawn at each stage of a run.
   'learn-subject-prepare': ['app/learn/s/[id]/prepare.tsx'],
+  // The header and its presses (plan #2307.1).
+  'learn-subject-header': ['app/learn/s/[id]/header.tsx'],
   'learn-subject-prepare-starting': ['app/learn/s/[id]/prepare.tsx'],
   'learn-subject-prepare-failed': ['app/learn/s/[id]/prepare.tsx'],
   'learn-subject-prepare-finished': ['app/learn/s/[id]/prepare.tsx'],
