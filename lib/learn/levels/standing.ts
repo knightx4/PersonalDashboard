@@ -84,6 +84,14 @@ export function topicStanding(
   return { level, heldAboveGap, rows, untouched: evidence.length === 0, reach: topicReach(map, readings, topic.id) };
 }
 
+/**
+ * The lowest level not yet shown, the one Practice Flow opens on from the
+ * topic page (plan #2276.11); null when every level is shown.
+ */
+export function firstOpenRow(standing: TopicStanding): LevelRow | null {
+  return standing.rows.find((row) => row.status !== 'shown') ?? null;
+}
+
 /** How a cell's status reads on the page. */
 export const STATUS_WORDS: Record<CellStatus, string> = {
   shown: 'Shown',

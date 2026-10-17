@@ -94,12 +94,15 @@ function Links({ row }: { row: LevelRow }) {
 export function LadderView({
   topicId,
   standing,
+  practise = null,
   open,
   timezone,
   now,
 }: {
   topicId: string;
   standing: TopicStanding;
+  /** Where Practice Flow opens on the first open level, when there is one. */
+  practise?: string | null;
   open?: LadderOpen;
   timezone: string;
   now: number;
@@ -113,7 +116,8 @@ export function LadderView({
       <Card padding="none">
         {standing.untouched && (
           <p className="card-pad-x border-b border-border py-3 text-small text-ink-muted">
-            Nothing shown yet. Practice Flow places you with its first question; until then every level is open.
+            Nothing shown yet. {practise ? <Link href={practise}>Practice</Link> : 'Practice'} places you with its first
+            question; until then every level is open.
           </p>
         )}
         <ol className="divide-y divide-border">
