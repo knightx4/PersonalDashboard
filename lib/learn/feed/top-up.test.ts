@@ -206,4 +206,8 @@ describe('topping up one subject', () => {
   it('leaves a goal track alone, since its lessons are on its plan', () => {
     expect(subjectLessonsWanted(0, true)).toBeNull();
   });
+
+  it('leaves a subject with a finished preparation alone', () => {
+    expect(subjectLessonsWanted(0, false, true)).toBeNull();
+  });
 });
