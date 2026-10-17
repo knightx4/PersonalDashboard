@@ -48,6 +48,8 @@ export type FinishDetail = {
   documents: SourceDocument[];
   /** Titles of the frame topics the territory's topics refine, in territory order. */
   frames: string[];
+  /** Topics the run drafted but left for the person to approve, with why (plan #2276.10). */
+  drafts?: { ask: string; name: string; reason: string }[];
 };
 
 export type FinishPorts = {
@@ -108,6 +110,15 @@ export function framesOf(territory: Territory | null): string[] {
   return [...new Set((territory?.topics ?? []).map((t) => t.frame.trim()).filter((f) => f.length > 0))];
 }
 
+function readKept(detail: Record<string, unknown> | undefined): { ask: string; name: string; reason: string }[] {
+  const kept = detail?.kept;
+  if (!Array.isArray(kept)) return [];
+  return kept.filter(
+    (k): k is { ask: string; name: string; reason: string } =>
+      !!k && typeof k.ask === 'string' && typeof k.name === 'string' && typeof k.reason === 'string',
+  );
+}
+
 function readPulled(detail: Record<string, unknown> | undefined): PulledDocument[] {
   const docs = detail?.documents;
   return Array.isArray(docs) ? (docs as PulledDocument[]).filter((d) => d && typeof d.title === 'string') : [];
@@ -139,12 +150,15 @@ export function finishPreparationStep(ports: FinishPorts): StepHandler {
       start: { unit, topic },
       documents: withCatalogue(docs, facts),
       frames: framesOf(territory),
+      drafts: readKept(ctx.steps.get('draft_topics')?.detail),
     };
     const where = unit ? ` Start with ${unit}.` : topic ? ` Start with ${topic.name}.` : '';
+    const left = detail.drafts?.length ?? 0;
+    const drafts = left > 0 ? ` ${left} ${left === 1 ? 'topic is' : 'topics are'} still a draft: ${detail.drafts?.map((d) => `${d.name} (${d.reason})`).join('; ')}.` : '';
     const took = `${minutes} minute${minutes === 1 ? '' : 's'}`;
     return {
       state: 'done',
-      summary: branch ? `Went deeper on ${branch.name} in ${took}.${where}` : `Prepared in ${took}.${where}`,
+      summary: branch ? `Went deeper on ${branch.name} in ${took}.${where}` : `Prepared in ${took}.${where}${drafts}`,
       counts: { seconds },
       detail,
     };
