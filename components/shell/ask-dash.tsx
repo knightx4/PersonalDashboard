@@ -18,7 +18,6 @@ import { usePathname } from 'next/navigation';
 import { Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
-import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
@@ -349,9 +348,10 @@ export function AskDashButton() {
       <IconButton
         label="Ask Dash"
         onClick={() => handle.open()}
-        className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+        className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink [&_svg]:size-6!"
       >
-        <DashMark size="icon" tone="brand" decorative />
+        {/* Dash on its charcoal plate, as the switcher and the chats show him (note 49ba62cf). */}
+        <ModuleMark module="dash" size="sm" />
       </IconButton>
     </Tooltip>
   );

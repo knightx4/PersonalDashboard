@@ -3,9 +3,8 @@
 import { whenDate } from '@/lib/core/when';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, SquarePen, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import Link from '@/components/ui/link';
-import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ToggleChip, toggleChipClass } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -494,11 +493,6 @@ export function AskChats({
 
   return (
     <div className="space-y-3">
-      <Link href="/ask" className={cn(buttonVariants({ variant: 'secondary' }), 'w-full justify-start border-border')}>
-        <SquarePen strokeWidth={1.75} aria-hidden />
-        New chat
-      </Link>
-
       {chats.length > 0 && <ChatSearch value={query} onChange={setQuery} />}
 
       {chips.length > 1 && <WorkspaceChips chips={chips} only={only} onPick={setOnly} />}

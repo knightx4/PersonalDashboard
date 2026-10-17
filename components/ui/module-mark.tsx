@@ -442,15 +442,15 @@ function GlassObject({
   );
 }
 
-/** Dash's mark, and the app's: Dash at rest on a dark plate. */
+/** Dash's mark, and the app's: Dash at rest on a dark charcoal plate (note 49ba62cf). */
 function DashPlate({ id }: { id: string }) {
   const plate = 'M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z';
   return (
     <>
       <defs>
         <linearGradient id={`${id}-plate`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0} y2={24}>
-          <stop offset="0" stopColor="#1a1b21" />
-          <stop offset="1" stopColor="#0b0b0e" />
+          <stop offset="0" stopColor="#34353c" />
+          <stop offset="1" stopColor="#222328" />
         </linearGradient>
         <linearGradient id={`${id}-shine`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0} y2={24}>
           <stop offset="0" stopColor="#fff" stopOpacity={0.07} />
