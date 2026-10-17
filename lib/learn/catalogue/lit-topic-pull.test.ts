@@ -51,6 +51,16 @@ describe('picking the topics to pull for', () => {
     expect(pickTopics({ lit, prior: new Map(), today: '2026-10-16', allowance: 0 })).toEqual([]);
   });
 
+  it('leaves out a frame topic a prepared subject refines, and reads its kind instead of classifying', async () => {
+    const lit = [{ ...topic(1), prepared: true }, topic(2), { ...topic(3), subjectKind: 'practical_skill' as const }];
+    expect(pickTopics({ lit, prior: new Map(), today: '2026-10-16', allowance: 5 }).map((t) => t.id)).toEqual(['t3', 't2']);
+    const classify = vi.fn(async () => ({ ok: true as const, kind: 'academic_course' as const }));
+    const { p, pulled } = ports({ lit, classify });
+    await pullForLitTopics(p, NOW);
+    expect(classify).toHaveBeenCalledTimes(1);
+    expect(pulled).not.toContain('ocw:Topic 1');
+  });
+
   it('tells the classifier the parent topic', () => {
     expect(goalOfTopic(topic(1))).toEqual({ name: 'Topic 1', about: 'A topic within Economics.' });
     expect(goalOfTopic({ ...topic(1), parentTitle: null }).about).toBeNull();

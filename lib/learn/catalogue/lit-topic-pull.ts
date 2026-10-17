@@ -25,6 +25,14 @@ export type LitTopic = {
   parentTitle: string | null;
   /** When the newest link that counts toward its lighting was found; the newest-lit topics go first. */
   litAt: string | null;
+  /**
+   * True when a topic of a subject with a finished preparation refines this
+   * frame topic: the preparation's pull_documents step has already pulled for
+   * it, so the daily run leaves it out (plan #2297.2).
+   */
+  prepared?: boolean;
+  /** The kind a subject refining this topic already carries; read in place of classifying again. */
+  subjectKind?: GoalKind | null;
 };
 
 export type PullOutcome = 'stored' | 'nothing' | 'failed';
@@ -49,6 +57,7 @@ export function pickTopics(input: {
   allowance: number;
 }): LitTopic[] {
   const open = input.lit.filter((topic) => {
+    if (topic.prepared) return false;
     const prior = input.prior.get(topic.id);
     return !prior || (prior.outcome === 'failed' && prior.pulledOn !== input.today);
   });
@@ -108,7 +117,9 @@ export async function pullForLitTopics(ports: LitTopicPorts, now: Date): Promise
     if (ports.outOfTime()) break;
     const goal = goalOfTopic(topic);
     const base = { topicId: topic.id, title: topic.title };
-    const classified = await ports.classify(goal);
+    const classified = topic.subjectKind
+      ? ({ ok: true, kind: topic.subjectKind } as const)
+      : await ports.classify(goal);
     let line: TopicPullLine;
     if (!classified.ok) {
       // Recorded as failed, so it counts against the day and is tried again on a later one.
