@@ -95,6 +95,64 @@ describe('pullStep', () => {
     expect((out as unknown as { detail: { documents: PulledDocument[] } }).detail.documents).toEqual([DOC]);
   });
 
+  it('records candidates that were not stored and counts them in the summary', async () => {
+    const out = await pullStep(
+      {
+        wired: () => ['extension'],
+        run: async (provider) => ({
+          provider,
+          ok: true,
+          lines: [
+            { candidate: 'a', status: 'stored', itemId: 'i1', units: 8, unchanged: false },
+            { candidate: 'b', status: 'not-confirmed', detail: 'not a syllabus' },
+            { candidate: 'c', status: 'failed', detail: 'getaddrinfo ENOTFOUND' },
+          ],
+        }),
+        describe: async () => [DOC],
+      },
+      async () => 'practical_skill',
+    )(ctx());
+    expect(out).toMatchObject({ state: 'done', counts: { proposed: 3, confirmed: 2, storeFailed: 1 } });
+    if (out.state !== 'done') throw new Error('expected done');
+    expect(out.summary).toContain('3 candidates proposed, 2 confirmed, 1 failed to store: getaddrinfo ENOTFOUND.');
+    expect((out.detail as { candidates: unknown[] }).candidates).toEqual([
+      { provider: 'extension', candidate: 'b', status: 'not-confirmed', detail: 'not a syllabus' },
+      { provider: 'extension', candidate: 'c', status: 'failed', detail: 'getaddrinfo ENOTFOUND' },
+    ]);
+  });
+
+  it('fails the step when every confirmed candidate failed to store', async () => {
+    const describe = vi.fn();
+    const out = await pullStep(
+      {
+        wired: () => ['extension'],
+        run: async (provider) => ({
+          provider,
+          ok: true,
+          lines: [
+            { candidate: 'a', status: 'failed', detail: 'getaddrinfo ENOTFOUND' },
+            { candidate: 'b', status: 'failed', detail: 'getaddrinfo ENOTFOUND' },
+          ],
+        }),
+        describe,
+      },
+      async () => 'practical_skill',
+    )(ctx());
+    expect(out.state).toBe('failed');
+    if (out.state !== 'failed') throw new Error('expected failed');
+    expect(out.error).toContain('2 failed to store: getaddrinfo ENOTFOUND');
+    expect((out.detail as { candidates: unknown[] }).candidates).toHaveLength(2);
+    expect(describe).not.toHaveBeenCalled();
+
+    // The retry searches again rather than reading the failed call as finished.
+    const run = vi.fn(async (provider: ProviderId) => ({ provider, ok: true as const, lines: [] }));
+    const again = await pullStep({ wired: () => ['extension'], run, describe: async () => [] }, async () => 'practical_skill')(
+      ctx({ detail: out.detail }),
+    );
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(again.state).toBe('done');
+  });
+
   it('returns more before the deadline and resumes without repeating a provider', async () => {
     const calls: string[] = [];
     const ports = {
