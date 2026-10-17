@@ -27,6 +27,7 @@ import { ASK_LISTS, type AskListFilter } from '@/lib/ask/list-filter';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-answer';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
@@ -470,5 +471,63 @@ export async function saveAskAnswer(ref: string, turnId: string, to: SaveAnswerT
     ref,
     turnId,
     to,
+  );
+}
+
+/**
+ * A thumbs up or down on one of Dash's answers (plan #2285.2), as the
+ * signed-in person. The chat must be one of their Ask Dash chats and the
+ * turn one of Dash's in it; every read and the write also name their id, so
+ * nobody else's turn is reached even past RLS.
+ */
+export async function rateAskAnswer(
+  ref: string,
+  turnId: string,
+  rating: AnswerRating | null,
+  note: string | null,
+): Promise<RateAnswerOutcome> {
+  const user = await requireUser();
+  const core = await createCoreClient();
+  return rateAnswer(
+    {
+      readRole: async (conversationId, id) => {
+        const [chat, turn] = await Promise.all([
+          core
+            .from('conversations')
+            .select('id')
+            .eq('id', conversationId)
+            .eq('user_id', user.id)
+            .eq('subject_kind', 'ask')
+            .maybeSingle(),
+          core
+            .from('conversation_turns')
+            .select('role')
+            .eq('id', id)
+            .eq('conversation_id', conversationId)
+            .eq('user_id', user.id)
+            .maybeSingle(),
+        ]);
+        if (chat.error) throw new Error(`Reading the chat failed: ${chat.error.message}`);
+        if (turn.error) throw new Error(`Reading the answer failed: ${turn.error.message}`);
+        if (!chat.data || !turn.data) return null;
+        return (turn.data as { role: string }).role === 'assistant' ? 'assistant' : 'user';
+      },
+      write: async (conversationId, id, patch) => {
+        const { data, error } = await core
+          .from('conversation_turns')
+          .update(patch)
+          .eq('id', id)
+          .eq('conversation_id', conversationId)
+          .eq('user_id', user.id)
+          .eq('role', 'assistant')
+          .select('id');
+        if (error) throw new Error(`Keeping the rating failed: ${error.message}`);
+        return (data ?? []).length;
+      },
+    },
+    ref,
+    turnId,
+    rating,
+    note,
   );
 }

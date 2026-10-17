@@ -83,6 +83,10 @@ export type TalkTurn = {
   citations?: TalkCitation[];
   /** Files the person sent with this turn, in an `ask` conversation; absent when there are none. */
   files?: TalkFile[];
+  /** Their thumbs on one of Dash's answers (plan #2285.2); absent when unrated. */
+  rating?: 'up' | 'down';
+  /** What they typed in What went wrong? with the rating; absent when nothing. */
+  ratingNote?: string;
 };
 
 export type TalkTurnRow = {
@@ -92,6 +96,8 @@ export type TalkTurnRow = {
   created_at: string;
   tool_calls?: TalkToolCall[] | null;
   citations?: TalkCitation[] | null;
+  rating?: string | null;
+  rating_note?: string | null;
 };
 
 /** A turn as it is written: Dash's may carry what it looked up and cited. */
@@ -107,7 +113,7 @@ export type NewTalkTurn = {
 /** The longest turn the table takes (conversation_turns_body_ck). */
 export const MAX_TURN = 8000;
 
-export const TURN_SELECT = 'id, role, body, created_at, tool_calls, citations';
+export const TURN_SELECT = 'id, role, body, created_at, tool_calls, citations, rating, rating_note';
 
 export function toTalkTurn(row: TalkTurnRow): TalkTurn {
   const turn: TalkTurn = {
@@ -118,6 +124,10 @@ export function toTalkTurn(row: TalkTurnRow): TalkTurn {
   };
   if (Array.isArray(row.tool_calls) && row.tool_calls.length > 0) turn.toolCalls = row.tool_calls;
   if (Array.isArray(row.citations) && row.citations.length > 0) turn.citations = row.citations;
+  if (turn.role === 'assistant' && (row.rating === 'up' || row.rating === 'down')) {
+    turn.rating = row.rating;
+    if (row.rating_note) turn.ratingNote = row.rating_note;
+  }
   return turn;
 }
 

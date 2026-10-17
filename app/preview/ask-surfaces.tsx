@@ -348,6 +348,10 @@ const FIXTURES: AskSource = {
     await new Promise((resolve) => setTimeout(resolve, 300));
     return { ok: true, change: savedChange(turnId, to, new Date().toISOString()) };
   },
+  rate: async (_ref, _turnId, rating, note) => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return { ok: true, rating, note: rating === null ? null : (note ?? null) };
+  },
   confirm: pressed('done'),
   decline: pressed('declined'),
   undo: pressed('undone'),
@@ -897,8 +901,19 @@ export function DashPageSurface({
  * An answer kept elsewhere with the presses under it (plan #1899.7): the
  * first answer made a todo and saved to the vault, each card with Undo, and
  * Edit pressed on the second, so its question is back in the box to change.
+ *
+ * The thumbs under each answer (plan #2285.2) draw unpressed here, and each
+ * hidden part has its own `thumbs` moment: `rated` with the first answer up
+ * and the second down with what went wrong, `note` with thumbs down just
+ * pressed on the second and What went wrong? open, `error` with a refused
+ * thumbs up put back and the line saying why, and `tip` with the tooltip
+ * held on the second answer's thumbs down.
  */
-export function AskAnswerActionsSurface() {
+export type AnswerThumbsMoment = 'rated' | 'note' | 'error' | 'tip';
+
+const RATING_REFUSED = 'That was not kept. Check your connection and try again.';
+
+export function AskAnswerActionsSurface({ thumbs }: { thumbs?: AnswerThumbsMoment } = {}) {
   const at = (hour: number) => `2026-10-14T${String(hour).padStart(2, '0')}:00:00Z`;
   const first = answerTo('What did I spend on eBay flips this quarter?').map((turn) => ({
     ...turn,
@@ -913,15 +928,24 @@ export function AskAnswerActionsSurface() {
       role: 'assistant',
       body: 'Two are still unsold: the Catan lot, listed at $210.00, and the Penguin Classics bundle, which is not listed yet.',
       createdAt: at(10),
+      ...(thumbs === 'rated'
+        ? { rating: 'down' as const, ratingNote: 'It left out the board games I sold on Vinted last month' }
+        : {}),
     },
   ];
+  if (thumbs === 'rated') turns[1] = { ...turns[1], rating: 'up' };
+  const source: AskSource =
+    thumbs === 'error' ? { ...FIXTURES, rate: async () => ({ ok: false, error: RATING_REFUSED }) } : FIXTURES;
   return (
-    <AskDashProvider source={FIXTURES}>
+    <AskDashProvider source={source}>
+      {thumbs === 'note' && <ActOnArrival label="Thumbs down" />}
+      {thumbs === 'error' && <ActOnArrival label="Thumbs up" />}
+      {thumbs === 'tip' && <ActOnArrival label="Thumbs down" focus />}
       {/* On the chat's card at reading width, as Dash's page draws it. */}
       <PageColumn className="py-4">
         <Card padding="standard" className="mx-auto w-full max-w-prose">
           <AskThread
-            id="ask-actions-preview"
+            id={`ask-actions-preview${thumbs ? `-${thumbs}` : ''}`}
             conversationRef="00000000-0000-4000-8000-000000000021"
             turns={turns}
             changes={[savedChange('s1-a', 'todo', at(9)), savedChange('s1-a', 'vault', at(9))]}
@@ -1209,5 +1233,23 @@ function PressOnArrival({ label }: { label: string }) {
     }, 0);
     return () => clearTimeout(timer);
   }, [label]);
+  return null;
+}
+
+/**
+ * Presses, or with `focus` rests the mouse on, the last button named
+ * `label` once the surface has drawn: the thumbs under the newest answer.
+ */
+function ActOnArrival({ label, focus = false }: { label: string; focus?: boolean }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const named = Array.from(document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`));
+      const button = named[named.length - 1];
+      // A mouse resting on it, which is what opens a tooltip.
+      if (focus) button?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+      else button?.click();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [label, focus]);
   return null;
 }

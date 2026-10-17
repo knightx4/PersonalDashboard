@@ -320,6 +320,7 @@ const WAITING_SOURCE: AskSource = {
   decline: never,
   undo: never,
   save: never,
+  rate: never,
 };
 
 /**

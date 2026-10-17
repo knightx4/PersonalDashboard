@@ -6609,6 +6609,41 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskAnswerActionsSurface />,
   },
   {
+    /* Thumbs on an answer already rated (plan #2285.2): the first up, the
+     * second down with what went wrong, both filled. */
+    id: 'ask-answer-actions-rated',
+    label: 'Dash · Answers rated up and down',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="rated" />,
+  },
+  {
+    /* Thumbs down just pressed on the second answer, What went wrong? open
+     * with Send and Skip. */
+    id: 'ask-answer-actions-note',
+    label: 'Dash · What went wrong? after a thumbs down',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="note" />,
+  },
+  {
+    /* A thumbs up the server refused: the thumb put back and the line
+     * saying why under the row. */
+    id: 'ask-answer-actions-error',
+    label: 'Dash · A rating that was not kept',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="error" />,
+  },
+  {
+    /* The tooltip on the second answer's thumbs down, held from the keyboard. */
+    id: 'ask-answer-actions-tip',
+    label: 'Dash · The thumbs down tooltip',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="tip" />,
+  },
+  {
     /* The same column opened as a sheet from the right, as it opens on a
      * phone and on a laptop with the list shown. */
     id: 'ask-page-used-sheet',
