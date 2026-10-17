@@ -5,7 +5,7 @@ import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
 import type { ChangePresses } from '@/components/talk/dash-changes';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import type { AskChat } from '@/lib/talk/ask-chats';
 import type { Crumb } from '@/components/shell/breadcrumb';
@@ -58,11 +58,12 @@ export function DashChatsFrame({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? '/ask';
+  const newChat = useSearchParams()?.get('chat') === 'new';
   return (
     <Conversation
       label="Chats"
       fill
-      open={openChatRef(pathname) !== null}
+      open={openChatRef(pathname) !== null || newChat}
       newChat={{ href: NEW_CHAT_HREF, label: 'New chat' }}
       list={
         <>
@@ -171,8 +172,11 @@ export function ArchivedNote({
 /** On a phone, the way from an open chat back to the list it is drawn over. */
 export const CHATS_BACK = { href: '/ask', label: 'Chats' };
 
-/** Where New chat goes: a page of its own, so a phone, whose /ask is the list, opens it. */
-export const NEW_CHAT_HREF = '/ask/new';
+/**
+ * Where New chat goes: /ask itself, marked so a phone, whose /ask is the
+ * list, draws the new chat over it (note bd8b9a15).
+ */
+export const NEW_CHAT_HREF = '/ask?chat=new';
 
 /**
  * A new chat on the page (plan #1899.2): Dash's mark, what he can do, the box
