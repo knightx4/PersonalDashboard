@@ -253,7 +253,10 @@ prepare text, but nothing goes out over your name that you did not put there.
 
 Reuses four dead columns and adds none: `evidence_item_ids` records what it
 cited, `unsupported_claims` records what it could not ground and shows as a
-warning, `profiles.writing_style_notes` goes into the prompt,
+warning (on application questions this gave way to `considerations`, added by
+job-search migration 0059: the drafter works out how to approach the question
+first, writes the answer from that, and the card shows those considerations,
+a gap in the bank among them, in place of the warning), `profiles.writing_style_notes` goes into the prompt,
 `profiles.banned_constructions` is a hard post-check that strips or flags
 (seeded with em dashes and "passionate about" — the check is a regex over the
 output, not an instruction in the prompt, because instructions leak).

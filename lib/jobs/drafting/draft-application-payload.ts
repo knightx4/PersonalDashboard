@@ -137,7 +137,12 @@ export function parseApplicationDraftPayload(
     const answerId = typeof row.answer_id === 'string' ? row.answer_id : null;
     if (!answerId || !requested.has(answerId) || done.has(answerId)) continue;
     const parsed = parseDraftPayload(
-      { answer: row.answer, evidence_item_ids: list(row.evidence_item_ids), unsupported_claims: list(row.unsupported_claims) },
+      {
+        answer: row.answer,
+        evidence_item_ids: list(row.evidence_item_ids),
+        unsupported_claims: list(row.unsupported_claims),
+        considerations: list(row.considerations),
+      },
       context.offeredEvidenceIds,
       context.banned,
     );
@@ -165,6 +170,7 @@ export function toStoredDraft(draft: AnswerDraft): StoredDraft {
     answer: draft.text,
     evidence_item_ids: draft.evidenceItemIds,
     unsupported_claims: draft.unsupportedClaims,
+    ...(draft.considerations?.length ? { considerations: draft.considerations } : {}),
     ...(draft.bannedFound.length > 0 ? { banned_found: draft.bannedFound } : {}),
     ...(draft.overLimit ? { over_limit: draft.overLimit } : {}),
   };
@@ -176,6 +182,7 @@ export function fromStoredDraft(stored: StoredDraft): AnswerDraft {
     text: stored.answer,
     evidenceItemIds: stored.evidence_item_ids,
     unsupportedClaims: stored.unsupported_claims,
+    ...(stored.considerations ? { considerations: stored.considerations } : {}),
     bannedFound: stored.banned_found ?? [],
     ...(stored.over_limit ? { overLimit: stored.over_limit } : {}),
   };

@@ -34,6 +34,23 @@ export function LimitCount({
 }
 
 /**
+ * How to approach one application question: what it tests, what to lead
+ * with, what the bank lacks. Dash's words, so the accent tone. Shown on the
+ * card once a drafted answer is saved, and inside the draft while it is open.
+ */
+export function Considerations({ items, className }: { items: readonly string[]; className?: string }) {
+  return (
+    <Note tone="accent" className={className} title="How to approach this question">
+      <ul className="list-disc pl-4 text-small text-ink">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </Note>
+  );
+}
+
+/**
  * Dash's draft, beside what it is a draft of and never inside it (plan
  * #2130.4). It reaches the record only through Insert, and Discard throws it
  * away: the compose.ts rule, the model may prepare text but nothing goes out
@@ -74,6 +91,10 @@ export function DraftPanel({
         <h4 className="text-small font-medium text-ink">A draft</h4>
         <span className="text-small text-ink-muted">Nothing is saved until you insert it and save.</span>
       </div>
+
+      {draft.considerations && draft.considerations.length > 0 && (
+        <Considerations items={draft.considerations} className="mt-2" />
+      )}
 
       <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">
         <LinkedText text={draft.text} />

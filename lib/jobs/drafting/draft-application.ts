@@ -88,13 +88,24 @@ What a good answer does:
   sentences. With no limit, write what the question needs, usually under 250
   words.
 
+Before you write each answer, work out how to approach that question, and
+write the answer from that. These considerations are shown to the person
+beside the answer, so write them to them, one short plain sentence each, two
+to four per answer:
+- What the question is really testing, and what a strong answer leads with.
+- Which of their stories or results fits best and why, or what angle on the
+  company or role from the posting and their research to take.
+- Any limit, and what that means for how much fits.
+- Anything the question asks for that the material and their replies do not
+  hold (a headcount, a date, a reason only they know): say what to add, and
+  leave it out of the answer rather than guess it.
+
 What it never does:
 - Invent facts about them. A number, a scale, a timeline, a job title, an
   employer or a result about the person comes from the material or from their
-  replies, or is not stated. If you do state something about them that
-  neither carries, report it verbatim in that answer's unsupported_claims.
-  What you say about the company or the role from the posting or their
-  research is not a claim about them and need not be reported.
+  replies, or is not stated. Where the question needs one neither carries,
+  that answer's considerations say so. What you say about the company or the
+  role from the posting or their research is not a claim about them.
 - Open by restating the question, call the role an exciting opportunity, or
   close with a paragraph of enthusiasm.
 - Use anything on their "never use" list.
@@ -115,18 +126,18 @@ made you leave Brex?").
 Report through ${APPLICATION_DRAFT_TOOL}:
 - answers: one entry for every answer id under "The questions to answer now":
   - answer_id: copied exactly.
-  - answer: the answer itself. Plain prose, no headings, no bullet list unless
-    the question asks for one.
+  - considerations: as above.
+  - answer: the answer itself, following its considerations. Plain prose, no
+    headings, no bullet list unless the question asks for one.
   - evidence_item_ids: every evidence item the answer draws on, ids copied
     exactly. Empty when it draws on none.
-  - unsupported_claims: as above.
 - asks: your questions for them, each with answer_id (or null) and question.
   Empty when you have none.`;
 
 const TOOL: Anthropic.Tool = {
   name: APPLICATION_DRAFT_TOOL,
   description:
-    'Report a draft for every answer id asked for, with what each cites and what it could not ground, and any questions for the person.',
+    'Report a draft for every answer id asked for, each with how to approach it and what it cites, and any questions for the person.',
   input_schema: {
     type: 'object',
     properties: {
@@ -134,13 +145,14 @@ const TOOL: Anthropic.Tool = {
         type: 'array',
         items: {
           type: 'object',
+          // Considerations before the answer, so they are written first.
           properties: {
             answer_id: { type: 'string' },
+            considerations: { type: 'array', items: { type: 'string' } },
             answer: { type: 'string' },
             evidence_item_ids: { type: 'array', items: { type: 'string' } },
-            unsupported_claims: { type: 'array', items: { type: 'string' } },
           },
-          required: ['answer_id', 'answer', 'evidence_item_ids', 'unsupported_claims'],
+          required: ['answer_id', 'considerations', 'answer', 'evidence_item_ids'],
         },
       },
       asks: {

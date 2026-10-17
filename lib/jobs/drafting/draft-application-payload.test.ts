@@ -273,6 +273,7 @@ describe('stored drafts', () => {
       text: 'An answer.',
       evidenceItemIds: ['e1'],
       unsupportedClaims: ['led nine people'],
+      considerations: ['Lead with the result.'],
       bannedFound: ['leverage'],
       overLimit: { count: 9, limit: 5, unit: 'words' as const },
     };
@@ -280,6 +281,7 @@ describe('stored drafts', () => {
       answer: 'An answer.',
       evidence_item_ids: ['e1'],
       unsupported_claims: ['led nine people'],
+      considerations: ['Lead with the result.'],
       banned_found: ['leverage'],
       over_limit: { count: 9, limit: 5, unit: 'words' },
     });
