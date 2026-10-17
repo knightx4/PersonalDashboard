@@ -71,6 +71,7 @@ function draftPorts(t: Territory, over: Partial<DraftTopicsPorts> = {}) {
     asked: async () => [...asked],
     draft,
     targets: vi.fn(async (_lens: string, topics: readonly TerritoryTopic[]) => topics.length),
+    approve: vi.fn(async (topics: readonly TerritoryTopic[]) => ({ approved: topics.length, kept: [] })),
     ...over,
   };
   return { ports, draft, asked };
@@ -110,6 +111,23 @@ describe('draftTopicsStep', () => {
     expect(ports.lens).not.toHaveBeenCalled();
     expect(ports.targets).toHaveBeenCalledWith('lens1', t.topics);
     expect(out).toMatchObject({ state: 'done', counts: { drafted: 3, remaining: 0, targeted: 3 } });
+  });
+
+  it('approves the drafted topics when none remain and records the ones it kept as drafts', async () => {
+    const t = territory(3);
+    const kept = [{ ask: 'Topic 3', name: 'Third', reason: '2 rows cite no source' }];
+    const { ports, asked } = draftPorts(t, { approve: vi.fn(async () => ({ approved: 2, kept })) });
+    asked.push('Topic 1', 'Topic 2', 'Topic 3');
+    const out = await draftTopicsStep(ports)(ctx({ detail: { lens: { id: 'lens1', name: 'Beekeeping' } } }));
+    expect(ports.approve).toHaveBeenCalledWith(t.topics);
+    expect(out).toMatchObject({ state: 'done', counts: { approved: 2, kept: 1 }, detail: { kept } });
+    expect((out as { summary: string }).summary).toContain('2 approved, 1 left as a draft');
+  });
+
+  it('approves nothing while topics are still being drafted', async () => {
+    const { ports } = draftPorts(territory(3));
+    await draftTopicsStep(ports)(ctx());
+    expect(ports.approve).not.toHaveBeenCalled();
   });
 
   it('gives up on a topic the drafter turns down twice, so the run can finish', async () => {

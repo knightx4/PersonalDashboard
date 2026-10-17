@@ -5,11 +5,14 @@ import { EvidenceList } from '@/components/learn/evidence-list';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Thread } from '@/components/thread/thread';
 import { Card } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
+import { practiceHref } from '@/lib/learn/flow/href';
 import type { DevComment } from '@/lib/comments/load';
 import { whenDay } from '@/lib/core/when';
 import { ladderLevel } from '@/lib/learn/levels/ladder';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
-import { reachWords, type TopicStanding } from '@/lib/learn/levels/standing';
+import { firstOpenRow, reachWords, type TopicStanding } from '@/lib/learn/levels/standing';
 import type { TopicDetail, TopicMatch } from '@/lib/learn/levels/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { draftProvenance } from '@/lib/learn/levels/provenance';
@@ -62,11 +65,21 @@ export function TopicView({
   const draft = topic.status === 'draft';
   const provenance = draft ? draftProvenance(topic) : null;
   const levels = topic.ceiling === 1 ? '1' : `1 to ${topic.ceiling}`;
+  const openRow = standing && !draft ? firstOpenRow(standing) : null;
+  const practise = openRow ? practiceHref({ cell: openRow.cellId }) : null;
   const reach = standing && !draft ? reachWords(standing.reach) : null;
 
   return (
     <DetailPage
-      header={<PageHeader subject={path} title={topic.name} actions={draft ? <ApproveTopicButton uncited={provenance?.uncited.length} /> : undefined} />}
+      header={<PageHeader subject={path} title={topic.name} actions={
+            draft ? (
+              <ApproveTopicButton uncited={provenance?.uncited.length} />
+            ) : practise ? (
+              <Link href={practise} className={buttonVariants({ size: 'sm' })}>
+                Practice
+              </Link>
+            ) : undefined
+          } />}
       details={
         <DetailFacts>
           {standing && !draft ? (
@@ -122,7 +135,7 @@ export function TopicView({
       {draft ? (
         <ApproveDraft topicId={topic.id} cells={topic.cells} links={topic.links} />
       ) : (
-        standing && <LadderView topicId={topic.id} standing={standing} open={open} timezone={timezone} now={now} />
+        standing && <LadderView topicId={topic.id} standing={standing} practise={practise} open={open} timezone={timezone} now={now} />
       )}
 
       {!draft && backing.length > 0 && (

@@ -73,6 +73,26 @@ describe('sourceDocuments', () => {
   });
 });
 
+describe('finishPreparationStep drafts', () => {
+  it('lists the topics still drafts with why, and says so in the summary', async () => {
+    const c = ctx(undefined);
+    const kept = [{ ask: 'Swarming', name: 'Why colonies swarm', reason: '1 row cites no source' }];
+    const steps = new Map(c.steps);
+    steps.set('draft_topics', { ...steps.get('draft_topics')!, status: 'done', detail: { kept } });
+    const out = await finishPreparationStep(ports())({ ...c, steps });
+    if (out.state !== 'done') throw new Error('not done');
+    expect((out.detail as FinishDetail).drafts).toEqual(kept);
+    expect(out.summary).toContain('Why colonies swarm (1 row cites no source)');
+  });
+
+  it('has no drafts line when every topic was approved', async () => {
+    const out = await finishPreparationStep(ports())(ctx(undefined));
+    if (out.state !== 'done') throw new Error('not done');
+    expect((out.detail as FinishDetail).drafts).toEqual([]);
+    expect(out.summary).not.toContain('still a draft');
+  });
+});
+
 describe('framesOf', () => {
   it('names each frame once, in territory order', () => {
     expect(framesOf(TERRITORY)).toEqual(['Insects', 'Animal husbandry']);
