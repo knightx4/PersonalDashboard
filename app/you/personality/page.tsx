@@ -2,7 +2,6 @@ import { PageColumn } from '@/components/shell/page-width';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { formatDay } from '@/lib/goals/dates';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { latestBigFive, type BigFiveResult, type TypedResult } from '@/lib/you/personality/model';
@@ -41,10 +40,7 @@ export default async function PersonalityPage() {
 
   return (
     <PageColumn>
-      <PageHeader
-        title="Personality"
-        description={latest ? `Big Five, taken ${formatDay(latest.takenAt, true)}` : undefined}
-      />
+      <PageHeader title="Personality" description="Your results from each test, side by side." />
       <PersonalitySection latest={latest} earlier={earlier} typed={typed} themes={themes} />
     </PageColumn>
   );
