@@ -834,7 +834,7 @@ export function DashPageSurface({
           fill
           open={opened}
           initialListOpen={listOpen}
-          newChat={{ href: '/ask', label: 'New chat' }}
+          newChat={{ href: '/ask/new', label: 'New chat' }}
           list={
             <AskChats
               chats={DASH_CHATS}

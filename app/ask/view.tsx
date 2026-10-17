@@ -66,7 +66,7 @@ export function DashChatsFrame({
       label="Chats"
       fill
       open={openChatRef(pathname) !== null}
-      newChat={{ href: '/ask', label: 'New chat' }}
+      newChat={{ href: NEW_CHAT_HREF, label: 'New chat' }}
       list={
         <>
           {chatsFailed && (
@@ -173,6 +173,9 @@ export function ArchivedNote({
 
 /** On a phone, the way from an open chat back to the list it is drawn over. */
 export const CHATS_BACK = { href: '/ask', label: 'Chats' };
+
+/** Where New chat goes: a page of its own, so a phone, whose /ask is the list, opens it. */
+export const NEW_CHAT_HREF = '/ask/new';
 
 /** Under the heading of a new chat: what Dash reads and what he will not do unasked. */
 const NEW_CHAT_LINE =

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen, PanelRight, PanelRightClose, PanelRightOpen, SquarePen, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { scrim } from '@/components/ui/popover';
 import Link from '@/components/ui/link';
 import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
@@ -144,12 +144,19 @@ export function Conversation({
         <div className={cn(!listOpen && 'min-[720px]:hidden')}>
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-display text-title font-semibold tracking-tight text-ink">{label}</h2>
-            <span className="hidden min-[720px]:inline-flex">
-              <Tooltip label={`Hide ${label.toLowerCase()}`} align="end">
-                <IconButton label={`Hide ${label.toLowerCase()}`} onClick={() => toggle(false)}>
-                  <PanelLeftClose strokeWidth={1.75} aria-hidden />
-                </IconButton>
-              </Tooltip>
+            <span className="flex items-center gap-1">
+              {/* New chat sits by the heading, as a compact button, as chat apps put it. */}
+              <Link href={newChat.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                <SquarePen strokeWidth={1.75} aria-hidden />
+                {newChat.label}
+              </Link>
+              <span className="hidden min-[720px]:inline-flex">
+                <Tooltip label={`Hide ${label.toLowerCase()}`} align="end">
+                  <IconButton label={`Hide ${label.toLowerCase()}`} onClick={() => toggle(false)}>
+                    <PanelLeftClose strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                </Tooltip>
+              </span>
             </span>
           </div>
           <div className="mt-2">{list}</div>
