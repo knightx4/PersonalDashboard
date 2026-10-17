@@ -169,11 +169,15 @@ the vault on every save.
 What the page looks like while you write:
 
 - One column, about 66 characters wide, body text at 19px with line height
-  1.6.
+  1.6. A text size control beside the tools makes it smaller or larger, and
+  each device keeps its own size.
 - The page scrolls only when the line you are typing comes within a third
   of the screen of the bottom, and then only as far as it must. It used to
   re-centre on every keystroke, which moved the page under you.
-- Markdown symbols are dimmed rather than hidden. Headings are larger.
+- Live preview, as in Obsidian: markdown symbols are hidden on every line but
+  the one the cursor is on, where they show dimmed to be seen and deleted. A
+  link reads as its text. Quote and list marks always show. Headings are
+  larger.
 - A word count at the bottom, against a target if you set one.
 - The tools stay where they are while you type. Hiding them on the first
   keystroke moved the text up the page each time.

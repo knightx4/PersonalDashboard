@@ -124,12 +124,14 @@ export function NotesEditor({
   api,
   handle,
   autoFocus = false,
+  textScale,
 }: {
   brief: EssayBrief;
   api: PlanApi;
   handle?: Ref<MarkdownEditorHandle>;
   /** Read once: the page opened on the notes. */
   autoFocus?: boolean;
+  textScale?: number;
 }) {
   const [initial] = useState(() => notesOf(brief, api.plan));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,6 +157,7 @@ export function NotesEditor({
         label="Your notes"
         placeholder="Write everything you think about this, in any order: claims, examples, doubts, half-sentences, quotes. Dash maps it when you ask."
         autoFocus={autoFocus}
+        textScale={textScale}
         onChange={(text) => {
           pending.current = text;
           if (timer.current) clearTimeout(timer.current);
