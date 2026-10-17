@@ -256,6 +256,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.application_drafts = applicationDraft.id;
 
+  // A finished research run on the company (job_search 0062).
+  const [research] = await admin<{ id: string }[]>`
+    insert into company_research (user_id, company_id, status, summary, sources, finished_at)
+    values (${userId}, ${company.id}, 'ready', ${`${tag} research`},
+            ${admin.json([{ url: 'https://example.com', title: 'Example', kind: 'company' }])}, now())
+    returning id`;
+  ids.company_research = research.id;
+
   return ids;
 }
 

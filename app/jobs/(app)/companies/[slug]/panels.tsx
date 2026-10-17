@@ -33,6 +33,8 @@ import { DashAction } from '@/components/ui/dash-action';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import type { Tab } from '@/lib/tabs';
 import { companyTabFrom, type CompanyTab } from './tabs';
+import { ResearchPanel } from './research-panel';
+import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import {
   answeredCount,
   PERSPECTIVE_QUESTIONS,
@@ -77,6 +79,11 @@ export function CompanyPanels(props: {
   perspective: Perspective;
   /** When an answer on the Perspective tab last changed, if one ever has. */
   perspectiveUpdatedAt: string | null;
+  /** The newest research run in any state, and the newest finished one. */
+  researchLatest: CompanyResearch | null;
+  researchShown: CompanyResearch | null;
+  /** Whether Research can be started on this deployment. */
+  researchAvailable: boolean;
   domains: string;
   industry: string;
   hqLocation: string;
@@ -183,6 +190,9 @@ function PerspectivePanel({
   priority,
   perspective,
   perspectiveUpdatedAt,
+  researchLatest,
+  researchShown,
+  researchAvailable,
   contacts,
   timezone,
 }: {
@@ -190,9 +200,13 @@ function PerspectivePanel({
   priority: string;
   perspective: Perspective;
   perspectiveUpdatedAt: string | null;
+  researchLatest: CompanyResearch | null;
+  researchShown: CompanyResearch | null;
+  researchAvailable: boolean;
   contacts: Array<{ id: string }>;
   timezone: string;
 }) {
+  const drafts = researchShown?.drafts ?? {};
   const [answers, setAnswers] = useServerSeeded(perspective);
   const [focus, setFocus] = useServerSeeded({ priority });
   const [error, setError] = useState<string | null>(null);
@@ -231,6 +245,14 @@ function PerspectivePanel({
         </div>
       </CardSection>
 
+      <ResearchPanel
+        companyId={companyId}
+        latest={researchLatest}
+        shown={researchShown}
+        timezone={timezone}
+        available={researchAvailable}
+      />
+
       <CardSection
         title="Your view"
         meta={`${answered} of ${PERSPECTIVE_QUESTIONS.length} answered${
@@ -251,6 +273,12 @@ function PerspectivePanel({
                   placeholder={question.prompt}
                   onSave={(next) => save(question.key, next)}
                 />
+                {!answers[question.key].trim() && drafts[question.key] && (
+                  <DraftAnswer
+                    draft={drafts[question.key] as string}
+                    onUse={() => save(question.key, drafts[question.key] as string)}
+                  />
+                )}
               </dd>
             </div>
           ))}
@@ -265,6 +293,38 @@ function PerspectivePanel({
         </p>
       </CardSection>
     </div>
+  );
+}
+
+/**
+ * What the research run suggested for an unanswered question, with a button
+ * that makes it the answer. Shown only while the question is blank: once
+ * there is an answer it is the person's, and a suggestion beside it is noise.
+ */
+function DraftAnswer({ draft, onUse }: { draft: string; onUse: () => Promise<string | null | void> }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <Note className="mt-2">
+      <p className="text-small font-medium text-ink-muted">Suggested from the research</p>
+      <FoldingMarkdown markdown={draft} className="mt-1 text-ui text-ink" />
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              setError((await onUse()) ?? null);
+            })
+          }
+        >
+          {pending ? 'Saving…' : 'Use this'}
+        </Button>
+        <FieldError>{error}</FieldError>
+      </div>
+    </Note>
   );
 }
 
