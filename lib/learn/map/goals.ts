@@ -44,6 +44,8 @@ export type GoalOnMap = {
   /** The lens's id, which the address holds as `goal`. */
   id: string;
   name: string;
+  /** The open goals that read this subject, by name; empty for a subject with none. */
+  goalNames: string[];
   /** What the row says after the name: topics and levels held, or the drafts waiting. */
   line: string;
   held: number;
@@ -83,6 +85,7 @@ export function goalsOnMap(
   map: TopicMap,
   readings: Readings,
   placed: ReadonlyMap<string, TopicPlacement>,
+  goalNames: ReadonlyMap<string, readonly string[]> = new Map(),
 ): GoalOnMap[] {
   const names = new Map<string, TopicName>(
     map.topics.map((t) => [t.id, { id: t.id, name: t.name, approved: t.approved, ceiling: t.ceiling }]),
@@ -127,6 +130,7 @@ export function goalsOnMap(
     return {
       id: lens.id,
       name: lens.name,
+      goalNames: [...(lens.subjectId ? (goalNames.get(lens.subjectId) ?? []) : [])],
       line: lensLine(summary),
       held: summary.held,
       total: summary.total,

@@ -352,7 +352,7 @@ export async function loadIdeaMap(
       }),
     );
     const readings = readCells(goalRows.map);
-    goals = goalsOnMap(goalRows.lenses, goalRows.map, readings, placedTopics);
+    goals = goalsOnMap(goalRows.lenses, goalRows.map, readings, placedTopics, goalRows.goalNames);
     territories = territoriesOnMap(goalRows.lenses, goalRows.map, readings, placedTopics, around);
     levels = {
       map: goalRows.map,
