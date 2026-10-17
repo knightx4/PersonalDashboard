@@ -301,6 +301,7 @@ import {
 } from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
+import { SubjectPresses, subjectDescription } from '@/app/learn/s/[id]/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
@@ -6137,6 +6138,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <PlacementPreview state="end-none" />,
+  },
+  {
+    /* The top of a prepared subject's page with no claims behind it (plan
+     * #2307.1): lens progress as tested and inferred, and both presses. */
+    id: 'learn-subject-header',
+    label: 'Subject · Header of a prepared subject',
+    module: 'learn',
+    width: 'page',
+    render: () => (
+      <PageHeader
+        title="Urban economics and the economics of housing supply"
+        description={subjectDescription(
+          { tested: 12, inferred: 9, declared: 0, total: 46 },
+          { unknown: 0, shaky: 0, recognised: 0, known: 0, sharp: 0, misconception: 0, total: 0 },
+        )}
+        actions={<SubjectPresses id="s1" lensId="l1" owner />}
+      />
+    ),
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything

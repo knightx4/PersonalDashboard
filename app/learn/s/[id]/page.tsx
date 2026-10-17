@@ -2,7 +2,6 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
-import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -10,7 +9,8 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
-import { nowHref, practiceHref, subjectClipsHref } from '@/lib/learn/flow/href';
+import { SubjectPresses, subjectDescription } from './header';
+import { loadSubjectLens } from './lens-held';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -47,7 +47,6 @@ import {
   learningOrder,
   pruneForGoal,
   readyNow,
-  settledCount,
   type Graph,
 } from '@/lib/learn/graph/model';
 import { Chip } from '@/components/ui/chip';
@@ -274,7 +273,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensId] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -295,17 +294,13 @@ export default async function SubjectPage({
     // be read leave the offer and the branch blocks out.
     loadDirection(supabase, user.id, id).catch(() => null),
     loadSubjectTerritory(supabase, user.id, id).catch(() => null),
-    // The subject's lens, for the Levels link: the Subjects list opens this
-    // page now rather than the lens. One that cannot be read leaves the link out.
-    supabase
-      .from('lenses')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('subject_id', id)
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => (data as { id: string } | null)?.id ?? null, () => null),
+    // The subject's lens, for the Levels link and the header's held levels:
+    // the Subjects list opens this page now rather than the lens. One that
+    // cannot be read leaves the link and the line out.
+    loadSubjectLens(supabase, user.id, id).catch(() => null),
   ]);
+  const lensId = lensRead?.id ?? null;
+  const held = lensRead?.held ?? null;
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
   const planGoal = await planGoalFor(supabase, user.id, id).catch(() => null);
@@ -370,57 +365,18 @@ export default async function SubjectPage({
       <PageHeader
         subject={await rowSubject(toRef('learn.subjects', id))}
         title={subject.name}
-        description={
-          counts.total === 0
-            ? 'Nothing in this graph yet.'
-            : `${settledCount(counts)} of ${counts.total} known${
-                counts.misconception > 0 ? ` · ${counts.misconception} mixed up` : ''
-              }`
-        }
+        description={subjectDescription(held, counts)}
         actions={
           <>
-            {/* Now with only this subject's cards (plan #1698). Its empty
-                state says when there are none, so it shows on every subject. */}
-            <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
-              Now
-            </Link>
-            {lensId && (
-              <Link href={`/learn/lens/${lensId}`} className={buttonVariants({ variant: 'secondary' })}>
-                Levels
-              </Link>
-            )}
-            {/* The clips that serve this subject (plan #1697). The owner's
-                alone, like Videos, since they are cut from the owner's
-                YouTube library. Its own empty state says when none serve it. */}
-            {owner && (
-              <Link href={subjectClipsHref(id)} className={buttonVariants({ variant: 'secondary' })}>
-                Clips
-              </Link>
-            )}
             {counts.total > 0 && (
-              <>
-                <Link
-                  href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
-                  className="text-ui text-ink-muted hover:text-ink"
-                >
-                  {showEverything ? 'Show what is left' : 'Show the whole graph'}
-                </Link>
-                <Link
-                  href={`/learn/s/${id}/probe`}
-                  className={buttonVariants({ variant: 'secondary' })}
-                >
-                  Ask me about this
-                </Link>
-                {/* The flow limited to this track (plan #779), left again with
-                  All tracks on the flow itself. */}
-                <Link
-                  href={practiceHref({ track: id })}
-                  className={buttonVariants({ variant: 'primary' })}
-                >
-                  Practice this
-                </Link>
-              </>
+              <Link
+                href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
+                className="text-ui text-ink-muted hover:text-ink"
+              >
+                {showEverything ? 'Show what is left' : 'Show the whole graph'}
+              </Link>
             )}
+            <SubjectPresses id={id} lensId={lensId} owner={owner} />
             <ConfirmStep
               action={deleteSubject}
               fields={{ subjectId: id }}
