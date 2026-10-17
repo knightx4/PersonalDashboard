@@ -1,165 +1,169 @@
 # Learn now
 
-The tab after Home: an endless deck of things to learn next, one card at a
-time, chosen from what you write about and from the fields you have never
-touched. You read a card and swipe it away, saying whether you know it. Since
-"Cards after the first week" below, each card carries a question to try, but
-nothing is graded.
+Learn's first tab, at `/learn/now`. It opens on today's piece of a prepared
+subject and a press to practise across your prepared subjects. Beside them is
+a short list of what is waiting for you and of the subjects Dash is still
+preparing. There is nothing to swipe. The endless deck of cards this page used
+to be survives as Cards, a page of its own that ends when the last card is
+answered.
 
-Practice Flow keeps the questions, and only the questions. The two tabs split
-Learn by what you are in the mood for: taking something in, or being tested on
-it.
+Until plan #2313 the page was that deck: cards drawn from Wikipedia sections
+for the themes you write about, with survey questions and goal questions mixed
+into Practice Flow. A subject you add is now prepared by Dash, with its
+syllabi, topics and first lessons (LEARN-LESSONS-SPEC), so the page no longer
+has to go looking for something to put in front of you.
 
-Written to [WRITING-GUIDE.md](WRITING-GUIDE.md). The decisions below were made
-by the owner on 23 September 2026.
+Written to [WRITING-GUIDE.md](WRITING-GUIDE.md). The owner decided the deck on
+23 September 2026 and its replacement on 17 October 2026.
 
 ---
 
-## What changes in Learn
+## The page
 
-- **Now is Learn's first tab**, at `/learn/now`, and what Learn opens on
-  (plan #1486). It was called Learn now and sat after Home from plan #1310
-  until #1486 folded Home and Practice Flow into it: what Home listed as
-  waiting is a strip at its top, Practice Flow is its Practice only switch,
-  and your study plans are on each subject's page. It replaces the Read now tab. The readings you queued yourself are still
-  there: they come first in the feed, ahead of anything the app picked.
-- **Practice Flow is questions only.** The readings #773 folded into the flow
-  after an answer move to Learn now. The new-track card stays in the flow,
-  because starting a track is how the flow gets more questions.
-- The other tabs (Tracks, Reading lists, Quizzes) are unchanged.
+Now is one main column with a rail beside it, and the rail follows the main
+column on a phone (`app/learn/now/now-view.tsx`). The main column holds, in
+order:
 
-## Practice Flow
+1. Today's piece, when there is one.
+2. The Practice card: the number of prepared subjects and a Start practising
+   press. With a piece on the page the press is quiet. With no piece the card
+   says "No piece is waiting today" above a primary press, so a missing piece
+   does not read as one that failed to load.
+3. Under the press, the topics Dash researched for you (briefs), the readings
+   you queued ("You said you would read these"), and the ideas due for review.
 
-Practice Flow, behind Now's Practice only switch (`/learn/now?practice=1`,
-plan #1486; `/learn/flow` before that, which redirects), asks one question after another. Since plan
-#842 it asks about two kinds of subject, and since #1385 a third:
+When there is no piece and no prepared subject the Practice card is replaced by
+an empty state. It says Dash is still preparing your subjects when a
+preparation is running, and otherwise offers Add a subject, which goes to
+`/learn/know`.
 
-- **Your tracks.** The ideas in each track, shared between tracks by how much
-  you engage with each, as "What to do next" in
-  [LEARN-GRAPH-SPEC.md](LEARN-GRAPH-SPEC.md) describes.
-- **Subjects you write about that are not tracks.** A theme from your vault
-  map with notes linked to it and no track made from it. The question tests
-  one idea taken from those notes. These are survey questions. Each is kept in
-  a hidden subject that no list of your tracks shows (decision #838), and the
-  screen names the vault subject and its field above the question, with a line
-  saying it is not one of your tracks.
-- **Your learning goals.** A goal you set on the Goals tab, such as startup
-  finance, and the Level 3 goal. See "Goal questions" below.
+The rail holds Waiting for you, Preparing, and what Dash did today in Learn.
+When the first two are empty the page is one column and Dash's day follows the
+main column. One read failing never fails the page: a count that cannot be
+read drops its own line, and a list that cannot be read comes back empty.
 
-A filter at the top of the page chooses between them:
+A switch in the page header, Today and Practice, moves between the two views
+by a search parameter, so the choice survives a reload and the back button.
+
+## Today's piece
+
+A piece is one sitting of about 20 to 30 minutes in a unit of a prepared
+subject or of a learning goal's subject (LEARN-LESSONS-SPEC, "A goal's units
+are split into pieces"). Now shows the lessons of the next piece you have not
+finished, and then its check. A right answer to the check finishes the piece
+on Now. The practice task stays on the piece's own page, and the piece passes
+only when that is handed in too.
+
+Which subject: the one whose piece check you last answered, so a course you are
+in the middle of keeps you there, and with none yet the oldest. A subject whose
+pieces are all finished on Now gives way to the next. A subject that has no
+pieces written yet is reported as such when no subject has a piece to give, and
+Now points at its page. A piece named in the link (`?piece=`, which the morning
+notification writes) leads when it is one of yours and not finished. The
+choice is `chooseTodaysPiece` in `lib/learn/lessons/todays-piece.ts`, and the
+reads are in `todays-piece-store.ts`.
+
+The piece has a conversation with Dash under it, in which the check is
+answered and marked. Its turns are kept against the piece, not on Now.
+
+## Practice
+
+Practice is the same address with the switch on (`/learn/now?practice=1`).
+`/learn/flow` redirects there with its query kept, and so does an old link
+carrying `goal` or `only`.
+
+Every question is about one level of one topic, chosen by
+[LEARN-LEVELS-SPEC](LEARN-LEVELS-SPEC.md), "Choosing the next question":
+placement on a topic you have not been placed on, then the fringe with misses
+first, and a re-check one answer in five. The answer screen lists every level
+the answer reached. Nothing else is asked. Since plan #2313.2 no survey
+question about a theme from your notes is written, no goal question is written
+ahead, and no hidden subject is made to hold either. The survey answers
+already given still count on the Know grid.
+
+Unfocused, the topics are those of every subject whose preparation has
+finished and every subject an open goal points at (`practiceSubjectIds` in
+`lib/learn/levels/practice-store.ts`). A filter at the top chooses between
+them:
 
 | Filter | What it asks about |
 |---|---|
-| Everything, the default (`/learn/flow`) | Your tracks, goal questions, and survey questions at the rates below |
-| Tracks only (`/learn/flow?only=tracks`) | Your tracks and nothing else |
-| Goals only (`/learn/flow?only=goals`) | Your goals and nothing else (plan #1387) |
+| Everything (`?only=all`) | Prepared subjects and goals' subjects |
+| Subjects only (`?only=tracks`) | Prepared subjects alone |
+| Goals only (`?only=goals`) | The subjects your open goals point at |
 
-Practice this on a track, and Test me on this on a Learn now card, open the
-flow on that one track (`?track=`). It asks only about that track, and the
-filter is not shown.
+With Goals only on in Learn settings, the bare address opens on Goals only and
+`only=all` gets past it.
 
-Practise on a goal on the Goals tab opens the flow on that one goal
-(`?goal=<aim id>`, plan #1387) in the same way. A goal with a track of its own
-opens that track's flow instead, and an archived or unknown goal opens the
-plain flow. When no question about the goal can be written, as with a Level 3
-goal that has no claimed article left untested, the page says there is
-nothing to ask about it.
+Three links narrow the questions further:
 
-### How often a survey question comes up
+- `?track=<subject id>` asks about one subject, and the filter is replaced by a
+  line saying so with a way back to all subjects. An id that is not a subject
+  of yours goes back to the plain flow.
+- `?goal=<aim id>`, a goal's Practise link, goes to the subject the goal points
+  at, or to the plain flow for a goal that points at none.
+- `?placement=1` with a subject asks up to eight placing questions on its lens
+  and ends on its first lesson (plan #2292.2).
 
-Decision #839 set the rate. It is worked out from the fields you write about,
-meaning the fields with at least one of your themes placed in them:
+A run is the questions since a time the links carry from one question to the
+next. End run, or running out of questions, shows what moved in it, and may
+offer a lens for a theme the run missed. Nothing about the run is stored. When
+every level you are ready for has been asked about recently the page says there
+is nothing left to ask.
 
-- While any of those fields has no answered question, in a track or in the
-  survey, one question in two is a survey question.
-- Once each has at least one, the rate falls with the share of fields that
-  still have fewer than three answered survey questions. A field where a track
-  has an answered question counts as having three.
-- Once every field has three, one question in five.
+## What is waiting
 
-At one in n, the next question is a survey question when none of the n - 1
-before it was. So at one in two the flow alternates, and at one in five it
-asks one survey question after every four about your tracks. The rate and the
-turn order are `surveyShare` and `surveySlots` in `lib/learn/survey/rate.ts`,
-with tests beside them.
+Waiting for you lists, in this order and each only when its count is above
+zero: things in the Learn inbox, ideas due for review, readings you said you
+would read, and cards from before. Each line links to where you deal with it.
+The reviews and readings lines jump to their lists lower on Now. The cards line
+goes to Cards and goes away with the last card.
 
-The subject a survey question is about is picked field by field, an untested
-field first, so the questions spread across fields rather than all coming
-from your strongest theme.
+A count that could not be read drops its line. If any could not be read and
+none shows, the list says so rather than claiming nothing is waiting. Goals
+without a plan are no longer counted: a subject you add is prepared on its
+own, so a goal has nothing to wait on you for here (`lib/learn/feed/waiting.ts`).
 
-### Written ahead
+## Preparing
 
-Survey questions are written ahead into the same queue as track questions, so
-the next question is on the screen without waiting for a model call. Tracks
-only and a focused track leave a waiting survey question in the queue until
-the flow is next opened with no filter. When your tracks have nothing left to
-ask, the default flow asks survey questions alone. When a survey question
-cannot be written, a track question takes its turn.
+A subject whose preparation has not finished is listed with the step its run is
+on ("Find syllabi and other structure documents", "Lay out the territory", and
+so on), linking to the subject's page. The line is `preparationLine` over
+`preparationView` in `lib/learn/prepare/view.ts`, the same words the subject's
+page uses. The list is drawn only while a run is unfinished. The steps and what
+they do are in LEARN-LESSONS-SPEC.
 
-Survey answers are graded like any other answer. An answered survey question
-counts towards its field being tested on the Know grid, the same as an answer
-in a track placed there, and a field tested that way is no longer offered as
-one you have never been tested in (plan #843).
+## Cards
 
-### Goal questions
+Cards are the old deck, at `/learn/now?cards=1`, one at a time with the three
+swipes below. They are the cards written before Now changed, and the page says
+so. It ends when none is left. Nothing on Now asks for more, and Generate more
+is gone. A morning notification that names a card (`?card=`, plan #2164.7)
+opens Cards on that card.
 
-Plan #1385 mixes in questions about your open learning goals. While you have
-one, one question in three is about a goal, the share #899 set for goal cards
-in Learn now. The goal turn is worked out first, with the same cadence as the
-survey turn: the next question is a goal question when neither of the two
-before it was. The other turns keep the split above between your tracks and
-survey questions, counted among themselves. So while a field you write about
-is untested and you have a goal, a goal, a vault subject and your tracks each
-get one turn in three, and your tracks get more as the survey rate falls. The
-turn order is `flowSlots` in `lib/learn/survey/rate.ts`.
+`/learn/now?track=<subject id>` without the Practice switch is one subject's
+cards, opened from the subject's page, with a link back to it. Its other side
+of the switch is Practice on that subject.
 
-With more than one goal, the goals take turns, the one with the fewest
-questions written about it going first (`goalsInTurn`). A question is written
-from the goal cards you marked Got it or saved, and from the goal's own
-wording when there are none (plan #1383). Each goal's questions are kept in a
-hidden subject of their own, as survey questions are (plan #1384), and the
-screen names the goal above the question with a line saying it comes from
-your learning goals.
+The rest of this document describes the cards: what one is, how it was and
+still is made, and what swiping it does. The hourly top-up
+(`/api/cron/feed-top-up`) still tops up a person who has placed themes and
+fewer than twenty ready cards. It writes no card or concept lesson for a
+subject whose preparation has finished, which the preparation covers (plan
+#2297.4). 
+A card shows up to two of your own notes on its idea (plan #1113). For the
+first cards the lookup starts on the server and is passed down unawaited, one
+promise a card, so the card paints first and the notes stream in under it.
 
-Goal questions are written ahead into the same queue. One that cannot be
-written gives its turn to a track question, and a goal that already has a
-track of its own name is asked about through that track. A waiting question
-about a goal you have since archived is thrown away unshown. Tracks only and a
-focused track leave goal questions out. Goals only and a goal's link do the
-opposite: every question written ahead is about a goal, and the track and
-survey questions waiting in the queue stay there for the default flow.
-
-The Level 3 goal takes its goal turns like any other goal, but its questions
-are about the articles you claimed (a Got it or a save) and have not yet been
-tested on (plan #1386), read from `learn.level3_untested_claims`. The article
-asked about least goes first, the longest claimed between equals, and one with
-a question already waiting is skipped. The idea is written from a section one
-of the article's cards was cut from. It is kept in the Level 3 goal's hidden
-subject and cross-listed under the subject named after the article, which is
-what `learn.article_evidence` reads, so a right answer moves the article from
-claimed to tested on the Goals page.
-
-A goal question asks you to explain the idea in a few sentences rather than
-pick from options (plan #2164.2). The prompt names the idea and, from its
-checks, what a full answer also covers, so one answer reaches several sides of
-it. Writing it takes no model call. The answer is marked by the teach-back
-grader for what was right and what was missing, Dash asks one follow-up, and
-that answer is marked too. The idea is left where a teach-back leaves it:
-shaky when the explanation does not hold, known when it does, and sharp when
-the follow-up holds as well. Skipping the follow-up leaves it known. Multiple
-choice on a goal's idea is only ever a re-check of one already settled, and a
-multiple-choice goal question written before this is thrown away unshown.
-
-An answered goal question counts towards the goal's field on the Know grid,
-as a survey answer does, and so towards the survey rate above. A goal not
-placed in a field adds to no field.
+The readings you queued yourself were once served first in the deck. They are
+now a list on Now under the Practice card.
 
 ## Two rules this overturns
 
 [LEARN-SPEC.md](LEARN-SPEC.md) was written for a reading queue, and two of its
-rules do not hold for a feed. The owner has set both aside for Learn now:
+rules do not hold for cards. The owner has set both aside for them:
 
-- **"Not a reader."** Learn now shows the source's own text on the card where
+- **"Not a reader."** A card shows the source's own text on the card where
   the source allows it. Wikipedia does, under CC BY-SA, with the article named
   and linked on every card. The reason is friction: reading in the feed beats
   leaving the app for every card.
@@ -180,10 +184,10 @@ came from, and a card is only made from material that was actually fetched.
 | Summary | Three or four sentences, written from the fetched text, never from memory |
 | The text | The section itself, when the source allows it, collapsed to a readable length with "Read the rest" |
 | Source | The article's name, the licence, and a link to the section |
-| Actions | Next, Save (to a reading list), Not interested, Test me on this |
+| Actions | The three swipes below, Save (to a reading list), Not interested, Test me on this |
 
-"Test me on this" hands the card's subject to Practice Flow as a track; it is
-the one bridge between the tabs, and it is always optional.
+"Test me on this" starts a subject from the card and opens Practice on it. It
+is the one bridge from a card to Practice, and it is always optional.
 
 ## What the feed pulls from
 
@@ -253,10 +257,10 @@ count drops to seven or fewer.
    the row. The "why" line is built from the row rather than written by the
    model, so it always names the right field and reason.
 
-The hourly run tops up anyone with fewer than twenty ready cards. After a
-response on the feed page, it runs only once seven or fewer are ready, and
-then writes fifteen. It writes the picked rows first and picks more targets
-only when they run out.
+The hourly run tops up anyone with fewer than twenty ready cards. It writes the
+picked rows first and picks more targets only when they run out. Since plan
+#2313.1 a response on Cards no longer starts a top-up, and the page has no
+Generate more.
 
 Wikipedia first, because it needs no key and its text can be shown. Lecture
 clips join once the catalogue has courses in it (plan #789).
@@ -302,9 +306,7 @@ The first decision stands: once a card is saved, dismissed or tested, nothing
 but Test me after a Save moves it again.
 
 A pass, by Next or by scrolling, takes a card out of the ready pool like the
-other actions, and asks for a top-up once the response has gone, so passing
-enough cards to leave seven or fewer ready starts more being written. Cards
-still ready stay in the pool while they are on the screen, so the page keeps the
+other actions. Cards still ready stay in the pool while they are on the screen, so the page keeps the
 list of cards already shown and asks only for others. A card that never reached
 the screen, or that you scrolled back up away from, comes back on your next
 visit, newest cards first. The tab's badge counts your queued readings, not the
@@ -490,11 +492,14 @@ row of its own, on the same section and target, numbered by `idea_index`.
 
 Each idea is also a concept in `learn.concepts`, with `origin = 'feed'`, its
 claim embedded in the concept's `embedding` column. Every concept must belong to
-a subject, so feed ideas are filed under a hidden subject named after the
-article, the same kind of hidden subject the survey uses (`survey = true`, with
-no theme). It is not listed as a track. Pressing Test me on this for a card
-starts the track on the article's subject, so the hidden subject becomes the
-track and its feed ideas are the track's first ideas.
+a subject, and since plan #2313.2 that is always one you chose and never a
+hidden one made for the card. In order, it is the subject the card was written
+for, the subject its goal points at, and a subject of yours named after the
+article. A card with none of these keeps its idea on the card and saves no
+concept. Each saved idea is attached at once to its nearest frame topic
+(`attach_idea_topic_parent`, learn 0179). Pressing Test me on this starts a
+subject named for the article when you have none, and the ideas already filed
+under it are its first.
 
 The swipes set the idea's state in `learn.concept_state`, on your word:
 
@@ -581,12 +586,3 @@ Two model calls per card, one to name the material (Haiku, about 230 tokens
 out) and one to write the card (Sonnet, a few hundred tokens out). Twenty cards
 is a few cents.
 Recorded in the spend ledger under their own operations.
-
-## Build order
-
-1. The tab change: Learn now first, Read now's queue inside it, readings out of
-   Practice Flow.
-2. The card store and the pass that picks targets and names material.
-3. Writing cards from fetched sections, and keeping twenty ready.
-4. The feed page.
-5. Weights from Save and Not interested.
