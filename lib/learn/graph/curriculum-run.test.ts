@@ -9,6 +9,7 @@ vi.mock('./curriculum-store', () => ({
   fileGoalUnder: vi.fn(),
 }));
 
+import { placeTrackAfterResponse } from '@/lib/learn/areas/place-track';
 import { makeCustomSubject } from './curriculum-run';
 import { ensureCurriculum } from './curriculum-store';
 import { findOrCreateSubject } from './save';
@@ -33,6 +34,13 @@ describe('makeCustomSubject', () => {
     vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false });
     await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: null, units: 'Churn\nCAC' });
     expect(ensureCurriculum).toHaveBeenCalledWith(supabase, 'u', { id: 's1', name: 'SaaS metrics' }, null, ['Churn', 'CAC']);
+  });
+
+  it('does not place a new subject itself, since its preparation places it when it finishes', async () => {
+    vi.mocked(placeTrackAfterResponse).mockReset();
+    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false });
+    await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: 'to price a plan', units: 'Churn' });
+    expect(placeTrackAfterResponse).not.toHaveBeenCalled();
   });
 
   it('leaves a subject the person already had to the old path', async () => {

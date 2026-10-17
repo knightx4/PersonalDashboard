@@ -5,6 +5,7 @@ import { loadAreas } from '@/lib/learn/areas/load';
 import { PLACE_MODEL, placeTracks, type Placement } from '@/lib/learn/areas/place';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * Placing one track into the areas (docs/LEARN-AREAS-SPEC.md, "Placement").
@@ -89,6 +90,12 @@ export async function placeTrack(
   userId: string,
   track: TrackToPlace,
   theme?: TrackTheme | null,
+  /**
+   * Where the spend goes when the call is not made inside a request (the
+   * preparation's finish step, which runs under the service role): the
+   * session's ledger needs cookies a cron call does not have.
+   */
+  record?: (reports: SpendReport[]) => Promise<void>,
 ): Promise<TrackPlacementOutcome> {
   try {
     if (theme) {
@@ -108,7 +115,7 @@ export async function placeTrack(
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
-    await recordLearnSpend(userId, 'place-track', spend.reports);
+    await (record ? record(spend.reports) : recordLearnSpend(userId, 'place-track', spend.reports));
 
     const placement = result.ok ? result.placements[0] : undefined;
     if (!placement) {

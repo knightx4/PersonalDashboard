@@ -1,5 +1,4 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { placeTrackAfterResponse } from '@/lib/learn/areas/place-track';
 import { parseOwnUnits } from './curriculum-payload';
 import { ensureCurriculum, fileGoalUnder, type EnsuredCurriculum } from './curriculum-store';
 import { loadGoals, loadSubject } from './load';
@@ -52,8 +51,9 @@ export type CustomSubjectResult =
  * curriculum"): the units the person wrote kept in their order, or written by
  * the model when they gave none (for a new subject, the preparation's
  * write_units step, so none are written here). A name they already have goes to that
- * subject, and its curriculum stays as it is. A new subject is placed among
- * the areas once the response has gone.
+ * subject, and its curriculum stays as it is. A new subject is not placed here:
+ * the insert opened its preparation run (0167), which places it when it
+ * finishes (plan #2297.3), so placing it now would pay for it twice.
  */
 export async function makeCustomSubject(
   supabase: LearnSupabaseClient,
@@ -73,15 +73,6 @@ export async function makeCustomSubject(
 
   if (subject.created) {
     if (want) await supabase.from('subjects').update({ note: want }).eq('id', subject.id);
-    // Placed in the areas once the response has gone, as a track from a
-    // chain is; a track with no field yet is still a track.
-    placeTrackAfterResponse(supabase, userId, {
-      id: subject.id,
-      name,
-      context: [want ? `aimed at: ${want}` : '', own.titles.length > 0 ? `units: ${own.titles.join('; ')}` : '']
-        .filter(Boolean)
-        .join('. '),
-    });
   }
 
   // A subject just made has a preparation run (0167), whose write_units step

@@ -196,6 +196,22 @@ export async function unfinishedPreparations(
     .map((r) => ({ subjectId: r.subject_id, branch: r.branch_key }));
 }
 
+/**
+ * The subjects whose preparation has finished (plan #2297.4): the main run
+ * (no branch) is done. The feed top-up writes no cards or concept lessons for
+ * these, since the preparation covers them.
+ */
+export async function preparedSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const { data, error } = await learn
+    .from('subject_preparations')
+    .select('subject_id')
+    .eq('user_id', userId)
+    .eq('status', 'done')
+    .is('branch_key', null);
+  if (error) throw new Error(`Reading prepared subjects failed: ${error.message}`);
+  return new Set(((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id));
+}
+
 /** The territory a run compiled (plan #2276.4), by the run's id; null before compile_territory has kept one. */
 export async function loadRunTerritory(learn: LearnSupabaseClient, userId: string, runId: string): Promise<Territory | null> {
   const { data, error } = await learn

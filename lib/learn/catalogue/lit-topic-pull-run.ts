@@ -17,6 +17,7 @@ import {
 import { liveGoalPullPorts, runProvider } from '@/lib/learn/catalogue/structure-pull-for-goal';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { topicStates, type TopicLink } from '@/lib/learn/evidence/topic-state';
+import type { GoalKind } from '@/lib/learn/goal-kind';
 import { classifyGoals } from '@/lib/learn/goal-kind-call';
 import { loadTopicRows } from '@/lib/learn/map/topics-load';
 
@@ -30,6 +31,53 @@ import { loadTopicRows } from '@/lib/learn/map/topics-load';
  */
 
 type PullRow = { topic_id: string; pulled_on: string; outcome: PullOutcome };
+
+type Covering = { prepared: boolean; kind: GoalKind | null };
+
+/**
+ * For each frame topic that a subject's topics refine: whether any of those
+ * subjects has a finished preparation (which has pulled for it already), and a
+ * kind one of them carries. Through topics.refines_article_id, the lens
+ * targets and the lens's subject (plan #2297.2).
+ */
+async function subjectsRefining(learn: LearnSupabaseClient, userId: string): Promise<Map<string, Covering>> {
+  const out = new Map<string, Covering>();
+  const refining = await learn
+    .from('topics')
+    .select('id, refines_article_id')
+    .eq('user_id', userId)
+    .not('refines_article_id', 'is', null);
+  if (refining.error) throw new Error(`Reading the topics that refine a frame failed: ${refining.error.message}`);
+  const frameOf = new Map(((refining.data ?? []) as { id: string; refines_article_id: string }[]).map((r) => [r.id, r.refines_article_id]));
+  if (frameOf.size === 0) return out;
+
+  const targets = await learn.from('lens_targets').select('lens_id, topic_id').eq('user_id', userId).in('topic_id', [...frameOf.keys()]);
+  if (targets.error) throw new Error(`Reading the lens targets failed: ${targets.error.message}`);
+  const lensIds = [...new Set(((targets.data ?? []) as { lens_id: string }[]).map((t) => t.lens_id))];
+  if (lensIds.length === 0) return out;
+  const lenses = await learn.from('lenses').select('id, subject_id').eq('user_id', userId).in('id', lensIds).not('subject_id', 'is', null);
+  if (lenses.error) throw new Error(`Reading the lenses failed: ${lenses.error.message}`);
+  const subjectOfLens = new Map(((lenses.data ?? []) as { id: string; subject_id: string }[]).map((l) => [l.id, l.subject_id]));
+  const subjectIds = [...new Set(subjectOfLens.values())];
+  if (subjectIds.length === 0) return out;
+  const [subjects, preps] = await Promise.all([
+    learn.from('subjects').select('id, kind').eq('user_id', userId).in('id', subjectIds),
+    learn.from('subject_preparations').select('subject_id, status').eq('user_id', userId).in('subject_id', subjectIds),
+  ]);
+  if (subjects.error) throw new Error(`Reading the subjects failed: ${subjects.error.message}`);
+  if (preps.error) throw new Error(`Reading the preparations failed: ${preps.error.message}`);
+  const kindOf = new Map(((subjects.data ?? []) as { id: string; kind: GoalKind | null }[]).map((s) => [s.id, s.kind]));
+  const done = new Set(((preps.data ?? []) as { subject_id: string; status: string }[]).filter((p) => p.status === 'done').map((p) => p.subject_id));
+
+  for (const t of (targets.data ?? []) as { lens_id: string; topic_id: string }[]) {
+    const frame = frameOf.get(t.topic_id);
+    const subject = subjectOfLens.get(t.lens_id);
+    if (!frame || !subject) continue;
+    const have = out.get(frame) ?? { prepared: false, kind: null };
+    out.set(frame, { prepared: have.prepared || done.has(subject), kind: have.kind ?? kindOf.get(subject) ?? null });
+  }
+  return out;
+}
 
 export async function runLitTopicPulls(input: {
   learn: LearnSupabaseClient;
@@ -70,6 +118,7 @@ export async function runLitTopicPulls(input: {
         ...rows.level4.map((r) => ({ id: r.id, level: 4 as const, parentId: r.parent_id })),
       ];
       const states = topicStates(nodes, [], linksByTopic, now);
+      const covering = await subjectsRefining(learn, userId);
       const out: LitTopic[] = [];
       for (const topic of rows.level4) {
         if (states.get(topic.id)?.state !== 'lit') continue;
@@ -78,6 +127,8 @@ export async function runLitTopicPulls(input: {
           title: topic.title,
           parentTitle: topic.parent_id ? (titleOf.get(topic.parent_id) ?? null) : null,
           litAt: litAt.get(topic.id) ?? null,
+          prepared: covering.get(topic.id)?.prepared ?? false,
+          subjectKind: covering.get(topic.id)?.kind ?? null,
         });
       }
       return out;

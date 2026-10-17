@@ -5,6 +5,7 @@ import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { AIM_COLUMNS, cardDepthForAim, toAim, type AimRow } from '@/lib/learn/aims';
 import { loadAimAreaNames } from '@/lib/learn/aims-store';
 import { loadAreas } from '@/lib/learn/areas/load';
@@ -126,12 +127,17 @@ async function loadGoals(
 ): Promise<{ goals: FeedGoal[]; since: string | null }> {
   const { data, error } = await learn
     .from('aims')
-    .select(AIM_COLUMNS)
+    .select(`${AIM_COLUMNS}, subject_id`)
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
-  const all = ((data ?? []) as AimRow[]).map(toAim);
+  // A goal whose subject has a finished preparation is covered by it: no
+  // section cards are drawn for it (plan #2297.4).
+  const prepared = await preparedSubjectIds(learn, userId);
+  const all = ((data ?? []) as (AimRow & { subject_id: string | null })[])
+    .filter((row) => !row.subject_id || !prepared.has(row.subject_id))
+    .map(toAim);
   const listed = all.filter((aim) => aim.listSource);
   const open = all.filter((aim) => !aim.listSource);
   const next = open.length > 0 ? await loadNextGoals(learn, userId) : null;

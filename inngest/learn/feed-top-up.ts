@@ -20,6 +20,7 @@ import { WRITE_CARD_MODEL, writeCard, type CardToWrite, type IdeaCard, type Writ
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import { LAYOUT_RESERVE_MS, LESSON_HOLD_MS, lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
 import { goalTrackIds, notPlanLessons } from '@/lib/learn/feed/plan-lessons';
 import { writeDuePieces, type PiecesPassSummary } from '@/lib/learn/lessons/pieces';
@@ -645,7 +646,8 @@ async function topUpSubjectAfterResponse(userId: string, subjectId: string): Pro
     const learn = createLearnServiceSupabase();
     const goalTracks = await goalTrackIds(learn, userId);
     const ready = await countReady(learn, userId, subjectId);
-    const wanted = subjectLessonsWanted(ready, goalTracks.includes(subjectId));
+    const prepared = (await preparedSubjectIds(learn, userId)).has(subjectId);
+    const wanted = subjectLessonsWanted(ready, goalTracks.includes(subjectId), prepared);
     if (wanted === null) return null;
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('The Learn now top-up needs ANTHROPIC_API_KEY to be set.');

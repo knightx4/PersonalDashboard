@@ -85,7 +85,7 @@ export const PAID_ACTIONS = {
   'app/you/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
   'app/you/personality/actions.ts#saveTypedAction': ['read-personality', 'embed-note-match'],
   'app/you/personality/actions.ts#readAgainAction': ['read-personality', 'embed-note-match'],
-  'app/learn/know/actions.ts#createCustomTrack': ['place-track', 'write-curriculum'],
+  'app/learn/know/actions.ts#createCustomTrack': ['write-curriculum'],
   'app/learn/c/[id]/actions.ts#proposeBranch': ['branch-from-selection'],
   'app/learn/c/[id]/actions.ts#approveBranch': ['place-track'],
   'app/learn/s/[id]/actions.ts#writeTrackCurriculum': ['write-curriculum'],

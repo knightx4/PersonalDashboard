@@ -8,6 +8,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
 import { embedCatalogueSegments, vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
 import { readStructure } from '@/lib/learn/catalogue/structure-store';
+import { placeTrack } from '@/lib/learn/areas/place-track';
 import { TOPIC_DIMENSIONS } from '@/lib/learn/areas/topic-import';
 import { embedOne } from '@/lib/learn/embed/embed';
 import { liveGoalPullPorts, runProvider, wiredProviders } from '@/lib/learn/catalogue/structure-pull-for-goal';
@@ -51,6 +52,7 @@ const EMBED_PASSES = 5;
 
 type Operation =
   | 'classify-goal-kind'
+  | 'place-track'
   | 'propose-structure-sources'
   | 'match-structure-units'
   | 'compile-territory'
@@ -425,6 +427,39 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     },
   });
 
+  // The subject is placed in the areas once, here, when its preparation
+  // finishes (plan #2297.3): the maker of a subject no longer places it as
+  // well. A branch run's subject is already placed. A failed placement leaves
+  // placed_at null and the hourly sweep counts and retries it; it never fails
+  // the run.
+  const finishAndPlace: StepHandler = async (ctx) => {
+    const outcome = await finish(ctx);
+    if (outcome.state === 'done' && !ctx.subject.branch) {
+      try {
+        const { data } = await learn
+          .from('subjects')
+          .select('placed_at, theme_id, survey')
+          .eq('user_id', userId)
+          .eq('id', ctx.subject.id)
+          .maybeSingle();
+        const row = data as { placed_at: string | null; theme_id: string | null; survey: boolean } | null;
+        if (row && !row.placed_at && !row.survey) {
+          const context = ctx.subject.note?.trim() || ctx.subject.name;
+          await placeTrack(
+            learn,
+            userId,
+            { id: ctx.subject.id, name: ctx.subject.name, context },
+            row.theme_id ? { id: row.theme_id, about: context } : null,
+            (reports) => ledger('place-track', reports),
+          );
+        }
+      } catch (error) {
+        console.error('[learn prepare] placement', error instanceof Error ? error.message : error);
+      }
+    }
+    return outcome;
+  };
+
   return {
     classify,
     pull_documents: pull,
@@ -432,6 +467,6 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     compile_territory: compile,
     draft_topics: draftTopics,
     write_units: writeUnits,
-    finish,
+    finish: finishAndPlace,
   };
 }
