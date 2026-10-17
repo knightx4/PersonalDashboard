@@ -127,6 +127,22 @@ describe('parseDraftPayload', () => {
     expect(result.draft.unsupportedClaims).toEqual(['led a team of nine']);
   });
 
+  it('carries how to approach the question, once each', () => {
+    const result = parseDraftPayload(
+      {
+        considerations: ['Lead with the close.', 'Add the team size.', 'Lead with the close.'],
+        answer: 'I rebuilt the close.',
+        evidence_item_ids: ['item-a'],
+      },
+      offered,
+      [],
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.draft.considerations).toEqual(['Lead with the close.', 'Add the team size.']);
+    expect(result.draft.unsupportedClaims).toEqual([]);
+  });
+
   it('flags the banned constructions it was told about', () => {
     const result = parseDraftPayload(
       { answer: 'I am passionate about close processes.', evidence_item_ids: ['item-b'] },

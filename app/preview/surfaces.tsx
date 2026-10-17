@@ -731,6 +731,7 @@ const rolePanels: PanelProps = {
       timesSeen: 3,
       evidenceItemIds: [],
       unsupportedClaims: [],
+      considerations: [],
       wordLimit: null,
     },
   ],
@@ -3585,6 +3586,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 1,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: null,
   },
   {
@@ -3599,6 +3601,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 1,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: 200,
   },
   {
@@ -3612,6 +3615,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 5,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: null,
   },
 ];
@@ -3632,7 +3636,12 @@ const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
   a3: {
     text: 'First I would sit with two desks and time how long an idea takes to become a backtest. I expect most of it is waiting on data to be cleaned by hand. I would move that cleaning into the pipeline, once, and measure the same journey again at the end of the quarter.',
     evidenceItemIds: [],
-    unsupportedClaims: ['most of it is waiting on data'],
+    unsupportedClaims: [],
+    considerations: [
+      'It tests whether you find the problem before you fix it: lead with how you would measure, then the fix.',
+      'Nothing in your bank says where research time goes today, so frame that as a guess to check, not a fact.',
+      'Close on what you would measure again, so the plan has an end.',
+    ],
     bannedFound: [],
   },
 };
@@ -3913,9 +3922,14 @@ export const SURFACES: readonly Surface[] = [
         answer={{ ...rolePanels.answers[0], wordLimit: 150 }}
         closed={false}
         initialDraft={{
-          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
           evidenceItemIds: [],
-          unsupportedClaims: ['for two years'],
+          unsupportedClaims: [],
+          considerations: [
+            'A "why this team" question: name what the team owns from the posting, then why you fit, in that order.',
+            'The tick-store story is the closest fit; one concrete result from it carries more than a list.',
+            'Your bank does not say how long you have worked on data quality, so add the dates or leave the span out.',
+          ],
           bannedFound: [],
         }}
       />

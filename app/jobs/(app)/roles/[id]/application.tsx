@@ -35,7 +35,7 @@ import { CopyText } from './copy-text';
 import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
 import { DashQuestions } from './dash-questions';
-import { DraftPanel, LimitCount, countOf } from './draft-panel';
+import { Considerations, DraftPanel, LimitCount, countOf } from './draft-panel';
 import type { PanelProps } from './types';
 
 export function Answers({
@@ -552,22 +552,13 @@ export function AnswerCard({
       )}
 
       {/*
-        The claims a saved draft could not ground, still shown after the reload.
-        This is the one thing worth re-reading before you submit, so it does not
-        live only in the session that generated it.
+        How to approach this question, from the draft the answer came from,
+        still shown after the reload. It replaced the list of claims the bank
+        did not carry: a gap in the bank is one of these, said as what to add.
+        While a new draft is open its own considerations show in the panel.
       */}
-      {!draft && answer.unsupportedClaims.length > 0 && (
-        <Note
-          tone="caution"
-          className="mt-2"
-          title="This answer states things your bank does not carry:"
-        >
-          <ul className="list-disc pl-4 text-small text-ink">
-            {answer.unsupportedClaims.map((claim) => (
-              <li key={claim}>{claim}</li>
-            ))}
-          </ul>
-        </Note>
+      {!draft && answer.considerations.length > 0 && (
+        <Considerations items={answer.considerations} className="mt-2" />
       )}
 
       {/* The answer, read. It was a five-row textarea holding its own value,
@@ -716,6 +707,7 @@ export function AnswerCard({
                 answer: draft.text,
                 evidenceItemIds: draft.evidenceItemIds,
                 unsupportedClaims: draft.unsupportedClaims,
+                considerations: draft.considerations ?? [],
               });
               setSaved(result.error ?? 'Inserted and saved as a draft.');
               if (!result.error) {

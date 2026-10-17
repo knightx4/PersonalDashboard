@@ -24,6 +24,8 @@ export interface StoredDraft {
   answer: string;
   evidence_item_ids: string[];
   unsupported_claims: string[];
+  /** How to approach the question, written before the answer; absent on older rows and the cover letter. */
+  considerations?: string[];
   /** Banned constructions found in the answer (plan #2130.3); absent on older rows. */
   banned_found?: string[];
   /** Set when the answer is still over its limit after the corrective retry (plan #2130.3). */
@@ -79,6 +81,8 @@ export function parseDrafts(value: unknown): DraftMap {
       evidence_item_ids: strings(entry.evidence_item_ids),
       unsupported_claims: strings(entry.unsupported_claims),
     };
+    const considerations = strings(entry.considerations);
+    if (considerations.length > 0) draft.considerations = considerations;
     const banned = strings(entry.banned_found);
     if (banned.length > 0) draft.banned_found = banned;
     const overrun = parseOverrun(entry.over_limit);

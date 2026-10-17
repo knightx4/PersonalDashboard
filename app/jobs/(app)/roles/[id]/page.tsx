@@ -197,7 +197,7 @@ export default async function RoleDetailPage({
     supabase
       .from('application_answers')
       .select(
-        'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!application_answers_question_id_fkey!inner ( id, text, kind, canonical_answer, times_seen )',
+        'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, considerations, questions!application_answers_question_id_fkey!inner ( id, text, kind, canonical_answer, times_seen )',
       )
       .eq('application_id', current.id),
     // The comment thread (note 89ad8bef): yours and Dash's replies, oldest
@@ -685,10 +685,11 @@ export default async function RoleDetailPage({
               questionKind: question.kind,
               canonicalAnswer: question.canonical_answer,
               timesSeen: question.times_seen,
-              // Persisted, so the claims you have to check survive the reload
+              // Persisted, so how to approach the question survives the reload
               // between drafting an answer and submitting it.
               evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
               unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
+              considerations: (answer.considerations as string[]) ?? [],
               wordLimit: (answer.word_limit as number | null) ?? null,
             };
           })}

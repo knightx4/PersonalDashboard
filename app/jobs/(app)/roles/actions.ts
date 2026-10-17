@@ -460,6 +460,7 @@ const acceptDraftSchema = z.object({
   answer: z.string().trim().min(1),
   evidenceItemIds: z.array(z.string().uuid()).max(40),
   unsupportedClaims: z.array(z.string().trim().min(1)).max(20),
+  considerations: z.array(z.string().trim().min(1)).max(10).default([]),
 });
 
 /**
@@ -467,7 +468,8 @@ const acceptDraftSchema = z.object({
  *
  * Separate from `saveAnswer` because the citation is the point: an answer with
  * `evidence_item_ids` can be traced back to the stories it rests on months
- * later, and `unsupported_claims` is what you re-read before you submit. The
+ * later, and `considerations` is how to approach the question, re-read before
+ * you submit (it took over from `unsupported_claims`, still written). The
  * used counters go up here rather than at draft time, so a draft you discarded
  * does not make a story look worn out.
  */
@@ -488,6 +490,7 @@ export async function saveDraftedAnswer(
       status: 'draft',
       evidence_item_ids: parsed.data.evidenceItemIds,
       unsupported_claims: parsed.data.unsupportedClaims,
+      considerations: parsed.data.considerations,
     })
     .eq('id', parsed.data.answerId)
     .eq('user_id', user.id);

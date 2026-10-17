@@ -21,6 +21,12 @@ export interface AnswerDraft {
   evidenceItemIds: string[];
   /** Claims the model itself flagged as not grounded in an item. */
   unsupportedClaims: string[];
+  /**
+   * How to approach the question, worked out before the answer and shown
+   * beside it: what it tests, what to lead with, what the material lacks.
+   * Absent on a cover letter and on drafts stored before it existed.
+   */
+  considerations?: string[];
   /** Banned constructions found in the text, as written. */
   bannedFound: string[];
   /** Set when the text is still over its limit after the corrective retry (plan #2130.3). */
@@ -33,6 +39,7 @@ const draftSchema = z.object({
   answer: z.string().trim().min(1),
   evidence_item_ids: z.array(z.string()).nullish(),
   unsupported_claims: z.array(z.string().trim().min(1)).nullish(),
+  considerations: z.array(z.string().trim().min(1)).nullish(),
 });
 
 /**
@@ -91,6 +98,7 @@ export function parseDraftPayload(
   const invented = (parsed.data.evidence_item_ids ?? []).filter((id) => !allowed.has(id)).length;
 
   const unsupported = [...new Set(parsed.data.unsupported_claims ?? [])];
+  const considerations = [...new Set(parsed.data.considerations ?? [])];
 
   return {
     ok: true,
@@ -103,6 +111,7 @@ export function parseDraftPayload(
         ? [...unsupported, 'Part of this cited an evidence item that does not exist.']
         : unsupported,
       bannedFound: findBannedConstructions(parsed.data.answer, banned),
+      ...(considerations.length > 0 ? { considerations } : {}),
     },
   };
 }
