@@ -54,6 +54,7 @@ export function useOptimisticWrite<Value, Change>({
   apply,
   write,
   onDone,
+  onError,
 }: {
   /** What the server rendered. What the control falls back to. */
   value: Value;
@@ -67,6 +68,11 @@ export function useOptimisticWrite<Value, Change>({
    * did not happen is worse than offering nothing.
    */
   onDone?: (change: Change) => void;
+  /**
+   * Where the reason goes when a write is refused, in place of the toast:
+   * for a control with room for a line of its own under it.
+   */
+  onError?: (message: string) => void;
 }): {
   /** What to draw: the change if one is in flight, the server's value if not. */
   shown: Value;
@@ -101,10 +107,11 @@ export function useOptimisticWrite<Value, Change>({
         }
 
         setFailed(true);
-        toast({ text: message });
+        if (onError) onError(message);
+        else toast({ text: message });
       });
     },
-    [addChange, write, onDone, toast],
+    [addChange, write, onDone, onError, toast],
   );
 
   return { shown, run, pending, failed };

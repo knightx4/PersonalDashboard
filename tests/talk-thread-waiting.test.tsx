@@ -76,6 +76,7 @@ describe('a chat with a reply on its way', () => {
       decline: never,
       undo: never,
       save: never,
+      rate: never,
     };
     const html = renderToStaticMarkup(
       <AskDashProvider source={source}>

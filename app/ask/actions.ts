@@ -14,6 +14,7 @@ import {
   listAskConversations,
   loadAskChanges,
   loadAskConversation,
+  rateAskAnswer,
   saveAskAnswer,
   searchAskChatsInRequest,
   reopenAskChange,
@@ -24,6 +25,7 @@ import type { AskChatEdit, AskChatHit } from '@/lib/talk/store';
 import { AskPagePath, AskRef } from '@/lib/talk/ask-input';
 import type { DashChange } from '@/lib/talk/changes';
 import type { SaveAnswerOutcome, SaveAnswerTo } from '@/lib/talk/save-answer';
+import { parseRating, ratingNote, type RateAnswerOutcome } from '@/lib/talk/rate-answer';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 
@@ -214,6 +216,33 @@ export async function saveDashAnswer(ref: string, turnId: string, to: SaveAnswer
   } catch (error) {
     console.error('saving an answer failed', error);
     return { ok: false, error: 'That was not saved. Check your connection and try again.' };
+  }
+}
+
+/**
+ * A thumbs up or down on one of Dash's answers, or null to take it back
+ * (plan #2285.2). The press sends the state wanted, with the words typed in
+ * What went wrong? when there are any. Never throws: the result is the
+ * rating as now kept, or a sentence saying why not.
+ */
+// latency: optimistic
+export async function rateDashAnswer(
+  ref: string,
+  turnId: string,
+  rating: 'up' | 'down' | null,
+  note: string | null = null,
+): Promise<RateAnswerOutcome> {
+  const conversation = Ref.safeParse(ref);
+  const turn = Ref.safeParse(turnId);
+  const wanted = parseRating(rating);
+  if (!conversation.success || !turn.success || wanted === undefined) {
+    return { ok: false, error: 'That answer is not there any more.' };
+  }
+  try {
+    return await rateAskAnswer(conversation.data, turn.data, wanted, ratingNote(note));
+  } catch (error) {
+    console.error('rating an answer failed', error);
+    return { ok: false, error: 'That was not kept. Check your connection and try again.' };
   }
 }
 
