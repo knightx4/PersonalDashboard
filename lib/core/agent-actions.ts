@@ -52,6 +52,7 @@ export const coreActions: ModuleActions = {
     renameDashChat: none('setting', 'Names a chat in the person\'s own list of chats with Dash.'),
     archiveDashChat: none('setting', 'Clears a chat out of the person\'s own list; nothing is lost.'),
     searchDashChats: none('page'),
+    rateDashAnswer: none('theirs', "The person's verdict on a Dash answer."),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
