@@ -315,6 +315,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired every hour by pg_cron to write the morning brief for whoever it is six to eleven in the morning for; no press starts it.',
   'app/api/cron/day-brief/route.ts#POST':
     'Fired every hour by pg_cron to write the morning brief for whoever it is six to eleven in the morning for; no press starts it.',
+  'app/api/cron/ask-reply-check/route.ts#GET':
+    'Fired on Mondays by pg_cron to check the week\'s Ask Dash chats for replies that went badly and list them in a Dev note; no press starts it.',
+  'app/api/cron/ask-reply-check/route.ts#POST':
+    'Fired on Mondays by pg_cron to check the week\'s Ask Dash chats for replies that went badly and list them in a Dev note; no press starts it.',
   'app/api/cron/week-review/route.ts#GET':
     'Fired once on Sunday at 14:11 UTC by pg_cron to write the review of the week just gone; no press starts it.',
   'app/api/cron/week-review/route.ts#POST':

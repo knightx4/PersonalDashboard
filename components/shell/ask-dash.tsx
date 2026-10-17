@@ -57,6 +57,7 @@ import {
   openAskQuestion,
   pollAskQuestion,
   recentAskQuestions,
+  rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
 } from '@/app/ask/actions';
@@ -117,6 +118,8 @@ export type AskSource = ChangePresses & {
   label: typeof askDashPageLabel;
   /** Make an answer a todo or a vault note, kept as a change under it (plan #1899.7). */
   save: typeof saveDashAnswer;
+  /** A thumbs up or down on an answer, or null to take it back (plan #2285.2). */
+  rate: typeof rateDashAnswer;
 };
 
 /**
@@ -216,6 +219,7 @@ const ACTIONS: AskSource = {
   costs: askDashCosts,
   label: askDashPageLabel,
   save: saveDashAnswer,
+  rate: rateDashAnswer,
   confirm: confirmDashChange,
   decline: declineDashChange,
   reopen: reopenDashChange,
@@ -559,6 +563,9 @@ export function AskThread({
               onSaved={(change) =>
                 setChanges((current) => [...current.filter((c) => c.id !== change.id), change])
               }
+              // Thumbs up and down (plan #2285.2), once the chat is kept and has a ref.
+              rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
+              rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
             />
           </>
         );

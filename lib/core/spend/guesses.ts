@@ -396,6 +396,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // review and the home page's observations; up to five observations and a
   // change out. The brief's own estimate for a heavy week.
   'write-week-review': background(run(SONNET, 20_000, 2_000)),
+  // A week of Ask Dash chats, the person's turns whole and Dash's cut to 600
+  // characters, about 70,000 characters; a short list of flags out.
+  'check-ask-replies': background(run(HAIKU, 20_000, 600)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.

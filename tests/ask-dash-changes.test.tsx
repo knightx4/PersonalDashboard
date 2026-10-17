@@ -30,6 +30,7 @@ const SOURCE: AskSource = {
   decline: never,
   undo: never,
   save: never,
+  rate: never,
 };
 
 const BASE = {

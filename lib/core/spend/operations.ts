@@ -142,6 +142,11 @@ export const SPEND_OPERATIONS = {
     // per person a week from the Sunday week-review cron, none on a week with
     // nothing counted; background.
     'write-week-review',
+    // The weekly check of Ask Dash replies that went badly (plan #2285.3).
+    // Haiku, one call per person a week over the week's chats, split only
+    // past 300,000 characters, from the Monday ask-reply-check cron; none on a
+    // week without chats.
+    'check-ask-replies',
     // Embedding passages of what the person wrote or did across the modules,
     // so Dash can find them by meaning (plan #1247). Voyage; background, from
     // the five-minute memory sweep, which is also the backfill. A row is
