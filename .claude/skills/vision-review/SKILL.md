@@ -32,9 +32,9 @@ the Sunday tick after it starts nothing.
 
 ## Working without the CLI
 
-There is no script for this yet. Use the **`Supabase`** connector
-(`mcp__Supabase__*`, loaded through ToolSearch), project ref
-`asjztutnqxbecruvyrbj`, and filter every query by the account's `user_id`.
+There is no script for this yet. Send the SQL through
+`npx tsx scripts/sql.ts` (CLAUDE.md), not the Supabase connector, and filter
+every query by the account's `user_id`.
 The SQL below is what a run writes.
 
 Before starting, generate one `review_id` for the run

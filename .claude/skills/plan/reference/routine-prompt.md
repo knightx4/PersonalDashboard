@@ -53,7 +53,7 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 ## Environment (Claude Code on the web)
 
 - If node_modules is empty and the job builds or checks code, run `npm ci` first. A job that only writes rows does not need it.
-- `DATABASE_URL` is not set, so `scripts/plan.ts` exits at once. Do not diagnose it. Use the `Supabase` connector (tools `mcp__Supabase__*`, loaded through ToolSearch) with project ref `asjztutnqxbecruvyrbj`, and the SQL in `reference/offline.md`, including its `core.record_dash_action` call for each write.
+- `scripts/plan.ts` reaches the database over HTTPS with `SUPABASE_SERVICE_ROLE_KEY`. If it cannot, do not diagnose it: send the SQL in `reference/offline.md` through `npx tsx scripts/sql.ts`, including its `core.record_dash_action` call for each write. Use the `Supabase` connector only when neither works, and never send a timed-out call again.
 - `plan_items`, `plan_dependencies`, `ideas` and `raised_items` are in the `public` schema. The plan belongs to user_id `d001bb0f-ffe8-4bfb-880f-17dd1a62b685`; other accounts exist with empty plans, so always filter by that id.
 - `started_at` and `completed_at` are written by a trigger from the status. Never set them by hand.
 - Use plain `git fetch origin`. Naming a branch that is not on the remote yet aborts the whole fetch and leaves origin/main stale.
