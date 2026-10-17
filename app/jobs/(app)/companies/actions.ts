@@ -19,6 +19,38 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
+
+/**
+ * Add a company by name, from the Companies tab (note 8554f9d8). The same
+ * company already on the list, by name or by the website given, is opened
+ * instead of made twice. Returns the slug the page goes to.
+ */
+// latency: pending
+export async function addCompany(input: {
+  name: string;
+  website?: string;
+}): Promise<{ error: string | null; slug?: string }> {
+  const parsed = z
+    .object({
+      name: z.string().trim().min(1, 'Name the company.').max(200),
+      website: z.string().trim().max(500).optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const company = await ensureCompany(supabase, user.id, parsed.data.name, {
+    website: parsed.data.website || null,
+  });
+  if (company.error) return { error: company.error };
+
+  const { data } = await supabase.from('companies').select('slug').eq('id', company.id).eq('user_id', user.id).maybeSingle();
+  revalidatePath('/jobs/companies');
+  return { error: null, slug: (data?.slug as string | undefined) ?? slugify(parsed.data.name) };
+}
 
 const updateSchema = z.object({
   companyId: z.string().uuid(),
@@ -30,6 +62,14 @@ const updateSchema = z.object({
   careersUrl: z.string().optional(),
   linkedinUrl: z.string().optional(),
   website: z.string().optional(),
+  /** Answers on the Perspective tab, by question key; a blank one clears it. */
+  perspective: z
+    .object(
+      Object.fromEntries(
+        PERSPECTIVE_QUESTIONS.map((question) => [question.key, z.string().max(20_000).optional()]),
+      ) as Record<(typeof PERSPECTIVE_QUESTIONS)[number]['key'], z.ZodOptional<z.ZodString>>,
+    )
+    .optional(),
 });
 
 // latency: pending
@@ -50,6 +90,13 @@ export async function updateCompany(
   if (parsed.data.careersUrl !== undefined) patch.careers_url = parsed.data.careersUrl || null;
   if (parsed.data.linkedinUrl !== undefined) patch.linkedin_url = parsed.data.linkedinUrl || null;
   if (parsed.data.website !== undefined) patch.website = parsed.data.website || null;
+  const perspective = parsed.data.perspective ?? {};
+  for (const question of PERSPECTIVE_QUESTIONS) {
+    const answer = perspective[question.key];
+    if (answer === undefined) continue;
+    patch[question.column] = answer.trim() || null;
+    patch.perspective_updated_at = new Date().toISOString();
+  }
   if (parsed.data.domains !== undefined) {
     // Domains drive email linking, so they are normalised rather than trusted:
     // a stray "https://" here means mail from that company never links.
@@ -67,6 +114,7 @@ export async function updateCompany(
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
 

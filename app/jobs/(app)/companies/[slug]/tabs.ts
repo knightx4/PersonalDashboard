@@ -11,7 +11,7 @@ import { tabFrom } from '@/lib/tabs';
  * The opening tab is the same for every company, so it is left out of the
  * address and the plain link to a company is that tab.
  */
-export const COMPANY_TABS = ['roles', 'about', 'people', 'outreach', 'notes'] as const;
+export const COMPANY_TABS = ['roles', 'perspective', 'about', 'people', 'outreach', 'notes'] as const;
 
 export type CompanyTab = (typeof COMPANY_TABS)[number];
 

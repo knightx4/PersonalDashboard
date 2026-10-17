@@ -16,6 +16,7 @@ export const jobsActions: ModuleActions = {
     applyAiCompanyEnrichment: none('theirs'),
     mergeRoles: tool('merge_roles'),
     mergeCompanies: none('deletes', 'Folds one company into another and deletes the emptied row, which nothing can put back.'),
+    addCompany: tool('add_job_lead', 'add_discovered_company'),
   },
   'app/jobs/(app)/_home/actions.ts': {
     completeReminder: tool('change_reminder'),
@@ -51,9 +52,11 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/contacts/actions.ts': {
     createContact: tool('change_contact'),
     updateContact: tool('change_contact'),
+    draftContactMessage: none('spends', 'Shows a draft on the page and keeps nothing; Dash can write the same message in Ask without a second run.'),
     logTouch: tool('change_touch'),
     updateTouch: tool('change_touch'),
     markTouchAnswered: tool('change_touch'),
+    deleteContact: none('deletes'),
   },
   'app/jobs/(app)/settings/actions.ts': {
     saveProfileField: none('setting'),

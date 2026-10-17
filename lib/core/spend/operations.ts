@@ -50,6 +50,10 @@ export const SPEND_OPERATIONS = {
     // and the search button on Contacts. Sonnet, up to five searches and
     // two calls.
     'suggest-outreach',
+    // Draft a message on a contact's page: one message to a person already
+    // on file, in the person's voice, from what the page knows about them.
+    // Sonnet, one call.
+    'draft-outreach',
     // Finding open postings worth applying for with a web search, from the
     // job suggestion cron (weekly) and the search button on Roles. Sonnet, up
     // to five searches and two calls.

@@ -17,7 +17,7 @@ export default async function ContactsPage() {
     await Promise.all([
       supabase
         .from('contacts')
-        .select('id, full_name, title, relationship, status, company_id, companies ( name, slug )')
+        .select('id, full_name, title, relationship, status, potential_lead, found_by_dash, company_id, companies ( name, slug )')
         .eq('user_id', user.id)
         .order('full_name'),
       supabase.from('companies').select('id, name').eq('user_id', user.id).order('name'),
@@ -91,6 +91,8 @@ export default async function ContactsPage() {
           title: string | null;
           relationship: string;
           status: string;
+          potential_lead: boolean;
+          found_by_dash: boolean;
           company_id: string | null;
           companies: { name: string; slug: string } | null;
         }>).map((contact) => ({
@@ -103,6 +105,8 @@ export default async function ContactsPage() {
           companySlug: contact.companies?.slug ?? null,
           lastTouchAt: lastTouchByContact.get(contact.id) ?? null,
           pendingReplies: pendingByContact.get(contact.id) ?? 0,
+          potentialLead: contact.potential_lead ?? false,
+          foundByDash: contact.found_by_dash ?? false,
         }))}
       />
     </PageColumn>

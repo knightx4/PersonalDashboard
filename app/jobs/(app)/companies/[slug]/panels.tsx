@@ -3,7 +3,7 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { useSearchParams } from 'next/navigation';
 import { useActionState, useState, useTransition, type ReactNode } from 'react';
-import { Briefcase, Building2, MessagesSquare, Send, Users } from 'lucide-react';
+import { Briefcase, Building2, Compass, MessagesSquare, Send, Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Note } from '@/components/ui/note';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { Segmented } from '@/components/ui/segmented';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { FoldingMarkdown } from '@/components/ui/folding-markdown';
@@ -32,9 +33,25 @@ import { DashAction } from '@/components/ui/dash-action';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import type { Tab } from '@/lib/tabs';
 import { companyTabFrom, type CompanyTab } from './tabs';
+import {
+  answeredCount,
+  PERSPECTIVE_QUESTIONS,
+  type Perspective,
+  type PerspectiveKey,
+} from '@/lib/jobs/companies/perspective';
+
+const PRIORITY_OPTIONS = [
+  { value: 'target', label: 'Target' },
+  { value: 'interested', label: 'Interested' },
+  { value: 'backup', label: 'Backup' },
+  { value: 'passed', label: 'Passed' },
+] as const;
+
+type Priority = (typeof PRIORITY_OPTIONS)[number]['value'];
 
 const TABS: readonly (Tab & { id: CompanyTab })[] = [
   { id: 'roles', label: 'Roles', icon: Briefcase },
+  { id: 'perspective', label: 'Perspective', icon: Compass },
   { id: 'about', label: 'About', icon: Building2 },
   { id: 'people', label: 'People', icon: Users },
   { id: 'outreach', label: 'Outreach', icon: Send },
@@ -45,8 +62,9 @@ const TABS: readonly (Tab & { id: CompanyTab })[] = [
  * A company's page below its header, one section at a time behind tabs (the
  * tabbed sections pattern, plan #1628), in the role page's shape since the
  * two are reached from each other. Roles holds the roles pursued here and
- * what is outstanding on them; About what you know about the place and its
- * details; then People, Outreach and Notes.
+ * what is outstanding on them; Perspective your own view of the company;
+ * About what you know about the place and its details; then People, Outreach
+ * and Notes.
  */
 export function CompanyPanels(props: {
   /** The Roles tab, drawn on the server: the roles here and what is outstanding. */
@@ -56,6 +74,9 @@ export function CompanyPanels(props: {
   opensOn?: CompanyTab;
   companyId: string;
   research: string;
+  perspective: Perspective;
+  /** When an answer on the Perspective tab last changed, if one ever has. */
+  perspectiveUpdatedAt: string | null;
   domains: string;
   industry: string;
   hqLocation: string;
@@ -101,6 +122,7 @@ export function CompanyPanels(props: {
     // switch writes the address without loading the company again.
     <TabbedSections tabs={tabs} label="Company" address={{ opensOn: props.opensOn }} shallow>
       {tab === 'roles' && props.roles}
+      {tab === 'perspective' && <PerspectivePanel {...props} />}
       {tab === 'about' && (
         // One column at every width: the details first, then the long text
         // (taste one-column-detail).
@@ -148,6 +170,102 @@ function useServerSeeded<T extends Record<string, string>>(
   }
 
   return [form, setForm];
+}
+
+/**
+ * The person's own view of a company they want to focus on: how much they
+ * want it, then six short answers (lib/jobs/companies/perspective.ts). Each
+ * answer is read until it is clicked, as the research note is, and saved on
+ * its own, because they are written a few at a time over weeks.
+ */
+function PerspectivePanel({
+  companyId,
+  priority,
+  perspective,
+  perspectiveUpdatedAt,
+  contacts,
+  timezone,
+}: {
+  companyId: string;
+  priority: string;
+  perspective: Perspective;
+  perspectiveUpdatedAt: string | null;
+  contacts: Array<{ id: string }>;
+  timezone: string;
+}) {
+  const [answers, setAnswers] = useServerSeeded(perspective);
+  const [focus, setFocus] = useServerSeeded({ priority });
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const answered = answeredCount(answers);
+
+  const save = async (key: PerspectiveKey, next: string) => {
+    const result = await updateCompany({ companyId, perspective: { [key]: next } });
+    if (result.error) return result.error;
+    setAnswers((current) => ({ ...current, [key]: next }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <CardSection
+        title="Focus"
+        hint="Mark the handful of companies you most want as Target. They lead the Companies list, with how far each view has got."
+      >
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <Segmented<Priority>
+            label="How much you want to work here"
+            value={focus.priority as Priority}
+            options={PRIORITY_OPTIONS}
+            disabled={pending}
+            onChange={(next) => {
+              const was = focus.priority;
+              setFocus(() => ({ priority: next }));
+              startTransition(async () => {
+                const result = await updateCompany({ companyId, priority: next });
+                setError(result.error);
+                if (result.error) setFocus(() => ({ priority: was }));
+              });
+            }}
+          />
+          <FieldError>{error}</FieldError>
+        </div>
+      </CardSection>
+
+      <CardSection
+        title="Your view"
+        meta={`${answered} of ${PERSPECTIVE_QUESTIONS.length} answered${
+          perspectiveUpdatedAt ? ` · updated ${formatDate(perspectiveUpdatedAt, timezone)}` : ''
+        }`}
+      >
+        <dl className="mt-2 space-y-4">
+          {PERSPECTIVE_QUESTIONS.map((question) => (
+            <div key={question.key}>
+              <dt className="text-ui font-medium text-ink">{question.label}</dt>
+              <dd className="mt-1">
+                <EditableProse
+                  label={question.label}
+                  value={answers[question.key]}
+                  markdown
+                  empty={question.prompt}
+                  editLabel={`Answer ${question.label.toLowerCase()}`}
+                  placeholder={question.prompt}
+                  onSave={(next) => save(question.key, next)}
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-4 text-small text-ink-muted">
+          {contacts.length === 0
+            ? 'Nobody here yet. '
+            : `${contacts.length === 1 ? 'One person' : `${contacts.length} people`} here. `}
+          <Link href="?tab=people">
+            {contacts.length === 0 ? 'Add who you know or could be introduced to' : 'See People'}
+          </Link>
+        </p>
+      </CardSection>
+    </div>
+  );
 }
 
 function Research({ companyId, research }: { companyId: string; research: string }) {

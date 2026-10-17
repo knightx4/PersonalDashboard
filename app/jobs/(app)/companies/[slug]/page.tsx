@@ -14,6 +14,7 @@ import { loadTasksFor } from '@/lib/todo/links/load';
 import { PageColumn } from '@/components/shell/page-width';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
+import { PERSPECTIVE_COLUMNS, perspectiveOf } from '@/lib/jobs/companies/perspective';
 
 export const metadata = { title: 'Company' };
 
@@ -35,7 +36,7 @@ export default async function CompanyDetailPage({
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, logo_url, industry, stage, headcount_band, hq_location, priority, research, status',
+      `id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, logo_url, industry, stage, headcount_band, hq_location, priority, research, status, ${PERSPECTIVE_COLUMNS}`,
     )
     .eq('user_id', user.id)
     .eq('slug', slug)
@@ -221,6 +222,8 @@ export default async function CompanyDetailPage({
         }
         companyId={company.id as string}
         research={(company.research as string) ?? ''}
+        perspective={perspectiveOf(company as Record<string, unknown>)}
+        perspectiveUpdatedAt={(company.perspective_updated_at as string | null) ?? null}
         domains={((company.domains as string[]) ?? []).join(', ')}
         industry={(company.industry as string) ?? ''}
         hqLocation={(company.hq_location as string) ?? ''}

@@ -134,6 +134,54 @@ function failure(error: unknown): { ok: false; error: string } {
 
 export const PEOPLE_TOOL = 'suggest_people';
 
+/**
+ * How a first message to someone is written: the rules and the two examples.
+ * The people search writes one for each suggestion with them, and Draft a
+ * message on a contact's page writes one to a person already on file
+ * (lib/jobs/contacts/draft-outreach.ts).
+ */
+export const MESSAGE_RULES = `It goes out under their name to a stranger who owes them nothing and gets
+messages like it every week. Write what a busy person would answer: the note
+someone sharp and a little informal types themselves, not a cover letter.
+
+- Open with the other person, not the job seeker: the specific thing that
+  prompted the message, such as a line from their talk or article, a move
+  they made, or a team they built. If nothing specific to this person can be
+  named, they are the wrong suggestion.
+- Say who the job seeker is in one short clause, and only the part that
+  matters to this reader. Never a list of credentials, a degree and class
+  year, or "I'm now aiming at" a list of roles.
+- End with one real question this person could answer in a two-line reply,
+  about their work or the move they made. Do not ask for "fifteen minutes"
+  or a call in a connection note. An email may offer a short call after the
+  question, once, as an aside.
+- Never ask for a job, a referral or "who else I should talk to" in a first
+  message.
+- A connection note is at most ${CONNECT_NOTE_MAX} characters, spaces included, and
+  usually 150 to 250: count before you report it, since a longer one is
+  thrown away. Anything else is under 80 words.
+- No sign-off or name at the end of a LinkedIn note. An email signs off with
+  the first name only.
+- Contractions and plain sentences, no preamble, no thanks in advance. Never
+  write "I'm reaching out", "I hope this finds you well", "I came across",
+  "caught my eye", "I'd love to", "I'd appreciate", "I'd be grateful", "pick
+  your brain", "on my list", "fellow alum", "happy to work around your
+  schedule", "whatever time works" or "I know you're busy".
+- When samples of their own emails are given, match them: their greeting,
+  their sentence length, how formal they are, how they sign off an email.
+  The samples show how they sound, not what to say; never copy their content.
+
+A message nobody answers:
+"Hi Dana, I'm a 2026 MBA graduate of State University, and before that I
+spent three years in FP&A at Acme. I'm now pursuing strategic finance roles
+in New York, and Ramp is on my list. Could I have fifteen minutes to hear
+about your path? I'd really appreciate it."
+
+One that gets a reply:
+"Hi Dana, your post on moving Ramp's forecast to weekly cash got me
+rethinking ours at Acme. I'm in FP&A and trying to get into strategic
+finance. Was that move a different job, or the same one with more say?"`;
+
 function peopleSystem(seeker: SeekerContext): string {
   return `You help someone in a job search build their network. Your job is to find
 people they have not met yet who are worth contacting this week, and to write
@@ -179,47 +227,7 @@ For each, give:
 
 Writing the message
 
-It goes out under their name to a stranger who owes them nothing and gets
-messages like it every week. Write what a busy person would answer: the note
-someone sharp and a little informal types themselves, not a cover letter.
-
-- Open with the other person, not the job seeker: the specific thing that
-  prompted the message, such as a line from their talk or article, a move
-  they made, or a team they built. If nothing specific to this person can be
-  named, they are the wrong suggestion.
-- Say who the job seeker is in one short clause, and only the part that
-  matters to this reader. Never a list of credentials, a degree and class
-  year, or "I'm now aiming at" a list of roles.
-- End with one real question this person could answer in a two-line reply,
-  about their work or the move they made. Do not ask for "fifteen minutes"
-  or a call in a connection note. An email may offer a short call after the
-  question, once, as an aside.
-- Never ask for a job, a referral or "who else I should talk to" in a first
-  message.
-- A connection note is at most ${CONNECT_NOTE_MAX} characters, spaces included, and
-  usually 150 to 250: count before you report it, since a longer one is
-  thrown away. Anything else is under 80 words.
-- No sign-off or name at the end of a LinkedIn note. An email signs off with
-  the first name only.
-- Contractions and plain sentences, no preamble, no thanks in advance. Never
-  write "I'm reaching out", "I hope this finds you well", "I came across",
-  "caught my eye", "I'd love to", "I'd appreciate", "I'd be grateful", "pick
-  your brain", "on my list", "fellow alum", "happy to work around your
-  schedule", "whatever time works" or "I know you're busy".
-- When samples of their own emails are given, match them: their greeting,
-  their sentence length, how formal they are, how they sign off an email.
-  The samples show how they sound, not what to say; never copy their content.
-
-A message nobody answers:
-"Hi Dana, I'm a 2026 MBA graduate of State University, and before that I
-spent three years in FP&A at Acme. I'm now pursuing strategic finance roles
-in New York, and Ramp is on my list. Could I have fifteen minutes to hear
-about your path? I'd really appreciate it."
-
-One that gets a reply:
-"Hi Dana, your post on moving Ramp's forecast to weekly cash got me
-rethinking ours at Acme. I'm in FP&A and trying to get into strategic
-finance. Was that move a different job, or the same one with more say?"
+${MESSAGE_RULES}
 
 Never suggest anyone on the lists of people they already know or were already
 suggested, and never anyone whose company works in an industry they will not

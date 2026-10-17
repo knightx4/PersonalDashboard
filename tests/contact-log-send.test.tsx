@@ -19,6 +19,8 @@ const contact = {
   email: null,
   howWeConnect: null,
   notes: null,
+  potentialLead: false,
+  foundByDash: false,
   companyName: null,
   companySlug: null,
   touches: [

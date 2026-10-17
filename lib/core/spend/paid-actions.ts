@@ -161,6 +161,8 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestPeople': ['suggest-outreach'],
+  // Draft a message on a contact's page
+  'app/jobs/(app)/contacts/actions.ts#draftContactMessage': ['draft-outreach'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
   // Shopping

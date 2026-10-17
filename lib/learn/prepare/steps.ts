@@ -25,6 +25,15 @@ export function isPreparationStepKey(value: unknown): value is PreparationStepKe
   return typeof value === 'string' && (PREPARATION_STEPS as readonly string[]).includes(value);
 }
 
+/**
+ * The steps a run has no row for, with the ordinal each takes: what a run
+ * opened before a step was added lacks (note b4a7a759).
+ */
+export function missingPreparationSteps(steps: readonly { key: string }[]): { key: PreparationStepKey; ordinal: number }[] {
+  const have = new Set(steps.map((s) => s.key));
+  return PREPARATION_STEPS.flatMap((key, i) => (have.has(key) ? [] : [{ key, ordinal: i + 1 }]));
+}
+
 export type PreparationStatus = 'pending' | 'running' | 'done' | 'failed';
 export type PreparationStepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed';
 
