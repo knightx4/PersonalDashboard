@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { IdeaSpaceView } from '@/app/learn/space/idea-space-view';
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
 import type { IdeaMapView, IdeaOnMap, PlaceOnMap } from '@/lib/learn/map/load';
+import type { GoalOnMap } from '@/lib/learn/map/goals';
 import type { Point } from '@/lib/learn/map/layout';
 import { lightOn } from '@/lib/learn/map/sky';
 import { stateSetAt, type StrengthInput } from '@/lib/learn/strength';
@@ -12,7 +13,15 @@ import { DEFAULT_PARAMS } from '@/lib/learn/map/view';
 import type { EvidenceLink } from '@/lib/learn/evidence/model';
 import { kindAndCeiling } from '@/lib/learn/evidence/kinds';
 import { NEXT_TOPICS_FIXTURE, topicsFor } from './idea-space-topics';
-import { TERRITORY_GOAL, TERRITORY_OPEN, TERRITORY_POINTED, territoryFixture, territoryLevels } from './idea-space-territory';
+import {
+  TERRITORY_GOAL,
+  TERRITORY_OPEN,
+  TERRITORY_POINTED,
+  territoryFixture,
+  territoryGoal,
+  territoryLevels,
+  territoryStars,
+} from './idea-space-territory';
 import { goalsFor } from './idea-space-goals';
 
 /**
@@ -58,24 +67,24 @@ const FIELDS: FieldSeed[] = [
       'Comparative advantage',
       'Opportunity cost',
       'Price elasticity of demand',
-      'Marginal utility falls as you consume more',
-      'Sunk costs should not change a decision',
-      'Moral hazard after insurance',
-      'Adverse selection in used car markets',
-      'The Phillips curve shifts with expectations',
-      'Money is neutral in the long run',
-      'Inflation targeting anchors expectations',
-      'Deadweight loss from a tax',
-      'Tax incidence falls on the less elastic side',
-      'Public goods are non-rival and non-excludable',
+      'Diminishing marginal utility',
+      'Sunk costs',
+      'Moral hazard',
+      'Adverse selection',
+      'The Phillips curve',
+      'Neutrality of money',
+      'Inflation targeting',
+      'Deadweight loss',
+      'Tax incidence',
+      'Public goods',
       'Tragedy of the commons',
-      'Network effects raise the value of each user',
-      'Switching costs lock customers in',
-      'Price discrimination by willingness to pay',
+      'Network effects',
+      'Switching costs',
+      'Price discrimination',
       'Monopsony power in labour markets',
-      'Rent seeking wastes resources',
-      'Diminishing returns to a fixed input',
-      'Economies of scale lower unit cost',
+      'Rent seeking',
+      'Diminishing returns',
+      'Economies of scale',
       'Real versus nominal interest rates',
     ],
   },
@@ -87,22 +96,22 @@ const FIELDS: FieldSeed[] = [
     axes: { x: 0.05, y: 0.45 },
     ideas: [
       'Annual recurring revenue',
-      'Net revenue retention above 100%',
-      'Customer acquisition cost payback',
+      'Net revenue retention',
+      'CAC payback period',
       'Lifetime value to CAC ratio',
-      'Gross margin of a software business',
-      'Churn compounds monthly',
+      'Software gross margin',
+      'Monthly churn',
       'The rule of 40',
       'Burn multiple',
       'Cohort analysis of retention',
       'Contribution margin per unit',
-      'Working capital ties up cash',
-      'Three-statement model links',
+      'Working capital',
+      'The three-statement model',
       'Discounted cash flow valuation',
-      'Terminal value dominates a DCF',
+      'Terminal value in a DCF',
       'Sensitivity tables in a model',
-      'Circular references in interest calculations',
-      'INDEX and MATCH over VLOOKUP',
+      'Circular references in a model',
+      'INDEX and MATCH lookups',
       'Scenario switches in a model',
     ],
   },
@@ -114,17 +123,17 @@ const FIELDS: FieldSeed[] = [
     axes: { x: -0.45, y: -0.1 },
     ideas: [
       'Loss aversion',
-      'Anchoring on the first number',
+      'Anchoring',
       'The availability heuristic',
-      'Spacing effect in memory',
-      'Retrieval practice beats rereading',
+      'The spacing effect',
+      'Retrieval practice',
       'Desirable difficulties',
       'Confirmation bias',
       'The fundamental attribution error',
       'Hyperbolic discounting',
-      'Habit loops of cue, routine and reward',
+      'Habit loops',
       'Learned helplessness',
-      'The Big Five traits are stable in adults',
+      'The Big Five personality traits',
     ],
   },
   {
@@ -136,7 +145,7 @@ const FIELDS: FieldSeed[] = [
     ideas: [
       "Median voter theorem",
       "Arrow's impossibility theorem",
-      'Principal-agent problems in government',
+      'Principal-agent problems',
       'Regulatory capture',
       "Duverger's law",
       'Collective action problems',
@@ -150,12 +159,12 @@ const FIELDS: FieldSeed[] = [
     axes: { x: 0.1, y: -0.55 },
     ideas: [
       'The Bretton Woods system',
-      'The Marshall Plan rebuilt Western Europe',
-      'The Great Depression deepened under the gold standard',
+      'The Marshall Plan',
+      'The Great Depression',
       'Stagflation in the 1970s',
       'The fall of the Berlin Wall',
       'Decolonisation after 1945',
-      'The Industrial Revolution began in textiles',
+      'The Industrial Revolution',
       'The Treaty of Versailles and reparations',
       'The Cold War arms race',
       'The 2008 financial crisis',
@@ -168,15 +177,15 @@ const FIELDS: FieldSeed[] = [
     at: { x: 0.6, y: 0.45 },
     axes: { x: 0.55, y: 0.3 },
     ideas: [
-      'Big O describes growth, not speed',
-      'Hash tables give constant-time lookup on average',
-      'Embeddings place meaning in vector space',
-      'Cosine similarity ignores length',
-      'Principal components keep the most variance',
-      'Gradient descent follows the slope down',
-      'Overfitting memorises noise',
-      'Indexes trade write speed for read speed',
-      'Idempotent requests can be retried',
+      'Big O notation',
+      'Hash tables',
+      'Embeddings',
+      'Cosine similarity',
+      'Principal component analysis',
+      'Gradient descent',
+      'Overfitting',
+      'Database indexes',
+      'Idempotent requests',
     ],
   },
   {
@@ -186,14 +195,14 @@ const FIELDS: FieldSeed[] = [
     at: { x: 0.65, y: -0.2 },
     axes: { x: 0.35, y: -0.15 },
     ideas: [
-      'Natural selection acts on variation',
-      'Genes are expressed, not just carried',
-      'Homeostasis by negative feedback',
-      'The mitochondrion makes ATP',
-      'Sleep consolidates memory',
+      'Natural selection',
+      'Gene expression',
+      'Homeostasis',
+      'Mitochondria and ATP',
+      'Sleep and memory',
       'Evolutionary arms races',
-      'Kin selection explains some altruism',
-      'Circadian rhythms set by light',
+      'Kin selection',
+      'Circadian rhythms',
     ],
   },
   {
@@ -204,11 +213,11 @@ const FIELDS: FieldSeed[] = [
     axes: { x: -0.35, y: -0.6 },
     ideas: [
       'The is-ought gap',
-      'Utilitarianism weighs outcomes',
+      'Utilitarianism',
       "Kant's categorical imperative",
       'The veil of ignorance',
-      'Stoic dichotomy of control',
-      'Falsifiability marks science',
+      'The Stoic dichotomy of control',
+      'Falsifiability',
     ],
   },
   {
@@ -233,7 +242,7 @@ const FIELDS: FieldSeed[] = [
     domain: 'physical',
     at: { x: 0.3, y: 0.85 },
     axes: { x: 0.7, y: 0.65 },
-    ideas: ['Entropy rises in a closed system', 'Energy is conserved'],
+    ideas: ['Entropy', 'Conservation of energy'],
   },
   {
     id: 'f-maths',
@@ -304,37 +313,103 @@ function lit(ideas: IdeaOnMap[]): IdeaOnMap[] {
   return ideas.map((idea) => ({ ...idea, ...light.get(idea.id)! }));
 }
 
-/** A place for each field with four ideas or more, at the middle of its ideas. */
-const PLACE_NAMES: Record<string, string> = {
-  'f-econ': 'Incentives, prices and the long run',
-  'f-business': 'Recurring revenue and what it is worth',
+/**
+ * The subject each field's topics were prepared under (plan #2317.2), which is
+ * the place they are in. Business and management holds two: the SaaS
+ * territory of idea-space-territory.ts, and financial modelling.
+ */
+const SUBJECT_NAMES: Record<string, string> = {
+  'f-econ': 'Economics for strategy work',
+  'f-business': 'Financial modelling and valuation',
   'f-psych': 'How memory holds on',
   'f-history': 'Empires and the trade that fed them',
 };
 
-function placesFor(ideas: IdeaOnMap[]): { places: PlaceOnMap[]; placeOf: Map<string, string> } {
-  const places: PlaceOnMap[] = [];
-  const placeOf = new Map<string, string>();
-  for (const field of FIELDS) {
-    const members = ideas.filter((idea) => idea.field?.id === field.id);
-    if (members.length < 4) continue;
-    const id = `place-${field.id}`;
-    for (const idea of members) placeOf.set(idea.id, id);
-    const size = members.length;
-    const mean = (pick: (idea: IdeaOnMap) => Point): Point => ({
-      x: members.reduce((sum, idea) => sum + pick(idea).x, 0) / size,
-      y: members.reduce((sum, idea) => sum + pick(idea).y, 0) / size,
-    });
-    places.push({
-      id,
-      name: PLACE_NAMES[field.id] ?? `${field.name} and what sits near it`,
-      ideaCount: members.length,
-      pca: mean((idea) => idea.pca),
-      neighbourMap: mean((idea) => idea.neighbourMap),
-    });
+/** The four big fields are a subject each; the rest were prepared together as one. */
+const subjectOf = (field: FieldSeed) =>
+  SUBJECT_NAMES[field.id]
+    ? { id: `place-${field.id}`, name: SUBJECT_NAMES[field.id]! }
+    : { id: 'place-wider', name: 'Wider reading across the sciences' };
+
+/** Each subject's place, at the middle of its topics. */
+function placesFor(ideas: IdeaOnMap[]): PlaceOnMap[] {
+  const members = new Map<string, IdeaOnMap[]>();
+  for (const idea of ideas) {
+    if (idea.placeId) members.set(idea.placeId, [...(members.get(idea.placeId) ?? []), idea]);
   }
-  return { places, placeOf };
+  return [...members.entries()]
+    .map(([id, list]) => {
+      const size = list.length;
+      const mean = (pick: (idea: IdeaOnMap) => Point): Point => ({
+        x: list.reduce((sum, idea) => sum + pick(idea).x, 0) / size,
+        y: list.reduce((sum, idea) => sum + pick(idea).y, 0) / size,
+      });
+      return {
+        id,
+        name: list[0]!.track?.name ?? id,
+        ideaCount: list.length,
+        pca: mean((idea) => idea.pca),
+        neighbourMap: mean((idea) => idea.neighbourMap),
+      };
+    })
+    .sort((a, b) => b.ideaCount - a.ideaCount || a.name.localeCompare(b.name));
 }
+
+/** Goals the subjects other than SaaS are read by, so the subjects card names some and leaves others with none. */
+const SUBJECT_GOALS: Record<string, string[]> = {
+  'place-f-econ': ['Lead the pricing review for the product team'],
+  'place-f-business': ['Pass the CFA Level 1 exam'],
+};
+
+/** Every subject but the SaaS one as the subjects card lists it: its topics, each with a target of four. */
+function subjectGoals(ideas: readonly IdeaOnMap[], places: readonly PlaceOnMap[]): GoalOnMap[] {
+  return places
+    .filter((place) => place.id !== TERRITORY_GOAL)
+    .map((place) => {
+      const own = ideas.filter((idea) => idea.placeId === place.id);
+      const held = own.reduce((n, idea) => n + Math.min(idea.levels?.held ?? 0, 4), 0);
+      return {
+        id: place.id,
+        name: place.name,
+        goalNames: SUBJECT_GOALS[place.id] ?? [],
+        line: `${own.length} topics · ${held} of ${own.length * 4} levels held`,
+        held,
+        total: own.length * 4,
+        next: null,
+        stars: own.map((idea) => ({
+          topicId: idea.id,
+          name: idea.name,
+          targetLevel: 4,
+          level: idea.levels?.held ?? 0,
+          pca: idea.pca,
+          neighbourMap: idea.neighbourMap,
+        })),
+        links: [],
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A topic is never held wrongly or shakily: its ladder reads recognised and up (lib/learn/map/topic-stars.ts). */
+function topicState(state: KnowledgeState): KnowledgeState {
+  return state === 'shaky' ? 'recognised' : state === 'misconception' ? 'unknown' : state;
+}
+
+/** A fixture topic's ladder, out of eight, from its state and how it is held. */
+function levelsFor(row: StrengthInput | null): NonNullable<IdeaOnMap['levels']> {
+  const held = row ? ({ recognised: 2, known: 5, sharp: 7 } as Record<string, number>)[row.state] ?? 0 : 0;
+  return { held, tested: row?.established === 'tested' ? held : 0, ceiling: 8 };
+}
+
+/** The ideas listed under the open fixture topic; the territory's topics carry their own. */
+const IDEAS_UNDER: Record<string, string[]> = {
+  'Price elasticity of demand': [
+    'A price rise loses fewer buyers when there is no close substitute',
+    'Elasticity is higher over a longer time',
+    'Total revenue rises with price while demand is inelastic',
+    'Luxury goods are more elastic than necessities',
+  ],
+};
 
 function fixture(): IdeaMapView {
   const random = seeded(1857);
@@ -347,51 +422,58 @@ function fixture(): IdeaMapView {
     for (const name of field.ideas) {
       n += 1;
       const id = `idea-${String(n).padStart(3, '0')}`;
-      const state = STATES[Math.floor(random() * STATES.length)]!;
+      const state = topicState(STATES[Math.floor(random() * STATES.length)]!);
+      const stateRow = stateRowFor(state, random);
+      const subject = subjectOf(field);
       ideas.push({
         id,
         name,
-        claim: `${name}: the claim as Learn wrote it, one or two sentences long, which the rail shows under the name so the idea can be read without opening it.`,
+        claim: `${name}: what the topic covers, as the preparation scoped it, one or two sentences long, which the rail shows under the name.`,
         state,
-        stateRow: stateRowFor(state, random),
+        stateRow,
         strength: 0,
         haze: 0,
         exposure: 0,
-        placeId: null,
-      createdAt: null,
+        placeId: subject.id,
+        createdAt: null,
         evidence: [],
         pca: { x: clamp(1.3 * (field.axes.x + jitter(0.28))), y: clamp(1.3 * (field.axes.y + jitter(0.28))) },
         neighbourMap: { x: clamp(field.at.x + jitter(0.24)), y: clamp(field.at.y + jitter(0.24)) },
         neighbours: [],
-        track: { id: `s-${field.id}`, name: field.id === 'f-business' ? 'SaaS metrics and Excel modelling' : field.name },
+        track: subject,
         field: { id: field.id, name: field.name },
         domain: { id: field.domain, name: DOMAINS[field.domain]! },
+        levels: levelsFor(stateRow),
+        ideasUnder: (IDEAS_UNDER[name] ?? []).map((idea, i) => ({ id: `${id}-idea-${i}`, name: idea })),
       });
     }
   }
-  // Two ideas written before the fields were catalogued: no field, no domain.
-  for (const name of ['Write the summary before the detail', 'A checklist beats memory under stress']) {
+  // Two topics of a subject with no field or domain yet.
+  for (const name of ['Writing the summary first', 'Checklists under stress']) {
     n += 1;
     ideas.push({
       id: `idea-${String(n).padStart(3, '0')}`,
       name,
-      claim: `${name}, as Learn wrote it.`,
+      claim: `${name}, as the preparation scoped it.`,
       state: 'unknown',
       stateRow: null,
       strength: 0,
       haze: 0,
       exposure: 0,
-      placeId: null,
+      placeId: 'place-working',
       createdAt: null,
       evidence: [],
       pca: { x: jitter(0.6), y: jitter(0.6) },
       neighbourMap: { x: 0.45 + jitter(0.1), y: -0.85 + jitter(0.1) },
       neighbours: [],
-      track: null,
+      track: { id: 'place-working', name: 'Working well under pressure' },
       field: null,
       domain: null,
+      levels: { held: 0, tested: 0, ceiling: 6 },
     });
   }
+  // The SaaS subject's territory, its topics among the business ones.
+  ideas.push(...territoryStars());
 
   // Six nearest by distance on the neighbour map, with a similarity that falls with it.
   for (const idea of ideas) {
@@ -406,8 +488,6 @@ function fixture(): IdeaMapView {
       .map(({ id, d }) => ({ id, similarity: Math.max(0.42, 0.93 - d * 0.9) }));
   }
 
-  const byName = new Map(ideas.map((idea) => [idea.name, idea.id]));
-  const pair = (a: string, b: string, similarity: number) => ({ a: byName.get(a)!, b: byName.get(b)!, similarity });
   const known = new Set(['known', 'sharp']);
 
   const fieldIdeas = (id: string) => ideas.filter((idea) => idea.field?.id === id).length;
@@ -438,14 +518,17 @@ function fixture(): IdeaMapView {
   });
 
   withCreated(ideas, 1997_8);
-  const { places, placeOf } = placesFor(ideas);
-  const shown = lit(ideas).map((idea) => ({ ...idea, placeId: placeOf.get(idea.id) ?? null }));
+  const places = placesFor(ideas);
+  const shown = lit(ideas);
 
   return {
     ideas: shown,
     asOf: AS_OF.toISOString(),
     places,
-    dust: dustFor(shown, 420, random),
+    // The vault's dust sat beside ideas; a topic has none (plan #2317.2).
+    dust: [],
+    territories: [territoryFixture()],
+    goals: [territoryGoal(), ...subjectGoals(shown, places)],
     variance: { first: 0.087, second: 0.054 },
     projection: {
       mean: [],
@@ -453,16 +536,7 @@ function fixture(): IdeaMapView {
       variance: [0.087, 0.054],
       frame: { cx: 0, cy: 0, scale: 1 },
     },
-    similarPairs: [
-      pair('Annual recurring revenue', 'Net revenue retention above 100%', 0.91),
-      // Across two subjects, so the card names them and links to the pairs page (plan #2147.2).
-      pair('Working capital ties up cash', 'Opportunity cost', 0.9),
-      pair('Spacing effect in memory', 'Retrieval practice beats rereading', 0.9),
-      pair('Customer acquisition cost payback', 'Lifetime value to CAC ratio', 0.89),
-      pair('Discounted cash flow valuation', 'Terminal value dominates a DCF', 0.88),
-      pair('Network effects raise the value of each user', 'Switching costs lock customers in', 0.87),
-      pair('Moral hazard after insurance', 'Adverse selection in used car markets', 0.86),
-    ],
+    similarPairs: [],
     untestedNearKnown: ideas
       .filter((idea) => idea.state === 'unknown')
       .map((idea) => ({
@@ -479,13 +553,47 @@ function fixture(): IdeaMapView {
   };
 }
 
-/** Vault notes as dust, each beside a fixture idea. */
-function dustFor(ideas: readonly IdeaOnMap[], count: number, random: () => number): IdeaMapView['dust'] {
-  return Array.from({ length: count }, (_, i) => ({
-    noteId: `note-${i}`,
-    conceptId: ideas[Math.floor(random() * ideas.length)]!.id,
-    similarity: 0.3 + random() * 0.5,
-  }));
+
+const EVIDENCE_BASES: { sourceKind: EvidenceLink['sourceKind']; basis: string; weight: number; similarity: number }[] = [
+  { sourceKind: 'course', basis: 'from MGT 541 Corporate Finance, HH, 2026', weight: 0.95, similarity: 0.71 },
+  {
+    sourceKind: 'note',
+    basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
+    weight: 1,
+    similarity: 0.68,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
+    weight: 1,
+    similarity: 0.63,
+  },
+  {
+    sourceKind: 'work',
+    basis: 'From your application notes in Stripe Strategy & Operations: "The team wants someone who has valued a business"',
+    weight: 0.4,
+    similarity: 0.62,
+  },
+  { sourceKind: 'note', basis: 'you wrote about this in Pricing power, clipped', weight: 0.25, similarity: 0.61 },
+];
+
+const EVIDENCE_OPEN_NAME = 'Terminal value in a DCF';
+
+function linksFor(ideaId: string, from: number, count: number): EvidenceLink[] {
+  return Array.from({ length: count }, (_, i) => {
+    const base = EVIDENCE_BASES[(from + i) % EVIDENCE_BASES.length]!;
+    return {
+      id: `${ideaId}-ev-${i}`,
+      targetKind: 'idea' as const,
+      targetId: ideaId,
+      sourceKind: base.sourceKind,
+      sourceId: `src-${(from + i) % EVIDENCE_BASES.length}`,
+      similarity: base.similarity,
+      ...kindAndCeiling({ source_kind: base.sourceKind, weight: base.weight }),
+      basis: base.basis,
+      foundAt: AS_OF.toISOString(),
+    };
+  }).sort((a, b) => b.ceiling - a.ceiling || b.similarity - a.similarity);
 }
 
 const VIEW = fixture();
@@ -542,8 +650,8 @@ function dense(count: number): IdeaMapView {
     const state = STATES[Math.floor(random() * STATES.length)]!;
     ideas.push({
       id: `dense-${i}`,
-      name: `Test idea ${i + 1}`,
-      claim: `Test idea ${i + 1}, for the frame rate.`,
+      name: `Test topic ${i + 1}`,
+      claim: `Test topic ${i + 1}, for the frame rate.`,
       state,
       stateRow: stateRowFor(state, random),
       strength: 0,
@@ -570,30 +678,28 @@ function dense(count: number): IdeaMapView {
     ideas: shown,
     places: clusters.slice(0, 30).map((cluster, i) => ({
       id: `dense-place-${i}`,
-      name: `Test place ${i + 1}`,
+      name: `Test subject ${i + 1}`,
       ideaCount: Math.floor(count / 60),
       pca: cluster,
       neighbourMap: cluster,
     })),
-    dust: dustFor(shown, 3000, random),
+    dust: [],
     similarPairs: [],
     untestedNearKnown: [],
+    // Its test subjects have no targets, so the subjects card and the territories are empty.
+    goals: [],
+    territories: [],
     areas: { fields: [], domains: [], fieldsMissing: 0 },
     missing: 0,
   };
 }
 
 /**
- * One place opened as a graph (plan #1997.7): every idea in it named in
- * full, its links drawn, the ideas next door round the edge, and one idea
- * pointed at so all its links show with their scores.
+ * A subject's name pressed on the sky (plan #2317.2): its place is its
+ * territory, which opens on the first topic you are ready for.
  */
 export function IdeaSpacePlaceSurface() {
-  const place = VIEW.places.find((p) => p.name === 'How memory holds on')!;
-  const pointed = VIEW.ideas.find((idea) => idea.name === 'Retrieval practice beats rereading')!.id;
-  return (
-    <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: place.id }} pointingAt={pointed} />
-  );
+  return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: TERRITORY_GOAL }} />;
 }
 
 /**
@@ -606,7 +712,7 @@ export function IdeaSpaceReplaySurface() {
 
 /** An idea in no place opened as its neighbourhood: itself and its six nearest. */
 export function IdeaSpaceAroundSurface() {
-  const loose = VIEW.ideas.find((idea) => idea.name === 'Write the summary before the detail')!.id;
+  const loose = VIEW.ideas.find((idea) => idea.name === 'Writing the summary first')!.id;
   return <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, around: loose }} />;
 }
 
@@ -615,7 +721,13 @@ export function IdeaSpaceAroundSurface() {
  * stars with their arcs and target rings, requirement links with arrowheads,
  * and the ideas next door round the edge.
  */
-const TERRITORY_VIEW = { ...VIEW, territories: [territoryFixture(VIEW.ideas)] };
+// The open topic was met in a note and a piece of work, which its popup lists (plan #2317.2).
+const TERRITORY_VIEW = {
+  ...VIEW,
+  ideas: VIEW.ideas.map((idea) =>
+    idea.id === TERRITORY_OPEN || idea.id === TERRITORY_POINTED ? { ...idea, evidence: linksFor(idea.id, 1, 2) } : idea,
+  ),
+};
 const TERRITORY_PARAMS = { ...DEFAULT_PARAMS, goal: TERRITORY_GOAL, topic: TERRITORY_OPEN };
 
 export function IdeaSpaceTerritorySurface() {
@@ -626,9 +738,15 @@ export function IdeaSpaceTerritorySurface() {
  * A territory as thin as the live one (plan #2187.7): topics with nothing
  * held yet, one requirement between them, and nothing ready, so no route.
  */
-const THIN = territoryFixture(VIEW.ideas);
+const THIN = territoryFixture();
 const THIN_VIEW = {
   ...VIEW,
+  // Its topics on the sky are as dark as their ladders.
+  ideas: VIEW.ideas.map((idea) =>
+    idea.placeId === TERRITORY_GOAL
+      ? { ...idea, state: 'unknown' as const, stateRow: null, strength: 0, levels: { ...idea.levels!, tested: 0, held: 0 } }
+      : idea,
+  ),
   territories: [
     {
       ...THIN,
@@ -668,16 +786,9 @@ export function IdeaSpaceTerritoryQuoteSurface() {
  * will fade, the gaps to a target and then and now, each its own tab.
  */
 const PANELS_VIEW = { ...TERRITORY_VIEW, levels: territoryLevels(VIEW.asOf) };
-/** As thin as the live goal: drafts with nothing held, one link, and none of the ideas round it held. */
+/** As thin as the live subject: drafts with nothing held, one link, and none of its topics lit. */
 const THIN_PANELS_VIEW = {
   ...THIN_VIEW,
-  territories: THIN_VIEW.territories.map((t) => ({
-    ...t,
-    topics: t.topics.map((topic) => ({
-      ...topic,
-      ideaIds: topic.ideaIds.filter((id) => VIEW.ideas.find((idea) => idea.id === id)?.stateRow === null),
-    })),
-  })),
   levels: territoryLevels(VIEW.asOf, { thin: true }),
 };
 
@@ -719,29 +830,24 @@ export function IdeaSpaceDenseSurface() {
   return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} />;
 }
 
+/** The two subjects the recording shots hide: the SaaS territory and economics. */
+const HIDDEN = [TERRITORY_GOAL, 'place-f-econ'];
+
 /**
- * Recording mode on (plan #1997.9) with a place open as a graph: the place and
- * the next one over are hidden, so the title, the ideas and the rail read
- * "A private place" and "Private idea", and the places left show as they are.
+ * Recording mode on (plan #1997.9) with a subject's territory open: it and
+ * one other subject are hidden, so the title, its topics, the subjects card
+ * and the rail read "A private subject" and "Private topic", and the
+ * subjects left show as they are.
  */
 export function IdeaSpaceRecordingSurface() {
-  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
-  const open = VIEW.places.find((p) => p.name === 'How memory holds on')!;
   return (
-    <IdeaSpaceView
-      view={VIEW}
-      params={{ ...DEFAULT_PARAMS, place: open.id }}
-      recording={{ on: true, hidden: hidden.map((p) => p.id) }}
-    />
+    <IdeaSpaceView view={VIEW} params={{ ...DEFAULT_PARAMS, place: TERRITORY_GOAL }} recording={{ on: true, hidden: HIDDEN }} />
   );
 }
 
-/** Recording mode off with two places ticked to hide, in the rail's Recording mode card. */
+/** Recording mode off with two subjects ticked to hide, in the rail's Recording mode card. */
 export function IdeaSpaceRecordingChooseSurface() {
-  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
-  return (
-    <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} recording={{ on: false, hidden: hidden.map((p) => p.id) }} chooseOpen />
-  );
+  return <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} recording={{ on: false, hidden: HIDDEN }} chooseOpen />;
 }
 
 /**
@@ -753,7 +859,7 @@ export function IdeaSpaceRecordingChooseSurface() {
 const LIT_FIXTURE = (() => {
   const set: [string, StateBasis, number][] = [
     ['Opportunity cost', 'tested', 3],
-    ['Spacing effect in memory', 'declared', 30],
+    ['The spacing effect', 'declared', 30],
     ['Annual recurring revenue', 'tested', 40],
   ];
   const rows = new Map(
@@ -795,53 +901,28 @@ export function IdeaSpaceLightsSurface() {
  * DCF idea no question has been asked about, is open in the rail with its
  * three strongest links and pointed at, so its card says what backs it.
  */
-const EVIDENCE_BASES: { sourceKind: EvidenceLink['sourceKind']; basis: string; weight: number; similarity: number }[] = [
-  { sourceKind: 'course', basis: 'from MGT 541 Corporate Finance, HH, 2026', weight: 0.95, similarity: 0.71 },
-  {
-    sourceKind: 'note',
-    basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
-    weight: 1,
-    similarity: 0.68,
-  },
-  {
-    sourceKind: 'work',
-    basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
-    weight: 1,
-    similarity: 0.63,
-  },
-  {
-    sourceKind: 'work',
-    basis: 'From your application notes in Stripe Strategy & Operations: "The team wants someone who has valued a business"',
-    weight: 0.4,
-    similarity: 0.62,
-  },
-  { sourceKind: 'note', basis: 'you wrote about this in Pricing power, clipped', weight: 0.25, similarity: 0.61 },
-];
-
-const EVIDENCE_OPEN_NAME = 'Terminal value dominates a DCF';
-
-function linksFor(ideaId: string, from: number, count: number): EvidenceLink[] {
-  return Array.from({ length: count }, (_, i) => {
-    const base = EVIDENCE_BASES[(from + i) % EVIDENCE_BASES.length]!;
-    return {
-      id: `${ideaId}-ev-${i}`,
-      targetKind: 'idea' as const,
-      targetId: ideaId,
-      sourceKind: base.sourceKind,
-      sourceId: `src-${(from + i) % EVIDENCE_BASES.length}`,
-      similarity: base.similarity,
-      ...kindAndCeiling({ source_kind: base.sourceKind, weight: base.weight }),
-      basis: base.basis,
-      foundAt: AS_OF.toISOString(),
-    };
-  }).sort((a, b) => b.ceiling - a.ceiling || b.similarity - a.similarity);
-}
-
 const EVIDENCE_FIXTURE: IdeaMapView = (() => {
   let unknown = 0;
   const ideas = VIEW.ideas.map((idea) => {
     if (idea.name === EVIDENCE_OPEN_NAME) {
-      return { ...idea, state: 'unknown' as const, stateRow: null, evidence: linksFor(idea.id, 0, 5) };
+      return {
+        ...idea,
+        // Held at level 3 by inference from another topic, never asked about itself.
+        state: 'recognised' as const,
+        stateRow: {
+          state: 'recognised' as const,
+          established: 'inferred' as const,
+          tested_at: null,
+          declared_at: new Date(AS_OF.getTime() - 12 * DAY_MS).toISOString(),
+          review_interval_days: null,
+        },
+        levels: { ...idea.levels!, held: 3, tested: 0 },
+        evidence: linksFor(idea.id, 0, 5),
+        ideasUnder: [
+          { id: 'tv-idea-1', name: 'Terminal value is often most of a DCF’s total' },
+          { id: 'tv-idea-2', name: 'A perpetuity growth rate above GDP growth is a warning sign' },
+        ],
+      };
     }
     if (idea.state !== 'unknown') return idea;
     unknown += 1;

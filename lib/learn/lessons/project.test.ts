@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { HandInRow } from './practice';
 import {
   PROJECT_LIMITS,
+  depthFromTargets,
   planLines,
   projectPrompt,
   toProjectView,
@@ -103,5 +104,14 @@ describe('toProjectView', () => {
 
   it('shows the worked answer once passed', () => {
     expect(toProjectView(row, null, true).worked).toBe('NRR = 115%.');
+  });
+});
+
+describe('depthFromTargets', () => {
+  it('words the mean target level as a goal depth', () => {
+    expect(depthFromTargets([])).toBeNull();
+    expect(depthFromTargets([3, 4])).toBe('familiar');
+    expect(depthFromTargets([4, 5, 5])).toBe('solid');
+    expect(depthFromTargets([6, 6, 5])).toBe('deep');
   });
 });

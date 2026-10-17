@@ -5,7 +5,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { makeCustomSubject, writeSubjectCurriculum } from '@/lib/learn/graph/curriculum-run';
 import { loadSubject } from '@/lib/learn/graph/load';
 import { addUnit } from '@/lib/learn/lessons/plan-edit';
-import { planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
 import { settleWanted } from '@/lib/learn/levels/store';
@@ -280,8 +280,8 @@ const addPlanUnitTool: DashPaidTool = {
     const title = text(args, 'title');
     if (!title) return { ok: false, error: 'Name the unit.' };
     const learn = await learnOf(ctx);
-    const goal = isUuid(subjectId) ? await planGoalFor(learn, ctx.userId, subjectId) : null;
-    if (!goal) return { ok: false, error: 'Only a learning goal’s plan can take a unit.' };
+    const goal = isUuid(subjectId) ? await planOwnerFor(learn, ctx.userId, subjectId) : null;
+    if (!goal) return { ok: false, error: 'Only the plan of a goal or a prepared subject can take a unit.' };
     return {
       ok: true,
       args: { subjectId, title },
@@ -293,7 +293,7 @@ const addPlanUnitTool: DashPaidTool = {
     const learn = await learnOf(ctx);
     const subjectId = String(args.subjectId);
     const subject = await loadSubject(learn, subjectId);
-    if (!subject || !(await planGoalFor(learn, ctx.userId, subjectId))) {
+    if (!subject || !(await planOwnerFor(learn, ctx.userId, subjectId))) {
       return { ok: false, error: 'That plan could not be found.' };
     }
     const result = await addUnit(learn, ctx.userId, subject, String(args.title));

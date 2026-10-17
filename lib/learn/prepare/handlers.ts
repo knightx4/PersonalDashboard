@@ -23,13 +23,14 @@ import { approveDraft, uncitedRows } from '@/lib/learn/levels/store';
 import { draftTopicsStep, writeUnitsStep, type KeptDraft, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishPreparationStep } from './finish-step';
+import { addedSourceItems, addedSourceWeeks } from './add-source-run';
 import { firstLessonStep } from './first-lesson-step';
 import { writeLessonCard } from '@/inngest/learn/lesson-top-up';
 import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
 import { writeUnitPiecesRecorded } from '@/lib/learn/lessons/pieces';
 import { loadLessons } from '@/lib/learn/lessons/piece-store';
 import type { StepHandler } from './run';
-import { loadRunTerritory, saveRunTerritory } from './store';
+import { loadDraftedNames, loadRunTerritory, saveRunTerritory } from './store';
 import type { PreparationStepKey } from './steps';
 import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKindRow } from './structure-steps';
 
@@ -192,6 +193,15 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
         })),
       };
     },
+    // What the person added with Add a source (plan #2307.4) joins whatever it scores.
+    async added(subject) {
+      const itemIds = await addedSourceItems(learn, userId, subject.id);
+      if (itemIds.length === 0) return { itemIds, weeks: [] };
+      const spent: SpendReport[] = [];
+      const weeks = await addedSourceWeeks(sql(), itemIds, subject, (r) => spent.push(r));
+      await ledger('match-structure-units', spent);
+      return { itemIds, weeks };
+    },
   });
 
   const compile = compileStep({
@@ -335,11 +345,7 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
 
   const writeUnits = writeUnitsStep({
     territory: (runId) => loadRunTerritory(learn, userId, runId),
-    async names(asks) {
-      const { data, error } = await learn.from('topics').select('asked, name').eq('user_id', userId).in('asked', [...asks]);
-      if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
-      return new Map(((data ?? []) as { asked: string; name: string }[]).map((t) => [t.asked.trim().toLowerCase(), t.name]));
-    },
+    names: (asks) => loadDraftedNames(learn, userId, asks),
     async units(subjectId) {
       const { data, error } = await learn
         .from('curriculum_units')

@@ -30,7 +30,8 @@ import {
   type PlacedName,
 } from '@/lib/learn/map/sky';
 import { STATE_MARK_LABEL, markOf } from '@/lib/learn/map/view';
-import { graphHeight, paramsFor, type IdeaGraph, type Opened } from '@/lib/learn/map/place-graph';
+import { levelsText, type TopicLevels } from '@/lib/learn/map/topic-stars';
+import { graphCount, graphHeight, paramsFor, type IdeaGraph, type Opened } from '@/lib/learn/map/place-graph';
 import { halvesOn, stateSetAt, type StrengthInput } from '@/lib/learn/strength';
 import type { LightThen } from '@/lib/learn/map/timeline';
 import { cn } from '@/lib/cn';
@@ -91,6 +92,15 @@ export type Star = {
   absent?: boolean;
   /** What backs it, "2 notes and a course", or null with no evidence (plan #2006.6). */
   backedBy?: string | null;
+  /** A topic's levels, tested and held apart (plan #2317.2), which the card names in place of its state. */
+  levels?: TopicLevels;
+};
+
+/** How a topic's highest level is held, in the card. */
+const HELD_TEXT: Record<StrengthInput['established'], string> = {
+  tested: 'Tested',
+  declared: 'You said you know it',
+  inferred: 'Inferred from an answer',
 };
 
 /** A topic of the frame (plan #2016.5) where the current layout puts it. */
@@ -1018,7 +1028,7 @@ export function StarSky({
     }
     wasOpen.current = true;
     const ids = [...graph.core, ...graph.next];
-    const h = graphHeight(w, ids.length, base);
+    const h = graphHeight(w, graphCount(graph), base);
     // A territory's stars are its topics, which the graph places itself (plan #2187.3).
     const nodeAt = (id: string) => graph.ladders?.get(id)?.at ?? starOf.get(id)?.at;
     const core = graph.core.map(nodeAt).filter((p): p is Point => p !== undefined);
@@ -1297,7 +1307,7 @@ export function StarSky({
   const cardAt = hover ?? heldAt;
   // A graph grows the frame so its names keep their room.
   const graphH =
-    graph && size ? graphHeight(size.w, graph.core.length + graph.next.length, mapH ?? size.h) : null;
+    graph && size ? graphHeight(size.w, graphCount(graph), mapH ?? size.h) : null;
 
   return (
     <div
@@ -1451,8 +1461,12 @@ function StarCard({
   const row = star.stateRow;
   const setAt = row ? stateSetAt(row) : null;
   const halves = row ? halvesOn(row, new Date(asOf)) : null;
-  const facts: [string, string][] = [['State', STATE_MARK_LABEL[markOf(star.state)]]];
-  if (row && star.state !== 'unknown') facts.push(['Evidence', EVIDENCE_TEXT[row.established]]);
+  const facts: [string, string][] = star.levels
+    ? [['Level', levelsText(star.levels)]]
+    : [['State', STATE_MARK_LABEL[markOf(star.state)]]];
+  if (row && star.state !== 'unknown') {
+    facts.push(['Evidence', star.levels ? HELD_TEXT[row.established] : EVIDENCE_TEXT[row.established]]);
+  }
   if (star.backedBy) facts.push(['Backed by', star.backedBy]);
   if (star.strength > 0) facts.push(['Strength', `${Math.round(star.strength * 100)}%`]);
   if (setAt) facts.push(['Last shown', whenDate(setAt, { timeZone: 'UTC' })]);

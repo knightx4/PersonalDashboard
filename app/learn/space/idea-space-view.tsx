@@ -9,11 +9,10 @@ import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NEIGHBOURS_PER_IDEA } from '@/lib/learn/map/idea-map';
-import { PAIRS_HREF } from '@/lib/learn/map/idea-pairs';
 import type { IdeaMapView } from '@/lib/learn/map/load';
-import { countText, mapHref, similarityText, type MapParams } from '@/lib/learn/map/view';
+import { countText, mapHref, type MapParams } from '@/lib/learn/map/view';
 import { ChosenIdea } from './chosen-idea';
-import { MapSection } from './map-section';
+import { MapSection, useOpenGraph } from './map-section';
 import { PickProvider } from './pick';
 import { PageColumn } from '@/components/shell/page-width';
 import { PlaceRail } from './place-rail';
@@ -26,21 +25,21 @@ import { NOT_RECORDING, viewFor, type Recording } from '@/lib/learn/map/recordin
 import { ALL_LAYERS, layeredView, type Layers } from '@/lib/learn/map/layers';
 
 /**
- * The Idea Space page (plan #1857): every idea with an embedding on one map,
- * apart from the read so the gallery draws it from fixtures.
+ * The Idea Space page (plan #1857): every topic of a subject you prepared on
+ * one map (plan #2317.2), apart from the read so the gallery draws it from
+ * fixtures.
  *
  * Main plus rail. The map is what the page is for and sits in the main
  * column with its switches and legend; the rail holds what you glance at
- * beside it: the idea you tapped and its six nearest, then the two lists the
- * map turns up, ideas that are probably one idea twice and untested ideas
- * surrounded by ones you know.
+ * beside it: the topic you tapped and its six nearest, your subjects, and
+ * the untested topics surrounded by ones you know.
  *
- * The view (layout, the open idea, the domain picked out) is held by `PickProvider`
+ * The view (layout, the open topic, the domain picked out) is held by `PickProvider`
  * in the browser and changes at once; the address follows, so a reload and a
  * pasted link still open the same view (law 5).
  */
 
-const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
+const TOPIC_HREF = (id: string) => `/learn/topics/${id}`;
 
 /** How many rows a rail list shows before the rest fold away. */
 const LIST_SHOWN = 5;
@@ -111,7 +110,7 @@ export function IdeaSpaceView({
       title="Idea Space"
       description={
         view && view.ideas.length > 0
-          ? `${plural(view.ideas.length, 'idea')}${view.missing > 0 ? `, and ${countText(view.missing)} waiting for the daily run to place ${view.missing === 1 ? 'it' : 'them'}` : ''}.`
+          ? `${plural(view.ideas.length, 'topic')}${view.missing > 0 ? `, and ${countText(view.missing)} waiting for the daily run to place ${view.missing === 1 ? 'it' : 'them'}` : ''}.`
           : undefined
       }
     />
@@ -122,7 +121,7 @@ export function IdeaSpaceView({
       <PageColumn>
         {header}
         <p className="text-body text-ink-muted">
-          Your ideas could not be read just now, so the map is missing. Reload to try again.
+          Your topics could not be read just now, so the map is missing. Reload to try again.
         </p>
       </PageColumn>
     );
@@ -134,11 +133,11 @@ export function IdeaSpaceView({
         {header}
         <EmptyState
           icon={Orbit}
-          title="No ideas on the map yet"
+          title="No topics on the map yet"
           description={
             view.missing > 0
-              ? `${plural(view.missing, 'idea')} ${view.missing === 1 ? 'is' : 'are'} waiting for the daily run to place ${view.missing === 1 ? 'it' : 'them'}.`
-              : 'Ideas land here as Learn writes them, from subjects, lessons and your notes.'
+              ? `${plural(view.missing, 'topic')} ${view.missing === 1 ? 'is' : 'are'} waiting for the daily run to place ${view.missing === 1 ? 'it' : 'them'}.`
+              : 'Topics land here when Learn prepares a subject for you.'
           }
         />
       </PageColumn>
@@ -159,12 +158,11 @@ export function IdeaSpaceView({
         rail={
           <>
             <ChosenIdea ideas={view.ideas} places={view.places} asOf={view.asOf} layers={layers} onLayers={setLayers} moreOpen={holdMore} />
-            <GoalRail goals={view.goals} holdNext={holdNext} />
             <PlaceRail view={view} layers={layers} onLayers={setLayers} holdQuote={holdQuote} />
+            <GoalRail goals={view.goals} holdNext={holdNext} />
             <TopicRail frame={view.topics} />
             <NextTopicsCard topics={nextTopics} />
             <RecordingCard places={whole?.places ?? []} recording={recording} onChange={setRecording} save={save} chooseOpen={chooseOpen} />
-            <SameIdeas view={view} nameOf={nameOf} />
             <UntestedNearKnown view={view} nameOf={nameOf} />
           </>
         }
@@ -211,51 +209,14 @@ function RailList<T>({
   );
 }
 
-function SameIdeas({ view, nameOf }: { view: IdeaMapView; nameOf: Map<string, string> }) {
-  // The subject (track) each idea was written under, so a pair across two
-  // subjects says so: those are the ones the pairs page settles (plan #2147.2).
-  const trackOf = new Map(view.ideas.map((idea) => [idea.id, idea.track]));
-  const across = (a: string, b: string) => {
-    const ta = trackOf.get(a);
-    const tb = trackOf.get(b);
-    return ta && tb && ta.id !== tb.id ? `${ta.name} · ${tb.name}` : null;
-  };
-  const anyAcross = view.similarPairs.some((pair) => across(pair.a, pair.b));
-  return (
-    <RailList
-      title="Probably the same idea"
-      rows={view.similarPairs}
-      foot={
-        // Pairs in two subjects are settled on a page of their own (plan #2147.2).
-        anyAcross ? (
-          <Link href={PAIRS_HREF} className="press-area mt-2 block text-small text-ink-muted hover:text-accent">
-            Merge or keep the pairs that sit in two subjects
-          </Link>
-        ) : undefined
-      }
-      render={(pair) => (
-        <li key={`${pair.a}:${pair.b}`} className="flex items-start gap-2 py-2">
-          <span className="min-w-0 flex-1 space-y-1">
-            <IdeaLink id={pair.a} name={nameOf.get(pair.a)} />
-            <IdeaLink id={pair.b} name={nameOf.get(pair.b)} />
-            {across(pair.a, pair.b) && (
-              <span className="block text-small text-ink-muted">{across(pair.a, pair.b)}</span>
-            )}
-          </span>
-          <span className="tabular shrink-0 text-small text-ink-muted">
-            {similarityText(pair.similarity)}
-          </span>
-        </li>
-      )}
-    />
-  );
-}
-
 function UntestedNearKnown({ view, nameOf }: { view: IdeaMapView; nameOf: Map<string, string> }) {
+  // With a subject or a neighbourhood open, only its own topics.
+  const graph = useOpenGraph(view);
+  const open = graph ? new Set(graph.core) : null;
   return (
     <RailList
-      title="Not tested, among ideas you know"
-      rows={view.untestedNearKnown}
+      title="Not tested, among topics you know"
+      rows={open ? view.untestedNearKnown.filter((row) => open.has(row.id)) : view.untestedNearKnown}
       render={(row) => (
         <li key={row.id} className="py-2">
           <IdeaLink id={row.id} name={nameOf.get(row.id)} />
@@ -270,8 +231,8 @@ function UntestedNearKnown({ view, nameOf }: { view: IdeaMapView; nameOf: Map<st
 
 function IdeaLink({ id, name }: { id: string; name: string | undefined }) {
   return (
-    <Link href={CONCEPT_HREF(id)} className="press-area block text-ui text-ink hover:text-accent">
-      {name ?? 'An idea'}
+    <Link href={TOPIC_HREF(id)} className="press-area block text-ui text-ink hover:text-accent">
+      {name ?? 'A topic'}
     </Link>
   );
 }

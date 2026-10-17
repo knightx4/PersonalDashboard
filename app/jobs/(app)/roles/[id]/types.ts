@@ -100,6 +100,8 @@ export interface PanelProps {
     /** What a previous draft cited, and what it could not ground. */
     evidenceItemIds: string[];
     unsupportedClaims: string[];
+    /** How to approach the question, from the draft the answer came from. */
+    considerations: string[];
     /** application_answers.word_limit; the question's own wording can set a limit too. */
     wordLimit: number | null;
   }>;

@@ -65,6 +65,16 @@ describe('goalsOnMap', () => {
     expect(goal!.stars[0]!.neighbourMap).toEqual({ x: 0.1, y: 0.1 });
   });
 
+  it('names the goals on a subject, and none for a subject nobody reads', () => {
+    const m = map();
+    const read = lens('g', 'subject', [['capm', 4]]);
+    const [withGoals] = goalsOnMap([read], m, readCells(m), PLACED, new Map([['s', ['Value a company', 'Read accounts']]]));
+    expect(withGoals!.goalNames).toEqual(['Value a company', 'Read accounts']);
+    const [without] = goalsOnMap([read], m, readCells(m), PLACED);
+    expect(without!.goalNames).toEqual([]);
+    expect(without!.stars.map((s) => s.topicId)).toEqual(['capm']);
+  });
+
   it('draws one line per pair of its own topics, never to a topic outside it', () => {
     const m = map();
     const [goal] = goalsOnMap([lens('g', 'subject', [['capm', 4], ['return', 3]])], m, readCells(m), PLACED);

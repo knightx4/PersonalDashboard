@@ -1,4 +1,7 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { openingTerritory } from '@/lib/learn/prepare/draft-steps';
+import { loadDraftedNames, loadSubjectTerritory } from '@/lib/learn/prepare/store';
+import type { CurriculumTerritory } from './curriculum';
 import { parseOwnUnits } from './curriculum-payload';
 import { ensureCurriculum, fileGoalUnder, type EnsuredCurriculum } from './curriculum-store';
 import { loadGoals, loadSubject } from './load';
@@ -17,16 +20,42 @@ export type SubjectCurriculumResult =
   | { ok: false; detail: string };
 
 /**
+ * The opening of a subject's territory as the curriculum call reads it, the
+ * way the preparation's write_units step gives it; null for a subject whose
+ * preparation compiled none.
+ */
+async function subjectTerritory(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  subjectId: string,
+): Promise<CurriculumTerritory | null> {
+  const territory = await loadSubjectTerritory(supabase, userId, subjectId);
+  if (!territory || territory.topics.length === 0) return null;
+  const names = await loadDraftedNames(
+    supabase,
+    userId,
+    territory.topics.map((t) => t.ask),
+  );
+  return openingTerritory(territory, names, []);
+}
+
+/**
  * Write the curriculum of a subject that has none, from the question its
  * oldest goal asked (or the subject's note), and file that goal under the unit
- * the question falls in. A subject that already has one keeps it.
+ * the question falls in. A subject that already has one keeps it. A prepared
+ * subject's units are read off its territory, as the preparation writes them
+ * (plan #2307.5), so the course starts where its documents start.
  */
 export async function writeSubjectCurriculum(
   supabase: LearnSupabaseClient,
   userId: string,
   subjectId: string,
 ): Promise<SubjectCurriculumResult> {
-  const [subject, goals] = await Promise.all([loadSubject(supabase, subjectId), loadGoals(supabase, subjectId)]);
+  const [subject, goals, territory] = await Promise.all([
+    loadSubject(supabase, subjectId),
+    loadGoals(supabase, subjectId),
+    subjectTerritory(supabase, userId, subjectId),
+  ]);
   if (!subject) return { ok: false, detail: 'That subject is gone.' };
 
   // The oldest goal is what the track was started for.
@@ -36,6 +65,8 @@ export async function writeSubjectCurriculum(
     userId,
     { id: subject.id, name: subject.name },
     first?.asked ?? subject.note ?? null,
+    undefined,
+    territory ?? undefined,
   );
   if (!result.ok) return { ok: false, detail: result.detail };
   if (result.goalUnitId && first && !first.unitId) await fileGoalUnder(supabase, first.id, result.goalUnitId);

@@ -13,6 +13,11 @@
  * why this company and role, and the model reports any claim about the
  * person the bank does not carry (note ad554975, which found answers drawn
  * only from evidence never said why this company or why they fit).
+ *
+ * The model first works out how to approach the question (what it tests,
+ * what to lead with, what the bank lacks) and writes the answer from that.
+ * Those considerations replace the old list of unsupported claims on the
+ * card: a gap in the bank is one of them, said as what to add.
  */
 import 'server-only';
 
@@ -48,21 +53,33 @@ What a good answer does:
   what the answer may say.
 - Stays under the word limit if one is given.
 
+Before you write, work out how to approach this question, and write the
+answer from that. These considerations are shown to the person beside the
+answer, so write them to them, one short plain sentence each, two to four in
+all:
+- What the question is really testing, and what a strong answer leads with.
+- Which of their stories or results fits best and why, or what angle on the
+  company or role from the posting to take.
+- Any limit, and what that means for how much fits.
+- Anything the question asks for that the bank does not hold (a headcount, a
+  date, a reason only they know): say what to add, and leave it out of the
+  answer rather than guess it.
+
 What it never does:
 - Invent facts about them. A number, a scale, a timeline, a job title, an
   employer or a result about the person comes from the bank or is not stated.
-  If you do state something about them the bank does not carry, report it
-  verbatim in unsupported_claims. What you say about the company or the role
-  from the posting is not a claim about them and need not be reported.
+  Where the question needs one the bank does not carry, the considerations
+  say so. What you say about the company or the role from the posting is not
+  a claim about them.
 - Open by restating the question, call the role an exciting opportunity, or
   close with a paragraph of enthusiasm.
 
 Report:
-- answer: the answer itself. Plain prose, no headings, no bullet list unless
-  the question asks for one.
+- considerations: as above.
+- answer: the answer itself, following the considerations. Plain prose, no
+  headings, no bullet list unless the question asks for one.
 - evidence_item_ids: every bank item the answer draws on, copied exactly. Empty
-  when it draws on none.
-- unsupported_claims: as above.`;
+  when it draws on none.`;
 
 export type DraftInput = {
   question: string;
@@ -148,15 +165,16 @@ export async function draftAnswer(
       tools: [
         {
           name: TOOL_NAME,
-          description: 'Report the draft, what it cites, and what it could not ground.',
+          description: 'Report how to approach the question, the draft written from that, and what it cites.',
           input_schema: {
             type: 'object',
+            // Considerations first, so they are written before the answer.
             properties: {
+              considerations: { type: 'array', items: { type: 'string' } },
               answer: { type: 'string' },
               evidence_item_ids: { type: 'array', items: { type: 'string' } },
-              unsupported_claims: { type: 'array', items: { type: 'string' } },
             },
-            required: ['answer', 'evidence_item_ids', 'unsupported_claims'],
+            required: ['considerations', 'answer', 'evidence_item_ids'],
           },
         },
       ],

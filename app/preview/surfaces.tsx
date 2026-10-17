@@ -272,6 +272,12 @@ import {
   LearnSubjectPrepareSurface,
 } from './learn-prepare-surfaces';
 import {
+  AddSourceErrorSurface,
+  AddSourceFetchingSurface,
+  AddSourceOpenSurface,
+  AddSourceSurface,
+} from './add-source-surfaces';
+import {
   LearnBriefFailedSurface,
   LearnBriefQuoteSourceSurface,
   LearnBriefResearchingSurface,
@@ -299,6 +305,7 @@ import {
 } from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
+import { SubjectPresses, subjectDescription } from '@/app/learn/s/[id]/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
@@ -413,12 +420,6 @@ import {
   NowPagePracticeSurface,
   NowPageSurface,
 } from './learn-now-page-surfaces';
-import {
-  SubjectArticlesEmptySurface,
-  SubjectArticlesErrorSurface,
-  SubjectArticlesLoadingSurface,
-  SubjectArticlesSurface,
-} from './subject-articles-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -734,6 +735,7 @@ const rolePanels: PanelProps = {
       timesSeen: 3,
       evidenceItemIds: [],
       unsupportedClaims: [],
+      considerations: [],
       wordLimit: null,
     },
   ],
@@ -3588,6 +3590,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 1,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: null,
   },
   {
@@ -3602,6 +3605,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 1,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: 200,
   },
   {
@@ -3615,6 +3619,7 @@ const draftedAnswers: PanelProps['answers'] = [
     timesSeen: 5,
     evidenceItemIds: [],
     unsupportedClaims: [],
+    considerations: [],
     wordLimit: null,
   },
 ];
@@ -3635,7 +3640,12 @@ const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
   a3: {
     text: 'First I would sit with two desks and time how long an idea takes to become a backtest. I expect most of it is waiting on data to be cleaned by hand. I would move that cleaning into the pipeline, once, and measure the same journey again at the end of the quarter.',
     evidenceItemIds: [],
-    unsupportedClaims: ['most of it is waiting on data'],
+    unsupportedClaims: [],
+    considerations: [
+      'It tests whether you find the problem before you fix it: lead with how you would measure, then the fix.',
+      'Nothing in your bank says where research time goes today, so frame that as a guess to check, not a fact.',
+      'Close on what you would measure again, so the plan has an end.',
+    ],
     bannedFound: [],
   },
 };
@@ -3916,9 +3926,14 @@ export const SURFACES: readonly Surface[] = [
         answer={{ ...rolePanels.answers[0], wordLimit: 150 }}
         closed={false}
         initialDraft={{
-          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
+          text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
           evidenceItemIds: [],
-          unsupportedClaims: ['for two years'],
+          unsupportedClaims: [],
+          considerations: [
+            'A "why this team" question: name what the team owns from the posting, then why you fit, in that order.',
+            'The tick-store story is the closest fit; one concrete result from it carries more than a list.',
+            'Your bank does not say how long you have worked on data quality, so add the dates or leave the span out.',
+          ],
           bannedFound: [],
         }}
       />
@@ -6104,6 +6119,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlacementPreview state="end-none" />,
   },
   {
+    /* The top of a prepared subject's page with no claims behind it (plan
+     * #2307.1): lens progress as tested and inferred, and both presses. */
+    id: 'learn-subject-header',
+    label: 'Subject · Header of a prepared subject',
+    module: 'learn',
+    width: 'page',
+    render: () => (
+      <PageHeader
+        title="Urban economics and the economics of housing supply"
+        description={subjectDescription(
+          { tested: 12, inferred: 9, declared: 0, total: 46 },
+          { unknown: 0, shaky: 0, recognised: 0, known: 0, sharp: 0, misconception: 0, total: 0 },
+        )}
+        actions={<SubjectPresses id="s1" lensId="l1" owner />}
+      />
+    ),
+  },
+  {
     /* The chain a subject reads as: the doors it turns on, then everything
      * downstream of them. The size difference is the surface. */
     id: 'learn-subject-chain',
@@ -6682,38 +6715,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SubjectClipsEmptySurface />,
   },
   {
-    /* The list after the press: five articles to keep or strike, one with a very long title. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles',
-    label: 'Learn · Find articles, proposed list',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesSurface />,
-  },
-  {
-    /* Mid-lookup, while idea names resolve one at a time. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-loading',
-    label: 'Learn · Find articles, looking up',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesLoadingSurface />,
-  },
-  {
-    /* Every article the ideas name is already in the catalogue. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-empty',
-    label: 'Learn · Find articles, all held',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesEmptySurface />,
-  },
-  {
-    /* Wikipedia did not answer. (plan #2157.1). Fixtures in subject-articles-surfaces.tsx. */
-    id: 'learn-subject-articles-error',
-    label: 'Learn · Find articles, Wikipedia down',
-    module: 'learn',
-    width: 'page',
-    render: () => <SubjectArticlesErrorSurface />,
-  },
-  {
     /* The Big Five test (plan #1632): fifty statements, the first seven
      * answered. Fixtures in personality-surfaces.tsx. */
     id: 'you-personality-test',
@@ -6770,12 +6771,12 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouPersonalityEmptySurface />,
   },
   {
-    /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
-     * star as bright as you know it, places named, one idea open in the rail
-     * with its nearest six, the two lists below it, and ideas still waiting
-     * for a place. Fixtures in idea-space-surfaces.tsx. */
+    /* Idea Space (plan #1857), a night sky since plan #1997.6 and of your
+     * prepared topics since plan #2317.2: every topic a star as bright as you
+     * know it, subjects named, one topic open in the rail with the ideas under
+     * it and its nearest six. Fixtures in idea-space-surfaces.tsx. */
     id: 'learn-idea-space',
-    label: 'Learn · Idea Space, an idea open',
+    label: 'Learn · Idea Space, a topic open',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceSurface />,
@@ -6809,18 +6810,18 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceReplaySurface />,
   },
   {
-    /* One place opened as a graph (plan #1997.7), with one idea pointed at
-     * so its links show their scores, and the ideas next door round the edge. */
+    /* A subject's name pressed (plan #2317.2): its place is its territory,
+     * opened on the first topic you are ready for. */
     id: 'learn-idea-space-place',
-    label: 'Learn · Idea Space, a place opened',
+    label: 'Learn · Idea Space, a subject opened',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpacePlaceSurface />,
   },
   {
-    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    /* A topic opened as its neighbourhood (plan #1997.7): itself and its six nearest. */
     id: 'learn-idea-space-around',
-    label: 'Learn · Idea Space, an idea in no place opened',
+    label: 'Learn · Idea Space, a topic’s neighbourhood',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
@@ -6879,8 +6880,8 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceLightsSurface />,
   },
   {
-    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
-     * places and the ideas in them read "A private place" and "Private idea". */
+    /* Recording mode on (plan #1997.9), a subject's territory open: the hidden
+     * subjects and the topics in them read "A private subject" and "Private topic". */
     id: 'learn-idea-space-recording',
     label: 'Learn · Idea Space, recording mode on',
     module: 'learn',
@@ -6931,17 +6932,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaPairsErrorSurface />,
   },
   {
-    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    /* Recording mode off, two subjects ticked to hide, in the rail's card. */
     id: 'learn-idea-space-recording-choose',
-    label: 'Learn · Idea Space, choosing places to hide',
+    label: 'Learn · Idea Space, choosing subjects to hide',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceRecordingChooseSurface />,
   },
   {
-    /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
+    /* Ten thousand test topics, for the frame rate the sky has to hold (plan #1997.6). */
     id: 'learn-idea-space-dense',
-    label: 'Learn · Idea Space, ten thousand ideas',
+    label: 'Learn · Idea Space, ten thousand topics',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDenseSurface />,
@@ -6952,7 +6953,7 @@ export const SURFACES: readonly Surface[] = [
      * tested, is open in the rail and pointed at, so both cards say what
      * backs it. */
     id: 'learn-idea-space-evidence',
-    label: 'Learn · Idea Space, an idea your notes back',
+    label: 'Learn · Idea Space, a topic your notes back',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceEvidenceSurface />,
@@ -9260,6 +9261,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Add a source (plan #2307.4): the press closed under Sources, with a
+     * document it added listed. Fixtures in add-source-surfaces.tsx. */
+    id: 'learn-subject-add-source',
+    label: 'Subject · Add a source, with one added',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-open',
+    label: 'Subject · Add a source, box open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceOpenSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-fetching',
+    label: 'Subject · Add a source, fetching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceFetchingSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-error',
+    label: 'Subject · Add a source, fetch failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceErrorSurface />,
   },
   {
     id: 'learn-subject-prepare-direction',

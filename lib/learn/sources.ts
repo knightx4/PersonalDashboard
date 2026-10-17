@@ -392,6 +392,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.quiz_sources', reason: 'Material a quiz was written from.' },
     { table: 'learn.settings', reason: 'Settings for how Learn behaves.' },
     { table: 'learn.subject_channels', reason: 'YouTube channels Dash found and judged for a subject; what was kept is read through watch_list.' },
+    { table: 'learn.subject_sources', reason: 'Join rows naming the catalogue documents added to a subject; the documents are read through the catalogue.' },
     { table: 'learn.subject_preparations', reason: 'Bookkeeping for preparing a subject: which step its run is on and why it stopped.' },
     { table: 'learn.subject_preparation_steps', reason: 'Bookkeeping for preparing a subject: the steps of its run and what each produced.' },
     { table: 'learn.theme_fields', reason: 'Model placement of vault themes.' },

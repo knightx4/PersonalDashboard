@@ -1,7 +1,7 @@
 import type { ProviderId } from '@/lib/learn/goal-kind';
 import { describe, expect, it, vi } from 'vitest';
 import type { StepContext, PreparationStepRow } from './run';
-import { classifyStep, matchStep, pullStep, type PulledDocument } from './structure-steps';
+import { classifyStep, matchStep, pullStep, withAddedWeeks, type PulledDocument } from './structure-steps';
 
 function ctx(over: { detail?: Record<string, unknown>; now?: number; deadline?: number } = {}): StepContext {
   const step: PreparationStepRow = {
@@ -192,5 +192,24 @@ describe('matchStep', () => {
   it('finishes with none found rather than failing', async () => {
     const out = await matchStep({ embed: async () => ({ finished: true }), find: async () => ({ ok: true, weeks: [] }) })(ctx());
     expect(out).toMatchObject({ state: 'done', counts: { weeks: 0 } });
+  });
+
+  it('keeps every week of an added document, however far it scores, and names the documents', async () => {
+    const added = [{ ...week(9, 0.1), itemId: 'added' }];
+    const out = await matchStep({
+      embed: async () => ({ finished: true }),
+      find: async () => ({ ok: true, weeks: [week(1, 0.5)] }),
+      added: async () => ({ itemIds: ['added'], weeks: added }),
+    })(ctx());
+    expect(out).toMatchObject({ state: 'done', counts: { weeks: 2, documents: 2 }, detail: { added: ['added'] } });
+  });
+});
+
+describe('withAddedWeeks', () => {
+  const w = (id: string, similarity: number) => ({ segmentId: id, itemId: 'i', ordinal: 0, label: null, heading: id, similarity });
+
+  it('caps the found weeks but never the added ones, and lists none twice', () => {
+    const weeks = withAddedWeeks([w('a', 0.9), w('b', 0.8), w('c', 0.7)], [w('c', 0.7), w('x', 0.2), w('y', 0.1)], 2);
+    expect(weeks.map((x) => x.segmentId)).toEqual(['a', 'b', 'c', 'x', 'y']);
   });
 });
