@@ -26,6 +26,7 @@ const contactSchema = z.object({
   howWeConnect: z.string().trim().optional(),
   notes: z.string().trim().optional(),
   potentialLead: z.boolean().default(false),
+  foundByDash: z.boolean().default(false),
 });
 
 // latency: pending
@@ -43,6 +44,7 @@ export async function createContact(
     howWeConnect: formData.get('howWeConnect') ?? '',
     notes: formData.get('notes') ?? '',
     potentialLead: formData.get('potentialLead') === 'on',
+    foundByDash: formData.get('foundByDash') === 'on',
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -61,6 +63,7 @@ export async function createContact(
     how_we_connect: parsed.data.howWeConnect || null,
     notes: parsed.data.notes || null,
     potential_lead: parsed.data.potentialLead,
+    found_by_dash: parsed.data.foundByDash,
   });
 
   if (error) return { error: error.message };
@@ -84,6 +87,7 @@ const contactPatchSchema = z
     relationship: z.enum(RELATIONSHIPS),
     status: z.enum(STATUSES),
     potentialLead: z.boolean(),
+    foundByDash: z.boolean(),
   })
   .partial();
 
@@ -99,6 +103,7 @@ const COLUMNS: Record<keyof ContactPatch, string> = {
   relationship: 'relationship',
   status: 'status',
   potentialLead: 'potential_lead',
+  foundByDash: 'found_by_dash',
 };
 
 /**

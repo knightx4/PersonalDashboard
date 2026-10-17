@@ -128,6 +128,16 @@ function ContactDetails({
           />
           Potential lead
         </label>
+        <label className="flex cursor-pointer items-center gap-2 text-ui text-ink">
+          <Switch
+            checked={contact.foundByDash}
+            onChange={(event) => {
+              const foundByDash = event.target.checked;
+              save({ foundByDash }, { foundByDash });
+            }}
+          />
+          Found by Dash
+        </label>
       </div>
 
       <ValueList className="mt-3">

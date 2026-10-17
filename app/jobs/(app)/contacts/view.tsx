@@ -35,6 +35,7 @@ export interface ContactRow {
   howWeConnect: string | null;
   notes: string | null;
   potentialLead: boolean;
+  foundByDash: boolean;
   companyName: string | null;
   companySlug: string | null;
   touches: Array<{
@@ -60,6 +61,8 @@ export interface ContactListRow {
   pendingReplies: number;
   /** Someone who could lead to a job, marked on their page or by an agent that found them. */
   potentialLead: boolean;
+  /** Found by Dash or an agent searching for people, not added by the person. */
+  foundByDash: boolean;
 }
 
 export function ContactsView({
@@ -76,9 +79,15 @@ export function ContactsView({
   // itself, and filled the right column on a laptop.
   const [adding, setAdding] = useState(false);
   // Everyone, or only the people marked as potential leads.
-  const [show, setShow] = useState<'all' | 'leads'>('all');
+  const [show, setShow] = useState<'all' | 'leads' | 'dash'>('all');
   const leadCount = contacts.filter((c) => c.potentialLead).length;
-  const shown = show === 'leads' ? contacts.filter((c) => c.potentialLead) : contacts;
+  const dashCount = contacts.filter((c) => c.foundByDash).length;
+  const shown =
+    show === 'leads'
+      ? contacts.filter((c) => c.potentialLead)
+      : show === 'dash'
+        ? contacts.filter((c) => c.foundByDash)
+        : contacts;
 
   const addButton = (
     <Button type="button" variant="secondary" size="sm" onClick={() => setAdding(true)}>
@@ -99,6 +108,7 @@ export function ContactsView({
             options={[
               { value: 'all', label: `Everyone ${contacts.length}` },
               { value: 'leads', label: `Potential leads ${leadCount}` },
+              { value: 'dash', label: `Found by Dash ${dashCount}` },
             ]}
           />
           {!adding && <span className="ml-auto">{addButton}</span>}
@@ -113,8 +123,9 @@ export function ContactsView({
 
       {contacts.length > 0 && shown.length === 0 && (
         <p className="text-ui text-ink-muted">
-          Nobody is marked as a potential lead yet. Mark someone on their page, or have an agent
-          mark the people it finds.
+          {show === 'leads'
+            ? 'Nobody is marked as a potential lead yet. Mark someone on their page, or have an agent mark the people it finds.'
+            : 'Dash has not found anyone yet. People an agent adds through Dash show here.'}
         </p>
       )}
 
@@ -146,6 +157,7 @@ export function ContactsView({
                     </Link>
                     {contact.title && <span className="ml-1.5 text-ink-muted">{contact.title}</span>}
                     {contact.potentialLead && <Chip className="ml-1.5">lead</Chip>}
+                    {contact.foundByDash && <Chip className="ml-1.5">found by Dash</Chip>}
                   </p>
                   {/* The date keeps its place at the right end; what comes
                     * before it is what shortens when the line runs out. */}
@@ -181,6 +193,7 @@ export function ContactsView({
                     <TD primary>
                       {contact.fullName}
                       {contact.potentialLead && <Chip className="ml-1.5">lead</Chip>}
+                      {contact.foundByDash && <Chip className="ml-1.5">found by Dash</Chip>}
                       {/* Under the name, so the name column does not crowd
                         * the date off the table's edge (law 18). */}
                       {contact.title && (
@@ -289,6 +302,7 @@ function AddContactForm({
         </Field>
       </div>
       <CheckRow name="potentialLead" title="Potential lead" hint="Someone who could lead to a job." />
+      <CheckRow name="foundByDash" title="Found by Dash" hint="Dash or an agent found them, rather than you knowing them." />
 
       {/* The action returns one error for the whole form, not one per field,
           so it sits under the fields rather than beside one of them. */}
