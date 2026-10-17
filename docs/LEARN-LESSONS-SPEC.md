@@ -203,7 +203,24 @@ on every run, whether or not the deck is short, a pass finds laid-out units of
 goal tracks with no pieces and writes up to two (`writeDuePieces` in
 `lib/learn/lessons/pieces.ts`). The pass covers units laid out any other way,
 such as by opening the unit on the track page, and the units laid out before
-pieces existed. Tracks not made from a goal get no pieces.
+pieces existed.
+
+A subject whose preparation has finished gets pieces the same way without a
+goal (plan #2292.1). The preparation's last step, `first_lesson`
+(`lib/learn/prepare/first-lesson-step.ts`), lays out unit 1 with the unit's
+own question, splits it into pieces, matches them to the territory's cells and
+writes the lessons of the first piece's ideas, so the subject has a lesson to
+read when the run ends. After that the top-up treats the subject as it treats
+a goal's track: `planSubjects` in `lib/learn/lessons/plan-store.ts` returns the
+active goals' tracks and the prepared subjects, and the plan pass, the pieces
+pass and the lay-out port all read it. Later units are laid out one ahead of
+the person and split as they are reached. A track that is neither a goal's nor
+a prepared subject still gets no pieces.
+
+The lesson's catalogue search reads one more kind of source for every track:
+units of stored structure documents whose licence is show
+(`learn.nearest_lesson_segments`, learn 0174). A structure_only or never_feed
+unit is never given to the lesson call.
 
 ### A piece is worked through on its own page
 

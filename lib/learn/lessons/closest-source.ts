@@ -15,7 +15,9 @@ import type { EmbeddingClient } from '@/lib/learn/embed/voyage';
  * enough, and null otherwise.
  *
  * The claim is embedded as a query and the catalogue read through
- * `findNearestSegments`, the same path the read button's search takes. Nothing
+ * `findNearestSegments`, the path the read button's search takes, with the
+ * `lessons` search: it also reads the units of structure documents whose
+ * licence is show, and never a structure_only or never_feed one. Nothing
  * is judged here and no link is written. The lesson call reads the section and
  * says whether it is about the claim at all, so a section that passes the
  * floor and turns out to be about something else costs the input tokens of one
@@ -108,7 +110,9 @@ export async function findLessonSource(
   if (!text) return null;
   const find = options.find ?? findNearestSegments;
   try {
+    // The lesson search also reads shown structure documents (plan #2292.1).
     const outcome = await find(supabase, text, {
+      search: 'lessons',
       limit: 1,
       minSimilarity: LESSON_SOURCE_MIN_SIMILARITY,
       onSpend: options.onSpend,

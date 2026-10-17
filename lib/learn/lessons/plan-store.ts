@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { nextUnitToOpen } from './lay-out-unit';
 import { unitStarted, type PlanLayoutDue } from './plan-layout';
 import { pieceState, planFinished, planProgress, type PlanProgress, type PlanUnit } from './plan-view';
@@ -31,6 +32,38 @@ export async function goalsWithTracks(learn: LearnSupabaseClient, userId: string
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
   return (data ?? []) as AimRow[];
+}
+
+/** A subject the plan pipeline lays out and writes: a goal's track, or a prepared subject. */
+export type PlanSubject = { subjectId: string; aimId: string | null };
+
+/**
+ * Every subject the pipeline lays out, splits into pieces and writes lessons
+ * for (plan #2292.1): the active goals' tracks, oldest goal first, then each
+ * subject whose own preparation has finished and is no goal's track. A
+ * prepared subject needs no goal; its first unit is written by the
+ * preparation's first_lesson step and its later ones by the top-up from here.
+ */
+export async function planSubjects(learn: LearnSupabaseClient, userId: string): Promise<PlanSubject[]> {
+  const [aims, prepared] = await Promise.all([goalsWithTracks(learn, userId), preparedSubjectIds(learn, userId)]);
+  const out: PlanSubject[] = [];
+  const seen = new Set<string>();
+  for (const aim of aims) {
+    if (seen.has(aim.subject_id)) continue;
+    seen.add(aim.subject_id);
+    out.push({ subjectId: aim.subject_id, aimId: aim.id });
+  }
+  for (const subjectId of prepared) {
+    if (seen.has(subjectId)) continue;
+    seen.add(subjectId);
+    out.push({ subjectId, aimId: null });
+  }
+  return out;
+}
+
+/** The subject ids `planSubjects` returns, for a caller that only asks whether one is in it. */
+export async function planSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  return new Set((await planSubjects(learn, userId)).map((one) => one.subjectId));
 }
 
 /**
@@ -258,7 +291,8 @@ async function loadUnitsStarted(
 }
 
 /**
- * Goal tracks with a unit that has no ideas laid out yet, oldest goal first,
+ * Goal tracks and prepared subjects (`planSubjects`) with a unit that has no
+ * ideas laid out yet, oldest goal first and prepared subjects after,
  * leaving out tracks held after a failed layout and tracks whose latest
  * laid-out unit the person has not started (`unitStarted`), so a plan is laid
  * out one unit ahead of use. For the top-up's plan pass (`plan-layout.ts`); it
@@ -270,8 +304,7 @@ export async function loadPlanLayoutsDue(
   limit: number,
   now: Date = new Date(),
 ): Promise<PlanLayoutDue[]> {
-  const aims = await goalsWithTracks(learn, userId);
-  const subjectIds = [...new Set(aims.map((aim) => aim.subject_id))];
+  const subjectIds = (await planSubjects(learn, userId)).map((one) => one.subjectId);
   if (subjectIds.length === 0 || limit <= 0) return [];
 
   const [subjects, units, goals] = await Promise.all([
