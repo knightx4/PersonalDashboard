@@ -8,8 +8,8 @@ import { lensLine, meanText, type FieldLevel, type LensSummary } from '@/lib/lea
  * The Know page's lenses and fields (docs/LEARN-LEVELS-SPEC.md, "Lenses:
  * subjects and goals"; plan #2138.7).
  *
- * Every subject is a lens, so a subject's row opens its lens and says how far
- * along it is to its targets. A subject whose lens has no topics yet keeps
+ * Every subject is a lens, so a subject's row says how far along it is to its
+ * targets. The row opens the subject's own page, which links to the lens. A subject whose lens has no topics yet keeps
  * the claims graph's count until it is moved. The learning goals follow as
  * lenses of their own, then each field by the mean level of its topics.
  *
@@ -40,7 +40,7 @@ export function SubjectLenses({ rows }: { rows: readonly SubjectLensRow[] }) {
         {rows.map((row) => (
           <li key={row.subjectId}>
             <Link
-              href={row.lens ? `/learn/lens/${row.lens.id}` : `/learn/s/${row.subjectId}`}
+              href={`/learn/s/${row.subjectId}`}
               className="card-pad-x row-pad flex min-h-11 items-center justify-between gap-3 hover:bg-sunken"
             >
               <span className="min-w-0">
