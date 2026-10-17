@@ -4,8 +4,8 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { scheduleIdeas } from './review-store';
 import { passedState, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
-import { checkCell, type PieceCellView } from './piece-cells';
-import { loadCellCheck, loadPieceCells } from './piece-cells-store';
+import { pieceCheckCell, type PieceCellView } from './piece-cells';
+import { loadCellCheck, loadPieceCellsAndLadder } from './piece-cells-store';
 
 /**
  * The reads and writes behind a piece's page (plan #1141). Shared by the page
@@ -34,10 +34,24 @@ export type PieceIdea = {
   dropped: string | null;
 };
 
-export type PieceSibling = { id: string; ordinal: number; title: string; passed: boolean };
+export type PieceSibling = {
+  id: string;
+  ordinal: number;
+  title: string;
+  passed: boolean;
+  /** A placement found it held (plan #2292.5): it opens short and asks a level higher. */
+  held?: boolean;
+};
 
 export type PiecePage = {
-  piece: { id: string; ordinal: number; title: string; passedAt: string | null };
+  piece: {
+    id: string;
+    ordinal: number;
+    title: string;
+    passedAt: string | null;
+    /** When a placement showed you hold every cell it teaches (plan #2292.5); its lessons open folded. */
+    heldAt: string | null;
+  };
   subject: { id: string; name: string };
   unit: { id: string; ordinal: number; title: string; outcome: string | null };
   /** Every piece of the unit, this one included, in the suggested order. */
@@ -50,6 +64,12 @@ export type PiecePage = {
   cells: PieceCellView[];
   /** The latest question asked on the piece, or null before the first. */
   check: PieceCheck | null;
+  /**
+   * The cell the piece's check asks about, or null when it asks its own
+   * written question: the level the piece reaches, or for a held piece the
+   * level above what was shown (plan #2292.5).
+   */
+  checkOn: PieceCellView | null;
 };
 
 type PieceRow = {
@@ -61,6 +81,7 @@ type PieceRow = {
   concept_ids: string[];
   cell_ids: string[];
   passed_at: string | null;
+  held_at: string | null;
 };
 
 type LessonRow = {
@@ -76,7 +97,7 @@ type LessonRow = {
   drop_reason: string | null;
 };
 
-const PIECE_COLUMNS = 'id, subject_id, unit_id, ordinal, title, concept_ids, cell_ids, passed_at';
+const PIECE_COLUMNS = 'id, subject_id, unit_id, ordinal, title, concept_ids, cell_ids, passed_at, held_at';
 
 /** The piece, when it is the person's and on this track. */
 export async function loadPieceRow(
@@ -197,7 +218,7 @@ export async function loadPiecePage(
   const piece = await loadPieceRow(learn, userId, subjectId, pieceId);
   if (!piece) return null;
 
-  const [subject, unit, siblings, ideas, lessons, ownCheck, cells] = await Promise.all([
+  const [subject, unit, siblings, ideas, lessons, ownCheck, { cells, ladder }] = await Promise.all([
     learn.from('subjects').select('id, name').eq('id', subjectId).eq('user_id', userId).maybeSingle(),
     learn
       .from('curriculum_units')
@@ -207,18 +228,20 @@ export async function loadPiecePage(
       .maybeSingle(),
     learn
       .from('plan_pieces')
-      .select('id, ordinal, title, passed_at')
+      .select('id, ordinal, title, passed_at, held_at')
       .eq('unit_id', piece.unit_id)
       .eq('user_id', userId)
       .order('ordinal'),
     loadIdeas(learn, userId, piece.concept_ids),
     loadLessons(learn, userId, piece.concept_ids),
     loadLatestCheck(learn, userId, piece.id),
-    loadPieceCells(learn, userId, piece.cell_ids),
+    loadPieceCellsAndLadder(learn, userId, piece.cell_ids),
   ]);
   // A piece with a cell it can ask about checks with a cell question; one
-  // without keeps its own written question (plan #2138.13).
-  const check = checkCell(cells)
+  // without keeps its own written question (plan #2138.13). A held piece asks
+  // the level above what the placement showed (plan #2292.5).
+  const checkOn = pieceCheckCell(cells, ladder, piece.held_at !== null);
+  const check = checkOn
     ? await loadCellCheck(learn, userId, piece.id)
     : ownCheck
       ? toPieceCheck(ownCheck)
@@ -229,12 +252,24 @@ export async function loadPiecePage(
   if (!subject.data || !unit.data) return null;
 
   return {
-    piece: { id: piece.id, ordinal: piece.ordinal, title: piece.title, passedAt: piece.passed_at },
+    piece: {
+      id: piece.id,
+      ordinal: piece.ordinal,
+      title: piece.title,
+      passedAt: piece.passed_at,
+      heldAt: piece.held_at,
+    },
     subject: subject.data as { id: string; name: string },
     unit: unit.data as PiecePage['unit'],
-    siblings: ((siblings.data ?? []) as { id: string; ordinal: number; title: string; passed_at: string | null }[]).map(
-      (row) => ({ id: row.id, ordinal: row.ordinal, title: row.title, passed: row.passed_at !== null }),
-    ),
+    siblings: (
+      (siblings.data ?? []) as { id: string; ordinal: number; title: string; passed_at: string | null; held_at: string | null }[]
+    ).map((row) => ({
+      id: row.id,
+      ordinal: row.ordinal,
+      title: row.title,
+      passed: row.passed_at !== null,
+      held: row.held_at !== null,
+    })),
     ideas: ideas.map((idea) => {
       const lesson = lessons.get(idea.id);
       return {
@@ -247,6 +282,7 @@ export async function loadPiecePage(
     }),
     cells,
     check,
+    checkOn,
   };
 }
 
@@ -256,7 +292,13 @@ export async function loadPieceForCheck(
   userId: string,
   subjectId: string,
   pieceId: string,
-): Promise<{ piece: PieceForCheck; conceptIds: string[]; cellIds: string[]; passedAt: string | null } | null> {
+): Promise<{
+  piece: PieceForCheck;
+  conceptIds: string[];
+  cellIds: string[];
+  passedAt: string | null;
+  heldAt: string | null;
+} | null> {
   const row = await loadPieceRow(learn, userId, subjectId, pieceId);
   if (!row) return null;
   const [subject, unit, ideas] = await Promise.all([
@@ -279,6 +321,7 @@ export async function loadPieceForCheck(
     conceptIds: ideas.map((idea) => idea.id),
     cellIds: row.cell_ids,
     passedAt: row.passed_at,
+    heldAt: row.held_at,
   };
 }
 
@@ -367,15 +410,16 @@ export async function loadTrackPieces(
 ): Promise<Map<string, PieceSibling[]>> {
   const { data, error } = await learn
     .from('plan_pieces')
-    .select('id, unit_id, ordinal, title, passed_at')
+    .select('id, unit_id, ordinal, title, passed_at, held_at')
     .eq('user_id', userId)
     .eq('subject_id', subjectId)
     .order('ordinal');
   if (error) throw new Error(`Reading the subject's pieces failed: ${error.message}`);
   const byUnit = new Map<string, PieceSibling[]>();
-  for (const row of (data ?? []) as { id: string; unit_id: string; ordinal: number; title: string; passed_at: string | null }[]) {
+  type Row = { id: string; unit_id: string; ordinal: number; title: string; passed_at: string | null; held_at: string | null };
+  for (const row of (data ?? []) as Row[]) {
     const list = byUnit.get(row.unit_id) ?? [];
-    list.push({ id: row.id, ordinal: row.ordinal, title: row.title, passed: row.passed_at !== null });
+    list.push({ id: row.id, ordinal: row.ordinal, title: row.title, passed: row.passed_at !== null, held: row.held_at !== null });
     byUnit.set(row.unit_id, list);
   }
   return byUnit;

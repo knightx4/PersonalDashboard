@@ -288,9 +288,9 @@ a right answer to the piece's own question does. A case's expected answer
 stays with the grader and is never shown. A piece with no cells it can ask
 about keeps the check above.
 
-### A placement passes the pieces you already hold
+### A placement holds the pieces you already know
 
-Plan #2292.2. Before a subject's first lesson you can answer a few questions
+Plan #2292.2, changed by #2292.5. Before a subject's first lesson you can answer a few questions
 so Dash knows where to start you. A placement is a Practice Flow run on the
 subject's lens with `placement=1` in `practiceHref`
 (`app/learn/flow/placement.tsx`). It asks up to eight questions and nothing
@@ -304,14 +304,21 @@ and move the lens as any practice answer does.
 Every question carries Skip to the lesson where a practice run has End run.
 The placement ends on the eighth answer, when no topic has a level left to
 place, or on Skip. At the end, every piece of the subject's laid-out units
-whose matched cells are all held is passed with `passed_reason = 'placement'`
-(learn 0175); a piece with no cells on the map is never passed this way, and
-its ideas are not put on the review schedule, since nothing here taught them.
-The end page lists each topic answered on with the level it now stands at and
-the pieces passed, and its forward action opens the first piece not passed.
-Skip goes straight to that piece. A piece's own check now writes
-`passed_reason = 'check'`; a piece passed before learn 0175 has no reason and
-was passed by its check.
+whose matched cells are all held is marked held: `held_at` and
+`held_reason = 'placement'` (learn 0180). A piece with no cells on the map is
+never held this way. Placement passes nothing. A held piece still opens: its
+lessons are folded to their takeaways, each with Open the lesson, and its
+check asks the level above what was shown, the lowest cell above the highest
+held one on the topics the piece's cells sit on (`aboveHeldCell` in
+`lib/learn/lessons/piece-cells.ts`), falling back to the piece's own level
+when those topics are held to the top. Passing that check, with the
+practice, passes the piece as any piece passes, with
+`passed_reason = 'check'`. The end page lists each topic answered on with the
+level it now stands at and the pieces held, which are shown short and asked
+harder, and its forward action opens the first piece not passed, held or
+not, so a fresh subject still opens on unit 1's first piece. Skip goes
+straight to that piece. Between learn 0175 and 0180 a placement passed held
+pieces with `passed_reason = 'placement'`; no piece was passed that way.
 
 ### A piece has a practice task
 

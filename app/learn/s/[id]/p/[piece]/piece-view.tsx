@@ -25,6 +25,7 @@ import {
 import { LinkedText } from '@/components/ui/linked-text';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Disclosure } from '@/components/ui/disclosure';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -44,10 +45,13 @@ export function PieceLessons({
   subjectId,
   pieceId,
   ideas: initial,
+  folded = false,
 }: {
   subjectId: string;
   pieceId: string;
   ideas: PieceIdea[];
+  /** Each lesson folded to its takeaway, for a piece a placement found held (plan #2292.5). */
+  folded?: boolean;
 }) {
   const { ideas, writing } = useWrittenLessons(subjectId, pieceId, initial);
 
@@ -55,7 +59,7 @@ export function PieceLessons({
     <ol className="space-y-4">
       {ideas.map((idea, index) => (
         <li key={idea.conceptId}>
-          <LessonCard idea={idea} number={index + 1} writing={writing[idea.conceptId] ?? null} />
+          <LessonCard idea={idea} number={index + 1} writing={writing[idea.conceptId] ?? null} folded={folded} />
         </li>
       ))}
     </ol>
@@ -116,7 +120,18 @@ export function useWrittenLessons(
   return { ideas, writing };
 }
 
-export function LessonCard({ idea, number, writing }: { idea: PieceIdea; number: number; writing: Writing | null }) {
+export function LessonCard({
+  idea,
+  number,
+  writing,
+  folded = false,
+}: {
+  idea: PieceIdea;
+  number: number;
+  writing: Writing | null;
+  /** Shows the takeaway alone, with the rest behind Open the lesson (plan #2292.5). */
+  folded?: boolean;
+}) {
   const { lesson } = idea;
   return (
     <Card padding="standard">
@@ -129,6 +144,36 @@ export function LessonCard({ idea, number, writing }: { idea: PieceIdea; number:
             <h3 className="text-small font-semibold text-accent">The takeaway</h3>
             <p className="mt-1 text-body font-medium text-ink">{lesson.takeaway}</p>
           </section>
+          {folded ? (
+            <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
+              <LessonBody lesson={lesson} />
+            </Disclosure>
+          ) : (
+            <LessonBody lesson={lesson} />
+          )}
+        </>
+      ) : (
+        <>
+          <p className="mt-2 text-body text-ink">{idea.claim}</p>
+          <p className="mt-2 text-small text-ink-muted" aria-live="polite">
+            {idea.dropped
+              ? `Dash could not write a lesson for this idea: ${idea.dropped}`
+              : writing?.state === 'failed'
+                ? `The lesson could not be written: ${writing.detail}`
+                : writing?.state === 'writing'
+                  ? 'Dash is writing this lesson…'
+                  : 'Waiting for the lesson before it to be written…'}
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** A written lesson below its takeaway: the context, the hook, the example and Try this. */
+function LessonBody({ lesson }: { lesson: NonNullable<PieceIdea['lesson']> }) {
+  return (
+    <>
           {lesson.context && <p className="mt-3 text-body text-ink">{lesson.context}</p>}
           {lesson.hook && <p className="mt-3 text-body font-semibold text-ink">{lesson.hook}</p>}
           {lesson.summary && <p className="mt-2 text-body text-ink">{lesson.summary}</p>}
@@ -151,22 +196,7 @@ export function LessonCard({ idea, number, writing }: { idea: PieceIdea; number:
               </details>
             </section>
           )}
-        </>
-      ) : (
-        <>
-          <p className="mt-2 text-body text-ink">{idea.claim}</p>
-          <p className="mt-2 text-small text-ink-muted" aria-live="polite">
-            {idea.dropped
-              ? `Dash could not write a lesson for this idea: ${idea.dropped}`
-              : writing?.state === 'failed'
-                ? `The lesson could not be written: ${writing.detail}`
-                : writing?.state === 'writing'
-                  ? 'Dash is writing this lesson…'
-                  : 'Waiting for the lesson before it to be written…'}
-          </p>
-        </>
-      )}
-    </Card>
+    </>
   );
 }
 
@@ -192,7 +222,7 @@ export function PiecePassing({
   practicePassed: boolean;
   checkPassed: boolean;
   /** The cell the check asks about, when the piece names one it can ask (plan #2138.13). */
-  checkOn?: { topicName: string; level: number } | null;
+  checkOn?: { topicName: string; level: number; above?: boolean } | null;
 }) {
   const router = useRouter();
   const [passedAt, setPassedAt] = useState(initialPassedAt);
@@ -486,7 +516,7 @@ function PieceCheckCard({
   passedAt: string | null;
   practicePassed: boolean;
   checkPassed: boolean;
-  checkOn: { topicName: string; level: number } | null;
+  checkOn: { topicName: string; level: number; above?: boolean } | null;
   onAnswered: (result: AnswerResult) => void;
 }) {
   const [check, setCheck] = useState(initialCheck);
@@ -528,7 +558,9 @@ function PieceCheckCard({
   // piece would ask about. Null on a piece that names no cells.
   const on = check?.cell ?? checkOn;
   const what = on
-    ? `One question on ${on.topicName} at level ${on.level}, the level this piece reaches, answered from memory.`
+    ? `One question on ${on.topicName} at level ${on.level}, ${
+        checkOn?.above ? 'one above what your placement showed' : 'the level this piece reaches'
+      }, answered from memory.`
     : 'One question needing this piece’s ideas together, answered from memory.';
 
   return (

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   PIECE_CELLS_MAX,
+  aboveHeldCell,
   checkCell,
+  pieceCheckCell,
   pieceCellsPrompt,
   readPieceCells,
   territoryCells,
@@ -97,6 +99,45 @@ describe('checkCell', () => {
     expect(checkCell([view('a', 10), view('b', 3)])?.cellId).toBe('b');
     expect(checkCell([view('a', 10)])).toBeNull();
     expect(checkCell([])).toBeNull();
+  });
+});
+
+describe('aboveHeldCell and pieceCheckCell (plan #2292.5)', () => {
+  const on = (cellId: string, topicId: string, level: number, status: PieceCellView['status'] = 'open'): PieceCellView => ({
+    cellId,
+    topicId,
+    topicName: topicId,
+    level,
+    status,
+  });
+  const cells = [on('e3', 'e', 3, 'shown'), on('r2', 'r', 2, 'implied')];
+  const ladder = [
+    on('e1', 'e', 1, 'shown'),
+    on('e3', 'e', 3, 'shown'),
+    on('e4', 'e', 4),
+    on('e5', 'e', 5),
+    on('r1', 'r', 1, 'shown'),
+    on('r2', 'r', 2, 'implied'),
+    on('r3', 'r', 3, 'shown'),
+    on('r4', 'r', 4),
+  ];
+
+  it('asks the lowest unheld level above what was shown, on the piece’s topics', () => {
+    expect(aboveHeldCell(cells, ladder)?.cellId).toBe('e4');
+    expect(aboveHeldCell([on('r2', 'r', 2, 'implied')], ladder)?.cellId).toBe('r4');
+  });
+
+  it('skips a defence and is null when nothing above can be asked', () => {
+    const top = [on('x9', 'x', 9, 'shown')];
+    expect(aboveHeldCell(top, [...top, on('x10', 'x', 10)])).toBeNull();
+    expect(aboveHeldCell([on('e4', 'e', 4)], ladder)).toBeNull();
+  });
+
+  it('climbs only for a held piece, and falls back to the piece’s own level', () => {
+    expect(pieceCheckCell(cells, ladder, true)?.cellId).toBe('e4');
+    expect(pieceCheckCell(cells, ladder, false)?.cellId).toBe('e3');
+    const top = [on('x9', 'x', 9, 'shown')];
+    expect(pieceCheckCell(top, top, true)?.cellId).toBe('x9');
   });
 });
 

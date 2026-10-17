@@ -28,8 +28,15 @@ function map(topics: LevelTopic[], evidence: CellEvidence[] = []): TopicMap {
   return { topics, cells: cellsFor(topics), links: [], evidence };
 }
 
-function piece(id: string, unitOrdinal: number, ordinal: number, cellIds: string[], passed = false): PlacementPiece {
-  return { id, unitOrdinal, ordinal, title: id, cellIds, passed };
+function piece(
+  id: string,
+  unitOrdinal: number,
+  ordinal: number,
+  cellIds: string[],
+  passed = false,
+  held = false,
+): PlacementPiece {
+  return { id, unitOrdinal, ordinal, title: id, cellIds, passed, held };
 }
 
 const cellTopic = new Map(cellsFor([RENT, AGG, ZONE]).map((c) => [c.id, c.topicId]));
@@ -89,13 +96,14 @@ describe('heldPieces and firstNotHeld', () => {
   ]);
   const readings = readCells(m);
 
-  it('passes a piece whose cells are all held, and no other', () => {
+  it('holds a piece whose cells are all held, and no other', () => {
     const pieces = [
       piece('held', 1, 1, ['rent1', 'rent3']),
       piece('half', 1, 2, ['rent2', 'agg2']),
       piece('none', 1, 3, []),
       piece('gone', 1, 4, ['deleted-cell']),
       piece('already', 1, 5, ['rent1'], true),
+      piece('held-before', 1, 6, ['rent1'], false, true),
     ];
     expect(heldPieces(pieces, readings)).toEqual(['held']);
   });
@@ -104,6 +112,11 @@ describe('heldPieces and firstNotHeld', () => {
     const pieces = [piece('u2', 2, 1, []), piece('u1b', 1, 2, []), piece('u1a', 1, 1, [], true)];
     expect(firstNotHeld(pieces)?.id).toBe('u1b');
     expect(firstNotHeld([piece('x', 1, 1, [], true)])).toBeNull();
+  });
+
+  it('opens on unit 1 piece 1 when a placement held it (plan #2292.5)', () => {
+    const pieces = [piece('u1b', 1, 2, ['rent1']), piece('u1a', 1, 1, ['rent1', 'rent3'], false, true)];
+    expect(firstNotHeld(pieces)?.id).toBe('u1a');
   });
 });
 
