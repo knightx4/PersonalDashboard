@@ -1260,6 +1260,81 @@ describe('collections and records (plan #953)', () => {
   });
 });
 
+describe("a goal's own lists (plan #2330.2)", () => {
+  const fields = [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'picture', label: 'Picture', type: 'image' },
+    { key: 'store', label: 'Store', type: 'place' },
+    { key: 'reading', label: 'Reading', type: 'ref' },
+  ];
+  let list = '';
+
+  beforeAll(async () => {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, goal_id, name, fields)
+      values (${userA}, ${goalA}, 'Candidates', ${JSON.stringify(fields)}::text::jsonb) returning id`);
+    list = row.id;
+  });
+
+  async function addRow(data: Record<string, unknown>): Promise<string> {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data)
+      values (${userA}, ${list}, ${JSON.stringify(data)}::text::jsonb) returning id`);
+    return row.id;
+  }
+
+  it('serves the goal it belongs to, so its number can be counted from it', async () => {
+    const served = await admin<{ goal_id: string; archived_at: string | null }[]>`
+      select goal_id, archived_at from collection_goals where collection_id = ${list}`;
+    expect(served).toEqual([{ goal_id: goalA, archived_at: null }]);
+  });
+
+  it('belongs to a goal, never to a step', async () => {
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Measure the wall') returning id`);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields)
+        values (${userA}, ${step.id}, 'On a step', '[]'::jsonb)`),
+    ).rejects.toThrow(/a list belongs to a goal/);
+  });
+
+  it('keeps a picture, a place and a row in the app in their stored forms', async () => {
+    const id = await addRow({
+      name: 'HOMCOM 72',
+      picture: 'https://cdn.example.com/homcom.jpg',
+      store: { address: '1 Retail Park, Leeds', lat: 53.8, lng: -1.55 },
+      reading: 'learn.readings:3f1c0b8e-1111-4222-8333-444455556666',
+    });
+    expect(id).toBeTruthy();
+    await addRow({ store: { address: 'Typed in, not looked up' } });
+    await expect(addRow({ picture: 'not a picture' })).rejects.toThrow(/Picture must be a web address/);
+    await expect(addRow({ store: { address: '1 High St', lat: 53.8 } })).rejects.toThrow(/Store needs both coordinates/);
+    await expect(addRow({ store: '1 High St' })).rejects.toThrow(/Store must be an address/);
+    await expect(addRow({ store: { address: '1 High St', zip: 'LS1' } })).rejects.toThrow(/Store must be an address/);
+    await expect(addRow({ reading: 'a reading' })).rejects.toThrow(/Reading must point at a row in the app/);
+  });
+
+  it('lets two goals each keep a list of the same name, and one goal only one', async () => {
+    const [other] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title) values (${userA}, 'goal', ${areaA}, 'Find a desk') returning id`);
+    await asUser(userA, (tx) => tx`
+      insert into collections (user_id, goal_id, name, fields) values (${userA}, ${other.id}, 'Candidates', '[]'::jsonb)`);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields) values (${userA}, ${goalA}, 'candidates ', '[]'::jsonb)`),
+    ).rejects.toThrow(/collections_goal_name_key/);
+  });
+
+  it("keeps a list to its account's goals", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields) values (${userB}, ${goalA}, 'Theirs', '[]'::jsonb)`),
+    ).rejects.toThrow();
+  });
+});
+
 describe('comments on goals and steps (plan #957)', () => {
   // Since plan #1470 a goal's thread is kept in core.conversations under the
   // item's ref, and goals.comments only holds the old rows, read-only.

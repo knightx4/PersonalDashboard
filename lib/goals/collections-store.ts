@@ -5,6 +5,7 @@ import {
   idField,
   fieldsError,
   revisionError,
+  sameValue,
   type CollectionDefinition,
   type CollectionField,
   type CollectionShape,
@@ -374,7 +375,7 @@ export async function updateRecord(
 
 function sameValues(a: RecordValues, b: RecordValues): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const key of keys) if ((a[key] ?? null) !== (b[key] ?? null)) return false;
+  for (const key of keys) if (!sameValue(a[key], b[key])) return false;
   return true;
 }
 
