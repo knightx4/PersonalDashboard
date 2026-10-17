@@ -195,7 +195,9 @@ export function topicsNamed(units: readonly CurriculumUnit[], topics: readonly {
 export function writeUnitsStep(ports: WriteUnitsPorts): StepHandler {
   return async (ctx) => {
     const territory = await ports.territory(ctx.run.id);
-    if (!territory) return { state: 'skipped', reason: 'No territory was laid out, so the opening units stay as they were.' };
+    if (!territory) {
+      return { state: 'skipped', reason: 'No territory was laid out, so there is nothing to write the opening units from.' };
+    }
 
     const units = (await ports.units(ctx.subject.id)).sort((a, b) => a.ordinal - b.ordinal);
     const replaceable = units.filter((u) => u.placeholder && !u.passed);

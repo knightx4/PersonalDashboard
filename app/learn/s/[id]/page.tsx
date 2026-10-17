@@ -29,7 +29,7 @@ import { deleteSubject } from './actions';
 import { loadSubjectLearning, type SubjectLearning } from '@/lib/learn/chat/subject-load';
 import { ChannelsSection } from './channels';
 import { ChatLearningSection } from './chat-learning';
-import { WriteCurriculum } from './curriculum';
+import { CurriculumComing, WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
 import { PullCourse } from './pull-course';
@@ -39,7 +39,7 @@ import { directionOffer } from '@/lib/learn/prepare/branch';
 import { SourcesSection, StartHere } from './sources';
 import { loadDirection, loadPreparation, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { loadStartTopic } from '@/lib/learn/prepare/start-load';
-import { branchPreparationView, preparationSources, preparationView } from '@/lib/learn/prepare/view';
+import { branchPreparationView, preparationSources, preparationView, unitsComeAtStep } from '@/lib/learn/prepare/view';
 import {
   countStates,
   learningOrder,
@@ -339,6 +339,7 @@ export default async function SubjectPage({
     const view = branchPreparationView(b);
     return view ? [view] : [];
   });
+  const comingAt = units.length === 0 && preparation ? unitsComeAtStep(preparationView(preparation)) : null;
   const live =
     units.length > 0
       ? outside
@@ -459,7 +460,9 @@ export default async function SubjectPage({
       {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
       {units.length === 0 ? (
-        <WriteCurriculum subjectId={id} />
+        // While the run is going its write_units step writes them (plan
+        // #2276.9); a run that failed before it, or a subject with none, keeps the card.
+        comingAt ? <CurriculumComing {...comingAt} /> : <WriteCurriculum subjectId={id} />
       ) : (
         !showEverything &&
         (plan ? (
