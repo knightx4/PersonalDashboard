@@ -24,17 +24,21 @@ import {
   addPostImage,
   confirmXMatch,
   dismissXMatch,
+  demotePost,
   dropPost,
   editPostAngle,
   editPostBody,
   markPostPosted,
   postToX,
+  promotePost,
   removePostImage,
   restorePost,
   type PostsActionState,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
 import { AddImage } from './add-image';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 
 /**
  * One draft on the Posts tab (plan #1419): its angle, its post and any thread
@@ -52,6 +56,11 @@ import { AddImage } from './add-image';
  * Copy puts the whole thread on the clipboard with a blank line between
  * posts. In a thread each post has its own copy as well, since X takes a
  * thread one reply at a time.
+ *
+ * Last comes the comment thread (plan #2202.2), on a waiting or posted draft:
+ * an Add a comment control until one is written. "@dash make this shorter"
+ * gets a reply, and on a waiting draft Dash rewrites the text with
+ * rewrite_post; a comment without the tag is only kept.
  */
 
 function useCopy() {
@@ -355,6 +364,7 @@ function SuggestedActions({
           <Button type="button" size="sm" onClick={() => setPosting(true)}>
             {send.requests < card.post.body.length ? 'Post the rest' : 'Post'}
           </Button>
+          {/* dash-action-ok: X's price for a post the person makes; Dash never posts and no model runs. */}
           <CostHint text={xPriceLine(send)} what="Cost of posting to X" />
           {send.warnings.length > 0 && (
             <Tooltip label={`Worth a look: ${send.warnings.join('; ')}.`}>
@@ -460,6 +470,20 @@ function RestoreButton({ id }: { id: string }) {
   );
 }
 
+/** Promote on a suggested draft, Demote on a planned one (plan #2261.3). */
+function MoveButton({ id, planned }: { id: string; planned: boolean }) {
+  const [state, action, pending] = useActionState(planned ? demotePost : promotePost, {} as PostsActionState);
+  return (
+    <form action={action} className="flex items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <Button type="submit" size="sm" variant="ghost" pending={pending}>
+        {planned ? (pending ? 'Moving…' : 'Demote') : pending ? 'Planning…' : 'Promote'}
+      </Button>
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
 function StatusLine({ card }: { card: PostCard }) {
   const { post, day } = card;
   if (post.status === 'posted') {
@@ -552,15 +576,18 @@ export function PostItem({
   card,
   postAs = null,
   postArmed,
+  commentOpen,
 }: {
   card: PostCard;
   /** The handle a draft is posted as from the tab; null when the sign-in cannot post. */
   postAs?: string | null;
   /** Draw Post already pressed once, its confirm showing: the gallery's hidden part. */
   postArmed?: boolean;
+  /** Draw the comment box open: the gallery's hidden part. */
+  commentOpen?: boolean;
 }) {
   const { post } = card;
-  const editable = post.status === 'suggested';
+  const editable = post.status === 'suggested' || post.status === 'planned';
   const [editing, setEditing] = useState<number | null>(null);
   const { copied, copy } = useCopy();
   const thread = post.body.length > 1;
@@ -581,7 +608,11 @@ export function PostItem({
     <li id={`post-${post.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Angle id={post.id} angle={post.angle} editable={editable} />
-        <StatusLine card={card} />
+        {/* The day and the move sit on a line of their own, so the title keeps the card's width. */}
+        <div className={cn('flex items-center gap-x-3', editable && 'basis-full sm:basis-auto')}>
+          <StatusLine card={card} />
+          {editable && <MoveButton id={post.id} planned={post.status === 'planned'} />}
+        </div>
       </div>
 
       <ol className="flex flex-col gap-2" aria-label={thread ? 'The thread' : 'The post'}>
@@ -730,6 +761,17 @@ export function PostItem({
 
       {editable && editing === null && <SuggestedActions card={card} postAs={postAs} postArmed={postArmed} />}
       {post.status === 'dropped' && <RestoreButton id={post.id} />}
+
+      {post.status !== 'dropped' && (
+        <Thread
+          subject={threadRef('post', post.id)}
+          turns={card.thread}
+          composerOpen={commentOpen}
+          placeholder={
+            editable ? 'A note on this draft, or @dash to ask for a change.' : 'A note on this post, or a question for Dash.'
+          }
+        />
+      )}
     </li>
   );
 }

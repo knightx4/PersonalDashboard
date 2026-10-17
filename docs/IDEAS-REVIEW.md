@@ -12,7 +12,7 @@ filed. Nothing here is deleted.
 
 The two guards that keep the list from growing back are `lib/ideas/duplicate.ts`,
 which refuses a body close to one already filed, and `lib/ideas/rate.ts`, which
-stops a session filing more than two an hour.
+stops sessions filing more than three a day (two an hour until 15 October 2026).
 
 ## 17 September 2026 (plan #545)
 

@@ -2,8 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
@@ -55,8 +55,16 @@ export async function createTask(
   input: TaskInput,
   timezone: string,
 ): Promise<{ id: string | null; error: string | null }> {
-  const supabase = await createTodoClient();
+  return insertTask(await createTodoClient(), userId, input, timezone);
+}
 
+/** createTask on a client the caller made, such as the ask address's session as the token's owner. */
+export async function insertTask(
+  supabase: TodoSupabaseClient,
+  userId: string,
+  input: TaskInput,
+  timezone: string,
+): Promise<{ id: string | null; error: string | null }> {
   const { data, error } = await supabase
     .from('tasks')
     .insert({
@@ -300,12 +308,12 @@ export async function setTaskPinned(
 
 /**
  * "Later": out of sight until a moment (the start of the day chosen from the
- * Later menu), still open, still due when it was due. A week with no moment.
+ * Later menu), still open, still due when it was due.
  */
 export async function snoozeTask(
   userId: string,
   id: string,
-  until: Date = new Date(Date.now() + SNOOZE_DAYS * 86_400_000),
+  until: Date,
 ): Promise<{ error: string | null }> {
   const supabase = await createTodoClient();
   const { error } = await supabase

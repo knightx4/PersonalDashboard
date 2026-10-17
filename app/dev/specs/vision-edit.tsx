@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState } from 'react';
 import {
   acceptVisionEdit,
@@ -59,7 +60,7 @@ export function VisionEditPanel({
       const next = await dismissVisionEdit(prev, formData);
       if (!next.error)
         toast({
-          text: 'Declined',
+          text: closedToast('declined', `the edit to ${label}'s vision`),
           undo: async () => {
             const back = await reopenVisionEdit(edit.id);
             if (back.error) throw new Error(back.error);

@@ -84,12 +84,11 @@ export function GoalActivity({
         </Card>
       )}
       {/* The goal's own thread (plan #957). Each step has its own, on its
-          page. One frame: `onCard` drops the thread's own well. */}
+          page. One frame: the thread sits on the card's own ground. */}
       <Card padding="dense">
         <Thread
           subject={threadRef('goal', goalId)}
           turns={thread}
-          onCard
           label="Comment on this goal"
           placeholder="A note on the goal. Tag @dash to ask about it, or to give it figures to file."
         />

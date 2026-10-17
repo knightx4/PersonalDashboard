@@ -18,7 +18,10 @@ import type { CommentTarget } from '@/lib/comments/load';
  * (plan #957), a role in Jobs (note 89ad8bef), a file (note 7a6a37aa), or a
  * todo, an order, an inventory item, a saved news story or a vault note
  * (plan #1471), or a reading in Learn, where the thread is a chat with Dash
- * about it (plan #1876.5).
+ * about it (plan #1876.5), a topic in Learn, drafted or approved (plan
+ * #2138.2), a lens, a subject or goal seen as topics to targets (plan
+ * #2138.7), an X post draft (plan #2202.2), or an answer or the cover letter
+ * on a job application (note be3c6616).
  */
 export type ThreadTarget =
   | CommentTarget
@@ -30,7 +33,11 @@ export type ThreadTarget =
   | 'item'
   | 'story'
   | 'vault_note'
-  | 'reading';
+  | 'reading'
+  | 'topic'
+  | 'lens'
+  | 'answer'
+  | 'application';
 
 /** The table each target's rows live in, which is the table half of its ref. */
 export const THREAD_TABLES = {
@@ -41,6 +48,7 @@ export const THREAD_TABLES = {
   spec: 'public.spec_sections',
   takeaway: 'public.inspiration_takeaways',
   change: 'public.spec_changes',
+  post: 'public.social_posts',
   goal: 'goals.items',
   role: 'job_search.roles',
   file: 'core.files',
@@ -50,6 +58,10 @@ export const THREAD_TABLES = {
   story: 'news.saved_stories',
   vault_note: 'obsidian.notes',
   reading: 'learn.readings',
+  topic: 'learn.topics',
+  lens: 'learn.lenses',
+  answer: 'job_search.application_answers',
+  application: 'job_search.applications',
 } as const satisfies Record<ThreadTarget, string>;
 
 const TARGET_OF = new Map<string, ThreadTarget>(

@@ -27,7 +27,7 @@
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
  *                                # either way, one close to an idea already
  *                                # filed is refused and names what it matched,
- *                                # and at most two an hour are written
+ *                                # and at most three a day are written
  *   npx tsx scripts/plan.ts raise "<title>" --ask "…" --consequence "<action>: <what>"
  *                                [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
@@ -55,9 +55,10 @@
  *                                # main: closes every step marked built under it,
  *                                # with the same checks done makes
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
- *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
- *                                [--on-steps]   # waiting on the steps it names,
- *                                # rather than on something only you can supply
+ *   npx tsx scripts/plan.ts block <n> --ask "what it needs" --on <m>[,<m>] [--note "the rest"]
+ *                                # waits on the steps it names: a decision, a
+ *                                # setup job (needs) or a ready step; never on
+ *                                # the person directly
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
@@ -90,19 +91,22 @@
  * Which account: `--user <id or email prefix>`, or PLAN_USER in the
  * environment; when exactly one account has a plan, that one without asking.
  *
- * Needs DATABASE_URL (service role). The reading -- nesting, what is ready,
+ * Needs DATABASE_URL (service role), or in a cloud session
+ * SUPABASE_SERVICE_ROLE_KEY, which sends each statement over HTTPS through
+ * public.service_sql (migration 0241). The reading -- nesting, what is ready,
  * the brief -- is lib/plan/tree.ts and lib/plan/brief.ts, the same code the
  * page runs, so the two cannot disagree about what is next.
  */
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { httpsSql, restTransport } from '../lib/db/https-sql';
 import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { isModuleId } from '../lib/modules';
 import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
-import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
@@ -131,7 +135,7 @@ import {
   parseDelay,
   type CheckBack,
 } from '../lib/plan/check-backs';
-import { blockAskRefusal } from '../lib/plan/block-ask';
+import { blockAskRefusal, blockTargetRefusal, BLOCK_ROUTES } from '../lib/plan/block-ask';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import {
   isPlanUpdateHealth,
@@ -187,8 +191,17 @@ import {
  */
 function connect() {
   const url = process.env.DATABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // A cloud session's proxy carries HTTPS and not Postgres, so there each
+  // statement goes through the REST API instead (lib/db/https-sql.ts).
+  if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
+    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    return httpsSql(restTransport(rest, key)) as unknown as ReturnType<typeof postgres>;
+  }
   if (!url) {
-    console.error('DATABASE_URL is not set. It is needed to read the plan.');
+    console.error(
+      'Neither DATABASE_URL nor SUPABASE_SERVICE_ROLE_KEY is set. One is needed to read the plan.',
+    );
     process.exit(1);
   }
   return postgres(url, { max: 2, prepare: false, onnotice: () => {} });
@@ -226,7 +239,9 @@ async function checkRowWriting(
     const reports: SpendReport[] = [];
     const result = await checkWriting({ text, enabled, onSpend: (report) => reports.push(report) });
     for (const report of reports) {
-      await sql`insert into core.model_spend ${sql(writingSpendRow(userId, report))}`.catch(() => {});
+      await sql`insert into core.model_spend ${sql(writingSpendRow(userId, report))}`.catch(
+        () => {},
+      );
     }
 
     const warning = writingWarning(result);
@@ -374,7 +389,11 @@ async function resolveUser(sql: Sql): Promise<string> {
       select id from auth.users
       where id::text like ${`${wanted}%`} or email like ${`${wanted}%`}`;
     if (rows.length === 1) return rows[0].id;
-    fail(rows.length === 0 ? `No account matches "${wanted}".` : `"${wanted}" matches ${rows.length} accounts.`);
+    fail(
+      rows.length === 0
+        ? `No account matches "${wanted}".`
+        : `"${wanted}" matches ${rows.length} accounts.`,
+    );
   }
 
   const owners = await sql<{ user_id: string }[]>`select distinct user_id from plan_items`;
@@ -461,6 +480,16 @@ async function loadVisions(sql: Sql, userId: string): Promise<VisionBodies> {
   return Object.fromEntries(rows.map((row) => [row.module, row.body])) as VisionBodies;
 }
 
+/** The drawings on plan rows, by the row they sit on, for the brief to name (not the SVGs). */
+async function loadPictures(sql: Sql, userId: string): Promise<Record<string, BriefPicture[]>> {
+  const rows = await sql<{ id: string; item_id: string; caption: string }[]>`
+    select id, item_id, caption from plan_item_pictures
+    where user_id = ${userId} order by position, created_at`;
+  const out: Record<string, BriefPicture[]> = {};
+  for (const row of rows) (out[row.item_id] ??= []).push({ id: row.id, caption: row.caption });
+  return out;
+}
+
 async function loadTree(sql: Sql, userId: string): Promise<PlanSection[]> {
   return (await loadState(sql, userId)).sections;
 }
@@ -500,7 +529,9 @@ function readable(text: string): string {
 async function byNumber(sql: Sql, userId: string, raw: string | undefined): Promise<PlanItem> {
   const number = numberFromRef(String(raw ?? ''), await loadOutlines(sql, userId));
   if (number === null || !Number.isInteger(number) || number < 1) {
-    fail(`Give a step by its outline, the "#1073.4" on the page, or its number. "${raw ?? ''}" names no step.`);
+    fail(
+      `Give a step by its outline, the "#1073.4" on the page, or its number. "${raw ?? ''}" names no step.`,
+    );
   }
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind,
@@ -627,7 +658,8 @@ function printCheckBack(row: CheckBack, now: number): void {
   if (row.source) console.log(`  from ${readable(row.source)}`);
   if (row.detail) console.log(`  ${readable(row.detail).replace(/\s+/g, ' ')}`);
   if (row.wokeAt) console.log(`  a session was woken for it at ${row.wokeAt}`);
-  if (!row.wake && row.status === 'waiting') console.log('  waits for a session: the tick will not wake one');
+  if (!row.wake && row.status === 'waiting')
+    console.log('  waits for a session: the tick will not wake one');
   if (row.outcome) console.log(`  found: ${readable(row.outcome).replace(/\s+/g, ' ')}`);
 }
 
@@ -659,7 +691,9 @@ function printRaise(row: RaisedListRow): void {
   if (consequence) console.log(`  a yes: ${readable(consequence.said).replace(/\s+/g, ' ')}`);
   if (row.detail) console.log(`  ${readable(row.detail).replace(/\s+/g, ' ')}`);
   for (const comment of row.comments ?? []) {
-    console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${readable(comment.body).replace(/\s+/g, ' ')}`);
+    console.log(
+      `  ${comment.author === 'me' ? 'user' : 'claude'}: ${readable(comment.body).replace(/\s+/g, ' ')}`,
+    );
   }
 }
 
@@ -711,7 +745,9 @@ async function main(): Promise<void> {
       // Dismissed ones are left out, which is what dismissing them was for: an
       // idea the user has put aside is not offered back to the session that
       // would suggest it again.
-      const rows = await sql<{ id: string; body: string; module: string | null; created_at: Date }[]>`
+      const rows = await sql<
+        { id: string; body: string; module: string | null; created_at: Date }[]
+      >`
         select id, body, module, created_at from ideas
         where user_id = ${userId} and plan_item_id is null and dismissed_at is null
         order by created_at desc`;
@@ -742,9 +778,10 @@ async function main(): Promise<void> {
      * ideas that were open when this check was added, over four days, several
      * of them the same thought in different words, because nothing here
      * looked first. An idea close to one already filed is refused and the
-     * refusal names what it matched (lib/ideas/duplicate.ts), and a session
-     * gets two an hour (lib/ideas/rate.ts) so one run cannot add ten rows to
-     * a list somebody has to read.
+     * refusal names what it matched (lib/ideas/duplicate.ts), and sessions
+     * get three a day between them (lib/ideas/rate.ts), so runs cannot add
+     * rows faster than somebody reads them. One Jev scores under
+     * SUGGESTION_SCORE_FLOOR (lib/ideas/score.ts) is folded out of the list.
      */
     if (command === 'idea') {
       const file = arg('--file');
@@ -758,7 +795,9 @@ async function main(): Promise<void> {
           ? [{ body: target.trim(), module: moduleArg && isModuleId(moduleArg) ? moduleArg : null }]
           : [];
       if (ideas.length === 0) {
-        fail('Give the idea: idea "…" [--module <id>] [--from <outline>], or idea --file <path> with a "## " heading per idea.');
+        fail(
+          'Give the idea: idea "…" [--module <id>] [--from <outline>], or idea --file <path> with a "## " heading per idea.',
+        );
       }
       /**
        * What a new idea is checked against, read through the statement in
@@ -784,7 +823,8 @@ async function main(): Promise<void> {
       const capped: string[] = [];
       let written = 0;
       for (const idea of ideas) {
-        if (idea.body.length > 4000) fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
+        if (idea.body.length > 4000)
+          fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
         // Re-read each time round, so one --file of ten stops at the cap too.
         if (!ideaAllowance(filedAt, Date.now()).allowed) {
           capped.push(ideaFirstLine(idea.body));
@@ -818,14 +858,16 @@ async function main(): Promise<void> {
         console.error('Add what is different to the idea that is already there, or leave it.');
       }
       if (capped.length > 0) {
-        console.error(`\n${capped.length} not filed; ${ideaCapRefusal(ideaAllowance(filedAt, Date.now()), Date.now())}`);
+        console.error(
+          `\n${capped.length} not filed; ${ideaCapRefusal(ideaAllowance(filedAt, Date.now()), Date.now())}`,
+        );
         for (const line of capped) console.error(`  "${line}"`);
         console.error('Keep the ones worth filing and leave the rest, or file them later.');
       }
       if (written === 0) process.exit(1);
       console.log(
         `\n${written} filed as suggestions${step ? ` from ${ref(step.number)}` : ''}. ` +
-          'They are on /dev/ideas, under the user\'s own list.',
+          "They are on /dev/ideas, under the user's own list.",
       );
       return;
     }
@@ -927,9 +969,7 @@ async function main(): Promise<void> {
         order by r.created_at desc`;
 
       const open = rows.filter((row) => row.status === 'open');
-      const answered = rows.filter(
-        (row) => row.status === 'answered' && lastAuthor(row) === 'me',
-      );
+      const answered = rows.filter((row) => row.status === 'answered' && lastAuthor(row) === 'me');
 
       // Check-backs are read at the same moment as the raises: the skill's
       // first step is this command, so a due one is seen by every run.
@@ -975,16 +1015,20 @@ async function main(): Promise<void> {
 
       const after = arg('--after');
       const at = arg('--at');
-      if (Boolean(after) === Boolean(at)) fail('Say when, with exactly one of --after 2h|90m|1d or --at <ISO time>.');
+      if (Boolean(after) === Boolean(at))
+        fail('Say when, with exactly one of --after 2h|90m|1d or --at <ISO time>.');
       let dueAt: Date;
       if (after) {
         const delay = parseDelay(after);
-        if (delay === null) fail(`"${after}" is not a delay: write 90m, 2h, 1d or 1h30m, up to 30d.`);
+        if (delay === null)
+          fail(`"${after}" is not a delay: write 90m, 2h, 1d or 1h30m, up to 30d.`);
         dueAt = new Date(Date.now() + delay);
       } else {
         dueAt = new Date(at!);
-        if (Number.isNaN(dueAt.getTime())) fail(`"${at}" is not a time: write it like 2026-09-26T02:20:00Z.`);
-        if (dueAt.getTime() - Date.now() > MAX_DELAY_MS) fail('A check-back is at most 30 days away.');
+        if (Number.isNaN(dueAt.getTime()))
+          fail(`"${at}" is not a time: write it like 2026-09-26T02:20:00Z.`);
+        if (dueAt.getTime() - Date.now() > MAX_DELAY_MS)
+          fail('A check-back is at most 30 days away.');
       }
 
       const from = arg('--from');
@@ -996,7 +1040,9 @@ async function main(): Promise<void> {
         insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, wake)
         values (${userId}, ${title}, ${detail}, ${dueAt}, ${step?.id ?? null}, ${source}, ${wake})
         returning id`;
-      console.log(`${row.id.slice(0, 8)}  due ${dueWords(dueAt.toISOString(), Date.now())}: ${readable(title)}`);
+      console.log(
+        `${row.id.slice(0, 8)}  due ${dueWords(dueAt.toISOString(), Date.now())}: ${readable(title)}`,
+      );
       console.log(
         wake
           ? 'The next session after it falls due picks it up; an hour past due, the tick wakes one.'
@@ -1032,7 +1078,8 @@ async function main(): Promise<void> {
 
     if (command === 'checked') {
       const prefix = target?.trim();
-      if (!prefix || !/^[0-9a-f-]{4,36}$/i.test(prefix)) fail('Name it by its id: checked <id> --note "…".');
+      if (!prefix || !/^[0-9a-f-]{4,36}$/i.test(prefix))
+        fail('Name it by its id: checked <id> --note "…".');
       const note = arg('--note')?.trim();
       if (!note) fail('Say what the check found, or why it no longer matters: --note "…".');
       if (note.length > 4000) fail('A note is at most 4000 characters.');
@@ -1042,7 +1089,8 @@ async function main(): Promise<void> {
         select id, title from check_backs
         where user_id = ${userId} and status = 'waiting' and id::text like ${`${prefix.toLowerCase()}%`}`;
       if (matches.length === 0) fail(`No waiting check-back starts with ${prefix}.`);
-      if (matches.length > 1) fail(`${prefix} matches ${matches.length} check-backs; give more of the id.`);
+      if (matches.length > 1)
+        fail(`${prefix} matches ${matches.length} check-backs; give more of the id.`);
 
       await sql`
         update check_backs
@@ -1094,6 +1142,7 @@ async function main(): Promise<void> {
             liveness,
             visions: await loadVisions(sql, userId),
             surfaces: changedSurfaces(item.commitSha),
+            pictures: await loadPictures(sql, userId),
           }),
         ),
       );
@@ -1409,7 +1458,9 @@ async function main(): Promise<void> {
         )
         select id from chain`;
       const ids = chain.map((row) => row.id);
-      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date }[]
+      >`
         select id, plan_item_id, status, created_at from plan_runs
         where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
       const run = runForStop(
@@ -1453,7 +1504,9 @@ async function main(): Promise<void> {
         )
         select id from chain`;
       const ids = chain.map((row) => row.id);
-      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date }[]
+      >`
         select id, plan_item_id, status, created_at from plan_runs
         where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
       const run = runForStop(
@@ -1496,7 +1549,9 @@ async function main(): Promise<void> {
         )
         select id from chain`;
       const ids = chain.map((row) => row.id);
-      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date }[]
+      >`
         select id, plan_item_id, status, created_at from plan_runs
         where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
       const run = runForStop(
@@ -1508,9 +1563,12 @@ async function main(): Promise<void> {
         })),
         ids,
       );
-      if (!run) fail(`No run was fired at ${ref(item.number)} or above it, so there is no run to explain.`);
+      if (!run)
+        fail(`No run was fired at ${ref(item.number)} or above it, so there is no run to explain.`);
       if (run.status === 'finished') {
-        fail(`The last run on ${ref(item.number)} already reads finished; there is no stop to explain.`);
+        fail(
+          `The last run on ${ref(item.number)} already reads finished; there is no stop to explain.`,
+        );
       }
       const columns = stopColumns(run, reason, pieces, new Date().toISOString());
       await sql`
@@ -1554,7 +1612,9 @@ async function main(): Promise<void> {
       const node = findNode(sections, item.id);
       const freed = node?.blocks.filter((ref) => findNode(sections, ref.id)?.ready) ?? [];
       if (freed.length > 0) {
-        console.log(`Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`);
+        console.log(
+          `Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`,
+        );
       }
       return;
     }
@@ -1573,10 +1633,14 @@ async function main(): Promise<void> {
       const note = arg('--note')?.trim();
       if (!note) fail(`built ${typed(item.number)} --note "what it built" [--commit <sha>]`);
       if (item.kind === 'decision' || item.kind === 'setup') {
-        fail(`${ref(item.number)} is a ${item.kind === 'decision' ? 'decision' : 'setup job'}, not work a branch can hold.`);
+        fail(
+          `${ref(item.number)} is a ${item.kind === 'decision' ? 'decision' : 'setup job'}, not work a branch can hold.`,
+        );
       }
       if (item.status !== 'in_progress' && item.status !== 'not_started') {
-        fail(`${ref(item.number)} is ${STATUS_WORD[item.status]}. Only a step being built can be marked built.`);
+        fail(
+          `${ref(item.number)} is ${STATUS_WORD[item.status]}. Only a step being built can be marked built.`,
+        );
       }
       const commit = arg('--commit') ?? currentCommit();
       if (!commit) fail('No commit to record: pass --commit <sha>.');
@@ -1591,7 +1655,9 @@ async function main(): Promise<void> {
         set status = 'in_progress', commit_sha = ${commit},
             comment = ${item.comment ? `${item.comment}\n\n${line}` : line}
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`);
+      console.log(
+        `${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`,
+      );
       await checkRowWriting(sql, userId, item, { note });
       return;
     }
@@ -1658,29 +1724,47 @@ async function main(): Promise<void> {
       const ask = command === 'block' ? arg('--ask')?.trim() : undefined;
       if (command === 'block' && !ask) {
         fail(
-          `block ${typed(item.number)} --ask "what it needs, in one sentence" [--on-steps] ` +
+          `block ${typed(item.number)} --ask "what it needs, in one sentence" --on <step>[,<step>] ` +
             `[--note "the rest"]. The ask is what Dash and the plan row show, and blocking ` +
-            `again replaces it; --note is the dated line, which is appended. --on-steps says ` +
-            `the block is waiting on the steps it names and should clear itself when they ` +
-            `close; without it the block waits for you.`,
+            `again replaces it; --note is the dated line, which is appended.\n${BLOCK_ROUTES}`,
         );
       }
-      // Which kind of block, which decides who clears it. A session parking
-      // its own step behind a question it may not answer says --on-steps and
-      // adds the dependency edge, so the step comes back on its own when the
-      // question is answered. Everything else -- a key, an account, a DNS
-      // record -- waits for the person, which is the default and the safe way
-      // to be wrong: #499 read as ready for a day because a block about a
-      // GitHub token cleared itself off unrelated steps closing.
-      const onSteps = command === 'block' && has('--on-steps');
+      // A block always waits on steps (the person's rule of 15 October 2026):
+      // a decision that asks them, a setup step that is a job of theirs, or a
+      // ready step a later run builds. #2126 reached their Inbox as a chore
+      // because a session blocked it on them over its own refused write. The
+      // steps it names become dependency rows, so the block clears when they
+      // close; --on may be left out only when the step already waits on an
+      // open one. The database refuses a session's block on the person (0245).
       if (command === 'block' && ask) {
-        const refusal = blockAskRefusal(ask, onSteps);
+        const refusal = blockAskRefusal(ask, true);
         if (refusal) fail(refusal);
+        const on = (arg('--on') ?? '')
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+        for (const written of on) {
+          const other = await byNumber(sql, userId, written);
+          if (other.id === item.id) fail(`${ref(item.number)} cannot wait on itself.`);
+          await sql`
+            insert into plan_dependencies (user_id, item_id, depends_on_id)
+            values (${userId}, ${item.id}, ${other.id})
+            on conflict (item_id, depends_on_id) do nothing`;
+        }
+        const [{ open }] = await sql<{ open: number }[]>`
+          select count(*)::int as open
+          from plan_dependencies d
+          join plan_items p on p.id = d.depends_on_id
+          where d.user_id = ${userId} and d.item_id = ${item.id}
+            and p.status not in ('done', 'dropped')`;
+        const target = blockTargetRefusal(open);
+        if (target) fail(target);
       }
       const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
 
-      const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
+      const status: PlanStatus =
+        command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
 
       if (command === 'done' && commit) {
@@ -1700,17 +1784,15 @@ async function main(): Promise<void> {
         set status = ${status}, comment = ${comment},
             commit_sha = coalesce(${commit}, commit_sha),
             block_ask = ${ask ?? null},
-            block_kind = ${blockPatch(status, onSteps ? 'steps' : null).block_kind}
+            block_kind = ${blockPatch(status, 'steps').block_kind}
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`${ref(item.number)} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`);
+      console.log(
+        `${ref(item.number)} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`,
+      );
       if (ask && ask !== note) console.log(`Needs: ${ask}`);
       await checkRowWriting(sql, userId, item, ask && ask !== note ? { ask, note } : { note });
       if (status === 'blocked') {
-        console.log(
-          onSteps
-            ? 'Waiting on the steps it names: it clears itself when they close.'
-            : 'Waiting on you: it stays blocked until you say otherwise.',
-        );
+        console.log('Waiting on the steps it names: it clears itself when they close.');
       }
 
       if (command === 'done') {
@@ -1718,7 +1800,9 @@ async function main(): Promise<void> {
         const node = findNode(sections, item.id);
         const freed = node?.blocks.filter((ref) => findNode(sections, ref.id)?.ready) ?? [];
         if (freed.length > 0) {
-          console.log(`Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`);
+          console.log(
+            `Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`,
+          );
         }
       }
       return;

@@ -66,6 +66,61 @@ describe('filterPipeline', () => {
   });
 });
 
+describe('ready and cover letter filters', () => {
+  const rows = [
+    row('lead', { readyToApply: true, hasCoverLetter: true }),
+    row('drafting', { readyToApply: false, hasCoverLetter: false }),
+    row('lead', { readyToApply: true, hasCoverLetter: null }),
+    row('submitted', { readyToApply: false, hasCoverLetter: null }),
+  ];
+  const shown = (params: Parameters<typeof parsePipeline>[0]) =>
+    filterPipeline(rows, parsePipeline(params)).filtered;
+
+  it('reads yes and no, and nothing else, as a filter', () => {
+    expect(parsePipeline({ ready: 'yes' }).ready).toBe(true);
+    expect(parsePipeline({ ready: 'no' }).ready).toBe(false);
+    expect(parsePipeline({ ready: 'maybe' }).ready).toBeNull();
+    expect(parsePipeline({ letter: 'yes' }).letter).toBe(true);
+    expect(parsePipeline({}).letter).toBeNull();
+  });
+
+  it('shows the ready and the not-ready roles', () => {
+    expect(shown({ ready: 'yes' })).toHaveLength(2);
+    expect(shown({ ready: 'no' })).toHaveLength(2);
+    expect(shown({ ready: 'yes' }).every((r) => r.readyToApply)).toBe(true);
+  });
+
+  it('filters by the all-questions-added mark, yes, no and either', () => {
+    const marked = [
+      row('lead', { allQuestionsAdded: true }),
+      row('submitted', { allQuestionsAdded: false }),
+      row('drafting', { allQuestionsAdded: true }),
+    ];
+    const by = (params: Parameters<typeof parsePipeline>[0]) =>
+      filterPipeline(marked, parsePipeline(params)).filtered;
+    expect(parsePipeline({ questions: 'yes' }).questions).toBe(true);
+    expect(parsePipeline({ questions: 'no' }).questions).toBe(false);
+    expect(parsePipeline({ questions: 'x' }).questions).toBeNull();
+    expect(by({ questions: 'yes' }).every((r) => r.allQuestionsAdded)).toBe(true);
+    expect(by({ questions: 'yes' })).toHaveLength(2);
+    expect(by({ questions: 'no' })).toHaveLength(1);
+    expect(by({})).toHaveLength(3);
+  });
+
+  it('puts a role with no cover letter answer under neither yes nor no', () => {
+    expect(shown({ letter: 'yes' })).toHaveLength(1);
+    expect(shown({ letter: 'no' })).toHaveLength(1);
+    expect(shown({}).filter((r) => r.hasCoverLetter === null)).toHaveLength(2);
+  });
+
+  it('combines with each other and keeps both in the link', () => {
+    expect(shown({ ready: 'yes', letter: 'no' })).toHaveLength(0);
+    expect(shown({ ready: 'yes', letter: 'yes' })).toHaveLength(1);
+    expect(pipelineHref({ ready: 'yes' }, { letter: 'no' })).toBe('/jobs/pipeline?ready=yes&letter=no');
+    expect(pipelineHref({ ready: 'yes', letter: 'no' }, { ready: undefined })).toBe('/jobs/pipeline?letter=no');
+  });
+});
+
 describe('pageOf', () => {
   it('pages and clamps', () => {
     const items = Array.from({ length: 120 }, (_, i) => i);

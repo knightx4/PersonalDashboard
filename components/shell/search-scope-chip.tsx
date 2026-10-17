@@ -101,7 +101,7 @@ export function SearchScopeChip({
         >
           {/* The mark of what is being searched: a workspace's own, or the app's
               for everything you own. */}
-          <ModuleMark module={scope === 'everything' ? null : scope} size="sm" />
+          <ModuleMark module={scope === 'everything' ? 'dash' : scope} size="sm" />
           {/* Which way the choice opens, and that there is one. */}
           <ChevronDown className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
         </button>
@@ -136,7 +136,7 @@ export function SearchScopeChip({
                 choice !== scope && 'text-ink-muted',
               )}
             >
-              <ModuleMark module={choice === 'everything' ? null : choice} size="sm" />
+              <ModuleMark module={choice === 'everything' ? 'dash' : choice} size="sm" />
               <span className="min-w-0 flex-1 truncate text-left">{scopeLabel(choice)}</span>
               {/* The tick rather than a highlighted row: the one you are in is
                   a state, and the row under the pointer is already lit. */}

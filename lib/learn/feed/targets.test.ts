@@ -249,3 +249,30 @@ describe('drawing goals', () => {
     expect(drawer.next(true, true)).toMatchObject({ reason: 'gap' });
   });
 });
+
+/** Plan #2164.1: with goals only on, nothing is drawn but goals. */
+describe('drawing with goals only', () => {
+  const fields = [field('a'), field('b')];
+  const themes = [theme('t1', 'a', 5), theme('t2', 'b', 5)];
+  const base = { themes, fields, tests: noTests, recentThemeIds: new Set<string>(), recentFieldIds: new Set<string>() };
+
+  it('draws a goal whatever kind is asked for, never a theme or a gap', () => {
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const drawer = createDrawer({ ...base, goals: [goal('g1'), goal('g2')], goalsOnly: true, random: seeded(seed) });
+      for (const [wantGap, wantGoal] of [
+        [false, false],
+        [true, false],
+        [false, true],
+        [true, true],
+      ] as const) {
+        expect(drawer.next(wantGap, wantGoal)).toMatchObject({ reason: 'goal' });
+      }
+    }
+  });
+
+  it('draws nothing when there is no goal, rather than falling back to themes', () => {
+    const drawer = createDrawer({ ...base, goalsOnly: true, random: seeded(3) });
+    expect(drawer.next(false, true)).toBeNull();
+    expect(drawer.next(true, false)).toBeNull();
+  });
+});

@@ -37,9 +37,7 @@ import { unitCheckDue, type UnitCheckDue } from './unit-check';
  * - The tracks of learning goals take no slot (plan #1143). A goal's lessons
  *   live on its plan (`/learn/s/[id]`), written when a piece is opened, so
  *   Learn now deals none of them. The chooser still reports a goal track's
- *   unit check, which is a review question and stays in Learn now, and its
- *   `no-outline` need, which is how a goal saved before outlines gets one.
- *   Its units are laid out ahead by the plan pass (`plan-layout.ts`), not
+ *   unit check, which is a review question and stays in Learn now. Its units are laid out ahead by the plan pass (`plan-layout.ts`), not
  *   here. From plan #972 to #1142 the goals shared one slot in three.
  * - A track picked up from its resting offer in Learn now (plan #1045) is not
  *   dormant for four weeks after the press, so its next lesson comes from the
@@ -56,12 +54,12 @@ export type LessonTrack = {
   goals: readonly UnitGoal[];
   graph: Graph;
   /**
-   * A learning goal's track has its whole outline written at once (plan
-   * #1139), so no unit is ever written after its last. `written` is a track
-   * outlined already; `wanted` is a goal's track that is not yet, whose need
-   * is its outline. Left out for a track whose units are written as it goes.
+   * `written` is a track whose whole outline was written at once (plan
+   * #1139), so no unit is ever written after its last. Left out for a track
+   * whose units are written as it goes. Outlines are no longer written for a
+   * goal (plan #2302.2); the tracks outlined before keep theirs.
    */
-  outline?: 'written' | 'wanted';
+  outline?: 'written';
 };
 
 export type ChooseLessonsInput = {
@@ -122,12 +120,6 @@ export type LessonPick = {
  *   still teaches what is left; `unitId` is the last unit, and the next unit
  *   is written after it so it is ready when this one is done.
  *
- * - `no-outline`: the track is a learning goal's and its whole outline has
- *   not been written (plan #1139). `unitId` is its last unit, or null. The
- *   outline is written after the units it has, and this is the only unit
- *   writing such a track ever gets: the three kinds above are never raised
- *   for a goal's track.
- *
  * Every kind but `no-chain` is met by writing a unit (plan #969,
  * LEARN-LESSONS-SPEC "Units are written as you go"); `unitId` is then the
  * track's last unit when the need was read, so a writer can tell that another
@@ -136,7 +128,7 @@ export type LessonPick = {
 export type TrackNeed = {
   subjectId: string;
   subjectName: string;
-  because: 'no-chain' | 'all-units-done' | 'no-curriculum' | 'last-unit-short' | 'no-outline';
+  because: 'no-chain' | 'all-units-done' | 'no-curriculum' | 'last-unit-short';
   unitId: string | null;
 };
 
@@ -197,7 +189,7 @@ export function planTrack(
     need: { subjectId: track.subjectId, subjectName: track.name, because, unitId },
   });
 
-  // A goal's track is never given units one at a time (plan #1139).
+  // An outlined track is never given units one at a time (plan #1139).
   const outlined = track.outline !== undefined;
   if (track.units.length === 0) return outlined ? { kind: 'finished' } : need('no-curriculum', null);
 
@@ -269,14 +261,6 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
     }
     const check = unitCheckDue(track, input.checked ?? new Set());
     if (check) checks.push(check);
-    if (track.outline === 'wanted') {
-      needs.push({
-        subjectId: track.subjectId,
-        subjectName: track.name,
-        because: 'no-outline',
-        unitId: track.units[track.units.length - 1]?.id ?? null,
-      });
-    }
     // A goal's lessons are on its plan, and its units are laid out by the
     // plan pass (plan #1143).
     if (goalTracks.has(track.subjectId)) continue;

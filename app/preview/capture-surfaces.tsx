@@ -19,6 +19,21 @@ import { goalsPlaceName } from '@/lib/capture/destination';
 import type { FiledCapture } from '@/lib/capture/place';
 import type { CapturePlace, CaptureSort } from '@/lib/capture/sort';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { HAIKU } from '@/lib/core/models';
+import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+
+/** What filing a sentence costs, as the ledger would price it, so File it shows its hint. */
+const FILE_COSTS: PaidCosts = {
+  'app/capture-actions.ts#fileCaptureBox': {
+    lowMicros: 400,
+    medianMicros: 700,
+    highMicros: 1_100,
+    runs: 30,
+    basis: 'measured',
+    per: 'run',
+    models: [HAIKU],
+  },
+};
 
 /** A photo added with the sentence (plan #1714), already in the bucket. */
 const UPLOADED: UploadedAttachment[] = [
@@ -110,19 +125,24 @@ const nothing = () => {};
 
 function Box({
   text,
+  action = ACTION,
   children,
 }: {
   text: string;
-  children: React.ReactNode;
+  /** Which action the panel is open on; the header names it and offers the rest. */
+  action?: CaptureAction;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>
-      <CaptureHeader action={ACTION} actions={CAPTURE_ACTIONS} onSwitch={nothing} />
+    // max-w-lg, as the real panel is: wider, the header had room the panel
+    // never gives it, and its name truncating to a dot never showed here.
+    <div className={cn(popoverSurface, 'mx-auto w-full max-w-lg overflow-hidden shadow-2xl')}>
+      <CaptureHeader action={action} actions={CAPTURE_ACTIONS} onSwitch={nothing} />
       <textarea
         readOnly
         value={text}
-        placeholder={ACTION.placeholder}
-        aria-label={ACTION.label}
+        placeholder={action.placeholder}
+        aria-label={action.label}
         rows={3}
         data-focus-ring="none"
         className="w-full resize-none bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost"
@@ -139,7 +159,7 @@ export function CaptureBoxSurface() {
         <PlaceLine guess={{ state: 'answered', sort: TWO_PARTS }} places={PLACES} picked={null} onPick={nothing} />
         <CaptureFoot
           pending={false}
-          costs={{}}
+          costs={FILE_COSTS}
           files={<AddFile value={UPLOADED} onChange={nothing} />}
         />
       </Box>
@@ -150,7 +170,7 @@ export function CaptureBoxSurface() {
           picked={null}
           onPick={nothing}
         />
-        <CaptureFoot pending={false} costs={{}} files={<AddFile value={[]} onChange={nothing} />} />
+        <CaptureFoot pending={false} costs={FILE_COSTS} files={<AddFile value={[]} onChange={nothing} />} />
         <FiledCaptures
           filed={FILED}
           busy={null}
@@ -163,6 +183,8 @@ export function CaptureBoxSurface() {
           }
         />
       </Box>
+      {/* Open on a quick note, the panel the header's name was lost on (note d81fb329). */}
+      <Box text="" action={captureAction('vault') as CaptureAction} />
     </div>
   );
 }

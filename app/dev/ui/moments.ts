@@ -91,12 +91,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'home',
     name: 'The first visit of the day',
     trigger: 'Opening Home for the first time on a new day.',
-    sees: 'The greeting, the brief, Today and the rail beside it arrive one after another rather than all at once.',
+    sees: 'The greeting, the date, the panel holding the day’s brief, then the brief rows, the Inbox count and the rail arrive one after another rather than all at once.',
     reducedMotion: 'All of it is there at once.',
     state: {
       built: 'yes',
       where:
-        'HomeArrival in app/home/arrival.tsx round both columns on /home (the rail rises with Today, in HomeColumns), played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
+        'HomeArrival in app/home/arrival.tsx round both columns on /home (the greeting and date first, then the panel holding the brief, then its rows and the Inbox count with the rail, in HomeColumns), played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
     },
     demo: 'motion-home-arrival',
   },
@@ -188,7 +188,7 @@ export const MOMENTS: readonly Moment[] = [
   {
     workspace: 'learn',
     name: 'An idea lights up',
-    trigger: 'Opening Idea Space after being tested on an idea, or saying you know one, in the last two days.',
+    trigger: 'Opening Idea Space after being tested on an idea in the last two days.',
     sees: 'Those ideas, up to three, start dark and brighten together to the strength each is known at, while the rest of the sky holds still. A line under the map names them.',
     reducedMotion: 'The sky is lit as it stands at once, and the line under the map names the same ideas.',
     state: {
@@ -219,7 +219,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). Played in the gallery at /preview?s=run-lines.',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on the Dash page, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
     },
   },
   {

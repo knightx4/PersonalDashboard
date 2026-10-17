@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanThread, parsePostedUrl, postImageSrc, socialPostFromRow, threadCopyText } from './posts';
-import { buildPostsPage, xPostsShown } from './posts-page';
+import { buildPostsPage, loadPostWants, NO_POST_WANTS, xPostsShown } from './posts-page';
 
 /** The helpers the Posts tab writes through, and the page it draws (plan #1419). */
 
@@ -87,6 +87,25 @@ describe('buildPostsPage', () => {
     expect(page.onX.total).toBe(60);
   });
 
+  it('hands each waiting or posted draft its thread, and a dropped one none (plan #2202.2)', () => {
+    const turn = (id: string) => ({ id, author: 'me' as const, body: '@dash shorter', createdAt: '2026-10-02T10:00:00Z' });
+    const page = buildPostsPage({
+      posts: [row('a', 'suggested'), row('b', 'posted'), row('c', 'dropped'), row('d', 'suggested')],
+      steps: [],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+      threads: new Map([
+        ['public.social_posts:a', [turn('t1')]],
+        ['public.social_posts:b', [turn('t2')]],
+        ['public.social_posts:c', [turn('t3')]],
+      ]),
+    });
+    expect(page.suggested.map((card) => card.thread.map((t) => t.id))).toEqual([['t1'], []]);
+    expect(page.posted[0].thread.map((t) => t.id)).toEqual(['t2']);
+    expect(page.dropped[0].thread).toEqual([]);
+  });
+
   it('lists the posts on X in whole pages of fifty, up to what X returns', () => {
     expect(xPostsShown(null)).toBe(50);
     expect(xPostsShown('70')).toBe(100);
@@ -132,5 +151,42 @@ describe('buildPostsPage', () => {
       now: Date.parse('2026-10-02T12:00:00Z'),
     });
     expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan/1084' });
+  });
+});
+
+describe('buildPostsPage wants', () => {
+  const input = { posts: [], steps: [], notes: [], run: null, now: Date.parse('2026-10-02T12:00:00Z') };
+
+  it('says the day saved text was last saved', () => {
+    const page = buildPostsPage({ ...input, wants: { text: 'No hashtags', updatedAt: '2026-10-01T18:30:00Z' } });
+    expect(page.wants.text).toBe('No hashtags');
+    expect(page.wantsDay).toBe('1 Oct');
+  });
+
+  it('has no day when nothing is saved', () => {
+    expect(buildPostsPage(input).wantsDay).toBeNull();
+  });
+});
+
+describe('loadPostWants', () => {
+  const db = (result: { data: unknown; error: { message: string } | null }) => {
+    const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => result };
+    return { from: () => chain } as never;
+  };
+
+  it('reads nothing written as an empty text', async () => {
+    expect(await loadPostWants(db({ data: null, error: null }), 'u')).toEqual(NO_POST_WANTS);
+  });
+
+  it('returns the saved text and when it changed', async () => {
+    const row = { wants: 'Shorter, no hashtags', updated_at: '2026-10-16T00:00:00Z' };
+    expect(await loadPostWants(db({ data: row, error: null }), 'u')).toEqual({
+      text: 'Shorter, no hashtags',
+      updatedAt: '2026-10-16T00:00:00Z',
+    });
+  });
+
+  it('raises a failed read', async () => {
+    await expect(loadPostWants(db({ data: null, error: { message: 'boom' } }), 'u')).rejects.toThrow('boom');
   });
 });

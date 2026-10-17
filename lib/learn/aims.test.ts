@@ -21,6 +21,11 @@ describe('toAim', () => {
     placed_at: null,
     archived_at: null,
     goal_id: '00000000-0000-4000-8000-0000000000g1',
+    kind: null,
+    kind_reason: null,
+    kind_by: null,
+    kind_read_name: null,
+    kind_read_about: null,
     created_at: '2026-09-24T00:00:00Z',
     updated_at: '2026-09-24T00:00:00Z',
   };
@@ -31,6 +36,15 @@ describe('toAim', () => {
       depth: 'familiar',
       goalId: '00000000-0000-4000-8000-0000000000g1',
     });
+  });
+
+  it('reads a kind, and an unknown one as none (plan #2247.2)', () => {
+    expect(toAim({ ...row, kind: 'practical_skill', kind_reason: 'Hands-on.', kind_by: 'person' })).toMatchObject({
+      kind: 'practical_skill',
+      kindReason: 'Hands-on.',
+      kindBy: 'person',
+    });
+    expect(toAim({ ...row, kind: 'hobby', kind_by: 'robot' })).toMatchObject({ kind: null, kindBy: null });
   });
 
   it('reads an unknown depth or list as the defaults', () => {

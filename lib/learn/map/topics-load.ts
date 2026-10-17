@@ -17,7 +17,15 @@ const IN_CHUNK = 200;
 
 type Page<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
-export async function loadTopicRows(learn: LearnSupabaseClient, userId?: string): Promise<TopicRows> {
+export async function loadTopicRows(
+  learn: LearnSupabaseClient,
+  userId?: string,
+  /**
+   * What sits under each topic, in place of your ideas (learn.idea_topic_parents):
+   * Idea Space passes its stars, each prepared topic under the topic it refines (plan #2317.2).
+   */
+  given?: TopicRows['parents'],
+): Promise<TopicRows> {
   const [level3, parents, links, total] = await Promise.all([
     readAll<TopicRows['level3'][number]>(
       (from, to) =>
@@ -28,16 +36,21 @@ export async function loadTopicRows(learn: LearnSupabaseClient, userId?: string)
           .order('id')
           .range(from, to) as unknown as Page<TopicRows['level3'][number]>,
     ),
-    readAll<TopicRows['parents'][number]>((from, to) => {
-      let q = learn.from('idea_topic_parents').select('concept_id, topic_id');
-      if (userId) q = q.eq('user_id', userId);
-      return q.order('concept_id').range(from, to) as unknown as Page<TopicRows['parents'][number]>;
-    }),
+    given
+      ? Promise.resolve(given)
+      : readAll<TopicRows['parents'][number]>((from, to) => {
+          let q = learn.from('idea_topic_parents').select('concept_id, topic_id');
+          if (userId) q = q.eq('user_id', userId);
+          return q.order('concept_id').range(from, to) as unknown as Page<
+            TopicRows['parents'][number]
+          >;
+        }),
     readAll<TopicRows['links'][number]>((from, to) => {
       let q = learn
         .from('evidence_links')
-        .select('target_id, weight, similarity, found_at, matched_by')
-        .eq('target_kind', 'topic');
+        .select('target_id, kind, ceiling, similarity, found_at, matched_by')
+        .eq('target_kind', 'topic')
+        .neq('kind', 'mention');
       if (userId) q = q.eq('user_id', userId);
       return q.order('id').range(from, to) as unknown as Page<TopicRows['links'][number]>;
     }),
@@ -47,13 +60,19 @@ export async function loadTopicRows(learn: LearnSupabaseClient, userId?: string)
 
   const level3Ids = new Set(level3.map((r) => r.id));
   const touched = [
-    ...new Set([...parents.map((p) => p.topic_id), ...links.map((l) => l.target_id)].filter((id) => !level3Ids.has(id))),
+    ...new Set(
+      [...parents.map((p) => p.topic_id), ...links.map((l) => l.target_id)].filter(
+        (id) => !level3Ids.has(id),
+      ),
+    ),
   ].sort();
   const level4: TopicRows['level4'] = [];
   const chunks: string[][] = [];
   for (let i = 0; i < touched.length; i += IN_CHUNK) chunks.push(touched.slice(i, i + IN_CHUNK));
   const reads = await Promise.all(
-    chunks.map((ids) => learn.from('area_check_articles').select('id, title, parent_id').eq('level', 4).in('id', ids)),
+    chunks.map((ids) =>
+      learn.from('area_check_articles').select('id, title, parent_id').eq('level', 4).in('id', ids),
+    ),
   );
   for (const { data, error } of reads) {
     if (error) throw new Error(`Reading the Level 4 topics failed: ${error.message}`);

@@ -4,6 +4,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import type { NavSection } from '@/components/shell/app-shell';
 import { loadJobsBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
 import { countReviewItems } from '@/lib/jobs/review/load';
 
@@ -30,24 +31,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
-  /**
-   * Eight sections, the most the design language allows. Today took in
-   * Interviews and Review (plan #1591): their pages keep their addresses and
-   * are reached from Today, and the review count is on Today's strip and in
-   * the brief rather than on a tab. Activity went the same way and came back
-   * as a tab at the person's ask, since "See all" at the foot of Today was
-   * too far down to find.
-   */
-  const sections: NavSection[] = [
-    { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
-    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
-    { href: '/jobs/find', label: 'Find', icon: 'find' },
-    { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
-    { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-    { href: '/jobs/material', label: 'Material', icon: 'answers' },
-    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
-  ];
+  // Read once, for the Inbox badge and the brief both.
+  const reviewCount = countReviewItems(supabase, core, user.id);
+  // Awaited below; this only keeps a failure from reading as unhandled first.
+  reviewCount.catch(() => {});
+
+  // The tabs and their order are in lib/shell/tabs.ts (plan #2208.2); the
+  // Inbox carries the review count.
+  const sections = async ({ owner }: { owner: boolean }): Promise<NavSection[]> =>
+    withBadges(tabsFor('jobs', owner), { '/jobs/inbox': await reviewCount });
 
   return shellFor({
     module: 'jobs',
@@ -55,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     sections,
     settingsHref: '/jobs/settings',
     settingsLabel: 'Job search settings',
-    brief: async () => loadJobsBrief(user.id, await countReviewItems(supabase, core, user.id)),
+    brief: async () => loadJobsBrief(user.id, await reviewCount),
     children,
   });
 }

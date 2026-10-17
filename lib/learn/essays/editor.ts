@@ -1,5 +1,11 @@
-import { EditorState, RangeSetBuilder, type Extension, type Text } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { RangeSetBuilder, type Extension, type Text } from '@codemirror/state';
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { EASE, MOTION_MS } from '@/lib/motion';
@@ -37,7 +43,11 @@ export const essayHighlight = syntaxHighlighting(
     { tag: tags.processingInstruction, color: 'var(--color-ink-muted)' },
     { tag: tags.heading1, fontSize: '1.45em', fontWeight: '600', lineHeight: '1.3' },
     { tag: tags.heading2, fontSize: '1.25em', fontWeight: '600', lineHeight: '1.35' },
-    { tag: [tags.heading3, tags.heading4, tags.heading5, tags.heading6], fontSize: '1.1em', fontWeight: '600' },
+    {
+      tag: [tags.heading3, tags.heading4, tags.heading5, tags.heading6],
+      fontSize: '1.1em',
+      fontWeight: '600',
+    },
     { tag: tags.emphasis, fontStyle: 'italic' },
     { tag: tags.strong, fontWeight: '600' },
     { tag: tags.strikethrough, textDecoration: 'line-through' },
@@ -94,21 +104,16 @@ export const focusParagraph: Extension = ViewPlugin.fromClass(
 );
 
 /**
- * The line you are typing stays in the middle of the screen. Only typing and
- * moving the cursor from the keyboard re-centre it; a click leaves the page
- * where it is, since the line you clicked is already where you are looking.
- * `wide` is asked on every transaction, so a phone, where the keyboard takes
- * half the screen, keeps the browser's own scrolling.
+ * Room kept around the caret, so the line you are typing never sits on the
+ * screen's edge. The page scrolls only when the caret would come within a
+ * third of the screen of the bottom, or under the app's header at the top,
+ * and then only as far as it must. Re-centring on every keystroke, as this
+ * did before, moved the page under the person on each letter (note of 16
+ * October 2026). `wide` is asked each time, so a phone, where the keyboard
+ * takes half the screen, keeps the browser's own scrolling.
  */
-export function typewriterScroll(wide: () => boolean): Extension {
-  return EditorState.transactionExtender.of((tr) => {
-    if (!wide()) return null;
-    const typed =
-      tr.docChanged &&
-      (tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo'));
-    const moved =
-      !tr.docChanged && tr.selection !== undefined && tr.isUserEvent('select') && !tr.isUserEvent('select.pointer');
-    if (!typed && !moved) return null;
-    return { effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: 'center' }) };
-  });
+export function caretRoom(wide: () => boolean): Extension {
+  return EditorView.scrollMargins.of(() =>
+    wide() ? { top: 128, bottom: Math.round(window.innerHeight / 3) } : null,
+  );
 }

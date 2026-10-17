@@ -15,6 +15,7 @@ import { attachTopicParents, type AttachParentsResult } from '@/lib/learn/areas/
 import { refreshNoteEvidence, type RefreshNoteEvidenceResult } from '@/lib/learn/evidence/notes-store';
 import { linkCourses, type LinkCoursesResult } from '@/lib/learn/evidence/course-store';
 import { refreshTopicUnlocks, type RefreshTopicUnlocksResult } from '@/lib/learn/evidence/topics-store';
+import { refreshCourseBands, type CourseBandsResult } from '@/lib/learn/evidence/course-band-store';
 import { refreshWorkEvidence, type WorkEvidenceResult } from '@/lib/learn/evidence/work';
 import { refreshVaultDust, type RefreshDustResult } from '@/lib/learn/map/dust-store';
 import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/lib/learn/places/store';
@@ -49,7 +50,11 @@ import { recomputePlaces, usersWithIdeas, type RecomputePlacesResult } from '@/l
  * the result. It reads stored vectors only, so it runs without the key too.
  * Before that, the Level 3 and 4 topics each person's notes, courses, work and ideas
  * touch are unlocked from the text and the stored vectors, with no model call
- * (plan #2016.3): `topics` in the result.
+ * (plan #2016.3): `topics` in the result. After the unlocks, each graded
+ * course not yet named has its frame topics named by one Haiku call, a few
+ * courses a day, and every named course marks its topics as a band of likely
+ * levels (plan #2172.4.1): `courseBands` in the result. Without the model key
+ * no course is named, and the bands already named are still refreshed.
  */
 const BUDGET_MS = 90_000;
 /** Ideas per person per run; a first run fills the ~150 missing today. */
@@ -58,6 +63,9 @@ const PER_PERSON_LIMIT = 500;
 const COURSE_BUDGET_MS = 45_000;
 /** Attaching topics to parents; the backfill of ten thousand was run by hand, so a day has few. */
 const PARENTS_BUDGET_MS = 60_000;
+/** Naming courses' topics; a transcript of ninety-five fills in a few days, or at once from /api/cron/course-bands. */
+const COURSE_BANDS_BUDGET_MS = 30_000;
+const COURSE_BANDS_PER_RUN = 30;
 
 export type LearnEmbeddingsDaily = {
   skipped?: 'no-key';
@@ -74,6 +82,7 @@ export type LearnEmbeddingsDaily = {
   work: { userId: string; result: WorkEvidenceResult | { error: string } }[];
   courses: { userId: string; result: LinkCoursesResult | { error: string } }[];
   topics: { userId: string; result: RefreshTopicUnlocksResult | { error: string } }[];
+  courseBands: { userId: string; result: CourseBandsResult | { error: string } }[];
 };
 
 export async function runLearnEmbeddingsDaily(): Promise<LearnEmbeddingsDaily> {
@@ -120,7 +129,7 @@ async function runParents(
 async function runMaps(
   learn: ReturnType<typeof createLearnServiceSupabase>,
   courseOptions: { embed: boolean },
-): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust' | 'noteEvidence' | 'courses' | 'work' | 'topics'>> {
+): Promise<Pick<LearnEmbeddingsDaily, 'places' | 'dust' | 'noteEvidence' | 'courses' | 'work' | 'topics' | 'courseBands'>> {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || undefined;
   const places: LearnEmbeddingsDaily['places'] = [];
   const dust: LearnEmbeddingsDaily['dust'] = [];
@@ -128,6 +137,7 @@ async function runMaps(
   const courses: LearnEmbeddingsDaily['courses'] = [];
   const work: LearnEmbeddingsDaily['work'] = [];
   const topics: LearnEmbeddingsDaily['topics'] = [];
+  const courseBands: LearnEmbeddingsDaily['courseBands'] = [];
   const failed = (error: unknown) => ({ error: error instanceof Error ? error.message : 'failed' });
   for (const userId of await usersWithIdeas(learn)) {
     try {
@@ -166,6 +176,18 @@ async function runMaps(
     } catch (error) {
       topics.push({ userId, result: failed(error) });
     }
+    try {
+      courseBands.push({
+        userId,
+        result: await refreshCourseBands(learn, userId, {
+          anthropicApiKey,
+          deadline: Date.now() + COURSE_BANDS_BUDGET_MS,
+          limit: COURSE_BANDS_PER_RUN,
+        }),
+      });
+    } catch (error) {
+      courseBands.push({ userId, result: failed(error) });
+    }
   }
-  return { places, dust, noteEvidence, courses, work, topics };
+  return { places, dust, noteEvidence, courses, work, topics, courseBands };
 }

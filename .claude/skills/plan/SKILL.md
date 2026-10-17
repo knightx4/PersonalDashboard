@@ -18,7 +18,9 @@ busy, and not marked `done` because the session is ending.
 
 ## The tool
 
-`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment.
+`scripts/plan.ts` needs `DATABASE_URL` (service role) in the environment, or in
+a cloud session `SUPABASE_SERVICE_ROLE_KEY`, which it uses to send each
+statement over HTTPS because the cloud proxy carries nothing else.
 
 ```
 npx tsx scripts/plan.ts next [--claude]        # what could be picked up, most urgent first
@@ -27,13 +29,10 @@ npx tsx scripts/plan.ts show <n>               # the brief: destination, decisio
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
-npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
-              # the ask names what the person does; "nothing needed from you" is refused.
+npx tsx scripts/plan.ts block <n> --ask "…" --on <m>[,<m>] [--note "…"]
+              # cannot proceed: waits on the steps it names, and clears when they close.
+              # Never on the person directly (see "When a step cannot finish").
               # A step that waits on data, time or a run gets a check-back --from <n>, which holds it.
-                                               # cannot proceed; the ask is the one sentence
-                                               # saying what it needs, rewritten each time.
-                                               # --on-steps: it clears itself when the steps it
-                                               # names close; without it, it waits for you
 npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # something only the person can supply — a key,
                                                # an account. Writes a setup step of theirs under
@@ -88,7 +87,8 @@ shows it with the outline, and you leave it as it is. Querying the database
 directly, join `plan_item_outlines` on `id` to get the outline
 (`reference/offline.md`).
 
-If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
+If both are missing, or `plan.ts` fails to reach the database, read
+`reference/offline.md` rather than guessing.
 
 **Writing by hand, record each write** to `plan_items` or `ideas` with
 `core.record_dash_action`, so Home lists it under what Dash did today with an
@@ -156,9 +156,11 @@ you close when they are all done.
 ## Building
 
 **One step, on its own** — "do #1073.4", or one step named in a brief. Read
-`reference/building.md` and follow it yourself, then put the commit on main as
-in step 4 below. A subagent for a single step is pure overhead, except on a
-Sonnet session for a step sized `m` or `l` (step 3 below).
+`reference/building.md` and follow it yourself, including its **When nobody
+sent you**, which puts the commit on main. A routine fired at one step is
+sent to that file directly and never reads this one. A subagent for a single
+step is pure overhead, except on a Sonnet session for a step sized `m` or `l`
+(step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -293,10 +295,12 @@ thousand tokens, and gets to the end.
 
    **When the merge to main will not go through** — a conflict you cannot
    resolve from what you have read, or a check you cannot get passing — the
-   branch is already pushed. Block the step that broke it, `block <n> --ask
-   "…" --note "…"`, with the branch named in the note. The ask never names it:
-   the person cannot open branches, and `block` refuses an ask that names one.
-   Stop the batch there. Decisions #685 and #695 are why.
+   branch is already pushed. That is the system's to finish, not the person's:
+   add a ready step under the feature, "Merge <the feature> into main", with
+   the branch and what stopped the merge in its `--detail`, and block the step
+   that broke it on that one (`block <n> --ask "…" --on <the merge step>`).
+   The ask never names the branch: `block` refuses one that does. Stop the
+   batch there. Decisions #685 and #695 are why.
 
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
@@ -344,33 +348,29 @@ Each is one file. Read the one you were sent for; do not read the others.
 | | |
 |---|---|
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
+| `reference/screen.md` | The gallery, photograph and critic loop, for a step that changes a screen. `building.md` sends a builder there only when it does. |
 | `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
 | `reference/unsticking.md` | Finding out why a feature stalled, and fixing it or writing what it waits on. |
 | `reference/overhaul.md` | Working an overhaul: the design session, the three phases, the review against the Contract. |
+| `reference/routine-prompt.md` | The standing prompt for the routine that works the plan, and how it routes each turn to one file. |
 | `reference/overhaul-routine.md` | The standing prompt for the routine that works an overhaul, and how to set it up. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |
 | `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
 | `reference/raising.md` | The four places something a session has to say can go. |
 | `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
-| `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
+| `reference/offline.md` | The SQL to use when `plan.ts` cannot reach the database. |
 
-A shaping run, a re-shape and a re-shape after a vision edit each have a row
-in `plan_runs` (job `shape`, `reshape` or `vision_reshape`) that nothing else
-marks finished. As the last write of the run, mark yours, under its own job
-name: a row marked under the wrong one leaves yours `started`, and it is
-written back as failed hours later however well the run went.
+## Ending the run
 
-```sql
-update plan_runs set status = 'finished', error = null
-where id = (select id from plan_runs
-            where job = '<shape, reshape or vision_reshape>' and status = 'started'
-            order by created_at desc limit 1);
-```
-
-For a re-shape, add `and plan_item_id = '<the feature's id>'` inside the
-select. A re-shape after a vision edit is about no feature, so it adds
-nothing. A build run needs nothing: closing or blocking its step ends it.
+Every turn the app fires ends with a `## Ending this run` note and a `Dash
+run id:` line. As the last write of the run, whatever the job, run the
+update that note gives: it marks your own row in `plan_runs` finished, by
+its id. A shaping run, a comment reply, a raise, a spec change and a CI fix
+are about no step, so nothing else ends them, and a row left `started` is
+written back as failed two hours later however well the run went. A run
+that did none of what it was sent for says why instead, with `stopped` or
+the failed update the note gives.
 
 ## Statuses
 
@@ -402,3 +402,23 @@ Beside the status, two columns say what a step is rather than where it stands.
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,
 build against the answer forever after.
+
+## When a step cannot finish
+
+A step a run cannot finish never lands on the person as a bare block (their
+rule of 15 October 2026, after #2126 reached their Inbox as a chore because a
+session was refused permission to write its own design-check rows). It goes
+to exactly one of three places:
+
+1. **Something for them to decide** is a question: a decision step
+   (`add "<the question>" --kind decision`), and the step blocks on it.
+2. **Something for them to do** is a setup step: `needs "<what to set>"
+   --for <n>`, which writes it and makes the step wait on it.
+3. **Anything the system can handle** is yours. A refused permission, a missing
+   connector, a failed write, a merge that will not go, a check to settle:
+   handle it in this run if you can, and if you cannot, `add` a ready step
+   naming what is left and block on that, so a later run does it.
+
+`block` refuses a step that names nothing to wait on, and the database refuses
+a session's block on the person outright (migration 0245). Only the person,
+signed in, can block a step on themselves.

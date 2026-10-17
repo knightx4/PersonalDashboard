@@ -1,9 +1,10 @@
 import { courseHref, transcriptHref } from '@/lib/you/education';
-import type { ModuleSources, Section } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
+const DETAILS: Section = { href: '/you/details', label: 'Details' };
 const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 
@@ -24,6 +25,7 @@ export const youSources: ModuleSources = {
       title: 'title',
       href: courseHref,
       section: WORK,
+      parent: parentBy('transcript_id', 'you.transcripts'),
       note:
         'transcript_id points at you.transcripts. year is the year of the term where the transcript gives one. ' +
         'grade is null for a course with no grade, such as transfer credit.',
@@ -52,6 +54,22 @@ export const youSources: ModuleSources = {
       note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
     {
+      table: 'you.details',
+      module: 'You',
+      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.',
+      weight: 'record',
+      search: ['title', 'phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
+      title: 'title',
+      newest: 'updated_at',
+      ref: 'user_id',
+      owner: 'user_id',
+      href: () => '/you/details',
+      section: DETAILS,
+      // One row per person, with no id to name it by.
+      page: null,
+      note: 'A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
+    },
+    {
       table: 'you.places',
       module: 'You',
       holds: 'The places they have lived, with when they moved in and out.',
@@ -75,6 +93,7 @@ export const youSources: ModuleSources = {
       newest: 'started',
       href: jobHref,
       section: WORK,
+      parent: parentBy('resume_id', 'job_search.resume_versions'),
       note:
         'started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. ' +
         'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',

@@ -19,12 +19,12 @@ import { nearbyIdeas, saveIdeas } from '@/lib/learn/feed/ideas-store';
 import { WRITE_CARD_MODEL, writeCard, type CardToWrite, type IdeaCard, type WriteResult } from '@/lib/learn/feed/write-card';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
-import { LAYOUT_RESERVE_MS, LESSON_HOLD_MS, lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
-import { linkAimTracks } from '@/lib/learn/lessons/aim-tracks';
+import { lessonsWanted, writeLessonsFor } from '@/lib/learn/lessons/top-up';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { goalTrackIds, notPlanLessons } from '@/lib/learn/feed/plan-lessons';
 import { writeDuePieces, type PiecesPassSummary } from '@/lib/learn/lessons/pieces';
 import { layOutPlans, type PlanLayoutSummary } from '@/lib/learn/lessons/plan-layout';
-import { loadOutlinesDue, loadPlanLayoutsDue } from '@/lib/learn/lessons/plan-store';
+import { loadPlanLayoutsDue } from '@/lib/learn/lessons/plan-store';
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { writeClipCards, type ClipCardPassResult } from '@/lib/learn/clips/clip-card-run';
@@ -87,9 +87,6 @@ export const BRIEF_CARDS_AFTER_RESEARCH_MS = 90_000;
  * makes up to two Sonnet calls one after the other, each well under a minute.
  */
 export const PIECES_RESERVE_MS = 60_000;
-
-/** Goal tracks outlined in one run, at most. Each is one outline call. */
-export const MAX_OUTLINES_PER_RUN = 2;
 
 const OPERATION: LearnOperation = 'write-feed-card';
 const EMBED_OPERATION: LearnOperation = 'embed-feed-ideas';
@@ -349,12 +346,6 @@ async function topUpWith(
   const target = options.target ?? READY_TARGET;
   let lessons: LessonTopUpSummary | undefined;
   if (readyBefore < options.threshold) {
-    // A learning goal without a track gets one first, so its lessons can be
-    // chosen in this run (plan #972). No model call; the track's first unit
-    // is written by the lesson top-up, as for any track with no curriculum.
-    await linkAimTracks(learn, userId).catch((error: unknown) => {
-      console.error('[learn feed top-up] goal tracks', error instanceof Error ? error.message : error);
-    });
     lessons = await writeLessonsFor(createLessonPorts({ learn, core, apiKey }), {
       userId,
       wanted: lessonsWanted(target - readyBefore),
@@ -383,27 +374,6 @@ async function topUpWith(
   // now, so nothing else would lay out its next unit. The lay-out port writes
   // the unit's pieces straight after.
   const lessonPorts = createLessonPorts({ learn, core, apiKey });
-
-  // A goal's track with no outline yet gets it here too, whether or not the
-  // deck was short (plan #1139). The lesson top-up above writes outlines only
-  // when the deck is short, so a well-stocked deck left four goals without
-  // one for days (check-back 4cb5457d). A failure holds the track for a day,
-  // as the lesson top-up does. Before the plan pass, so it can lay out the
-  // new units in the same run.
-  if (options.deadline - Date.now() >= LAYOUT_RESERVE_MS) {
-    const outlinesDue = await loadOutlinesDue(learn, userId, MAX_OUTLINES_PER_RUN).catch((error: unknown) => {
-      console.error('[learn feed top-up] outlines', error instanceof Error ? error.message : error);
-      return [];
-    });
-    for (const due of outlinesDue) {
-      const result = await lessonPorts.outline(userId, due.subjectId);
-      if (result.outcome !== 'failed') continue;
-      console.error('[learn feed top-up] outlines', `${due.subjectName}: ${result.detail}`);
-      await lessonPorts.hold(userId, due.subjectId, new Date(Date.now() + LESSON_HOLD_MS)).catch((error: unknown) => {
-        console.error('[learn feed top-up] outlines', error instanceof Error ? error.message : error);
-      });
-    }
-  }
 
   const plans: PlanLayoutSummary | null = await layOutPlans(
     {
@@ -645,7 +615,8 @@ async function topUpSubjectAfterResponse(userId: string, subjectId: string): Pro
     const learn = createLearnServiceSupabase();
     const goalTracks = await goalTrackIds(learn, userId);
     const ready = await countReady(learn, userId, subjectId);
-    const wanted = subjectLessonsWanted(ready, goalTracks.includes(subjectId));
+    const prepared = (await preparedSubjectIds(learn, userId)).has(subjectId);
+    const wanted = subjectLessonsWanted(ready, goalTracks.includes(subjectId), prepared);
     if (wanted === null) return null;
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('The Learn now top-up needs ANTHROPIC_API_KEY to be set.');

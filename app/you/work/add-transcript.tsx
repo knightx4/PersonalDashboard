@@ -4,10 +4,10 @@ import { useActionState, useId, useRef, useState } from 'react';
 import { GraduationCap } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { useToast } from '@/components/ui/toast';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
@@ -122,10 +122,15 @@ export function UploadForm({ onRead, onCancel }: { onRead: (draft: TranscriptDra
         />
       </Field>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" pending={reading} disabled={!file && text.trim() === ''}>
+        <DashAction
+          type="submit"
+          pending={reading}
+          disabled={!file && text.trim() === ''}
+          paid={READ_ACTION}
+          what="Cost of reading the transcript"
+        >
           {reading ? 'Reading…' : 'Read the courses'}
-        </Button>
-        <PaidHint action={READ_ACTION} what="Cost of reading the transcript" />
+        </DashAction>
         <Button type="button" variant="ghost" onClick={onCancel} disabled={reading}>
           Cancel
         </Button>

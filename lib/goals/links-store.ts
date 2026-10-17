@@ -3,7 +3,6 @@ import 'server-only';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   LINK_COLUMNS,
-  READ_CARD_STATUSES,
   toLink,
   type GoalLinks,
   type JobWeek,
@@ -12,7 +11,12 @@ import {
   type LinkRow,
   type LinkedAim,
   type LinkedJob,
+  type LensProgressView,
+  type SubjectPreparation,
 } from '@/lib/goals/links';
+import { listLenses, loadTopicNames } from '@/lib/learn/levels/lens-store';
+import { lensProgress, readCells } from '@/lib/learn/levels/model';
+import { loadTopicMap } from '@/lib/learn/levels/store';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { statusLabel } from '@/lib/jobs/status-label';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -98,63 +102,127 @@ export async function loadAimChoices(
   return aims.map((aim) => ({ id: aim.id, name: aim.name }));
 }
 
+type AimRow = {
+  id: string;
+  name: string;
+  list_source: string | null;
+  archived_at: string | null;
+  subject_id: string | null;
+  goal_id: string | null;
+};
+
+/** The subjects' preparation runs, by subject id; a subject with none is absent. */
+async function readPreparations(
+  learn: LearnSupabaseClient,
+  subjectIds: string[],
+): Promise<Map<string, SubjectPreparation>> {
+  const out = new Map<string, SubjectPreparation>();
+  if (subjectIds.length === 0) return out;
+  const { data, error } = await learn
+    .from('subject_preparations')
+    .select('subject_id, status')
+    .in('subject_id', subjectIds)
+    .is('branch_key', null);
+  if (error) throw new Error(`Could not read the preparations: ${error.message}`);
+  for (const row of (data ?? []) as { subject_id: string; status: string }[]) {
+    out.set(row.subject_id, row.status === 'done' ? 'done' : row.status === 'failed' ? 'failed' : 'working');
+  }
+  return out;
+}
+
+/** The subjects' lenses summed per kind of evidence, over the approved topics, by subject id. */
+async function readLenses(
+  learn: LearnSupabaseClient,
+  subjectIds: string[],
+): Promise<Map<string, LensProgressView>> {
+  const out = new Map<string, LensProgressView>();
+  if (subjectIds.length === 0) return out;
+  const [lenses, map, names] = await Promise.all([listLenses(learn), loadTopicMap(learn), loadTopicNames(learn)]);
+  const readings = readCells(map);
+  for (const lens of lenses) {
+    if (!lens.subjectId || !subjectIds.includes(lens.subjectId)) continue;
+    const approved = lens.targets.filter((target) => names.get(target.topicId)?.approved);
+    if (approved.length === 0) continue;
+    const progress = lensProgress(map, readings, approved);
+    out.set(lens.subjectId, {
+      topics: approved.length,
+      tested: progress.held.tested,
+      inferred: progress.held.inferred,
+      declared: progress.held.declared,
+      total: progress.total,
+    });
+  }
+  return out;
+}
+
+/**
+ * The title of the first piece not yet passed in each subject's plan, in
+ * unit and piece order, by subject id (the order today's piece reads). A
+ * piece whose check was answered right counts as finished.
+ */
+async function readNextPieces(learn: LearnSupabaseClient, subjectIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (subjectIds.length === 0) return out;
+  const [units, pieces] = await Promise.all([
+    learn.from('curriculum_units').select('id, subject_id, ordinal').in('subject_id', subjectIds),
+    learn
+      .from('plan_pieces')
+      .select('id, unit_id, subject_id, ordinal, title, passed_at')
+      .in('subject_id', subjectIds)
+      .is('passed_at', null),
+  ]);
+  if (units.error) throw new Error(`Could not read the units: ${units.error.message}`);
+  if (pieces.error) throw new Error(`Could not read the pieces: ${pieces.error.message}`);
+  type PieceRow = { id: string; unit_id: string; subject_id: string; ordinal: number; title: string };
+  const open = (pieces.data ?? []) as PieceRow[];
+  if (open.length === 0) return out;
+  const checks = await learn
+    .from('piece_checks')
+    .select('piece_id')
+    .eq('correct', true)
+    .in('piece_id', open.map((piece) => piece.id));
+  if (checks.error) throw new Error(`Could not read the checks: ${checks.error.message}`);
+  const checked = new Set(((checks.data ?? []) as { piece_id: string }[]).map((row) => row.piece_id));
+  const unitOrdinal = new Map(((units.data ?? []) as { id: string; ordinal: number }[]).map((u) => [u.id, u.ordinal]));
+  const ordered = open
+    .filter((piece) => !checked.has(piece.id))
+    .sort((a, b) => (unitOrdinal.get(a.unit_id) ?? 0) - (unitOrdinal.get(b.unit_id) ?? 0) || a.ordinal - b.ordinal);
+  for (const piece of ordered) if (!out.has(piece.subject_id)) out.set(piece.subject_id, piece.title);
+  return out;
+}
+
+/**
+ * A linked goal's Learn progress is what its subject's lens says (plan
+ * #2302.4): the levels held by a test, by inference and by saying so, the
+ * subject's preparation, and the next piece. Cards read no longer count.
+ */
 async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<LinkedAim[]> {
   const ids = links.flatMap((link) => (link.targetId ? [link.targetId] : []));
   if (ids.length === 0) return [];
 
-  const [aims, cards] = await Promise.all([
-    learn.from('aims').select('id, name, list_source, archived_at, subject_id, goal_id').in('id', ids),
-    learn
-      .from('feed_cards')
-      .select('aim_id, status')
-      .in('aim_id', ids)
-      .in('status', READ_CARD_STATUSES as unknown as string[]),
-  ]);
+  const aims = await learn
+    .from('aims')
+    .select('id, name, list_source, archived_at, subject_id, goal_id')
+    .in('id', ids);
   if (aims.error) throw new Error(`Could not read the Learn goals: ${aims.error.message}`);
-  if (cards.error) throw new Error(`Could not read the Learn cards: ${cards.error.message}`);
-
-  type AimRow = {
-    id: string;
-    name: string;
-    list_source: string | null;
-    archived_at: string | null;
-    subject_id: string | null;
-    goal_id: string | null;
-  };
   const byId = new Map(((aims.data ?? []) as AimRow[]).map((row) => [row.id, row]));
 
-  // An open goal's cards are its track's lessons (plan #972), which carry the
-  // track rather than the goal.
-  const aimOfTrack = new Map<string, string>();
-  for (const row of byId.values()) if (row.subject_id) aimOfTrack.set(row.subject_id, row.id);
-  const lessons =
-    aimOfTrack.size === 0
-      ? { data: [], error: null }
-      : await learn
-          .from('feed_cards')
-          .select('subject_id, status')
-          .in('subject_id', [...aimOfTrack.keys()])
-          .in('reason', ['lesson', 'unit_check'])
-          .in('status', READ_CARD_STATUSES as unknown as string[]);
-  if (lessons.error) throw new Error(`Could not read the Learn lessons: ${lessons.error.message}`);
-  const trackCards = ((lessons.data ?? []) as { subject_id: string; status: string }[]).map((card) => ({
-    aim_id: aimOfTrack.get(card.subject_id)!,
-    status: card.status,
-  }));
+  const subjectIds = [
+    ...new Set([...byId.values()].flatMap((row) => (row.subject_id && row.list_source !== 'level3' ? [row.subject_id] : []))),
+  ];
   const level3 = [...byId.values()].some((row) => row.list_source === 'level3')
     ? await loadLevel3Counts(learn)
     : null;
-
-  const read = new Map<string, number>();
-  const saved = new Map<string, number>();
-  for (const card of [...((cards.data ?? []) as { aim_id: string; status: string }[]), ...trackCards]) {
-    read.set(card.aim_id, (read.get(card.aim_id) ?? 0) + 1);
-    if (card.status === 'saved') saved.set(card.aim_id, (saved.get(card.aim_id) ?? 0) + 1);
-  }
+  const [preparations, lenses, pieces] = await Promise.all([
+    readPreparations(learn, subjectIds),
+    readLenses(learn, subjectIds),
+    readNextPieces(learn, subjectIds),
+  ]);
 
   return links.flatMap((link) => {
     if (!link.targetId) return [];
     const row = byId.get(link.targetId);
+    const subjectId = row?.subject_id ?? null;
     return {
       linkId: link.id,
       aimId: link.targetId,
@@ -162,8 +230,9 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
       goalId: row?.goal_id ?? null,
       archived: row?.archived_at != null,
       level3: row?.list_source === 'level3' ? level3 : null,
-      cardsRead: read.get(link.targetId) ?? 0,
-      cardsSaved: saved.get(link.targetId) ?? 0,
+      preparation: (subjectId && preparations.get(subjectId)) || 'none',
+      lens: (subjectId && lenses.get(subjectId)) || null,
+      nextPiece: (subjectId && pieces.get(subjectId)) || null,
     };
   });
 }

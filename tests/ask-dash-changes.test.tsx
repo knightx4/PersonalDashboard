@@ -29,6 +29,8 @@ const SOURCE: AskSource = {
   confirm: never,
   decline: never,
   undo: never,
+  save: never,
+  rate: never,
 };
 
 const BASE = {

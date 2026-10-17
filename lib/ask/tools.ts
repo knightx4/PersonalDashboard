@@ -1,7 +1,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
-import { AskInputError, isOpenableHref, type AskContext, type AskToolResult } from './db';
+import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
+import { jobBoardLookup } from './job-board';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -18,8 +19,13 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
+import { applicationAnswersLookup } from './answers';
+import { duplicateAnswersLookup } from './duplicate-answers';
 import { coursesLookup } from './courses';
 import { learningCoveredLookup, readingListLookup } from './learn';
+import { withParents } from './parents';
+import { tableInfoLookup } from './table-info';
+import { QUERY_OPS, QUERY_ROWS_MAX, queryRowsLookup } from './query';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
@@ -46,8 +52,12 @@ export const ASK_TOOL_NAMES = [
   'recall',
   'open_row',
   'list_rows',
+  'table_info',
+  'query_rows',
   'spend_by_merchant',
   'job_applications',
+  'application_answers',
+  'duplicate_answers',
   'todos',
   'agenda',
   'goal_status',
@@ -61,6 +71,7 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'search_mail',
   'read_mail',
+  'read_job_board',
   'show_chart',
 ] as const;
 
@@ -70,7 +81,7 @@ export const ASK_TOOL_NAMES = [
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'show_chart'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -143,7 +154,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'list_rows',
-    description: `List the person's own rows in any table that holds what they wrote, saved, did or have, newest first, with each row's text, a ref and a link. It reaches tables no other lookup does, such as the videos on their watch list, Learn cards, saved stories, interview notes and personality results, so use it whenever the other lookups do not cover what they asked about, and before saying you cannot see something. Pass contains to keep only rows holding every one of those words. Use it to choose for them as well as to find: "give me a good video to watch" is list_rows on learn.watch_list, then a pick from what the rows say. Open one row in full with open_row where it takes the table. The tables: ${listableList()}.`,
+    description: `List the person's own rows in any table that holds what they wrote, saved, did or have, newest first, with each row's text, a ref and a link, and for a row that belongs to another (a cover letter to its application, an interview to its application, a note on an idea) that row's table, ref, title and link under parent. It reaches tables no other lookup does, such as the videos on their watch list, Learn cards, saved stories, interview notes and personality results, so use it whenever the other lookups do not cover what they asked about, and before saying you cannot see something. Pass contains to keep only rows holding every one of those words. Use it to choose for them as well as to find: "give me a good video to watch" is list_rows on learn.watch_list, then a pick from what the rows say. Open one row in full with open_row where it takes the table. The tables: ${listableList()}.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -153,6 +164,92 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
           description: 'Words every row returned must hold, in its title or text. Leave out to list the newest rows.',
         },
         limit: { type: 'integer', minimum: 1, maximum: LIST_ROWS_MAX, description: `How many rows to return, up to ${LIST_ROWS_MAX}; 20 when left out.` },
+      },
+      required: ['table'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'table_info',
+    description:
+      "Ask what you are able to read. With no table it lists every table list_rows can read and what each holds. With a table it gives all that table's columns with their types, the tables it points to (linksTo) and the tables that point to it (linkedFrom). Use it before naming a table or column you are not sure of, and when asked what you can see.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: {
+          type: 'string',
+          enum: LISTABLE.map((s) => s.table),
+          description: 'One table, for its columns and links. Leave out to list them all.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'query_rows',
+    description: `Ask one table of the person's own rows a precise question: the rows where a column equals, differs from, is above or below a value, is one of a list, contains some text, or is empty or not. List them (up to ${QUERY_ROWS_MAX}, in any order), count them (count_only), or count them by the values of one column (group_by). Use it for "how many applications at each status" (group_by status), "which applications have no cover letter" (a condition with op empty) or "videos added since March" (greater on the date column), in one call; use list_rows to read the newest rows or find rows by words. linked keeps the rows that have, or have none of, a row of another table linked to them: "which to-apply applications have no answers to application questions and no cover letter" is one call on job_search.applications, with status one_of lead and drafting, cover_letter empty, and linked [{table: job_search.application_answers, present: false}]. Use it instead of looking up each row's linked rows one by one. Column names and links must be the table's own: check them with table_info (columns, linksTo, linkedFrom) first when unsure. Every result says how many rows matched and how many it lists, and names each row's parent. The tables are the ones list_rows reads.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: { type: 'string', enum: LISTABLE.map((s) => s.table) },
+        where: {
+          type: 'array',
+          description: 'Conditions every row must meet. Leave out for all their rows in the table.',
+          items: {
+            type: 'object',
+            properties: {
+              column: { type: 'string', description: 'A column of the table, as table_info names it.' },
+              op: {
+                type: 'string',
+                enum: [...QUERY_OPS],
+                description:
+                  'equals, not_equals (rows with nothing in the column count as not equal), greater, less (dates as YYYY-MM-DD), one_of (value is a list), contains (text holding the value, ignoring case, or a list holding it), empty (nothing in it: no value, empty text or an empty list), not_empty.',
+              },
+              value: {
+                description: 'The value to compare with; a list for one_of; left out for empty and not_empty.',
+              },
+            },
+            required: ['column', 'op'],
+            additionalProperties: false,
+          },
+        },
+        linked: {
+          type: 'array',
+          maxItems: 5,
+          description:
+            'Conditions on linked rows: each keeps the rows that have (present true) or have none of (present false) a row of another table linked to them by a key, either way round. The tables are those table_info lists under linksTo and linkedFrom.',
+          items: {
+            type: 'object',
+            properties: {
+              table: { type: 'string', description: 'The linked table, such as job_search.cover_letters.' },
+              present: { type: 'boolean', description: 'true for rows with at least one linked row, false for rows with none.' },
+              via: {
+                type: 'string',
+                description: 'The key column to follow, needed only where the two tables are linked more than one way.',
+              },
+            },
+            required: ['table', 'present'],
+            additionalProperties: false,
+          },
+        },
+        columns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: "The columns to return for each row. Leave out for the table's usual ones.",
+        },
+        order: {
+          type: 'object',
+          properties: {
+            column: { type: 'string' },
+            ascending: { type: 'boolean', description: 'Smallest or oldest first. Largest or newest first when left out.' },
+          },
+          required: ['column'],
+          additionalProperties: false,
+          description: 'How to order the rows listed. Newest first when left out.',
+        },
+        count_only: { type: 'boolean', description: 'Only count the rows that match; list none.' },
+        group_by: { type: 'string', description: 'Count the rows that match by the values of this one column, most common first; list none.' },
+        limit: { type: 'integer', minimum: 1, maximum: QUERY_ROWS_MAX, description: `How many rows to list, up to ${QUERY_ROWS_MAX}; 50 when left out.` },
       },
       required: ['table'],
       additionalProperties: false,
@@ -202,6 +299,25 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: 'application_answers',
+    description:
+      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the first words of the answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        role_ref: { type: 'string', description: "The job_search.roles ref, as job_applications or search returned it. Reads the role's latest application." },
+        application_ref: { type: 'string', description: 'The job_search.applications ref, as job_applications returned it.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'duplicate_answers',
+    description:
+      'The application answers that repeat a question already answered on another role, grouped by question ("1. Why are you interested in Rogo?" and "Why are you interested in Rogo?" are one question). Each row is a copy that could go: its answer ref, the question, the role, its status and the first words, with remove true when it is an identical copy of the one kept (and keeps naming that one) and remove false when the copies are worded differently and the person has to say which to keep. Submitted answers are never rows. Use it for "remove my duplicate answers" or "which answers are repeated", then propose_delete for the rows with remove true.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'todos',
@@ -411,6 +527,22 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'read_job_board',
+    description:
+      'Read the open roles on a company\'s job board, from its careers page or its website: "look at their job board and see if any roles look good for me". It finds the board the page links to (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee, Breezy, BambooHR or Rippling) and returns each open role\'s title, place and link, up to 80. It reads no other page text and cannot browse other sites. Judge the roles against the person\'s job settings and target titles, and give the link with any role you suggest.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The company\'s careers page or website, as the person gave it ("https://www.tenex.co/careers").',
+        },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+  },
   CHART_TOOL_DEFINITION,
 ];
 
@@ -424,8 +556,14 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   open_row: { run: openLookup, module: null },
   // Checks the workspace of the table it is given, below.
   list_rows: { run: listRowsLookup, module: null },
+  // Leaves out the tables of switched-off workspaces itself.
+  table_info: { run: tableInfoLookup, module: null },
+  // Checks the workspace of the table it is given, below.
+  query_rows: { run: queryRowsLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
+  application_answers: { run: applicationAnswersLookup, module: 'jobs' },
+  duplicate_answers: { run: duplicateAnswersLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
   agenda: { run: agendaLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
@@ -441,6 +579,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
+  read_job_board: { run: jobBoardLookup, module: 'jobs' },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
 };
@@ -454,6 +593,23 @@ async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Pr
   const parsed = parseChart(input);
   if (!parsed.ok) return parsed;
   return { ok: true, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
+}
+
+/**
+ * Whether a lookup is offered when the person keeps a question to one
+ * workspace (plan #1899.5). A lookup bound to a workspace is offered in its
+ * own. The ones that range over every workspace (search, recall, open_row,
+ * list_rows) are offered too, since the context they run with is narrowed to
+ * that workspace and they leave out the rest themselves. Mail belongs to no
+ * workspace and the Dev lookups only to Dev, so neither is offered elsewhere.
+ * A chart reads nothing and is always offered.
+ */
+export function lookupInScope(name: string, scope: ModuleId): boolean {
+  if (!isAskToolName(name)) return true;
+  if (name === 'search_mail' || name === 'read_mail') return false;
+  if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text') return scope === 'dev';
+  const { module } = LOOKUPS[name];
+  return module === null || module === scope;
 }
 
 export function isAskToolName(name: string): name is AskToolName {
@@ -473,6 +629,19 @@ const MODULE_LABELS: Record<ModuleId, string> = {
 };
 
 /**
+ * The rows with the row each belongs to (lib/ask/parents.ts). A parent that
+ * fails to read costs the rows their parents, not the lookup its answer.
+ */
+async function parentsOf(ctx: AskContext, rows: AskRow[]): Promise<AskRow[]> {
+  try {
+    return await withParents(ctx, rows);
+  } catch (error) {
+    console.error('ask tool parents failed', error);
+    return rows;
+  }
+}
+
+/**
  * Run one tool call the model made. Never throws: a bad input, a switched-off
  * workspace or a failed read comes back as `{ ok: false, error }`, which the
  * loop hands the model as an error tool_result so it can try another way.
@@ -490,7 +659,7 @@ export async function executeAskTool(
     module ??
     (name === 'open_row' && typeof args.table === 'string'
       ? (SCHEMA_MODULES[args.table.split('.')[0] as AskSchema] ?? null)
-      : name === 'list_rows' && typeof args.table === 'string'
+      : (name === 'list_rows' || name === 'query_rows') && typeof args.table === 'string'
         ? (() => {
             const source = listableSource(args.table);
             return source ? sourceWorkspace(source) : null;
@@ -505,7 +674,8 @@ export async function executeAskTool(
     if (!result.ok) return result;
     // The promise to the page: every row a tool gives back opens somewhere,
     // in the app or, for a message, in Gmail (isOpenableHref).
-    return { ...result, rows: result.rows.filter((row) => isOpenableHref(row.href)) };
+    const rows = result.rows.filter((row) => isOpenableHref(row.href));
+    return { ...result, rows: await parentsOf(ctx, rows) };
   } catch (error) {
     if (error instanceof AskInputError) return { ok: false, error: error.message };
     console.error(`ask tool ${name} failed`, error);

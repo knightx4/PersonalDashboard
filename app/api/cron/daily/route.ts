@@ -15,6 +15,8 @@ import { runGoalsWeekly } from '@/inngest/goals/weekly';
 import { runScopeDays } from '@/inngest/goals/scope-days';
 import { runBriefWatch } from '@/inngest/learn/brief-watch';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
+import { runLitTopicPullsDaily } from '@/inngest/learn/lit-topic-pulls';
+import { runPreparationsDaily } from '@/inngest/learn/prepare';
 import { runXReadsForAll } from '@/inngest/x/read';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
@@ -101,6 +103,12 @@ export async function GET(request: NextRequest) {
     // Last, and bounded: Learn ideas saved without a vector get one (plan #1854),
     // then the places on Idea Space are worked out from them again (plan #1997.2).
     { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
+    // After the embeddings, which light the topics: one structure document for
+    // each of up to five topics that just lit (plan #2247.11).
+    { name: 'learn-lit-topic-pulls', run: () => runLitTopicPullsDaily() },
+    // Subjects whose preparation stopped short (plan #2276.1). Each is started
+    // in a function of its own, so this stage costs a few requests.
+    { name: 'learn-preparations', run: () => runPreparationsDaily(origin) },
   ];
 
   const results: Record<string, unknown> = {};

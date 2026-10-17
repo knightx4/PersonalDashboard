@@ -419,7 +419,10 @@ const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => (
       later: ctx.later,
       apiKey: ctx.anthropicApiKey,
     });
-    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn, research }, input);
+    // attach_vault_note finds the note in their vault, while that workspace is on.
+    const vaultOn = !ctx.account || ctx.account.enabledModules.includes('vault');
+    const vault = write.name === 'attach_vault_note' && ctx.db && vaultOn ? await ctx.db('obsidian') : undefined;
+    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn, research, vault }, input);
     if ('ok' in made) throw new AskInputError(made.error);
     await recordLearn(ctx, made);
     return { ok: true, rows: [made.row], note: made.summary };
@@ -673,7 +676,7 @@ const JOBS_TOOLS: readonly ConnectorWriteTool[] = JOBS_WRITES.map((write) => ({
   async run(ctx, input) {
     if (!ctx.db || !ctx.account) refuse();
     if (!ctx.account.enabledModules.includes('jobs')) throw new AskInputError(JOBS_OFF);
-    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db, ctx.account.timezone), input);
     if ('ok' in made) throw new AskInputError(made.error);
     if (!made.undo) {
       await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);

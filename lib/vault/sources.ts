@@ -2,7 +2,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of the vault's nav its rows sit under (app/vault/layout.tsx). */
-const NOTES: Section = { href: '/vault', label: 'Notes' };
+const NOTES: Section = { href: '/vault', label: 'Now' };
 const MAP: Section = { href: '/vault/map', label: 'Map' };
 const MAYA: Section = { href: '/vault/maya', label: 'Maya' };
 
@@ -56,6 +56,7 @@ export const vaultSources: ModuleSources = {
       weight: 'intent',
       search: ['sentence'],
       title: 'sentence',
+      parent: parentBy('older_note_id', 'obsidian.notes'),
       note:
         'older_note_id and recent_note_ids point at obsidian.notes. week_ending is the day the week was read back from. ' +
         'A row with dismissed_at set is one they hid as not useful.',
@@ -82,6 +83,7 @@ export const vaultSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentBy('thread_id', 'obsidian.maya_threads'),
       note:
         "Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. " +
         'thread_id points at maya_threads. Every message here was copied into core.conversation_turns with the same id.',

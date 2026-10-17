@@ -2,9 +2,8 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { formatMoney } from '@/lib/money';
 import type { ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -86,10 +85,15 @@ function Rooting({ note }: { note: RootingNote }) {
 function SearchButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" pending={pending}>
-      <Search className="size-4" strokeWidth={1.75} aria-hidden />
-      {pending ? 'Searching…' : 'Find something to read'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/r/[id]/actions.ts#findSources"
+      what="Cost of the search"
+    >
+      {pending ? 'Searching…' : 'Find what to read on this'}
+    </DashAction>
   );
 }
 
@@ -215,7 +219,6 @@ export function FindSources({ readingId }: { readingId: string }) {
       {findState.rooting && <Rooting note={findState.rooting} />}
       <div className="flex flex-wrap items-center gap-3">
         <SearchButton />
-        <PaidHint action="app/learn/r/[id]/actions.ts#findSources" what="Cost of the search" />
         {findState.error && <span className="text-ui text-danger">{findState.error}</span>}
       </div>
       <p className="mt-2 text-small text-ink-muted">

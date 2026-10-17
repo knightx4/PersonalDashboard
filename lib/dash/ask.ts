@@ -6,7 +6,7 @@ import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/chang
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
 import type { DashFile } from './files';
-import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
@@ -15,12 +15,16 @@ import {
   type DashExecutor,
   type DashLookupEvent,
   type DashProposer,
+  type DashQueuer,
   type DashSeen,
   type DashStop,
   type DashVoice,
   type DashWriter,
 } from './loop';
-import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import { lookupInScope } from '@/lib/ask/tools';
+import { moduleById, type ModuleId } from '@/lib/modules';
+import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
+import type { PaidQueued } from './paid';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -53,7 +57,17 @@ choose or suggest from them, and ask you to change them.
 THEIR THINGS REACH FURTHER THAN THAT LIST. list_rows reads any table that
 holds what they wrote, saved, did or have, including tables no other lookup
 covers, such as the videos on their watch list. When the other lookups do not
-fit what they asked about, list_rows does.
+fit what they asked about, list_rows does. table_info gives a table's columns
+and the tables it links to. query_rows answers a precise question about one
+table in a single call: the rows where a column is empty, equals or passes a
+value, how many there are, or how many at each value of a column. Its linked
+conditions keep the rows that have, or have none of, a row of another table
+linked to them, so "which applications have no answers" is one call too.
+When a question is about many rows and what is linked to each, use
+query_rows before looking each row up in turn. Check the column names and
+links with table_info first when you are not sure of them. Every
+lookup says how many rows matched and how many it showed; when it showed
+fewer, say so rather than counting the rows you were given.
 
 LOOK IT UP. Answer from what the lookup tools return, never from memory or a
 guess about what they probably have. Work out which lookups the question needs
@@ -92,14 +106,27 @@ who sent it, the day it arrived and its subject, and cite it the same way:
 the person opens it in Gmail from there. When the question is about what an
 email says, find it with search_mail, then open it with read_mail and answer
 from its text. Open only the messages the question is about, and quote no
-more of the text than the answer needs.
+more of the text than the answer needs. When they give a company's careers
+page or site and ask about its roles, read them with read_job_board, and give
+the link with each role you suggest.
 
-A BREAKDOWN CAN BE DRAWN. When they ask how something splits or changes over
-time, such as where their money went, spending by shop or month, or where
-their applications are stuck, and a lookup gives three or more figures to
-compare, call show_chart with those figures exactly as the lookup gave them,
-then answer. It is drawn under your answer, so say in a sentence or two what
-it shows (the largest row, the change) rather than listing every figure.
+A NUMBER CAN BE DRAWN, AND SO CAN WHAT IT IS MADE OF. Call show_chart with
+figures exactly as a lookup gave them, then answer; the chart is drawn under
+your answer, so say in a sentence or two what it shows (the change, the
+largest row) rather than listing every figure again.
+- When they ask for one amount for a period, such as what they spent in
+  September or how many applications they sent this month, draw it as a
+  figure with the usual amount as its reference. For spending, ask
+  spend_by_merchant from three months before the period to its end: its
+  months give both the amount and the usual one, the average of the three
+  months before. Where a note or goal of theirs sets a target, such as a
+  monthly budget, use the target instead and name it.
+- When they ask how an amount changes over time, draw columns, oldest
+  first, with the target as the reference when there is one.
+- When they ask how something splits, such as spending by shop or
+  applications by status, and a lookup gives three or more figures, draw a
+  bar. A figure for the total and a bar for the shops behind it is a good
+  pair; never draw more than two.
 
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. When they ask you to
 add, rename, move or tick off a todo, add a goal under one of their areas,
@@ -113,9 +140,11 @@ set_goal_done_when, mark_returned, add_role_note, add_job_lead,
 add_interview_round, link_round_email, write_prep_note, add_idea, add_quick_note, change_items or move_roles. A
 job is saved from its posting link when they give one. In Learn, when they ask to change a reading (its status, the Read
 now shelf, their note, its text or its link), start a reading list, add
-something to one, reword an idea, note on an idea or a card, or mark or move
-a video, call change_reading, add_learn_track, add_track_reading,
-reword_concept, add_concept_note or change_video. In Todo, when they ask to
+something to one, reword an idea, note on an idea or a card, mark or move
+a video, add a finding to a research brief, or attach a vault note to an
+essay's notes, call change_reading, add_learn_track, add_track_reading,
+reword_concept, add_concept_note, change_video, add_to_brief or
+attach_vault_note. In Todo, when they ask to
 write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
@@ -135,14 +164,16 @@ change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
  item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To rename a recurring payment, leave it out of the monthly total or count it again, merge two or move some of its charges to another, call change_recurring; to set how long a shop gives them to return things, call return_window; to add someone they shop for or rename one, call change_person. In Jobs, to change a role's title, location, pay, posting or company, call
-change_role; to set how excited they are about one or how they applied, call
+change_role; to set how excited they are about one, how they applied, whether it is ready to apply or whether it has a cover letter, call
 change_application; to add the questions an application asks, call add_application_questions; to save an answer to one, keep a drafted answer with what it rests on, approve it or mark it submitted, call save_answer, and to write or rewrite one from their evidence, write it yourself from list_rows on job_search.evidence_items and the role's description, then call save_answer; to make an answer the default reused for a question on every application, call set_default_answer; to rename a company or correct its details, call change_company; to fold duplicate roles into one, call merge_roles; to finish, put off, reword, move or link a reminder to an email, call change_reminder; to finish or put off a row waiting on them, call change_waiting; to link an email to a role, turn a suggested one down or take one off a role, call change_role_email; in Jobs review, to confirm or reopen an application, call review_application, and to clear the flag on events that conflict with a pursuit or flag them again, call review_events, and to dismiss emails waiting there or bring dismissed ones back, call review_emails, and to make a new role from an email waiting there, call add_role_from_email; to add or correct a contact, call change_contact; to log that they reached out to someone, correct that entry or mark it answered, call change_touch; when they have messaged a person Dash suggested, call mark_suggestion_sent. From Material, Settings and Find, to add a story to their evidence bank, call add_evidence; to add a resume version, call add_resume_version; to keep a PDF they sent you as a version's file, call attach_resume_pdf; to write or reword a career goals entry, call change_career_thought; to add a startup Find discovered to their companies, call add_discovered_company. On a role's interviews, to correct an interview's kind, status, date or notes, call change_interview; to name who interviewed them or take someone off, call change_interviewer; to rename, renumber or write notes on a round, gather rounds into one, split an interview into a round of its own or take an email off a round, call change_interview_round. In the Vault, to write
 a note, change or rename one, file a quick note, or rename a theme or a
 thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job. When they state a rule for many items or
+or ask to correct one, call save_job. When they ask for one of their X post
+drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
+with the whole new text. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The
@@ -160,6 +191,29 @@ outside the app, or to tell them when it drops, call propose_watch. Nothing is
 written: it shows as a card under your answer and they confirm or decline it.
 Say what it will do and when it stops.
 
+A BUILD IS PROPOSED, NOT STARTED. When they ask you to build, start, send or
+restart a step on the plan, look the step up with read_dev_row and call
+propose_build, never hand_off. Nothing starts until they confirm the card,
+which names the step and says the start cannot be undone, so your sentence
+need not repeat either: say only what the card does not, such as how long a
+quiet run has gone without pushing.
+When it is refused, say why in plain words and do not propose anything else.
+
+A DELETE IS PROPOSED, NOT DONE. When they ask you to remove rows, call propose_delete
+with the refs a lookup returned; nothing is deleted until they confirm the card,
+and a confirmed delete can be undone. For repeated application answers ("remove
+my duplicate answers"), call duplicate_answers first and propose only the rows
+with remove true, naming in your answer the copy that stays. Where the copies
+are worded differently, propose nothing: show each wording and ask which to
+keep, then propose the others. A submitted answer is never proposed. A note on
+a job, company or contact (job_search.notes) is found with list_rows or recall
+and proposed the same way, as is a job role (job_search.roles), found with search, which is refused when it has
+applications, notes or anything else attached; and a task (todo.tasks), found with search,
+todos or list_rows, which is refused when it has subtasks. When propose_delete refuses a row because something
+is attached to it, tell them what is attached and propose nothing for it. Say
+which rows you proposed removing and why, and that nothing is gone until they
+confirm.
+
 ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
 change something none of your tools can (a job application, a contact, a
 vault note, a goal's done-when), or to do work your lookups cannot finish
@@ -169,7 +223,7 @@ for it. A routine does it within a few minutes and its reply appears in this
 conversation. Then say in a sentence that you have passed it on; do not say
 it is done, and do not propose something near it instead. Never hand on a
 question you can answer by looking things up, and never a request to delete
-something, send an email or spend money: for those, say you cannot. Those
+something (application answers, job notes, job roles and tasks are the exception, above: propose_delete), send an email or spend money: for those, say you cannot. Those
 three are the only requests you turn down; anything else is looked up, done
 with a tool, or handed on.
 
@@ -181,6 +235,16 @@ about anything else, ignore the page and answer as if it had not been said.`;
 
 /** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
+
+/**
+ * Ask's voice for a question kept to one workspace (plan #1899.5): every
+ * tool but the lookups outside it (lookupInScope). Writes stay, since a
+ * change the person asks for is not a lookup.
+ */
+export function scopedVoice(scope: ModuleId | null | undefined): DashVoice {
+  if (!scope) return ASK_VOICE;
+  return { ...ASK_VOICE, tools: ASK_VOICE.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+}
 
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
@@ -206,6 +270,8 @@ export async function answerQuestion(input: {
   propose?: AskProposer;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /** Absent: every paid tool is refused (plan #2228.1). */
+  queue?: DashQueuer;
   /**
    * Keeps a hand-off and returns what to tell the model. Absent: every
    * hand-off is refused. `seen` says whether Dash has seen the row it names.
@@ -220,9 +286,22 @@ export async function answerQuestion(input: {
   onLookup?: (event: AskLookupEvent) => void;
   /** Hears the answer's text as it is written (plan #1902); present, the calls stream. */
   onText?: (piece: string) => void;
+  /** Stops the answer, keeping what was written (plan #1899.5). */
+  signal?: AbortSignal;
+  /** The workspace the question is kept to (plan #1899.5); null or absent for every one. */
+  scope?: ModuleId | null;
 }): Promise<AskAnswer> {
-  const { page, ...rest } = input;
-  return runDash({ ...rest, voice: ASK_VOICE, context: { surface: 'ask', subject: null, page: page ?? null } });
+  const { page, scope, ...rest } = input;
+  return runDash({
+    ...rest,
+    voice: scopedVoice(scope),
+    context: {
+      surface: 'ask',
+      subject: null,
+      page: page ?? null,
+      scope: scope ? (moduleById(scope)?.label ?? scope) : null,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +367,12 @@ export type AskWriteRunner = (
   seen: DashSeen,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
+/**
+ * Checks and prices a paid press as the person (queuePaidPress in
+ * lib/dash/paid.ts, bound to a request), without keeping it (plan #2228.1).
+ */
+export type AskQueueRunner = (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
+
 /** What the model is told once a change is made and kept. */
 function madeNote(summary: string): string {
   return `Done: ${summary} It shows under your answer with an Undo. Say what you did, and cite the row this returned.`;
@@ -336,6 +421,12 @@ export async function askDash(
      * `saveChange` store: every write is refused.
      */
     write?: AskWriteRunner;
+    /**
+     * Checks and prices a paid press (plan #2228.1); the press is kept as a
+     * proposal with the answer's others, and runs only on an approval.
+     * Absent: every paid tool is refused.
+     */
+    queue?: AskQueueRunner;
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
@@ -343,6 +434,18 @@ export async function askDash(
     onLookup?: (event: AskLookupEvent) => void;
     /** Hears the answer's text as it is written (plan #1902). */
     onText?: (piece: string) => void;
+    /**
+     * Hears the question once it is kept, before Dash is asked (plan
+     * #1899.5): the streaming route tells the browser, so a question stopped
+     * mid-answer can be found again.
+     */
+    onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
+    /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
+    signal?: AbortSignal;
+    /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
+    mentions?: readonly TalkCitation[];
+    /** The workspace the question is kept to (plan #1899.5). */
+    scope?: ModuleId | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -363,11 +466,23 @@ export async function askDash(
     } else {
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [{ role: 'user', body: question, files: input.files }]);
+    asked = await stores.append(subject, [
+      {
+        role: 'user',
+        body: question,
+        files: input.files,
+        ...(input.mentions?.length ? { citations: input.mentions } : {}),
+      },
+    ]);
   } catch {
     return { turns: [], error: 'Your question was not kept. Try again.' };
   }
   const conversation = { ref: subject.ref, title: subject.title ?? null };
+  try {
+    input.onAsked?.({ conversation, turns: asked });
+  } catch (error) {
+    console.error('ask question listener failed', error);
+  }
 
   if (!input.anthropicApiKey) {
     return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
@@ -418,6 +533,23 @@ export async function askDash(
           return { ok: true, rows: [row], note: madeNote(result.summary) };
         }
       : undefined;
+  // A paid press is checked and priced, then kept as a proposal like any
+  // other: nothing runs until the person approves it (plan #2228.1).
+  const queueRun = input.queue;
+  const queue: DashQueuer | undefined = queueRun
+    ? async (tool, args, seen) => {
+        const queued = await queueRun(tool, args, seen);
+        if (!queued.ok) return { ok: false, error: queued.error };
+        let kept: DashChange;
+        try {
+          kept = await save(queued.change);
+        } catch (error) {
+          console.error(`ask paid tool ${tool.name} was not queued`, error);
+          return { ok: false, error: 'That could not be queued. Tell them nothing was run.' };
+        }
+        return { ok: true, rows: [], totals: { queued: { id: kept.id, kind: kept.kind, input: kept.input } }, note: queued.note };
+      }
+    : undefined;
   const handed: DashHandoff[] = [];
   const saveHandoff = stores.saveHandoff;
   const handOff =
@@ -468,12 +600,15 @@ export async function askDash(
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
     write,
+    queue,
     handOff,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     now: input.now,
     onLookup: input.onLookup,
     onText: input.onText,
+    signal: input.signal,
+    scope: input.scope,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);

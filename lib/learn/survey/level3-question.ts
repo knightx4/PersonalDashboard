@@ -5,12 +5,10 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedIdeaClaim } from '@/lib/learn/embed/idea-embedding';
-import { loadConcept } from '@/lib/learn/graph/load';
-import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
-import { nextMasteryCheck, recordProbe } from '@/lib/learn/graph/session';
 import type { SurveyIdea } from './idea';
 import { goalQuestionDepth, ideaForGoal, type GoalCardSource } from './goal-idea';
 import {
+  recordGoalExplain,
   unusedCard,
   type GoalAim,
   type GoalQuestion,
@@ -129,8 +127,6 @@ export async function writeLevel3Question(input: {
   client?: Anthropic;
   /** The idea's model call. Record it as 'write-survey-idea'. */
   onIdeaSpend?: SpendSink;
-  /** The question's model call. Record it as 'write-survey-question'. */
-  onSpend?: SpendSink;
 }): Promise<WrittenGoalQuestion> {
   const { supabase, userId, aim } = input;
 
@@ -196,45 +192,12 @@ export async function writeLevel3Question(input: {
   const articleSubjectId = await subjectForArticle(supabase, userId, article);
   await crossList(supabase, userId, idea.conceptId, articleSubjectId, article);
 
-  const check = nextMasteryCheck(idea.mastery, []);
-  const written = await writeProbe({
-    concept: idea.name,
-    claim: idea.claim,
-    check,
-    otherChecks: idea.mastery.filter((other) => other !== check),
-    anthropicApiKey: input.anthropicApiKey,
-    client: input.client,
-    onSpend: input.onSpend,
-  });
-  // The idea stays, unasked, and the next call uses it.
-  if (!written.ok) {
-    return {
-      ok: false,
-      reason: written.reason === 'error' ? 'error' : 'ungrounded',
-      detail: written.detail,
-    };
-  }
-
-  let flow;
-  if (input.flow) {
-    const concept = await loadConcept(supabase, idea.conceptId);
-    flow = {
-      pickedState: concept?.state ?? 'unknown',
-      pickedRecheck: null,
-      shownAt: input.flow.shownAt,
-    };
-  }
-  const probeId = await recordProbe(supabase, userId, {
-    conceptId: idea.conceptId,
-    probe: written.probe,
-    model: PROBE_MODEL,
-    flow,
-  });
+  const asked = await recordGoalExplain(supabase, userId, idea, input.flow);
 
   return {
     ok: true,
     question: {
-      probeId,
+      probeId: asked.probeId,
       conceptId: idea.conceptId,
       conceptName: idea.name,
       subjectId: subject.id,
@@ -243,8 +206,10 @@ export async function writeLevel3Question(input: {
       depth,
       source: idea.source,
       cardTitle: idea.cardTitle,
-      question: written.probe.question,
-      options: written.probe.options,
+      question: asked.question,
+      options: [],
+      explain: true,
+      case: false,
     },
   };
 }

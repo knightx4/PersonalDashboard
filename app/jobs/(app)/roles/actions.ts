@@ -7,12 +7,13 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
-import { draftAnswer } from '@/lib/jobs/evidence/draft';
-import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSessionSpend } from '@/lib/core/spend/session';
-import { DEFAULT_BANNED_CONSTRUCTIONS, type AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
-import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
-import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
+import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import {
+  draftAnswerFor,
+  draftApplicationAs,
+  type DraftApplicationResult,
+} from '@/lib/jobs/drafting/run-draft';
+import { dropDraft, saveReplies, type StoredAsk } from '@/lib/jobs/drafting/store';
 
 // latency: pending
 export async function updateRole(
@@ -159,6 +160,44 @@ export async function saveAnswer(
 }
 
 /**
+ * Take a question off this application (note 08c638c3). The question stays in
+ * the bank with its default answer, since other applications may ask it; only
+ * this application's answer row goes, and the count of times it was asked
+ * drops by the one this application added.
+ */
+// latency: pending
+export async function removeAnswer(answerId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data: removed, error } = await supabase
+    .from('application_answers')
+    .delete()
+    .eq('id', answerId)
+    .eq('user_id', user.id)
+    .select('question_id')
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (removed?.question_id) {
+    const { data: question } = await supabase
+      .from('questions')
+      .select('times_seen')
+      .eq('id', removed.question_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (question && (question.times_seen as number) > 1) {
+      await supabase
+        .from('questions')
+        .update({ times_seen: (question.times_seen as number) - 1 })
+        .eq('id', removed.question_id)
+        .eq('user_id', user.id);
+    }
+  }
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/material');
+  return { error: null };
+}
+
+/**
  * Promote an approved answer to the question's canonical version.
  *
  * This is the loop that compounds: after twenty applications the common
@@ -298,18 +337,25 @@ export async function lookUpJobDescription(roleId: string): Promise<JdLookupResu
  * Drafting one answer: the best answer to the question, drawing on the bank
  * and the posting (note ad554975).
  *
- * The draft comes back to the caller and is not written anywhere. It lands
- * beside the textarea, not in it, and only an Insert followed by a Save puts
- * it on the record — the compose.ts principle carried forward: the model may
- * prepare text, but nothing goes out over your name that you did not put
- * there.
+ * Since plan #2130.3 it is the whole-application drafter asked for one
+ * question, so a single draft reads everything on file, sees the other
+ * answers, and uses the replies to Dash's earlier asks. The draft lands beside
+ * the textarea, not in it, and only an Insert followed by a Save puts it on
+ * the record: the compose.ts principle carried forward, the model may prepare
+ * text, but nothing goes out over your name that you did not put there. It is
+ * also kept in application_drafts with the rest of the application's drafts.
  */
 const draftSchema = z.object({ answerId: z.string().uuid() });
 
 // latency: pending
 export async function draftAnswerFromEvidence(
   input: z.input<typeof draftSchema>,
-): Promise<{ draft: AnswerDraft | null; error: string | null }> {
+): Promise<{
+  draft: AnswerDraft | null;
+  /** Dash's questions on the application after this run, so the tab can show a new one (plan #2130.4). */
+  asks?: StoredAsk[];
+  error: string | null;
+}> {
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
 
@@ -317,93 +363,96 @@ export async function draftAnswerFromEvidence(
   if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
 
   const user = await requireUser();
-  const supabase = await createClient();
+  const result = await draftAnswerFor(user.id, apiKey, parsed.data.answerId);
+  return { draft: result.draft, asks: result.asks, error: result.error };
+}
 
+/**
+ * Drafting every answer on an application in one call (plan #2130.3), or the
+ * ones named. Dash reads everything on file (gather), writes the answers
+ * together so they tell different stories, checks each against its limit,
+ * and lists what it needs to ask. Replies to its earlier asks are saved
+ * first, so the drafts use them.
+ *
+ * The result is stored in application_drafts, a working copy: as with the
+ * single draft, only an Insert and a Save put an answer on the record.
+ */
+const draftApplicationSchema = z.object({
+  applicationId: z.string().uuid(),
+  /** Absent or empty: every question with no answer. */
+  answerIds: z.array(z.string().uuid()).max(100).optional(),
+  /** Replies to Dash's asks, by ask id; an empty reply clears one. */
+  replies: z.record(z.string(), z.string().max(4_000)).optional(),
+});
+
+export type { DraftApplicationResult };
+
+// latency: pending
+export async function draftApplication(
+  input: z.input<typeof draftApplicationSchema>,
+): Promise<DraftApplicationResult> {
+  const parsed = draftApplicationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { drafts: null, drafted: [], flagged: [], missing: [], error: parsed.error.issues[0].message };
+  }
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { drafts: null, drafted: [], flagged: [], missing: [], error: 'Drafting is not configured.' };
+
+  const user = await requireUser();
+  return draftApplicationAs(user.id, apiKey, parsed.data);
+}
+
+const answerRepliesSchema = z.object({
+  applicationId: z.string().uuid(),
+  replies: z.record(z.string(), z.string().max(4_000)),
+});
+
+/**
+ * Keeps the person's replies to Dash's questions about the answers without
+ * redrafting (plan #2130.4), so a reply typed and left survives a reload and
+ * the next run uses it. An empty reply clears it.
+ */
+// latency: pending
+export async function saveAnswerReplies(
+  input: z.input<typeof answerRepliesSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = answerRepliesSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await requireUser();
+  const supabase = await createClient();
+  const { saved, error } = await saveReplies(supabase, parsed.data.applicationId, 'answers', parsed.data.replies);
+  if (error) return { error };
+  if (!saved) return { error: 'There are no drafts to reply to.' };
+  return { error: null };
+}
+
+const dropAnswerDraftSchema = z.object({ answerId: z.string().uuid() });
+
+/**
+ * Takes an answer's draft out of the application's stored drafts once it has
+ * been inserted or discarded (plan #2130.4), so a reload does not offer it
+ * again. Dash's questions and their replies stay.
+ */
+// latency: pending
+export async function dropAnswerDraft(
+  input: z.input<typeof dropAnswerDraftSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = dropAnswerDraftSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
   const { data: row, error: rowError } = await supabase
     .from('application_answers')
-    .select(
-      `id, word_limit,
-       questions!application_answers_question_id_fkey!inner ( text, canonical_answer ),
-       applications!inner ( roles!inner ( title, jd_text, requirement_matches, companies!inner ( name ) ) )`,
-    )
+    .select('application_id')
     .eq('id', parsed.data.answerId)
     .eq('user_id', user.id)
     .maybeSingle();
+  if (rowError) return { error: rowError.message };
+  if (!row) return { error: 'That question is not yours.' };
 
-  if (rowError) return { draft: null, error: rowError.message };
-  if (!row) return { draft: null, error: 'That question is not yours.' };
-
-  const question = row.questions as unknown as { text: string; canonical_answer: string | null };
-  const role = (row.applications as unknown as {
-    roles: {
-      title: string;
-      jd_text: string | null;
-      requirement_matches: RequirementMatch[] | null;
-      companies: { name: string } | null;
-    };
-  }).roles;
-
-  const [{ data: bank, error: bankError }, { data: profile }] = await Promise.all([
-    supabase
-      .from('evidence_items')
-      .select('id, title, body, context, metrics, skills, strength')
-      .eq('user_id', user.id),
-    supabase
-      .from('profiles')
-      .select('writing_style_notes, banned_constructions')
-      .eq('id', user.id)
-      .maybeSingle(),
-  ]);
-
-  if (bankError) return { draft: null, error: bankError.message };
-
-  const items = (bank ?? []).map((item) => ({
-    id: item.id as string,
-    title: item.title as string,
-    body: item.body as string,
-    context: (item.context as string) ?? null,
-    metrics: (item.metrics as string) ?? null,
-    skills: (item.skills as string[]) ?? [],
-    strength: item.strength as number,
-  }));
-
-
-  // The shortlist is against the question rather than the description: this
-  // one answer is about one thing, and sending the whole bank invites the
-  // model to reach for a stronger story that answers a different question.
-  const shortlist = shortlistEvidence([{ text: question.text, kind: 'must_have' }], items);
-
-  // What the match already established this role wants, so the draft is
-  // written toward the role rather than in the abstract. Absent until the
-  // requirements have been matched, which is fine.
-  const matches = (role.requirement_matches as RequirementMatch[] | null) ?? [];
-  const wants = matches
-    .filter((match) => match.kind === 'must_have')
-    .slice(0, 8)
-    .map((match) => match.requirement)
-    .join('; ');
-
-  const banned = (profile?.banned_constructions as string[] | null) ?? [];
-
-  const spend: SpendReport[] = [];
-  const result = await draftAnswer(
-    { apiKey, onSpend: (report) => spend.push(report) },
-    {
-      question: question.text,
-      roleLabel: [role.companies?.name, role.title].filter(Boolean).join(', '),
-      bank: shortlist,
-      wordLimit: (row.word_limit as number) ?? null,
-      styleNotes: (profile?.writing_style_notes as string) ?? null,
-      banned: banned.length > 0 ? banned : DEFAULT_BANNED_CONSTRUCTIONS,
-      canonicalAnswer: question.canonical_answer,
-      requirementSummary: wants || null,
-      posting: role.jd_text,
-    },
-  );
-  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-answer' }, spend);
-
-  if (!result.ok) return { draft: null, error: result.error };
-  return { draft: result.draft, error: null };
+  return dropDraft(supabase, row.application_id as string, 'answers', parsed.data.answerId);
 }
 
 const acceptDraftSchema = z.object({

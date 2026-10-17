@@ -5,8 +5,7 @@
  *
  * This file is the goal lines, the summary, and
  * the split of what is on you into Do next and the rest. The ranking is
- * lib/goals/today.ts and what Dash did is lib/goals/done-since.ts; the reads
- * are in lib/goals/home-store.ts.
+ * lib/goals/today.ts; the reads are in lib/goals/home-store.ts.
  *
  * Pure, so the wording is tested without a database.
  */

@@ -11,7 +11,8 @@ import { PageColumn } from '@/components/shell/page-width';
  * page puts them in: a plan run going, with every kind of line; one waiting
  * on your answer, its choices as presses (plan #1824); one waiting on a
  * question asked without choices, answered in your own words; one gone quiet with its Acknowledge press; one just
- * started with nothing written yet; and one whose live connection dropped.
+ * started with nothing written yet; one whose live connection dropped; and a
+ * feature session's, folded under the feature's steps.
  * The live part (components/runs/live-run-lines.tsx) only feeds these lines
  * from Realtime, so the drawing is the same. The first card is a going run
  * whose next line arrives on a press (run-lines-demo.tsx), for the strip.
@@ -98,6 +99,40 @@ export const GOAL_RUN_QUESTION: RunQuestion = {
 };
 
 /** Every state of the card, stacked as the gallery shows them. */
+/**
+ * A feature session's lines as the runner card's open slot draws them: one
+ * fold for each step of the feature, the step being built open, the lines
+ * about another feature left out and counted, a repeat drawn once with a
+ * count and a run of file changes as one line naming the files.
+ */
+const FEATURE_LINES: RunActivity[] = [
+  line('f1', 'thought', '14:53', 'Checking the due check-backs before sending step #2124.1 to a builder.'),
+  line('f2', 'thought', '14:53', 'Woke the session on #1980 for its check-back.'),
+  line('f3', 'action', '14:53', 'Claimed #2124.1'),
+  line('f4', 'action', '14:53', 'Claimed #2124.1'),
+  line('f5', 'action', '14:54', 'Writing supabase/migrations-you/0007_details.sql'),
+  line('f6', 'action', '14:54', 'Writing lib/you/details-store.test.ts'),
+  line('f7', 'action', '14:55', 'Editing tests/rls-you.test.ts'),
+  line('f8', 'action', '14:59', 'Finished #2124.1, committed'),
+  line('f9', 'thought', '15:06', '#2124.2 is ready and touches different files from the rest, so it goes to a builder now.'),
+  line('f10', 'action', '15:06', 'Claimed #2124.2'),
+  line('f11', 'thought', '15:14', 'The #2124.2 builder has edits to the You layout and the nav icons, but no commit yet.'),
+  line('f11b', 'action', '15:14', 'Claimed #2124.4'),
+  line('f11c', 'thought', '15:14', 'I passed this screen on round 3. The earlier fix is done: while Dash marks the answer, the row under the explanation box holds one press on a single line at 390 in both light and dark. Nothing is cut off at 390, and the dark theme keeps its contrast. The pending state is clear in every shot, so this surface does draw its hidden part.'),
+  line('f12', 'thought', '15:15', 'Still waiting on the #2124.2 builder: 8 changed files in its worktree, no commit yet.'),
+  line('f13', 'thought', '15:16', 'The untracked files are the builder worktrees, which stay uncommitted.'),
+  line('f14', 'thought', '15:17', 'The #2124.2 builder committed. Merging its branch and running the fast checks.'),
+  line('f15', 'thought', '15:18', 'Type check and lint pass on the merged branch.'),
+  line('f16', 'thought', '15:19', 'Marking #2124.2 built and pushing.'),
+];
+
+const FEATURE_STEPS = [
+  { ref: '#2124.1', title: 'Store the details: table, store and tests', status: 'done' as const },
+  { ref: '#2124.2', title: 'A Details tab on the You page', status: 'in_progress' as const },
+  { ref: '#2124.3', title: 'Edit a detail in place', status: 'not_started' as const },
+  { ref: '#2124.4', title: 'Fill the details from the note you wrote', status: 'in_progress' as const },
+];
+
 export function RunLinesSurface() {
   return (
     <PageColumn className="space-y-6">
@@ -111,6 +146,7 @@ export function RunLinesSurface() {
       />
       <RunLinesView lines={[]} state="live" />
       <RunLinesView lines={RUN_LINES.slice(0, 2)} state="live" connection="lost" />
+      <RunLinesView lines={FEATURE_LINES} state="live" feature={{ ref: '#2124', steps: FEATURE_STEPS }} />
     </PageColumn>
   );
 }

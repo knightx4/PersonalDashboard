@@ -12,6 +12,7 @@ import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
+import { withMockups } from '@/lib/plan/mockup';
 import { loadFeatureUpdates } from '@/lib/plan/updates-load';
 import { featureRow } from '@/lib/plan/feature-table';
 import { updateOverdueDaysNow } from '@/lib/plan/updates';
@@ -160,7 +161,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       commitChecks={commitChecks}
       overhaulProgress={overhaulProgress}
       criticStops={criticStops}
-      screenChanges={screenChanges}
+      screenChanges={withMockups(screenChanges, sections, pictures)}
       pictures={pictures}
       updates={updates}
       activity={activity}

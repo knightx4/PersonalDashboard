@@ -1,11 +1,11 @@
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 import Link, { linkVariants } from '@/components/ui/link';
-import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
+import { BadgeCheck, AlertTriangle, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { READING_TABS, type ReadingTab } from '@/lib/learn/tracks/reading-tabs';
@@ -63,6 +63,8 @@ export type ReadingViewProps = {
   tab?: ReadingTab;
   /** A failed Summarize press, drawn by the gallery; the page passes none. */
   summaryFailure?: SummaryFailure | null;
+  /** Gallery only: draws the Check it now prompt as if the reading had just been marked read. */
+  checkOffered?: { href: string };
   /** The chat with Dash under the reading, oldest turn first (plan #1876.5). */
   thread?: readonly DevComment[];
   /** Gallery only: the chat's waiting line and open box. */
@@ -83,6 +85,7 @@ export function ReadingView({
   origin,
   tab = 'reading',
   summaryFailure = null,
+  checkOffered,
   thread = [],
   chatState,
   path,
@@ -125,7 +128,7 @@ export function ReadingView({
           chat={<ReadingChat readingId={reading.id} turns={thread} {...chatState} />}
         />
       ) : (
-        <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} />
+        <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} checkOffered={checkOffered} />
       )}
     </TabbedDetail>
   );
@@ -195,10 +198,12 @@ function ReadingTabBody({
   reading,
   subjects,
   alreadyRead,
+  checkOffered,
 }: {
   reading: ReadingDetail;
   subjects: Subject[];
   alreadyRead: { trackTitle: string } | null;
+  checkOffered?: { href: string };
 }) {
   const verified = reading.locatorConfidence === 'verified';
   const pages =
@@ -279,11 +284,15 @@ function ReadingTabBody({
             {url ? (
               <form action={openReading} className="flex flex-wrap items-center gap-1">
                 <input type="hidden" name="readingId" value={reading.id} />
-                <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
-                  Open
-                </Button>
-                <PaidHint action="app/learn/r/[id]/actions.ts#openReading" what="Cost of finding the passage" />
+                <DashAction
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  paid="app/learn/r/[id]/actions.ts#openReading"
+                  what="Cost of finding the passage"
+                >
+                  Open at the passage
+                </DashAction>
                 {!verified && (
                   <span className="ml-2 text-small text-ink-muted">Finds the passage on the way, the first time.</span>
                 )}
@@ -305,7 +314,7 @@ function ReadingTabBody({
           this" opens it as a reading list of its own. */}
       <section className="mb-5">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where you are</h2>
-        <StatusButtons readingId={reading.id} status={reading.status} />
+        <StatusButtons readingId={reading.id} status={reading.status} offered={checkOffered} />
         <div className="mt-2 flex flex-wrap items-start gap-2">
           <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
           <form action={goDeeper}>

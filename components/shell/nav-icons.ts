@@ -10,6 +10,7 @@ import {
   Bug,
   Building2,
   FileText,
+  FolderInput,
   Fingerprint,
   Flag,
   GalleryHorizontalEnd,
@@ -25,6 +26,7 @@ import {
   History,
   Hourglass,
   House,
+  IdCard,
   Inbox,
   KanbanSquare,
   LayoutDashboard,
@@ -71,6 +73,8 @@ import { OwlIcon } from '@/components/shell/owl-icon';
  * happen to sit beside.
  */
 export const NAV_ICONS = {
+  // Home's front page (plan #1937.7): the house, as the other front pages.
+  home: House,
   // Shopping
   dashboard: LayoutDashboard,
   orders: Receipt,
@@ -134,6 +138,9 @@ export const NAV_ICONS = {
   calendar: CalendarDays,
   tasks: List,
   notes: StickyNote,
+  // The vault's quick notes, filed out of the Inbox folder into the vault
+  // (plan #1937.6). Not Inbox, which is every workspace's second section.
+  triage: FolderInput,
   // The vault's map: subjects joined to the positions and notes under them.
   // Not Map, which is the plan's, and not Network, which is Learn's knowledge
   // graph -- the map claims nothing about what you know.
@@ -184,6 +191,8 @@ export const NAV_ICONS = {
   review: ClipboardCheck,
 
   personality: Fingerprint,
+  // Details: phone, LinkedIn and the facts a form asks for (plan #2124.2).
+  details: IdCard,
   places: MapPin,
   workSchool: GraduationCap,
   insights: Sparkles,

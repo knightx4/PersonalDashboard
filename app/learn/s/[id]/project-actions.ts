@@ -7,11 +7,12 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { MARK_POINTS_MODEL } from '@/lib/learn/lessons/mark-points';
-import { planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import { handedInSomething, lineUpFigures } from '@/lib/learn/lessons/practice';
-import { PROJECT_ANSWER_MAX, type PlanForProject, type ProjectView } from '@/lib/learn/lessons/project';
+import { depthFromTargets, PROJECT_ANSWER_MAX, type PlanForProject, type ProjectView } from '@/lib/learn/lessons/project';
 import { loadProjectRow, projectViewOf } from '@/lib/learn/lessons/project-store';
 import { markProject, WRITE_PROJECT_MODEL, writeProject } from '@/lib/learn/lessons/write-project';
+import { loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
 /**
@@ -29,24 +30,44 @@ async function loadPlanForProject(
   userId: string,
   subjectId: string,
 ): Promise<PlanForProject | null> {
-  const goal = await planGoalFor(learn, userId, subjectId);
-  if (!goal) return null;
-  const [aim, units] = await Promise.all([
-    learn.from('aims').select('about, depth').eq('user_id', userId).eq('id', goal.aimId).maybeSingle(),
-    loadCurriculum(learn, subjectId, userId),
-  ]);
-  if (aim.error) throw new Error(`Reading the goal failed: ${aim.error.message}`);
-  const row = aim.data as { about: string | null; depth: string | null } | null;
+  const owner = await planOwnerFor(learn, userId, subjectId);
+  if (!owner) return null;
+  const units = await loadCurriculum(learn, subjectId, userId);
+  const { about, depth } = owner.aimId
+    ? await goalAboutDepth(learn, userId, owner.aimId)
+    : await subjectAboutDepth(learn, userId, subjectId);
   return {
-    goal: goal.name,
-    about: row?.about ?? null,
-    depth: row?.depth ?? null,
+    goal: owner.name,
+    about,
+    depth,
     units: units.map((unit) => ({
       ordinal: unit.ordinal,
       title: unit.title,
       covers: unit.covers || null,
       outcome: unit.outcome || null,
     })),
+  };
+}
+
+type AboutDepth = { about: string | null; depth: string | null };
+
+async function goalAboutDepth(learn: LearnSupabaseClient, userId: string, aimId: string): Promise<AboutDepth> {
+  const aim = await learn.from('aims').select('about, depth').eq('user_id', userId).eq('id', aimId).maybeSingle();
+  if (aim.error) throw new Error(`Reading the goal failed: ${aim.error.message}`);
+  const row = aim.data as AboutDepth | null;
+  return { about: row?.about ?? null, depth: row?.depth ?? null };
+}
+
+/** A prepared subject with no goal: its note stands in for about, its territory's target levels for depth. */
+async function subjectAboutDepth(learn: LearnSupabaseClient, userId: string, subjectId: string): Promise<AboutDepth> {
+  const [subject, territory] = await Promise.all([
+    learn.from('subjects').select('note').eq('user_id', userId).eq('id', subjectId).maybeSingle(),
+    loadSubjectTerritory(learn, userId, subjectId).catch(() => null),
+  ]);
+  if (subject.error) throw new Error(`Reading the subject failed: ${subject.error.message}`);
+  return {
+    about: (subject.data as { note: string | null } | null)?.note ?? null,
+    depth: depthFromTargets(territory?.topics.map((topic) => topic.target) ?? []),
   };
 }
 
@@ -70,7 +91,7 @@ export async function writePlanProject(subjectId: string): Promise<ProjectResult
     if (existing) return { project: await projectViewOf(learn, user.id, existing) };
 
     const plan = await loadPlanForProject(learn, user.id, id.data);
-    if (!plan) return { error: 'This subject is not a learning goal’s plan.' };
+    if (!plan) return { error: 'This subject has no plan to set a project from.' };
     if (plan.units.length === 0) return { error: 'This plan has no units to set a project from yet.' };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -149,7 +170,7 @@ export async function handInPlanProject(
     if (!handedInSomething(working, lined)) return { error: 'Type in the figures or your working first.' };
 
     const plan = await loadPlanForProject(learn, user.id, subject);
-    if (!plan) return { error: 'This subject is not a learning goal’s plan.' };
+    if (!plan) return { error: 'This subject has no plan to set a project from.' };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { error: 'Marking a hand-in needs ANTHROPIC_API_KEY to be set.' };

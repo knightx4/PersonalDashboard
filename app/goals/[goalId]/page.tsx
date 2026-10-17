@@ -11,7 +11,9 @@ import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
-import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { loadCollection, loadCollectionsForGoal } from '@/lib/goals/collections-store';
+import { namedLists, type MetricList } from '@/lib/goals/metric-chart';
+import { loadMetricCounts } from '@/lib/goals/metrics-store';
 import { shownContext, type ContextItem } from '@/lib/goals/context';
 import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
@@ -44,7 +46,10 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadAimForGoal, loadLevel3Counts } from '@/lib/learn/aims-store';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { loadSubjectKind } from '@/lib/learn/goal-kind-store';
 import { loadPlans } from '@/lib/learn/lessons/plan-store';
+import { loadPreparation } from '@/lib/learn/prepare/store';
+import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
 import { progressLine } from '@/lib/learn/lessons/plan-view';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { FileLinks } from '@/components/files/file-links';
@@ -79,6 +84,11 @@ import { GoalHelp } from './goal-help';
 import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
+import { MetricsProperty } from './metrics-property';
+import { metricLists } from '@/lib/goals/metric-form';
+import type { Metric } from '@/lib/goals/metrics';
+import { loadMetrics } from '@/lib/goals/metrics-store';
+import { GoalMetrics, type MetricView } from './goal-metrics';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
@@ -240,17 +250,42 @@ async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, 
   const aim = await loadAimForGoal(learn, goalId).catch(() => null);
   if (!aim) return null;
   const level3 = aim.listSource === 'level3';
-  const [plans, level3Counts] = await Promise.all([
+  const [plans, level3Counts, subject] = await Promise.all([
     loadPlans(learn, userId).catch(() => []),
     level3 ? loadLevel3Counts(learn).catch(() => null) : null,
+    level3 ? null : loadGoalSubject(learn, userId, aim.id).catch(() => null),
   ]);
   const plan = plans.find((p) => p.aimId === aim.id);
   return {
-    aim: { id: aim.id, name: aim.name, depth: aim.depth, level3 },
+    aim: { id: aim.id, name: aim.name, depth: aim.depth, level3, subject },
     plan: plan
       ? { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress, plan.finished) }
       : null,
     level3Counts,
+  };
+}
+
+/**
+ * The subject a learning goal points at, with its kind and its preparation in
+ * one line (plan #2302.2); null while the goal points at none.
+ */
+async function loadGoalSubject(learn: LearnSupabaseClient, userId: string, aimId: string) {
+  const { data, error } = await learn.from('aims').select('subject_id').eq('id', aimId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const subjectId = (data as { subject_id: string | null } | null)?.subject_id;
+  if (!subjectId) return null;
+  const [kind, preparation] = await Promise.all([
+    loadSubjectKind(learn, subjectId),
+    loadPreparation(learn, userId, subjectId),
+  ]);
+  const view = preparationView(preparation);
+  return {
+    id: subjectId,
+    kind: kind.kind,
+    kindReason: kind.reason,
+    kindBy: kind.by,
+    preparation: preparationLine(view),
+    stopped: view.kind === 'failed',
   };
 }
 
@@ -342,6 +377,27 @@ export default async function GoalMapPage({
   // The saved step counts behind the burn-up chart (plan #1837). A failed
   // read leaves the chart out rather than the page.
   const scopeDays = loadScopeDays(core, goalScopeRef(map.goal.id)).catch((): ScopeDay[] => []);
+  // The goal's metrics for the properties column (plan #2084.3). A failed
+  // read leaves them out rather than the page.
+  const metricRowsRead = loadMetrics(client, map.goal.id).catch((): Metric[] | null => null);
+  // Each metric's counts by week or month (plan #2084.2), named by the list
+  // it reads. A failed read is the section's own message, not a broken page.
+  const metricsRead = loadMetricCounts(
+    client,
+    { id: map.goal.id, createdAt: map.goal.createdAt ?? null },
+    account.timezone,
+  )
+    .then(async (counted): Promise<MetricView[]> => {
+      const known = new Set(sources.map((list) => list.id));
+      const others = await Promise.all(
+        [...new Set(counted.map((m) => m.collectionId))]
+          .filter((id) => !known.has(id))
+          .map((id) => loadCollection(client, id)),
+      );
+      const lists: MetricList[] = [...sources, ...others.filter((list) => list !== null)];
+      return namedLists(counted, lists);
+    })
+    .catch((): MetricView[] | null => null);
   const related = relatedNotes(
     vault,
     user.id,
@@ -467,6 +523,16 @@ export default async function GoalMapPage({
   const runs = shapingView?.runs ?? runRowsOf(history, account.timezone);
 
   const burnUpDays = await scopeDays;
+  const metrics = await metricsRead;
+  const metricRows = await metricRowsRead;
+  const lists = metricLists(sources);
+  const metricsPart =
+    metricRows && (metricRows.length > 0 || lists.length > 0)
+      ? {
+          node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
+          count: Math.max(1, metricRows.length),
+        }
+      : null;
   const overview = (
     <div className="space-y-6">
       <GoalDoneWhen goal={map.goal} />
@@ -488,6 +554,7 @@ export default async function GoalMapPage({
         {!numberEmpty && <GoalNumber {...number} />}
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>
+      <GoalMetrics metrics={metrics} />
       <BurnUpChart days={burnUpDays} />
       <GoalContext items={shownItems} />
       {map.goal.status === 'open' && (
@@ -535,6 +602,7 @@ export default async function GoalMapPage({
       progress={progress}
       timeZone={account.timezone}
       pace={pace}
+      metrics={metricsPart}
     >
       {tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>

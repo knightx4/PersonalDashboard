@@ -148,7 +148,7 @@ async function inventoryItems(ctx: AskContext, query: string): Promise<Inventory
 /** The applications the Pipeline page lists under `query`. */
 export function pipelineMatches(rows: readonly PipelineRow[], query: string): PipelineRow[] {
   const params: PipelineParams = {};
-  for (const key of ['status', 'source', 'excitement', 'minfit', 'minchance', 'q'] as const) {
+  for (const key of ['status', 'source', 'excitement', 'minfit', 'minchance', 'ready', 'questions', 'letter', 'q'] as const) {
     const value = new URLSearchParams(query).get(key);
     if (value) params[key] = value;
   }

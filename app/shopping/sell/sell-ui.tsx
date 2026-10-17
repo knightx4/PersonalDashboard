@@ -25,7 +25,7 @@ import type { SellQueueRow } from '@/lib/sell/load-for-sale';
 import type { SellPath } from '@/lib/sell/route';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { BilledPress } from './billed-press';
 
 const PRICE_HINT = 'app/shopping/sell/actions.ts#priceSellItems';
 
@@ -434,9 +434,8 @@ export function SellQueue({
   const present = new Set(rows.map((r) => r.inventoryItemId));
   const selectedIds = [...selected].filter((id) => present.has(id));
 
-  // Only a web estimate is billed; a catalog lookup costs nothing.
-  const hint = (count: number, what: string) =>
-    paid ? <PaidHint action={PRICE_HINT} count={count} what={what} /> : null;
+  // Only a web estimate is billed; a catalog lookup costs nothing, and its
+  // buttons are plain ones with no hint (BilledPress).
   const thisRun = Math.min(unpricedCount, batchLimit);
 
   const donate = rows.filter((r) => r.path === 'donate');
@@ -448,35 +447,53 @@ export function SellQueue({
           <div className="flex flex-wrap items-center gap-2">
             {unpricedCount > 0 && (
               <form action={priceAction}>
-                <Button type="submit" size="sm" disabled={pricePending}>
+                <BilledPress
+                  billed={paid}
+                  type="submit"
+                  size="sm"
+                  disabled={pricePending}
+                  paid={PRICE_HINT}
+                  count={thisRun}
+                  what="Cost of pricing the unpriced"
+                >
                   {pricePending ? 'Pricing…' : `Price all ${thisRun} unpriced`}
-                </Button>
+                </BilledPress>
               </form>
             )}
-            {unpricedCount > 0 && hint(thisRun, 'Cost of pricing the unpriced')}
 
             <form action={priceAction}>
               <input type="hidden" name="ids" value={selectedIds.join(',')} />
-              <Button
+              <BilledPress
+                billed={paid}
                 type="submit"
                 size="sm"
                 variant="secondary"
                 disabled={pricePending || selectedIds.length === 0}
+                paid={selectedIds.length > 0 ? PRICE_HINT : undefined}
+                count={selectedIds.length}
+                what="Cost of pricing the selected"
               >
                 {`Price ${selectedIds.length} selected`}
-              </Button>
+              </BilledPress>
             </form>
-            {selectedIds.length > 0 && hint(selectedIds.length, 'Cost of pricing the selected')}
 
             {/* Prices go stale and lookups come back empty, so "already priced"
                 cannot be the end of it. */}
             <form action={priceAction}>
               <input type="hidden" name="rescan" value="1" />
-              <Button type="submit" size="sm" variant="ghost" disabled={pricePending}>
+              <BilledPress
+                billed={paid}
+                type="submit"
+                size="sm"
+                variant="ghost"
+                disabled={pricePending}
+                paid={PRICE_HINT}
+                count={Math.min(rows.length, batchLimit)}
+                what="Cost of the rescan"
+              >
                 Rescan everything
-              </Button>
+              </BilledPress>
             </form>
-            {hint(Math.min(rows.length, batchLimit), 'Cost of the rescan')}
 
             <Button
               type="button"

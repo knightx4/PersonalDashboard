@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { SPEND_OPERATIONS } from '@/lib/core/spend/operations';
 import { LEARN_OPERATIONS } from '@/lib/learn/spend';
 
@@ -71,10 +72,10 @@ export function functionSpendRows(rows: readonly FunctionSpendRow[]): FunctionSp
  * ledger's RLS keeps it to the signed-in person.
  */
 export async function readFunctionSpend(
-  client: SupabaseClient,
+  client: SupabaseClient | CoreSupabaseClient,
   window: { since7: string; since: string },
 ): Promise<FunctionSpend[]> {
-  const { data, error } = await client
+  const { data, error } = await (client as SupabaseClient)
     .schema('core')
     .rpc('function_spend_since', { p_since7: window.since7, p_since30: window.since });
   if (error) throw new Error(`Could not read the spend per function: ${error.message}`);

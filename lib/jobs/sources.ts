@@ -1,7 +1,7 @@
-import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of the job search's nav its rows sit under (app/jobs/(app)/layout.tsx). */
-const TODAY: Section = { href: '/jobs', label: 'Today' };
+const INBOX: Section = { href: '/jobs/inbox', label: 'Inbox' };
 const PIPELINE: Section = { href: '/jobs/pipeline', label: 'Pipeline' };
 const COMPANIES: Section = { href: '/jobs/companies', label: 'Companies' };
 const CONTACTS: Section = { href: '/jobs/contacts', label: 'Contacts' };
@@ -74,6 +74,7 @@ export const jobsSources: ModuleSources = {
       search: ['summary'],
       title: 'summary',
       owner: 'user_id',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.interviews',
@@ -116,6 +117,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['message', 'response_summary'],
       title: 'message',
+      parent: parentByFirst(['contact_id', 'job_search.contacts'], ['application_id', 'job_search.applications']),
     },
     {
       table: 'job_search.notes',
@@ -124,6 +126,13 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
+      parent: parentByFirst(
+        ['interview_id', 'job_search.interviews'],
+        ['application_id', 'job_search.applications'],
+        ['role_id', 'job_search.roles'],
+        ['contact_id', 'job_search.contacts'],
+        ['company_id', 'job_search.companies'],
+      ),
     },
     {
       table: 'job_search.evidence_items',
@@ -152,14 +161,16 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.application_answers',
       module: 'Job search',
-      holds: 'Their answers to application questions.',
+      holds: "Their answers to application questions. The answers on one application, each with its question, are in application_answers.",
       weight: 'record',
       search: ['answer'],
       title: 'answer',
+      parent: parentBy('application_id', 'job_search.applications'),
     },
     {
       table: 'job_search.questions',
@@ -178,8 +189,9 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['body'],
       title: 'body',
-      href: () => '/jobs',
-      section: TODAY,
+      href: () => '/jobs/inbox',
+      section: INBOX,
+      parent: parentByFirst(['application_id', 'job_search.applications'], ['contact_id', 'job_search.contacts']),
     },
   ],
   notSources: [
@@ -197,6 +209,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.search_runs', reason: 'When Dash searched for roles and people, and how each run ended; what it found is in suggestions.' },
     { table: 'job_search.discovery_runs', reason: 'When the weekly startup discovery ran for the person and how far it got.' },
     { table: 'job_search.watchlist_startups', reason: 'Startups the weekly discovery found on YC and Hacker News, with the board found for each; the person sees them only through their roles, and a saved role makes a companies row.' },
+    { table: 'job_search.application_drafts', reason: "Dash's working draft of a whole application and the questions it asked back; what you keep lands in application_answers or the cover letter, which are sources." },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },
     { table: 'job_search.waiting_dismissals', reason: 'Dismissed waiting-on-reply nudges.' },
   ],

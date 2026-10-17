@@ -164,6 +164,14 @@ For four weeks from when this spec is approved:
   on continues.
 - The inspiration and X post routines keep running (decision 2).
 
+On 15 October 2026 the person lifted the hold on shaping. Pressing *Shape this
+into a plan* is already their decision, and every shape run starts from them,
+so refusing it slowed nobody but them. Session-filed ideas are slowed where
+they are written instead: sessions may file three a day between them
+(`lib/ideas/rate.ts`, two an hour before), and a suggestion has to score 60 to
+stay in the list rather than 40 (`SUGGESTION_SCORE_FLOOR` in
+`lib/ideas/score.ts`).
+
 Two things found while writing this get fixed regardless. The Sunday week
 review is scheduled `11 * * * 0`, which fires every hour on Sundays, and
 `core.week_reviews` has no rows, so the review has never been written. And the
@@ -175,10 +183,11 @@ notification, so its open count says nothing about whether it is read on Home.
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. The
 baseline was measured on main on 3 October 2026.
 
-**R1.** Learn has six tabs at most: Now, Subjects, Idea Space, Essays, Reading
-lists and, for the owner, Videos. Idea Space was added at your ask on 12
-October 2026, and Essays on 13 October 2026.
-Checked by: count `learn-nav-tabs`, baseline 6.
+**R1.** Learn has seven tabs at most: Now, Inbox, Subjects, Idea Space,
+Essays, Reading lists and, for the owner, Videos. Idea Space was added at
+your ask on 12 October 2026, Essays on 13 October 2026, and Inbox on 14
+October 2026, when every workspace took an Inbox second (plan #1937).
+Checked by: count `learn-nav-tabs`, baseline 7.
 
 **R2.** Every page opened is recorded in `core.page_views`, and a prefetch or
 an `/api` call is not.

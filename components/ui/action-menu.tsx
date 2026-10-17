@@ -26,7 +26,9 @@ export type ActionMenuItem = {
   label: string;
   /**
    * The item closes the row (plan #1957.3): drawn with that ending's glyph,
-   * and its label is the ending's verb, whatever `label` says.
+   * and its label is the ending's verb, whatever `label` says. A label that
+   * opens with the verb is kept whole, so "Decline, with 2 beneath" can say
+   * what goes with it (plan #1957.8).
    */
   lifecycle?: Lifecycle;
   destructive?: boolean;
@@ -52,6 +54,12 @@ export type ActionMenuItem = {
   /** Marks the link as the page you are already on. */
   current?: boolean;
 };
+
+/** The verb alone, or the label when it opens with the verb. */
+function lifecycleLabel(lifecycle: Lifecycle, label: string): string {
+  const verb = LIFECYCLE_VERB[lifecycle];
+  return label.startsWith(`${verb},`) ? label : verb;
+}
 
 type MenuPosition = { top: number; left: number; minWidth: number };
 
@@ -124,7 +132,9 @@ export function ActionMenu({
   trigger,
   className,
   triggerClassName,
+  panelClassName,
   onOpenChange,
+  defaultOpen = false,
 }: {
   label?: string;
   items: ActionMenuItem[];
@@ -138,9 +148,17 @@ export function ActionMenu({
    * icon-sized square.
    */
   triggerClassName?: string;
+  /**
+   * Classes for the floating panel. A trigger hidden at some widths (a table
+   * header on a phone) hides its panel the same way, since the panel is in a
+   * portal and would otherwise float at the top of the page.
+   */
+  panelClassName?: string;
   onOpenChange?: (open: boolean) => void;
+  /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   /** The item whose confirm is showing, if any. Cleared whenever the menu closes. */
@@ -253,7 +271,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1')}
+            className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1', panelClassName)}
           >
             {items.map((item) => {
               if (armed === item.id) {
@@ -331,7 +349,7 @@ export function ActionMenu({
                   {item.lifecycle ? (
                     <span className="flex items-center gap-2">
                       <StatusGlyph glyph={LIFECYCLE_GLYPH[item.lifecycle]} />
-                      {LIFECYCLE_VERB[item.lifecycle]}
+                      {lifecycleLabel(item.lifecycle, item.label)}
                     </span>
                   ) : (
                     item.label

@@ -17,7 +17,7 @@ import { phoneShot } from './plan-surfaces';
 import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
-import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { DevSettingsView } from '@/app/dev/settings/settings-view';
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { DigestNight } from '@/lib/digest/night';
@@ -823,7 +823,18 @@ const raise: RaisedRow = {
   title: 'The share link page has no rate limit on its answer route',
   detail: 'Found while building the gallery surface for the shared form. Anyone with the link can send answers as fast as they like.',
   ask: 'Add a limit of thirty answers a minute per link?',
-  consequence: null,
+  // A yes Dash carries out, so the row shows "Yes, do it" with Dash's mark.
+  consequence: {
+    action: {
+      name: 'file_idea',
+      text: 'Limit the share link answer route to thirty answers a minute per link',
+      module: 'shopping',
+      field: null,
+      detail: null,
+      kind: null,
+    },
+    said: 'Files this on the ideas page, about Shopping: Limit the share link answer route to thirty answers a minute per link',
+  },
   outcome: null,
   module: 'shopping',
   source: 'plan #1599',
@@ -981,13 +992,14 @@ export function DevInboxSurface() {
 }
 
 /**
- * The Status panel at the top of Home in Dev: the plan runner resting with
- * three features ready, and the notes routine with twelve notes open. Dash's
- * mark sits under Plan (note 076e7744).
+ * Dev settings (plan #1937.10), once the Status panel at the top of Home: the
+ * plan runner resting with three features ready, the notes routine with
+ * twelve notes open, and the vision review. Dash's mark sits under Plan
+ * (note 076e7744).
  */
-export function DevRaisedStatusSurface() {
-  return column(
-    <StatusPanel
+export function DevSettingsSurface() {
+  return (
+    <DevSettingsView
       run={null}
       canSend
       card={{
@@ -1002,11 +1014,16 @@ export function DevRaisedStatusSurface() {
       }}
       goals={null}
       openNotes={12}
-      notesLastRun={null}
-      vision={null}
+      notesLastRun={{ at: '2026-10-06T02:40:00Z', done: 7, declined: 1, blocked: 2 }}
+      vision={{
+        lastRunAt: '2026-10-03T07:00:00Z',
+        failed: null,
+        nextAt: '2026-10-10T07:00:00Z',
+        pendingEdits: 2,
+      }}
       autoApprove={false}
       now={Date.parse('2026-10-06T08:00:00Z')}
-    />,
+    />
   );
 }
 
@@ -1040,18 +1057,28 @@ const apps: ConnectedApp[] = [
   },
 ];
 
-/** Capture tokens (plan #1705): one in use, one never used with the longest name, one revoked. */
+/** Tokens (plan #1705): one in use, one that asks Dash, one never used with the longest name, one revoked. */
 const captureTokens: CaptureTokenListing[] = [
   {
     id: 'ct1',
     label: 'iPhone Shortcut',
+    kind: 'capture',
     createdAt: '2026-10-01T09:00:00Z',
     lastUsedAt: '2026-10-08T07:42:00Z',
     revokedAt: null,
   },
   {
+    id: 'ct4',
+    label: 'iPhone: Ask Dash',
+    kind: 'ask',
+    createdAt: '2026-10-12T08:15:00Z',
+    lastUsedAt: '2026-10-14T18:03:00Z',
+    revokedAt: null,
+  },
+  {
     id: 'ct2',
     label: 'Zapier: starred Gmail messages to the vault reading list',
+    kind: 'capture',
     createdAt: '2026-10-05T18:30:00Z',
     lastUsedAt: null,
     revokedAt: null,
@@ -1059,6 +1086,7 @@ const captureTokens: CaptureTokenListing[] = [
   {
     id: 'ct3',
     label: 'Old iPad',
+    kind: 'capture',
     createdAt: '2026-09-02T12:00:00Z',
     lastUsedAt: '2026-09-20T21:10:00Z',
     revokedAt: '2026-10-01T09:01:00Z',
@@ -1082,7 +1110,7 @@ export function AccountSurface({
   /** Only the newest capture token, as the list reads once the first is made. */
   onlyFirstToken?: boolean;
 }) {
-  return column(
+  return (
     <>
       <AccountView
         tab={tab}
@@ -1098,9 +1126,9 @@ export function AccountSurface({
         isOwner
         vapidPublicKey={null}
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
-        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
+        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture', askAddress: 'https://dash.example.com/api/ask/voice' }}
       />
-    </>,
+    </>
   );
 }
 
@@ -1168,11 +1196,17 @@ export function DevRunnerCrewSurface() {
             endedAt: null,
             step: {
               number: 1700,
-              ref: '#1700.4',
-              title: 'Show the four Dashes on the runner card, each in its own visor',
+              ref: '#1700',
+              title: 'Four Dashes on the runner card, one for each thing it can run at once',
             },
             module: 'Dev',
             doing: null,
+            steps: [
+              { ref: '#1700.1', title: 'Slots for the four sessions', status: 'done' },
+              { ref: '#1700.2', title: 'A visor shape for each Dash', status: 'done' },
+              { ref: '#1700.3', title: 'Pose from the newest line', status: 'done' },
+              { ref: '#1700.4', title: 'Show the four Dashes on the runner card, each in its own visor', status: 'in_progress' },
+            ],
           },
           {
             id: 's2',

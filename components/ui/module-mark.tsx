@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { cn } from '@/lib/cn';
-import { HOME_MARK, moduleById, type MarkShape, type ModuleId } from '@/lib/modules';
+import { DASH_MARK, HOME_MARK, moduleById, type MarkKey, type MarkShape, type ModuleId } from '@/lib/modules';
 import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
 
 /**
@@ -25,8 +25,9 @@ import { DashGlyph, GlassEdgeStops, glassOutline } from './dash-mark';
  * corner. A new mark that breaks one of these will look like it came from a
  * different set.
  *
- * module={null} is the app itself: Dash at rest on a dark plate, the same
- * drawing as app/icon.svg.
+ * module={null} is Home: a house of thick, clear glass that splits light into
+ * colour round its rim, where the other marks have a hue. module="dash" is Dash, and the
+ * app itself: Dash at rest on a dark plate, the same drawing as app/icon.svg.
  */
 
 const SIZES = {
@@ -57,6 +58,18 @@ type Drawing = {
   dots?: React.ReactNode;
   /** Drawn on the colour layer itself, in white. */
   onBack?: React.ReactNode;
+  /**
+   * For a prism mark only: the corners where thick glass bends light most, as
+   * [x, y, radius], so the spectrum in the rim gathers there; and the light
+   * caught on the glass, in white.
+   */
+  bends?: readonly (readonly [number, number, number])[];
+  glints?: React.ReactNode;
+  /**
+   * For a prism mark only: the detail as a closed shape carved into the glass,
+   * drawn with the same refraction as the rim, in place of `lines`.
+   */
+  recess?: string;
 };
 
 const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
@@ -135,6 +148,30 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       <path d="M10.2 3.3c1.15-.65 2.2.45 3.5-.1a.3.3 0 0 1 .42.28v2.35a.4.4 0 0 1-.24.37c-1.3.55-2.35-.55-3.68.1Z" />
     ),
   },
+  house: {
+    // A glass house with its chimney behind, and the arch of a door.
+    back: <rect x={15} y={2.6} width={4} height={8} rx={1.6} />,
+    front:
+      'M10.47 4.59Q12 3.3 13.53 4.59L19.98 10.07Q21.2 11.1 21.2 12.7V18A3.2 3.2 0 0 1 18 21.2H6A3.2 3.2 0 0 1 2.8 18V12.7Q2.8 11.1 4.02 10.07Z',
+    lines: <path d="M9.9 20.4V17.3a2.1 2.1 0 0 1 4.2 0v3.1" />,
+    // The door, carved into the glass rather than drawn on it.
+    recess: 'M9.7 21.4V17.3a2.3 2.3 0 0 1 4.6 0v4.1Z',
+    // The peak, the two eaves and the two foot corners.
+    bends: [
+      [12, 4.2, 4.2],
+      [3.6, 11.6, 3.4],
+      [20.4, 11.6, 3.4],
+      [4.6, 19.4, 3.6],
+      [19.4, 19.4, 3.6],
+    ],
+    // A streak along the lit slope of the roof, and a point of light at the peak.
+    glints: (
+      <>
+        <path d="M4.9 11.3 10.5 6.5" stroke="#fff" strokeWidth={0.9} strokeLinecap="round" />
+        <circle cx={12} cy={5.3} r={0.5} fill="#fff" />
+      </>
+    ),
+  },
   person: {
     // A bust: the head is the colour, sitting into a pair of glass shoulders,
     // and the V of a collar is what makes the pane shoulders rather than a hill.
@@ -158,11 +195,57 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawing; from: string; to: string; px: number }) {
+/**
+ * The colours a prism mark's glass splits light into: deep cobalt and electric
+ * cyan, a little lime, then amber, orange and magenta into violet, the
+ * saturated dispersion of very refractive glass rather than a flat rainbow.
+ * It runs corner to corner across the mark, so each part of the rim takes a
+ * different colour, as the edge of a thick piece of glass does.
+ */
+const SPECTRUM = [
+  { offset: 0, colour: '#1d3cff' },
+  { offset: 0.16, colour: '#2f9bff' },
+  { offset: 0.3, colour: '#3fe6ff' },
+  { offset: 0.4, colour: '#cfff4a' },
+  { offset: 0.5, colour: '#ffb21e' },
+  { offset: 0.62, colour: '#ff5a14' },
+  { offset: 0.76, colour: '#ff2e8a' },
+  { offset: 0.9, colour: '#7a2cff' },
+  { offset: 1, colour: '#1d3cff' },
+] as const;
+
+/** The rim's spectrum away from the bends: there, but faint. */
+const RIM_FLOOR = 0.32;
+
+function GlassObject({
+  id,
+  drawing,
+  from,
+  to,
+  px,
+  prism = false,
+}: {
+  id: string;
+  drawing: Drawing;
+  from: string;
+  to: string;
+  px: number;
+  prism?: boolean;
+}) {
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
+  // A prism mark carves its detail into the glass instead of drawing it on.
+  const recess = prism ? drawing.recess : undefined;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   // White on dark, the deep hue on light, where white would not hold against the tint.
-  const ink = `light-dark(${to}, #fff)`;
+  // A white pane takes its deep end on both, since white lines would vanish on it.
+  const ink = prism ? to : `light-dark(${to}, #fff)`;
+  // A white pane is close to opaque, or the dark ground turns it grey.
+  const tintTop = prism
+    ? `color-mix(in srgb, ${from} 86%, transparent)`
+    : `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)`;
+  const tintBottom = prism
+    ? `color-mix(in srgb, color-mix(in srgb, ${from} 72%, ${to}) 80%, transparent)`
+    : `color-mix(in srgb, ${to} ${TINT}%, transparent)`;
   // Thicker as the mark gets smaller, so the detail survives at 18px.
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
 
@@ -171,7 +254,8 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
       <defs>
         <linearGradient id={`${id}-ramp`} gradientUnits="userSpaceOnUse" x1={4} y1={2} x2={20} y2={22}>
           <stop offset="0" stopColor={from} />
-          <stop offset="1" stopColor={to} />
+          {/* A prism mark's colour layer is silver, paler than its ink. */}
+          <stop offset="1" stopColor={prism ? '#9aa4b8' : to} />
         </linearGradient>
         <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={1.25} />
@@ -187,17 +271,100 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
         </linearGradient>
         {/* The glass itself in the hue, from the middle of the ramp down to the deep end. */}
         <linearGradient id={`${id}-tint`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <stop offset="0" style={{ stopColor: `color-mix(in srgb, color-mix(in srgb, ${from} 55%, ${to}) ${TINT}%, transparent)` }} />
-          <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${to} ${TINT}%, transparent)` }} />
+          <stop offset="0" style={{ stopColor: tintTop }} />
+          <stop offset="1" style={{ stopColor: tintBottom }} />
         </linearGradient>
+        {prism && (
+          <>
+            {/* Corner to corner, and the same the other way for the inner rim. */}
+            <linearGradient id={`${id}-spectrum`} gradientUnits="userSpaceOnUse" x1={3} y1={3} x2={21} y2={21}>
+              {SPECTRUM.map((stop) => (
+                <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+              ))}
+            </linearGradient>
+            <linearGradient id={`${id}-reverse`} gradientUnits="userSpaceOnUse" x1={21} y1={21} x2={3} y2={3}>
+              {SPECTRUM.map((stop) => (
+                <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+              ))}
+            </linearGradient>
+            <linearGradient id={`${id}-caustic`} gradientUnits="userSpaceOnUse" x1={3} y1={0} x2={21} y2={0}>
+              {SPECTRUM.map((stop) => (
+                <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+              ))}
+            </linearGradient>
+            <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={0.55} />
+            </filter>
+            <filter id={`${id}-fine`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={0.22} />
+            </filter>
+            <filter id={`${id}-wide`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
+              <feGaussianBlur stdDeviation={1.1} />
+            </filter>
+            {/* The dark a thick edge refracts in from round the object: cobalt
+                under the lit top, deepening to navy at the foot. */}
+            <linearGradient id={`${id}-depth`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+              <stop offset="0" stopColor="#2a3fd0" stopOpacity={0.45} />
+              <stop offset="1" stopColor="#0a0f45" stopOpacity={0.9} />
+            </linearGradient>
+            <clipPath id={`${id}-back-clip`}>{back}</clipPath>
+            {recess && (
+              <>
+                <clipPath id={`${id}-recess-clip`}>
+                  <path d={recess} />
+                </clipPath>
+                {/* The cut's own spread of the spectrum, cool on its lit side
+                    to warm on the far one, as the rim runs across the mark. */}
+                <linearGradient id={`${id}-recess-light`} gradientUnits="userSpaceOnUse" x1={9.2} y1={15} x2={14.8} y2={21.4}>
+                  {SPECTRUM.map((stop) => (
+                    <stop key={stop.colour} offset={stop.offset} stopColor={stop.colour} />
+                  ))}
+                </linearGradient>
+              </>
+            )}
+            {/* Where the rim's spectrum shows: faintly everywhere, fully at the bends. */}
+            {drawing.bends?.map(([cx, cy, r], i) => (
+              <radialGradient key={i} id={`${id}-bend-${i}`} gradientUnits="userSpaceOnUse" cx={cx} cy={cy} r={r}>
+                <stop offset="0" stopColor="#fff" />
+                <stop offset="1" stopColor="#fff" stopOpacity={0} />
+              </radialGradient>
+            ))}
+            <mask id={`${id}-bends`} maskUnits="userSpaceOnUse" x={0} y={0} width={24} height={24}>
+              <rect width={24} height={24} fill="#fff" fillOpacity={RIM_FLOOR} />
+              {drawing.bends?.map(([cx, cy, r], i) => (
+                <circle key={i} cx={cx} cy={cy} r={r} fill={`url(#${id}-bend-${i})`} />
+              ))}
+            </mask>
+          </>
+        )}
       </defs>
 
+      {/* Light the glass has split, thrown on the ground beneath it. */}
+      {prism && (
+        <ellipse
+          cx={12}
+          cy={22.6}
+          rx={8.4}
+          ry={1.1}
+          fill={`url(#${id}-caustic)`}
+          opacity={0.3}
+          filter={`url(#${id}-wide)`}
+        />
+      )}
       {/* A soft shadow in the hue, under the whole object. */}
       <g opacity={0.4} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill={to}>
         {back}
         {pane({ opacity: 0.35 })}
       </g>
       <g fill={`url(#${id}-ramp)`}>{back}</g>
+      {prism && (
+        // The colour layer is glass too, with a thin rim of its own.
+        <g clipPath={`url(#${id}-back-clip)`}>
+          <g filter={`url(#${id}-fine)`} fill="none" stroke={`url(#${id}-reverse)`} strokeWidth={1.1} opacity={0.55}>
+            {back}
+          </g>
+        </g>
+      )}
       {onBack && (
         <g stroke="#fff" strokeOpacity={0.85} strokeWidth={1.2} strokeLinecap="round">
           {onBack}
@@ -211,24 +378,72 @@ function GlassObject({ id, drawing, from, to, px }: { id: string; drawing: Drawi
       </g>
       {pane({ fill: `url(#${id}-tint)` })}
       {pane({ fill: `url(#${id}-sheen)` })}
+      {prism && (
+        <>
+          {/* Thick glass seen the way it refracts: a deep band inside the edge,
+              where the glass bends in the dark around it; the spectrum caught
+              in the rim over that dark, gathered at the corners where it bends
+              light most; a sharper fringe where the band meets the clear
+              middle; a faint rim inside that running the other way, as light
+              reflected back through the glass does; and the light caught on
+              the glass. */}
+          <g clipPath={`url(#${id}-clip)`}>
+            {pane({ stroke: `url(#${id}-depth)`, strokeWidth: 4.2, filter: `url(#${id}-soft)` })}
+          </g>
+          <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-bends)`}>
+            {pane({ stroke: `url(#${id}-spectrum)`, strokeWidth: 2.2, opacity: 0.65, filter: `url(#${id}-soft)` })}
+            <g transform="translate(12 12.6) scale(.88) translate(-12 -12.6)">
+              {pane({ stroke: `url(#${id}-spectrum)`, strokeWidth: 0.75, filter: `url(#${id}-fine)` })}
+            </g>
+          </g>
+          <g clipPath={`url(#${id}-clip)`} filter={`url(#${id}-fine)`}>
+            {/* The edge face itself, catching the light. */}
+            {pane({ stroke: '#fff', strokeWidth: 1, strokeOpacity: 0.8 })}
+            <g transform="translate(12 12.6) scale(.8) translate(-12 -12.6)">
+              {pane({ stroke: `url(#${id}-reverse)`, strokeWidth: 0.4, opacity: 0.45 })}
+            </g>
+            {drawing.glints}
+          </g>
+        </>
+      )}
       {pane({ strokeWidth: 0.8, style: { stroke: glassOutline(to) } })}
       {pane({ stroke: `url(#${id}-edge)`, strokeWidth: 0.55 })}
-      <g
-        fill="none"
-        strokeWidth={weight}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ stroke: ink }}
-      >
-        {lines}
-      </g>
+      {recess ? (
+        // The detail carved into the glass, seen the way the rim is: dark where
+        // the cut bends in the light around it, the spectrum round its edge,
+        // and the edge of the cut catching the light.
+        <g clipPath={`url(#${id}-clip)`}>
+          <path d={recess} fill={`url(#${id}-depth)`} opacity={0.7} />
+          <g clipPath={`url(#${id}-recess-clip)`} filter={`url(#${id}-soft)`}>
+            <path d={recess} fill="none" stroke={`url(#${id}-recess-light)`} strokeWidth={1.8} opacity={0.8} />
+          </g>
+          <path
+            d={recess}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={0.45}
+            strokeOpacity={0.75}
+            filter={`url(#${id}-fine)`}
+          />
+        </g>
+      ) : (
+        <g
+          fill="none"
+          strokeWidth={weight}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ stroke: ink }}
+        >
+          {lines}
+        </g>
+      )}
       {dots && <g style={{ fill: ink }}>{dots}</g>}
     </>
   );
 }
 
-/** The app's own mark: Dash at rest on a dark plate. */
-function HomePlate({ id }: { id: string }) {
+/** Dash's mark, and the app's: Dash at rest on a dark plate. */
+function DashPlate({ id }: { id: string }) {
   const plate = 'M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Z';
   return (
     <>
@@ -258,23 +473,30 @@ export function ModuleMark({
   size = 'md',
   className,
 }: {
-  /** null means the app itself. */
-  module: ModuleId | null;
+  /** null means Home, and 'dash' means Dash, which is also the app's own mark. */
+  module: ModuleId | null | 'dash';
   size?: keyof typeof SIZES;
   className?: string;
 }) {
-  const entry = moduleById(module);
   const sizing = SIZES[size];
   const id = `mark-${useId().replace(/:/g, '')}`;
-  const key = entry?.key ?? HOME_MARK.key;
+  const key: MarkKey =
+    module === 'dash' ? DASH_MARK.key : (moduleById(module)?.key ?? HOME_MARK.key);
 
   return (
     <span className={cn('flex shrink-0 items-center justify-center', sizing.box, className)} aria-hidden>
       <svg width={sizing.px} height={sizing.px} viewBox="0 0 24 24" fill="none" overflow="visible">
         {key.shape === 'dash' ? (
-          <HomePlate id={id} />
+          <DashPlate id={id} />
         ) : (
-          <GlassObject id={id} drawing={DRAWINGS[key.shape]} from={key.from} to={key.to} px={sizing.px} />
+          <GlassObject
+            id={id}
+            drawing={DRAWINGS[key.shape]}
+            from={key.from}
+            to={key.to}
+            px={sizing.px}
+            prism={key.prism}
+          />
         )}
       </svg>
     </span>

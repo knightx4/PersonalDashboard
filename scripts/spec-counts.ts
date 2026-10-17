@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { actionGaps } from '../lib/agent-actions/catalogue';
+import { actionGaps, unconvertedPaidButtons } from '../lib/agent-actions/catalogue';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
@@ -95,7 +95,20 @@ const MODEL_ID = /['"`]claude-(?:opus|sonnet|haiku)-[0-9][a-z0-9.-]*['"`]/;
 
 // -- docs/CUT-BACK-SPEC.md -----------------------------------------------------
 
-const LEARN_LAYOUT = 'app/learn/layout.tsx';
+/**
+ * Learn's tabs are written in the shared list since plan #2208.2, not in its
+ * layout: the `learn: [` block of lib/shell/tabs.ts, up to the line that
+ * closes it.
+ */
+const TAB_LIST = 'lib/shell/tabs.ts';
+
+function learnTabs(root: string): string {
+  const text = read(root, TAB_LIST, 'learn-nav-tabs');
+  const start = text.indexOf('\n  learn: [');
+  const end = text.indexOf('\n  ],', start);
+  if (start < 0 || end < 0) throw new Error(`learn-nav-tabs cannot find Learn's tabs in ${TAB_LIST}; update the counter`);
+  return text.slice(start, end);
+}
 
 // -- docs/UI-QUALITY-SPEC.md ---------------------------------------------------
 
@@ -392,6 +405,84 @@ function formOnlyPages(root: string): string[] {
 const DATE_FORMATTER = /\b(?:Intl\.DateTimeFormat|toLocaleDateString|toLocaleString|toLocaleTimeString)\b/;
 const WHEN_HOME = 'lib/core/when.ts';
 
+/**
+ * docs/ONE-INTERFACE-SPEC.md, R12 (plan #1964.1): a control that calls a
+ * model names Dash, and "AI" appears on no control. Counts each button or
+ * link under app/ and components/ whose label, the text between its tags,
+ * holds the word AI. The gallery's fixtures are not controls and are left out.
+ */
+const CONTROL_ELEMENT = /<(Button|button|Link|a|DashAction|RowAction)\b[^>]*>([\s\S]*?)<\/\1>/g;
+const AI_WORD = /(?<![\w-])AI(?![\w-])/;
+
+function aiOnControls(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return [...text.matchAll(CONTROL_ELEMENT)]
+        .filter((m) => AI_WORD.test(m[2].replace(/\{\/\*[\s\S]*?\*\/\}/g, '')))
+        .map((m) => `${file}:${lineAt(text, m.index ?? 0)}`);
+    })
+    .sort();
+}
+
+/**
+ * Plan #1964.1: every press that spends a model run is a DashAction, which
+ * draws its cost hint itself. A PaidHint or CostHint written anywhere else
+ * under app/ and components/ is a paid button not yet moved onto it. The
+ * primitives that define them and the gallery are left out.
+ *
+ * A hint that is not on a Dash press is passed by a `dash-action-ok:`
+ * comment on its line or the line above, saying why: a composer whose send
+ * is an arrow beside the text, or a price that is not a model run, such as
+ * posting to X.
+ */
+const HINT_ELEMENT = /<(?:PaidHint|CostHint)\b/g;
+const HINT_HOMES = new Set([
+  'components/ui/paid-hint.tsx',
+  'components/ui/cost-hint.tsx',
+  'components/ui/dash-action.tsx',
+  // The one thread (plan #1964.3) prices a reply beside the arrow that sends
+  // it and the button that opens its box, the way DashAction prices a press,
+  // so every conversation takes its hint from here.
+  'components/thread/thread.tsx',
+]);
+
+function paidHintsOutsideDashAction(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !HINT_HOMES.has(file) && !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .flatMap((file) => {
+      const raw = readFileSync(join(root, file), 'utf8');
+      const lines = raw.split('\n');
+      const text = withoutComments(raw);
+      return [...text.matchAll(HINT_ELEMENT)]
+        .map((m) => lineAt(text, m.index ?? 0))
+        .filter((line) => !/dash-action-ok:\s*\S/.test(`${lines[line - 2] ?? ''}\n${lines[line - 1]}`))
+        .map((line) => `${file}:${line}`);
+    })
+    .sort();
+}
+
+/**
+ * docs/ONE-INTERFACE-SPEC.md, "One thread" (plan #1964.3): one component
+ * draws every conversation. A file draws turns of its own when it names the
+ * person's turns "You" and draws both the person's glyph (CircleUser) and
+ * Dash's mark beside them. The gallery is left out; the target is the one
+ * thread, components/thread/thread.tsx.
+ */
+const PERSON_GLYPH = /\bCircleUser\b/;
+const YOU_NAME = /['"`]You['"`]/;
+
+function threadComponents(root: string): string[] {
+  return listFiles(root, ['app', 'components'], ['.tsx'])
+    .filter((file) => !/^app\/preview\/|\.test\.tsx$/.test(file))
+    .filter((file) => {
+      const text = withoutComments(readFileSync(join(root, file), 'utf8'));
+      return PERSON_GLYPH.test(text) && /\bDashMark\b/.test(text) && YOU_NAME.test(text);
+    })
+    .sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -453,7 +544,7 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     name: 'learn-nav-tabs',
     counts: "tabs in Learn's nav",
     measure: (root) =>
-      [...read(root, LEARN_LAYOUT, 'learn-nav-tabs').matchAll(/\bhref:\s*'([^']+)'/g)].map((m) => m[1]),
+      [...learnTabs(root).matchAll(/\bhref:\s*'([^']+)'/g)].map((m) => m[1]),
   },
   {
     name: 'raw-motion-values',
@@ -528,5 +619,32 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: 'server actions an agent should be able to do and has no tool for',
     target: 0,
     measure: () => actionGaps(),
+  },
+  {
+    // Plan #2228.6: the paid buttons Dash cannot yet press. Plan #2228 gives
+    // each one a paid tool or a stated reason; this counts the ones with
+    // neither, and a new paid button must start with one of the two.
+    name: 'unconverted-paid-buttons',
+    counts: "paid buttons catalogued as none('spends') with no reason and no tool",
+    target: 0,
+    measure: () => unconvertedPaidButtons(),
+  },
+  {
+    name: 'ai-on-controls',
+    counts: 'buttons and links under app/ and components/ whose label says AI',
+    target: 0,
+    measure: aiOnControls,
+  },
+  {
+    name: 'thread-components',
+    counts: 'components under app/ and components/ that draw the turns of a conversation',
+    target: 1,
+    measure: threadComponents,
+  },
+  {
+    name: 'paid-hints-outside-dash-action',
+    counts: 'cost hints drawn beside a button rather than by DashAction',
+    target: 0,
+    measure: paidHintsOutsideDashAction,
   },
 ];

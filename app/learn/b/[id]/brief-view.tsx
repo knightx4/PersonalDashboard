@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkle } from 'lucide-react';
@@ -14,8 +15,9 @@ import { Switch } from '@/components/ui/field';
 import { LiveDot } from '@/components/ui/live-dot';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
+import { LinkedText } from '@/components/ui/linked-text';
 import { watchLine } from '@/lib/learn/briefs/watch';
 import { FOUND_KIND_LABELS, type Brief, type BriefCitation, type BriefSection } from '@/lib/learn/briefs/model';
 import {
@@ -30,6 +32,9 @@ import {
 } from '@/lib/learn/briefs/view';
 import { QuickReadButton } from './quick/quick-read-button';
 import { StartEssayButton } from './start-essay-button';
+import { GoalPanel } from './goal-panel';
+import type { BriefGoalPanel } from '@/lib/learn/briefs/topics';
+import { groupFindings, type BriefFinding } from '@/lib/learn/briefs/findings';
 import { retryBrief, saveShortAnswer, setBriefArchived, setBriefWatch } from './actions';
 import { PathLine } from '@/components/shell/back-link';
 import { parentCrumb } from '@/lib/core/back-from';
@@ -131,18 +136,58 @@ function Quote({
   );
 }
 
+/**
+ * Findings added after the run (add_to_brief), each with the sources it rests
+ * on: the source's title links out, and its quote sits under it.
+ */
+function AddedFindings({ findings }: { findings: readonly BriefFinding[] }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {findings.map((finding) => (
+        <li key={finding.id} className="flex flex-col gap-2">
+          <p className="max-w-prose whitespace-pre-line text-body text-ink">
+            <LinkedText text={finding.body} refs={false} />
+          </p>
+          {finding.sources.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {finding.sources.map((source, i) => (
+                <li key={i} className="flex flex-col gap-1">
+                  {source.quote && (
+                    <blockquote className="border-l-2 border-border pl-3 text-ui text-ink">&ldquo;{source.quote}&rdquo;</blockquote>
+                  )}
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn('inline-flex min-h-11 items-center text-ui lg:min-h-8', linkVariants())}
+                  >
+                    {source.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Section({
   index,
   text,
   section,
   sources,
   openQuote,
+  added = [],
 }: {
   index: number;
   text: string;
   section: BriefSection | undefined;
   sources: Record<string, BriefSource>;
   openQuote?: string;
+  /** Findings added since the run that answer this sub-question. */
+  added?: readonly BriefFinding[];
 }) {
   const from = section ? sectionSources(section, sources) : [];
   return (
@@ -189,7 +234,13 @@ function Section({
           )}
         </>
       ) : (
-        <p className="text-ui text-ink-muted">The sources found had nothing to say on this one.</p>
+        added.length === 0 && <p className="text-ui text-ink-muted">The sources found had nothing to say on this one.</p>
+      )}
+      {added.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-small text-ink-muted">Added since</h3>
+          <AddedFindings findings={added} />
+        </div>
       )}
     </Card>
   );
@@ -227,10 +278,12 @@ function Failed({ brief }: { brief: Brief }) {
       <p className="text-body font-semibold text-ink">The research stopped before it finished</p>
       <p className="text-ui text-ink-muted">{brief.error?.trim() || 'Dash did not say why.'}</p>
       <div className="flex flex-wrap items-center gap-3">
-        <Button
+        <DashAction
           type="button"
           variant="primary"
           pending={pending}
+          paid="app/learn/b/[id]/actions.ts#retryBrief"
+          what="Cost of researching it again"
           onClick={() =>
             start(async () => {
               const result = await retryBrief(brief.id);
@@ -239,9 +292,8 @@ function Failed({ brief }: { brief: Brief }) {
             })
           }
         >
-          Try again
-        </Button>
-        <PaidHint action="app/learn/b/[id]/actions.ts#retryBrief" what="Cost of researching it again" />
+          Research it again
+        </DashAction>
       </div>
       {error && <p className="text-small text-danger">{error}</p>}
     </Card>
@@ -309,7 +361,17 @@ function NewSince({ sources }: { sources: BriefSource[] }) {
   );
 }
 
-function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: number }) {
+function Rail({
+  brief,
+  sourcesFound,
+  goal,
+  goalShown,
+}: {
+  brief: BriefOnPage;
+  sourcesFound: number;
+  goal?: BriefGoalPanel;
+  goalShown?: { pending?: boolean; error?: string };
+}) {
   const [watch, setWatch] = useState(brief.watchOn);
   const [archived, setArchived] = useState(brief.archivedAt !== null);
   const toast = useToast();
@@ -336,6 +398,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
           </span>
         </p>
       </CardSection>
+      {goal && brief.status === 'ready' && <GoalPanel briefId={brief.id} panel={goal} shown={goalShown} />}
       <CardSection title="New sources">
         <label htmlFor={switchId} className="flex min-h-11 items-center justify-between gap-3 lg:min-h-8">
           <span>
@@ -390,7 +453,7 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
                   setArchived(true);
                   // Drop, with Undo in the toast (plan #1957.3).
                   toast({
-                    text: 'Dropped',
+                    text: closedToast('dropped', brief.question),
                     undo: async () => {
                       const back = await setBriefArchived(brief.id, false);
                       if (back.error) throw new Error(back.error);
@@ -423,7 +486,8 @@ function Rail({ brief, sourcesFound }: { brief: BriefOnPage; sourcesFound: numbe
  *
  * `live` is off in the gallery; `openQuote` and `editing` draw a hidden part
  * open there (a quote's source as `<sub-question id>:<index>`, and the short
- * answer's editor).
+ * answer's editor). `goal` is the rail's goal section (plan #2184.1), and
+ * `goalShown` draws its press mid-draft or failed.
  */
 export function BriefView({
   page,
@@ -431,8 +495,13 @@ export function BriefView({
   openQuote,
   editing = false,
   path,
+  goal,
+  goalShown,
 }: {
   page: BriefPage;
+  /** The goals to put the brief under and the topics drafted from it; absent when they could not be read. */
+  goal?: BriefGoalPanel;
+  goalShown?: { pending?: boolean; error?: string };
   live?: boolean;
   openQuote?: string;
   editing?: boolean;
@@ -443,6 +512,11 @@ export function BriefView({
   const sourcesFound = Object.keys(sources).length;
   useLiveWhileResearching(brief.status === 'researching', live);
   const sections = new Map(brief.sections.map((section) => [section.sub_question_id, section]));
+  // Until the brief is ready its sub-questions are not drawn, so every added finding goes under Added findings.
+  const added = groupFindings(
+    page.findings ?? [],
+    brief.status === 'ready' ? brief.subQuestions.map((sub) => sub.id) : [],
+  );
 
   const main = (
     <div className="flex flex-col gap-4">
@@ -476,12 +550,19 @@ export function BriefView({
               section={sections.get(sub.id)}
               sources={sources}
               openQuote={openQuote}
+              added={added.bySub.get(sub.id)}
             />
           ))}
         </>
       )}
+      {added.other.length > 0 && (
+        <Card padding="standard" className="flex flex-col gap-3">
+          <h2 className="text-body font-semibold text-ink">Added findings</h2>
+          <AddedFindings findings={added.other} />
+        </Card>
+      )}
     </div>
   );
 
-  return <MainRail main={main} rail={<Rail brief={brief} sourcesFound={sourcesFound} />} />;
+  return <MainRail main={main} rail={<Rail brief={brief} sourcesFound={sourcesFound} goal={goal} goalShown={goalShown} />} />;
 }

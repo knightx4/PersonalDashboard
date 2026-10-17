@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { TaskInput } from '@/lib/todo/tasks/input';
 import { changeHref, confirmChange, declineChange, undoChange, type ChangeDeps } from './changes';
 import type { AskSchema, SchemaClient } from './db';
+import type { DashPaidTool } from '@/lib/dash/registry';
+import { PAID_NO_UNDO } from '@/lib/dash/paid-input';
+import { noUndoReason } from '@/lib/core/dash-actions';
+
+const handOver = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/plan/handover', () => ({ handStepToClaude: handOver }));
 
 /**
  * Confirming, declining and undoing Dash's changes (plan #1189), against an
@@ -23,6 +29,18 @@ type Row = Record<string, unknown>;
 type Tables = Record<string, Row[]>;
 
 let counter = 1000;
+
+/** One `column[->>key].op.value` part of an `or` filter. */
+function orPart(row: Row, part: string): boolean {
+  const match = /^(\w+)(?:->>(\w+))?\.(not\.is|is|lt)\.(.+)$/.exec(part);
+  if (!match) throw new Error(`The fake cannot read the filter ${part}`);
+  const [, column, key, op, value] = match;
+  const base = row[column] as Row | null | undefined;
+  const cell = key ? (base?.[key] ?? null) : (base ?? null);
+  if (op === 'is') return cell === null;
+  if (op === 'not.is') return cell !== null;
+  return typeof cell === 'string' && cell < value;
+}
 
 function fakeDb(tables: Tables) {
   let historyId = 0;
@@ -105,8 +123,11 @@ function fakeDb(tables: Tables) {
           update: (value: Row) => ((op = 'update'), (payload = value), query),
           delete: () => ((op = 'delete'), query),
           eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), query),
+          in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), query),
           is: (c: string, v: null) => (filters.push((r) => (r[c] ?? null) === v), query),
           gt: (c: string, v: number) => (filters.push((r) => (r[c] as number) > v), query),
+          // The few PostgREST `or` filters a paid press's claim uses (plan #2228.1).
+          or: (expr: string) => (filters.push((r) => expr.split(',').some((part) => orPart(r, part))), query),
           order: (column: string, o?: { ascending?: boolean }) => ((order = { column, ascending: o?.ascending ?? true }), query),
           limit: (n: number) => ((limit = n), query),
           single: () => ((single = 'one'), query),
@@ -502,5 +523,233 @@ describe('start_watch', () => {
       expect(!undone.ok && undone.error).toContain(error);
       expect(tables['core.watches']).toHaveLength(1);
     }
+  });
+});
+
+describe('start_build', () => {
+  const STEP = id(2106);
+  const RUN = id(2107);
+  const BUILD_INPUT = { stepId: STEP, number: 2200, outline: '2106.2', title: 'Start the session', quiet: false };
+  const SENT = { ok: true, number: 2200, outline: '2106.2', title: 'Start the session', beneath: 0, detail: 'Started.', changed: true };
+
+  beforeEach(() => handOver.mockReset());
+
+  function build(input = BUILD_INPUT) {
+    const made = setup({ kind: 'start_build', input, enabled: ['dev'] });
+    made.tables['public.plan_runs'] = [{ id: RUN, user_id: ME, plan_item_id: STEP, created_at: '2026-09-29T12:00:00Z' }];
+    return made;
+  }
+
+  it('confirming starts the session and settles the card against the run, with no undo', async () => {
+    handOver.mockResolvedValue(SENT);
+    const { deps, change } = build();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(handOver).toHaveBeenCalledWith(expect.objectContaining({ userId: ME, id: STEP, confirmQuiet: undefined }));
+    expect(confirmed.ok && confirmed.change).toMatchObject({ status: 'done', writtenTable: 'public.plan_runs', writtenRef: RUN });
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(false);
+  });
+
+  it('shows the refusal and leaves the card waiting when the step changed after the card was made', async () => {
+    handOver.mockResolvedValue({ ok: false, error: 'A session is already working on this step.' });
+    const { tables, deps, change } = build();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed).toMatchObject({ ok: false, error: 'A session is already working on this step.' });
+    expect(tables['core.dash_actions'][0].status).toBe('proposed');
+  });
+
+  it('passes confirmQuiet only when the card said the last run was quiet', async () => {
+    handOver.mockResolvedValue(SENT);
+    const { deps, change } = build({ ...BUILD_INPUT, quiet: true });
+    await confirmChange(deps, change.id as string);
+    expect(handOver).toHaveBeenCalledWith(expect.objectContaining({ confirmQuiet: true }));
+  });
+
+  it('does nothing when the Dev workspace is off', async () => {
+    const { deps, change } = setup({ kind: 'start_build', input: BUILD_INPUT, enabled: [] });
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok).toBe(false);
+    expect(handOver).not.toHaveBeenCalled();
+  });
+});
+
+describe('paid_action', () => {
+  const ran = vi.fn();
+  const PAID_INPUT = {
+    tool: 'write_year_review',
+    action: 'app/timeline/actions.ts#writeYearReview',
+    args: { year: 2026 },
+    line: 'Write the review of 2026 from the timeline.',
+    estimate: null,
+    workspace: null,
+    paths: ['/timeline/year/2026'],
+  };
+  const REVIEW = id(700);
+
+  function paid(outcome: Awaited<ReturnType<DashPaidTool['run']>> | Error = { ok: true, subjectRef: `core.year_reviews:${REVIEW}`, op: 'insert', summary: 'Dash wrote the review of 2026.' }) {
+    const made = setup({ kind: 'paid_action', input: PAID_INPUT });
+    const tool = {
+      name: 'write_year_review',
+      kind: 'paid',
+      workspace: null,
+      run: async (ctx: unknown, args: unknown) => {
+        ran(ctx, args);
+        if (outcome instanceof Error) throw outcome;
+        return outcome;
+      },
+    } as unknown as DashPaidTool;
+    made.deps.paidTool = (name) => (name === tool.name ? tool : undefined);
+    return made;
+  }
+
+  beforeEach(() => ran.mockReset());
+
+  it('runs the tool once with the arguments it was queued with, and keeps the row it wrote with no Undo', async () => {
+    const { deps, change, tables } = paid();
+    const outcome = await confirmChange(deps, change.id as string);
+    expect(outcome.ok).toBe(true);
+    expect(ran).toHaveBeenCalledTimes(1);
+    expect(ran.mock.calls[0][1]).toEqual({ year: 2026 });
+    const row = tables['core.dash_actions'][0];
+    expect(row).toMatchObject({ status: 'done', subject_ref: `core.year_reviews:${REVIEW}`, op: 'insert', summary: 'Dash wrote the review of 2026.' });
+    expect(noUndoReason({ undo: row.undo as Row })).toBe(PAID_NO_UNDO);
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone).toMatchObject({ ok: false, error: PAID_NO_UNDO });
+  });
+
+  it('runs nothing on a second approval, whether the first is still running or done', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].undo = { running_at: '2026-09-29T11:59:00Z' };
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false, error: 'Dash is already running this.' });
+    tables['core.dash_actions'][0].undo = null;
+    await confirmChange(deps, change.id as string);
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false });
+    expect(ran).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a failed run proposed with the reason, so it can be approved again', async () => {
+    const { deps, change, tables } = paid({ ok: false, error: '2026 has 3 events on the timeline, too few to write about.' });
+    const outcome = await confirmChange(deps, change.id as string);
+    expect(outcome).toMatchObject({ ok: false, error: '2026 has 3 events on the timeline, too few to write about.' });
+    expect(tables['core.dash_actions'][0]).toMatchObject({ status: 'proposed', undo: { failed: '2026 has 3 events on the timeline, too few to write about.' } });
+    await confirmChange(deps, change.id as string);
+    expect(ran).toHaveBeenCalledTimes(2);
+  });
+
+  it('says so when the run throws, and leaves it proposed', async () => {
+    const { deps, change, tables } = paid(new Error('boom'));
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false, error: 'Dash could not run this. Try again.' });
+    expect(tables['core.dash_actions'][0].status).toBe('proposed');
+  });
+
+  it('is dismissed without running, but not while it runs', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].undo = { running_at: '2026-09-29T11:59:00Z' };
+    expect((await declineChange(deps, change.id as string)).ok).toBe(false);
+    tables['core.dash_actions'][0].undo = null;
+    expect((await declineChange(deps, change.id as string)).ok).toBe(true);
+    expect(await confirmChange(deps, change.id as string)).toMatchObject({ ok: false });
+    expect(ran).not.toHaveBeenCalled();
+  });
+
+  it('is approved from a thread too', async () => {
+    const { deps, change, tables } = paid();
+    tables['core.dash_actions'][0].surface = 'thread';
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(true);
+    expect(ran).toHaveBeenCalledTimes(1);
+  });
+
+  it('is refused when Dash no longer has the tool', async () => {
+    const { deps, change } = paid();
+    deps.paidTool = () => undefined;
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
+    expect(ran).not.toHaveBeenCalled();
+  });
+});
+
+describe('delete_rows', () => {
+  const A1 = id(701);
+  const A2 = id(702);
+  const row = (rid: string, answer: string): Row => ({
+    id: rid,
+    user_id: ME,
+    application_id: id(50),
+    question_id: id(rid === A1 ? 60 : 61),
+    answer,
+    status: 'draft',
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  });
+  const input = () => ({
+    table: 'job_search.application_answers',
+    count: 2,
+    titles: ['Why us?', 'Why this role?'],
+    href: `/jobs/roles/${id(70)}`,
+    rows: [row(A1, 'Same'), row(A2, 'Same')],
+  });
+
+  function pending() {
+    const made = setup({ kind: 'delete_rows', input: input(), enabled: ['jobs'] });
+    made.tables['job_search.application_answers'] = [row(A1, 'Same'), row(A2, 'Same')];
+    return made;
+  }
+
+  it('confirming removes the named rows and records them for Undo; undoing puts them back', async () => {
+    const { tables, deps, change } = pending();
+    const confirmed = await confirmChange(deps, change.id as string);
+    expect(confirmed.ok && confirmed.change).toMatchObject({ status: 'done', writtenTable: 'job_search.application_answers', writtenRef: A1 });
+    expect(tables['job_search.application_answers']).toEqual([]);
+    const recorded = tables['core.dash_actions'][0];
+    expect(recorded.op).toBe('delete');
+    expect((recorded.undo as { rows: unknown[] }).rows).toHaveLength(2);
+
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok && undone.change.status).toBe('undone');
+    expect(tables['job_search.application_answers'].map((r) => r.id)).toEqual([A1, A2]);
+    expect(tables['job_search.application_answers'][0]).toMatchObject({ answer: 'Same', created_at: '2026-09-01T00:00:00Z' });
+  });
+
+  it('declining removes nothing', async () => {
+    const { tables, deps, change } = pending();
+    const declined = await declineChange(deps, change.id as string);
+    expect(declined.ok && declined.change.status).toBe('declined');
+    expect(tables['job_search.application_answers']).toHaveLength(2);
+    expect((await confirmChange(deps, change.id as string)).ok).toBe(false);
+    expect(tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it('removes nothing when a row changed since it was proposed, or the workspace is off', async () => {
+    const edited = pending();
+    edited.tables['job_search.application_answers'][1].answer = 'Rewritten';
+    const refused = await confirmChange(edited.deps, edited.change.id as string);
+    expect(refused).toMatchObject({ ok: false, error: expect.stringContaining('has changed') });
+    expect(edited.tables['job_search.application_answers']).toHaveLength(2);
+    expect(edited.tables['core.dash_actions'][0].status).toBe('proposed');
+
+    const off = setup({ kind: 'delete_rows', input: input(), enabled: [] });
+    off.tables['job_search.application_answers'] = [row(A1, 'Same'), row(A2, 'Same')];
+    expect((await confirmChange(off.deps, off.change.id as string)).ok).toBe(false);
+    expect(off.tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it("refuses a table outside the allowed list and never touches another person's row", async () => {
+    const other = setup({ kind: 'delete_rows', input: { ...input(), table: 'job_search.roles' }, enabled: ['jobs'] });
+    other.tables['job_search.roles'] = [{ id: A1, user_id: ME }];
+    expect((await confirmChange(other.deps, other.change.id as string)).ok).toBe(false);
+    expect(other.tables['job_search.roles']).toHaveLength(1);
+
+    const theirs = pending();
+    theirs.tables['job_search.application_answers'] = [{ ...row(A1, 'Same'), user_id: id(9) }, { ...row(A2, 'Same'), user_id: id(9) }];
+    expect((await confirmChange(theirs.deps, theirs.change.id as string)).ok).toBe(false);
+    expect(theirs.tables['job_search.application_answers']).toHaveLength(2);
+  });
+
+  it('undo leaves a row that is already back and puts back the rest', async () => {
+    const { tables, deps, change } = pending();
+    await confirmChange(deps, change.id as string);
+    tables['job_search.application_answers'].push(row(A1, 'Back already'));
+    const undone = await undoChange(deps, change.id as string);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.application_answers'].map((r) => r.id).sort()).toEqual([A1, A2]);
   });
 });

@@ -5,10 +5,10 @@ import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
-import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
+import { MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
-import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
+import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
 import { whenDate, whenWeekday } from '@/lib/core/when';
 
 /**
@@ -180,7 +180,18 @@ export type DashContext = {
   subject: { ref: string; title?: string | null } | null;
   /** The page the person is on; null when none is told. */
   page: PageContext | null;
+  /**
+   * The workspace the person kept the question to (plan #1899.5), by its
+   * name: told to the model, which is offered only that workspace's lookups.
+   * Absent or null: every workspace.
+   */
+  scope?: string | null;
 };
+
+/** What the model is told when the person keeps a question to one workspace (plan #1899.5). */
+export function scopeLine(workspace: string): string {
+  return `They kept this question to their ${workspace} workspace. Look only there: your lookups reach that workspace alone, so answer from what they find and say so if the answer is elsewhere.`;
+}
 
 /** "Sunday, 4 October 2026", from a YYYY-MM-DD day read as a calendar day. */
 function spelledDay(day: string): string {
@@ -259,7 +270,7 @@ function pageRowLine(page: PageContext): string {
  * sent once; a second refusal stands.
  */
 export const LOOK_FIRST =
-  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
+  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, query_rows filters and counts one, including by whether rows of another table are linked to each (table_info names its columns and links), search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
@@ -268,10 +279,10 @@ const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what
  * Why the answer stopped. 'unfinished': the model wrote nothing usable, and
  * the answer was built from the lookups (answerFromLookups).
  */
-export type DashStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished';
+export type DashStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished' | 'stopped';
 
 /** The sentence an answer written under a limit ends with. */
-export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished'>): string {
+export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>): string {
   return stop === 'lookups'
     ? `I stopped after ${MAX_LOOKUPS} lookups, so this answer rests only on what those found.`
     : 'I stopped looking before I had checked everything, so this answer rests only on what I found by then.';
@@ -337,6 +348,16 @@ export type DashProposer = (name: string, input: unknown, seen: DashSeen) => Pro
  */
 export type DashWriter = (tool: DashWriteTool, input: unknown, seen: DashSeen) => Promise<AskToolResult>;
 
+/**
+ * Queues one paid press for an approval (plan #2228.1). Never throws. The
+ * surface checks and prices it (queuePaidPress in lib/dash/paid.ts), keeps
+ * it as a proposed row, and returns what to tell the model; nothing runs.
+ */
+export type DashQueuer = (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<AskToolResult>;
+
+/** Said to the model when a paid tool is called where nothing can be queued. */
+const NO_QUEUE = 'Nothing that costs money can be queued here. Answer in words, and say they can press the button on its page.';
+
 /** Said to the model when a proposal is made where none can be kept. */
 const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
 /** Said to the model when a write is called where none can be made. */
@@ -371,13 +392,21 @@ function keptResult(result: AskToolResult): unknown {
 
 /**
  * The conversation so far as the model is sent it. An earlier answer carries
- * the rows it cited, so a follow-up ("and the second one?") can name them.
+ * the rows it cited, so a follow-up ("and the second one?") can name them,
+ * and a question carries the rows the person added to it with @ (plan
+ * #1899.5), which are the rows it is about.
  */
-function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[]): Anthropic.MessageParam[] {
+export function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[]): Anthropic.MessageParam[] {
   return toModelMessages(
     turns.map((turn) => {
-      if (turn.role !== 'assistant' || !turn.citations?.length) return turn;
+      if (!turn.citations?.length) return turn;
       const rows = turn.citations.map((c) => `${c.table} ${c.ref} "${c.title}"`).join('; ');
+      if (turn.role === 'user') {
+        return {
+          role: turn.role,
+          body: `${turn.body}\n\n(Rows I added for you to read, as table, ref and title: ${rows}. Open each with open_row, or read_dev_row for a plan step, idea, note or raise, before answering about it.)`,
+        };
+      }
       return { role: turn.role, body: `${turn.body}\n\n(Rows cited: ${rows})` };
     }),
   );
@@ -411,15 +440,19 @@ function withRollingBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.Me
 }
 
 /**
- * The answer given when the model wrote nothing usable after its lookups
- * (plan #1437): the rows they returned, each named once, in the order found,
- * and cited so the person can open them. Null when no lookup returned a row,
- * since a list of nothing is not an answer.
+ * The answer given when the model could not finish (plan #1437, #2080.3): the
+ * first line says what went wrong, then come the rows of the last lookup, each named once and cited so the person can open them, up to
+ * FALLBACK_ROWS. Rows from earlier lookups are left out, since they answered
+ * other questions. Null when that lookup returned no row, since a reason with
+ * nothing under it is an error, not an answer.
  */
-export function answerFromLookups(found: readonly TalkCitation[]): { body: string; citations: TalkCitation[] } | null {
+export function answerFromLookups(
+  reason: string,
+  lastRows: readonly TalkCitation[],
+): { body: string; citations: TalkCitation[] } | null {
   const seen = new Set<string>();
   const rows: TalkCitation[] = [];
-  for (const row of found) {
+  for (const row of lastRows) {
     const key = citationKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -428,13 +461,25 @@ export function answerFromLookups(found: readonly TalkCitation[]): { body: strin
   if (rows.length === 0) return null;
   const listed = rows.slice(0, FALLBACK_ROWS);
   const lines = listed.map((row) => `- ${row.title.replace(/\s+/g, ' ').trim()}`);
-  const more = rows.length - listed.length;
-  if (more > 0) lines.push(`- and ${more} more`);
   const body = [
-    'I could not finish writing the answer, so here is what my lookups found. Ask again for more about any of them.',
+    `I could not finish this answer: ${reason} My last lookup found these, which may not be what you asked about.`,
     lines.join('\n'),
   ].join('\n\n');
   return { body: body.slice(0, MAX_TURN), citations: listed };
+}
+
+/** A stopped reply, in words for the person. */
+function stoppedInWords(reply: { stop_reason?: string | null }): string {
+  switch (reply.stop_reason) {
+    case 'max_tokens':
+      return 'the reply grew too long and was cut off.';
+    case 'refusal':
+      return 'the model declined to answer.';
+    case 'pause_turn':
+      return 'the model paused and did not come back.';
+    default:
+      return 'the model stopped without writing an answer.';
+  }
 }
 
 function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[]; couldNot: string | null } {
@@ -574,14 +619,16 @@ async function callModel(
   params: Anthropic.MessageCreateParamsNonStreaming,
   onText: ((piece: string) => void) | undefined,
   finishName: string,
+  signal: AbortSignal | undefined,
 ): Promise<Anthropic.Message> {
-  if (!onText) return client.messages.create(params);
+  const options = signal ? { signal } : undefined;
+  if (!onText) return client.messages.create(params, options);
   const tools = params.tools?.map((tool) =>
     'name' in tool && tool.name === finishName && !('type' in tool && tool.type)
       ? ({ ...tool, eager_input_streaming: true } as Anthropic.Tool)
       : tool,
   );
-  const stream = client.messages.stream({ ...params, ...(tools ? { tools } : {}) });
+  const stream = client.messages.stream({ ...params, ...(tools ? { tools } : {}) }, options);
   // The answer call's input as it arrives, by content block index.
   const answering = new Map<number, string>();
   let told = '';
@@ -631,6 +678,8 @@ export type DashRun = {
   handOff?: (input: unknown, seen: DashSeen, tool: DashHandoffTool) => Promise<AskToolResult>;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /** Absent: every paid tool is refused, and nothing is queued (plan #2228.1). */
+  queue?: DashQueuer;
   /**
    * Marks the comment being answered as seen, in place of a reply (plan
    * #1649), or says why it will not. Absent, or on any surface but a
@@ -652,11 +701,18 @@ export type DashRun = {
    * written one failed). Whatever it throws is ignored.
    */
   onText?: (piece: string) => void;
+  /**
+   * Ends the answer when it aborts (plan #1899.5): the model call in flight
+   * is cancelled, no further call or lookup is started, and the answer is
+   * what `onText` had been told so far, with STOPPED_NOTE, stopped
+   * 'stopped'. Writes already made stay made. Absent: runs to its end.
+   */
+  signal?: AbortSignal;
 };
 
 /**
  * Dash's answer to the last of the turns, which is the person's. Calls the
- * model until it answers or a limit is reached. Never throws.
+ * model until it answers, a limit is reached or `signal` aborts. Never throws.
  */
 export async function runDash(input: DashRun): Promise<DashAnswer> {
   const { voice, context } = input;
@@ -675,9 +731,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     ...(choose ? { webCited } : {}),
   });
   const toolCalls: TalkToolCall[] = [];
-  // Every row a lookup in this answer returned, in the order found: what an
-  // answer is built from when the model writes none.
-  const found: TalkCitation[] = [];
+  // The rows the last lookup returned: all an answer is built
+  // from when the model writes none.
+  let lastRows: TalkCitation[] = [];
+  // What the last lookup that failed said, to name when the answer stops.
+  let lastError: string | null = null;
   const hear = (event: DashLookupEvent) => {
     try {
       input.onLookup?.(event);
@@ -685,8 +743,19 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       console.error('ask lookup listener failed', error);
     }
   };
+  // Everything onText has been told, which a stopped answer keeps.
+  let written = '';
+  const signal = input.signal;
+  const stoppedAnswer = (): DashAnswer => ({
+    ok: true,
+    body: stoppedBody(written),
+    toolCalls,
+    citations: [],
+    stop: 'stopped',
+  });
   const onText = input.onText
     ? (piece: string) => {
+        written += piece;
         try {
           input.onText?.(piece);
         } catch (error) {
@@ -694,10 +763,18 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       }
     : undefined;
-  const fail = (detail: string): DashAnswer => {
-    const built = answerFromLookups(found);
+  const fail = (detail: string, plain: string = detail): DashAnswer => {
+    const cause = lastError ? `${plain} A lookup also failed: ${lastError}` : plain;
+    console.error('ask answer did not finish', detail, lastError ? `(last lookup error: ${lastError})` : '');
+    const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
+  };
+  const noteLookup = (result: AskToolResult) => {
+    lastError = result.ok ? null : result.error.replace(/\s+/g, ' ').trim().slice(0, 200);
+    const rows = citationsOf(result);
+    for (const c of rows) known.set(citationKey(c), c);
+    lastRows = rows;
   };
   const history = withNewestFiles(historyMessages(input.turns), input.files);
   if (history.length === 0 || history[history.length - 1].role !== 'user') {
@@ -730,6 +807,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   ];
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
+  if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
@@ -741,6 +819,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     if (tool?.kind === 'write') {
       if (!input.write) return Promise.resolve({ ok: false, error: NO_WRITES });
       return input.write(tool, args, seenOrShown);
+    }
+    if (tool?.kind === 'paid') {
+      if (!input.queue) return Promise.resolve({ ok: false, error: NO_QUEUE });
+      return input.queue(tool, args, seenOrShown);
     }
     if (tool?.kind === 'proposal' || (!tool && isProposal(name))) {
       if (!input.propose) return Promise.resolve({ ok: false, error: NO_PROPOSALS });
@@ -769,6 +851,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard.
   for (let round = 0; round <= MAX_LOOKUPS + 1; round++) {
+    if (signal?.aborted) return stoppedAnswer();
     const limit: DashStop | null =
       lookups >= MAX_LOOKUPS
         ? 'lookups'
@@ -793,9 +876,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         },
         onText,
         finishName,
+        signal,
       );
     } catch (error) {
-      return fail(error instanceof Error ? error.message : 'The answer failed.');
+      if (signal?.aborted) return stoppedAnswer();
+      return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
     }
 
     const usage = usageFrom(response.usage);
@@ -826,8 +911,12 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       // Writes made in the same round as the answer are made first (plan
       // #1478): the answer says they are done, and capture files every move
       // and its answer in one round. Lookups beside an answer are not run,
-      // since nothing would read what they return.
-      const writes = uses.filter((use) => use !== answered && dashTool(use.name, voice.tools)?.kind === 'write');
+      // since nothing would read what they return. A paid press queued beside
+      // the answer is kept the same way (plan #2228.1).
+      const writes = uses.filter((use) => {
+        const kind = use === answered ? null : dashTool(use.name, voice.tools)?.kind;
+        return kind === 'write' || kind === 'paid';
+      });
       const made = await Promise.all(
         writes.map(async (use, i): Promise<AskToolResult> => {
           if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
@@ -840,14 +929,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         const kept = keptResult(result);
         toolCalls.push({ name: use.name, input: use.input, result: kept });
         hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
-        for (const c of citationsOf(result)) {
-          known.set(citationKey(c), c);
-          found.push(c);
-        }
+        noteLookup(result);
       });
       lookups += writes.length;
       const { answer, cited, couldNot } = answerInput(answered.input);
-      if (!answer && !voice.finish) return fail('The answer came back empty.');
+      if (!answer && !voice.finish) return fail('The answer came back empty.', 'the model finished without writing any words.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
       for (const c of cited) {
@@ -918,7 +1004,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     if (voice.finish && (uses.length === 0 || mustAnswer)) {
       // Its answer has a shape prose cannot give.
-      return fail(stopped === 'refusal' ? 'The model declined to answer.' : whyNoReport(response));
+      return fail(stopped === 'refusal' ? 'The model declined to answer.' : whyNoReport(response), stoppedInWords(response));
     }
 
     if (uses.length === 0 || mustAnswer) {
@@ -959,9 +1045,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             },
             onText,
             finishName,
+            signal,
           );
         } catch (error) {
-          return fail(error instanceof Error ? error.message : 'The answer failed.');
+          if (signal?.aborted) return stoppedAnswer();
+          return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
         }
         input.onSpend?.({ model, usage: usageFrom(prose.usage) });
         const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
@@ -970,9 +1058,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           const note = `\n\n${limitNote(stop)}`;
           return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
         }
-        return fail(whyNoReport(prose));
+        return fail(whyNoReport(prose), stoppedInWords(prose));
       }
-      return fail(whyNoReport(response));
+      return fail(whyNoReport(response), stoppedInWords(response));
     }
 
     // Run this round's calls together, as many as the cap still allows.
@@ -991,10 +1079,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       const kept = keptResult(result);
       toolCalls.push({ name: use.name, input: use.input, result: kept });
       hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
-      for (const c of citationsOf(result)) {
-        known.set(citationKey(c), c);
-        found.push(c);
-      }
+      noteLookup(result);
       return {
         type: 'tool_result',
         tool_use_id: use.id,
@@ -1006,5 +1091,5 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     messages.push({ role: 'assistant', content: response.content }, { role: 'user', content: blocks });
   }
 
-  return fail('The answer did not finish.');
+  return fail('The answer did not finish.', 'it ran out of steps before the model wrote an answer.');
 }

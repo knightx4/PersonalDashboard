@@ -113,6 +113,19 @@ describe('search_mail', () => {
     expect(result.note).toContain('More messages matched');
   });
 
+  it('says which mailbox was searched when another could not be, so an empty result is not read as no search', async () => {
+    const { ctx } = context({
+      ...FOUND,
+      messages: [],
+      problems: [
+        { accountId: 'acc-2', mailbox: 'old@example.com', kind: 'needs_reauth', reason: 'Reconnect old@example.com in Settings.' },
+      ],
+    });
+    const result = await executeAskTool('search_mail', { words: 'tenex' }, ctx);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.note).toContain(`Searched ${FOUND.searched.join(', ')}, and nothing there matched. Not searched: old@example.com.`);
+  });
+
   it('points at Settings when no mailbox is connected, and refuses where mail cannot be searched', async () => {
     const none = context({ ok: false, kind: 'no_mailbox', reason: 'none' }).ctx;
     expect(await executeAskTool('search_mail', { from: 'Anthony' }, none)).toEqual({

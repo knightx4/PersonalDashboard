@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { Sparkles } from 'lucide-react';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,15 @@ import {
  * Crafting a takeaway shown under two videos is one press for both: the row
  * is the same, so once it is crafted the button is gone under each.
  */
-export function TakeawayActions({ id, status }: { id: string; status: 'open' | 'crafted' | 'dismissed' }) {
+export function TakeawayActions({
+  id,
+  title,
+  status,
+}: {
+  id: string;
+  title: string;
+  status: 'open' | 'crafted' | 'dismissed';
+}) {
   const dismissed = status === 'dismissed';
   const [crafted, craft, crafting] = useActionState(craftTakeaway, {} as InspirationActionState);
   const toast = useToast();
@@ -38,7 +47,7 @@ export function TakeawayActions({ id, status }: { id: string; status: 'open' | '
       const next = await dismissTakeaway(prev, formData);
       if (!next.error)
         toast({
-          text: 'Declined',
+          text: closedToast('declined', title),
           undo: async () => {
             const back = await restoreTakeaway({}, formData);
             if (back.error) throw new Error(back.error);

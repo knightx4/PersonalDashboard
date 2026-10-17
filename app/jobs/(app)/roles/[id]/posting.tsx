@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -15,7 +16,6 @@ import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { LinkedText } from '@/components/ui/linked-text';
 import type { PanelProps } from './types';
 import { VERDICT_STYLE } from './verdict';
@@ -106,7 +106,7 @@ export function Posting({
         hint={
           matches
             ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
-            : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'
+            : undefined
         }
         action={
           // At phone width the buttons wrap under the heading; the ghost
@@ -124,11 +124,13 @@ export function Posting({
               </Button>
             )}
             {lines.length > 0 && (
-              <Button
+              <DashAction
                 type="button"
                 size="sm"
                 variant="secondary"
                 pending={matching}
+                paid="app/jobs/(app)/roles/[id]/posting-actions.ts#matchRoleRequirements"
+                what="Cost of matching"
                 onClick={() => {
                   setMatching(true);
                   setMatchError(null);
@@ -145,13 +147,7 @@ export function Posting({
                 }}
               >
                 {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
-              </Button>
-            )}
-            {lines.length > 0 && (
-              <PaidHint
-                action="app/jobs/(app)/roles/[id]/posting-actions.ts#matchRoleRequirements"
-                what="Cost of matching"
-              />
+              </DashAction>
             )}
           </div>
         }

@@ -1,9 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { isUuid, type AskRow } from '@/lib/ask/db';
+import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { LearnChangeInput, LearnChangeKind } from '@/lib/ask/learn-changes';
 import { toRef } from '@/lib/core/refs';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { BRIEF_DEPTHS, sameTopic, type BriefDepth } from '@/lib/learn/briefs/model';
+import { BRIEF_DEPTHS, readSubQuestions, sameTopic, type BriefDepth } from '@/lib/learn/briefs/model';
+import { FINDING_MAX, FINDING_QUOTE_MAX, FINDING_SOURCES_MAX, type FindingSource } from '@/lib/learn/briefs/findings';
+import { essayTitle } from '@/lib/learn/essays/model';
 import { briefStarter, type BriefStarter } from '@/lib/learn/briefs/start';
 import { rewrittenClaimUpdate } from '@/lib/learn/graph/rewrite-save';
 import { isSameClaim, MAX_CLAIM } from '@/lib/learn/graph/rewrite';
@@ -29,6 +31,11 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                      moved to another pile.
  *   research_topic     a reading list and a research brief on a topic, with
  *                      the run that fills them in started (plan #2023.3).
+ *   add_to_brief       a finding, with its sources, added to a brief after
+ *                      its run, in learn.brief_findings, which the run never
+ *                      writes, so a later run keeps it.
+ *   attach_vault_note  a vault note attached to an essay's notes, in
+ *                      learn.essay_vault_notes; Update the map reads it.
  *
  * Each is one row, inserted or updated, so the one undo rule in
  * lib/core/dash-actions.ts puts it back from the values kept (#1894.4: an
@@ -46,10 +53,16 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
 
 /**
  * Who the change is for, and their learn client: all a Learn write needs.
- * `research` starts a brief's run, for research_topic; without it that tool
- * is refused.
+ * `research` starts a brief's run, for research_topic, and `vault` is their
+ * obsidian client, for attach_vault_note to find the note; without one, the
+ * tool that needs it is refused.
  */
-export type LearnWriteEnv = { userId: string; learn: LearnSupabaseClient; research?: BriefStarter };
+export type LearnWriteEnv = {
+  userId: string;
+  learn: LearnSupabaseClient;
+  research?: BriefStarter;
+  vault?: SchemaClient;
+};
 
 /** A Learn change as made, before a surface keeps it. */
 export type LearnMade = {
@@ -564,6 +577,128 @@ async function researchTopic(env: LearnWriteEnv, args: Args): Promise<LearnMade>
 }
 
 // ---------------------------------------------------------------------------
+// add_to_brief
+// ---------------------------------------------------------------------------
+
+/** The sources given with a finding, each with a title and an https link, or a refusal. */
+function findingSources(raw: unknown): FindingSource[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) throw new LearnRefused('sources must be a list of { title, url, quote }.');
+  if (raw.length > FINDING_SOURCES_MAX) throw new LearnRefused(`Give at most ${FINDING_SOURCES_MAX} sources with one finding.`);
+  return raw.map((item, i) => {
+    const source = item && typeof item === 'object' ? (item as Args) : {};
+    const title = text(source, 'title');
+    if (!title) throw new LearnRefused(`Source ${i + 1} has no title: name the page or document.`);
+    if (title.length > 300) throw new LearnRefused(`Keep source ${i + 1}'s title under 300 characters.`);
+    const url = httpsLink(text(source, 'url'));
+    const quote = text(source, 'quote');
+    if (quote.length > FINDING_QUOTE_MAX) throw new LearnRefused(`Keep source ${i + 1}'s quote under ${FINDING_QUOTE_MAX} characters.`);
+    return { title, url, quote };
+  });
+}
+
+async function addToBrief(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
+  const briefId = idOf(args, 'brief_id', 'brief');
+  const body = text(args, 'finding');
+  if (!body) throw new LearnRefused('finding is missing: say what was found, in a few sentences.');
+  if (body.length > FINDING_MAX) throw new LearnRefused(`Keep the finding under ${FINDING_MAX} characters; split it into two.`);
+  const sources = findingSources(args.sources);
+  const brief = await ownRow(env, 'briefs', briefId, 'brief');
+  if (brief.archived_at) throw new LearnRefused('That brief is archived. Nothing was added.');
+
+  const subQuestions = readSubQuestions(brief.sub_questions);
+  let subQuestionId: string | null = null;
+  let under = '';
+  if (sent(args, 'sub_question')) {
+    const n = args.sub_question;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > subQuestions.length) {
+      throw new LearnRefused(
+        subQuestions.length
+          ? `sub_question must be a number from 1 to ${subQuestions.length}, as the brief numbers them, or left out.`
+          : 'This brief has no sub-questions yet. Leave sub_question out.',
+      );
+    }
+    subQuestionId = subQuestions[n - 1].id;
+    under = ` under "${quoted(subQuestions[n - 1].text)}"`;
+  }
+
+  const after = await inserted(
+    env,
+    'brief_findings',
+    { user_id: env.userId, brief_id: briefId, sub_question_id: subQuestionId, body, sources },
+    'finding',
+  );
+  const id = after.id as string;
+  const title = named(brief.question, 'the brief');
+  const href = `/learn/b/${briefId}`;
+  const cited = sources.length === 0 ? '' : sources.length === 1 ? ', with one source' : `, with ${sources.length} sources`;
+  return {
+    kind: 'add_to_brief',
+    input: { verb: 'Added a finding to', what: title, rest: `${under}${cited}: ${quoted(body)}`, href, where: 'Open the brief', paths: [href] },
+    subjectRef: toRef('learn.brief_findings', id),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash added a finding to the brief "${title}"${under}${cited}: ${quoted(body, 160)}`,
+    row: { table: 'learn.brief_findings', ref: id, title: quoted(body), href, detail: { brief: title, sources: sources.length } },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// attach_vault_note
+// ---------------------------------------------------------------------------
+
+const WHY_MAX = 500;
+
+async function attachVaultNote(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
+  const essayId = idOf(args, 'essay_id', 'essay');
+  const ref = text(args, 'note');
+  if (!ref) throw new LearnRefused('note is missing: give the note\'s ref (its path) as vault_notes, search or recall returned it.');
+  const why = text(args, 'why');
+  if (why.length > WHY_MAX) throw new LearnRefused(`Keep why under ${WHY_MAX} characters.`);
+  if (!env.vault) throw new LearnRefused('Vault notes cannot be reached from here. Tell them nothing was attached.');
+
+  const essay = await ownRow(env, 'essays', essayId, 'essay');
+  const lookup = env.vault.from('notes').select('id, path, title').eq('user_id', env.userId).is('deleted_at', null);
+  const { data: note, error } = await (isUuid(ref) ? lookup.eq('id', ref) : lookup.eq('path', ref.replace(/^\/+/, ''))).maybeSingle();
+  if (error) throw new Error(`Reading the vault note failed: ${error.message}`);
+  if (!note) throw new LearnRefused('There is no vault note of theirs at that ref. Find it with vault_notes or search first.');
+  const { id: noteId, path, title: noteTitle } = note as { id: string; path: string; title: string };
+  if (essay.note_id === noteId) throw new LearnRefused('That note is the essay itself. Nothing was attached.');
+
+  const { data: already, error: alreadyError } = await env.learn
+    .from('essay_vault_notes')
+    .select('id')
+    .eq('essay_id', essayId)
+    .eq('note_id', noteId)
+    .eq('user_id', env.userId)
+    .maybeSingle();
+  if (alreadyError) throw new Error(`Reading the essay's attached notes failed: ${alreadyError.message}`);
+  if (already) throw new LearnRefused('That note is already attached to this essay. Nothing was changed.');
+
+  const after = await inserted(
+    env,
+    'essay_vault_notes',
+    { user_id: env.userId, essay_id: essayId, note_id: noteId, why },
+    'attached note',
+  );
+  const id = after.id as string;
+  const name = named(noteTitle || path, path);
+  const essayName = named(essayTitle(String(essay.draft_body ?? ''), String(essay.path ?? '')), 'the essay');
+  const href = `/learn/e/${essayId}`;
+  return {
+    kind: 'attach_vault_note',
+    input: { verb: 'Attached', what: name, rest: ` to the notes of ${essayName}`, href, where: 'Open the essay', paths: [href] },
+    subjectRef: toRef('learn.essay_vault_notes', id),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash attached the vault note "${name}" to the notes of the essay "${essayName}".`,
+    row: { table: 'learn.essay_vault_notes', ref: id, title: name, href, detail: { essay: essayName, path } },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The definitions
 // ---------------------------------------------------------------------------
 
@@ -694,6 +829,61 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
     },
     run: researchTopic,
   },
+  {
+    name: 'add_to_brief',
+    description:
+      'Add a finding to one of their research briefs, when they ask to add what a conversation found to their research ' +
+      '("add this to my brief on X", "put these sources in my research"). Give the brief, the finding in a few sentences of ' +
+      'your own, the sub-question it answers by its number on the brief (leave it out when it answers none), and each source ' +
+      'it rests on with its title, its https link and the words quoted from it, exactly as the page has them. ' +
+      'Only sources you actually read: never a link you did not open. A later run of the brief keeps it. ' +
+      'To put a source on the brief\'s reading list too, add it with add_track_reading; to copy the finding into a vault ' +
+      'note as well, use edit_vault_note or write_vault_note.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        brief_id: ID('The brief, from list_rows on learn.briefs, search or an earlier row.'),
+        finding: { type: 'string', description: 'What was found, in a few sentences.' },
+        sub_question: { type: 'integer', description: 'The sub-question it answers, numbered from 1 as the brief shows them. Leave out when it answers none.' },
+        sources: {
+          type: 'array',
+          description: 'What the finding rests on.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'The page or document, as it names itself.' },
+              url: { type: 'string', description: 'Its https link.' },
+              quote: { type: 'string', description: 'The words the finding rests on, exactly as the page has them.' },
+            },
+            required: ['title', 'url'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['brief_id', 'finding'],
+      additionalProperties: false,
+    },
+    run: addToBrief,
+  },
+  {
+    name: 'attach_vault_note',
+    description:
+      "Attach one of their vault notes to the notes of one of their Learn essays, when they ask (\"attach my Walzer note to " +
+      'the essay", "use this note for my essay"). The note is listed on the essay\'s Notes tab and Dash reads it with their ' +
+      'notes when they press Update the map. Nothing is copied into the notes. Give the essay and the note by the ref ' +
+      'vault_notes, search or recall returned for it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        essay_id: ID('The essay, from list_rows on learn.essays, search or an earlier row.'),
+        note: { type: 'string', description: "The vault note's ref, its path, as vault_notes, search or recall returned it." },
+        why: { type: 'string', description: 'What it brings to the essay, in a sentence, when they said.' },
+      },
+      required: ['essay_id', 'note'],
+      additionalProperties: false,
+    },
+    run: attachVaultNote,
+  },
 ];
 
 /** Runs one Learn write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -725,7 +915,8 @@ export const LEARN_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = LEAR
       return { ok: false, error: 'The Learn workspace is switched off, so nothing can be changed there.' };
     }
     const learn = (await ctx.db('learn')) as LearnSupabaseClient;
-    const env: LearnWriteEnv = { userId: ctx.userId, learn, research: briefStarter({ learn, userId: ctx.userId }) };
+    const vault = write.name === 'attach_vault_note' && ctx.enabledModules.includes('vault') ? await ctx.db('obsidian') : undefined;
+    const env: LearnWriteEnv = { userId: ctx.userId, learn, research: briefStarter({ learn, userId: ctx.userId }), vault };
     const made = await runLearnWrite(write, env, input);
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: made.undo ?? null };

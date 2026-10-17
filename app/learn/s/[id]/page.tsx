@@ -2,7 +2,6 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
-import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -10,7 +9,8 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
-import { nowHref, practiceHref, subjectClipsHref } from '@/lib/learn/flow/href';
+import { SubjectPresses, subjectDescription } from './header';
+import { loadSubjectLens } from './lens-held';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -19,7 +19,7 @@ import { loadCurriculum, type StoredUnit } from '@/lib/learn/graph/curriculum-st
 import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view';
 import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
-import { loadPlan, planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { loadPlan, planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { loadProjectView } from '@/lib/learn/lessons/project-store';
@@ -29,16 +29,32 @@ import { deleteSubject } from './actions';
 import { loadSubjectLearning, type SubjectLearning } from '@/lib/learn/chat/subject-load';
 import { ChannelsSection } from './channels';
 import { ChatLearningSection } from './chat-learning';
-import { WriteCurriculum } from './curriculum';
+import { CurriculumComing, WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
-import { PullArticles } from './pull-articles';
-import { PullCourse } from './pull-course';
+import { AddSource } from './add-source';
+import { PreparationBlock } from './prepare';
+import { DirectionOffer } from './direction';
+import { directionOffer } from '@/lib/learn/prepare/branch';
+import { SourcesSection, StartHere } from './sources';
+import { loadPlacementPieces } from '@/lib/learn/levels/placement-store';
+import { firstNotHeld } from '@/lib/learn/levels/placement';
+import { loadDirection, loadPreparation, loadSubjectTerritory } from '@/lib/learn/prepare/store';
+import { loadStartTopic } from '@/lib/learn/prepare/start-load';
+import {
+  branchPreparationView,
+  offersWriteCurriculum,
+  preparationSources,
+  preparationView,
+  unitsComeAtStep,
+  withAddedSources,
+} from '@/lib/learn/prepare/view';
+import { loadAddedSources } from '@/lib/learn/prepare/add-source-run';
+import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import {
   countStates,
   learningOrder,
   pruneForGoal,
   readyNow,
-  settledCount,
   type Graph,
 } from '@/lib/learn/graph/model';
 import { Chip } from '@/components/ui/chip';
@@ -265,7 +281,8 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added] =
+    await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -279,10 +296,26 @@ export default async function SubjectPage({
     // Readings related to it and chats logged about it (plan #1814). Ones that
     // cannot be read leave the section out.
     loadSubjectLearning(supabase, id).catch((): SubjectLearning => ({ readings: [], sessions: [] })),
+    // The subject's preparation run (plan #2276.2): null for a subject made
+    // before preparation existed. One that cannot be read leaves the block out.
+    loadPreparation(supabase, user.id, id).catch(() => undefined),
+    // The direction offer and the branch runs (plan #2276.7). Ones that cannot
+    // be read leave the offer and the branch blocks out.
+    loadDirection(supabase, user.id, id).catch(() => null),
+    loadSubjectTerritory(supabase, user.id, id).catch(() => null),
+    // The subject's lens, for the Levels link and the header's held levels:
+    // the Subjects list opens this page now rather than the lens. One that
+    // cannot be read leaves the link and the line out.
+    loadSubjectLens(supabase, user.id, id).catch(() => null),
+    // What the person added with Add a source (plan #2307.4). Ones that
+    // cannot be read leave the Sources section with the run's documents.
+    loadAddedSources(supabase, user.id, id).catch((): SourceDocument[] => []),
   ]);
+  const lensId = lensRead?.id ?? null;
+  const held = lensRead?.held ?? null;
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
-  const planGoal = await planGoalFor(supabase, user.id, id).catch(() => null);
+  const planGoal = await planOwnerFor(supabase, user.id, id).catch(() => null);
   const [plan, project]: [PlanUnit[] | null, ProjectView | null] = planGoal
     ? await Promise.all([
         loadPlan(supabase, user.id, id).catch(() => null),
@@ -300,6 +333,41 @@ export default async function SubjectPage({
     : null;
   const counts = countStates(graph);
   const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
+  // Where a finished preparation says to start, and what it came from (plan
+  // #2276.6). The topic is read as it stands, since it is approved after the
+  // run; one that cannot be read leaves the name the run recorded.
+  const sources = preparation ? preparationSources(preparation) : null;
+  // The Sources section lists what the person added too, finished run or not.
+  const sourceList = withAddedSources(sources, added);
+  const startTopic = sources?.start.topic
+    ? await loadStartTopic(supabase, user.id, sources.start.topic.id).catch(() => null)
+    : null;
+  // The first lesson Start here opens: the first piece not passed. A subject
+  // whose pieces cannot be read, or has none, keeps the practice press.
+  const startPieces =
+    sources && !showEverything
+      ? await loadPlacementPieces(supabase, user.id, id).catch(() => null)
+      : null;
+  const startPiece = startPieces ? firstNotHeld(startPieces) : null;
+  // The card stays until the first unit is done; the curriculum's Next takes over from there.
+  const firstRow = unitRows[0] ?? null;
+  const showStart = sources !== null && (firstRow === null || firstRow.state !== 'done');
+  // Going deeper (plan #2276.7): the offer once enough answers are graded on
+  // the lens, and each branch run's steps, newest last.
+  const offer = direction
+    ? directionOffer({
+        answers: direction.answers,
+        direction: direction.direction,
+        territory,
+        taken: new Set(direction.branches.flatMap((b) => (b.run.branch ? [b.run.branch.key] : []))),
+        prepared: direction.prepared,
+      })
+    : null;
+  const branchRuns = (direction?.branches ?? []).flatMap((b) => {
+    const view = branchPreparationView(b);
+    return view ? [view] : [];
+  });
+  const comingAt = units.length === 0 && preparation ? unitsComeAtStep(preparationView(preparation)) : null;
   const live =
     units.length > 0
       ? outside
@@ -311,52 +379,18 @@ export default async function SubjectPage({
       <PageHeader
         subject={await rowSubject(toRef('learn.subjects', id))}
         title={subject.name}
-        description={
-          counts.total === 0
-            ? 'Nothing in this graph yet.'
-            : `${settledCount(counts)} of ${counts.total} known${
-                counts.misconception > 0 ? ` · ${counts.misconception} mixed up` : ''
-              }`
-        }
+        description={subjectDescription(held, counts)}
         actions={
           <>
-            {/* Now with only this subject's cards (plan #1698). Its empty
-                state says when there are none, so it shows on every subject. */}
-            <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
-              Now
-            </Link>
-            {/* The clips that serve this subject (plan #1697). The owner's
-                alone, like Videos, since they are cut from the owner's
-                YouTube library. Its own empty state says when none serve it. */}
-            {owner && (
-              <Link href={subjectClipsHref(id)} className={buttonVariants({ variant: 'secondary' })}>
-                Clips
+            {counts.total > 0 && (
+              <Link
+                href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
+                className="text-ui text-ink-muted hover:text-ink"
+              >
+                {showEverything ? 'Show what is left' : 'Show the whole graph'}
               </Link>
             )}
-            {counts.total > 0 && (
-              <>
-                <Link
-                  href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
-                  className="text-ui text-ink-muted hover:text-ink"
-                >
-                  {showEverything ? 'Show what is left' : 'Show the whole graph'}
-                </Link>
-                <Link
-                  href={`/learn/s/${id}/probe`}
-                  className={buttonVariants({ variant: 'secondary' })}
-                >
-                  Ask me about this
-                </Link>
-                {/* The flow limited to this track (plan #779), left again with
-                  All tracks on the flow itself. */}
-                <Link
-                  href={practiceHref({ track: id })}
-                  className={buttonVariants({ variant: 'primary' })}
-                >
-                  Practice this
-                </Link>
-              </>
-            )}
+            <SubjectPresses id={id} lensId={lensId} owner={owner} />
             <ConfirmStep
               action={deleteSubject}
               fields={{ subjectId: id }}
@@ -389,16 +423,48 @@ export default async function SubjectPage({
         </p>
       )}
 
+      {/* The person's own words about the subject, on a quiet panel rather
+          than the bare page (taste:no-bare-text, raised on plan #2276.2). */}
       {subject.note && (
-        <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">
-          {subject.note}
-        </p>
+        <div className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
+          <p className="border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>
+        </div>
       )}
+
+      {/* While the subject is being prepared this leads the page; once the run
+          is finished it is one line (plan #2276.2). */}
+      {/* Finished, it gives way to the Start here card, and its line opens
+          the Sources section under the curriculum (plan #2276.6). */}
+      {preparation !== undefined && !showEverything && !sources && (
+        <PreparationBlock subjectId={id} view={preparationView(preparation)} />
+      )}
+      {sources && showStart && !showEverything && (
+        <StartHere
+          unit={firstRow ? { ordinal: firstRow.unit.ordinal, title: firstRow.unit.title, covers: firstRow.unit.covers } : null}
+          topic={startTopic}
+          draftedName={sources.start.topic?.name ?? null}
+          subjectId={id}
+          lesson={startPiece ? { pieceId: startPiece.id, title: startPiece.title } : null}
+          lessonPending={startPieces !== null && startPieces.length === 0}
+        />
+      )}
+      {!showEverything &&
+        branchRuns.map((b) => (
+          <PreparationBlock key={b.key} subjectId={id} view={b.view} branch={{ key: b.key, name: b.name }} />
+        ))}
+      {offer && !showEverything && <DirectionOffer subjectId={id} offer={offer} />}
 
       {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
       {units.length === 0 ? (
-        <WriteCurriculum subjectId={id} />
+        // While the run is going its write_units step writes them (plan
+        // #2276.9); a run that failed before it, or a subject with none, keeps the card.
+        // #2307.4: the card is offered only when the run failed before writing them.
+        comingAt ? (
+          <CurriculumComing {...comingAt} />
+        ) : (
+          offersWriteCurriculum(preparation) && <WriteCurriculum subjectId={id} />
+        )
       ) : (
         !showEverything &&
         (plan ? (
@@ -496,16 +562,24 @@ export default async function SubjectPage({
         ))
       )}
 
+      {sourceList && !showEverything && (
+        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} />
+      )}
+      {/* One press feeds the bank the preparation reads (plan #2307.4). */}
+      {!showEverything && <AddSource subjectId={id} />}
+
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
       <GoalForm subjectId={subject.id} />
 
       <ChatLearningSection learning={learning} timezone={settings.timezone} />
 
-      {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
-
-      <PullArticles />
-      <PullCourse />
+      {/* YouTube channels stay, folded away as a secondary line (plan #2307.4). */}
+      {channels && (
+        <SectionFold title="YouTube channels" defaultOpen={false} className="mt-6">
+          <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} folded />
+        </SectionFold>
+      )}
     </PageColumn>
   );
 }

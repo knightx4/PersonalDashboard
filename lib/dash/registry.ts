@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { ASK_TOOLS, IN_APP_ONLY_TOOLS } from '@/lib/ask/tools';
 import { PROPOSAL_TOOLS } from '@/lib/ask/propose';
 import type { ChangeDeps } from '@/lib/ask/changes';
-import type { AskContext, AskRow } from '@/lib/ask/db';
+import type { AskContext, AskDb, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
 import { CHART_TOOL } from '@/lib/talk/chart';
@@ -10,6 +10,9 @@ import { CAPTURE_TABLE, CAPTURE_TOOLS } from './capture-tools';
 import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
 import type { FetchOutcome } from '@/lib/jobs/ats';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
+import type { ModuleId } from '@/lib/modules';
+import { PAID_TOOLS } from './paid-tools';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -30,10 +33,11 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
  *             moved or ticked off, a goal or a step added, a step closed,
  *             an item marked returned, a note on a role.
  *
- * Only a watch on a price is still a proposal (propose_watch): it reads a
+ * Two things are still proposals. A watch on a price (propose_watch) reads a
  * page outside the app every hour, and what acts outside the app waits for
- * the person. The other three proposals became the writes add_todo,
- * add_goal_step and mark_returned.
+ * the person. A build on a plan step (propose_build, plan #2106.1) starts a
+ * session that cannot be undone. The other three proposals became the writes
+ * add_todo, add_goal_step and mark_returned.
  *
  * The lookup and proposal code stays where it is: this file lists the tools
  * and does not run them. A write tool is different, since what it does is
@@ -52,11 +56,22 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
  * tools on `goals.captures`: offered only to the capture box, which files
  * each one as the model makes it.
  *
+ * A paid tool (plan #2228.1) presses a button that spends money, and only
+ * once the person approves it. Calling one runs nothing: lib/dash/paid.ts
+ * checks the input with `prepare`, prices it from the button's key in
+ * PAID_ACTIONS, and keeps it as a proposed `paid_action` row in
+ * core.dash_actions. Approving runs `run`, which calls the function the
+ * button's server action calls (`runs` names it, and paid-actions.test.ts
+ * checks both reach it). Offered in Ask and in threads, never on the
+ * connector, which has no card to approve on.
+ *
+ *   paid      queues a paid press for an approval (lib/dash/paid-tools.ts).
+ *
  * `answer` is not here. It is how the loop ends a turn, not something Dash
  * can do, and the loop adds it after a surface's tools.
  */
 
-export type DashToolKind = 'lookup' | 'proposal' | 'handoff' | 'write';
+export type DashToolKind = 'lookup' | 'proposal' | 'handoff' | 'write' | 'paid';
 
 type DashToolBase = {
   name: string;
@@ -177,12 +192,75 @@ export type DashWriteTool<R = DashWriteResult | DashRecordedWrite> = DashToolBas
   undo?: (ctx: AskContext, action: DashAction) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
-export type DashTool = DashLookupTool | DashProposalTool | DashHandoffTool | DashWriteTool;
+/** What a paid tool's check is given: the person's context and the rows Dash has seen. */
+export type DashPaidCheckContext = AskContext & {
+  seen: (table: string, ref: string) => boolean;
+};
+
+/** A paid press checked and ready to queue, or the sentence saying why not. */
+export type DashPaidPrepared =
+  | {
+      ok: true;
+      /** What `run` will be handed, kept in the item's input. */
+      args: Record<string, unknown>;
+      /** What the card's line says the press will do, naming Dash. */
+      line: string;
+      /** How many units a per-unit press works on; absent for one priced per run. */
+      count?: number;
+      /** The pages to revalidate once it has run. */
+      paths: string[];
+    }
+  | { ok: false; error: string };
+
+/** What a paid tool's run is given at the approval: the person's settings and their own clients. */
+export type DashPaidRunContext = {
+  userId: string;
+  timezone: string;
+  /** YYYY-MM-DD in that timezone. */
+  today: string;
+  enabledModules: readonly ModuleId[];
+  db: AskDb;
+  now: Date;
+};
+
+/** What a press did once it ran, in the shape core.dash_actions keeps for a done row. */
+export type DashPaidRan =
+  | {
+      ok: true;
+      /** `schema.table:id`, the row the press wrote. */
+      subjectRef: string;
+      op: DashActionOp;
+      /** The sentence the person reads for it, naming Dash. */
+      summary: string;
+    }
+  | { ok: false; error: string };
+
+export type DashPaidTool = DashToolBase & {
+  kind: 'paid';
+  /** Never on the connector: approving needs the card. */
+  inAppOnly: true;
+  /** The button's key in PAID_ACTIONS: the estimate is priced from it, and its action is the one it stands for. */
+  action: PaidAction;
+  /**
+   * The function the button's action and `run` both call, as `file#export`
+   * from the repository root. paid-actions.test.ts checks that both reach it,
+   * so Dash never carries a second copy of what the button does.
+   */
+  runs: string;
+  /** The workspace it runs in, which has to be on to queue or approve it; null for none. */
+  workspace: ModuleId | null;
+  /** Checks the input as the button's action would, and says what the press will do. Never throws. */
+  prepare: (ctx: DashPaidCheckContext, input: unknown) => Promise<DashPaidPrepared>;
+  /** Runs the press through `runs`, as the person. May throw; the approval catches it. */
+  run: (ctx: DashPaidRunContext, args: Record<string, unknown>) => Promise<DashPaidRan>;
+};
+
+export type DashTool = DashLookupTool | DashProposalTool | DashHandoffTool | DashWriteTool | DashPaidTool;
 
 const IN_APP = new Set<string>(IN_APP_ONLY_TOOLS);
 
 /** The proposals still offered: the rest became writes (plan #1440). */
-const REGISTERED_PROPOSALS = new Set<string>(['propose_watch']);
+const REGISTERED_PROPOSALS = new Set<string>(['propose_watch', 'propose_build', 'propose_delete']);
 
 /** The tools in the order the model is sent them, which keeps the cached prefix stable. */
 export const DASH_TOOLS: readonly DashTool[] = [
@@ -200,6 +278,7 @@ export const DASH_TOOLS: readonly DashTool[] = [
   ...PROPOSAL_TOOLS.filter((definition) => REGISTERED_PROPOSALS.has(definition.name)).map(
     (definition): DashProposalTool => ({ name: definition.name, kind: 'proposal', definition }),
   ),
+  ...PAID_TOOLS,
   { name: HAND_OFF_TOOL.name, kind: 'handoff', definition: HAND_OFF_TOOL },
 ];
 
@@ -229,7 +308,7 @@ export const ASK_DASH_TOOLS: readonly DashTool[] = DASH_TOOLS.filter((tool) => o
 
 /**
  * The tools a thread on a row of `table` offers (plan #1465): every lookup,
- * every write, and the row's own tools. Not the watch proposal or Ask's
+ * every write, every paid tool (plan #2228.1), and the row's own tools. Not the watch proposal or Ask's
  * hand-off, which keep what they start in an Ask conversation a thread does
  * not have, and not the chart (plan #1655), which is drawn from the tool
  * calls an Ask answer keeps and a thread's reply does not.
@@ -237,7 +316,10 @@ export const ASK_DASH_TOOLS: readonly DashTool[] = DASH_TOOLS.filter((tool) => o
 export function threadDashTools(table: string): DashTool[] {
   return DASH_TOOLS.filter(
     (tool) =>
-      (tool.kind === 'lookup' || tool.kind === 'write' || (tool.kind === 'handoff' && tool.subjects)) &&
+      (tool.kind === 'lookup' ||
+        tool.kind === 'write' ||
+        tool.kind === 'paid' ||
+        (tool.kind === 'handoff' && tool.subjects)) &&
       tool.name !== CHART_TOOL &&
       offeredOn(tool, table),
   );

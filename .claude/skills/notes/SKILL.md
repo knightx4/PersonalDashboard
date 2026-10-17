@@ -195,8 +195,8 @@ group counts as one note.
    the code disproves is moved. Move it:
 
    1. File an idea from the note's own words, with the note's module, and
-      `source = 'me'`. The person wrote it, so the hold on session-filed ideas
-      and the limit of two an hour do not apply. `plan.ts idea` writes
+      `source = 'me'`. The person wrote it, so the score threshold on
+      session-filed ideas and the limit of three a day do not apply. `plan.ts idea` writes
       `source = 'claude'` and is held to both, so insert the row by hand
       (below). Add a line after the text saying what you found
       that makes it bigger, such as "Needs a new table and a new screen."
@@ -495,8 +495,8 @@ above. Name the law in the subject: `Make scrolled lists lists, not cards
 
 `check:ui` reads zero on plenty of surfaces that read badly, so a fix that
 touches a screen goes through the critic before it closes. This is the same
-loop the plan's building reference states under **Building a screen**
-(`.claude/skills/plan/reference/building.md`), which has the commands, and it
+loop the plan's screen reference states
+(`.claude/skills/plan/reference/screen.md`), which has the commands, and it
 applies to any note whose fix changes a surface, not only notes filed from the
 gallery:
 

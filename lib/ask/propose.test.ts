@@ -83,9 +83,11 @@ const GOAL = (n: number): [string, string] => ['goals.items', id(n)];
 const ITEM = (n: number): [string, string] => ['public.inventory_items', id(n)];
 
 describe('executeProposal', () => {
-  it('offers exactly the four tools', () => {
+  it('offers exactly the six tools', () => {
     expect(PROPOSAL_TOOLS.map((t) => t.name)).toEqual([...PROPOSAL_TOOL_NAMES]);
-    expect(PROPOSAL_TOOL_NAMES).toEqual(['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch']);
+    // propose_delete is tested in propose-delete.test.ts (plan #2232.1).
+    // propose_build is tested in propose-build.test.ts (plan #2106.1).
+    expect(PROPOSAL_TOOL_NAMES).toEqual(['propose_todo', 'propose_goal_step', 'propose_returned', 'propose_watch', 'propose_build', 'propose_delete']);
   });
 
   it('refuses a kind outside the four', async () => {
@@ -93,7 +95,7 @@ describe('executeProposal', () => {
     const result = await executeProposal('propose_delete_todo', {}, ctx);
     expect(result).toEqual({
       ok: false,
-      error: 'There is no tool called propose_delete_todo. You can propose only a todo, a goal step, a return or a watch.',
+      error: 'There is no tool called propose_delete_todo. You can propose only a todo, a goal step, a return, a watch, a build or a delete.',
     });
     expect(kept).toEqual([]);
   });

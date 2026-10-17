@@ -47,7 +47,7 @@ export default function HomePage() {
 
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
         <Link href="/" className={cn(PRESS_AREA, 'flex items-center gap-2.5')}>
-          <ModuleMark module={null} size="md" />
+          <ModuleMark module="dash" size="md" />
           <span className={cn('text-body font-semibold tracking-tight whitespace-nowrap', s.ink)}>
             Dash
           </span>
@@ -165,7 +165,7 @@ export default function HomePage() {
                   </div>
 
                   <div className={cn(s.ask, 'mt-4 flex items-center gap-2.5 px-3 py-2')}>
-                    <ModuleMark module={null} size="xs" />
+                    <ModuleMark module="dash" size="xs" />
                     <span className={cn(s.ghost, 'text-ui')}>Ask Dash about anything in here</span>
                   </div>
                 </div>
@@ -246,7 +246,7 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="mt-4 flex gap-3">
-                <ModuleMark module={null} size="sm" />
+                <ModuleMark module="dash" size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className={cn(s.muted, 'text-ui leading-relaxed')}>
                     Three. You last heard from each of these on the date shown.
@@ -343,7 +343,7 @@ export default function HomePage() {
       <footer className={s.divider}>
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-ui sm:px-6">
           <span className={cn(s.ghost, 'flex items-center gap-2')}>
-            <ModuleMark module={null} size="xs" />
+            <ModuleMark module="dash" size="xs" />
             Dash
           </span>
           <nav className="flex gap-5">
@@ -497,7 +497,7 @@ function Connections({ byId }: { byId: (id: ModuleId) => AppModule }) {
             ))}
           </div>
           <div className={cn(s.dashRow, 'mt-4 flex items-center gap-3 p-3')}>
-            <ModuleMark module={null} size="sm" />
+            <ModuleMark module="dash" size="sm" />
             <p className={cn(s.muted, 'text-small leading-relaxed')}>
               <span className={cn(s.ink, 'font-semibold')}>Dash</span> reads across all of them
               and links every answer to where it came from.

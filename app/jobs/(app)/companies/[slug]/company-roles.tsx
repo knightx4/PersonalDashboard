@@ -70,7 +70,7 @@ export function CompanyRoles({
                       {todo.role.title}
                     </Link>
                   )}
-                  <ReminderActions id={todo.id} />
+                  <ReminderActions id={todo.id} title={todo.body} />
                 </li>
               ))}
             </ul>

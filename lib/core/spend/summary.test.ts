@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  byModule,
   monthStart,
   rollUp,
   sinceLocalDate,
   tokensOf,
+  sumOf,
   totalOf,
+  type FunctionTotal,
   type SpendRow,
 } from './summary';
 
@@ -113,5 +116,31 @@ describe('this month', () => {
 
     expect(sinceLocalDate(rows, '2026-09-01', inAuckland)).toHaveLength(2);
     expect(sinceLocalDate(rows, '2026-09-01', inLondon)).toHaveLength(1);
+  });
+});
+
+describe('by module', () => {
+  const fn = (module: string, operation: string, micros: number, calls = 1, unpriced = 0): FunctionTotal => ({
+    module,
+    operation,
+    micros,
+    calls,
+    unpriced,
+  });
+
+  it('adds each module up and puts the dearest first, inside and out', () => {
+    const modules = byModule([
+      fn('learn', 'plan-topic', 100, 2),
+      fn('jobs', 'score', 5000, 10, 1),
+      fn('learn', 'lesson', 900, 3, 2),
+    ]);
+    expect(modules.map((m) => m.module)).toEqual(['jobs', 'learn']);
+    expect(modules[1]).toMatchObject({ calls: 5, micros: 1000, unpriced: 2 });
+    expect(modules[1].functions.map((f) => f.operation)).toEqual(['lesson', 'plan-topic']);
+  });
+
+  it('sums to the same all-time total as the functions it groups', () => {
+    const functions = [fn('learn', 'a', 1, 1), fn('jobs', 'b', 2, 2, 1), fn('core', 'c', 3, 3)];
+    expect(sumOf(byModule(functions))).toEqual(sumOf(functions));
   });
 });

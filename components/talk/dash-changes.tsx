@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { closedToast } from '@/lib/core/lifecycle';
+import { useMemo, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,9 @@ import {
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
+import { DELETE_NOUNS } from '@/lib/ask/deletable';
+import { DeleteDialog } from './delete-dialog';
+import { PaidCard, type PaidChange } from './paid-card';
 
 /**
  * The changes Dash made or proposed in one answer, drawn under it (plan
@@ -39,7 +43,11 @@ export type ChangePresses = {
   undo: (id: string) => Promise<ChangeOutcome>;
 };
 
-/** One answer's changes, as one sunken panel with a rule between rows. */
+/**
+ * One answer's changes, as one sunken panel with a rule between rows. What
+ * costs money is gathered on its own card under them (plan #2228.2), with
+ * one Accept all, so the free rows keep their own Confirm and Undo.
+ */
 export function DashChanges({
   changes,
   presses,
@@ -52,19 +60,27 @@ export function DashChanges({
   /** YYYY-MM-DD, so a due date this year leaves the year off. */
   today?: string;
 }) {
+  // Kept by identity, so the card's own state is reset only by a newer list.
+  const paid = useMemo(() => changes.filter((change): change is PaidChange => change.kind === 'paid_action'), [changes]);
   if (changes.length === 0) return null;
-  const verb = changes.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
+  const free = changes.filter((change) => change.kind !== 'paid_action');
+  const verb = free.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
   return (
-    <ul
-      aria-label={changes.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
-      className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
-    >
-      {changes.map((change) => (
-        <li key={change.id} className="py-2.5">
-          <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
-        </li>
-      ))}
-    </ul>
+    <>
+      {free.length > 0 && (
+        <ul
+          aria-label={free.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
+          className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
+        >
+          {free.map((change) => (
+            <li key={change.id} className="py-2.5">
+              <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {paid.length > 0 && <PaidCard changes={paid} presses={presses} onChanged={onChanged} />}
+    </>
   );
 }
 
@@ -92,6 +108,8 @@ export function DashChangeRow({
   const [change, setChange] = useState(given);
   const [error, setError] = useState<string | null>(null);
   const [pressing, setPressing] = useState<Press | null>(null);
+  // The "Are you sure?" popup of a proposed delete (plan #2232.2).
+  const [confirming, setConfirming] = useState(false);
   const [, startPress] = useTransition();
   const toast = useToast();
 
@@ -116,10 +134,11 @@ export function DashChangeRow({
         onChanged?.(next);
       }
       if (!outcome.ok) setError(outcome.error);
+      if (outcome.ok) setConfirming(false);
       const reopen = presses.reopen;
       if (outcome.ok && which === 'decline' && reopen) {
         toast({
-          text: 'Declined',
+          text: closedToast('declined', words.what),
           undo: async () => {
             const back = await reopen(change.id);
             if (!back.ok) throw new Error(back.error);
@@ -164,6 +183,15 @@ export function DashChangeRow({
         </p>
       )}
 
+      {change.kind === 'start_build' && change.status === 'proposed' && (
+        <p className="text-small text-ink-muted">
+          {change.input.quiet
+            ? 'Confirm writes off its quiet last run and starts a new session now.'
+            : 'Confirm starts a session on this step now.'}{' '}
+          It cannot be undone.
+        </p>
+      )}
+
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -171,9 +199,18 @@ export function DashChangeRow({
             size="sm"
             pending={pressing === 'confirm'}
             disabled={pressing !== null}
-            onClick={() => press('confirm')}
+            onClick={() => {
+              if (change.kind === 'delete_rows') {
+                setError(null);
+                setConfirming(true);
+              } else press('confirm');
+            }}
           >
-            {pressing === 'confirm' ? 'Writing…' : 'Confirm'}
+            {pressing === 'confirm' && !confirming
+              ? change.kind === 'start_build'
+                ? 'Starting…'
+                : 'Writing…'
+              : 'Confirm'}
           </Button>
           <CloseButton
             lifecycle="declined"
@@ -190,28 +227,46 @@ export function DashChangeRow({
           <ChangeStatus change={change} />
           <Link
             href={changeHref(change)}
-            className={`${linkVariants({ tone: 'inline' })} text-small`}
+            className={`${linkVariants({ tone: 'inline' })} press-area text-small`}
           >
             {changeWhere(change)}
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="-ml-1"
-            pending={pressing === 'undo'}
-            disabled={pressing !== null}
-            onClick={() => press('undo')}
-          >
-            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {pressing === 'undo' ? 'Undoing…' : 'Undo'}
-          </Button>
+          {/* A started build cannot be taken back (plan #2106.1). */}
+          {change.kind !== 'start_build' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="-ml-1"
+              pending={pressing === 'undo'}
+              disabled={pressing !== null}
+              onClick={() => press('undo')}
+            >
+              <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pressing === 'undo' ? 'Undoing…' : 'Undo'}
+            </Button>
+          )}
         </div>
       )}
 
       {settled && <ChangeStatus change={change} />}
 
-      <FieldError>{error}</FieldError>
+      {change.kind === 'delete_rows' && change.status === 'proposed' && confirming && (
+        <DeleteDialog
+          count={change.input.count}
+          titles={change.input.titles}
+          noun={DELETE_NOUNS[change.input.table]}
+          pending={pressing === 'confirm'}
+          error={error}
+          onDelete={() => press('confirm')}
+          onCancel={() => {
+            setError(null);
+            setConfirming(false);
+          }}
+        />
+      )}
+
+      {!confirming && <FieldError>{error}</FieldError>}
     </div>
   );
 }

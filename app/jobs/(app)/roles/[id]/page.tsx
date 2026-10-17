@@ -1,3 +1,4 @@
+import { marksFromRow } from '@/lib/jobs/application-marks';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -36,7 +37,12 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
-import { loadThread } from '@/lib/thread/store';
+import { loadThread, loadThreads } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
+import { loadDrafts } from '@/lib/jobs/drafting/store';
+import { coverLetterView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
+import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
+import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 
@@ -60,6 +66,11 @@ import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 import { PageColumn } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Role' };
+
+// Drafting a whole application (draftApplication in ../actions.ts) runs one
+// Opus call over everything on file, and a second to shorten any answer over
+// its limit, in this page's server actions.
+export const maxDuration = 300;
 
 /**
  * The page you actually live in: the posting, the requirement map, the
@@ -117,7 +128,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, needs_review, created_by, cover_letter, referral_contact_id`,
+       excitement, needs_review, created_by, cover_letter, ready_to_apply, all_questions_added, has_cover_letter, referral_contact_id`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -160,6 +171,8 @@ export default async function RoleDetailPage({
     { data: companyContacts },
     { data: bank },
     { data: allCompanies },
+    { drafts: storedDrafts },
+    { drafts: storedLetter },
   ] = await Promise.all([
     supabase
       .from('application_events')
@@ -207,7 +220,7 @@ export default async function RoleDetailPage({
       )
       .eq('resulting_application_id', current.id)
       .order('received_at', { ascending: false }),
-    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase.from('profiles').select('timezone, banned_constructions').eq('id', user.id).single(),
     supabase
       .from('reminders')
       .select('id, body, due_at, ingested_message_id')
@@ -234,6 +247,11 @@ export default async function RoleDetailPage({
     supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
     // Every company on file, to move this role to the right one by name.
     supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
+    // Dash's drafts of the answers and its questions back, kept between
+    // visits (plan #2130.4). A failed read shows the tab without them.
+    loadDrafts(supabase, current.id as string, 'answers'),
+    // The cover letter Dash drafted and its questions about it (plan #2135.2).
+    loadDrafts(supabase, current.id as string, 'cover_letter'),
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -256,6 +274,14 @@ export default async function RoleDetailPage({
         .select('group_id, message_id')
         .in('group_id', groupIds)
     : { data: [] };
+
+  // The threads under each answer and under the cover letter (note
+  // be3c6616): a second read too, since the answer ids come out of the batch.
+  // A failed read leaves the threads empty rather than the page.
+  const answerThreads = await loadThreads(supabase, [
+    ...(answers ?? []).map((answer) => threadRef('answer', answer.id as string)),
+    threadRef('application', current.id as string),
+  ]).catch(() => new Map());
 
   const messageIdsByGroup = new Map<string, string[]>();
   for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
@@ -376,6 +402,7 @@ export default async function RoleDetailPage({
           everSubmitted: current.submitted_at !== null,
           closedOn: current.closed_at ? formatDateInline(current.closed_at as string, timezone) : null,
           interviewCount: (interviews ?? []).length,
+          allQuestionsAdded: current.all_questions_added === true,
         })
       : null;
 
@@ -576,6 +603,7 @@ export default async function RoleDetailPage({
           }
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
+          {...marksFromRow(current)}
           timezone={timezone}
           defaultTab={defaultRoleTab(status)}
           focusInterviewId={focusInterviewId ?? null}
@@ -661,9 +689,19 @@ export default async function RoleDetailPage({
               // between drafting an answer and submitting it.
               evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
               unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
+              wordLimit: (answer.word_limit as number | null) ?? null,
             };
           })}
+          answerDrafts={Object.fromEntries(
+            Object.entries(storedDrafts?.drafts ?? {}).map(([id, draft]) => [id, fromStoredDraft(draft)]),
+          )}
+          dashAsks={storedDrafts?.asks ?? []}
+          coverLetterDraft={coverLetterView(
+            storedLetter ? { drafts: storedLetter.drafts, asks: storedLetter.asks } : null,
+            bannedOrDefault(profile?.banned_constructions),
+          )}
           thread={notes ?? []}
+          answerThreads={Object.fromEntries(answerThreads)}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
             id: group.id as string,
             label: (group.label as string | null) ?? null,
@@ -713,4 +751,10 @@ function debriefDue(iso: string | null): boolean {
   const scheduledAt = new Date(iso).getTime();
   const now = Date.now();
   return scheduledAt < now && scheduledAt >= now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
+}
+
+/** The person's banned constructions, or the defaults the drafter uses when they have set none. */
+function bannedOrDefault(value: unknown): string[] {
+  const own = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+  return own.length > 0 ? own : [...DEFAULT_BANNED_CONSTRUCTIONS];
 }

@@ -3,24 +3,39 @@
 import { useState, useTransition } from 'react';
 import { CheckCircle2, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card, CardSection } from '@/components/ui/card';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { ProseAtRest } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Textarea } from '@/components/ui/field';
+import { CheckRow, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
+import { answerLimit } from '@/lib/jobs/drafting/limits';
+import type { StoredAsk } from '@/lib/jobs/drafting/store';
 import {
   addQuestions,
   draftAnswerFromEvidence,
+  draftApplication,
+  dropAnswerDraft,
   promoteToCanonical,
+  removeAnswer,
   saveAnswer,
+  saveAnswerReplies,
   saveDraftedAnswer,
+  type DraftApplicationResult,
 } from '../actions';
-import { saveCoverLetter } from './actions';
-import { PaidHint } from '@/components/ui/paid-hint';
-import { LinkedText } from '@/components/ui/linked-text';
+import { saveApplicationMarks } from './actions';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
+import { CopyText } from './copy-text';
+import { CoverLetter } from './cover-letter';
 import { roleStage } from '@/lib/jobs/role-stage';
+import { DashQuestions } from './dash-questions';
+import { DraftPanel, LimitCount, countOf } from './draft-panel';
 import type { PanelProps } from './types';
 
 export function Answers({
@@ -28,7 +43,16 @@ export function Answers({
   applicationId,
   roleId,
   coverLetter,
+  readyToApply,
+  allQuestionsAdded,
+  hasCoverLetter,
   status,
+  answerDrafts,
+  dashAsks,
+  draftRun,
+  coverLetterDraft,
+  coverLetterRun,
+  answerThreads,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
   // as a record, but adding questions and drafting from the bank are folded
@@ -38,9 +62,85 @@ export function Answers({
   const [pasting, setPasting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Held here so saving an inserted letter can turn the Cover letter mark to
+  // Yes above it (plan #2135.2).
+  const [letterMark, setLetterMark] = useState(hasCoverLetter);
+
+  // Dash's drafts and questions live here, above the cards, so one run can
+  // fill every card and the questions panel at once (plan #2130.4). The run
+  // is not a transition: the cards stay usable for the minute or two it takes.
+  const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>(answerDrafts);
+  const [asks, setAsks] = useState<StoredAsk[]>(dashAsks);
+  const [running, setRunning] = useState(draftRun?.pending ?? false);
+  const [runError, setRunError] = useState<string | null>(draftRun?.error ?? null);
+  const [runNote, setRunNote] = useState<string | null>(null);
+
+  const questionText = new Map(answers.map((answer) => [answer.id, answer.questionText]));
+
+  /** Takes in what a run stored; returns the error to show, or null. */
+  function apply(result: DraftApplicationResult): string | null {
+    if (result.error || !result.drafts) return result.error ?? 'Nothing came back.';
+    const stored = result.drafts;
+    setDrafts(
+      Object.fromEntries(
+        Object.entries(stored.drafts)
+          .filter(([id]) => questionText.has(id))
+          .map(([id, draft]) => [id, fromStoredDraft(draft)]),
+      ),
+    );
+    setAsks(stored.asks);
+    const parts = [`Drafted ${countOf(result.drafted.length, 'answer', 'answers')}.`];
+    if (result.flagged.length > 0) {
+      parts.push(
+        `${result.flagged.length === 1 ? 'One is' : `${result.flagged.length} are`} still over the limit.`,
+      );
+    }
+    if (result.missing.length > 0) {
+      parts.push(
+        `No draft came back for ${countOf(result.missing.length, 'question', 'questions')}.`,
+      );
+    }
+    setRunNote(parts.join(' '));
+    return null;
+  }
+
+  async function run(input: { answerIds?: string[]; replies?: Record<string, string> }) {
+    setRunning(true);
+    setRunError(null);
+    setRunNote(null);
+    try {
+      return apply(await draftApplication({ applicationId, ...input }));
+    } catch {
+      return 'Drafting stopped before it finished. Try again.';
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function draftAll() {
+    setRunError(await run({}));
+  }
+
+  // Redraft redoes the drafts on screen and the answers Dash asked about, now
+  // with the replies. With none of either, it is a full run.
+  async function redraft(replies: Record<string, string>) {
+    const ids = new Set(Object.keys(drafts));
+    for (const ask of asks) if (ask.answer_id) ids.add(ask.answer_id);
+    const answerIds = [...ids].filter((id) => questionText.has(id));
+    return run({ answerIds: answerIds.length > 0 ? answerIds : undefined, replies });
+  }
 
   return (
     <div className="space-y-4">
+      <ApplicationMarks
+        applicationId={applicationId}
+        roleId={roleId}
+        closed={closed}
+        initialReady={readyToApply}
+        initialAllQuestions={allQuestionsAdded}
+        letter={letterMark}
+        onLetter={setLetterMark}
+      />
       {/* The panel is the answers. Adding questions is something you do to it
           now and then, and it used to be a four-row textarea sitting above
           them on every visit -- the first thing on a page you came to read.
@@ -94,11 +194,63 @@ export function Answers({
       ) : (
         answers.length > 0 &&
         !closed && (
-          <div className="flex flex-wrap items-center gap-3">
-            <AddTrigger label="Add more questions" onClick={() => setPasting(true)} />
-            {message && <span className="text-small text-ink-muted">{message}</span>}
+          <div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <DashAction
+                type="button"
+                size="sm"
+                variant="secondary"
+                pending={running}
+                disabled={running}
+                paid="app/jobs/(app)/roles/actions.ts#draftApplication"
+                what="Cost of drafting every answer"
+                onClick={() => void draftAll()}
+              >
+                {running ? 'Drafting…' : 'Draft all answers'}
+              </DashAction>
+              <AddTrigger label="Add more questions" onClick={() => setPasting(true)} />
+            </div>
+            {running ? (
+              <Note role="status" className="mt-2 px-3 py-2 text-small text-ink-muted">
+                Dash is drafting each answer, which takes a minute or two. You can keep working
+                below.
+              </Note>
+            ) : runError ? (
+              <p role="alert" className="mt-1.5 text-small text-danger">
+                Drafting failed: {runError}
+              </p>
+            ) : (
+              (runNote || message) && (
+                <p role="status" className="mt-1.5 text-small text-ink-muted">
+                  {[runNote, message].filter(Boolean).join(' ')}
+                </p>
+              )
+            )}
           </div>
         )
+      )}
+
+      {!closed && asks.length > 0 && (
+        <DashQuestions
+          asks={asks}
+          aboutLabel={(answerId) => {
+            if (answerId === null) return 'About the whole application';
+            const question = questionText.get(answerId);
+            return question ? `For “${question}”` : 'For a question no longer on this application';
+          }}
+          onSaveReply={async (askId, reply) => {
+            const result = await saveAnswerReplies({ applicationId, replies: { [askId]: reply } });
+            if (!result.error) {
+              setAsks((before) =>
+                before.map((ask) => (ask.id === askId ? { ...ask, reply: reply || null } : ask)),
+              );
+            }
+            return result.error;
+          }}
+          onRedraft={redraft}
+          redraftPaid="app/jobs/(app)/roles/actions.ts#draftApplication"
+          busy={running}
+        />
       )}
 
       {answers.length === 0 ? (
@@ -125,96 +277,176 @@ export function Answers({
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} closed={closed} />
+            <AnswerCard
+              key={answer.id}
+              answer={answer}
+              closed={closed}
+              thread={answerThreads?.[threadRef('answer', answer.id)] ?? []}
+              draft={drafts[answer.id] ?? null}
+              onDraftChange={(draft) =>
+                setDrafts((before) => {
+                  const next = { ...before };
+                  if (draft) next[answer.id] = draft;
+                  else delete next[answer.id];
+                  return next;
+                })
+              }
+              onAsks={setAsks}
+            />
           ))}
         </div>
       )}
 
       {/* Keyed on the text so a letter Dash writes from the Comments tab
-          replaces what this box holds rather than sitting behind it. */}
-      <CoverLetter
-        key={coverLetter}
-        applicationId={applicationId}
-        roleId={roleId}
-        initial={coverLetter}
-      />
+          replaces what this box holds rather than sitting behind it. Marked
+          No, the application takes no letter, so there is none to write
+          (note 67df30d0); pressing No again brings it back. */}
+      {letterMark !== false && (
+        <CoverLetter
+          key={coverLetter}
+          applicationId={applicationId}
+          roleId={roleId}
+          initial={coverLetter}
+          closed={closed}
+          initialDraft={coverLetterDraft}
+          initialRun={coverLetterRun}
+          onMarkedYes={() => setLetterMark(true)}
+          thread={answerThreads?.[threadRef('application', applicationId)] ?? []}
+        />
+      )}
     </div>
   );
 }
 
 /**
- * The cover letter sent with this application (note b4cecf70), under the
- * answers because it is part of the same submission. Read as prose and edited
- * in place, as an answer is.
+ * Two marks you keep on the application: ready to apply, and whether it has a
+ * cover letter (plan #2102.2). The cover letter answer is yours, separate from
+ * the text below it. Pressing the pressed answer again clears it. Each press
+ * saves at once; a closed application shows them without the controls.
  */
-function CoverLetter({
+function ApplicationMarks({
   applicationId,
   roleId,
-  initial,
+  closed,
+  initialReady,
+  initialAllQuestions,
+  letter,
+  onLetter: setLetter,
 }: {
   applicationId: string;
   roleId: string;
-  initial: string;
+  closed: boolean;
+  initialReady: boolean;
+  initialAllQuestions: boolean;
+  /** The Cover letter mark, held by the tab so saving an inserted letter can set it. */
+  letter: boolean | null;
+  onLetter: (letter: boolean | null) => void;
 }) {
-  const [text, setText] = useState(initial);
-  const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [ready, setReady] = useState(initialReady);
+  const [allQuestions, setAllQuestions] = useState(initialAllQuestions);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  function save(
+    marks: { readyToApply?: boolean; allQuestionsAdded?: boolean; hasCoverLetter?: boolean | null },
+    revert: () => void,
+  ) {
+    setError(null);
+    startTransition(async () => {
+      const result = await saveApplicationMarks({ applicationId, roleId, ...marks });
+      if (result.error) {
+        revert();
+        setError(result.error);
+      }
+    });
+  }
+
+  function pressLetter(answer: boolean) {
+    const before = letter;
+    const next = before === answer ? null : answer;
+    setLetter(next);
+    save({ hasCoverLetter: next }, () => setLetter(before));
+  }
+
+  if (closed) {
+    return (
+      <Card padding="dense">
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-ui text-ink-muted">
+          <span className="whitespace-nowrap">
+            {ready ? 'Marked ready to apply' : 'Not marked ready to apply'}
+          </span>
+          <span className="whitespace-nowrap">
+            {allQuestions ? 'All questions added' : 'Not all questions added'}
+          </span>
+          <span className="whitespace-nowrap">
+            {letter === null
+              ? 'Cover letter not answered'
+              : letter
+                ? 'Has a cover letter'
+                : 'No cover letter'}
+          </span>
+        </p>
+      </Card>
+    );
+  }
+
   return (
-    <CardSection title="Cover letter">
-      {editing ? (
-        <Textarea
-          rows={12}
-          value={text}
-          autoFocus
-          aria-label="Cover letter"
-          onChange={(event) => setText(event.target.value)}
+    <Card padding="dense">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+        <CheckRow
+          title="Ready to apply"
+          className="items-center"
+          checked={ready}
+          disabled={pending}
+          onChange={(event) => {
+            const before = ready;
+            const next = event.target.checked;
+            setReady(next);
+            save({ readyToApply: next }, () => setReady(before));
+          }}
         />
-      ) : (
-        <ProseAtRest
-          text={text}
-          onEdit={() => setEditing(true)}
-          title="Edit the cover letter"
-          empty="No cover letter yet."
+        <CheckRow
+          title="All questions added"
+          className="items-center"
+          checked={allQuestions}
+          disabled={pending}
+          onChange={(event) => {
+            const before = allQuestions;
+            const next = event.target.checked;
+            setAllQuestions(next);
+            save({ allQuestionsAdded: next }, () => setAllQuestions(before));
+          }}
         />
-      )}
-      {(editing || saved) && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {editing && (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await saveCoverLetter({ applicationId, roleId, body: text });
-                    setSaved(result.error ?? 'Saved.');
-                    if (!result.error) setEditing(false);
-                  })
-                }
-              >
-                Save
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  setText(initial);
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </>
-          )}
-          {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        <div role="group" aria-label="Has a cover letter" className="flex items-center gap-2">
+          <span className="text-ui text-ink">Cover letter</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === true}
+            disabled={pending}
+            onClick={() => pressLetter(true)}
+          >
+            Yes
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            pressed={letter === false}
+            disabled={pending}
+            onClick={() => pressLetter(false)}
+          >
+            No
+          </Button>
         </div>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {error}
+        </p>
       )}
-    </CardSection>
+    </Card>
   );
 }
 
@@ -222,13 +454,24 @@ function CoverLetter({
 export function AnswerCard({
   answer,
   closed,
+  thread = [],
   initialDraft = null,
+  draft: heldDraft,
+  onDraftChange,
+  onAsks,
 }: {
   answer: PanelProps['answers'][number];
   /** The application has closed: no drafting from the bank. */
   closed: boolean;
+  /** The comments under this answer (note be3c6616). */
+  thread?: DevComment[];
   /** For the preview gallery: the card opens with this draft beside it. */
   initialDraft?: AnswerDraft | null;
+  /** With onDraftChange, the draft is held above the card, where Draft all answers fills it. */
+  draft?: AnswerDraft | null;
+  onDraftChange?: (draft: AnswerDraft | null) => void;
+  /** Dash's questions after this card's own draft, which may have asked something new. */
+  onAsks?: (asks: StoredAsk[]) => void;
 }) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
@@ -236,15 +479,26 @@ export function AnswerCard({
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // The draft lives here, beside the textarea, and never in it. It reaches the
+  // The draft lives beside the textarea, and never in it. It reaches the
   // answer only through Insert, and the record only through Save -- the
   // compose.ts rule: the model may prepare text, but nothing goes out over
   // your name that you did not put there.
-  const [draft, setDraft] = useState<AnswerDraft | null>(initialDraft);
+  const [ownDraft, setOwnDraft] = useState<AnswerDraft | null>(initialDraft);
+  const held = onDraftChange !== undefined;
+  const draft = held ? (heldDraft ?? null) : ownDraft;
+  const setDraft = held ? onDraftChange : setOwnDraft;
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
 
   const usingCanonical = !answer.answer && Boolean(answer.canonicalAnswer);
+  // Set on the row, or written into the question: "(140 characters)".
+  const limit = answerLimit(answer.wordLimit, answer.questionText);
+
+  // Inserted or discarded, the draft also leaves the stored drafts, so a
+  // reload does not offer it again. Best effort: the card has moved on.
+  function forget() {
+    if (held) void dropAnswerDraft({ answerId: answer.id }).catch(() => undefined);
+  }
 
   return (
     <Card padding="dense">
@@ -254,17 +508,41 @@ export function AnswerCard({
           <p className="mt-0.5 text-small text-ink-muted">
             {answer.questionKind}
             {answer.timesSeen > 1 && ` · asked ${answer.timesSeen} times`}
+            {limit && (
+              <>
+                {' · '}
+                <LimitCount text={text} limit={limit} />
+              </>
+            )}
           </p>
         </div>
-        {/* Positive rather than the offer hue: an approved answer is a thing
-            done, not a pipeline stage. */}
-        {status === 'approved' && (
-          <CheckCircle2
-            className="size-4 shrink-0 text-positive"
-            strokeWidth={1.75}
-            aria-label="Approved"
-          />
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Positive rather than the offer hue: an approved answer is a thing
+              done, not a pipeline stage. */}
+          {status === 'approved' && (
+            <CheckCircle2
+              className="size-4 shrink-0 text-positive"
+              strokeWidth={1.75}
+              aria-label="Approved"
+            />
+          )}
+          {!editing && text.trim() && <CopyText text={text} what="answer" />}
+          {/* Up here, opposite the question it removes, rather than at the end
+              of the action row, where on a phone it wrapped onto a line alone. */}
+          {!editing && (
+            <ConfirmStep
+              prompt="Take this question off the application? It stays in your bank with its default answer."
+              confirmLabel="Remove"
+              pendingLabel="Removing…"
+              onConfirm={async () => {
+                const result = await removeAnswer(answer.id);
+                if (result.error) throw new Error(result.error);
+              }}
+            >
+              Remove
+            </ConfirmStep>
+          )}
+        </div>
       </div>
 
       {usingCanonical && (
@@ -279,7 +557,11 @@ export function AnswerCard({
         live only in the session that generated it.
       */}
       {!draft && answer.unsupportedClaims.length > 0 && (
-        <Note tone="caution" className="mt-2" title="This answer states things your bank does not carry:">
+        <Note
+          tone="caution"
+          className="mt-2"
+          title="This answer states things your bank does not carry:"
+        >
           <ul className="list-disc pl-4 text-small text-ink">
             {answer.unsupportedClaims.map((claim) => (
               <li key={claim}>{claim}</li>
@@ -371,11 +653,40 @@ export function AnswerCard({
             {text.trim() ? 'Edit' : 'Write an answer'}
           </Button>
         )}
+        {!closed && (
+          <DashAction
+            type="button"
+            size="sm"
+            variant="ghost"
+            pending={drafting}
+            disabled={drafting}
+            paid="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+            what="Cost of drafting"
+            onClick={() => {
+              setDrafting(true);
+              setDraftError(null);
+              startTransition(async () => {
+                const result = await draftAnswerFromEvidence({ answerId: answer.id });
+                setDrafting(false);
+                if (result.error || !result.draft) {
+                  setDraftError(result.error ?? 'Nothing came back.');
+                  return;
+                }
+                setDraft(result.draft);
+                if (result.asks) onAsks?.(result.asks);
+              });
+            }}
+          >
+            {drafting ? 'Drafting…' : draft ? 'Draft again' : 'Draft an answer'}
+          </DashAction>
+        )}
+        {/* Last, and a link with no padding, so on a phone where it wraps it
+            starts on the card's text edge (law 18). */}
         {!editing && status === 'approved' && !answer.canonicalAnswer && (
           <Button
             type="button"
             size="sm"
-            variant="ghost"
+            variant="link"
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
@@ -387,113 +698,48 @@ export function AnswerCard({
             Make this my default answer
           </Button>
         )}
-        {!closed && (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              pending={drafting}
-              onClick={() => {
-                setDrafting(true);
-                setDraftError(null);
-                startTransition(async () => {
-                  const result = await draftAnswerFromEvidence({ answerId: answer.id });
-                  setDrafting(false);
-                  if (result.error || !result.draft) {
-                    setDraftError(result.error ?? 'Nothing came back.');
-                    return;
-                  }
-                  setDraft(result.draft);
-                });
-              }}
-            >
-              {drafting ? 'Drafting…' : 'Draft'}
-            </Button>
-            <PaidHint
-              action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-              what="Cost of drafting"
-            />
-          </>
-        )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}
       </div>
 
       {draft && (
-        // A well, not a frame. This is the one thing on the page that is not
-        // yours yet -- a machine's suggestion waiting to be inserted or thrown
-        // away -- and a recessed ground says that without adding a second
-        // border inside the answer card. Law 11: a shared ground groups.
-        <Note className="mt-3 p-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="text-small font-medium text-ink">A draft</h4>
-            <span className="text-small text-ink-muted">
-              Nothing is saved until you insert it and save.
-            </span>
-          </div>
-
-          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">
-            <LinkedText text={draft.text} />
-          </p>
-
-          <p className="mt-2 text-small text-ink-muted">
-            {draft.evidenceItemIds.length === 0
-              ? 'Draws on nothing from your bank.'
-              : `Draws on ${draft.evidenceItemIds.length === 1 ? 'one item' : `${draft.evidenceItemIds.length} items`} from your bank.`}
-          </p>
-
-          {draft.unsupportedClaims.length > 0 && (
-            <Note tone="caution" className="mt-2" title="Not grounded in anything you wrote:">
-              <ul className="list-disc pl-4 text-small text-ink">
-                {draft.unsupportedClaims.map((claim) => (
-                  <li key={claim}>{claim}</li>
-                ))}
-              </ul>
-              <p className="mt-1 text-small text-ink-muted">
-                Check each of these before it goes out, or cut it.
-              </p>
-            </Note>
-          )}
-
-          {draft.bannedFound.length > 0 && (
-            <p className="mt-2 text-small text-caution">
-              Uses {draft.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
-              list.
-            </p>
-          )}
-
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={pending}
-              onClick={() => {
-                setText(draft.text);
-                startTransition(async () => {
-                  const result = await saveDraftedAnswer({
-                    answerId: answer.id,
-                    answer: draft.text,
-                    evidenceItemIds: draft.evidenceItemIds,
-                    unsupportedClaims: draft.unsupportedClaims,
-                  });
-                  setSaved(result.error ?? 'Inserted and saved as a draft.');
-                  if (!result.error) {
-                    setStatus('draft');
-                    setDraft(null);
-                  }
-                });
-              }}
-            >
-              Insert
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(null)}>
-              Discard
-            </Button>
-          </div>
-        </Note>
+        <DraftPanel
+          className="mt-3"
+          draft={draft}
+          limit={limit}
+          pending={pending}
+          onInsert={() => {
+            setText(draft.text);
+            startTransition(async () => {
+              const result = await saveDraftedAnswer({
+                answerId: answer.id,
+                answer: draft.text,
+                evidenceItemIds: draft.evidenceItemIds,
+                unsupportedClaims: draft.unsupportedClaims,
+              });
+              setSaved(result.error ?? 'Inserted and saved as a draft.');
+              if (!result.error) {
+                setStatus('draft');
+                setDraft(null);
+                forget();
+              }
+            });
+          }}
+          onDiscard={() => {
+            setDraft(null);
+            forget();
+          }}
+        />
       )}
+      {/* Comments on this answer: a note to yourself, or @dash to ask
+          for a change (note be3c6616). */}
+      <div className="mt-3">
+        <Thread
+          subject={threadRef('answer', answer.id)}
+          turns={thread}
+          placeholder="A note on this answer, or @dash make it shorter."
+        />
+      </div>
     </Card>
   );
 }

@@ -40,9 +40,6 @@ export function toLink(row: LinkRow): Link | null {
   return { id: row.id, itemId: row.item_id, kind: row.kind, targetId: row.target_id };
 }
 
-/** The Learn statuses that mean a card was read, not only drawn or passed over. */
-export const READ_CARD_STATUSES = ['opened', 'saved', 'tested', 'known', 'review'] as const;
-
 /** What a linked Learn aim shows, read from learn.aims and its cards. */
 export type LinkedAim = {
   linkId: string;
@@ -57,9 +54,28 @@ export type LinkedAim = {
   goalId?: string | null;
   /** The Level 3 list, whose progress is its claimed and tested articles. */
   level3: { claimed: number; tested: number; total: number } | null;
-  /** Cards drawn for an open-subject aim that were read, and of those saved. */
-  cardsRead: number;
-  cardsSaved: number;
+  /** The subject's preparation run; 'none' for a goal that points at no subject. */
+  preparation: SubjectPreparation;
+  /** The subject's lens, or null when it has none or no topic on it is approved. */
+  lens: LensProgressView | null;
+  /** Title of the next piece to work in the subject, or null when none is written. */
+  nextPiece: string | null;
+};
+
+/**
+ * Where the subject's preparation stands (plan #2302.4): 'none' when no run
+ * was started, 'working' for a run still going, 'failed' for one that
+ * stopped, 'done' once the subject is prepared.
+ */
+export type SubjectPreparation = 'none' | 'working' | 'failed' | 'done';
+
+/** What the subject's lens holds, per kind of evidence, over the levels its topics ask for. */
+export type LensProgressView = {
+  topics: number;
+  tested: number;
+  inferred: number;
+  declared: number;
+  total: number;
 };
 
 /** The job search's week, counted from job_search. */
@@ -106,16 +122,33 @@ function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** The line under a linked aim. */
+/** The levels held, said by kind: "5 of 40 levels held: 3 tested, 2 inferred". */
+export function lensHeldLine(lens: LensProgressView): string {
+  const held = lens.tested + lens.inferred + lens.declared;
+  const kinds = [
+    lens.tested > 0 ? `${lens.tested} tested` : null,
+    lens.inferred > 0 ? `${lens.inferred} inferred` : null,
+    lens.declared > 0 ? `${lens.declared} declared` : null,
+  ].filter((part): part is string => part !== null);
+  return `${held} of ${count(lens.total, 'level', 'levels')} held${kinds.length > 0 ? `: ${kinds.join(', ')}` : ''}`;
+}
+
+/** The line under a linked aim: the subject's lens, its preparation and the next piece (plan #2302.4). */
 export function aimProgressLine(aim: LinkedAim): string {
   if (aim.name === null) return 'No longer in Learn';
   if (aim.level3) {
     const { claimed, tested, total } = aim.level3;
     return `${claimed} of ${total} articles claimed, ${tested} tested`;
   }
-  const read = aim.cardsRead === 0 ? 'No cards read yet' : count(aim.cardsRead, 'card read', 'cards read');
-  const saved = aim.cardsSaved > 0 ? `, ${aim.cardsSaved} saved` : '';
-  return `${read}${saved}${aim.archived ? '. Archived in Learn' : ''}`;
+  const archived = aim.archived ? '. Archived in Learn' : '';
+  if (aim.preparation === 'none') return `Preparation has not run${archived}`;
+  const parts: string[] = [];
+  if (aim.preparation === 'working') parts.push('Preparing the subject');
+  if (aim.preparation === 'failed') parts.push('Preparation stopped');
+  if (aim.lens) parts.push(lensHeldLine(aim.lens));
+  else if (aim.preparation === 'done') parts.push('No topics on the lens yet');
+  if (aim.nextPiece) parts.push(`Next: ${aim.nextPiece}`);
+  return `${parts.join('. ')}${archived}`;
 }
 
 /** The line under the job search. */

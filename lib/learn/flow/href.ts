@@ -18,6 +18,24 @@ export type PracticeScope = {
   track?: string | null;
   goal?: string | null;
   only?: string | null;
+  /** One level of a topic to ask an explain question about (plan #2138.5). */
+  cell?: string | null;
+  /** When the practice run began, carried from question to question (plan #2138.6). */
+  run?: string | null;
+  /** The run to sum up: End run's link. */
+  end?: string | null;
+  /**
+   * The question just answered. Only makes each Next link a new address, so
+   * going on is a fresh render rather than the cached page of the last one.
+   */
+  after?: string | null;
+  /**
+   * A placement before the subject's first lesson (plan #2292.2): up to eight
+   * questions on `track`'s lens that only place you, ending on the lesson.
+   */
+  placement?: boolean;
+  /** With `placement` and `end`: go straight on to the lesson rather than show the end. */
+  skip?: boolean;
 };
 
 export function practiceHref(scope: PracticeScope = {}): string {
@@ -25,6 +43,12 @@ export function practiceHref(scope: PracticeScope = {}): string {
   if (scope.track) params.set('track', scope.track);
   if (scope.goal) params.set('goal', scope.goal);
   if (scope.only) params.set('only', scope.only);
+  if (scope.cell) params.set('cell', scope.cell);
+  if (scope.run) params.set('run', scope.run);
+  if (scope.end) params.set('end', scope.end);
+  if (scope.after) params.set('after', scope.after);
+  if (scope.placement) params.set('placement', '1');
+  if (scope.skip) params.set('skip', '1');
   return `${NOW_HREF}?${params.toString()}`;
 }
 

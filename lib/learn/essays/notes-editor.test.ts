@@ -16,7 +16,9 @@ describe('noteRanges', () => {
   function start() {
     return EditorState.create({
       doc,
-      extensions: [essayNotes([{ id: 'n1', from, to: from + quote.length, open: true }], () => undefined)],
+      extensions: [
+        essayNotes([{ id: 'n1', from, to: from + quote.length, open: true }], () => undefined),
+      ],
     });
   }
 
@@ -30,7 +32,9 @@ describe('noteRanges', () => {
   });
 
   it('keeps a word typed inside the range, and closes up when the text is deleted', () => {
-    let state = start().update({ changes: { from: from + 'nobody'.length, insert: ' ever' } }).state;
+    let state = start().update({
+      changes: { from: from + 'nobody'.length, insert: ' ever' },
+    }).state;
     let [range] = state.field(noteRanges).ranges;
     expect(state.doc.sliceString(range.from, range.to)).toBe('nobody ever eats gold');
     state = state.update({ changes: { from: range.from, to: range.to } }).state;

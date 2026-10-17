@@ -42,12 +42,25 @@ describe('referenceProblems', () => {
     expect(problems).toContain('a: docs/references/a/one.png is not in the repository');
     expect(problems).toContain('b: neither pictures nor a link');
   });
+
+  it('asks a chat mockup for its HTML source, and finds a source that is missing', () => {
+    const chat = { ...ok, link: 'https://claude.ai/artifact/abc123' };
+    expect(referenceProblems({ a: chat }, ['a'], () => true)).toEqual([
+      'a: a chat mockup with no source; save its HTML beside its pictures',
+    ]);
+    const saved = { ...chat, source: 'docs/references/a/mockup.html' };
+    expect(referenceProblems({ a: saved }, ['a'], () => true)).toEqual([]);
+    expect(referenceProblems({ a: saved }, ['a'], (path) => !path.endsWith('.html'))).toEqual([
+      'a: docs/references/a/mockup.html is not in the repository',
+    ]);
+    expect(referenceProblems({ a: { ...ok, link: 'https://example.com/list' } }, ['a'], () => true)).toEqual([]);
+  });
 });
 
 describe('the instructions that carry a reference', () => {
   const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8').replace(/\s+/g, ' ');
   const critic = read('.claude/agents/ui-critic.md');
-  const building = read('.claude/skills/plan/reference/building.md');
+  const screen = read('.claude/skills/plan/reference/screen.md');
   const shaping = read('.claude/skills/plan/reference/shaping.md');
 
   it('give the critic the rule from Part 2 and a breaks value for it', () => {
@@ -57,9 +70,14 @@ describe('the instructions that carry a reference', () => {
   });
 
   it('have the builder register a reference and send it on every round', () => {
-    expect(building).toContain('lib/preview/references.ts');
-    expect(building).toContain('Send a registered reference to the critic on every round');
-    expect(building).toContain(`${REFERENCE_DIR}/<surface>/`);
+    expect(screen).toContain('lib/preview/references.ts');
+    expect(screen).toContain('Send a registered reference to the critic on every round');
+    expect(screen).toContain(`${REFERENCE_DIR}/<surface>/`);
+    expect(screen).toContain('as the entry\'s `source`');
+  });
+
+  it('have the critic measure from the source', () => {
+    expect(critic).toContain('Measure from the source when there is one.');
   });
 
   it('teach shaping the Reference line', () => {
@@ -68,6 +86,18 @@ describe('the instructions that carry a reference', () => {
 });
 
 describe('referenceForCritic', () => {
+  it('names the source and says to read the numbers from it', () => {
+    const text = referenceForCritic('a', {
+      pictures: ['docs/references/a/one.png'],
+      link: 'https://claude.ai/artifact/abc123',
+      source: 'docs/references/a/mockup.html',
+      why: 'Calm.',
+      from: '1.1',
+    });
+    expect(text).toContain('Source: docs/references/a/mockup.html.');
+    expect(text).toContain('sizes, colours and spacing');
+  });
+
   it('asks for a link with no pictures to be photographed first', () => {
     const text = referenceForCritic('a', { pictures: [], link: 'https://example.com', why: 'Calm.', from: '1.1' });
     expect(text).toContain('not yet photographed: shoot it into docs/references/a/');

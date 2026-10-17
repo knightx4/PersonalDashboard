@@ -336,7 +336,7 @@ describe('waitingGroups', () => {
     ).toEqual({
       'Your actions': ['#3', '#4'],
       'Questions for you': ['#2'],
-      'To approve': ['#1'],
+      'To review': ['#1'],
     });
   });
 
@@ -363,7 +363,7 @@ describe('waitingGroups', () => {
     ).toEqual({
       'Your actions': ['#3'],
       'Questions for you': ['#1', '#2', '#4'],
-      'To approve': [],
+      'To review': [],
     });
   });
 
@@ -416,13 +416,13 @@ describe('waitingGroups', () => {
     ).toEqual({
       'Your actions': [],
       'Questions for you': ['Should the export keep the nesting?'],
-      'To approve': ['File this as an idea'],
+      'To review': ['File this as an idea'],
     });
   });
 
   it('leaves out a raise that is not open', () => {
     expect(laidOut([], [raise({ id: 'r3', status: 'closed', outcome: 'Filed as #700.' })])).toEqual(
-      { 'Your actions': [], 'Questions for you': [], 'To approve': [] },
+      { 'Your actions': [], 'Questions for you': [], 'To review': [] },
     );
   });
 

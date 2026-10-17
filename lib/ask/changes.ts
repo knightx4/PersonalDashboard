@@ -10,10 +10,11 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
-import { undoInterviewRows } from '@/lib/dash/interview-edit-writes';
 import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { handStepToClaude } from '@/lib/plan/handover';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
+import { DELETABLE, deleteRows, isDeletableTable, undoDeletedRows } from './delete-rows';
 import {
   DASH_ACTIONS,
   type NewDashChange,
@@ -25,6 +26,8 @@ import {
   type DashChangeStatus,
 } from '@/lib/talk/changes';
 import type { AskDb, SchemaClient } from './db';
+import type { DashPaidTool } from '@/lib/dash/registry';
+import { PAID_NO_UNDO, PAID_RUN_STALE_MS, paidState } from '@/lib/dash/paid-input';
 import { isWrittenCard, type WrittenCardKind } from './todo-changes';
 import { isVaultFileKind } from './vault-changes';
 
@@ -98,6 +101,11 @@ export type ChangeDeps = {
   undoVaultNote?: (
     action: Pick<DashAction, 'id' | 'status' | 'subjectRef' | 'undo'>,
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /**
+   * The paid tool of that name in Dash's registry (plan #2228.1), which an
+   * approved paid press runs. Absent: every paid press is refused.
+   */
+  paidTool?: (name: string) => DashPaidTool | undefined;
 };
 
 /** What the card or the list shows after a press: the change as it now is, or why not. */
@@ -162,6 +170,12 @@ export function changePaths(change: DashChange): string[] {
     }
     case 'add_quick_note':
       return ['/vault', '/vault/triage'];
+    case 'start_build':
+      return ['/dev/plan', `/dev/plan/${change.input.number}`];
+    case 'paid_action':
+      return change.input.paths;
+    case 'delete_rows':
+      return [change.input.href, '/home', '/jobs/pipeline'];
   }
 }
 
@@ -170,7 +184,7 @@ export function changePaths(change: DashChange): string[] {
  * The kinds with a writer here: Learn's and Todo's newer ones are written by
  * their tools alone (lib/dash/learn-writes.ts, lib/dash/todo-writes.ts).
  */
-type WrittenKind = Exclude<DashChangeKind, WrittenCardKind>;
+type WrittenKind = Exclude<DashChangeKind, WrittenCardKind | 'paid_action' | 'delete_rows'>;
 
 const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null> = {
   add_todo: { module: 'todo', label: 'Todo' },
@@ -188,6 +202,7 @@ const WORKSPACE: Record<WrittenKind, { module: ModuleId; label: string } | null>
   move_roles: { module: 'jobs', label: 'Jobs' },
   set_goal_done_when: { module: 'goals', label: 'Goals' },
   add_quick_note: { module: 'vault', label: 'Vault' },
+  start_build: { module: 'dev', label: 'Dev' },
 };
 
 const WRITTEN_TABLE: Record<WrittenKind, string> = {
@@ -206,6 +221,8 @@ const WRITTEN_TABLE: Record<WrittenKind, string> = {
   move_roles: 'job_search.applications',
   set_goal_done_when: 'goals.items',
   add_quick_note: 'obsidian.notes',
+  // The run the confirm starts (plan #2106.2).
+  start_build: 'public.plan_runs',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -225,6 +242,7 @@ const WRITTEN_OP: Record<WrittenKind, 'insert' | 'update'> = {
   move_roles: 'update',
   set_goal_done_when: 'update',
   add_quick_note: 'insert',
+  start_build: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -288,8 +306,12 @@ function notConfirmed(status: DashChangeStatus): string {
 type ProposalChange = Extract<DashChange, { kind: 'add_todo' | 'add_goal_step' | 'mark_returned' | 'start_watch' }>;
 
 function isProposalKind(change: DashChange): change is ProposalChange {
-  return PROPOSAL_KINDS.includes(change.kind);
+  // A started build is a proposal too, but it has no writer or undo here.
+  return change.kind !== 'start_build' && PROPOSAL_KINDS.includes(change.kind);
 }
+
+/** Why a started build has no Undo. */
+export const BUILD_NO_UNDO = 'A build that has started cannot be undone.';
 
 type Written = { ref: string; undo: Record<string, unknown> | null };
 
@@ -609,22 +631,235 @@ function refusedOrThrow(error: unknown, change: DashChange | null): ChangeOutcom
 }
 
 /**
+ * Start the session a build card proposed (plan #2106.2).
+ *
+ * The step is checked again by handStepToClaude, so a step that was sent, closed
+ * or blocked since the card was made is refused here with the plan page's own
+ * sentence and nothing starts. The quiet run is written off only when the card
+ * said the run was quiet. The change is marked done against the run the send
+ * started; there is no undo, because a started session cannot be recalled.
+ */
+async function confirmBuild(deps: ChangeDeps, change: Extract<DashChange, { kind: 'start_build' }>): Promise<ChangeOutcome> {
+  const client = await deps.db('public');
+  const sent = await handStepToClaude({
+    supabase: client as never,
+    userId: deps.userId,
+    id: change.input.stepId,
+    confirmQuiet: change.input.quiet ? true : undefined,
+  });
+  if (!sent.ok) return { ok: false, error: sent.error, change };
+
+  // startRoutineRun does not return the run it recorded, so the newest run on
+  // the step is the one this press started.
+  const { data: run } = await client
+    .from('plan_runs')
+    .select('id')
+    .eq('user_id', deps.userId)
+    .eq('plan_item_id', change.input.stepId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const runId = (run as { id?: string } | null)?.id;
+  const subjectRef = runId ? toRef('public.plan_runs', runId) : null;
+
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({
+      status: 'done',
+      done_at: now(deps),
+      ...(subjectRef ? { subject_ref: subjectRef } : {}),
+      op: 'insert',
+      undo: null,
+    })
+    .eq('id', change.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'proposed')
+    .select(DASH_CHANGE_SELECT);
+  const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+  if (error || rows.length === 0) {
+    // The session is already running and cannot be recalled; say so rather than
+    // leave the card offering to start it again.
+    if (error) throw new Error(`The build started but marking the card done failed: ${error.message}`);
+    const current = await loadOne(deps, change.id);
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+  return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
+ * Delete the rows a delete card named (plan #2232.1), after the person
+ * confirmed. deleteRows reads them again as the person and refuses, deleting
+ * nothing, when one has changed since the snapshot. The removed rows are kept
+ * in `undo.rows` for Undo; if marking the card done then fails or loses a
+ * race, they are put back, since the card would otherwise offer to delete
+ * rows that are already gone.
+ */
+async function confirmDelete(deps: ChangeDeps, change: Extract<DashChange, { kind: 'delete_rows' }>): Promise<ChangeOutcome> {
+  if (!isDeletableTable(change.input.table)) {
+    return { ok: false, error: 'Dash may not delete from that table.', change };
+  }
+  const spec = DELETABLE[change.input.table];
+  if (!deps.enabledModules.includes(spec.module)) {
+    return { ok: false, error: `The ${spec.moduleLabel} workspace is switched off, so this cannot be removed.`, change };
+  }
+  const removed = await deleteRows({ userId: deps.userId, db: deps.db }, change.input);
+  if (!removed.ok) return { ok: false, error: removed.error, change };
+  const first = removed.deleted.rows[0];
+
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({
+      status: 'done',
+      done_at: now(deps),
+      subject_ref: first.ref,
+      op: 'delete',
+      before_values: first.values,
+      after_values: null,
+      undo: removed.deleted as unknown as Record<string, unknown>,
+    })
+    .eq('id', change.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'proposed')
+    .select(DASH_CHANGE_SELECT);
+  const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+  if (error || rows.length === 0) {
+    const back = await undoDeletedRows({ userId: deps.userId, db: deps.db }, removed.deleted as unknown as Record<string, unknown>);
+    if (!back.ok) console.error(`ask change ${change.id}: putting back the rows failed`, back.error);
+    if (error) throw new Error(`Marking the change done failed: ${error.message}`);
+    const current = await loadOne(deps, change.id);
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+  return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
+ * Run a paid press Dash queued (plan #2228.1): the tool's `run`, which calls
+ * the function the button calls and records the spend there.
+ *
+ * The press is claimed before it runs, by marking `undo.running_at` on a row
+ * that is still proposed and not already running, so a second approval
+ * (another window, a double press) finds it taken and runs nothing. A run
+ * that refuses or breaks leaves the item proposed with `undo.failed`, so the
+ * card can say why and it can be approved again or dismissed. One left
+ * running longer than PAID_RUN_STALE_MS can be claimed again. Once it has
+ * run, the item is done with the row the press wrote, and has no Undo: the
+ * money is spent.
+ */
+async function confirmPaid(
+  deps: ChangeDeps,
+  change: Extract<DashChange, { kind: 'paid_action' }>,
+  surface: ChangeSurface,
+): Promise<ChangeOutcome> {
+  const tool = deps.paidTool?.(change.input.tool);
+  if (!tool) return { ok: false, error: 'Dash can no longer run this. Press the button on its page instead.', change };
+  if (tool.workspace && !deps.enabledModules.includes(tool.workspace)) {
+    return { ok: false, error: 'Its workspace is switched off, so this cannot be run.', change };
+  }
+  const startedAt = now(deps);
+  const stale = new Date(Date.parse(startedAt) - PAID_RUN_STALE_MS).toISOString();
+  const { data: claimed, error: claimError } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({ undo: { running_at: startedAt } })
+    .eq('id', change.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'proposed')
+    .or(`undo.is.null,undo->>failed.not.is.null,undo->>running_at.lt.${stale}`)
+    .select('id');
+  if (claimError) throw new Error(`Claiming the press failed: ${claimError.message}`);
+  if ((claimed ?? []).length === 0) {
+    const current = await loadOne(deps, change.id, surface);
+    if (current?.status === 'proposed' && paidState(current.undo).state === 'running') {
+      return { ok: false, error: 'Dash is already running this.', change: current };
+    }
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+
+  let ran: Awaited<ReturnType<DashPaidTool['run']>>;
+  try {
+    ran = await tool.run(
+      {
+        userId: deps.userId,
+        timezone: deps.timezone,
+        today: deps.today,
+        enabledModules: deps.enabledModules,
+        db: deps.db,
+        now: new Date(Date.parse(startedAt)),
+      },
+      change.input.args,
+    );
+  } catch (error) {
+    console.error(`paid press ${change.input.tool} failed`, error);
+    ran = { ok: false, error: 'Dash could not run this. Try again.' };
+  }
+
+  if (!ran.ok) {
+    const { data } = await deps.core
+      .from(DASH_ACTIONS)
+      .update({ undo: { failed: ran.error } })
+      .eq('id', change.id)
+      .eq('user_id', deps.userId)
+      .eq('status', 'proposed')
+      .select(DASH_CHANGE_SELECT);
+    const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+    return { ok: false, error: ran.error, change: rows[0] ? toDashChange(rows[0]) : change };
+  }
+
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS)
+    .update({
+      status: 'done',
+      done_at: now(deps),
+      subject_ref: ran.subjectRef,
+      op: ran.op,
+      summary: ran.summary.replace(/\s+/g, ' ').trim().slice(0, 300),
+      undo: { none: PAID_NO_UNDO },
+    })
+    .eq('id', change.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'proposed')
+    .select(DASH_CHANGE_SELECT);
+  // The press has run and spent; say so rather than offer to run it again.
+  if (error) throw new Error(`The press ran but marking it done failed: ${error.message}`);
+  const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
+  if (rows.length === 0) {
+    const current = await loadOne(deps, change.id, surface);
+    return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
+  }
+  return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
+ * A change to confirm or decline, with the surface it was kept on: Ask's, or
+ * a paid press a thread queued (plan #2228.1), which is approved the same way.
+ */
+async function loadPressable(deps: ChangeDeps, id: string): Promise<{ change: DashChange; surface: ChangeSurface } | null> {
+  const asked = await loadOne(deps, id);
+  if (asked) return { change: asked, surface: 'ask' };
+  const queued = await loadOne(deps, id, 'thread');
+  return queued?.kind === 'paid_action' ? { change: queued, surface: 'thread' } : null;
+}
+
+/**
  * Write a proposed change and mark it done. Refused, with the change as
  * it stands, when it is not a proposal any more, its answer is still being
  * written, its workspace is off, or what it points at can no longer take it.
  */
 export async function confirmChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
-  const change = await loadOne(deps, id);
-  if (!change) return { ok: false, error: GONE, change: null };
+  const found = await loadPressable(deps, id);
+  if (!found) return { ok: false, error: GONE, change: null };
+  const { change, surface } = found;
   if (change.status !== 'proposed') return { ok: false, error: notProposed(change.status), change };
   if (!change.turnId) {
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
-  if (!isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
+  if (change.kind === 'paid_action') return confirmPaid(deps, change, surface);
+  if (change.kind === 'delete_rows') return confirmDelete(deps, change);
+  if (change.kind !== 'start_build' && !isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
   const workspace = WORKSPACE[change.kind];
   if (workspace && !deps.enabledModules.includes(workspace.module)) {
     return { ok: false, error: `The ${workspace.label} workspace is switched off, so this cannot be written.`, change };
   }
+  if (change.kind === 'start_build') return confirmBuild(deps, change);
 
   // An update records the row as it was, read before the write; an insert
   // has no row before it.
@@ -669,8 +904,13 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
 
 /** Mark a proposed change declined. Nothing else is written. */
 export async function declineChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
-  const change = await loadOne(deps, id);
-  if (!change) return { ok: false, error: GONE, change: null };
+  const found = await loadPressable(deps, id);
+  if (!found) return { ok: false, error: GONE, change: null };
+  const { change, surface } = found;
+  // A paid press that is running cannot be dismissed: it is already spending.
+  if (change.kind === 'paid_action' && change.status === 'proposed' && paidState(change.undo).state === 'running') {
+    return { ok: false, error: 'Dash is already running this, so it cannot be dismissed.', change };
+  }
   if (change.status !== 'proposed') {
     const error = change.status === 'declined' ? 'You have already declined this change.' : notProposed(change.status);
     return { ok: false, error, change };
@@ -681,11 +921,13 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
     .eq('id', change.id)
     .eq('user_id', deps.userId)
     .eq('status', 'proposed')
+    // Not while an approval is running it (plan #2228.1).
+    .or('undo.is.null,undo->>running_at.is.null')
     .select(DASH_CHANGE_SELECT);
   if (error) throw new Error(`Marking the change declined failed: ${error.message}`);
   const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
   if (rows.length === 0) {
-    const current = await loadOne(deps, id);
+    const current = await loadOne(deps, id, surface);
     return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
   }
   return { ok: true, change: toDashChange(rows[0]) };
@@ -739,6 +981,8 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
+  if (change.kind === 'start_build') return { ok: false, error: BUILD_NO_UNDO, change };
+  if (change.kind === 'paid_action') return { ok: false, error: PAID_NO_UNDO, change };
   if (!isProposalKind(change)) return undoWrite(deps, change, surface);
 
   try {
@@ -805,6 +1049,7 @@ export async function writeChange(
 async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSurface): Promise<ChangeOutcome> {
   // A note Dash wrote, edited, renamed or filed: the Undo is a commit too (plan #1894.9.3).
   if (change.kind === 'add_quick_note' || isVaultFileKind(change.kind)) return undoQuickNote(deps, change, surface);
+  if (change.kind === 'delete_rows') return undoMany(deps, change, surface, undoDeletedRows);
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);

@@ -6,6 +6,7 @@ import {
   monthKeyOf,
   monthLabel,
   monthStart,
+  monthTotals,
   monthWindow,
   parseTimelineModule,
   shiftMonth,
@@ -104,5 +105,33 @@ describe('months', () => {
     expect(parseTimelineModule('shopping', ['jobs', 'vault'])).toBeNull();
     expect(parseTimelineModule('news', ['news'])).toBeNull();
     expect(parseTimelineModule(undefined, ['jobs'])).toBeNull();
+  });
+});
+
+describe('monthTotals', () => {
+  it('counts every month of the window, oldest first, the empty ones at zero', () => {
+    const timezone = 'UTC';
+    const months = groupByMonth(
+      [
+        event('2026-03-10T12:00:00Z', 'applied', 'jobs'),
+        event('2026-03-02T12:00:00Z', 'ordered', 'shopping'),
+        event('2026-01-05T12:00:00Z', 'task_done', 'todo'),
+      ],
+      timezone,
+      { first: '2026-01', last: '2026-04' },
+    );
+    expect(monthTotals(months, { first: '2026-01', last: '2026-04' })).toEqual([
+      { key: '2026-01', count: 1, share: 0.5 },
+      { key: '2026-02', count: 0, share: 0 },
+      { key: '2026-03', count: 2, share: 1 },
+      { key: '2026-04', count: 0, share: 0 },
+    ]);
+  });
+
+  it('crosses a year and gives no share when nothing happened', () => {
+    expect(monthTotals([], { first: '2025-12', last: '2026-01' })).toEqual([
+      { key: '2025-12', count: 0, share: 0 },
+      { key: '2026-01', count: 0, share: 0 },
+    ]);
   });
 });

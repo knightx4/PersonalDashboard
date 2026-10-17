@@ -6,6 +6,7 @@ import {
   parseWordTarget,
   readBrief,
   readInterview,
+  retitleEssay,
   toSummary,
   wordCountLabel,
 } from './model';
@@ -13,16 +14,54 @@ import { paragraphAround } from './editor';
 
 describe('essayTitle', () => {
   it('takes the first top-level heading', () => {
-    expect(essayTitle('Intro line\n# Why money is odd\n\n## Part', 'Essays/Untitled essay.md')).toBe('Why money is odd');
+    expect(
+      essayTitle('Intro line\n# Why money is odd\n\n## Part', 'Essays/Untitled essay.md'),
+    ).toBe('Why money is odd');
   });
 
   it('ignores a second-level heading and frontmatter', () => {
-    expect(essayTitle('---\ntitle: x\n---\n## Not this\ntext', 'Essays/Saved name.md')).toBe('Saved name');
+    expect(essayTitle('---\ntitle: x\n---\n## Not this\ntext', 'Essays/Saved name.md')).toBe(
+      'Saved name',
+    );
   });
 
   it('falls back to Untitled essay', () => {
     expect(essayTitle('', '')).toBe('Untitled essay');
     expect(essayTitle('#   \n', 'Essays/Untitled essay.md')).toBe('Untitled essay');
+  });
+});
+
+describe('retitleEssay', () => {
+  const apply = (body: string, title: string) => {
+    const { from, to, insert } = retitleEssay(body, title);
+    return body.slice(0, from) + insert + body.slice(to);
+  };
+
+  it('rewrites the first heading, wherever it is', () => {
+    expect(apply('# Old name\n\nText.', 'New name')).toBe('# New name\n\nText.');
+    expect(apply('Intro.\n\n# Old\n\nMore.', 'New')).toBe('Intro.\n\n# New\n\nMore.');
+  });
+
+  it('takes a first line written without the space as the title line', () => {
+    const body = '#Taking a Control Mindset to AI \nTest \n';
+    const next = apply(body, 'Controls for AI');
+    expect(next).toBe('# Controls for AI\nTest \n');
+    expect(essayTitle(next, 'Essays/Untitled essay.md')).toBe('Controls for AI');
+  });
+
+  it('puts a heading in ahead of the text when there is none, after frontmatter', () => {
+    expect(apply('Just text.', 'Named')).toBe('# Named\n\nJust text.');
+    expect(apply('', 'Named')).toBe('# Named\n');
+    expect(apply('---\nstage: draft\n---\nText.', 'Named')).toBe('---\nstage: draft\n---\n# Named\n\nText.');
+  });
+
+  it('leaves second-level headings and later #lines alone', () => {
+    expect(apply('## Part one\n\nText.', 'Named')).toBe('# Named\n\n## Part one\n\nText.');
+    expect(apply('Text.\n#tag', 'Named')).toBe('# Named\n\nText.\n#tag');
+  });
+
+  it('keeps the title to one line', () => {
+    expect(apply('', '  Two\nlines  ')).toBe('# Two lines\n');
   });
 });
 
@@ -85,13 +124,17 @@ describe('readBrief and toSummary', () => {
   });
 
   it('reads the interview, and none when it is missing or malformed', () => {
-    expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: 'And your answer?' } })).toEqual({
+    expect(
+      readInterview({ interview: { status: 'asking', field: 'claim', ask: 'And your answer?' } }),
+    ).toEqual({
       status: 'asking',
       field: 'claim',
       ask: 'And your answer?',
     });
     expect(readInterview({ interview: { status: 'done' } })).toEqual({ status: 'done' });
-    expect(readInterview({ interview: { status: 'asking', field: 'mood', ask: 'How?' } })).toBeNull();
+    expect(
+      readInterview({ interview: { status: 'asking', field: 'mood', ask: 'How?' } }),
+    ).toBeNull();
     expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: ' ' } })).toBeNull();
     expect(readInterview({})).toBeNull();
   });
@@ -107,7 +150,12 @@ describe('readBrief and toSummary', () => {
       published_at: null,
       updated_at: '2026-10-12T00:00:00Z',
     });
-    expect(summary).toMatchObject({ title: 'A title', question: 'Why?', words: 4, wordTarget: 400 });
+    expect(summary).toMatchObject({
+      title: 'A title',
+      question: 'Why?',
+      words: 4,
+      wordTarget: 400,
+    });
   });
 });
 

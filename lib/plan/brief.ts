@@ -277,7 +277,17 @@ export type BriefOptions = {
    * in lib/preview/references.ts; tests pass their own.
    */
   references?: Readonly<Record<string, Reference>>;
+  /**
+   * The drawings on plan rows (`plan_item_pictures`), by the id of the row
+   * they sit on, without the drawings themselves. A build step's brief names
+   * the ones approved for it: on the step, on the rows above it, and the
+   * chosen option on each decision answered under its feature.
+   */
+  pictures?: Readonly<Record<string, readonly BriefPicture[]>>;
 };
+
+/** One drawing on a plan row, as much as a brief names. */
+export type BriefPicture = { id: string; caption: string };
 
 /** More than this and the list is cut, since a change to the shell reaches every surface. */
 const SURFACES_LISTED = 20;
@@ -305,7 +315,10 @@ function surfaceLines(ids: readonly string[]): string[] {
     '',
     '## Gallery surfaces',
     '',
-    'Draw and photograph these before wiring the screen to real data:',
+    // The one place a builder learns its step is a screen step, so the file
+    // with the gallery loop is named here and nowhere a plain step reads it.
+    'This step changes a screen: read .claude/skills/plan/reference/screen.md and follow it. ' +
+      'Draw and photograph these before wiring the screen to real data:',
     '',
     ...lines,
   ];
@@ -355,10 +368,83 @@ function patternLines(node: PlanNode, hasSurfaces: boolean): string[] {
  * which the builder registers, and those already registered for the surfaces
  * it photographs, which go to the critic with every round on that surface.
  */
+/** A mockup made in a chat: a claude.ai artifact link, wherever it is written. */
+const ARTIFACT_LINK = /https:\/\/claude\.ai\/(?:code\/)?artifact\/[A-Za-z0-9_-]+/g;
+
+function artifactLinks(text: string | null): string[] {
+  return text?.match(ARTIFACT_LINK) ?? [];
+}
+
+/**
+ * The pictures on an answered decision that show what was chosen: those
+ * captioned "Chosen", else those whose caption opens with the answer's letter
+ * ("B: Stages as one list" for "B — Stages as one list"), else all of them,
+ * since an answer in other words still chose among what was drawn.
+ */
+function chosenPictures(decision: PlanNode, pictures: readonly BriefPicture[]): BriefPicture[] {
+  const chosen = pictures.filter((p) => /^\s*chosen\b/i.test(p.caption));
+  if (chosen.length > 0) return chosen;
+  const letter = decision.resolution?.match(/^\s*([A-Z])\b/)?.[1];
+  if (letter) {
+    const lettered = pictures.filter((p) => new RegExp(`^\\s*${letter}\\b`).test(p.caption));
+    if (lettered.length > 0) return lettered;
+  }
+  return [...pictures];
+}
+
+/**
+ * The mockups approved for a build step, which were lost on the way to the
+ * builder or the critic when they sat anywhere but a `Reference:` line on the
+ * step itself (the design audit of 15 October 2026): artifact links and
+ * drawings on the step and the rows above it, unless a row is still only
+ * proposed, and on each decision answered under its feature, the chosen
+ * option's drawing.
+ */
+function approvedMockups(
+  node: PlanNode,
+  ancestors: readonly PlanNode[],
+  decided: readonly PlanNode[],
+  pictures: Readonly<Record<string, readonly BriefPicture[]>>,
+): { links: string[]; pictures: (BriefPicture & { on: PlanNode })[] } {
+  const rows = [...ancestors, node].filter((row) => row.status !== 'proposed');
+  const links = new Set<string>();
+  const drawn: (BriefPicture & { on: PlanNode })[] = [];
+  for (const row of rows) {
+    for (const link of artifactLinks(row.detail)) links.add(link);
+    for (const picture of pictures[row.id] ?? []) drawn.push({ ...picture, on: row });
+  }
+  for (const decision of decided) {
+    for (const link of [...artifactLinks(decision.detail), ...artifactLinks(decision.resolution)]) {
+      links.add(link);
+    }
+    for (const picture of chosenPictures(decision, pictures[decision.id] ?? [])) {
+      drawn.push({ ...picture, on: decision });
+    }
+  }
+  return { links: [...links], pictures: drawn };
+}
+
+/**
+ * The drawings approved for a step, by the same rule the brief lists them:
+ * on the step and the rows above it, and the chosen option on each decision
+ * answered under its feature. The plan row pairs one with the build's
+ * pictures (plan #2215.10).
+ */
+export function approvedDrawings<P extends BriefPicture>(
+  sections: readonly PlanSection[],
+  node: PlanNode,
+  pictures: Readonly<Record<string, readonly P[]>>,
+): (P & { on: PlanNode })[] {
+  const ancestors = ancestorsOf(sections, node.id);
+  const decided = decidedSoFar(featureOf(node, ancestors), node);
+  return approvedMockups(node, ancestors, decided, pictures).pictures as (P & { on: PlanNode })[];
+}
+
 function referenceLines(
   node: PlanNode,
   surfaces: readonly string[],
   references: Readonly<Record<string, Reference>>,
+  approved: ReturnType<typeof approvedMockups>,
 ): string[] {
   if (node.kind !== 'build') return [];
   const named = referenceNamed(node.detail ?? '');
@@ -366,12 +452,30 @@ function referenceLines(
     const reference = referenceFor(id, references);
     return reference ? [`- ${referenceForCritic(id, reference)}`] : [];
   });
-  if (!named && registered.length === 0) return [];
+  const registeredLinks = new Set(Object.values(references).map((r) => r.link));
+  const unnamedLinks = approved.links.filter(
+    (link) => !named?.links.includes(link) && !registeredLinks.has(link),
+  );
+  const mockups = [
+    ...unnamedLinks.map((link) => `- ${link}`),
+    ...approved.pictures.map(
+      (p) => `- "${p.caption}", drawn on ${stepRef(p.on)} (plan_item_pictures ${p.id})`,
+    ),
+  ];
+  if (!named && registered.length === 0 && mockups.length === 0) return [];
   const lines = ['', '## Reference', ''];
   if (named) {
     const listed = [...named.pictures, ...named.links].join(', ');
     lines.push(
-      `The step names a reference design: ${listed}. Register it in lib/preview/references.ts under the surface it is for, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link the first time), before round 1.`,
+      `The step names a reference design: ${listed}. Register it in lib/preview/references.ts under the surface it is for, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link the first time, and save a chat mockup's HTML there as its source), before round 1.`,
+    );
+  }
+  if (mockups.length > 0) {
+    if (named) lines.push('');
+    lines.push(
+      `Mockups approved for this work. Register each in lib/preview/references.ts under the surface it draws, saving its pictures under ${REFERENCE_DIR}/<surface>/ (photograph a link at 390 and 1280 and save a chat mockup's HTML there as its source; save a drawing's SVG from plan_item_pictures), before round 1, so the critic judges every round against it:`,
+      '',
+      ...mockups,
     );
   }
   if (registered.length > 0) {
@@ -544,7 +648,14 @@ export function planBrief(
   const surfaces = surfaceIds(node, options.surfaces);
   out.push(...surfaceLines(surfaces));
   out.push(...patternLines(node, surfaces.length > 0));
-  out.push(...referenceLines(node, surfaces, options.references ?? REFERENCES));
+  out.push(
+    ...referenceLines(
+      node,
+      surfaces,
+      options.references ?? REFERENCES,
+      approvedMockups(node, ancestors, decided, options.pictures ?? {}),
+    ),
+  );
 
   if (node.dependsOn.length > 0) {
     out.push('', '## Waits on', '');

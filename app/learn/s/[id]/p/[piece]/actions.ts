@@ -23,6 +23,10 @@ import { MARK_POINTS_MODEL } from '@/lib/learn/lessons/mark-points';
 import { markPractice, WRITE_PRACTICE_MODEL, writePractice } from '@/lib/learn/lessons/write-practice';
 import { markPieceCheck, PIECE_CHECK_MODEL, writePieceCheck } from '@/lib/learn/lessons/write-piece-check';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { answerCell, askCell } from '@/lib/learn/levels/answer-store';
+import { roleLineFinder } from '@/lib/learn/levels/role-match';
+import { checkCell } from '@/lib/learn/lessons/piece-cells';
+import { loadCellCheck, loadPieceCells } from '@/lib/learn/lessons/piece-cells-store';
 
 /**
  * The presses on a piece's page (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -75,6 +79,14 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
   const learn = await createLearnClient();
 
   try {
+    const loaded = await loadPieceForCheck(learn, user.id, subject, pieceIdValue);
+    if (!loaded) return { error: 'This piece has no ideas left to ask about.' };
+
+    // A piece that names a cell it can ask about is checked with a cell
+    // question at the level the piece reaches (plan #2138.13).
+    const target = checkCell(await loadPieceCells(learn, user.id, loaded.cellIds));
+    if (target) return await askCellCheck(learn, user.id, pieceIdValue, target.cellId);
+
     const { data: open, error: openError } = await learn
       .from('piece_checks')
       .select('id, question, expected, response, correct, marked_why')
@@ -86,9 +98,6 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
       .maybeSingle();
     if (openError) return { error: `Reading the piece's check failed: ${openError.message}` };
     if (open) return { check: toPieceCheck(open as PieceCheckRow) };
-
-    const loaded = await loadPieceForCheck(learn, user.id, subject, pieceIdValue);
-    if (!loaded) return { error: 'This piece has no ideas left to ask about.' };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { error: 'Writing a question needs ANTHROPIC_API_KEY to be set.' };
@@ -121,6 +130,29 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not write a question.' };
   }
+}
+
+/**
+ * The piece's check as a question on one of its cells: an unanswered one is
+ * shown again, otherwise a new one is asked through the level questions'
+ * own writer (an explanation, or a case at levels 4 to 6).
+ */
+async function askCellCheck(
+  learn: Awaited<ReturnType<typeof createLearnClient>>,
+  userId: string,
+  pieceId: string,
+  cellId: string,
+): Promise<AskResult> {
+  const latest = await loadCellCheck(learn, userId, pieceId);
+  if (latest && latest.correct === null) return { check: latest };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const spend = collectSpend();
+  const asked = await askCell(learn, userId, cellId, apiKey ? { anthropicApiKey: apiKey, onSpend: spend.sink } : undefined, pieceId, roleLineFinder(learn, userId));
+  await recordLearnSpend(userId, 'write-cell-case', spend.reports);
+  if (!asked.ok) return { error: asked.error };
+  const check = await loadCellCheck(learn, userId, pieceId, asked.asked.questionId);
+  return check ? { check } : { error: 'The question was not saved.' };
 }
 
 export type AnswerResult = {
@@ -157,6 +189,9 @@ export async function answerPieceCheck(
   const learn = await createLearnClient();
 
   try {
+    const cellCheck = await loadCellCheck(learn, user.id, pieceIdValue, checkIdValue);
+    if (cellCheck) return await answerCellCheck(learn, user.id, subject, pieceIdValue, cellCheck, answer.data);
+
     const { data, error } = await learn
       .from('piece_checks')
       .select('id, question, expected, response, correct, marked_why')
@@ -221,6 +256,55 @@ export async function answerPieceCheck(
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };
   }
+}
+
+/**
+ * Answering the piece's cell question: graded by the level grader, which
+ * writes cell_evidence for every cell the answer reached, so the topic
+ * ladder moves whatever the mark. Right means the asked cell was shown; that
+ * marks the piece's ideas tested and passes the piece once its practice is
+ * passed too, as a right answer to its own question does.
+ */
+async function answerCellCheck(
+  learn: Awaited<ReturnType<typeof createLearnClient>>,
+  userId: string,
+  subjectId: string,
+  pieceId: string,
+  check: PieceCheck,
+  response: string,
+): Promise<AnswerResult> {
+  // Answered already, in another tab: show that mark rather than paying for another.
+  if (check.correct !== null) return { check };
+  const loaded = await loadPieceForCheck(learn, userId, subjectId, pieceId);
+  if (!loaded) return { error: 'This piece is no longer there.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
+
+  const spend = collectSpend();
+  const graded = await answerCell(learn, userId, {
+    questionId: check.id,
+    response,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(userId, 'grade-cell-answer', spend.reports);
+  if (!graded.ok) return { error: graded.error };
+
+  const marked = await loadCellCheck(learn, userId, pieceId, check.id);
+  if (!marked) return { error: 'That question is no longer there.' };
+  revalidatePath(`/learn/topics/${marked.cell?.topicId ?? ''}`);
+  if (!marked.correct) return { check: marked };
+
+  const tested = await markPieceIdeasTested(learn, userId, loaded.conceptIds);
+  const standing = await passPieceIfDone(learn, userId, pieceId, loaded.passedAt);
+  revalidatePath(`/learn/s/${subjectId}`);
+  return {
+    check: marked,
+    passedAt: standing.passedAt ?? undefined,
+    practicePassed: standing.practicePassed,
+    tested,
+  };
 }
 
 export type PracticeResult = { error?: string; practice?: PracticeView };

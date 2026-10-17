@@ -12,7 +12,7 @@ import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requ
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
-import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
+import { LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CAREER_WRITES, companyHeld } from './career-writes';
 import { INTERVIEW_EDIT_WRITES } from './interview-edit-writes';
@@ -26,8 +26,9 @@ import { JobsRefused } from './jobs-refused';
  *   change_role         a role's title, location, work mode, seniority,
  *                       posting link and status, description or pay band,
  *                       or the company it is filed under.
- *   change_application  how excited they are about it, and how they applied
- *                       (the channel, and who referred them).
+ *   change_application  how excited they are about it, how they applied
+ *                       (the channel, and who referred them), whether it is
+ *                       ready to apply and whether it has a cover letter.
  *
  * and, from a role's application questions and the answer bank (plan
  * #1894.6.8):
@@ -51,9 +52,9 @@ import { JobsRefused } from './jobs-refused';
  *
  * and, from Jobs Today and a role's timeline (plan #1894.6.3):
  *
- *   change_reminder     a reminder finished, put off a week, reworded, moved
+ *   change_reminder     a reminder finished, put off to a day, reworded, moved
  *                       to another day, or linked to the email behind it.
- *   change_waiting      a "Waiting on you" row done or put off a week.
+ *   change_waiting      a "Waiting on you" row done or put off to a day.
  *
  *
  * and, from Jobs review (plan #1894.6.4.1):
@@ -115,6 +116,8 @@ export type JobsWriteEnv = {
   todo: SchemaClient;
   /** For a role's thread, which a merge will not leave behind. */
   core: SchemaClient;
+  /** Their IANA zone, for the day a Later ends; UTC when absent. */
+  timezone?: string;
 };
 
 /** A Jobs change as made, before a surface keeps it. */
@@ -418,7 +421,36 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     throw new JobsRefused('referral_contact_ref goes with channel "referral".');
   }
 
-  if (Object.keys(update).length === 0) throw new JobsRefused('Nothing to change: give excitement or channel.');
+  if (given(args, 'ready_to_apply')) {
+    if (typeof args.ready_to_apply !== 'boolean') throw new JobsRefused('ready_to_apply is true or false.');
+    update.ready_to_apply = args.ready_to_apply;
+    changed.push(args.ready_to_apply ? 'marked it ready to apply' : 'marked it not ready to apply');
+  }
+
+  if (given(args, 'all_questions_added')) {
+    if (typeof args.all_questions_added !== 'boolean') throw new JobsRefused('all_questions_added is true or false.');
+    update.all_questions_added = args.all_questions_added;
+    changed.push(args.all_questions_added ? 'marked that all its questions are added' : 'marked that not all its questions are added');
+  }
+
+  if (given(args, 'has_cover_letter')) {
+    const value = args.has_cover_letter;
+    if (value !== null && typeof value !== 'boolean') {
+      throw new JobsRefused('has_cover_letter is true, false, or null to clear it.');
+    }
+    update.has_cover_letter = value;
+    changed.push(
+      value === null
+        ? 'cleared whether it has a cover letter'
+        : value
+          ? 'marked that it has a cover letter'
+          : 'marked that it has no cover letter',
+    );
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new JobsRefused('Nothing to change: give excitement, channel, ready_to_apply, all_questions_added or has_cover_letter.');
+  }
 
   const { data, error } = await env.jobs
     .from('applications')
@@ -959,11 +991,14 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
  * The rows that hang off an application, by `schema.table`, with the column
  * that names it, whether the table keeps a user_id, and the columns that,
  * with the application, may hold only one row. Every one is moved onto the
- * application kept, so nothing goes with the duplicates. The company page's
- * own merge moves fewer, and its reminders, rounds groups and quiet marks go
- * with the row it deletes.
+ * application kept, so nothing goes with the duplicates. A table added
+ * with a foreign key to applications or roles and left out of these lists
+ * fails tests/merge-children-jobs.test.ts, which reads the keys from the
+ * database. The company page merges through job_search.merge_roles, which
+ * reads them itself.
  */
-const APPLICATION_CHILDREN = [
+export const APPLICATION_CHILDREN = [
+  { table: 'job_search.application_drafts', column: 'application_id', owned: true, unique: 'kind' },
   { table: 'job_search.application_events', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.application_answers', column: 'application_id', owned: true, unique: 'question_id' },
   { table: 'job_search.attachments', column: 'application_id', owned: true, unique: null },
@@ -979,8 +1014,12 @@ const APPLICATION_CHILDREN = [
   { table: 'todo.task_links', column: 'application_id', owned: false, unique: null },
 ] as const;
 
-/** The rows that hang off a role itself, moved onto the role kept. Its applications are handled on their own. */
-const ROLE_CHILDREN = [
+/**
+ * The rows that hang off a role itself, moved onto the role kept. Its
+ * applications are handled on their own, and a role's old thread notes
+ * (job_search.notes.role_id) refuse the merge (refuseThreads).
+ */
+export const ROLE_CHILDREN = [
   { table: 'job_search.attachments', column: 'role_id', owned: true },
   { table: 'job_search.suggestions', column: 'role_id', owned: true },
   { table: 'todo.task_links', column: 'role_id', owned: false },
@@ -1286,10 +1325,17 @@ export async function undoRoleMerge(
 const REMINDERS = 'job_search.reminders';
 const WAITING = 'job_search.waiting_dismissals';
 const BODY_MAX = 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A week on, as Jobs Today's "Later" puts a reminder or a waiting row off. */
-const putOffUntil = () => new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString();
+/**
+ * The day a put-off ends, from the one Later menu's choices as Jobs Today's
+ * Later offers them (plan #1957.9), read in their zone.
+ */
+function putOffUntil(env: JobsWriteEnv, choice: unknown, field: string): { at: string; words: string } {
+  const zone = env.timezone ?? 'UTC';
+  const later = typeof choice === 'string' ? laterUntil(choice, zone) : null;
+  if (!later) throw new JobsRefused(`${field} must be ${LATER_UNTIL_HELP}.`);
+  return { at: later.until.toISOString(), words: untilWords(later.day, zone) };
+}
 
 /** The role an application is on, for the words a change is told in. */
 async function applicationRole(env: JobsWriteEnv, applicationId: unknown): Promise<{ id: string; name: string } | null> {
@@ -1346,16 +1392,17 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
   const update: Row = {};
   const changed: string[] = [];
 
-  if (args.finish === true && args.put_off === true) throw new JobsRefused('Finish it or put it off, not both.');
+  if (args.finish === true && given(args, 'put_off')) throw new JobsRefused('Finish it or put it off, not both.');
   if (args.finish === true) {
     if (before.completed_at) throw new JobsRefused('That reminder is finished already.');
     update.completed_at = new Date().toISOString();
     changed.push('finished');
   }
-  if (args.put_off === true) {
-    if (given(args, 'due')) throw new JobsRefused('Put it off a week, or give it a new due date, not both.');
-    update.due_at = putOffUntil();
-    changed.push(`put off for ${SNOOZE_DAYS} days`);
+  if (given(args, 'put_off')) {
+    if (given(args, 'due')) throw new JobsRefused('Put it off, or give it a new due date, not both.');
+    const until = putOffUntil(env, args.put_off, 'put_off');
+    update.due_at = until.at;
+    changed.push(`put off ${until.words}`);
   }
   if (given(args, 'body')) {
     const body = text(args, 'body');
@@ -1429,7 +1476,7 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
  * Jobs Today's "Waiting on you" rows are mail that asked something of them,
  * recomputed from the event log on every load, so finishing one or putting
  * it off writes a row of its own in job_search.waiting_dismissals, as the
- * page does: no date for done, a week on for later. The first time that row
+ * page does: no date for done, the day chosen for later. The first time that row
  * is new, and its Undo takes it out; after that it is changed in place.
  */
 async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
@@ -1452,7 +1499,8 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = (existing as Row | null) ?? null;
   if (verb === 'finish' && before && before.dismissed_until === null) throw new JobsRefused('That one is marked done already.');
 
-  const until = verb === 'finish' ? null : putOffUntil();
+  const later = verb === 'finish' ? null : putOffUntil(env, args.until, 'until');
+  const until = later?.at ?? null;
   const { data, error } = before
     ? await env.jobs
         .from('waiting_dismissals')
@@ -1471,7 +1519,7 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const after = data as Row;
   const role = await applicationRole(env, event.application_id);
   const what = quotedBody(event.summary, 'the email that asked them something');
-  const said = verb === 'finish' ? 'marked done' : `put off for ${SNOOZE_DAYS} days`;
+  const said = later ? `put off ${later.words}` : 'marked done';
   const href = role ? roleHref(role.id) : '/jobs';
   return {
     kind: 'change_waiting',
@@ -2126,7 +2174,7 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
     const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, companyGiven);
     if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
     companyId = company.id;
-    undo.company_added = company.id;
+    if (company.created) undo.company_added = company.id;
   }
 
   // Recruiter inbound only when the recruiter wrote first, as the page decides.
@@ -2823,7 +2871,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_application',
     description:
-      'Set how excited they are about a role (1 to 5, or 0 to clear it) or how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
+      'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, whether all its questions are added, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
     input_schema: {
       type: 'object',
       properties: {
@@ -2832,6 +2880,12 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         excitement: { type: 'integer', description: 'How excited they are, 1 to 5; 0 clears it.' },
         channel: { type: 'string', enum: [...APPLICATION_SOURCES], description: 'How they applied.' },
         referral_contact_ref: { type: 'string', description: 'With channel referral: the job_search.contacts ref of who referred them.' },
+        ready_to_apply: { type: 'boolean', description: 'True when the application is ready to send, false when it is not.' },
+        all_questions_added: { type: 'boolean', description: 'True when every question the application asks has been added to it, false when not.' },
+        has_cover_letter: {
+          type: ['boolean', 'null'],
+          description: 'Whether the application has a cover letter: true yes, false no, null clears the answer.',
+        },
       },
       additionalProperties: false,
     },
@@ -2855,7 +2909,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'save_answer',
     description:
-      "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. When they ask you to write or rewrite an answer, write it yourself rather than asking for the words: read their evidence bank with list_rows on job_search.evidence_items and the role's description with open_row on job_search.roles, write the answer from what those hold, and save it as a draft with the evidence_refs it rests on and any unsupported_claims it makes. Give only what to change. Name the answer by answer_ref (list_rows on job_search.application_answers), or by question with application_ref or role_ref. Nothing is sent to the employer.",
+      "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. When they ask you to write or rewrite answers, do it in one pass without asking for the words: read the answers and their questions with application_answers (role_ref or application_ref), read their evidence bank with list_rows on job_search.evidence_items and the role's description with open_row on job_search.roles, write each new version, and save each with its own save_answer call in the same reply, passing the ref from application_answers as answer_ref, with the evidence_refs it rests on and any unsupported_claims it makes. Writing rules for a rewrite: plain first-person language in their own voice; shorter than the old version; an answer to \"why this company\" says why the company and why they fit before any story; facts only from the evidence bank, their résumé and the job description, and every claim nothing there backs goes in unsupported_claims. Leave status as draft unless they say otherwise; never mark an answer approved or submitted on your own. Finish by telling them which answers you changed, naming each question. Give only what to change. A single answer can also be named by question with application_ref or role_ref. Nothing is sent to the employer.",
     input_schema: {
       type: 'object',
       properties: {
@@ -2933,13 +2987,13 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_reminder',
-    description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off ${SNOOZE_DAYS} days as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
+    description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off to a day as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
     input_schema: {
       type: 'object',
       properties: {
         reminder_ref: { type: 'string', description: 'The job_search.reminders ref list_rows or a lookup returned.' },
         finish: { type: 'boolean', description: 'True to tick it off.' },
-        put_off: { type: 'boolean', description: `True to put it off ${SNOOZE_DAYS} days from now.` },
+        put_off: { type: 'string', description: `To put it off, the day it comes back: ${LATER_UNTIL_HELP}.` },
         body: { type: 'string', description: 'The new wording.' },
         due: { type: 'string', description: 'The new due day, YYYY-MM-DD.' },
         email_ref: {
@@ -2954,12 +3008,13 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_waiting',
-    description: `Finish or put off (${SNOOZE_DAYS} days) a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
+    description: `Finish or put off to a day a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
     input_schema: {
       type: 'object',
       properties: {
         event_ref: { type: 'string', description: 'The job_search.application_events ref of the request.' },
         verb: { type: 'string', enum: ['finish', 'put_off'], description: 'finish when it is dealt with; put_off for later.' },
+        until: { type: 'string', description: `For put_off, the day it comes back: ${LATER_UNTIL_HELP}.` },
       },
       required: ['event_ref', 'verb'],
       additionalProperties: false,
@@ -3131,8 +3186,8 @@ export async function runJobsWrite(
 }
 
 /** The clients a Jobs write runs on, from a surface's clients per schema. */
-export async function jobsEnv(userId: string, db: AskDb): Promise<JobsWriteEnv> {
-  return { userId, jobs: await db('job_search'), todo: await db('todo'), core: await db('core') };
+export async function jobsEnv(userId: string, db: AskDb, timezone?: string): Promise<JobsWriteEnv> {
+  return { userId, jobs: await db('job_search'), todo: await db('todo'), core: await db('core'), timezone };
 }
 
 /** The sentence for a person with Jobs switched off. */
@@ -3148,7 +3203,7 @@ export const JOBS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = JOBS_
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('jobs')) return { ok: false, error: JOBS_OFF };
-    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db), input);
+    const made = await runJobsWrite(write, await jobsEnv(ctx.userId, ctx.db, ctx.timezone), input);
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown> };
   },

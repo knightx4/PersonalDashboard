@@ -7,6 +7,7 @@ import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { pickAhead, pickOneToAsk, type NothingToAsk, type PickedToAsk } from '@/lib/learn/graph/pick';
 import { READY_LIMIT } from '@/lib/learn/graph/ready';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
+import { predictedStrength } from '@/lib/learn/predicted';
 import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -21,7 +22,7 @@ import {
   FLOW_LOOKBACK,
   flowSlots,
   GOAL_SHARE,
-  surveyShare,
+  surveyShareFor,
   type FlowTurn,
 } from '@/lib/learn/survey/rate';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
@@ -63,7 +64,9 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  * readers here tell it apart by the subject's `aim_id`, and name it after the
  * goal. A waiting question about a goal archived since is thrown away unshown.
  * The Level 3 goal takes its turns too, with questions about the articles you
- * claimed and have not been tested on (plan #1386).
+ * claimed and have not been tested on (plan #1386). A goal question asks you
+ * to explain the idea rather than pick an option (plan #2164.2, `explain.ts`);
+ * multiple choice on a goal's idea is only ever a re-check.
  *
  * `goalsOnly` asks about your goals and nothing else (plan #1387), and `aim`
  * about one goal: every question written ahead is a goal question, and a
@@ -83,6 +86,12 @@ export type FlowScope = {
   tracksOnly?: boolean;
   goalsOnly?: boolean;
   aim?: string | null;
+  /**
+   * The goals-only setting (plan #2164.1, `learn.settings.goals_only`): no
+   * survey question is written or taken, whatever the filter. The mixed flow
+   * still asks about tracks and goals.
+   */
+  noSurvey?: boolean;
 };
 
 /** Whether the flow asks about goals and nothing else: all of them, or one. */
@@ -160,7 +169,18 @@ export type FlowQuestion = {
    */
   goal?: GoalAbout;
   question: string;
+  /** The options to pick from. Empty on an explain question. */
   options: string[];
+  /**
+   * Set on an explain question (plan #2164.2): answered in your own words and
+   * marked the way a teach-back is, rather than picked from `options`.
+   */
+  explain?: true;
+  /**
+   * Set on a worked case (plan #2164.3): figures and a task, answered with a
+   * number or two sentences and graded as the applied rung.
+   */
+  case?: true;
 };
 
 export type SurveyAbout = { themeName: string; fieldName: string };
@@ -180,9 +200,21 @@ type QueuedRow = {
   picked_state: KnowledgeState;
   picked_recheck: 'tested' | 'declared' | null;
   shown_at: string | null;
+  rung: 'recognise' | 'apply' | 'defend';
 };
 
-const QUEUED_COLUMNS = 'id, concept_id, question, options, picked_state, picked_recheck, shown_at';
+const QUEUED_COLUMNS =
+  'id, concept_id, question, options, picked_state, picked_recheck, shown_at, rung';
+
+/** An explain question: no options, at the rung the teach-back marks at. */
+function isExplain(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
+  return row.options === null && row.rung === 'defend';
+}
+
+/** A worked case on a goal's idea: no options, at the applied rung. */
+function isCase(row: Pick<QueuedRow, 'options' | 'rung'>): boolean {
+  return row.options === null && row.rung === 'apply';
+}
 
 function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
@@ -390,7 +422,9 @@ async function claimsNow(
 }
 
 function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
-  if (!row.options) return null;
+  const explain = isExplain(row);
+  const worked = isCase(row);
+  if (!row.options && !explain && !worked) return null;
   return {
     probeId: row.id,
     conceptId: row.concept_id,
@@ -401,14 +435,23 @@ function asQuestion(row: QueuedRow, claim: ClaimNow): FlowQuestion | null {
     ...(claim.survey ? { survey: claim.survey } : {}),
     ...(claim.goal ? { goal: claim.goal } : {}),
     question: row.question,
-    options: row.options,
+    options: row.options ?? [],
+    ...(explain ? { explain: true as const } : {}),
+    ...(worked ? { case: true as const } : {}),
   };
 }
 
-/** Whether the pick a question came from still holds. */
+/**
+ * Whether the pick a question came from still holds. A goal question is
+ * asked as an explain question unless it is a re-check (plan #2164.2), so a
+ * multiple-choice one written before that is thrown away and written again.
+ */
 function holds(row: QueuedRow, claims: Map<string, ClaimNow>): boolean {
   const claim = claims.get(row.concept_id);
-  return claim !== undefined && claim.state === row.picked_state && row.options !== null;
+  if (claim === undefined || claim.state !== row.picked_state) return false;
+  if (isExplain(row) || isCase(row)) return true;
+  if (row.options === null) return false;
+  return claim.goal === null || row.picked_recheck !== null;
 }
 
 async function discard(supabase: LearnSupabaseClient, ids: string[]): Promise<void> {
@@ -488,6 +531,7 @@ async function pickRows(
  * a goal's link, and anything at all with no filter.
  */
 function fits(claim: ClaimNow, scope: FlowScope): boolean {
+  if (scope.noSurvey && claim.survey !== null) return false;
   if (scope.track !== null) return inTrack(claim) && claim.subjectId === scope.track;
   if (scope.aim) return claim.goal?.aimId === scope.aim;
   if (scope.goalsOnly) return claim.goal !== null;
@@ -514,11 +558,16 @@ export async function takeWaiting(
   }
 
   for (const { row, claim } of valid.filter(({ claim }) => fits(claim, options))) {
-    // Conditional on it still being unshown, so two presses at once cannot
-    // both take the same question.
+    // Keep what Learn believes of the idea at this moment with the question
+    // (plan #2179.1). Conditional on it still being unshown, so two presses at
+    // once cannot both take the same question.
+    const now = new Date();
     const { data, error } = await supabase
       .from('probes')
-      .update({ shown_at: new Date().toISOString() })
+      .update({
+        shown_at: now.toISOString(),
+        predicted_strength: await predictedStrength(supabase, row.concept_id, now),
+      })
       .eq('id', row.id)
       .is('shown_at', null)
       .select('id');
@@ -545,7 +594,7 @@ export async function takeWaiting(
 export async function putBack(supabase: LearnSupabaseClient, probeId: string): Promise<void> {
   const { error } = await supabase
     .from('probes')
-    .update({ shown_at: null, created_at: new Date().toISOString() })
+    .update({ shown_at: null, predicted_strength: null, created_at: new Date().toISOString() })
     .eq('id', probeId)
     .not('picked_state', 'is', null)
     .is('answered_at', null);
@@ -746,8 +795,9 @@ async function writeGoals(input: {
   const written: FlowQuestion[] = [];
   if (input.count <= 0 || input.goals.length === 0) return written;
 
+  // The idea is a model call; the question is not (plan #2164.2).
   const ideaSpend = collectSpend();
-  const questionSpend = collectSpend();
+  const caseSpend = collectSpend();
   try {
     // Rotated after each question, so the next goal turn goes to the next
     // goal. A goal that cannot be written for is dropped for this round.
@@ -764,7 +814,7 @@ async function writeGoals(input: {
         anthropicApiKey: input.apiKey,
         flow: { shownAt: input.shownAt },
         onIdeaSpend: ideaSpend.sink,
-        onSpend: questionSpend.sink,
+        onCaseSpend: caseSpend.sink,
       });
       if (!result.ok) {
         if (result.reason === 'error') console.error('[learn flow] goal question', result.detail);
@@ -781,6 +831,7 @@ async function writeGoals(input: {
         goal: { aimId: question.aimId, aimName: question.aimName },
         question: question.question,
         options: question.options,
+        ...(question.case ? { case: true as const } : { explain: true as const }),
       });
     }
   } catch (error) {
@@ -788,7 +839,7 @@ async function writeGoals(input: {
   }
   await Promise.all([
     recordLearnSpend(input.userId, 'write-survey-idea', ideaSpend.reports),
-    recordLearnSpend(input.userId, 'write-survey-question', questionSpend.reports),
+    recordLearnSpend(input.userId, 'write-goal-case', caseSpend.reports),
   ]);
   return written;
 }
@@ -862,7 +913,7 @@ export async function nextQuestion(
       });
       if (goal) return { kind: 'question', question: goal };
     }
-    if (options.vault && surveys(options)) {
+    if (options.vault && surveys(options) && !options.noSurvey) {
       const [survey] = await writeSurveys({
         supabase,
         vault: options.vault,
@@ -932,7 +983,7 @@ export async function fillQueue(
       waitingByTrack.set(claim.subjectId, (waitingByTrack.get(claim.subjectId) ?? 0) + 1);
     }
 
-    const mixing = vault !== undefined && surveys(scope);
+    const mixing = vault !== undefined && surveys(scope) && !scope.noSurvey;
     const [subjects, { rows, shares }, answered, pool, recent, goals] = await Promise.all([
       loadSubjects(supabase),
       pickRows(supabase, READY_LIMIT, scope.track, waitingByTrack),
@@ -968,7 +1019,7 @@ export async function fillQueue(
       recent,
       {
         goal: goals.length > 0 ? GOAL_SHARE : 0,
-        survey: pool ? surveyShare(fieldsWrittenAbout(pool)) : 0,
+        survey: pool ? surveyShareFor(fieldsWrittenAbout(pool), scope.noSurvey === true) : 0,
       },
       wanted,
     );

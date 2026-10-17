@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
 import { CardSection } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 import { companyFacts, type DiscoveredCompany, type DiscoveryLine } from '@/lib/jobs/discover/watchlist-view';
@@ -86,12 +86,19 @@ export function DiscoveredCompanies({
           )}
           {notice && <p className="text-small text-ink-muted">{notice}</p>}
         </div>
-        <span className="flex shrink-0 items-center gap-1">
-          <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
-            {searching ? 'Searching…' : 'Find startups'}
-          </Button>
-          <PaidHint action="app/jobs/(app)/find/actions.ts#findStartups" what="Cost of a startup search" align="end" />
-        </span>
+        <DashAction
+          type="button"
+          size="sm"
+          variant="secondary"
+          pending={searching}
+          onClick={ask}
+          paid="app/jobs/(app)/find/actions.ts#findStartups"
+          what="Cost of a startup search"
+          align="end"
+          wrapperClassName="shrink-0"
+        >
+          {searching ? 'Searching…' : 'Find startups'}
+        </DashAction>
       </div>
 
       {companies.length > 0 && (

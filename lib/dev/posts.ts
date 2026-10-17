@@ -21,8 +21,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * The row
  * ---------------------------------------------------------------------- */
 
-export type PostStatus = 'suggested' | 'posted' | 'dropped';
-export const POST_STATUSES: readonly PostStatus[] = ['suggested', 'posted', 'dropped'];
+export type PostStatus = 'suggested' | 'planned' | 'posted' | 'dropped';
+export const POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned', 'posted', 'dropped'];
+/** The statuses of a draft still waiting to be posted: the card actions work on either. */
+export const OPEN_POST_STATUSES: readonly PostStatus[] = ['suggested', 'planned'];
 
 export type SocialPost = {
   id: string;
@@ -89,9 +91,9 @@ export function socialPostFromRow(row: Record<string, unknown>): SocialPost {
   };
 }
 
-/** Suggested first, newest first within each status, then posted, then dropped. */
+/** Planned first, then suggested, newest first within each status, then posted, then dropped. */
 export function sortPosts(posts: readonly SocialPost[]): SocialPost[] {
-  const rank: Record<PostStatus, number> = { suggested: 0, posted: 1, dropped: 2 };
+  const rank: Record<PostStatus, number> = { planned: 0, suggested: 1, posted: 2, dropped: 3 };
   return [...posts].sort(
     (a, b) => rank[a.status] - rank[b.status] || b.createdAt.localeCompare(a.createdAt),
   );
@@ -211,7 +213,13 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
 }
 
 /** The turn appended to the plan routine's session. */
-export function postsRunText(input: { userId: string; focus?: PostsRunFocus | null }): string {
+export function postsRunText(input: {
+  userId: string;
+  focus?: PostsRunFocus | null;
+  /** What the person saved on the Posts tab; empty or absent adds nothing. */
+  wants?: string | null;
+}): string {
+  const wants = (input.wants ?? '').trim();
   const lines = [
     `Suggest X posts about building this app, for user_id ${input.userId}.`,
     '',
@@ -223,6 +231,16 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
     '',
     focusLine(input.focus),
     '',
+    ...(wants
+      ? [
+          'What the person wants from their posts, as they saved it on the Posts tab. Read it ' +
+            'before choosing angles and count it as direction on topic and tone. The voice ' +
+            "guide's privacy and length checks win where they disagree with it.",
+          '',
+          ...wants.split('\n').map((line) => `> ${line}`),
+          '',
+        ]
+      : []),
     'Dash never posts. You change rows, not code, and do not touch any plan step. The one ' +
       'commit you may push is screenshots under public/posts/, as the skill describes.',
   ];

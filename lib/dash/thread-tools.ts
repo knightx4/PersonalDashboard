@@ -26,6 +26,9 @@ export const DEV_THREAD_TABLES = {
   spec: 'public.spec_sections',
   takeaway: 'public.inspiration_takeaways',
   change: 'public.spec_changes',
+  // An X post draft on the Posts tab (plan #2202.2), rewritten with
+  // rewrite_post (lib/dash/post-writes.ts), which is offered on every thread.
+  post: 'public.social_posts',
 } as const;
 
 /** A goal or a step under one. */

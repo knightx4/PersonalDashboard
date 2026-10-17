@@ -12,7 +12,7 @@ import {
   ScannedAttached,
   Viewfinder,
 } from '@/components/shell/capture-camera';
-import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { popoverSurface } from '@/components/ui/popover';
 import { ToastProvider, useToast } from '@/components/ui/toast';
 import { CAPTURE_KINDS } from '@/lib/capture/actions';
@@ -53,7 +53,11 @@ const COSTS: PaidCosts = {
 };
 
 function Aimed({ children }: { children: React.ReactNode }) {
-  return <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>{children}</div>;
+  return (
+    <PaidCostsProvider costs={COSTS}>
+      <div className={cn(popoverSurface, 'w-full overflow-hidden shadow-2xl')}>{children}</div>
+    </PaidCostsProvider>
+  );
 }
 
 /** The toast an order leaves, held open for the shot. */
@@ -85,11 +89,7 @@ export function ShoppingAimedSurface() {
             error={null}
             onSubmit={nothing}
             tools={<ReceiptPhotoButton taken={false} onFile={nothing} />}
-            hint={
-              <PaidCostsProvider costs={COSTS}>
-                <PaidHint action="app/capture-actions.ts#makeAimedCapture" what="Cost of reading it" align="end" />
-              </PaidCostsProvider>
-            }
+            paid={{ action: 'app/capture-actions.ts#makeAimedCapture', what: 'Cost of reading it' }}
           />
         </Aimed>
         <Aimed>
@@ -176,11 +176,7 @@ export function ShoppingAimedCameraSurface() {
           onSubmit={nothing}
           attached={<ReceiptAttached src={RECEIPT_PHOTO} onRemove={nothing} />}
           tools={<ReceiptPhotoButton taken onFile={nothing} />}
-          hint={
-            <PaidCostsProvider costs={COSTS}>
-              <PaidHint action="app/capture-actions.ts#makeAimedCapture:receipt" what="Cost of reading the receipt" align="end" />
-            </PaidCostsProvider>
-          }
+          paid={{ action: 'app/capture-actions.ts#makeAimedCapture:receipt', what: 'Cost of reading the receipt' }}
         />
       </Aimed>
       <Aimed>

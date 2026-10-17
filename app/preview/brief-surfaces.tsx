@@ -2,6 +2,10 @@ import { sectionSubject } from '@/lib/core/section-path';
 import { BriefView } from '@/app/learn/b/[id]/brief-view';
 import { BriefsList } from '@/app/learn/now/briefs-list';
 import type { BriefOnPage, BriefPage, BriefSource, BriefSummary } from '@/lib/learn/briefs/view';
+import type { BriefGoalPanel } from '@/lib/learn/briefs/topics';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * A researched topic (plan #2023.4), from fixtures shaped like `learn.briefs`
@@ -117,13 +121,85 @@ const ready: BriefOnPage = {
 
 const readyPage: BriefPage = { brief: ready, sources };
 
+/** The learning goals the brief could go under (plan #2184.1), the longest name first in the list. */
+const goals: BriefGoalPanel['goals'] = [
+  { id: '00000000-0000-4000-8000-000000000501', name: 'Move into an IT audit manager role at a Big Four firm within two years' },
+  { id: '00000000-0000-4000-8000-000000000502', name: 'SOX and internal control' },
+  { id: '00000000-0000-4000-8000-000000000503', name: 'Startup FP&A' },
+];
+
+const choosing: BriefGoalPanel = { goals, topics: [], aim: null };
+
+/* What drafting the brief's topic costs, as the learn layout provides it, so
+ * the $ beside Draft its topic is drawn (law 16): two Sonnet calls and an embedding. */
+const DRAFT_COST: CostEstimate = {
+  lowMicros: 120_000,
+  medianMicros: 180_000,
+  highMicros: 260_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [MODELS.learnTopicDraft, 'voyage-4-lite'],
+};
+
+function Priced({ children }: { children: React.ReactNode }) {
+  return <PaidCostsProvider costs={{ 'app/learn/b/[id]/actions.ts#draftBriefTopics': DRAFT_COST }}>{children}</PaidCostsProvider>;
+}
+
+// The path the page reads from the catalogue: Learn › Now › the brief.
+const briefPath = sectionSubject('/learn/now', 'Now', {
+  label: ready.question,
+  href: `/learn/b/${ready.id}`,
+});
+
 export function LearnBriefSurface() {
-  // The path the page reads from the catalogue: Learn › Now › the brief.
-  const path = sectionSubject('/learn/now', 'Now', {
-    label: ready.question,
-    href: `/learn/b/${ready.id}`,
-  });
-  return <BriefView page={readyPage} live={false} path={path} />;
+  return (
+    <Priced>
+      <BriefView page={readyPage} live={false} path={briefPath} goal={choosing} />
+    </Priced>
+  );
+}
+
+/** Topics drafted from the brief under a goal, one approved and one still a draft. */
+export function LearnBriefTopicsSurface() {
+  const drafted: BriefGoalPanel = {
+    goals,
+    aim: goals[1]!,
+    topics: [
+      { id: '00000000-0000-4000-8000-000000000601', name: 'AI in internal control over financial reporting', approved: true, aimName: goals[1]!.name },
+      { id: '00000000-0000-4000-8000-000000000602', name: 'IT general controls', approved: false, aimName: goals[1]!.name },
+    ],
+  };
+  return <BriefView page={readyPage} live={false} path={briefPath} goal={drafted} />;
+}
+
+/** No learning goal set yet: the section says where to name one. */
+export function LearnBriefGoalEmptySurface() {
+  return <BriefView page={readyPage} live={false} path={briefPath} goal={{ goals: [], topics: [], aim: null }} />;
+}
+
+/** Draft its topic pressed: the two drafts running. */
+export function LearnBriefGoalPendingSurface() {
+  return (
+    <Priced>
+      <BriefView page={readyPage} live={false} path={briefPath} goal={choosing} goalShown={{ pending: true }} />
+    </Priced>
+  );
+}
+
+/** Draft its topic failed. */
+export function LearnBriefGoalErrorSurface() {
+  return (
+    <Priced>
+      <BriefView
+        page={readyPage}
+        live={false}
+        path={briefPath}
+        goal={choosing}
+        goalShown={{ error: 'Dash could not write the draft. The reply was cut off. Press Draft its topic to send it again.' }}
+      />
+    </Priced>
+  );
 }
 
 /**

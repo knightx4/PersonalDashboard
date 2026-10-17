@@ -16,7 +16,8 @@ import { PICK_A_DAY, SNOOZE_CHOICES, SNOOZE_LABELS } from '@/lib/core/snooze-day
  * This weekend, Next week, Next month, or Pick a day, the same on a todo, a
  * goal step, a raise and an Inbox row. It only asks: `onChoose` gets one of
  * lib/core/snooze-days.ts's choices or a YYYY-MM-DD day and does the write,
- * which each caller records as it always has.
+ * which each caller records as it always has. Every Inbox says Later for
+ * putting a row off (plan #1937.4, docs/ONE-INTERFACE-SPEC.md Part 4).
  */
 
 const LATER = LIFECYCLE_VERB.later;
@@ -115,7 +116,7 @@ export function LaterMenu({
         ) : (
           <span className="inline-flex items-center gap-1">
             <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
-            <span className="max-sm:sr-only">{LATER}</span>
+            <span>{LATER}</span>
             <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
           </span>
         )

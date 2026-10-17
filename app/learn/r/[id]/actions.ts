@@ -5,9 +5,9 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadReading, type ReadingSummary } from '@/lib/learn/tracks/load';
+import { loadReading } from '@/lib/learn/tracks/load';
 import { getReadingText } from '@/lib/learn/locate/reading-text';
-import { summarizeReadingText } from '@/lib/learn/tracks/reading-summary-model';
+import { summarizeReadingFor, type SummarizeResult } from '@/lib/learn/tracks/summarize-run';
 import { answerAboutReading } from '@/lib/learn/tracks/reading-chat-model';
 import { answerWithCut, CHAT_UNREADABLE, readingMaterial } from '@/lib/learn/tracks/reading-chat';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -35,7 +35,6 @@ import {
   setReadingNote,
   setReadingText,
   setReadingStatus,
-  setReadingSummary,
 } from '@/lib/learn/tracks/save';
 import { cleanReadingText, MAX_READING_TEXT, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
 import { extractPdfText, ownsReadingPdfPath } from '@/lib/learn/tracks/reading-pdf';
@@ -55,6 +54,14 @@ import { formatNumber } from '@/lib/money';
  */
 
 export type ReadingActionState = { error?: string };
+
+/**
+ * What marking a reading's status answers with. `check` is set only when a
+ * reading queued for a gap in a subject graph has just been marked read: the
+ * probe page for that idea, which the reading page offers as "Check it now"
+ * (plan #2152.1).
+ */
+export type StatusActionState = ReadingActionState & { check?: { href: string } };
 
 /**
  * What the search was told about you, said out loud beside the results.
@@ -225,9 +232,9 @@ const StatusInput = z.object({
 
 // latency: pending
 export async function updateStatus(
-  _prev: ReadingActionState,
+  _prev: StatusActionState,
   formData: FormData,
-): Promise<ReadingActionState> {
+): Promise<StatusActionState> {
   const user = await requireUser();
 
   const parsed = StatusInput.safeParse({
@@ -237,6 +244,7 @@ export async function updateStatus(
   if (!parsed.success) return { error: 'That is not a status.' };
 
   const supabase = await createLearnClient();
+  let check: StatusActionState['check'];
   try {
     await setReadingStatus(supabase, parsed.data.readingId, parsed.data.status);
 
@@ -251,6 +259,17 @@ export async function updateStatus(
         readingId: parsed.data.readingId,
         outcome: 'read',
       });
+
+      // A reading queued for a gap was read to close it, so offer one question
+      // on that idea while it is fresh. One you added yourself has no concept
+      // and offers nothing. The answer is recorded by the probe like any other.
+      const reading = await loadReading(supabase, parsed.data.readingId);
+      if (reading?.conceptId) {
+        const subjectId = await subjectIdOfConcept(supabase, reading.conceptId);
+        if (subjectId) {
+          check = { href: `/learn/s/${subjectId}/probe?concept=${reading.conceptId}` };
+        }
+      }
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not update that.' };
@@ -260,7 +279,7 @@ export async function updateStatus(
   revalidatePath('/learn/lists');
   // Finishing or giving up takes it off the shelf, so the shelf has changed.
   revalidatePath('/learn/now');
-  return {};
+  return check ? { check } : {};
 }
 
 const ReadNowInput = z.object({
@@ -366,22 +385,9 @@ export async function saveReadingText(
   return {};
 }
 
-export type SummarizeResult =
-  | { ok: true; summary: ReadingSummary }
-  | {
-      ok: false;
-      error: string;
-      /** True when the reading's text could not be read: the page points to paste or upload. */
-      unreadable?: boolean;
-    };
-
 /**
  * Summarize, and Redo (plan #1876.4): one model call over the reading's text,
- * kept on the reading so it shows again on later visits.
- *
- * The text is what getReadingText returns: the text you gave the reading when
- * there is some, its link otherwise. A link Dash cannot read costs nothing and
- * comes back as the paste-or-upload message.
+ * kept on the reading so it shows again on later visits (summarizeReadingFor).
  */
 // latency: pending
 export async function summarizeReading(readingId: string): Promise<SummarizeResult> {
@@ -390,44 +396,9 @@ export async function summarizeReading(readingId: string): Promise<SummarizeResu
   const id = z.string().uuid().safeParse(readingId);
   if (!id.success) return { ok: false, error: 'Could not work out which reading that was.' };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, error: 'Summarize needs the Anthropic key, which is not set on this deployment.' };
-
-  try {
-    const supabase = await createLearnClient();
-    const reading = await loadReading(supabase, id.data);
-    if (!reading) return { ok: false, error: 'That reading is not there any more.' };
-
-    const text = await getReadingText(supabase, {
-      id: reading.id,
-      url: reading.openUrl ?? reading.source?.canonicalUrl ?? null,
-    });
-    if (!text.ok) return { ok: false, error: text.message, unreadable: true };
-
-    const spend = collectSpend();
-    const result = await summarizeReadingText({
-      title: reading.subject,
-      why: reading.why,
-      text: text.text,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
-    });
-    await recordLearnSpend(user.id, 'summarize-reading', spend.reports);
-    if (!result.ok) {
-      console.error('[reading summary]', result.detail);
-      return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
-    }
-
-    const saved = { text: result.text, from: text.from, label: text.label, truncated: text.truncated };
-    const found = await setReadingSummary(supabase, reading.id, saved);
-    if (!found) return { ok: false, error: 'That reading is not there any more.' };
-
-    revalidatePath(`/learn/r/${reading.id}`);
-    return { ok: true, summary: { ...saved, writtenAt: new Date().toISOString() } };
-  } catch (error) {
-    console.error('[reading summary]', error instanceof Error ? error.message : error);
-    return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
-  }
+  const result = await summarizeReadingFor(await createLearnClient(), user.id, id.data);
+  if (result.ok) revalidatePath(`/learn/r/${id.data}`);
+  return result;
 }
 
 export type ReadingCommentState = { error?: string; message?: string };

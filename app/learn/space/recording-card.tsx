@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { CheckRow } from '@/components/ui/field';
-import type { Recording } from '@/lib/learn/map/recording';
+import { PRIVATE_IDEA, PRIVATE_PLACE, type Recording } from '@/lib/learn/map/recording';
 
 /**
  * Recording mode's switch in Idea Space's rail (plan #1997.9). Off, it lists
- * the places so the person can tick the ones to hide; on, it says how many
+ * the places, your subjects since plan #2317.2, so the person can tick the ones to hide; on, it says how many
  * are hidden and does not list them, since the list would name them. The
  * choice is remembered per person through `save`.
  */
@@ -77,9 +77,8 @@ export function RecordingCard({
           <p className="mt-1 text-ui text-ink-muted">
             On.{' '}
             {hiddenHere.length === 0
-              ? 'No place is hidden.'
-              : `${hiddenHere.length} ${hiddenHere.length === 1 ? 'place is' : 'places are'} hidden`}
-            , along with the ideas in {hiddenHere.length === 1 ? 'it' : 'them'}.
+              ? 'No subject is hidden.'
+              : `${hiddenHere.length} ${hiddenHere.length === 1 ? 'subject is' : 'subjects are'} hidden, along with the topics in ${hiddenHere.length === 1 ? 'it' : 'them'}.`}
           </p>
           <Button
             variant="secondary"
@@ -93,11 +92,11 @@ export function RecordingCard({
       ) : (
         <>
           <p className="mt-1 text-small text-ink-muted">
-            Chosen places show as &ldquo;A private place&rdquo;, and the ideas in them as
-            &ldquo;Private idea&rdquo;.
+            Chosen subjects show as &ldquo;{PRIVATE_PLACE}&rdquo;, and the topics in them as
+            &ldquo;{PRIVATE_IDEA}&rdquo;.
           </p>
           <Disclosure
-            title="Places to hide"
+            title="Subjects to hide"
             meta={`${hiddenHere.length} of ${places.length}`}
             defaultOpen={chooseOpen}
             className="mt-1"

@@ -14,7 +14,7 @@ export function OnboardingFrame({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh bg-page">
       <header className="mx-auto flex h-14 max-w-lg items-center justify-between px-4 sm:px-0 sm:pt-6">
         <Link href="/onboarding" className={cn(PRESS_AREA, 'flex items-center gap-2')}>
-          <ModuleMark module={null} size="md" />
+          <ModuleMark module="dash" size="md" />
           <span className="text-body font-semibold tracking-tight text-ink">
             Dash
           </span>

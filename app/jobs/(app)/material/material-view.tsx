@@ -6,6 +6,7 @@ import { MessageSquareText, Trash2 } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Chip } from '@/components/ui/chip';
 import { Group } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -15,7 +16,6 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient as createBrowserJobsClient } from '@/lib/jobs/auth/client';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
@@ -727,10 +727,12 @@ function SeedFromWriting({
           </span>
         )}
 
-        <Button
+        <DashAction
           type="button"
           size="sm"
           variant="secondary"
+          paid="app/jobs/(app)/material/evidence-actions.ts#proposeEvidence"
+          what="Cost of proposing evidence"
           disabled={busy || (kind === 'resume' && !resumeVersionId)}
           onClick={() => {
             setBusy(true);
@@ -757,12 +759,8 @@ function SeedFromWriting({
             });
           }}
         >
-          {busy ? 'Reading…' : 'Propose'}
-        </Button>
-        <PaidHint
-          action="app/jobs/(app)/material/evidence-actions.ts#proposeEvidence"
-          what="Cost of proposing evidence"
-        />
+          {busy ? 'Reading…' : 'Propose evidence'}
+        </DashAction>
 
         {error && <span className="text-small text-danger">{error}</span>}
         {message && <span className="text-small text-ink-muted">{message}</span>}

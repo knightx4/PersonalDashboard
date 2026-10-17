@@ -1,0 +1,26 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { requireUser } from '@/lib/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { detachNote } from '@/lib/learn/essays/vault-notes';
+
+const Id = z.string().uuid();
+
+/** Take an attached vault note off the essay (attached-notes.tsx). The note stays in the vault. */
+// latency: pending
+export async function detachVaultNote(essayId: string, attachmentId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  if (!Id.safeParse(essayId).success || !Id.safeParse(attachmentId).success) {
+    return { ok: false, error: 'Could not find that note on the essay.' };
+  }
+  try {
+    await detachNote(await createLearnClient(), essayId, attachmentId);
+    revalidatePath(`/learn/e/${essayId}`);
+    return { ok: true };
+  } catch (error) {
+    console.error('[essay attached notes]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not take the note off. Try again in a moment.' };
+  }
+}

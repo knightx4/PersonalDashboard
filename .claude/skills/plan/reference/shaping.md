@@ -9,26 +9,6 @@ nothing else.
 A run started by approving a spec change is the one exception: its work
 goes in approved, and its procedure is the last section of this file.
 
-## Until 30 October 2026: only from what the person wrote
-
-For four weeks from 2 October 2026 (docs/CUT-BACK-SPEC.md part 5), a new
-feature is shaped only from something the person wrote, meaning a note, an
-idea of theirs or an answer, or from a page-view number in `core.page_opens`
-(the Usage tab in Dev). An idea a session filed (`ideas.source = 'claude'`,
-shown on the ideas page as a suggestion) waits until the hold ends. The end
-date is `SESSION_IDEA_HOLD_ENDS` in `lib/plan/hold.ts`, and it is the only
-place the date is kept; read it there if this paragraph and the code disagree.
-
-The *Shape into a plan* button already refuses such an idea and says why. A
-run that starts some other way, such as "shape idea …" typed in a session,
-checks the idea's `source` first. If it is `'claude'` and the date is before
-the end date, do not write a proposal: say that the idea was filed by a
-session, that it can be shaped from 30 October 2026, and that the person can
-file it again in their own words to shape it now. Then stop.
-
-Building approved steps, the inspiration routine and the X post routine are
-not held.
-
 1. **Read the idea.** `ideas` lists the ones not yet shaped, with their id
    prefix. The brief a routine was fired with carries the full text.
 2. **Read the code it touches.** The module's spec in `docs/`, the routes and
@@ -293,8 +273,9 @@ something the person decided.
    same commit, with a one-sentence blurb.
 3. **Put it on main.** Commit the spec on its own, subject `Write "<change
    title>" into the <spec title> spec`, with the change's id in the body.
-   Then `git fetch origin`, merge `origin/main`, `npm run gate`, and merge to
-   main and push as in step 4 of the Building section in `SKILL.md`. If the
+   Then `git fetch origin` (naming no refs), merge `origin/main`, run `npm
+   run gate`, and once it ends with `gate: all clear` merge to main with
+   `--no-ff` and push. If the
    gate fails because of the change itself, such as a spec rule check, put
    the change back to proposed as in step 2 with the gate's reason in the
    comment, and stop.

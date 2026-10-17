@@ -2,185 +2,62 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Network, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
-import { ChipSelect, ComposeBox, ComposeTitle } from '@/components/ui/field';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
-import { MasteryChecks } from '@/components/learn/mastery-checks';
-import { KindBadge } from '@/components/learn/kind-badge';
-import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
-import { approveChain, proposeGoal, type ApproveState, type ProposeState } from './actions';
-import { Chip } from '@/components/ui/chip';
+import { DashAction } from '@/components/ui/dash-action';
+import { ComposeBox, ComposeTitle } from '@/components/ui/field';
+import { proposeGoal, type ProposeState } from './actions';
 
 /**
- * Name a goal, then look at what it proposes before any of it is real.
+ * Name a goal, and Dash drafts its topic (plan #2138.4).
  *
- * The approval step is not politeness. A generated graph is the thing every
- * later question gets asked against, so a wrong one is worse than none at all,
- * and a person reading eight claims for ten seconds is the cheapest check
- * available — much cheaper than finding out from a probe session built on top
- * of it.
+ * This laid out a chain of claims for the claims graph until the graph moved
+ * onto topics. Now it is the same press as New topic on /learn/topics: one
+ * call drafts the topic's levels, and the press opens the draft to be read,
+ * reworded and approved. Nothing is asked about it until then.
  *
- * What is shown is therefore the claims themselves rather than a tidy list of
- * names. A name tells you nothing about whether the node is right; the claim
- * is the thing you can disagree with.
+ * A topic belongs to the one shared map, not to a subject. Named on a
+ * subject's page, it also joins that subject's lens at solid (plan #2138.7),
+ * so the subject's progress counts it. The unit and opening-question ids the
+ * callers still pass are ignored.
  */
 
 function AskButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <Sparkles className="size-4" strokeWidth={1.75} aria-hidden />
-      {pending ? 'Laying it out…' : 'Lay out the chain'}
-    </Button>
-  );
-}
-
-function ApproveButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" pending={pending}>
-      {pending ? 'Saving…' : 'Approve and save'}
-    </Button>
-  );
-}
-
-function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
-  return (
-    <li className="px-4 py-3">
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-body font-medium text-ink">{node.name}</span>
-        {node.existingId ? (
-          <Chip>
-            Already in this subject
-          </Chip>
-        ) : (
-          <Chip>
-            New
-          </Chip>
-        )}
-        {isGoal && (
-          <Chip tone="accent">
-            What you asked for
-          </Chip>
-        )}
-        {/* Only on a new node: approving writes nothing for one the subject
-            already has, so the mark shown would not be the mark stored. */}
-        {!node.existingId && <KindBadge kind={node.kind} />}
-      </p>
-
-      {/* The claim, because it is the thing you can disagree with. A list of
-          names gives you nothing to check. */}
-      {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
-      {node.basis && <p className="mt-0.5 text-small text-ink-muted">{node.basis}</p>}
-
-      {/* Only under a new node: approving writes nothing for one the subject
-          already has, so its checks are not what will be stored. */}
-      {!node.existingId && <MasteryChecks checks={node.mastery} className="mt-1" />}
-    </li>
-  );
-}
-
-function Proposal({
-  chain,
-  asked,
-  sweepId,
-  unitId,
-}: {
-  chain: ProposedChain;
-  asked: string;
-  sweepId?: string;
-  unitId?: string;
-}) {
-  const [state, approve] = useActionState<ApproveState, FormData>(approveChain, {});
-  const added = chain.nodes.filter((node) => !node.existingId).length;
-
-  return (
-    <form action={approve} className="mt-6">
-      <input type="hidden" name="asked" value={asked} />
-      {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
-      {unitId && <input type="hidden" name="unitId" value={unitId} />}
-      <input type="hidden" name="chain" value={JSON.stringify(chain)} />
-
-      <p className="mb-2 text-body text-ink-muted">
-        {added === 0
-          ? `Nothing new. Every step of this is already in ${chain.subject}.`
-          : `${added} new ${added === 1 ? 'concept' : 'concepts'} in ${chain.subject}${
-              chain.joined > 0 ? `, joined onto ${chain.joined} you already had` : ''
-            }. Nothing is saved until you approve it.`}
-      </p>
-
-      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-        {chain.nodes.map((node) => (
-          <NodeRow
-            key={node.name}
-            node={node}
-            isGoal={node.name.toLowerCase() === chain.goalConcept.toLowerCase()}
-          />
-        ))}
-      </ul>
-
-      {chain.dropped.length > 0 && (
-        // Said out loud rather than swallowed: what it proposed and could not
-        // place is the clearest signal that the goal was too broad.
-        <p className="mt-2 text-small text-ink-muted">
-          Left out: {chain.dropped.map((d) => `${d.name} (${d.reason})`).join(', ')}.
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center gap-3">
-        <ApproveButton />
-        <PaidHint action="app/learn/know/actions.ts#approveChain" what="Cost of saving the subject" />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-      </div>
-    </form>
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeGoal"
+      what="Cost of drafting the topic"
+      hintFirst
+      wrapperClassName="ml-auto"
+    >
+      {pending ? 'Drafting the levels…' : 'Draft the topic'}
+    </DashAction>
   );
 }
 
 export function GoalForm({
   subjectId,
-  subjects,
   goal,
-  sweepId,
-  unitId,
   bare = false,
 }: {
   subjectId?: string;
-  /** The curriculum unit this goal opens; the approved chain is filed under it. */
   unitId?: string;
-  /**
-   * Pick the subject here instead of being fixed to one, for the places that
-   * offer a goal away from a subject page. The first one is selected, since
-   * the reason to show this list is to go further in something you have.
-   */
   subjects?: { id: string; name: string }[];
   /** Filled in when the words were typed earlier, at the start of a sweep. */
   goal?: string;
-  /** The opening questions this goal was asked about, when there were any. */
   sweepId?: string;
   /** No card of its own: it is being drawn inside one. */
   bare?: boolean;
 }) {
   const [state, propose] = useActionState<ProposeState, FormData>(proposeGoal, {});
 
-  if (state.chain && state.asked) {
-    return (
-      <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} unitId={state.unitId} />
-    );
-  }
-
-  const picker = subjects !== undefined && subjects.length > 0;
-
-  // Written as a question rather than filled in as a field (plan #1435): the
-  // goal is the title line, the track a chip beside the button that sends it.
+  // Written as a question rather than filled in as a field (plan #1435).
   return (
     <form action={propose} className={bare ? 'mt-3' : 'mt-6'}>
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
-      {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
-      {unitId && <input type="hidden" name="unitId" value={unitId} />}
-
       <ComposeBox className="space-y-2 py-2.5">
         <ComposeTitle
           name="goal"
@@ -191,26 +68,7 @@ export function GoalForm({
           placeholder="What do you want to understand? Like how a policy rate reaches prices"
         />
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-          {picker && (
-            <ChipSelect
-              name="subjectId"
-              defaultValue={subjects[0].id}
-              aria-label="Which subject"
-              title="What it lays out is joined onto what that subject already holds"
-              icon={<Network className="size-3.5" strokeWidth={1.75} />}
-            >
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-              <option value="">A new subject</option>
-            </ChipSelect>
-          )}
-          <span className="ml-auto flex items-center gap-1">
-            <PaidHint action="app/learn/know/actions.ts#proposeGoal" what="Cost of laying it out" />
-            <AskButton />
-          </span>
+          <AskButton />
         </div>
       </ComposeBox>
       {state.error && (
@@ -219,7 +77,7 @@ export function GoalForm({
         </p>
       )}
 
-      <p className="mt-2 text-small text-ink-muted">A narrow question gets a short chain.</p>
+      <p className="mt-2 text-small text-ink-muted">Dash drafts its levels, and you approve them before anything is asked.</p>
     </form>
   );
 }

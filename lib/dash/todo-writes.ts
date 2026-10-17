@@ -11,7 +11,8 @@ import { taskInput } from '@/lib/todo/tasks/input';
 import { clientsOver } from '@/lib/todo/agenda/clients';
 import { sourceById } from '@/lib/todo/agenda/registry';
 import { isSourceId, SOURCE_IDS, type AgendaSource, type SourceContext, type SourceId } from '@/lib/todo/agenda/sources';
-import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
+import { todayIn } from '@/lib/todo/tasks/model';
+import { LATER_REFUSED, LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -163,16 +164,18 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     said.push(pinned ? 'pinned' : 'unpinned');
   }
   if (sent(args, 'later')) {
-    // "Later" on the row: out of sight for a week, still open, still due when it was.
-    const later = bool(args, 'later');
-    if (later) {
-      const until = new Date();
-      until.setUTCDate(until.getUTCDate() + SNOOZE_DAYS);
-      patch.snoozed_until = until.toISOString();
-    } else {
+    // "Later" on the row, to a day from the one Later menu: out of sight
+    // until it begins, still open, still due when it was. "back" brings it back.
+    const choice = text(args, 'later');
+    if (choice === 'back') {
       patch.snoozed_until = null;
+      said.push('brought back');
+    } else {
+      const later = laterUntil(choice, env.timezone);
+      if (!later) throw new TodoRefused(`later must be ${LATER_UNTIL_HELP}, or back. ${LATER_REFUSED}`);
+      patch.snoozed_until = later.until.toISOString();
+      said.push(`put off ${untilWords(later.day, env.timezone)}`);
     }
-    said.push(later ? `put off for ${SNOOZE_DAYS} days` : 'brought back');
   }
   if (sent(args, 'state')) {
     const state = text(args, 'state') as (typeof TODO_STATES)[number];
@@ -498,6 +501,13 @@ function agendaSubject(source: SourceId, verb: AgendaVerb, key: string): AgendaS
   if (source === 'job_reminders') {
     return { schema: 'job_search', table: 'reminders', match: { id: key.slice('job_reminders:'.length) } };
   }
+  if (source === 'job_waiting') {
+    return {
+      schema: 'job_search',
+      table: 'waiting_dismissals',
+      match: { application_event_id: key.slice('job_waiting:'.length) },
+    };
+  }
   if (source === 'drafts') {
     return { schema: 'core', table: 'drafted_messages', match: { id: key.slice('drafts:'.length) } };
   }
@@ -526,6 +536,9 @@ async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade>
   if (!key) throw new TodoRefused('agenda_key is missing: give the key the agenda lookup returned.');
   if (!(verbName in AGENDA_VERBS)) throw new TodoRefused('verb must be finish, put_off or dismiss.');
   const verb = AGENDA_VERBS[verbName];
+  // Put off to a day from the one Later menu, read in their zone (plan #1957.9).
+  const later = verbName === 'put_off' ? laterUntil(text(args, 'until'), env.timezone) : null;
+  if (verbName === 'put_off' && !later) throw new TodoRefused(`until must be ${LATER_UNTIL_HELP}.`);
   const source = sourceById(sourceId) as AgendaSource;
 
   // The row has to be on the agenda now: that is what makes the key real and
@@ -543,12 +556,13 @@ async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade>
 
   const subject = agendaSubject(sourceId, verbName, key);
   const before = await subjectRow(env, subject);
-  if (!before && subject.table !== 'dismissals') throw new TodoRefused('That row is not theirs to change.');
+  if (!before && subject.table !== 'dismissals' && subject.table !== 'waiting_dismissals') throw new TodoRefused('That row is not theirs to change.');
 
   const now = new Date();
   const today = todayIn(env.timezone, now);
   const ctx: SourceContext = { userId: env.userId, timezone: env.timezone, from: today, to: today, now, clients: clientsOver(env.db) };
-  await (source[verb.method] as (ctx: SourceContext, key: string) => Promise<void>)(ctx, key);
+  if (later) await source.defer!(ctx, key, later.until);
+  else await (source[verb.method] as (ctx: SourceContext, key: string) => Promise<void>)(ctx, key);
 
   const after = await subjectRow(env, subject);
   if (!after) throw new Error('Changing the agenda row failed: the row is gone.');
@@ -562,7 +576,7 @@ async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade>
     op: before ? 'update' : 'insert',
     before,
     after,
-    summary: `Dash ${verb.said} "${title}" on the Todo agenda.`,
+    summary: `Dash ${verb.said} "${title}"${later ? ` ${untilWords(later.day, env.timezone)}` : ''} on the Todo agenda.`,
     row: {
       table: `${subject.schema}.${subject.table}`,
       ref: id,
@@ -593,14 +607,14 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   {
     name: 'edit_todo',
     description:
-      "Change one of the person's todos in ways change_todo does not, when they ask: write or clear its notes, pin or unpin it, put it off for a week (later: true) or bring it back (later: false), drop it (state: dropped), or reopen one that is done or dropped (state: open). Send only what they asked to change. Renaming it, moving it to another day and ticking it off are not done with this tool.",
+      "Change one of the person's todos in ways change_todo does not, when they ask: write or clear its notes, pin or unpin it, put it off to a day (later: tomorrow, weekend, next_week, next_month or a day) or bring it back (later: back), drop it (state: dropped), or reopen one that is done or dropped (state: open). Send only what they asked to change. Renaming it, moving it to another day and ticking it off are not done with this tool.",
     input_schema: {
       type: 'object',
       properties: {
         todo_ref: TODO_REF,
         notes: { type: 'string', description: 'The notes on it, replacing what is there. Empty clears them.' },
         pinned: { type: 'boolean' },
-        later: { type: 'boolean', description: 'True puts it out of sight for a week; false brings it back now.' },
+        later: { type: 'string', description: `Puts it out of sight until a day: ${LATER_UNTIL_HELP}. back brings it back now.` },
         state: { type: 'string', enum: [...TODO_STATES], description: 'open reopens it; dropped drops it.' },
       },
       required: ['todo_ref'],
@@ -683,6 +697,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
         agenda_source: { type: 'string', enum: [...SOURCE_IDS], description: 'The agenda_source the agenda lookup returned.' },
         agenda_key: { type: 'string', description: 'The agenda_key the agenda lookup returned for the row.' },
         verb: { type: 'string', enum: Object.keys(AGENDA_VERBS), description: 'finish ticks it off, put_off moves it later, dismiss says not this one.' },
+        until: { type: 'string', description: `For put_off, the day it comes back: ${LATER_UNTIL_HELP}.` },
       },
       required: ['agenda_source', 'agenda_key', 'verb'],
       additionalProperties: false,

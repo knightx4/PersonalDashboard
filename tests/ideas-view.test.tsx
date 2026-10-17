@@ -107,7 +107,7 @@ describe('the ideas page', () => {
       />,
     );
 
-    expect(html).toMatch(/Suggestions scored under 40\s*<span[^>]*>\(1\)<\/span>/);
+    expect(html).toMatch(/Suggestions scored under 60\s*<span[^>]*>\(1\)<\/span>/);
     expect(html).not.toContain('Suggested by Dash');
     expect(html).not.toMatch(/<details[^>]*open/);
   });
@@ -127,9 +127,11 @@ describe('the ideas page', () => {
       />,
     );
 
-    // Two chips, each opening with a mark before its word.
+    // Two chips, each opening with a mark before its word. Dash's own mark on
+    // each idea's Shape button is not a module mark and is left out.
     expect(
-      html.match(/<span[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)?.length,
+      html.match(/<span(?![^>]*data-dash-state)[^>]*aria-hidden="true"[^>]*><svg[^>]*><defs><linearGradient/g)
+        ?.length,
     ).toBe(2);
     expect(html).toMatch(/<\/svg><\/span>Vault<\/span>/);
     expect(html).toMatch(/<\/svg><\/span>Everything<\/span>/);

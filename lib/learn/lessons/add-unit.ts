@@ -7,6 +7,8 @@ import { CURRICULUM_MODEL, writeNextUnit } from '@/lib/learn/graph/curriculum';
 import { loadGraph } from '@/lib/learn/graph/load';
 import type { Graph } from '@/lib/learn/graph/model';
 import type { LearnOperation } from '@/lib/learn/spend';
+import { citeWeeks, laterTopics, topicsTaught, type LaterTopic } from '@/lib/learn/prepare/later-units';
+import { loadDraftedNames, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 
 /**
  * Writing a track's next unit when it runs out (plan #969, LEARN-LESSONS-SPEC
@@ -20,6 +22,12 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * from then on, like every other unit. Its chain is laid out later by
  * `layOutNextUnit`, when the track reaches it.
  *
+ * A prepared subject's next unit is written from its territory as well (plan
+ * #2307.5): the call is given the territory topics no unit names yet, in
+ * order, with the document weeks that teach each, and names in what the unit
+ * covers the topics it teaches. The weeks of those topics are cited after
+ * what it covers, so the course keeps the shape the syllabi gave it.
+ *
  * It runs with the service role, so every read names the person and the track
  * is checked to be theirs before anything is written into it.
  */
@@ -30,7 +38,8 @@ const OPERATION: LearnOperation = 'write-next-unit';
 const UNIQUE_VIOLATION = '23505';
 
 export type AddedUnit =
-  | { outcome: 'added'; unitId: string; title: string }
+  /** `topics` are the territory topics the unit names, `weeks` the document weeks cited for them. */
+  | { outcome: 'added'; unitId: string; title: string; topics: string[]; weeks: string[] }
   /** The track's last unit is no longer the one the need named: another run added one. */
   | { outcome: 'already-added' }
   | { outcome: 'failed'; detail: string };
@@ -50,6 +59,26 @@ export function shownInTrack(graph: Graph): { known: string[]; workingOn: string
     else if (concept.state === 'shaky') workingOn.push(concept.name);
   }
   return { known: known.sort(), workingOn: workingOn.sort() };
+}
+
+/**
+ * The territory topics the units so far do not teach, for a subject whose
+ * preparation compiled a territory; none for a subject without one.
+ */
+async function loadLaterTopics(
+  learn: LearnSupabaseClient,
+  userId: string,
+  subjectId: string,
+  units: readonly UnitRow[],
+): Promise<LaterTopic[]> {
+  const territory = await loadSubjectTerritory(learn, userId, subjectId);
+  if (!territory || territory.topics.length === 0) return [];
+  const names = await loadDraftedNames(
+    learn,
+    userId,
+    territory.topics.map((t) => t.ask),
+  );
+  return laterTopics(territory, names, units);
 }
 
 async function loadUnits(learn: LearnSupabaseClient, userId: string, subjectId: string): Promise<UnitRow[]> {
@@ -116,6 +145,7 @@ export async function addNextUnit(
     if ((last?.id ?? null) !== lastUnitId) return { outcome: 'already-added' };
 
     const shown = shownInTrack(graph);
+    const topics = await loadLaterTopics(learn, userId, subjectId, units);
     const spend: SpendReport[] = [];
     const result = await writeNextUnit({
       subject: name,
@@ -123,6 +153,7 @@ export async function addNextUnit(
       known: shown.known,
       workingOn: shown.workingOn,
       tooHard,
+      ...(topics.length > 0 ? { territory: { topics } } : {}),
       anthropicApiKey: apiKey,
       onSpend: (report) => spend.push(report),
     });
@@ -131,6 +162,8 @@ export async function addNextUnit(
       await recordSpend(core, userId, { module: 'learn', operation: OPERATION, model: report.model, usage: report.usage });
     }
     if (!result.ok) return { outcome: 'failed', detail: result.detail };
+    const taught = topicsTaught(result.unit, topics);
+    const cited = citeWeeks(result.unit.covers, taught);
 
     const { data, error } = await learn
       .from('curriculum_units')
@@ -139,7 +172,7 @@ export async function addNextUnit(
         subject_id: subjectId,
         ordinal: (last?.ordinal ?? 0) + 1,
         title: result.unit.title,
-        covers: result.unit.covers,
+        covers: cited.covers,
         outcome: result.unit.outcome,
         write_model: CURRICULUM_MODEL,
       })
@@ -149,7 +182,13 @@ export async function addNextUnit(
       if (error.code === UNIQUE_VIOLATION) return { outcome: 'already-added' };
       return { outcome: 'failed', detail: `Saving the unit failed: ${error.message}` };
     }
-    return { outcome: 'added', unitId: (data as { id: string }).id, title: result.unit.title };
+    return {
+      outcome: 'added',
+      unitId: (data as { id: string }).id,
+      title: result.unit.title,
+      topics: taught.map((t) => t.name),
+      weeks: cited.weeks,
+    };
   } catch (error) {
     return { outcome: 'failed', detail: error instanceof Error ? error.message : 'Could not write the next unit.' };
   }

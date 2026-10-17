@@ -1,5 +1,6 @@
 import { loadVaultBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Shell for the vault workspace.
@@ -21,14 +22,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
      * gear, where every other workspace keeps it -- it was a nav tab here only
      * because this shell was written on its own.
      */
-    sections: [
-      { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-      // The quick notes waiting in the Inbox folder, on a tab of their own (note aee95195).
-      { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
-      { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-      // Maya's threads on your notes (plan #1286).
-      { href: '/vault/maya', label: 'Maya', icon: 'maya' },
-    ],
+    sections: ({ owner }) => tabsFor('vault', owner),
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',
     brief: () => loadVaultBrief(),

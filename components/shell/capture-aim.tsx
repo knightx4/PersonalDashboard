@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { ToggleChip } from '@/components/ui/chip';
 import { FieldError } from '@/components/ui/field';
 import { Kbd } from '@/components/ui/kbd';
@@ -12,6 +13,7 @@ import type { CaptureAim, CaptureKind, CaptureUnder } from '@/lib/capture/action
 import { isCalendarDay, type CaptureDay } from '@/lib/capture/todo';
 import { roleName, type CaptureSortRole } from '@/lib/capture/sort';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 
 /**
  * Capture aimed at a kind (plan #1950.1): what an Add button on a list opens.
@@ -106,9 +108,10 @@ export function AimedCaptureForm({
   error,
   fieldRef,
   onSubmit,
-  hint,
+  paid,
   attached,
   tools,
+  onPaste,
 }: {
   kind: CaptureKind;
   /** The role a note goes on, which the page aiming it already knew. */
@@ -127,8 +130,12 @@ export function AimedCaptureForm({
   error: string | null;
   fieldRef?: (node: HTMLInputElement | HTMLTextAreaElement | null) => void;
   onSubmit: () => void;
-  /** The $ hint beside Add, for a kind whose press makes a model call. */
-  hint?: React.ReactNode;
+  /**
+   * For a kind whose press makes a model call: the action it calls, so Add
+   * is Dash's press with the cost beside it. The figure comes from the
+   * PaidCostsProvider around the form.
+   */
+  paid?: { action: PaidAction; what: string };
   /**
    * What takes the field's place while it is there (plan #1950.3.2): a
    * receipt photo, the barcode viewfinder, or the book a scan named.
@@ -136,7 +143,15 @@ export function AimedCaptureForm({
   attached?: React.ReactNode;
   /** The camera step's button, at the start of the foot (capture-camera.tsx). */
   tools?: React.ReactNode;
+  /**
+   * A paste into the field, for a kind that takes files: true when it held a
+   * picture and went in as a file, so the field keeps no text for it.
+   */
+  onPaste?: (data: DataTransfer) => boolean;
 }) {
+  const paste = (event: React.ClipboardEvent) => {
+    if (onPaste?.(event.clipboardData)) event.preventDefault();
+  };
   const field = 'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
   return (
@@ -155,6 +170,7 @@ export function AimedCaptureForm({
           ref={fieldRef}
           value={text}
           onChange={(event) => onText(event.target.value)}
+          onPaste={paste}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
               event.preventDefault();
@@ -174,6 +190,7 @@ export function AimedCaptureForm({
           ref={fieldRef}
           value={text}
           onChange={(event) => onText(event.target.value)}
+          onPaste={paste}
           placeholder={kind.placeholder}
           aria-label={kind.label}
           data-focus-ring="none"
@@ -207,11 +224,24 @@ export function AimedCaptureForm({
           </div>
         )}
         <span className="ml-auto flex items-center gap-2 self-end">
-          {hint}
-          <Button type="submit" size="sm" pending={pending}>
-            <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {pending ? 'Adding…' : 'Add'}
-          </Button>
+          {paid ? (
+            <DashAction
+              type="submit"
+              size="sm"
+              pending={pending}
+              paid={paid.action}
+              what={paid.what}
+              align="end"
+              hintFirst
+            >
+              {pending ? 'Adding…' : 'Add'}
+            </DashAction>
+          ) : (
+            <Button type="submit" size="sm" pending={pending}>
+              <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pending ? 'Adding…' : 'Add'}
+            </Button>
+          )}
         </span>
       </div>
 

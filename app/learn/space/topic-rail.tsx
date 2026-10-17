@@ -7,7 +7,7 @@ import { TopicSwatch } from './swatch';
 
 /**
  * The rail's card for Wikipedia's topics on Idea Space (plan #2016.5): the
- * Level 3 topics your ideas and evidence reach, strongest first, seven at
+ * Level 3 topics your prepared topics and evidence reach, strongest first, seven at
  * most, as the map names them. The rest are counted, not listed, so no
  * screen names more than about seven topics at one level; the map is where
  * they are found, by zooming in.
@@ -19,7 +19,7 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 function stateText(topic: TopicOnMap): string {
   const state = topic.state === 'lit' ? `${Math.round(topic.strength * 100)}% known` : 'Unlocked, not known yet';
-  return topic.childCount > 0 ? `${state} · ${plural(topic.childCount, 'topic')} inside` : state;
+  return topic.childCount > 0 ? `${state} · ${plural(topic.childCount, 'sub-topic')} inside` : state;
 }
 
 export function TopicRail({ frame }: { frame: TopicFrame | null }) {
@@ -32,12 +32,12 @@ export function TopicRail({ frame }: { frame: TopicFrame | null }) {
   return (
     <Card padding="standard">
       <h2 className="text-ui font-semibold text-ink">
-        Topics you have reached
+        Wikipedia topics you have reached
         <span className="tabular ml-2 font-normal text-ink-muted">{touched.length}</span>
       </h2>
       {shown.length === 0 ? (
         <p className="mt-1 text-ui text-ink-muted">
-          Nothing you have written touches a topic yet. Topics unlock as your notes, courses, work and ideas reach
+          Nothing you have written touches a Wikipedia topic yet. They unlock as your notes, courses, work and topics reach
           them.
         </p>
       ) : (
@@ -50,7 +50,7 @@ export function TopicRail({ frame }: { frame: TopicFrame | null }) {
                   <span className="block text-ui text-ink">{topic.title}</span>
                   <span className="block text-small text-ink-muted">{stateText(topic)}</span>
                 </span>
-                <span className="tabular shrink-0 text-small text-ink-muted">{plural(topic.ideaCount, 'idea')}</span>
+                <span className="tabular shrink-0 text-small text-ink-muted">{countText(topic.ideaCount)} of yours</span>
               </li>
             ))}
           </ul>

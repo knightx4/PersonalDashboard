@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { dayLabel } from '@/lib/dev/inspiration/view';
 import { planHref } from '@/lib/search/sources/dev-map';
 import { stepRef } from '@/lib/plan/ref';
+import type { DevComment } from '@/lib/comments/load';
+import { loadRowThreads, rowRef } from '@/lib/thread/store';
 import {
   loadLastPostsRun,
   loadSocialPosts,
@@ -11,6 +13,7 @@ import {
   type PostsRun,
   type PostsRunState,
   type SocialPost,
+  OPEN_POST_STATUSES,
 } from './posts';
 
 /**
@@ -68,9 +71,19 @@ export type PostCard = {
    * that costs (plan #2072). Null for a posted or dropped one.
    */
   send: XSendCheck | null;
+  /**
+   * The comments under it and Dash's replies (plan #2202.2), oldest first.
+   * Only a waiting or posted draft has a thread drawn; a dropped one is empty.
+   */
+  thread: DevComment[];
 };
 
+/** The table a draft's thread is keyed by, as `public.social_posts:<id>`. */
+export const POSTS_TABLE = 'public.social_posts';
+
 export type PostsPage = {
+  /** Posts set aside to post, above the suggestions (plan #2261.3). */
+  planned: PostCard[];
   suggested: PostCard[];
   posted: PostCard[];
   dropped: PostCard[];
@@ -81,7 +94,23 @@ export type PostsPage = {
    * the page of them drawn, `total` how many there are in all.
    */
   onX: { posts: XPostView[]; total: number };
+  /** What the person wants from their posts (plan #2227); empty until they write it. */
+  wants: PostWants;
+  /** The day `wants` was last saved, as 2 Oct; null when nothing is saved. */
+  wantsDay: string | null;
 };
+
+/** The longest "what I want from posts" text (post_preferences_wants_ck). */
+export const POST_WANTS_MAX = 2000;
+
+/** What the person wrote about what they want from posts, and when it last changed. */
+export type PostWants = {
+  text: string;
+  /** ISO time of the last change; null when nothing was ever saved. */
+  updatedAt: string | null;
+};
+
+export const NO_POST_WANTS: PostWants = { text: '', updatedAt: null };
 
 /** A cited step; `outline` is where the plan page places it, `1073.4`, when known. */
 export type PostStepRow = { id: string; number: number; title: string; outline?: string | null };
@@ -99,6 +128,10 @@ export function buildPostsPage(input: {
   now: number;
   /** What was read from X: the posts drafts ask about, and the page of the rest. */
   x?: { candidates: readonly XStoredPost[]; listed: readonly XStoredPost[]; total: number };
+  /** Each draft's thread, keyed by its ref (rowRef(POSTS_TABLE, id)). */
+  threads?: ReadonlyMap<string, DevComment[]>;
+  /** What the person wants from posts; absent reads as nothing written. */
+  wants?: PostWants;
 }): PostsPage {
   const steps = new Map(input.steps.map((step) => [step.id, step]));
   const notes = new Map(input.notes.map((note) => [note.id, note]));
@@ -141,17 +174,22 @@ export function buildPostsPage(input: {
     const when = post.status === 'posted' ? post.postedAt : post.status === 'dropped' ? post.droppedAt : null;
     const candidate =
       post.status !== 'posted' && post.xCandidateId ? (candidates.get(post.xCandidateId) ?? null) : null;
-    const send = post.status === 'suggested' ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
-    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send };
+    const send = OPEN_POST_STATUSES.includes(post.status)
+      ? xSendCheck({ body: post.body, sent: post.xThreadIds?.length ?? 0 }) : null;
+    const thread = post.status === 'dropped' ? [] : (input.threads?.get(rowRef(POSTS_TABLE, post.id)) ?? []);
+    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today), send, thread };
   };
 
   return {
+    planned: input.posts.filter((post) => post.status === 'planned').map(card),
     suggested: input.posts.filter((post) => post.status === 'suggested').map(card),
     posted: input.posts.filter((post) => post.status === 'posted').map(card),
     dropped: input.posts.filter((post) => post.status === 'dropped').map(card),
     run: input.run,
     runState: postsRunState(input.run, input.now),
     onX: { posts: (input.x?.listed ?? []).map(xView), total: input.x?.total ?? 0 },
+    wants: input.wants ?? NO_POST_WANTS,
+    wantsDay: input.wants?.text && input.wants.updatedAt ? dayLabel(input.wants.updatedAt, today) : null,
   };
 }
 
@@ -238,21 +276,38 @@ async function loadXPosts(
   };
 }
 
+/** The person's "what I want from posts" text; empty when none is saved. */
+export async function loadPostWants(supabase: Db, userId: string): Promise<PostWants> {
+  const { data, error } = await supabase
+    .from('post_preferences')
+    .select('wants, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read what you want from posts: ${error.message}`);
+  if (!data) return NO_POST_WANTS;
+  const row = data as { wants: string | null; updated_at: string | null };
+  return { text: row.wants ?? '', updatedAt: row.updated_at };
+}
+
 export async function loadPostsPage(
   supabase: Db,
   userId: string,
   now: number = Date.now(),
   shown: number = X_POSTS_PAGE,
 ): Promise<PostsPage> {
-  const [posts, run] = await Promise.all([
+  const [posts, run, wants] = await Promise.all([
     loadSocialPosts(supabase, userId),
     loadLastPostsRun(supabase, userId),
+    loadPostWants(supabase, userId),
   ]);
 
   const stepIds = [...new Set(posts.flatMap((post) => post.sourcePlanItemIds))];
   const noteIds = [...new Set(posts.flatMap((post) => post.sourceFeedbackIds))];
 
-  const [steps, outlines, notes, x] = await Promise.all([
+  // Threads only on the drafts that draw one: a dropped draft has none.
+  const threaded = posts.filter((post) => post.status !== 'dropped').map((post) => post.id);
+
+  const [steps, outlines, notes, x, threads] = await Promise.all([
     stepIds.length
       ? supabase.from('plan_items').select('id, number, title').eq('user_id', userId).in('id', stepIds)
       : Promise.resolve({ data: [], error: null }),
@@ -264,6 +319,7 @@ export async function loadPostsPage(
       ? supabase.from('feedback_items').select('id, body').eq('user_id', userId).in('id', noteIds)
       : Promise.resolve({ data: [], error: null }),
     loadXPosts(supabase, userId, posts, shown),
+    loadRowThreads(supabase, POSTS_TABLE, threaded, { userId }),
   ]);
   if (steps.error) throw new Error(`Could not read the steps the posts cite: ${steps.error.message}`);
   if (notes.error) throw new Error(`Could not read the notes the posts cite: ${notes.error.message}`);
@@ -279,5 +335,7 @@ export async function loadPostsPage(
     run,
     now,
     x,
+    threads,
+    wants,
   });
 }

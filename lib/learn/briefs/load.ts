@@ -1,4 +1,5 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { loadFindings } from './findings';
 import { readSubQuestions, type BriefStatus } from './model';
 import {
   BRIEF_PAGE_COLUMNS,
@@ -41,22 +42,23 @@ function toSource(row: SourceRow): BriefSource {
   };
 }
 
-/** One brief and the readings its run found, or null when it is not theirs or not there. */
+/** One brief, the readings its run found and the findings added since, or null when it is not theirs or not there. */
 export async function loadBrief(supabase: LearnSupabaseClient, id: string): Promise<BriefPage | null> {
-  const [brief, readings] = await Promise.all([
+  const [brief, readings, findings] = await Promise.all([
     supabase.from('briefs').select(BRIEF_PAGE_COLUMNS).eq('id', id).maybeSingle(),
     supabase
       .from('readings')
       .select('id, title, found_kind, found_at, open_url, found_change, status, sources ( title, year, canonical_url )')
       .eq('brief_id', id)
       .order('position'),
+    loadFindings(supabase, id),
   ]);
   if (brief.error) throw new Error(`Could not read the brief: ${brief.error.message}`);
   if (!brief.data) return null;
   if (readings.error) throw new Error(`Could not read the brief's sources: ${readings.error.message}`);
   const sources: Record<string, BriefSource> = {};
   for (const row of (readings.data ?? []) as unknown as SourceRow[]) sources[row.id] = toSource(row);
-  return { brief: toBriefOnPage(brief.data as unknown as BriefPageRow), sources };
+  return { brief: toBriefOnPage(brief.data as unknown as BriefPageRow), sources, findings };
 }
 
 /** The briefs not archived, newest first, for Learn's home. */

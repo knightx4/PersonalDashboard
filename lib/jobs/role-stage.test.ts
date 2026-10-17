@@ -32,6 +32,14 @@ describe('closedSummary', () => {
     );
   });
 
+  it('adds that all its questions were added, only when marked', () => {
+    const input = { ...base, status: 'rejected' as const, reached: 'acknowledged' as const };
+    expect(closedSummary({ ...input, allQuestionsAdded: true })).toBe(
+      'Rejected on 8 Sep 2026, with no reply from a person before it closed. All its questions were added.',
+    );
+    expect(closedSummary({ ...input, allQuestionsAdded: false })).toBe(closedSummary(input));
+  });
+
   it('counts a logged interview even when the record says it got no further', () => {
     expect(
       closedSummary({ ...base, status: 'ghosted', reached: 'acknowledged', interviewCount: 1 }),

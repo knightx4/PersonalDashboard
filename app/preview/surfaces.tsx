@@ -1,5 +1,12 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
+import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import {
+  GoalMetricsEmptySurface,
+  GoalMetricsErrorSurface,
+  GoalMetricsSurface,
+  GoalMetricsTooltipSurface,
+} from './goal-metrics-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -7,9 +14,12 @@ import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouTabEmpty } from '@/app/you/you-tabs';
 import { PlacesView } from '@/app/you/places/places-view';
+import { DetailsView } from '@/app/you/details/details-view';
+import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
 import { PlaceView } from '@/app/you/places/place-view';
 import { PlaceForm } from '@/app/you/places/place-form';
 import type { Place } from '@/lib/you/places';
+import { drawPlaceMap, drawPlacesMap } from '@/lib/you/places-map-outlines';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -38,21 +48,45 @@ import {
   IdeaSpaceLightsSurface,
   IdeaSpaceEvidenceSurface,
   IdeaSpaceSurface,
+  IdeaSpaceTerritoryHoverSurface,
+  IdeaSpaceTerritoryThinSurface,
+  IdeaSpaceTerritoryQuoteSurface,
+  IdeaSpaceLayersSurface,
+  IdeaSpaceTerritorySurface,
   IdeaSpaceTopicsSurface,
+  IdeaSpaceGoalSurface,
+  IdeaSpaceGoalNextSurface,
+  IdeaSpaceFadeSurface,
+  IdeaSpaceFadeEmptySurface,
+  IdeaSpaceGapsSurface,
+  IdeaSpaceGapsThinSurface,
+  IdeaSpaceGapsEmptySurface,
+  IdeaSpaceThenSurface,
+  IdeaSpaceThenPickSurface,
+  IdeaSpaceThenThinSurface,
 } from './idea-space-surfaces';
+import {
+  IdeaPairSurface,
+  IdeaPairsEmptySurface,
+  IdeaPairsErrorSurface,
+  IdeaPairsLoadingSurface,
+  IdeaPairsSurface,
+} from './idea-pairs-surfaces';
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
+import { SentBackChart } from '@/app/dev/ui/sent-back';
+import type { SentBackWeek } from '@/lib/plan/sent-back';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { PATTERNS } from '@/app/dev/ui/patterns';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
@@ -76,7 +110,9 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
-import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
+import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
+import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -92,19 +128,21 @@ import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { summariseSearch } from '@/lib/jobs/home/summary';
 import type { SinceView } from '@/lib/jobs/home/since-load';
-import {
-  closestToOffer,
-  withoutClosestDebriefs,
-  type ClosestApplication,
-  type ClosestInterview,
-} from '@/lib/jobs/today/closest';
-import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
-import { LaterMenuRows } from './later-menu-surface';
+import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  GoalArchiveConfirmSurface,
+  GoalPutAwayMenuSurface,
+  GoalsAllPutAwayMenuSurface,
+  GoalsAllPutAwayToastSurface,
+  GoalsAllSelectConfirmSurface,
+  GoalsAllSelectSurface,
+  GoalsAllSelectToastSurface,
+} from './goal-put-away-surfaces';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -137,6 +175,40 @@ import {
 import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
+import { FlowExplainPreview } from './learn-flow-explain-surfaces';
+import { FlowCasePreview } from './learn-flow-case-surfaces';
+import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
+import {
+  LearnTopicDraftCommentPreview,
+  LearnTopicDraftMatchPreview,
+  LearnTopicDraftPreview,
+  LearnTopicsErrorPreview,
+  LearnTopicsLoadingPreview,
+  LearnTopicsPreview,
+  LearnTopicPreview,
+  LearnTopicEmptyPreview,
+  LearnTopicQuotesPreview,
+  LearnTopicEditPreview,
+  LearnTopicLoadingPreview,
+  LearnTopicDraftChecksPreview,
+  LearnTopicsSourcesPreview,
+} from './learn-topic-surfaces';
+import {
+  LearnKnowLensesEmptyPreview,
+  LearnKnowLensesPreview,
+  LearnLensEditPreview,
+  LearnLensEmptyPreview,
+  LearnLensErrorPreview,
+  LearnLensFringePreview,
+  LearnLensLoadingPreview,
+  LearnLensPreview,
+  LearnLensUntouchedPreview,
+} from './learn-lens-surfaces';
+import {
+  LearnTopicsReviewEmptyPreview,
+  LearnTopicsReviewPreview,
+  LearnTopicsReviewRunningPreview,
+} from './learn-move-surfaces';
 import {
   LearnCourseCheckPreview,
   LearnCoursesEmptyPreview,
@@ -148,14 +220,21 @@ import {
   LearnListsSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
+  LearnPieceCellCheckSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
+  LearnExternalSurface,
+  LearnExternalItemSurface,
+  LearnExternalNewSurface,
+  LearnExternalScoreSurface,
   LearnReadingSurface,
   LearnReadingTextSurface,
   LearnReadingSummarySurface,
   LearnReadingChatSurface,
   LearnReadingUnreadableSurface,
+  LearnReadingCheckSurface,
+  LearnReadingCheckOwnSurface,
   LearnVideoSurface,
   LearnVideosSurface,
   LearnYoutubeChannelSurface,
@@ -172,8 +251,9 @@ import {
   LearnEssayResearchSurface,
   LearnEssayFinishSurface,
   LearnEssayPublishSurface,
-  LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
+  LearnEssayNotesMapSurface,
+  LearnEssayDraftFromNotesSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectConversationsSurface,
@@ -181,26 +261,60 @@ import {
   LearnEssaysSurface,
 } from './essay-surfaces';
 import {
+  LearnSubjectPrepareBranchSurface,
+  LearnSubjectPrepareDirectionSurface,
+  LearnSubjectPrepareEmptySurface,
+  LearnSubjectPrepareFailedSurface,
+  LearnSubjectPrepareFinishedSurface,
+  LearnSubjectPrepareSourcesEmptySurface,
+  LearnSubjectPrepareSourcesFoldedSurface,
+  LearnSubjectPrepareStartingSurface,
+  LearnSubjectPrepareStartSurface,
+  LearnSubjectPrepareStartPendingSurface,
+  LearnSubjectPrepareSurface,
+} from './learn-prepare-surfaces';
+import {
+  AddSourceErrorSurface,
+  AddSourceFetchingSurface,
+  AddSourceOpenSurface,
+  AddSourceSurface,
+} from './add-source-surfaces';
+import {
   LearnBriefFailedSurface,
   LearnBriefQuoteSourceSurface,
   LearnBriefResearchingSurface,
   LearnBriefShortAnswerEditorSurface,
+  LearnBriefTopicsSurface,
+  LearnBriefGoalEmptySurface,
+  LearnBriefGoalPendingSurface,
+  LearnBriefGoalErrorSurface,
   LearnBriefSurface,
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
-import { educationGroups, educationCounts } from './education-fixtures';
+import { educationGroups, educationCounts, educationExplains } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import {
+  TodaysPieceCheckSurface,
+  TodaysPieceDoneSurface,
+  TodaysPieceErrorSurface,
+  TodaysPieceLoadingSurface,
+  TodaysPieceNoneSurface,
+  TodaysPieceSurface,
+} from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
+import { SubjectPresses, subjectDescription } from '@/app/learn/s/[id]/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { StatusLine } from '@/components/shell/status-line';
+import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
@@ -216,6 +330,7 @@ import { formatMoney } from '@/lib/money';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
+import type { DashChange } from '@/lib/talk/changes';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -240,6 +355,7 @@ import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
   PlanScreenChangeSurface,
+  PlanScreenMockupSurface,
   PlanSendBackSurface,
   PlanOpenedSurface,
   PlanFeatureSurface,
@@ -263,23 +379,42 @@ import {
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
-import { DashSeenDemo } from './dash-moment-demos';
+import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
+import { DashWorkingReadingDemo } from './dash-working-rows';
+import { NoteListRow } from '@/components/vault/note-list-row';
+import { IssueListRow } from '@/app/news/all/list-view';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
+  AskBuildSurface,
+  AskDeleteSurface,
+  AskPaidSurface,
   AskChangesSurface,
+  AT_WORK_QUESTION,
   AskDashSurface,
   AskMadeChangesSurface,
+  DashPageSurface,
+  AskAnswerActionsSurface,
+  AskBoxSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
+import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
+import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
-import { DashTodaySurface } from './dash-today-surfaces';
+import { DashTodaySurface, NowDashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
+import {
+  GoalMetricPropsEmptySurface,
+  GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormSurface,
+  GoalMetricPropsMenuSurface,
+  GoalMetricPropsPendingSurface,
+  GoalMetricPropsSurface,
+} from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -288,11 +423,16 @@ import {
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
 import {
+  PostsCommentSurface,
   PostsDraftingSurface,
+  PostsWantsEditSurface,
+  PostsWantsSavingSurface,
+  PostsWantsSurface,
   PostsMatchedSurface,
   PostsNoDraftSurface,
   PostsSendSurface,
   PostsSurface,
+  PostsThreadSurface,
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
@@ -310,6 +450,16 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import { InboxPageSurface } from './inbox-page-surface';
+import { HomeInboxSurface } from './home-inbox-surfaces';
+import {
+  JobsInboxSurface,
+  LearnInboxSurface,
+  NewsInboxSurface,
+  ShoppingInboxSurface,
+  TodoInboxSurface,
+  VaultInboxSurface,
+} from './workspace-inbox-surfaces';
 import {
   AuthCodeErrorSurface,
   ConsentSurface,
@@ -332,10 +482,10 @@ import {
   JobsAnswersSurface,
   JobsCasePageSurface,
   JobsOnboardingSurface,
-  JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import { RunLinesSurface } from './run-lines-surfaces';
+import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -345,7 +495,7 @@ import {
   DevIdeasEmptySurface,
   DevRaisedSurface,
   DevInboxSurface,
-  DevRaisedStatusSurface,
+  DevSettingsSurface,
   DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
@@ -500,6 +650,10 @@ const rolePanels: PanelProps = {
   requirementMatchesStale: false,
   bankSize: 6,
   coverLetter: '',
+  coverLetterDraft: null,
+  readyToApply: false,
+  allQuestionsAdded: false,
+  hasCoverLetter: null,
   timezone: 'Europe/London',
   focusInterviewId: null,
   events: [
@@ -577,8 +731,11 @@ const rolePanels: PanelProps = {
       timesSeen: 3,
       evidenceItemIds: [],
       unsupportedClaims: [],
+      wordLimit: null,
     },
   ],
+  answerDrafts: {},
+  dashAsks: [],
   thread: [],
   interviewGroups: [
     { id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] },
@@ -624,7 +781,8 @@ const pipelineRow = (
 ): PipelineRow => ({
   roleId: `role-${row.applicationId}`,
   companyId: `co-${row.applicationId}`,
-  companySlug: 'a-company',
+  // Each company its own slug, so the Company column's filter narrows.
+  companySlug: row.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
   companyLogoUrl: null,
   companyDomains: [],
   companyWebsite: null,
@@ -634,6 +792,9 @@ const pipelineRow = (
   attempt: 1,
   excitement: 3,
   needsReview: false,
+  readyToApply: false,
+  allQuestionsAdded: false,
+  hasCoverLetter: null,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -659,6 +820,9 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     excitement: 5,
+    readyToApply: true,
+    allQuestionsAdded: false,
+    hasCoverLetter: true,
     compMinCents: 18000000,
     compMaxCents: 24000000,
     daysSinceActivity: 1,
@@ -672,6 +836,9 @@ const pipelineRows: PipelineRow[] = [
     roleTitle: 'Software Developer',
     status: 'in_process',
     excitement: 4,
+    readyToApply: true,
+    allQuestionsAdded: true,
+    hasCoverLetter: false,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -1006,6 +1173,7 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
+    showNudges: false,
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -1319,31 +1487,6 @@ const todayBoard: TodayBoard = {
       occurredAt: '2026-08-28T14:20:00.000Z',
     },
   ],
-  reminders: [
-    {
-      id: 'tr1',
-      kind: 'follow_up',
-      body: 'No reply to the take-home submission in nine days.',
-      dueAt: '2026-09-09T00:00:00.000Z',
-      applicationId: 'p4',
-      roleId: 'role-p4',
-      companyName: 'Kestrel Bank',
-      roleTitle: 'Platform Engineer',
-      followUpHref: 'https://mail.google.com/mail/?view=cm&to=&su=Following%20up',
-    },
-    {
-      id: 'tr2',
-      kind: 'manual',
-      body: 'Record a video interview',
-      dueAt: '2026-09-12T00:00:00.000Z',
-      applicationId: 'p1',
-      roleId: 'role-p1',
-      companyName: 'Larkspur Vane',
-      roleTitle: 'Quantitative Developer, Systematic Strategies',
-      followUpHref: null,
-    },
-  ],
-  debriefs: [],
 };
 
 /**
@@ -1364,93 +1507,9 @@ const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
       ? { ...row, status: 'final_round', lastTurnEvent: 'interview_scheduled' }
       : row,
 );
-const closestInterview = (
-  id: string,
-  applicationId: string,
-  scheduledAt: string,
-  extra: Partial<ClosestInterview> = {},
-): ClosestInterview => ({
-  id,
-  applicationId,
-  scheduledAt,
-  timeKnown: true,
-  status: 'scheduled',
-  groupId: null,
-  prepNotes: null,
-  hasPrepNote: false,
-  notes: null,
-  questionsAsked: null,
-  group: null,
-  ...extra,
-});
-const todayPageClosest: ClosestApplication[] = closestToOffer(
-  todayPageRows,
-  [
-    closestInterview('ti-screen', 'p1', '2026-09-02T15:00:00.000Z', {
-      groupId: 'tg-screen',
-      group: { id: 'tg-screen', label: 'Recruiter screen', roundNumber: 1, notes: null },
-      notes: 'Team of six under the head of systematic. They want someone who has shipped a backtester.',
-      questionsAsked: [
-        'Walk me through the last model you put into production',
-        'How do you test a signal for lookahead bias?',
-        'Why leave your current team now?',
-      ],
-    }),
-    closestInterview('ti1', 'p1', '2026-09-11T13:30:00.000Z', {
-      groupId: 'tg1',
-      group: { id: 'tg1', label: 'Technical', roundNumber: 2, notes: null },
-      prepNotes: 'Revise the event-driven backtester and the slippage model.',
-    }),
-    closestInterview('ti-hm', 'p2', '2026-08-28T10:00:00.000Z', {
-      groupId: 'tg-hm',
-      group: { id: 'tg-hm', label: 'Hiring manager', roundNumber: 1, notes: 'Talked through the ledger migration.' },
-    }),
-    closestInterview('ti0', 'p2', '2026-09-08T15:00:00.000Z', {
-      groupId: 'tg0',
-      group: { id: 'tg0', label: 'Technical', roundNumber: 2, notes: null },
-    }),
-    closestInterview('ti2', 'p2', '2026-09-16T08:00:00.000Z', {
-      timeKnown: false,
-      groupId: 'tg2',
-      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
-    }),
-    closestInterview('ti3', 'p2', '2026-09-16T10:00:00.000Z', {
-      timeKnown: false,
-      groupId: 'tg2',
-      group: { id: 'tg2', label: 'Final', roundNumber: 3, notes: null },
-    }),
-  ],
-  todayPageNow,
-);
-const todayPageBoard: TodayBoard = {
-  ...todayBoard,
-  debriefs: [
-    {
-      key: 'tg0',
-      leadId: 'ti0',
-      roleId: 'role-p2',
-      companyName: 'The Halloran-Achterberg group',
-      roleTitle: 'Software Developer',
-      scheduledAt: '2026-09-08T15:00:00.000Z',
-      timeKnown: true,
-    },
-  ],
-};
-const todayPageReview: ReviewPeek = {
-  count: 5,
-  items: [
-    {
-      id: 'rv1',
-      title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
-      kind: 'Confirmation email',
-    },
-    { id: 'rv2', title: 'Brightwell · Software Engineer, Treasury', kind: 'New application from mail' },
-    { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
-  ],
-};
 const todayPageSince: SinceView = {
   state: 'loaded',
-  hint: 'Since 8 Sept, 18:40',
+  hint: 'Since 8 Sept, 6:40 PM BST',
   stopped: [],
   entries: [
     {
@@ -1925,6 +1984,47 @@ const subjectConcepts: Concept[] = [
     mastery: [],
     testedAt: null,
     declaredAt: null,
+  },
+];
+
+/** Vault notes for the working rows surface; the second has a run on it, named by path as a goal's context names it. */
+const workingNotes = [
+  {
+    id: 'wn1',
+    path: 'Work/Interview notes, Halloran-Achterberg.md',
+    title: 'Interview notes, Halloran-Achterberg',
+    excerpt: 'Second round with the platform team. They asked about the replication lag incident twice.',
+  },
+  {
+    id: 'wn2',
+    path: 'Work/What I want from the next role.md',
+    title: 'What I want from the next role',
+    excerpt: 'A team that owns its own on-call, a manager who writes things down, and no more than two days in the office.',
+  },
+  { id: 'wn3', path: 'Work/Salary bands.md', title: 'Salary bands', excerpt: null },
+];
+
+/** Newsletter issues for the working rows surface; the first has a run on it. */
+const workingSenders = new Map([
+  ['ws1', { id: 'ws1', email: 'hello@moneystuff.example', name: 'Money Stuff', muted: false }],
+  ['ws2', { id: 'ws2', email: 'editor@thedispatch.example', name: 'The Morning Dispatch from the Engineering Desk', muted: false }],
+]);
+const workingIssues = [
+  {
+    id: 'wi1',
+    senderId: 'ws1',
+    subject: 'The bond market is pricing in two more cuts, and why the curve disagrees',
+    receivedAt: '2026-10-15T06:40:00.000Z',
+    readAt: null,
+    summaryLine: 'Rate cuts, a fund that gated withdrawals, and a lawsuit over a rounding error.',
+  },
+  {
+    id: 'wi2',
+    senderId: 'ws2',
+    subject: 'Postgres 18 ships asynchronous I/O',
+    receivedAt: '2026-10-14T17:05:00.000Z',
+    readAt: '2026-10-14T19:00:00.000Z',
+    summaryLine: null,
   },
 ];
 
@@ -2701,8 +2801,10 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -2725,6 +2827,8 @@ const youPlaces: Place[] = [
     movedIn: '2019-08',
     movedOut: null,
     note: 'Two bedrooms and a yard. Walked to the station every morning for the Leeds job.\n\nThe landlord is Sam Okafor.',
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-leeds',
@@ -2735,6 +2839,8 @@ const youPlaces: Place[] = [
     movedIn: '2015',
     movedOut: '2019-08',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-lisbon',
@@ -2745,6 +2851,8 @@ const youPlaces: Place[] = [
     movedIn: '2014-02',
     movedOut: '2014-09',
     note: null,
+    latitude: null,
+    longitude: null,
   },
   {
     id: 'place-childhood',
@@ -2755,12 +2863,36 @@ const youPlaces: Place[] = [
     movedIn: '1992',
     movedOut: '2014',
     note: null,
+    latitude: null,
+    longitude: null,
   },
 ];
+
+/** The same places with positions for the Map view (plan #2091.4); the childhood home has none. */
+const PLACE_POSITIONS: Record<string, [number, number]> = {
+  'place-york': [53.96, -1.08],
+  'place-leeds': [53.8, -1.55],
+  'place-lisbon': [38.72, -9.14],
+};
+const youPlacesOnMap: Place[] = youPlaces.map((place) => {
+  const at = PLACE_POSITIONS[place.id];
+  return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
+});
+
+/** Six details filled in, LinkedIn typed without its scheme (plan #2124.2). */
+const youDetails: Details = {
+  phone: '+1 (415) 555-0142',
+  linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+  citizenship: 'United States and Ireland',
+  race: 'White',
+  gender: 'Man',
+  sexuality: 'Straight',
+};
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
 const youSections: NavSection[] = [
   { href: '/you/personality', label: 'Personality', icon: 'personality' },
+  { href: '/you/details', label: 'Details', icon: 'details' },
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
@@ -3266,6 +3398,20 @@ const CORRECTION_WEEKS: CorrectionWeek[] = [
   { week: '2026-10-05', notes: 7, corrections: 2 },
 ];
 
+/**
+ * Seven weeks of the sent-back count on /dev/ui (plan #2215.5): a week that
+ * shipped nothing, one where none were sent back, and the audit week.
+ */
+const SENT_BACK_WEEKS: SentBackWeek[] = [
+  { week: '2026-08-31', shipped: 31, sentBack: 4 },
+  { week: '2026-09-07', shipped: 24, sentBack: 3 },
+  { week: '2026-09-14', shipped: 0, sentBack: 0 },
+  { week: '2026-09-21', shipped: 38, sentBack: 5 },
+  { week: '2026-09-28', shipped: 42, sentBack: 3 },
+  { week: '2026-10-05', shipped: 47, sentBack: 0 },
+  { week: '2026-10-12', shipped: 19, sentBack: 2 },
+];
+
 /** People to meet: one with a drafted message and a long title, one with only a move. */
 const recommendedPeople: OpenSuggestion[] = [
   recommendedOpening({
@@ -3385,16 +3531,14 @@ const findView = {
   people: recommendedPeople,
 };
 
-/** Jobs Today drawn from the sample rows, with the review queue given. */
-function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+/** Jobs' Now drawn from the sample rows. */
+function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   return (
     <TodayPage
-      review={review}
-      closest={todayPageClosest}
-      board={withoutClosestDebriefs(todayPageBoard, todayPageClosest)}
+      board={board}
       summary={summariseSearch(
         todayPageRows,
-        todayPageBoard.interviews.map((interview) => ({
+        board.interviews.map((interview) => ({
           id: interview.id,
           scheduledAt: interview.scheduledAt,
           timeKnown: interview.timeKnown,
@@ -3407,6 +3551,145 @@ function JobsTodaySurface({ review }: { review: ReviewPeek }) {
     />
   );
 }
+
+/** The foot of a page with the status line under it, the run as given. */
+function StatusRunSurface({ going }: { going: GoingRunLine }) {
+  return (
+    <div className="flex min-h-48 flex-col justify-between overflow-hidden rounded-card bg-sunken">
+      <div className="p-4 text-small text-ink-muted">Today</div>
+      <StatusLine
+        lines={[{ text: 'mail: 14 new', at: null }]}
+        brief={{ text: '3 roles waiting on you', tone: 'caution', href: '/jobs' }}
+        main={null}
+        going={going}
+      />
+    </div>
+  );
+}
+
+/**
+ * An application with four questions after Draft all answers (plan #2130.4):
+ * three drafts waiting, one over its character limit, one answer already
+ * approved, and three questions Dash asked back, one of them replied to.
+ */
+const draftedAnswers: PanelProps['answers'] = [
+  { ...rolePanels.answers[0], wordLimit: 150 },
+  {
+    id: 'a2',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q2',
+    questionText: 'Tell us about a time you shipped something under a hard deadline. (400 characters)',
+    questionKind: 'behavioural',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+  {
+    id: 'a3',
+    answer: '',
+    status: 'unanswered',
+    questionId: 'q3',
+    questionText:
+      'What would you want to change about how research tooling is built here in your first ninety days, and how would you know it had worked?',
+    questionKind: 'motivation',
+    canonicalAnswer: null,
+    timesSeen: 1,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: 200,
+  },
+  {
+    id: 'a4',
+    answer: 'Yes. I hold settled status and need no sponsorship.',
+    status: 'approved',
+    questionId: 'q4',
+    questionText: 'Are you authorised to work in the UK?',
+    questionKind: 'logistics',
+    canonicalAnswer: null,
+    timesSeen: 5,
+    evidenceItemIds: [],
+    unsupportedClaims: [],
+    wordLimit: null,
+  },
+];
+
+const draftedAnswerDrafts: PanelProps['answerDrafts'] = {
+  a1: {
+    text: 'The research tooling team owns the pipeline every strategy desk reads from, and that is the work I have been doing at Kestrel: making market data people can trust. I would rather fix a bad day of ticks at the source than work around it downstream, and this team is where the source is.',
+    evidenceItemIds: ['ev-1', 'ev-2'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a2: {
+    text: 'In March the exchange moved its feed to a new binary format with three weeks of notice. I rewrote our decoder, ran it beside the old one on a week of recorded traffic until the two agreed to the tick, and cut over on the Sunday before the switch. The desks lost no trading time. What made it work was the side-by-side check: every difference was a bug in one or the other, and I fixed eleven of them before anyone downstream saw one.',
+    evidenceItemIds: ['ev-3'],
+    unsupportedClaims: [],
+    bannedFound: [],
+  },
+  a3: {
+    text: 'First I would sit with two desks and time how long an idea takes to become a backtest. I expect most of it is waiting on data to be cleaned by hand. I would move that cleaning into the pipeline, once, and measure the same journey again at the end of the quarter.',
+    evidenceItemIds: [],
+    unsupportedClaims: ['most of it is waiting on data'],
+    bannedFound: [],
+  },
+};
+
+/**
+ * Dash's cover letter after Draft a cover letter (plan #2135.2): five
+ * paragraphs citing three items, one claim to check, and two questions back,
+ * the first already replied to.
+ */
+const draftedLetter: NonNullable<PanelProps['coverLetterDraft']> = {
+  letter: [
+    'Dear hiring team,',
+    'I am applying for the quantitative developer role on your systematic trading teams. For the last three years at Kestrel I have built the research tooling our desk runs on: the backtester, the tick store behind it, and the checks that stop a bad day of market data reaching a live strategy.',
+    'The part of your posting I keep coming back to is turning an idea into a backtest and a backtest into a live strategy. At Kestrel that path took two weeks when I joined. After I moved the backtester onto the same data path as production it took two days, and the strategies that went live behaved the way their backtests said they would.',
+    'I write Python every day and C++ where the hot path needs it, and I have run market data at the scale of every US equity tick. I would like to bring that to the team that owns the pipeline every desk reads from.',
+    'Thank you for reading. I would be glad to talk it through.',
+  ].join('\n\n'),
+  words: 178,
+  evidenceItemIds: ['ev-1', 'ev-2', 'ev-3'],
+  unsupportedClaims: ['the strategies that went live behaved the way their backtests said they would'],
+  bannedFound: [],
+  asks: [
+    {
+      id: 'letter-ask-1',
+      answer_id: null,
+      question: 'Who should the letter be addressed to? The posting names no hiring manager.',
+      reply: 'Dana Okafor, who ran the phone screen',
+    },
+    {
+      id: 'letter-ask-2',
+      answer_id: null,
+      question: 'Is the move from two weeks to two days something you can say publicly, or should it stay vaguer?',
+      reply: null,
+    },
+  ],
+};
+
+const draftedAsks: PanelProps['dashAsks'] = [
+  {
+    id: 'ask-1',
+    answer_id: 'a2',
+    question: 'Which deadline should this be: the feed migration in March, or the regulatory report in 2024?',
+    reply: null,
+  },
+  {
+    id: 'ask-2',
+    answer_id: 'a3',
+    question: 'Have you used their open-source backtester, or only read about it?',
+    reply: 'Ran the examples and read the docs, never in production.',
+  },
+  {
+    id: 'ask-3',
+    answer_id: null,
+    question: 'Would you move to London for this, or is it remote only for you?',
+    reply: null,
+  },
+];
 
 export const SURFACES: readonly Surface[] = [
   {
@@ -3425,6 +3708,7 @@ export const SURFACES: readonly Surface[] = [
             everSubmitted: true,
             closedOn: '8 Sep',
             interviewCount: 1,
+            allQuestionsAdded: true,
           })}
         />
         <RoleTodos
@@ -3467,15 +3751,166 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'jobs-role-answers-marked',
+    label: 'Role · Answers, marked ready',
+    module: 'jobs',
+    width: 'wide',
+    // Ready and All questions added ticked, the cover letter answered Yes (plan #2102.2, #2196.1),
+    // with an answer and a letter written, so each shows Copy, and a comment under the
+    // answer (notes 69abdbad, be3c6616).
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        readyToApply
+        allQuestionsAdded
+        hasCoverLetter
+        answers={[
+          {
+            ...rolePanels.answers[0],
+            answer:
+              'The payments risk team sits where the product meets the money, and the last two years of my work have been there: models that flag a bad merchant before the first chargeback.',
+            status: 'approved',
+          },
+        ]}
+        coverLetter={'Dear hiring team,\n\nI have spent the last two years building risk models for a payments platform, and Lattice Pay is the team I would most like to do that with next.'}
+        answerThreads={{
+          [`job_search.application_answers:${rolePanels.answers[0].id}`]: [
+            { id: 'c-1', author: 'me', body: 'Too long for their form, cut the second clause.', createdAt: '2026-10-14T09:00:00Z' },
+          ],
+        }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-closed',
+    label: 'Role · Answers, closed',
+    module: 'jobs',
+    width: 'wide',
+    // A closed application shows the marks without controls.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="rejected"
+        readyToApply
+        allQuestionsAdded
+        hasCoverLetter={false}
+        defaultTab="answers"
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-questions',
+    label: 'Role · Answers drafted, with Dash\'s questions',
+    module: 'jobs',
+    width: 'wide',
+    // After Draft all answers (plan #2130.4): a draft beside every unanswered
+    // question, one over its character limit, and Dash's questions above the
+    // cards with one already replied to.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        answerDrafts={draftedAnswerDrafts}
+        dashAsks={draftedAsks}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-drafting',
+    label: 'Role · Answers, drafting all',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers mid-run: the button reads Drafting and the cards stay open.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-error',
+    label: 'Role · Answers, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft all answers failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        answers={draftedAnswers}
+        draftRun={{ pending: false, error: 'Dash ran out of time before the answers were written. Nothing was saved; try again.' }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-draft',
+    label: "Role · Cover letter drafted, with Dash's questions",
+    module: 'jobs',
+    width: 'wide',
+    // After Draft a cover letter (plan #2135.2): the draft beside the empty
+    // letter, one claim to check, and Dash's two questions with Redraft.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterDraft={draftedLetter}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-drafting',
+    label: 'Role · Cover letter, drafting',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter mid-run: the button reads Drafting with a note under it.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{ pending: true, error: null }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
+    id: 'jobs-role-answers-letter-error',
+    label: 'Role · Cover letter, drafting failed',
+    module: 'jobs',
+    width: 'wide',
+    // Draft a cover letter failed: one line under the button says what went wrong.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        coverLetterRun={{
+          pending: false,
+          error: 'Dash ran out of time before the letter was written. Nothing was saved; try again.',
+        }}
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answer-draft',
     label: 'Role · An answer with its draft',
     module: 'jobs',
     width: 'wide',
     // The draft beside a question after Draft is pressed (note ad554975): one
-    // drawn from the posting alone, citing nothing from the bank.
+    // drawn from the posting alone, citing nothing from the bank, counted
+    // against the question's 150-word limit (plan #2130.4).
     render: () => (
       <AnswerCard
-        answer={rolePanels.answers[0]}
+        answer={{ ...rolePanels.answers[0], wordLimit: 150 }}
         closed={false}
         initialDraft={{
           text: 'I want to work on the research tooling team because the posting describes the job I have been doing on the side for two years: making market data people can trust. The team owns the pipeline every strategy desk reads from, and I would rather fix a bad day of ticks at the source than work around it downstream.',
@@ -3558,12 +3993,40 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Pipeline narrowed to the roles with all their questions added (plan
+     * #2196.2): the one chip set, the rest of the line unchanged. */
+    id: 'jobs-pipeline-marks',
+    label: 'Pipeline · All questions added filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PreviewShell>
+        <PipelinePage rows={pipelineRows} params={{ view: 'table', questions: 'yes' }} />
+      </PreviewShell>
+    ),
+  },
+  {
     /* The table view, every live application a row on one surface. */
     id: 'jobs-pipeline-table',
     label: 'Pipeline · Table',
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
+  },
+  {
+    /* The table with a column's menu open (note f05f5f04): its sort, then
+     * the companies it can be narrowed to, one already chosen. */
+    id: 'jobs-pipeline-column-menu',
+    label: 'Pipeline · Table · Column filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PipelinePage
+        rows={pipelineRows}
+        params={{ view: 'table', company: pipelineRows[0].companySlug }}
+        openColumn="company"
+      />
+    ),
   },
   {
     /* The page as it opens: what is in process, waiting and to apply. */
@@ -3626,14 +4089,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Kestrel Bank is in Closed”.',
+        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “Declined: Kestrel Bank · 5 open” with Undo.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p4"
         to="rejected"
-        label="Reject Kestrel Bank"
+        label="Decline Kestrel Bank"
       />
     ),
   },
@@ -3727,7 +4190,6 @@ export const SURFACES: readonly Surface[] = [
         </p>
         <Thread
           subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
-          onCard
           turns={[
             {
               id: 'seen-1',
@@ -3737,6 +4199,100 @@ export const SURFACES: readonly Surface[] = [
               acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
+        />
+      </div>
+    ),
+  },
+  {
+    /* What a comment asked Dash to run that costs money (plan #2228.2): the
+     * approval card under the reply that says it was queued, in the thread
+     * on a goal, as every row's thread draws it. */
+    id: 'thread-paid',
+    label: 'Thread · Paid actions waiting under a comment',
+    module: 'goals',
+    width: 'narrow',
+    render: () => {
+      const at = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
+      const press = (id: string, line: string, medianMicros: number): DashChange => ({
+        id,
+        conversationId: '00000000-0000-4000-8000-000000000441',
+        turnId: 'paid-ask',
+        kind: 'paid_action',
+        status: 'proposed',
+        subjectRef: null,
+        writtenTable: null,
+        writtenRef: null,
+        undo: null,
+        createdAt: at(4),
+        doneAt: null,
+        declinedAt: null,
+        undoneAt: null,
+        input: {
+          tool: 'write_year_review',
+          action: 'app/timeline/actions.ts#writeYearReview',
+          args: {},
+          line,
+          estimate: {
+            lowMicros: Math.round(medianMicros * 0.7),
+            medianMicros,
+            highMicros: Math.round(medianMicros * 1.6),
+            runs: 9,
+            basis: 'measured',
+            per: 'run',
+            models: [SONNET],
+          },
+          workspace: null,
+          paths: ['/jobs/pipeline'],
+        },
+      });
+      return (
+        <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+          <p className="text-body text-ink">Move into a senior analyst role by spring</p>
+          <Thread
+            subject={threadRef('goal', '00000000-0000-4000-8000-000000000442')}
+            turns={[
+              {
+                id: 'paid-ask',
+                author: 'me',
+                body: '@dash draft my answers on the Northwind and Fernhill applications',
+                createdAt: at(5),
+                paid: [
+                  press('thread-paid-1', 'Draft the answers on the Northwind Analytics application.', 148_000),
+                  press('thread-paid-2', 'Draft the answers on the Fernhill Labs application.', 131_000),
+                ],
+              },
+              {
+                id: 'paid-reply',
+                author: 'claude',
+                body: 'I have queued both drafts. They cost money, so nothing runs until you accept them below.',
+                createdAt: at(4),
+              },
+            ]}
+          />
+        </div>
+      );
+    },
+  },
+  {
+    /* "Dash at work" on the button that started a run (plan #1964.2.1): the
+     * press hands the area to Dash and the button's working mark stands in
+     * place of its label while the run goes. */
+    id: 'dash-action-run',
+    label: 'Dash action · a run going',
+    module: 'goals',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-run"]',
+      shows:
+        'Pressing “Plan this area” turns its mark to working beside the label, then the label gives way to the working mark alone, pulsing in the middle of a button that keeps its width, as the line beside it says Dash is planning the area.',
+    },
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">Health</p>
+        <DashRunButtonDemo
+          label="Plan this area"
+          line="Dash is planning this area · Reading your notes"
         />
       </div>
     ),
@@ -3864,6 +4420,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <BurnUpSurface />,
   },
   {
+    /* A goal's metrics on its Overview (plan #2084.2): twelve weeks with a
+     * target, five months with none and a target above every count. Its
+     * hidden parts follow: a bar's tooltip, a metric with nothing counted
+     * yet, and the section's message when the read fails. */
+    id: 'goals-metrics',
+    label: 'Goals · Metrics as bar charts',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsSurface />,
+  },
+  {
+    id: 'goals-metrics-tooltip',
+    label: 'Goals · Metrics, a bar hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsTooltipSurface />,
+  },
+  {
+    id: 'goals-metrics-empty',
+    label: 'Goals · Metrics, nothing counted yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsEmptySurface />,
+  },
+  {
+    id: 'goals-metrics-error',
+    label: 'Goals · Metrics, the read failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalMetricsErrorSurface />,
+  },
+  {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
      * Dash's latest update (plan #1666), the detail, a question, what it
      * waits on and the thread, and the properties column. */
@@ -3938,6 +4526,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanSendBackSurface />,
+  },
+  {
+    /* A finished step's screens with the mockup you approved beside the
+     * build (plan #2215.10): the mockup first, Send back under each pair,
+     * and a surface with no mockup drawn as before. */
+    id: 'dev-plan-screen-mockup',
+    label: 'Plan · a step’s screens beside their mockup',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanScreenMockupSurface />,
   },
   {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
@@ -4041,12 +4639,123 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsInboxSurface />,
   },
   {
+    /* The one Inbox component (plan #1937.4) from its row shape alone, as
+     * every workspace's Inbox draws it: the three sections, the verbs, Later
+     * and Decline, and the Later fold open. */
+    id: 'inbox-page',
+    label: 'Inbox · the one component',
+    module: 'dev',
+    width: 'page',
+    render: () => <InboxPageSurface />,
+  },
+  /* Each workspace's Inbox (plan #1937.5): the agenda's on-you rows cut to
+   * the workspace, with a queue row where it keeps one. News is drawn empty.
+   * Fixtures in workspace-inbox-surfaces.tsx. */
+  {
+    id: 'shopping-inbox',
+    label: 'Shopping · Inbox',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingInboxSurface />,
+  },
+  {
+    id: 'jobs-inbox',
+    label: 'Job search · Inbox',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface />,
+  },
+  {
+    id: 'todo-inbox',
+    label: 'Todo · Inbox',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoInboxSurface />,
+  },
+  {
+    id: 'vault-inbox',
+    label: 'Vault · Inbox',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultInboxSurface />,
+  },
+  {
+    id: 'learn-inbox',
+    label: 'Learn · Inbox',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnInboxSurface />,
+  },
+  {
+    id: 'news-inbox',
+    label: 'News · Inbox, empty',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsInboxSurface />,
+  },
+  {
     /* Three areas and their goals, edited where they stand. */
     id: 'goals-all',
     label: 'Goals · all goals',
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* A goal's row menu on All goals, open: Later and Drop (plans #2097.1, #1957.8). */
+    id: 'goals-all-menu',
+    label: 'Goals · all goals, a goal’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayMenuSurface />,
+  },
+  {
+    /* Back on All goals after parking a goal: the toast with Undo (plan #2097.1). */
+    id: 'goals-all-toast',
+    label: 'Goals · all goals, parked with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllPutAwayToastSurface />,
+  },
+  {
+    /* Select on, three goals ticked: the bar with Later and Drop (plans #2097.2, #1957.8). */
+    id: 'goals-all-select',
+    label: 'Goals · all goals, several selected',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectSurface />,
+  },
+  {
+    /* Drop pressed with six ticked: the bar asks first (plan #2097.2). */
+    id: 'goals-all-select-confirm',
+    label: 'Goals · all goals, dropping six',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectConfirmSurface />,
+  },
+  {
+    /* Three goals parked together: one toast and one Undo (plan #2097.2). */
+    id: 'goals-all-select-toast',
+    label: 'Goals · all goals, parked three with Undo',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSelectToastSurface />,
+  },
+  {
+    /* The goal page's heading menu, open, with Later and Drop (plans #2097.1, #1957.8). */
+    id: 'goals-page-top-menu',
+    label: 'Goal · the heading menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPutAwayMenuSurface />,
+  },
+  {
+    /* Drop pressed: the confirm naming its steps (plan #2097.1). */
+    id: 'goals-page-top-archive',
+    label: 'Goal · dropping it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalArchiveConfirmSurface />,
   },
   {
     /* An area's own page (plan #1619): one area, its goals and proposals. */
@@ -4176,7 +4885,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <UiStandard corrections={CORRECTION_WEEKS} removedTaste={REMOVED_TASTE} />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} sentBack={SENT_BACK_WEEKS} removedTaste={REMOVED_TASTE} />,
   },
   {
     /* The correction measure on /dev/ui alone (plan #1543), since the whole
@@ -4191,6 +4900,22 @@ export const SURFACES: readonly Surface[] = [
         <CorrectionsChart weeks={CORRECTION_WEEKS} />
         <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
         <CorrectionsChart weeks={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The sent-back count on /dev/ui alone (plan #2215.5), with the empty and
+     * unread states beneath, since the whole page is too tall to read a chart. */
+    id: 'dev-ui-sent-back',
+    label: 'UI · how many new screens you send back',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <SentBackChart weeks={SENT_BACK_WEEKS} />
+        <SentBackChart weeks={SENT_BACK_WEEKS.slice(-2)} />
+        <SentBackChart weeks={[]} />
+        <SentBackChart weeks={null} />
       </div>
     ),
   },
@@ -4342,10 +5067,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-settings',
-    label: 'Settings',
+    label: 'Jobs · Settings, the Search tab',
     module: 'jobs',
-    width: 'wide',
-    render: () => <SettingsView {...settings} />,
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} />,
   },
   {
     id: 'jobs-material',
@@ -4447,22 +5172,22 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Today, where Jobs opens (plan #1591): the review strip, the
-     * applications closest to an offer, This week, the live applications by whose move it is, and what came in since. */
+    /* Now, where Jobs opens (plan #1591, #1937.9): This week's interviews
+     * and the live applications by whose move it is, with what came in
+     * since in the rail. What asks for an action is on jobs-inbox. */
     id: 'jobs-today',
-    label: 'Today',
+    label: 'Now',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={todayPageReview} />,
+    render: () => <JobsTodaySurface />,
   },
   {
-    /* The same page with nothing waiting to be checked, so the review strip
-     * does not draw: the picture for a post about Today. */
+    /* The same page in a week with no interviews, so This week is one line. */
     id: 'jobs-today-clear',
-    label: 'Today · nothing to check',
+    label: 'Now · a quiet week',
     module: 'jobs',
     width: 'wide',
-    render: () => <JobsTodaySurface review={{ count: 0, items: [] }} />,
+    render: () => <JobsTodaySurface board={{ ...todayBoard, interviews: [] }} />,
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */
@@ -4554,6 +5279,20 @@ export const SURFACES: readonly Surface[] = [
       <div className={SHELL_FOOT}>
         <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
         <TriagePreview writable />
+      </div>
+    ),
+  },
+  {
+    /* Make it a note of its own, pressed (note 24fd1e02): the name field,
+     * filled with the name the first line gives it, ready to change. */
+    id: 'vault-triage-naming',
+    label: 'Vault · Quick note triage · Naming a new note',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
+        <TriagePreview writable naming />
       </div>
     ),
   },
@@ -4833,7 +5572,9 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* Saved courses by school and then by term, newest first, with the
-     * transcripts each school issued. */
+     * transcripts each school issued. A graded course named for its topics
+     * offers its one explain prompt, and one already explained says what
+     * the answer showed (plan #2172.4.2). */
     id: 'you-work-list',
     label: 'Work & school · Courses by school and term',
     module: 'you',
@@ -4841,7 +5582,35 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <PageHeader title="Work & school" />
-        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+        <EducationSection
+          groups={educationGroups}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          explains={educationExplains}
+        />
+      </>
+    ),
+  },
+  {
+    /* A course's explain prompt open on its row (plan #2172.4.2): the
+     * question naming the topics the course was named for, the box, and the
+     * press that grades it. */
+    id: 'you-work-explain',
+    label: 'Work & school · Explaining a course',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          explains={educationExplains}
+          explaining="c3"
+        />
       </>
     ),
   },
@@ -4876,6 +5645,73 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* "Dash is on it" on a row while a run or an Ask Dash hand-off is about
+     * it (plan #1964.2.2), in the three workspaces whose rows had no move of
+     * their own: a reading, a vault note and a newsletter issue. The press
+     * starts a run about the reading with no source; the note and the issue
+     * are drawn with a run already going. */
+    id: 'dash-working-rows',
+    label: 'Rows · Dash is on it',
+    module: 'learn',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-row"]',
+      shows:
+        'Pressing “Find a source” turns the button’s mark to working beside its words, which become “Finding a source”, and on the reading with no source “No source yet” gives way to Dash’s pulsing mark and “Dash is on it” in the same place, with nothing below moving.',
+    },
+    render: () => (
+      <div className="space-y-6">
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Learn · Distributed systems</h2>
+          <DashWorkingReadingDemo readings={trackReadings.slice(1, 4)} target="rd4" />
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Vault · Work</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingNotes.map((note) => (
+              <NoteListRow key={note.id} note={note} working={['obsidian.notes:Work/What I want from the next role.md']} />
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">News · Latest</h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {workingIssues.map((issue) => (
+              <IssueListRow
+                key={issue.id}
+                issue={issue}
+                sender={workingSenders.get(issue.senderId)}
+                from={null}
+                timezone="Europe/London"
+                working={['news.issues:wi1']}
+              />
+            ))}
+          </ul>
+        </section>
+      </div>
+    ),
+  },
+  {
+    /* Due for review on Learn now (note 9b011a39): the list folds under its
+     * heading, with the count on the closed line. Fixtures in
+     * notes-batch-surfaces.tsx. */
+    id: 'learn-review-list',
+    label: 'Now · Due for review',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface />,
+  },
+  {
+    /* The same list folded shut: one line, the chevron, Due for review and
+     * the count (note 9b011a39). */
+    id: 'learn-review-list-folded',
+    label: 'Now · Due for review, folded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface folded />,
+  },
+  {
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
@@ -4890,6 +5726,63 @@ export const SURFACES: readonly Surface[] = [
     // On its second card (plan #1931.5): the first is passed, so Previous shows.
     render: () => (
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
+    ),
+  },
+  /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
+   * (plan #2164.5), and its hidden parts: the check as the last turn, the
+   * finished thread, an answer being marked, a mark that failed, and a goal
+   * with no pieces yet. */
+  {
+    id: 'learn-now-deck-piece',
+    label: 'Now · Today’s piece, an idea marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-check',
+    label: 'Now · Today’s piece, the check as the last turn',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceCheckSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-done',
+    label: 'Now · Today’s piece, finished',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceDoneSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-loading',
+    label: 'Now · Today’s piece, an answer being marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceLoadingSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-error',
+    label: 'Now · Today’s piece, a mark that failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <TodaysPieceErrorSurface />,
+  },
+  {
+    id: 'learn-now-deck-piece-none',
+    label: 'Now · A goal with no pieces yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      // Enough cards that the deck does not reach for more, which the gallery cannot load.
+      <TodaysPieceNoneSurface
+        cards={
+          <LearnNowFeed
+            first={[...deckCards, ...deckCards.map((card, index) => ({ ...card, id: `${card.id.slice(0, -1)}${'abc'[index]}` }))]}
+            ready={20}
+            low={10}
+          />
+        }
+      />
     ),
   },
   {
@@ -5011,6 +5904,260 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FlowScopePreview />,
   },
   {
+    /* A goal question in Practice Flow (plan #2164.2): an idea to explain in a
+     * few sentences, with the box to write in, Mark it, I don't know and Later. */
+    id: 'learn-flow-explain',
+    label: 'Practice Flow · An explain question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="ask" />,
+  },
+  {
+    /* The explanation marked: what was right, what was missing, the example
+     * line, and the one follow-up with its own box. Next skips it. */
+    id: 'learn-flow-explain-marked',
+    label: 'Practice Flow · Explanation marked, with the follow-up',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="marked" />,
+  },
+  {
+    /* The follow-up marked too: where the idea now stands, the idea as
+     * written, and Next. */
+    id: 'learn-flow-explain-done',
+    label: 'Practice Flow · Follow-up marked',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="done" />,
+  },
+  {
+    /* Mark it pressed: the press held while Dash marks the explanation. */
+    id: 'learn-flow-explain-grading',
+    label: 'Practice Flow · Marking the explanation',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="grading" />,
+  },
+  {
+    /* A worked case on a goal's idea (plan #2164.3): figures and a task, the
+     * box to write a number or two sentences in, and Later. */
+    id: 'learn-flow-case',
+    label: 'Practice Flow · A worked case',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowCasePreview stage="ask" />,
+  },
+  {
+    /* The case answered: Dash's sentence, the answer expected, and Next. */
+    id: 'learn-flow-case-answered',
+    label: 'Practice Flow · Case answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowCasePreview stage="answered" />,
+  },
+  {
+    /* What a session moved (plan #2164.6): the card that ends a Practice Flow
+     * run, with the ideas shown and missed quoted and what came onto the fringe. */
+    id: 'learn-flow-summary',
+    label: 'Practice Flow · What moved',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowSummaryPreview />,
+  },
+  {
+    /* Marking failed: the explanation stays in its box, with the reason under the card. */
+    id: 'learn-flow-explain-error',
+    label: 'Practice Flow · Marking failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowExplainPreview stage="error" />,
+  },
+  {
+    /* An explain question about one level of a topic, before an answer
+     * (plan #2138.5). The forward row holds Check my answer. */
+    id: 'learn-cell-answer',
+    label: 'Practice Flow · Explain a level',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" />,
+  },
+  {
+    /* The same question while the answer is graded. */
+    id: 'learn-cell-answer-loading',
+    label: 'Practice Flow · Explain a level, grading',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="loading" />,
+  },
+  {
+    /* Grading failed: the answer stays in the box to send again. */
+    id: 'learn-cell-answer-error',
+    label: 'Practice Flow · Explain a level, grading failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="error" />,
+  },
+  {
+    /* The answer screen: every level the answer reached, shown or implied,
+     * and a link put up for review. */
+    id: 'learn-cell-answer-reached',
+    label: 'Practice Flow · What an answer reached',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="reached" />,
+  },
+  {
+    /* The same list with the quote behind the first shown level opened. */
+    id: 'learn-cell-answer-quote',
+    label: 'Practice Flow · What an answer reached, quote open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="quote" />,
+  },
+  {
+    /* A case at level 4: numbers to work and a box to show the working in
+     * (plan #2138.8). */
+    id: 'learn-cell-answer-case',
+    label: 'Practice Flow · Work a case',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case" />,
+  },
+  {
+    /* The same case graded on the asked level alone. */
+    id: 'learn-cell-answer-case-reached',
+    label: 'Practice Flow · Work a case, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
+    /* A question Practice Flow picked (plan #2138.6), with the reason it was
+     * chosen opened, and End run beside the forward action. */
+    id: 'learn-practice-why',
+    label: 'Practice Flow · Why this question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="asked" openWhy />,
+  },
+  {
+    /* The end of a run: every level that moved while it lasted. */
+    id: 'learn-practice-run-end',
+    label: 'Practice Flow · End of a run',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end" />,
+  },
+  {
+    /* The end of a run with a lens offered for a vault theme no lens covers. */
+    id: 'learn-practice-run-end-offer',
+    label: 'Practice Flow · End of a run, lens offered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer" />,
+  },
+  {
+    /* The same offer with the longest names it has to hold. */
+    id: 'learn-practice-run-end-offer-long',
+    label: 'Practice Flow · End of a run, lens offered, long names',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-offer-long" />,
+  },
+  {
+    /* A run ended before anything was answered. */
+    id: 'learn-practice-run-end-empty',
+    label: 'Practice Flow · End of a run, nothing answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-empty" />,
+  },
+  {
+    /* A run that ended because nothing was left to ask. */
+    id: 'learn-practice-run-end-nothing-left',
+    label: 'Practice Flow · End of a run, nothing left',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="end-nothing-left" />,
+  },
+  {
+    /* The next question while it is chosen and written. */
+    id: 'learn-practice-loading',
+    label: 'Practice Flow · Choosing the next question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="loading" />,
+  },
+  {
+    /* No approved topic to place you on. */
+    id: 'learn-practice-no-topic',
+    label: 'Practice Flow · No topic yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="no-topic" />,
+  },
+  {
+    /* The next question could not be chosen. */
+    id: 'learn-practice-error',
+    label: 'Practice Flow · Choosing failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PracticeRunPreview state="error" />,
+  },
+  {
+    /* A placement question before a subject's first lesson (plan #2292.2):
+     * where it sits among the eight, why it was chosen, and Skip to the lesson
+     * where End run sits in a practice run. */
+    id: 'learn-placement-question',
+    label: 'Placement · A question, with Skip',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="question" />,
+  },
+  {
+    /* The same question answered: the levels it reached, Next, and Skip. */
+    id: 'learn-placement-answered',
+    label: 'Placement · A question answered',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="answered" />,
+  },
+  {
+    /* The end: each topic answered on at its level, the pieces passed by
+     * placement, and the lesson the subject now starts on. */
+    id: 'learn-placement-end',
+    label: 'Placement · The end, with pieces passed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="end" />,
+  },
+  {
+    /* An end where nothing was held well enough to pass a piece. */
+    id: 'learn-placement-end-none',
+    label: 'Placement · The end, nothing passed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <PlacementPreview state="end-none" />,
+  },
+  {
+    /* The top of a prepared subject's page with no claims behind it (plan
+     * #2307.1): lens progress as tested and inferred, and both presses. */
+    id: 'learn-subject-header',
+    label: 'Subject · Header of a prepared subject',
+    module: 'learn',
+    width: 'page',
+    render: () => (
+      <PageHeader
+        title="Urban economics and the economics of housing supply"
+        description={subjectDescription(
+          { tested: 12, inferred: 9, declared: 0, total: 46 },
+          { unknown: 0, shaky: 0, recognised: 0, known: 0, sharp: 0, misconception: 0, total: 0 },
+        )}
+        actions={<SubjectPresses id="s1" lensId="l1" owner />}
+      />
+    ),
+  },
+  {
     /* The chain a subject reads as: the doors it turns on, then everything
      * downstream of them. The size difference is the surface. */
     id: 'learn-subject-chain',
@@ -5061,6 +6208,17 @@ export const SURFACES: readonly Surface[] = [
         <SearchBarSurface />
       </div>
     ),
+  },
+
+  {
+    /* The search box as the phone's dock button opens it (note 5f3ef44f):
+     * the switcher and the search in one, so before anything is typed it
+     * lists every workspace, Home first, the one you are in marked. */
+    id: 'shell-go-to',
+    label: 'Dock · Go to, before anything is typed',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => <GoToSurface />,
   },
 
   {
@@ -5164,6 +6322,27 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Dash at work in the sheet (plan #1899.8): Send pressed on a question,
+     * each lookup appearing under Dash's name as it is made, the answer's
+     * words after them, and the mark coming to rest when it lands. */
+    id: 'ask-dash-at-work',
+    label: 'Ask Dash · Dash at work',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => (
+      <AskDashSurface open draft={AT_WORK_QUESTION}>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
     /* An answer that failed (plan #1337): the question was kept, the answer
      * was not, and Dash's mark shows failed with the error beside it where
      * the working line was. */
@@ -5230,6 +6409,90 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskChangesSurface />,
   },
   {
+    /* Ask Dash asked to build plan steps (plan #2106.1): a card naming the
+     * step with Confirm and Decline, one whose last run has gone quiet, and
+     * a step that cannot be built, refused in words with no card. */
+    id: 'ask-dash-build',
+    label: 'Ask Dash · Start a build',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface />,
+  },
+  {
+    /* The "Are you sure?" popup Confirm opens on a proposed delete (plan
+     * #2232.2): the answers listed, Cancel focused, Delete beside it. */
+    id: 'ask-dash-delete-popup',
+    label: 'Ask Dash · Delete, are you sure',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface />,
+  },
+  {
+    /* The same popup after Delete was turned down: the reason inside, the rows kept. */
+    id: 'ask-dash-delete-popup-refused',
+    label: 'Ask Dash · Delete, refused',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="refused" />,
+  },
+  {
+    /* The popup while the delete runs: both buttons held, Delete working. */
+    id: 'ask-dash-delete-popup-deleting',
+    label: 'Ask Dash · Delete, running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskDeleteSurface mode="deleting" />,
+  },
+  {
+    /* The build card after a Confirm the server refused, the reason under it. */
+    id: 'ask-dash-build-refused',
+    label: 'Ask Dash · Start a build, refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <AskBuildSurface refused />,
+  },
+  {
+    /* What costs money, on one card under the answer that queued it (plan
+     * #2228.2): a cost on each line, the total, Accept all and Decline. */
+    id: 'ask-dash-paid',
+    label: 'Ask Dash · Paid actions waiting',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface />,
+  },
+  {
+    /* Accept all pressed: the first line running, the rest waiting their turn. */
+    id: 'ask-dash-paid-running',
+    label: 'Ask Dash · Paid actions running',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="running" />,
+  },
+  {
+    /* Every line run: each links to what it wrote, and none has an Undo. */
+    id: 'ask-dash-paid-done',
+    label: 'Ask Dash · Paid actions run',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="done" />,
+  },
+  {
+    /* One line refused with its reason; the lines either side of it still ran. */
+    id: 'ask-dash-paid-failed',
+    label: 'Ask Dash · A paid action that failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="failed" />,
+  },
+  {
+    /* Declined: the card greyed, nothing run and nothing spent. */
+    id: 'ask-dash-paid-declined',
+    label: 'Ask Dash · Paid actions declined',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskPaidSurface moment="declined" />,
+  },
+  {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind
      * newest first, one undone, Undo on the step refused with its reason. */
     id: 'ask-made-changes',
@@ -5240,8 +6503,9 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Ask Dash thread on its own (plan #1708), where a change to
-     * components/talk/talk-thread.tsx is looked at: a short answer with its
-     * rows, a long markdown one, one with bars and one with a table. */
+     * components/thread/thread.tsx without a subject is looked at: a short answer with its
+     * rows, a long markdown one, one with bars, one with a table, and one
+     * with a figure against the usual amount and columns by month. */
     id: 'ask-dash-thread',
     label: 'Ask Dash · The thread',
     module: 'jobs',
@@ -5257,6 +6521,191 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadFilesSurface />,
+  },
+  {
+    /* A chat in the middle of an answer (plan #2262.2): Dash's earlier
+     * message once, your reply and the loading line. */
+    id: 'ask-dash-waiting',
+    label: 'Ask Dash · A chat waiting for an answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadWaitingSurface />,
+  },
+  {
+    /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
+     * left, grouped by day with the workspaces each used and chips to narrow
+     * them, and the open chat beside them. On a phone the chat is drawn over
+     * the list, with the way back above its title. */
+    id: 'ask-page',
+    label: 'Dash · A chat open beside the list',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface />,
+  },
+  {
+    /* Dash at work on the full page (plan #1899.8): Send pressed in an open
+     * chat, each lookup appearing under Dash's name, the answer written out
+     * after them and the mark coming to rest. */
+    id: 'ask-page-at-work',
+    label: 'Dash · Dash at work in a chat',
+    module: 'jobs',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: 'button[type="submit"][title="Send"]',
+      submits: true,
+      shows:
+        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+    },
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
+  },
+  {
+    /* The same page at /ask, a new chat beside the list; on a phone the
+     * list is the whole page. */
+    id: 'ask-page-new',
+    label: 'Dash · The list and a new chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* The list hidden to its strip (New chat and the button to show it),
+     * with the chat centred at its reading width. The column of what Dash
+     * used is folded too, to its button in the chat's header (#1899.4). */
+    id: 'ask-page-hidden',
+    label: 'Dash · The list hidden',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
+  },
+  {
+    /* What Dash used in the open chat (plan #1899.4): with the list hidden
+     * there is room, so the column sits beside the chat: the rows read, the
+     * change made with Undo, the lookups, the file sent and the cost. A
+     * phone has no room, so the chat shows the Used button. */
+    id: 'ask-page-used',
+    label: 'Dash · What Dash used, beside the chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} />,
+  },
+  {
+    /* Dash's box (plan #1899.5): a question that carried two rows added
+     * with @, shown under it; an answer stopped part way, kept as far as it
+     * got; and the box open on "@cat" with the rows the top bar's search
+     * finds, one already added as a chip, the scope chip on Shopping. */
+    id: 'ask-box-rows',
+    label: 'Dash · Adding a row with @',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="rows" />,
+  },
+  {
+    /* The same box with / typed: the things Dash can already do, each
+     * written into the box for you to finish. */
+    id: 'ask-box-commands',
+    label: 'Dash · The commands / offers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="commands" />,
+  },
+  {
+    /* The scope chip's menu open: Everything, or one workspace Dash's
+     * lookups are kept to, Learn chosen. */
+    id: 'ask-box-scope',
+    label: 'Dash · Keeping the lookups to one workspace',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskBoxSurface open="scope" />,
+  },
+  {
+    /* The list searched for "Catan" (plan #1899.6): two chats found by what
+     * was said in them, one only in Dash's answer, each with the words
+     * around it. On a phone the list is the page. */
+    id: 'ask-page-search',
+    label: 'Dash · Searching the chats',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="search" />,
+  },
+  {
+    /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
+    id: 'ask-page-menu',
+    label: "Dash · A chat's menu",
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="menu" />,
+  },
+  {
+    /* A chat being renamed in place in the list (plan #1899.6). */
+    id: 'ask-page-rename',
+    label: 'Dash · Renaming a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="new" list="rename" />,
+  },
+  {
+    /* An archived chat opened from Archived at the foot of the list (plan
+     * #1899.6), with the line above it that puts it back. */
+    id: 'ask-page-archived',
+    label: 'Dash · An archived chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface chat="archived" usedOpen={false} />,
+  },
+  {
+    /* The presses under each answer (plan #1899.7): the first answer made a
+     * todo and saved to the vault, each card with Undo, and Edit pressed on
+     * the second, so its question is back in the box. */
+    id: 'ask-answer-actions',
+    label: 'Dash · An answer kept as a todo and a note',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface />,
+  },
+  {
+    /* Thumbs on an answer already rated (plan #2285.2): the first up, the
+     * second down with what went wrong, both filled. */
+    id: 'ask-answer-actions-rated',
+    label: 'Dash · Answers rated up and down',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="rated" />,
+  },
+  {
+    /* Thumbs down just pressed on the second answer, What went wrong? open
+     * with Send and Skip. */
+    id: 'ask-answer-actions-note',
+    label: 'Dash · What went wrong? after a thumbs down',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="note" />,
+  },
+  {
+    /* A thumbs up the server refused: the thumb put back and the line
+     * saying why under the row. */
+    id: 'ask-answer-actions-error',
+    label: 'Dash · A rating that was not kept',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="error" />,
+  },
+  {
+    /* The tooltip on the second answer's thumbs down, held from the keyboard. */
+    id: 'ask-answer-actions-tip',
+    label: 'Dash · The thumbs down tooltip',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskAnswerActionsSurface thumbs="tip" />,
+  },
+  {
+    /* The same column opened as a sheet from the right, as it opens on a
+     * phone and on a laptop with the list shown. */
+    id: 'ask-page-used-sheet',
+    label: 'Dash · What Dash used, as a sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface sheetOpen />,
   },
 
   {
@@ -5343,12 +6792,12 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouPersonalityEmptySurface />,
   },
   {
-    /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
-     * star as bright as you know it, places named, one idea open in the rail
-     * with its nearest six, the two lists below it, and ideas still waiting
-     * for a place. Fixtures in idea-space-surfaces.tsx. */
+    /* Idea Space (plan #1857), a night sky since plan #1997.6 and of your
+     * prepared topics since plan #2317.2: every topic a star as bright as you
+     * know it, subjects named, one topic open in the rail with the ideas under
+     * it and its nearest six. Fixtures in idea-space-surfaces.tsx. */
     id: 'learn-idea-space',
-    label: 'Learn · Idea Space, an idea open',
+    label: 'Learn · Idea Space, a topic open',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceSurface />,
@@ -5382,21 +6831,58 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceReplaySurface />,
   },
   {
-    /* One place opened as a graph (plan #1997.7), with one idea pointed at
-     * so its links show their scores, and the ideas next door round the edge. */
+    /* A subject's name pressed (plan #2317.2): its place is its territory,
+     * opened on the first topic you are ready for. */
     id: 'learn-idea-space-place',
-    label: 'Learn · Idea Space, a place opened',
+    label: 'Learn · Idea Space, a subject opened',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpacePlaceSurface />,
   },
   {
-    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    /* A topic opened as its neighbourhood (plan #1997.7): itself and its six nearest. */
     id: 'learn-idea-space-around',
-    label: 'Learn · Idea Space, an idea in no place opened',
+    label: 'Learn · Idea Space, a topic’s neighbourhood',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* A goal's territory opened on one of its topics (plan #2187.3): topics
+     * as stars with an arc for the level held and a dashed ring for the
+     * target, requirement links with arrowheads, a missed level ringed red. */
+    id: 'learn-idea-space-territory',
+    label: 'Learn · Idea Space, a territory opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritorySurface />,
+  },
+  {
+    /* The territory with its most linked star pointed at: all its links,
+     * the level each needs, and its own level line. */
+    id: 'learn-idea-space-territory-hover',
+    label: 'Learn · Idea Space, pointing at a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryHoverSurface />,
+  },
+  {
+    /* A territory as thin as the live one (plan #2187.7): nothing held,
+     * one requirement line, nothing ready, so no route and no Start here. */
+    id: 'learn-idea-space-territory-thin',
+    label: 'Learn · Idea Space, a territory with little in it',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryThinSurface />,
+  },
+  {
+    /* The open topic's quote (plan #2187.5): the words of the answer that
+     * showed its level, folded until tapped, drawn open. */
+    id: 'learn-idea-space-territory-quote',
+    label: 'Learn · Idea Space, the words behind a territory star',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceTerritoryQuoteSurface />,
   },
   {
     /* The moment An idea lights up (plan #1997.10): three ideas set in the
@@ -5415,8 +6901,8 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceLightsSurface />,
   },
   {
-    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
-     * places and the ideas in them read "A private place" and "Private idea". */
+    /* Recording mode on (plan #1997.9), a subject's territory open: the hidden
+     * subjects and the topics in them read "A private subject" and "Private topic". */
     id: 'learn-idea-space-recording',
     label: 'Learn · Idea Space, recording mode on',
     module: 'learn',
@@ -5424,17 +6910,60 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceRecordingSurface />,
   },
   {
-    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    /* The same idea in two subjects (plan #2147.2): the pairs still to
+     * settle, closest first, each named by the idea a merge would keep.
+     * Fixtures in idea-pairs-surfaces.tsx. */
+    id: 'learn-idea-pairs',
+    label: 'Learn · Same idea twice',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsSurface />,
+  },
+  {
+    /* One pair open: the two ideas side by side, the tested one kept on a
+     * merge, and keeping both carrying Known across. */
+    id: 'learn-idea-pairs-pair',
+    label: 'Learn · Same idea twice, a pair open',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairSurface />,
+  },
+  {
+    /* No pair left to settle. */
+    id: 'learn-idea-pairs-empty',
+    label: 'Learn · Same idea twice, none',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsEmptySurface />,
+  },
+  {
+    /* While the pairs are read. */
+    id: 'learn-idea-pairs-loading',
+    label: 'Learn · Same idea twice, loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsLoadingSurface />,
+  },
+  {
+    /* The pairs could not be read. */
+    id: 'learn-idea-pairs-error',
+    label: 'Learn · Same idea twice, not read',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaPairsErrorSurface />,
+  },
+  {
+    /* Recording mode off, two subjects ticked to hide, in the rail's card. */
     id: 'learn-idea-space-recording-choose',
-    label: 'Learn · Idea Space, choosing places to hide',
+    label: 'Learn · Idea Space, choosing subjects to hide',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceRecordingChooseSurface />,
   },
   {
-    /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
+    /* Ten thousand test topics, for the frame rate the sky has to hold (plan #1997.6). */
     id: 'learn-idea-space-dense',
-    label: 'Learn · Idea Space, ten thousand ideas',
+    label: 'Learn · Idea Space, ten thousand topics',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDenseSurface />,
@@ -5445,10 +6974,19 @@ export const SURFACES: readonly Surface[] = [
      * tested, is open in the rail and pointed at, so both cards say what
      * backs it. */
     id: 'learn-idea-space-evidence',
-    label: 'Learn · Idea Space, an idea your notes back',
+    label: 'Learn · Idea Space, a topic your notes back',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceEvidenceSurface />,
+  },
+  {
+    /* The layer switch with courses and work off (plan #2187.5): the rings
+     * they gave leave the sky, and the idea's list says only what is on. */
+    id: 'learn-idea-space-layers',
+    label: 'Learn · Idea Space, courses and work turned off',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceLayersSurface />,
   },
   {
     /* Wikipedia's topics as the frame (plan #2016.5), flown into Economics:
@@ -5459,6 +6997,92 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceTopicsSurface />,
+  },
+  {
+    /* A learning goal chosen in the rail on the sky of ten thousand ideas
+     * (plan #2187.2): its topics ringed at their targets and joined where
+     * one requires another. Fixtures in idea-space-goals.tsx. */
+    id: 'learn-idea-space-goal',
+    label: 'Learn · Idea Space, a goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalSurface />,
+  },
+  {
+    /* The goals in the rail with none chosen, and one row's next rung held
+     * open as hovering it shows it (plan #2187.2). */
+    id: 'learn-idea-space-goal-next',
+    label: 'Learn · Idea Space, the next rung of a goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGoalNextSurface />,
+  },
+  {
+    /* The panels under the map (plan #2187.6) on a territory opened, the
+     * first tab: the ideas round the goal whose strength halves soonest,
+     * each with a re-check that opens Practice Flow. */
+    id: 'learn-idea-space-fade',
+    label: 'Learn · Idea Space, what will fade',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeSurface />,
+  },
+  {
+    /* The fade tab with none of the goal's ideas held, so nothing fades. */
+    id: 'learn-idea-space-fade-empty',
+    label: 'Learn · Idea Space, nothing fading',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceFadeEmptySurface />,
+  },
+  {
+    /* The gaps tab: the open topic at its target, and the levels under it
+     * that are not held, the ready ones with Practise and a miss marked. */
+    id: 'learn-idea-space-gaps',
+    label: 'Learn · Idea Space, the gaps to a target',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsSurface />,
+  },
+  {
+    /* The gaps tab as thin as the live goal: a draft with every level open. */
+    id: 'learn-idea-space-gaps-thin',
+    label: 'Learn · Idea Space, the gaps on a draft goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsThinSurface />,
+  },
+  {
+    /* The gaps tab with no goal chosen. */
+    id: 'learn-idea-space-gaps-empty',
+    label: 'Learn · Idea Space, gaps with no goal chosen',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceGapsEmptySurface />,
+  },
+  {
+    /* The then and now tab: the goal four weeks ago beside today. */
+    id: 'learn-idea-space-then',
+    label: 'Learn · Idea Space, then and now',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenSurface />,
+  },
+  {
+    /* Then and now with its day picker open, as tapping the day opens it. */
+    id: 'learn-idea-space-then-pick',
+    label: 'Learn · Idea Space, choosing the earlier day',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenPickSurface />,
+  },
+  {
+    /* Then and now on the thin goal: nothing held on either day. */
+    id: 'learn-idea-space-then-thin',
+    label: 'Learn · Idea Space, then and now with nothing held',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceThenThinSurface />,
   },
   {
     /* Clips before any are cut. */
@@ -5503,6 +7127,32 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsSurface />,
+  },
+  {
+    /* What I want from posts (plan #2227.2), saved: the line under the
+     * heading holds the text on one line and the day it was saved. With
+     * nothing saved it is the one-line prompt dev-posts draws. */
+    id: 'dev-posts-wants',
+    label: 'Dev · Posts, what you want from them',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsSurface />,
+  },
+  {
+    /* The wants line pressed: the box open on the saved text. */
+    id: 'dev-posts-wants-edit',
+    label: 'Dev · Posts, changing what you want',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsEditSurface />,
+  },
+  {
+    /* Save pressed on the wants box: mid-save, then refused. */
+    id: 'dev-posts-wants-saving',
+    label: 'Dev · Posts, saving what you want',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWantsSavingSurface />,
   },
   {
     /* The first press: Dash drafting, nothing written yet. */
@@ -5559,6 +7209,34 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsSendSurface />,
   },
   {
+    /* Comments on a draft (plan #2202.2): a waiting draft Dash shortened
+     * when tagged, with an untagged note under it, and a posted one whose
+     * tagged comment Dash marked seen. */
+    id: 'dev-posts-thread',
+    label: 'Dev · Posts, comments on a draft',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsThreadSurface />,
+  },
+  {
+    /* Add a comment pressed on a draft with no thread: the box open. */
+    id: 'dev-posts-comment',
+    label: 'Dev · Posts, writing a comment',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsCommentSurface />,
+  },
+  {
+    /* Home's Inbox (plan #1937.7), which took the bell's place: every
+     * workspace's on-you rows, grouped under each workspace's mark. Fixtures
+     * in home-inbox-surfaces.tsx. */
+    id: 'home-inbox',
+    label: 'Home · Inbox',
+    module: 'goals',
+    width: 'page',
+    render: () => <HomeInboxSurface />,
+  },
+  {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
      * header, briefs, Today and Updates in the main column, and Watching,
      * what Dash did, the week and the workspaces in the rail. Inside the
@@ -5591,6 +7269,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashTodaySurface />,
   },
   {
+    /* A workspace's Now carries the same fold, filtered to that workspace
+     * (plan #1964.4). Fixtures in dash-today-surfaces.tsx. */
+    id: 'now-dash-today',
+    label: 'Workspace Now · What Dash did today',
+    module: 'todo',
+    width: 'wide',
+    render: () => <NowDashTodaySurface />,
+  },
+  {
     /* The "What did you do?" box (plan #1740): Home's Done today with a line
      * filed as three changes and the day's list, the same card with nothing
      * done yet, and the box on a goal's Overview. Fixtures in
@@ -5611,6 +7298,57 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSuggestionsSurface />,
+  },
+  {
+    /* A goal's metrics in its properties column (plan #2084.3): two metrics,
+     * one with the longest name, and the line that adds another. The column
+     * is drawn as a phone's opened fold and the laptop's rail. Fixtures in
+     * goal-metric-props-surfaces.tsx, as are the parts below. */
+    id: 'goals-metrics-props',
+    label: 'Goal · Metrics in the properties',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsSurface />,
+  },
+  {
+    /* The add line pressed: the form open in place. */
+    id: 'goals-metrics-props-form',
+    label: 'Goal · Metrics, adding one',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormSurface />,
+  },
+  {
+    /* A metric's row pointed at, its Change and Remove menu showing. */
+    id: 'goals-metrics-props-menu',
+    label: 'Goal · Metrics, a row’s menu',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsMenuSurface />,
+  },
+  {
+    /* No list on the goal has a date to count by. */
+    id: 'goals-metrics-props-empty',
+    label: 'Goal · Metrics, nothing to count',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsEmptySurface />,
+  },
+  {
+    /* A new metric mid-save: the button's pending state. */
+    id: 'goals-metrics-props-pending',
+    label: 'Goal · Metrics, saving',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsPendingSurface />,
+  },
+  {
+    /* A change refused, its message beside the field. */
+    id: 'goals-metrics-props-error',
+    label: 'Goal · Metrics, a change refused',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsErrorSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
@@ -5668,6 +7406,42 @@ export const SURFACES: readonly Surface[] = [
   },
 
   {
+    /* The status line while Dash is on a run (plan #1964.2.3): its mark, working,
+     * and the run's newest line in the run's own words, linking to the run. The
+     * line is drawn from lg up only, as everywhere, so the phone shots are the
+     * page without it by design. The longest line a run writes, beside the
+     * workspace summary and the main dot, is the fixture. */
+    id: 'shell-status-run',
+    label: 'The shell · Status line while Dash is on a run',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <StatusRunSurface
+        going={{
+          href: '/goals/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+          line: {
+            id: 'line-1',
+            user_id: 'u',
+            run_table: 'goals.runs',
+            run_id: '6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03',
+            kind: 'action',
+            body: 'Reading the three most recent statements from Gmail to fill in what the mortgage step still needs before the end of the month',
+            options: null,
+            created_at: '2026-10-15T10:00:00Z',
+          },
+        }}
+      />
+    ),
+  },
+  {
+    id: 'shell-status-run-new',
+    label: 'The shell · Status line, run started and no line written yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <StatusRunSurface going={{ href: '/dev/plan/runs/6b1f0c52-3d1e-4c7a-9a40-2f6d8e1b7c03', line: null }} />,
+  },
+
+  {
     /* The You workspace in its shell, on Personality, its first tab (plan
      * #1991.1): the four tabs in the sidebar and, since #1991.2, the tab
      * with a result taken and read. */
@@ -5699,12 +7473,88 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouTabEmpty tab="insights" />,
   },
   {
+    /* Details (plan #2124.2): the six facts a form asks for, read as a
+     * list, LinkedIn as a link, with the count in the rail. */
+    id: 'you-details',
+    label: 'You · Details, all six set',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} />,
+  },
+  {
+    id: 'you-details-empty',
+    label: 'You · Details, before any are given',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={EMPTY_DETAILS} />,
+  },
+  {
+    /* Edit details turns the list into its six fields in place. Two not set. */
+    id: 'you-details-edit',
+    label: 'You · Details, being edited',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={{ ...youDetails, race: null, sexuality: null }} editing />,
+  },
+  {
+    /* A save that did not go through keeps what was typed and says why. */
+    id: 'you-details-error',
+    label: 'You · Details, a save that did not go through',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <DetailsView
+        details={youDetails}
+        editing
+        state={{
+          error: 'The connection dropped before your details saved. What you typed is still here: press Save to try again.',
+          values: {
+            phone: '+353 87 555 0199',
+            linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
+            citizenship: 'United States and Ireland',
+            race: 'White',
+            gender: 'Man',
+            sexuality: '',
+          },
+        }}
+      />
+    ),
+  },
+  {
     /* Places they have lived, newest first, the home they live in now marked (plan #1991.5). */
     id: 'you-places',
     label: 'You · Places, four homes',
     module: 'you',
     width: 'page',
     render: () => <PlacesView places={youPlaces} />,
+  },
+  {
+    /* The Map view (plan #2091.4): three homes on the map, two of them in
+     * neighbouring cities fanned apart, joined in move-in order, the home
+     * they live in now marked, and one with no position listed beneath. */
+    id: 'you-places-map',
+    label: 'You · Places on the map',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} />,
+  },
+  {
+    /* Hovering a dot names the place and its years. */
+    id: 'you-places-map-tooltip',
+    label: 'You · Places on the map, a dot hovered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlacesView places={youPlacesOnMap} view="map" map={drawPlacesMap(youPlacesOnMap)} tipOpenFor="place-lisbon" />
+    ),
+  },
+  {
+    /* The Map view before any place has a position. */
+    id: 'you-places-map-empty',
+    label: 'You · Places on the map, before any has a position',
+    module: 'you',
+    width: 'page',
+    render: () => <PlacesView places={youPlaces} view="map" map={drawPlacesMap(youPlaces)} />,
   },
   {
     id: 'you-places-empty',
@@ -5727,7 +7577,55 @@ export const SURFACES: readonly Surface[] = [
     label: 'You · One place, the home they live in now',
     module: 'you',
     width: 'page',
-    render: () => <PlaceView place={youPlaces[0]} thisMonth="2026-10" />,
+    render: () => (
+      <PlaceView place={youPlaces[0]} thisMonth="2026-10" map={drawPlaceMap(youPlaces[0], youPlaces)} />
+    ),
+  },
+  {
+    /* A place on the map (plan #2091.5): its region, its dot, Move and Clear. */
+    id: 'you-place-map',
+    label: 'You · One place, on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[0]}
+        thisMonth="2026-10"
+        map={drawPlaceMap(youPlacesOnMap[0], youPlacesOnMap)}
+      />
+    ),
+  },
+  {
+    /* Set on map pressed for a place with no position: the hint line, the
+     * map of the region their other places are in, and Cancel. */
+    id: 'you-place-map-placing',
+    label: 'You · One place, being set on the map',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{ ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap), start: { placing: true } }}
+      />
+    ),
+  },
+  {
+    /* The same, after a press whose save did not go through. */
+    id: 'you-place-map-error',
+    label: 'You · One place, a position that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PlaceView
+        place={youPlacesOnMap[3]}
+        thisMonth="2026-10"
+        map={{
+          ...drawPlaceMap(youPlacesOnMap[3], youPlacesOnMap),
+          start: { placing: true, error: 'The place was not put on the map. Try again.' },
+        }}
+      />
+    ),
   },
   {
     id: 'you-place-form',
@@ -5845,7 +7743,8 @@ export const SURFACES: readonly Surface[] = [
           account="preview"
           module="news"
           sections={[
-            { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
+            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
             { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
@@ -6154,6 +8053,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SpendOverviewSurface />,
   },
   {
+    id: 'account-spend-by-module',
+    label: 'Account · Spend, where it goes, one fold per module',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface />,
+  },
+  {
+    id: 'account-spend-by-module-open',
+    label: 'Account · Spend, where it goes, a module opened',
+    module: 'learn',
+    width: 'page',
+    render: () => <SpendByModuleSurface open="jobs" />,
+  },
+  {
     id: 'usage-day-bars-empty',
     label: 'Usage · Per-day bar chart, nothing in the period',
     module: 'dev',
@@ -6182,6 +8095,16 @@ export const SURFACES: readonly Surface[] = [
         />
       </div>
     ),
+  },
+  {
+    /* Rows the agenda borrows from other workspaces (plan #1957.9): one that
+     * can be ticked, one that is a date and cannot, each with the one Later
+     * menu as its clock and Drop beside it. */
+    id: 'todo-agenda-rows',
+    label: 'Todo · Agenda rows from elsewhere',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaRowsSurface />,
   },
   {
     /* The agenda opens with a button, not a box (plan #1950.6). */
@@ -6268,45 +8191,33 @@ export const SURFACES: readonly Surface[] = [
     id: 'home-arrival',
     label: 'Home · The first visit of the day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="home-arrival"]',
       shows:
-        'The greeting, the date, the brief line, each rise in a beat after the one before, the Today card and the Watching rail together on the last, all settled by about three quarters of a second.',
+        'The greeting, the date, the panel with the brief line, each rise in a beat after the one before, the brief rows, the Inbox count and the rail together on the last, all settled by about three quarters of a second.',
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day',
     label: 'Home · A finished day',
     module: 'dev',
-    width: 'narrow',
+    width: 'page',
     interaction: {
       kind: 'completion',
       target: '[data-motion-demo="home-finished"]',
-      shows: "The Today card goes, and the day's sigil draws in cell by cell beside the date.",
+      shows: "Today leaves the rail, and the day's sigil draws in cell by cell beside the date.",
     },
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo />
-      </div>
-    ),
+    render: () => <HomeArrivalDemo />,
   },
   {
     id: 'home-finished-day-rest',
     label: 'Home · A day already finished',
     module: 'dev',
-    width: 'narrow',
-    render: () => (
-      <div className={cardVariants({ padding: 'standard' })}>
-        <HomeArrivalDemo finished />
-      </div>
-    ),
+    width: 'page',
+    render: () => <HomeArrivalDemo finished />,
   },
 
   /* The pages outside the shell, and /open's not-found (plan #1599).
@@ -6541,13 +8452,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevInboxSurface />,
   },
   {
-    /* The Status panel at the top of Home in Dev, with Dash's mark under
-     * Plan (note 076e7744). */
-    id: 'dev-raised-status',
-    label: 'Dev · Home, the Status panel',
+    /* Dev settings (plan #1937.10): the routines that were the Status panel
+     * on Home, with Dash's mark under Plan (note 076e7744). */
+    id: 'dev-settings',
+    label: 'Dev · Settings',
     module: 'dev',
     width: 'page',
-    render: () => <DevRaisedStatusSurface />,
+    render: () => <DevSettingsSurface />,
+  },
+  {
+    /* Goals settings (plan #1937.10): the morning run on, the weekly run off. */
+    id: 'goals-settings',
+    label: 'Goals · Settings',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsSettingsView settings={{ morningRun: true, weeklyRun: false }} />,
+  },
+  {
+    /* Learn settings (plan #1937.10): goals only on (plan #2164.1), subject
+     * offers on, an explain-back card in every ten. */
+    id: 'learn-settings',
+    label: 'Learn · Settings',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
     /* The runner card on /dev/plan with its four Dashes (plan #1704): a
@@ -6648,6 +8576,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalRunSurface />,
   },
   {
+    /* One plan run's page (plan #1964.2.4): its facts, its lines and every
+     * row it touched as a link. Fixtures in plan-run-surfaces.tsx. */
+    id: 'dev-plan-run',
+    label: 'Plan · One run and what it touched',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanRunSurface />,
+  },
+  {
     /* A run's lines as Dash writes them (plan #1826), on a plan step's run
      * and on a goal run's page: going, waiting on you, gone quiet with its
      * Acknowledge press, just started, and with the live connection lost.
@@ -6687,10 +8624,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-thoughts',
-    label: 'Jobs · Career goals',
+    label: 'Jobs · Settings, the Career goals tab',
     module: 'jobs',
     width: 'page',
-    render: () => <JobsThoughtsSurface />,
+    render: () => <JobsSettingsView {...settings} tab="career-goals" opensOn="career-goals" />,
   },
   {
     id: 'jobs-onboarding',
@@ -6716,6 +8653,190 @@ export const SURFACES: readonly Surface[] = [
 
   /* The Learn pages that had no picture (plan #1602). Fixtures in
    * learn-page-surfaces.tsx. */
+  {
+    /* Learn's topics (plan #2138.2): drafts first, then the map. */
+    id: 'learn-topics',
+    label: 'Topics · Name a goal, and the topics you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsPreview />,
+  },
+  {
+    id: 'learn-topics-loading',
+    label: 'Topics · While a draft is written',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsLoadingPreview />,
+  },
+  {
+    id: 'learn-topics-error',
+    label: 'Topics · When drafting fails',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsErrorPreview />,
+  },
+  {
+    /* What a topic is drafted from, open on Edit sources (plan #2138.11). */
+    id: 'learn-topics-sources',
+    label: 'Topics · The sources a draft is compiled from',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsSourcesPreview />,
+  },
+  {
+    /* A draft topic to read, reword and approve (plan #2138.2). */
+    id: 'learn-topic-draft',
+    label: 'Topic · A draft to approve',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftPreview />,
+  },
+  {
+    id: 'learn-topic-draft-match',
+    label: 'Topic · A draft close to a topic you have',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftMatchPreview />,
+  },
+  {
+    /* The five checks with every row cited or marked personal (plan #2138.11). */
+    id: 'learn-topic-draft-checks',
+    label: 'Topic · A draft whose checks let it be approved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftChecksPreview />,
+  },
+  {
+    id: 'learn-topic-draft-comment',
+    label: 'Topic · A draft with comments',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicDraftCommentPreview />,
+  },
+  {
+    /* An approved topic: where you stand on each level (plan #2138.3). */
+    id: 'learn-topic',
+    label: 'Topic · Where you stand on each level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicPreview />,
+  },
+  {
+    id: 'learn-topic-empty',
+    label: 'Topic · Nothing shown yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEmptyPreview />,
+  },
+  {
+    id: 'learn-topic-quotes',
+    label: 'Topic · The answers behind a level, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicQuotesPreview />,
+  },
+  {
+    id: 'learn-topic-edit',
+    label: 'Topic · Rewording a level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicEditPreview />,
+  },
+  {
+    id: 'learn-topic-loading',
+    label: 'Topic · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicLoadingPreview />,
+  },
+  {
+    /* Moving the claims graph onto topics (plan #2138.4): what the move
+     * left for you, with a failed subject and a downward edge. */
+    id: 'learn-topics-review',
+    label: 'From the claims graph · What needs your answer',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewPreview />,
+  },
+  {
+    id: 'learn-topics-review-running',
+    label: 'From the claims graph · While subjects move',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewRunningPreview />,
+  },
+  {
+    id: 'learn-topics-review-empty',
+    label: 'From the claims graph · Before anything has moved',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnTopicsReviewEmptyPreview />,
+  },
+  {
+    /* A subject or learning goal as a lens (plan #2138.7). */
+    id: 'learn-lens',
+    label: 'Lens · A subject as topics to targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensPreview />,
+  },
+  {
+    id: 'learn-lens-fringe',
+    label: 'Lens · What you are ready for on one topic, open',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensFringePreview />,
+  },
+  {
+    id: 'learn-lens-edit',
+    label: 'Lens · Setting the targets',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEditPreview />,
+  },
+  {
+    id: 'learn-lens-untouched',
+    label: 'Lens · A goal with no answers yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensUntouchedPreview />,
+  },
+  {
+    id: 'learn-lens-empty',
+    label: 'Lens · No topics yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensEmptyPreview />,
+  },
+  {
+    id: 'learn-lens-loading',
+    label: 'Lens · While it loads',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensLoadingPreview />,
+  },
+  {
+    id: 'learn-lens-error',
+    label: 'Lens · When it cannot be read',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnLensErrorPreview />,
+  },
+  {
+    /* The Know page's lenses and fields (plan #2138.7), each subject once with its goals (plan #2302.3). */
+    id: 'learn-know-lenses',
+    label: 'Subjects · Lenses with their goals, and fields by level',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesPreview />,
+  },
+  {
+    id: 'learn-know-lenses-empty',
+    label: 'Subjects · Before anything is on topics',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnKnowLensesEmptyPreview />,
+  },
   {
     id: 'learn-concept',
     label: 'Idea · One idea, partly known',
@@ -6761,6 +8882,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnQuizTakeSurface />,
   },
   {
+    /* External check (plan #2179.4): one set scored, one half sat. */
+    id: 'learn-external',
+    label: 'Learn · External check',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalSurface />,
+  },
+  {
+    /* No set sat yet: the paste form stands open. */
+    id: 'learn-external-new',
+    label: 'Learn · External check, no set yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalNewSurface />,
+  },
+  {
+    /* The item form, one question at a time, with nothing said of earlier ones. */
+    id: 'learn-external-item',
+    label: 'Learn · External check, one item',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalItemSurface />,
+  },
+  {
+    /* The score, drawn after the last item. */
+    id: 'learn-external-score',
+    label: 'Learn · External check, the score',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnExternalScoreSurface />,
+  },
+  {
     id: 'learn-reading',
     label: 'Reading · One reading, in progress',
     module: 'learn',
@@ -6796,11 +8949,32 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReadingUnreadableSurface />,
   },
   {
+    id: 'learn-reading-check',
+    label: 'Reading · Just marked read, with one question offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingCheckSurface />,
+  },
+  {
+    id: 'learn-reading-check-own',
+    label: 'Reading · One you added, marked read, nothing offered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingCheckOwnSurface />,
+  },
+  {
     id: 'learn-piece',
     label: 'Plan · One piece, with its practice',
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceSurface />,
+  },
+  {
+    id: 'learn-piece-cell-check',
+    label: 'Plan · One piece, its check answered on a cell',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCellCheckSurface />,
   },
   {
     id: 'learn-probe',
@@ -6888,6 +9062,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnBriefShortAnswerEditorSurface />,
+  },
+  /* The brief's place on your map (plan #2184.1): topics drafted from it
+   * under a goal, no goal yet, and Draft its topic running or failed. */
+  {
+    id: 'learn-brief-topics',
+    label: 'Research brief · Topics drafted under a goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefTopicsSurface />,
+  },
+  {
+    id: 'learn-brief-goal-empty',
+    label: 'Research brief · No learning goal yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalEmptySurface />,
+  },
+  {
+    id: 'learn-brief-goal-pending',
+    label: 'Research brief · Drafting its topic',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalPendingSurface />,
+  },
+  {
+    id: 'learn-brief-goal-error',
+    label: 'Research brief · Drafting its topic failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnBriefGoalErrorSurface />,
   },
   {
     id: 'learn-now-briefs',
@@ -6983,17 +9187,24 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'learn-essay-interview',
-    label: 'Essay · Interview opening on a finished goal',
+    label: 'Essay · A new essay on an empty notes page',
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayInterviewSurface />,
   },
   {
-    id: 'learn-essay-interview-later',
-    label: 'Essay · Interview, fourth question',
+    id: 'learn-essay-notes-map',
+    label: 'Essay · Notes with Dash’s map beside them',
     module: 'learn',
     width: 'page',
-    render: () => <LearnEssayInterviewLaterSurface />,
+    render: () => <LearnEssayNotesMapSurface />,
+  },
+  {
+    id: 'learn-essay-draft-from-notes',
+    label: 'Essay · Draft view with Assemble and the model draft',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayDraftFromNotesSurface />,
   },
   {
     id: 'learn-plan-finished',
@@ -7008,6 +9219,113 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectConversationsSurface />,
+  },
+  {
+    id: 'learn-subject-prepare',
+    label: 'Subject · Being prepared, partway through',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-starting',
+    label: 'Subject · Just added, preparation starting',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartingSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-failed',
+    label: 'Subject · Preparation stopped on a step, with Continue',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareFailedSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-finished',
+    label: 'Subject · Preparation finished, one line',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareFinishedSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-empty',
+    label: 'Subject · Made before preparation, with Prepare',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareEmptySurface />,
+  },
+  {
+    id: 'learn-subject-prepare-start',
+    label: 'Subject · Prepared, Start here and Sources',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-start-pending',
+    label: 'Subject · Start here, first lesson still being written',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartPendingSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-sources-empty',
+    label: 'Subject · Prepared with no documents, topic still a draft',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSourcesEmptySurface />,
+  },
+  {
+    id: 'learn-subject-prepare-sources-folded',
+    label: 'Subject · Sources folded once read',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Add a source (plan #2307.4): the press closed under Sources, with a
+     * document it added listed. Fixtures in add-source-surfaces.tsx. */
+    id: 'learn-subject-add-source',
+    label: 'Subject · Add a source, with one added',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-open',
+    label: 'Subject · Add a source, box open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceOpenSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-fetching',
+    label: 'Subject · Add a source, fetching',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceFetchingSurface />,
+  },
+  {
+    id: 'learn-subject-add-source-error',
+    label: 'Subject · Add a source, fetch failed',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <AddSourceErrorSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-direction',
+    label: 'Subject · Offer to go deeper, past thirty answers',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareDirectionSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-branch',
+    label: 'Subject · Going deeper on a branch, steps running',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareBranchSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

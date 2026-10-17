@@ -76,10 +76,11 @@ export async function setAsideAction(form: FormData): Promise<SetAsideState> {
     return { error: 'It could not be set aside. Try again.' };
   }
   redraw();
+  // The toast puts "Later:" and the step's title in front (plan #1957.8).
   return {
     message: dueMoved
-      ? `Later, until ${formatDay(on)}. Its due date moved with it.`
-      : `Later, until ${formatDay(on)}.`,
+      ? `until ${formatDay(on)}. Its due date moved with it.`
+      : `until ${formatDay(on)}.`,
     before: {
       id: id.data,
       startsOn: (step.starts_on as string | null) ?? null,

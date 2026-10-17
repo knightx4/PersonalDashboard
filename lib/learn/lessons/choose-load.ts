@@ -5,6 +5,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadGoals, loadGraph, loadSubjects } from '@/lib/learn/graph/load';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { loadGoalTracks } from './aim-tracks';
 import { chooseLessons, type ChooseLessonsInput, type LessonChoice, type LessonTrack } from './choose';
 import { pickedUpSince } from './resting';
@@ -110,7 +111,7 @@ export async function loadLessonInput(
   now: Date = new Date(),
   only: string | null = null,
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards, checked, goalTracks, resting, outlined, weak] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks, resting, outlined, weak, prepared] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -133,23 +134,21 @@ export async function loadLessonInput(
     loadRestingRecord(supabase, userId),
     loadOutlined(supabase, userId),
     loadWeak(supabase, userId),
+    preparedSubjectIds(supabase, userId),
   ]);
 
   // One track's lessons when a subject's Now asks for them (plan #1699).
   const tracks = await Promise.all(
-    subjects.filter((subject) => !only || subject.id === only).map(async (subject) => {
+    // A prepared subject's preparation covers it, so no concept lessons are
+  // chosen for it (plan #2297.4); its cards already written stay readable.
+  subjects.filter((subject) => !prepared.has(subject.id) && (!only || subject.id === only)).map(async (subject) => {
       const [graph, goals, units] = await Promise.all([
         loadGraph(supabase, subject.id, userId),
         loadGoals(supabase, subject.id, userId),
         loadCurriculum(supabase, subject.id, userId),
       ]);
-      const outline: LessonTrack['outline'] = outlined.has(subject.id)
-        ? 'written'
-        : goalTracks.has(subject.id)
-          ? 'wanted'
-          : undefined;
       const track: LessonTrack = { subjectId: subject.id, name: subject.name, units, goals, graph };
-      return outline ? { ...track, outline } : track;
+      return outlined.has(subject.id) ? { ...track, outline: 'written' as const } : track;
     }),
   );
 

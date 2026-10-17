@@ -2,8 +2,8 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { Select } from '@/components/ui/field';
 import { approveNoteConcepts, readNoteIntoGraph, type NoteGraphState } from './actions';
 
@@ -22,12 +22,22 @@ import { approveNoteConcepts, readNoteIntoGraph, type NoteGraphState } from './a
  * out.
  */
 
-function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
+function SubmitButton({
+  idle,
+  busy,
+  paid,
+  what,
+}: {
+  idle: string;
+  busy: string;
+  paid: PaidAction;
+  what: string;
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
+    <DashAction type="submit" variant="secondary" size="sm" pending={pending} paid={paid} what={what}>
       {pending ? busy : idle}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -76,9 +86,10 @@ export function NoteToGraph({
 
         {added.length > 0 && (
           <div className="mt-3 flex items-center gap-3">
-            <SubmitButton idle="Add these to the graph" busy="Adding…" />
-            <PaidHint
-              action="app/learn/r/[id]/actions.ts#approveNoteConcepts"
+            <SubmitButton
+              idle="Add these to the graph"
+              busy="Adding…"
+              paid="app/learn/r/[id]/actions.ts#approveNoteConcepts"
               what="Cost of adding them"
             />
             {saved.error && <span className="text-ui text-danger">{saved.error}</span>}
@@ -105,9 +116,10 @@ export function NoteToGraph({
         </Select>
       </div>
 
-      <SubmitButton idle="Read the note" busy="Reading…" />
-      <PaidHint
-        action="app/learn/r/[id]/actions.ts#readNoteIntoGraph"
+      <SubmitButton
+        idle="Read the note"
+        busy="Reading…"
+        paid="app/learn/r/[id]/actions.ts#readNoteIntoGraph"
         what="Cost of reading the note"
       />
       {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}

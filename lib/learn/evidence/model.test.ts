@@ -8,20 +8,21 @@ const row = (over: Partial<EvidenceRow>): EvidenceRow => ({
   source_kind: 'note',
   source_id: 'n1',
   similarity: 0.7,
-  weight: 0.5,
+  kind: 'note',
+  ceiling: 0.5,
   basis: 'you wrote about this in Notes',
   found_at: '2026-10-01T00:00:00Z',
   ...over,
 });
 
 describe("an idea's evidence", () => {
-  it('puts the strongest weight first', () => {
+  it('puts the highest ceiling first', () => {
     const links = evidenceFromRows([
-      row({ id: 'clipping', weight: 0.25 }),
-      row({ id: 'own', weight: 1 }),
-      row({ id: 'course', weight: 0.6 }),
+      row({ id: 'clipping', kind: 'clipping', ceiling: 0.25 }),
+      row({ id: 'work', kind: 'work', ceiling: 1 }),
+      row({ id: 'course', kind: 'course', ceiling: 0.6 }),
     ]);
-    expect(links.map((l) => l.id)).toEqual(['own', 'course', 'clipping']);
+    expect(links.map((l) => l.id)).toEqual(['work', 'course', 'clipping']);
   });
 
   it('breaks a tie on similarity, then the newer find, then the id', () => {

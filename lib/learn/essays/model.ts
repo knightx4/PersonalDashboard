@@ -9,6 +9,7 @@
 
 import { readDraftMarks, type AuthorMark } from './authorship';
 import { formatNumber } from '@/lib/money';
+import { readPlan, type EssayPlan } from './plan';
 
 /**
  * The brief, in the person's own words (spec, "Starting an essay"): the five
@@ -63,6 +64,8 @@ export type Essay = {
   brief: EssayBrief;
   /** The interview, or null once there is none to show. */
   interview: EssayInterview | null;
+  /** What the person worked out between the interview and the draft (LEARN-ESSAYS-SPEC, "The stages"). */
+  plan?: EssayPlan;
   /** The length aimed at, 200 to 2,000 words, or null for none. */
   wordTarget: number | null;
   publishedAt: string | null;
@@ -90,7 +93,7 @@ export type EssaySummary = {
 
 /** The columns both reads select. */
 export const ESSAY_COLUMNS =
-  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, word_target, published_at, first_published_at, slug, finished_at, evidence_item_id, updated_at';
+  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, plan, word_target, published_at, first_published_at, slug, finished_at, evidence_item_id, updated_at';
 
 export type EssayRow = {
   id: string;
@@ -101,6 +104,7 @@ export type EssayRow = {
   draft_authorship?: unknown;
   unsaved: boolean | null;
   brief: unknown;
+  plan?: unknown;
   word_target: number | null;
   published_at: string | null;
   first_published_at?: string | null;
@@ -123,7 +127,9 @@ function text(value: unknown): string {
 }
 
 function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function readPins(value: unknown): EssayPin[] {
@@ -155,10 +161,12 @@ export function readBrief(value: unknown): EssayBrief {
 /** The interview from the brief's jsonb; null when there is none or it is not one this code wrote. */
 export function readInterview(value: unknown): EssayInterview | null {
   const interview = object(object(value).interview);
-  if (interview.status === 'done' || interview.status === 'skipped') return { status: interview.status };
+  if (interview.status === 'done' || interview.status === 'skipped')
+    return { status: interview.status };
   if (interview.status !== 'asking') return null;
   const field = interview.field;
-  if (typeof field !== 'string' || !(BRIEF_FIELDS as readonly string[]).includes(field)) return null;
+  if (typeof field !== 'string' || !(BRIEF_FIELDS as readonly string[]).includes(field))
+    return null;
   if (!text(interview.ask).trim()) return null;
   return { status: 'asking', field: field as BriefField, ask: text(interview.ask) };
 }
@@ -174,6 +182,7 @@ export function toEssay(row: EssayRow): Essay {
     unsaved: row.unsaved ?? false,
     brief: readBrief(row.brief),
     interview: readInterview(row.brief),
+    plan: readPlan(row.plan),
     wordTarget: row.word_target,
     publishedAt: row.published_at,
     firstPublishedAt: row.first_published_at ?? null,
@@ -214,6 +223,28 @@ export function essayTitle(body: string, path: string): string {
 }
 
 /**
+ * The change that renames an essay (note 1c956878): its title is its first
+ * top-level heading, so renaming rewrites that line. Failing a heading, a
+ * first line written `#Title` without the space, which markdown does not read
+ * as a heading but was meant as one, is taken as the title line. Failing
+ * both, the heading goes in ahead of the text, after any frontmatter.
+ */
+export function retitleEssay(body: string, title: string): { from: number; to: number; insert: string } {
+  const line = `# ${title.replace(/\s+/g, ' ').trim()}`;
+  const start = body.match(FRONTMATTER)?.[0].length ?? 0;
+  const rest = body.slice(start);
+  const heading = rest.match(/^#[ \t]+(.+?)[ \t#]*$/m);
+  const lead = rest.match(/^\s*/)![0].length;
+  const unspaced = rest.slice(lead).match(/^#(?![#\s])[^\r\n]*/);
+  const found = heading && heading[1]!.trim() ? heading : unspaced;
+  if (found) {
+    const at = start + (found === unspaced ? lead : found.index!);
+    return { from: at, to: at + found[0].length, insert: line };
+  }
+  return { from: start, to: start, insert: rest.trim() ? `${line}\n\n` : `${line}\n` };
+}
+
+/**
  * The words in a draft: runs of text holding at least one letter or digit,
  * so markdown symbols on their own (`#`, `-`, `>`, `---`, `**`) are not
  * counted, and frontmatter is left out.
@@ -242,7 +273,9 @@ export function parseWordTarget(input: string): { target: number | null } | { er
   if (!/^\d+$/.test(trimmed)) return { error: 'Write the target as a number of words.' };
   const target = Number(trimmed);
   if (target < WORD_TARGET_MIN || target > WORD_TARGET_MAX) {
-    return { error: `A target is between ${WORD_TARGET_MIN} and ${formatNumber(WORD_TARGET_MAX)} words.` };
+    return {
+      error: `A target is between ${WORD_TARGET_MIN} and ${formatNumber(WORD_TARGET_MAX)} words.`,
+    };
   }
   return { target };
 }

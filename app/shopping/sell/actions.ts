@@ -11,7 +11,8 @@ import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
 import { loadForSaleItems, priceTargetOf } from '@/lib/sell/for-sale';
-import { priceOneTarget, runPriceLookups } from '@/lib/sell/price-run';
+import { priceOneTarget } from '@/lib/sell/price-run';
+import { ESTIMATE_SPEND, priceItemsFor } from '@/lib/sell/price-items-run';
 import { gamePriceQuery } from '@/lib/sell/game-query';
 import {
   lookupPriceByIsbn,
@@ -22,9 +23,6 @@ import type { PriceEvidence } from '@/lib/sell/price-evidence';
 import { formatMoney, parseDollarsToCents } from '@/lib/money';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import type { SpendOperation } from '@/lib/core/spend/operations';
-
-const ESTIMATE_SPEND: SpendOperation = { module: 'shopping', operation: 'estimate-resale-price' };
 
 export type SellActionState = {
   error?: string;
@@ -157,16 +155,7 @@ export async function priceSellItems(
   }
   const rescan = String(formData.get('rescan') ?? '') === '1';
 
-  const spend: SpendReport[] = [];
-  const result = await runPriceLookups({
-    supabase,
-    userId: user.id,
-    ids,
-    // A named item is always re-fetched; a sweep of the whole list fills gaps.
-    skipPriced: ids === undefined && !rescan,
-    onSpend: (report) => spend.push(report),
-  });
-  await recordSessionSpend(user.id, ESTIMATE_SPEND, spend);
+  const result = await priceItemsFor({ supabase, userId: user.id, ids, rescan });
 
   if (result.source === 'none') {
     return { error: 'No price source configured.' };

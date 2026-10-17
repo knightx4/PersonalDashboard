@@ -4,7 +4,7 @@ import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
-import { orderItemTags } from '@/lib/orders/search';
+import { orderItemTags, type OrderListItemTag } from '@/lib/orders/search';
 import type { DevComment } from '@/lib/comments/load';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
@@ -37,7 +37,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     )
     .eq('id', id)
     .eq('user_id', user.id)
-    .maybeSingle();
+    .maybeSingle<OrderRow>();
 
   if (!order) notFound();
 
@@ -233,6 +233,40 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     />
   );
 }
+
+/** The row the order query above selects, with its joins. */
+type OrderRow = {
+  id: string;
+  order_date: string;
+  status: string;
+  source: string;
+  external_order_number: string | null;
+  return_deadline: string | null;
+  needs_review: boolean;
+  subtotal_cents: number;
+  tax_cents: number;
+  shipping_cents: number;
+  discount_cents: number;
+  total_cents: number;
+  currency: string;
+  deleted_at: string | null;
+  merchants: { id: string; name: string } | { id: string; name: string }[] | null;
+  order_items: OrderItemRow[] | null;
+};
+
+type OrderItemRow = {
+  id: string;
+  name: string;
+  variant: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  category_id: string | null;
+  product_url: string | null;
+  image_url: string | null;
+  categories: { name: string } | { name: string }[] | null;
+  inventory_items: { id: string; cost_cents: number; status: string }[] | null;
+  order_item_tags: { id: string; tag_id: string; item_tags: OrderListItemTag | OrderListItemTag[] | null }[] | null;
+};
 
 type LinkedEmail = {
   id?: string;

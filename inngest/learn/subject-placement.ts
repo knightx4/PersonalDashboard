@@ -26,7 +26,11 @@ import type { LearnOperation } from '@/lib/learn/spend';
  * placeTracks in batches of one person's subjects. Every placement the model
  * returns is written, including one that spans domains (neither a field nor a
  * domain), so `placed_at` is set and the subject is not asked about again. A
- * batch whose call fails writes nothing and is tried again next hour.
+ * batch whose call fails writes nothing and is tried again next hour, and
+ * each failure, or a subject the reply left out, is counted on the row
+ * (plan #2297.1): at MAX_PLACEMENT_ATTEMPTS the sweep leaves it alone until
+ * its name or note changes (0172 resets the count). Survey subjects are
+ * hidden and never placed by the sweep.
  *
  * The write only lands on a row still unplaced and not moved by hand. The
  * service client bypasses RLS, so every read and write names the owner.
@@ -34,6 +38,9 @@ import type { LearnOperation } from '@/lib/learn/spend';
 
 /** Rows per read. PostgREST caps a response at 1,000. */
 const PAGE = 1000;
+
+/** Failed attempts after which the sweep stops asking about a subject. */
+export const MAX_PLACEMENT_ATTEMPTS = 3;
 
 /** Batches placed at once. */
 const CONCURRENCY = 4;
@@ -55,6 +62,7 @@ type SubjectRow = {
   name: string;
   note: string | null;
   theme_id: string | null;
+  placement_attempts: number;
 };
 
 type PlacementColumns = {
@@ -75,14 +83,16 @@ export function nameKey(name: string): string {
   return name.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-async function pendingSubjects(learn: LearnSupabaseClient): Promise<SubjectRow[]> {
+export async function pendingSubjects(learn: LearnSupabaseClient): Promise<SubjectRow[]> {
   const rows: SubjectRow[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await learn
       .from('subjects')
-      .select('id, user_id, name, note, theme_id')
+      .select('id, user_id, name, note, theme_id, placement_attempts')
       .is('placed_at', null)
       .eq('placement_moved_by_hand', false)
+      .eq('survey', false)
+      .lt('placement_attempts', MAX_PLACEMENT_ATTEMPTS)
       .order('id')
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Reading unplaced subjects failed: ${error.message}`);
@@ -140,6 +150,24 @@ async function writePlacement(
     .eq('placement_moved_by_hand', false);
   if (error) console.error('[learn subject-placement] write', error.message);
   return !error;
+}
+
+/** Count one failed attempt on a subject and keep what it said. */
+export async function recordFailedPlacement(
+  learn: LearnSupabaseClient,
+  subject: Pick<SubjectRow, 'id' | 'user_id' | 'placement_attempts'>,
+  detail: string,
+): Promise<void> {
+  const { error } = await learn
+    .from('subjects')
+    .update({
+      placement_attempts: subject.placement_attempts + 1,
+      last_placement_error: detail.slice(0, 500),
+    })
+    .eq('id', subject.id)
+    .eq('user_id', subject.user_id)
+    .is('placed_at', null);
+  if (error) console.error('[learn subject-placement] record failure', error.message);
 }
 
 /**
@@ -218,7 +246,14 @@ export async function runSubjectPlacement(deadline: number): Promise<SubjectPlac
     for (const { batch, result } of results) {
       if (!result.ok) {
         summary.failed.push(result.detail);
+        for (const subject of batch.subjects) await recordFailedPlacement(learn, subject, result.detail);
         continue;
+      }
+      const returned = new Set(result.placements.map((placement) => nameKey(placement.title)));
+      for (const subject of batch.subjects) {
+        if (!returned.has(nameKey(subject.name))) {
+          await recordFailedPlacement(learn, subject, 'The model gave no placement for this subject.');
+        }
       }
       const byName = new Map(batch.subjects.map((subject) => [nameKey(subject.name), subject]));
       for (const placement of result.placements) {

@@ -12,6 +12,7 @@
  */
 import {
   featureProgress,
+  featureSteps,
   lastNightFrom,
   onNow,
   type DigestNight,
@@ -22,7 +23,8 @@ import {
 } from '@/lib/digest/night';
 import { oneLine } from '@/lib/digest/build';
 import type { PlanItem } from './load';
-import { lastStoredPush, type StoredPush } from './liveness';
+import { featureRunIdle, lastStoredPush, type StoredPush } from './liveness';
+import { isStalledClaim } from './elapsed';
 import { IN_FLIGHT_LOOKBACK_MS, runEnd, type StoredRunReading } from './run-end';
 import { overnightStanding, type OvernightRun } from './overnight';
 import { readyFeatureCount, runnerOrder } from './overnight-choice';
@@ -64,6 +66,45 @@ function moduleName(module: string | null): string | null {
   return moduleById(module as ModuleId)?.label ?? module;
 }
 
+/**
+ * What a feature's rows say about the session sent at it, read from the rows
+ * the page already has: the overnight tick's `subtreeTrail`, without the
+ * database. A claim past `isStalledClaim` is one the sweep is about to put
+ * back, so it does not count.
+ */
+function trailOf(
+  items: readonly PlanItem[],
+  rootId: string,
+  now: number,
+): { claimed: boolean; touchedAt: string | null } {
+  const children = new Map<string, PlanItem[]>();
+  for (const item of items) {
+    if (!item.parentId) continue;
+    const list = children.get(item.parentId) ?? [];
+    list.push(item);
+    children.set(item.parentId, list);
+  }
+  const root = items.find((item) => item.id === rootId);
+  if (!root) return { claimed: false, touchedAt: null };
+  let claimed = false;
+  let touchedAt: string | null = null;
+  const queue = [root];
+  for (let i = 0; i < queue.length; i += 1) {
+    const item = queue[i];
+    if (
+      item.status === 'in_progress' &&
+      (!item.startedAt || !isStalledClaim(item.startedAt, now))
+    ) {
+      claimed = true;
+    }
+    if (!touchedAt || Date.parse(item.updatedAt) > Date.parse(touchedAt)) {
+      touchedAt = item.updatedAt;
+    }
+    queue.push(...(children.get(item.id) ?? []));
+  }
+  return { claimed, touchedAt };
+}
+
 export function runnerCard(input: {
   run: OvernightRun | null;
   fires: readonly CardFire[];
@@ -101,10 +142,19 @@ export function runnerCard(input: {
     if (status !== 'started') {
       return now - new Date(started.at).getTime() < IN_FLIGHT_LOOKBACK_MS;
     }
-    return (
-      runEnd({ status, createdAt: started.at }, itemById.get(started.planItemId) ?? null, now) ===
-      null
+    const end = runEnd(
+      { status, createdAt: started.at },
+      itemById.get(started.planItemId) ?? null,
+      now,
     );
+    if (end === null) return true;
+    if (end === 'finished') return false;
+    // Past the two-hour clock, the tick still counts a run whose feature shows
+    // work: a live claim beneath it, or a change in the last twenty minutes
+    // (`featureRunIdle`). On 15 October #2138's session was four hours in and
+    // still building, holding Learn's workspace, while this card showed its
+    // Dash free and offered #2138 as next up.
+    return !featureRunIdle(started.at, trailOf(items, started.planItemId, now), now);
   });
 
   const on = live
@@ -164,11 +214,12 @@ export function runnerCard(input: {
         firedAt: fire.at,
         endedAt: isGoing
           ? null
-          : (('writtenBackAt' in fire && fire.writtenBackAt) || new Date(now).toISOString()),
+          : ('writtenBackAt' in fire && fire.writtenBackAt) || new Date(now).toISOString(),
         // The feature, not the step under it the session has claimed: the
         // Dash's line pairs it with progress through the whole feature.
         step: { number: item.number, title: oneLine(item.title), ref: `#${item.number}` },
         progress: isGoing ? featureProgress(items, `#${item.number}`) : null,
+        steps: isGoing ? featureSteps(items, item.number) : undefined,
         module: moduleName(item.module),
         doing: null,
       });

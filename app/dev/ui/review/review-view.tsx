@@ -1,5 +1,6 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useLayoutEffect, useRef, useState, useTransition } from 'react';
 import { CloseButton } from '@/components/inbox/close-button';
 import { useToast } from '@/components/ui/toast';
@@ -154,7 +155,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
       setDeclineError(result.error);
       if (result.error) return;
       toast({
-        text: 'Declined',
+        text: closedToast('declined', finding.body.split('\n')[0]),
         undo: async () => {
           const back = await decide('open');
           if (back.error) throw new Error(back.error);

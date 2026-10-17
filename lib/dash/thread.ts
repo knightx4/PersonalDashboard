@@ -1,11 +1,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
-import type { MadeDashChange, ThreadCause } from '@/lib/talk/changes';
+import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation } from '@/lib/talk/talk';
-import { MAX_LOOKUPS, runDash, type DashExecutor, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { MAX_LOOKUPS, runDash, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import type { PaidQueued } from './paid';
 import {
   threadDashTools,
+  type DashPaidTool,
   type DashRecordedWrite,
   type DashThreadActs,
   type DashWriteResult,
@@ -45,7 +47,9 @@ answer. When the comment needs something it does not hold (a todo, an order,
 a note, an application, an email, what they said elsewhere), use the lookup
 tools: they reach everything in the app that Ask Dash reaches. Never answer
 from memory or a guess about what they probably have. You have at most
-${MAX_LOOKUPS} lookups, so choose them well.
+${MAX_LOOKUPS} lookups, so choose them well: for a question about many rows
+and what is linked to each, one query_rows call with linked conditions comes
+before looking each row up in turn.
 
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. Adding, renaming,
 moving or ticking off a todo, adding a goal or a step, closing a step, setting
@@ -57,7 +61,8 @@ tools add_todo, change_todo, close_todo, add_goal, add_goal_step,
 close_goal_step, set_goal_done_when, mark_returned, add_role_note,
 add_job_lead, add_interview_round, link_round_email, write_prep_note, add_idea, add_quick_note, change_items and
 move_roles, and in Learn change_reading, add_learn_track,
-add_track_reading, reword_concept, add_concept_note and change_video, and in
+add_track_reading, reword_concept, add_concept_note, change_video,
+add_to_brief and attach_vault_note, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
@@ -67,7 +72,8 @@ file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
 add_discovered_company, add_role_from_email, change_interview, change_interviewer and
-change_interview_round. This
+change_interview_round, and in Dev rewrite_post for the text of an X post
+draft. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is
@@ -147,6 +153,13 @@ export type ThreadDash = {
    * 'thread', under the comment that asked for it when there is one.
    */
   saveChange: (made: MadeDashChange, cause: ThreadCause | null) => Promise<unknown>;
+  /**
+   * Checks and prices a paid press as the person (plan #2228.1), without
+   * keeping it. Absent: every paid tool is refused.
+   */
+  queue?: (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
+  /** Keeps a queued paid press as proposed, under the comment that asked for it. */
+  saveProposal?: (change: NewDashChange, cause: ThreadCause) => Promise<DashChange>;
 };
 
 /** What a thread's hand-off did: started something, or why not. */
@@ -180,11 +193,16 @@ export type ThreadReply =
        * is empty and the caller writes nothing into the thread.
        */
       acknowledged: boolean;
+      /** The paid presses queued for an approval (plan #2228.1), as their core.dash_actions ids. */
+      queued?: string[];
     }
   | { ok: false; detail: string };
 
 /** The reply when a change was made and the answer saying so never came. */
 const UNFINISHED = 'I made the change you asked for, but could not finish writing this reply. It is listed on Home, with its Undo.';
+
+/** The reply when a paid press was queued and the answer saying so never came. */
+const QUEUED_UNFINISHED = 'I queued what you asked for, but could not finish writing this reply. Nothing has run: approve it on the card when you are ready.';
 
 /** What the model is told once a registry write is made and kept. */
 function madeNote(summary: string, kept: boolean): string {
@@ -263,6 +281,28 @@ export async function replyInThread(input: {
     return { ok: true, rows: [result.row], note: madeNote(result.summary, kept) };
   };
 
+  // A paid press is kept as proposed under the comment that asked for it,
+  // and runs only on an approval (plan #2228.1). With no comment to hang it
+  // from there is nowhere for its card, so nothing is queued.
+  const queued: string[] = [];
+  const { queue: check, saveProposal } = dash;
+  const cause = input.cause ?? null;
+  const queue: DashQueuer | undefined =
+    check && saveProposal && cause
+      ? async (tool, args, seen) => {
+          const result = await check(tool, args, seen);
+          if (!result.ok) return { ok: false, error: result.error };
+          try {
+            const kept = await saveProposal(result.change, cause);
+            queued.push(kept.id);
+            return { ok: true, rows: [], totals: { queued: { id: kept.id, kind: kept.kind, input: kept.input } }, note: result.note };
+          } catch (error) {
+            console.error(`thread paid tool ${tool.name} was not queued`, error);
+            return { ok: false, error: 'That could not be queued. Tell them nothing was run.' };
+          }
+        }
+      : undefined;
+
   const { handOff, acknowledge } = input;
   const answer = await runDash({
     voice: input.voice,
@@ -271,6 +311,7 @@ export async function replyInThread(input: {
     today: dash.today,
     execute: dash.execute,
     write,
+    queue,
     handOff: handOff
       ? async (args, _seen, tool) => {
           const outcome = await handOff(tool.name, args);
@@ -285,7 +326,7 @@ export async function replyInThread(input: {
       ? async () => {
           // A change is always reported in words, so the mark is refused once
           // one is made; the database cannot tell (plan #1648).
-          if (made.length > 0 || started > 0) return { ok: false, error: CHANGED_SO_ANSWER };
+          if (made.length > 0 || started > 0 || queued.length > 0) return { ok: false, error: CHANGED_SO_ANSWER };
           await acknowledge();
           return { ok: true };
         }
@@ -299,8 +340,9 @@ export async function replyInThread(input: {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {
       const body = said.length > 0 ? said.join('\n\n') : UNFINISHED;
-      return { ok: true, body, citations: [], made, passedOn, acknowledged: false };
+      return { ok: true, body, citations: [], made, passedOn, acknowledged: false, queued };
     }
+    if (queued.length > 0) return { ok: true, body: QUEUED_UNFINISHED, citations: [], made, passedOn, acknowledged: false, queued };
     return { ok: false, detail: answer.detail };
   }
   if (answer.acknowledged) return { ok: true, body: '', citations: [], made, passedOn, acknowledged: true };
@@ -311,6 +353,7 @@ export async function replyInThread(input: {
     made,
     passedOn,
     acknowledged: false,
+    queued,
   };
 }
 

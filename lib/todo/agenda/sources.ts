@@ -32,6 +32,8 @@ export const SOURCE_IDS = [
   'bills',
   'drafts',
   'applications',
+  'job_waiting',
+  'job_nudges',
   'plan_steps',
   'raised',
   'threads',
@@ -117,6 +119,13 @@ export interface AgendaItem {
    * everything else.
    */
   options?: AgendaItemOption[];
+  /**
+   * The workspace whose Inbox lists it (plan #1937.5), where the row's own
+   * table does not say: a draft is Shopping's or Jobs' by what it is about,
+   * though both are kept in core. Left out, the ref's table decides
+   * (lib/todo/agenda/workspace.ts).
+   */
+  workspace?: ModuleId;
 }
 
 /**
@@ -188,6 +197,12 @@ export interface AgendaSource {
    * everything on you shows, and a switch could only hide part of it.
    */
   alwaysOn?: boolean;
+  /**
+   * Its items can belong to another workspace than `module` (a thread on any
+   * row, a draft about an order or a role), so a workspace's Inbox runs it
+   * whichever workspace it is for.
+   */
+  crossesWorkspaces?: boolean;
   /** One line, shown beside the switch. Say what appears, not how it works. */
   description: string;
   /** Everything this source has for the window. */
@@ -207,8 +222,11 @@ export interface AgendaSource {
    * Optional together, because a source that contributes only day context has
    * no items to act on: an interview is an appointment, and there is no honest
    * meaning for pushing one from a to-do list.
+   *
+   * `until` is the start of the day picked from the one Later menu
+   * (lib/core/snooze-days.ts `laterUntil`), when the item comes back.
    */
-  defer?(ctx: SourceContext, key: string): Promise<void>;
+  defer?(ctx: SourceContext, key: string, until: Date): Promise<void>;
   dismiss?(ctx: SourceContext, key: string): Promise<void>;
   /** Takes a Later or Drop back, for the toast's Undo (plan #1957.3). */
   restore?(ctx: SourceContext, key: string): Promise<void>;

@@ -18,10 +18,14 @@ import {
  * written once, when it comes back; nothing updates it after.
  */
 
-const COLUMNS = 'id, level, question, queries, sources, findings, cost_micros, created_at';
+const COLUMNS =
+  'id, level, question, queries, sources, findings, cost_micros, summary, asks, created_at';
 
 /** The newest run of each level, for the essay page. The pages' kept text stays on the server. */
-export async function loadEssayResearch(supabase: LearnSupabaseClient, essayId: string): Promise<EssayResearchRuns> {
+export async function loadEssayResearch(
+  supabase: LearnSupabaseClient,
+  essayId: string,
+): Promise<EssayResearchRuns> {
   const runs: EssayResearchRuns = { ...NO_RESEARCH };
   for (const level of ['first', 'deeper'] as const) {
     const { data, error } = await supabase
@@ -51,6 +55,8 @@ export async function insertEssayResearch(
     findings: ResearchPosition[] | ResearchClaim[];
     costMicros: number | null;
     model: string;
+    summary?: string;
+    asks?: string[];
   },
 ): Promise<EssayResearch> {
   const { data, error } = await supabase
@@ -65,10 +71,13 @@ export async function insertEssayResearch(
       findings: run.findings,
       cost_micros: run.costMicros,
       model: run.model,
+      summary: run.summary ?? '',
+      asks: run.asks ?? [],
     })
     .select(COLUMNS)
     .single();
-  if (error || !data) throw new Error(`learn: saving the research failed (${error?.message ?? 'no row'})`);
+  if (error || !data)
+    throw new Error(`learn: saving the research failed (${error?.message ?? 'no row'})`);
   const saved = researchFromRow(data as ResearchRow);
   if (!saved) throw new Error('learn: the saved research could not be read back');
   return forBrowser(saved);

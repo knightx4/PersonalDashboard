@@ -37,10 +37,11 @@ export const READY_LOW = 8;
  * share of it, which is what a main top-up spends on lessons. Only lessons
  * carry a subject, so none of the batch goes to section cards. A goal's track
  * is left alone: its lessons are on its plan and never in the deck, so
- * writing them here would be paid for and not shown.
+ * writing them here would be paid for and not shown. A subject with a finished
+ * preparation is left alone too (plan #2297.4): the preparation covers it.
  */
-export function subjectLessonsWanted(ready: number, isGoalTrack: boolean): number | null {
-  if (isGoalTrack || ready >= READY_LOW) return null;
+export function subjectLessonsWanted(ready: number, isGoalTrack: boolean, isPrepared = false): number | null {
+  if (isGoalTrack || isPrepared || ready >= READY_LOW) return null;
   return lessonsWanted(READY_BATCH);
 }
 

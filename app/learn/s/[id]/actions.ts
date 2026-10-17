@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { requestOrigin } from '@/lib/auth/origin';
 import { requireUser } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { judgeSubjectChannelsNow } from '@/inngest/learn/youtube-library';
@@ -18,28 +19,18 @@ import {
   searchCatalogueIfNew,
   searchCompleted,
 } from '@/lib/learn/catalogue/search';
-import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
-import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
+import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { writeSubjectCurriculum } from '@/lib/learn/graph/curriculum-run';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
-import { planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { planOwnerFor } from '@/lib/learn/lessons/plan-store';
+import { kickPreparation } from '@/lib/learn/prepare/kick';
+import { directionOffer, storedBranch } from '@/lib/learn/prepare/branch';
+import { loadDirection, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
-import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
-import { parseTitles, pullArticles, type PullReport } from '@/lib/learn/catalogue/pull';
-import {
-  DEFAULT_COURSE_PROVIDER,
-  sweepWikipediaArticle,
-  sweepYouTubeCourse,
-} from '@/lib/learn/catalogue/sweep';
-import { storeMissingPassages, transcriptCutVideos } from '@/lib/learn/catalogue/store';
-import {
-  EMBED_BUDGET_MS,
-  TRANSCRIPT_BUDGET_MS,
-  parsePlaylistId,
-  pullCourse,
-  type CoursePullReport,
-} from '@/lib/learn/catalogue/pull-course';
+import { addSourceToSubject } from '@/lib/learn/prepare/add-source-run';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 
 /**
  * Taking a gap to the reading queue, or to what has already been written about
@@ -165,131 +156,63 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   redirect(`/learn/r/${readingId}`);
 }
 
-export type PullState = { report?: PullReport; error?: string };
+export type AddSourceState = { lines?: string[]; error?: string };
+
+/** How long the press leaves for embedding the new weeks, counted from the press; the page allows 300 seconds. */
+const ADD_SOURCE_EMBED_BUDGET_MS = 200_000;
 
 /**
- * Fetching named Wikipedia articles into the catalogue, and embedding them.
+ * Add a source (plan #2307.4): one press that puts a document in the shared
+ * bank the preparation reads, in place of the three pulls the page used to
+ * have. It takes an address or a search phrase, stores what it finds as a
+ * structure document with its licence, records it on the subject, and joins
+ * the document's weeks into the subject's matched weeks
+ * (lib/learn/prepare/add-source-run.ts).
  *
- * What `npm run catalogue -- "…" --embed` does, from a subject page, so the
- * deployed app can fill the catalogue with the keys it already holds. The
- * articles are stored first and embedded after, in the same press, and the
- * embedding spend goes on the ledger of the account that pressed, as #741
- * settled.
- *
- * Both passes run inside the action rather than in after(), because a Voyage
- * refusal or a missing key has to be shown on the page, and after() runs once
- * the response has gone. The page sets maxDuration so twenty articles fit.
- *
- * The embedding pass is not limited to the articles this press fetched: it
- * gives a vector to every segment in the catalogue that has none, the same as
- * the script. Before it, any article section that has no passages yet is cut
- * into them (storeMissingPassages, #1133), so those passages are embedded too. Anything an earlier run left unembedded is finished here too,
- * and billed to this account.
- *
- * Pulling an article that is already in the catalogue updates its sections in
- * place. A section whose text is unchanged keeps its vector and the judgements
- * made against it. A section whose text changed loses its vector and is
- * embedded again, and a section the article no longer has is deleted along
- * with its judgements.
+ * Everything runs inside the press, so a page that will not load or a search
+ * that finds nothing is said under the box. The search's proposing calls and
+ * the embedding go on the ledger of the account that pressed.
  */
 // latency: pending
-export async function pullWikipediaArticles(
-  _previous: PullState,
-  formData: FormData,
-): Promise<PullState> {
-  const user = await requireUser();
-
-  const parsed = parseTitles(String(formData.get('titles') ?? ''));
-  if (!parsed.ok) return { error: parsed.error };
-
-  let sql;
-  try {
-    sql = catalogueSql();
-  } catch (error) {
-    return {
-      error: `The catalogue cannot be written from this deployment: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    };
-  }
-
-  const report = await pullArticles(
-    {
-      sweep: (title) => sweepWikipediaArticle(sql, title),
-      embed: async (limit) => {
-        await storeMissingPassages(sql);
-        return embedCatalogueSegments(sql, { userId: user.id, limit });
-      },
-    },
-    parsed.titles,
-  );
-
-  return { report };
-}
-
-export type CoursePullState = { report?: CoursePullReport; error?: string };
-
-/**
- * Fetching a lecture course from its YouTube playlist into the catalogue, and
- * embedding it.
- *
- * What `npm run catalogue -- --course <playlist> --embed` does, from a subject
- * page, as #789 settled. The course goes under MIT OpenCourseWare, so each
- * lecture's transcript comes from ocw.mit.edu, and the embedding is billed to
- * the account that pressed, as #741 settled.
- *
- * One press has 300 seconds. Past TRANSCRIPT_BUDGET_MS it stops looking up
- * transcripts and stores the remaining lectures with their chapter or
- * whole-video cut, so the course is always stored whole and in order. Past
- * EMBED_BUDGET_MS it stops embedding. The report says how far it got, and a
- * second press finishes: lectures already cut from a transcript are left as
- * they are, so it spends its time on the ones the first press did not reach,
- * and the embedding pass picks up whatever has no vector yet.
- *
- * Pressing again on the same playlist updates the rows in place, keyed on the
- * playlist and video ids, so it never adds a second course or lecture.
- */
-// latency: pending
-export async function pullLectureCourse(
-  _previous: CoursePullState,
-  formData: FormData,
-): Promise<CoursePullState> {
-  const user = await requireUser();
+export async function addSubjectSource(_previous: AddSourceState, formData: FormData): Promise<AddSourceState> {
   const startedAt = Date.now();
-
-  const parsed = parsePlaylistId(String(formData.get('playlist') ?? ''));
-  if (!parsed.ok) return { error: parsed.error };
+  const user = await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
 
   let sql;
   try {
     sql = catalogueSql();
   } catch (error) {
     return {
-      error: `The catalogue cannot be written from this deployment: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      error: `The bank cannot be written from this deployment: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
-  const report = await pullCourse({
-    sweep: () =>
-      sweepYouTubeCourse(sql, {
-        providerSlug: DEFAULT_COURSE_PROVIDER,
-        playlistId: parsed.playlistId,
-        keep: (videoIds) => transcriptCutVideos(sql, DEFAULT_COURSE_PROVIDER, videoIds),
-        deadline: startedAt + TRANSCRIPT_BUDGET_MS,
-      }),
-    embed: async (limit) => {
-      await storeMissingPassages(sql);
-      return embedCatalogueSegments(sql, {
-        userId: user.id,
-        limit,
-        deadline: startedAt + EMBED_BUDGET_MS,
-      });
-    },
-  });
+  const learn = await createLearnClient();
+  const spend = { propose: [] as SpendReport[], match: [] as SpendReport[] };
+  let result;
+  try {
+    result = await addSourceToSubject({
+      learn,
+      sql,
+      userId: user.id,
+      subjectId: subjectId.data,
+      ask: String(formData.get('ask') ?? ''),
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      deadline: startedAt + ADD_SOURCE_EMBED_BUDGET_MS,
+      spend,
+    });
+  } catch (error) {
+    result = { ok: false as const, error: `Adding the source failed: ${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    await recordLearnSpend(user.id, 'propose-structure-sources', spend.propose);
+    await recordLearnSpend(user.id, 'match-structure-units', spend.match);
+  }
 
-  return { report };
+  if (!result.ok) return { error: result.error };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { lines: result.lines };
 }
 
 /**
@@ -405,32 +328,19 @@ export async function writeTrackCurriculum(_prev: CurriculumState, formData: For
   if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
 
   const supabase = await createLearnClient();
-  const [subject, goals] = await Promise.all([
-    loadSubject(supabase, subjectId.data),
-    loadGoals(supabase, subjectId.data),
-  ]);
-  if (!subject) return { error: 'That subject is gone.' };
-
-  // The oldest goal is what the track was started for.
-  const first = goals.at(-1) ?? null;
-  const result = await ensureCurriculum(
-    supabase,
-    user.id,
-    { id: subject.id, name: subject.name },
-    first?.asked ?? subject.note ?? null,
-  );
+  const result = await writeSubjectCurriculum(supabase, user.id, subjectId.data);
   if (!result.ok) return { error: result.detail };
-  if (result.goalUnitId && first && !first.unitId) await fileGoalUnder(supabase, first.id, result.goalUnitId);
+  const subject = result.subject;
 
   revalidatePath(`/learn/s/${subject.id}`);
   return {};
 }
 
 /**
- * Changing a goal's plan from its page (plan #1144): move a unit a place up
+ * Changing a plan from its page (plan #1144): move a unit a place up
  * or down, remove one with no passed piece, or add one by name. Each returns
  * what went wrong rather than throwing, so the plan can say it in place. Only
- * a track that is a learning goal's plan takes these; the checks on whose
+ * a track that is a goal's plan, or a prepared subject's, takes these; the checks on whose
  * unit it is are in the database functions (learn 0076).
  */
 export type PlanEditState = { error?: string };
@@ -442,8 +352,8 @@ async function planTrackFor(formData: FormData) {
   const parsed = planEditSchema.safeParse({ subjectId: formData.get('subjectId') });
   if (!parsed.success) return { error: 'That plan could not be found.' } as const;
   const supabase = await createLearnClient();
-  const goal = await planGoalFor(supabase, user.id, parsed.data.subjectId);
-  if (!goal) return { error: 'Only a learning goal’s plan can be changed here.' } as const;
+  const owner = await planOwnerFor(supabase, user.id, parsed.data.subjectId);
+  if (!owner) return { error: 'Only the plan of a goal or a prepared subject can be changed here.' } as const;
   return { user, supabase, subjectId: parsed.data.subjectId } as const;
 }
 
@@ -487,4 +397,90 @@ export async function addUnitToPlan(_prev: PlanEditState, formData: FormData): P
   if (!result.ok) return { error: result.detail };
   afterPlanEdit(track.subjectId);
   return {};
+}
+
+export type PreparationPressState = { error?: string; started?: boolean };
+
+/**
+ * Continue a subject's preparation (plan #2276.1): the page's press for a
+ * failed step, and its Prepare press for a subject made before preparation
+ * existed. Starts the run in a function of its own and returns at once; the
+ * page shows the steps moving as the rows change (#2276.2).
+ */
+// latency: pending
+export async function continuePreparation(_prev: PreparationPressState, formData: FormData): Promise<PreparationPressState> {
+  await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+
+  // Read on the session, so only the person's own subject can be started.
+  const supabase = await createLearnClient();
+  const { data: subject } = await supabase.from('subjects').select('id').eq('id', subjectId.data).maybeSingle();
+  if (!subject) return { error: 'That subject is gone.' };
+
+  // A branch run's Continue names its branch (plan #2276.7).
+  const branch = z.string().min(1).max(80).safeParse(formData.get('branch'));
+  const started = await kickPreparation(await requestOrigin(), subjectId.data, branch.success ? branch.data : null);
+  if (!started) return { error: 'Dash could not start the preparation just now. Try again in a minute.' };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { started: true };
+}
+
+export type DirectionPressState = { error?: string; done?: 'picked' | 'dismissed' };
+
+/**
+ * The direction offer's two presses (plan #2276.7). The offer is read again
+ * here, as the page would draw it, so a press on a page left open past a
+ * change cannot pick a branch that is no longer offered.
+ */
+async function offerFor(subjectId: string) {
+  const user = await requireUser();
+  const supabase = await createLearnClient();
+  const [territory, direction] = await Promise.all([
+    loadSubjectTerritory(supabase, user.id, subjectId),
+    loadDirection(supabase, user.id, subjectId),
+  ]);
+  if (!direction) return { supabase, offer: null };
+  const offer = directionOffer({
+    answers: direction.answers,
+    direction: direction.direction,
+    territory,
+    taken: new Set(direction.branches.flatMap((b) => (b.run.branch ? [b.run.branch.key] : []))),
+    prepared: direction.prepared,
+  });
+  return { supabase, offer };
+}
+
+// latency: pending
+export async function chooseDirection(_prev: DirectionPressState, formData: FormData): Promise<DirectionPressState> {
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  const key = z.string().min(1).max(80).safeParse(formData.get('branch'));
+  if (!subjectId.success || !key.success) return { error: 'Could not work out which branch this was.' };
+
+  const { supabase, offer } = await offerFor(subjectId.data);
+  const branch = offer?.branches.find((b) => b.key === key.data);
+  if (!offer || !branch) return { error: 'That branch is no longer on offer. Reload the page to see what is.' };
+
+  const { error } = await supabase.rpc('choose_subject_direction', {
+    p_subject: subjectId.data,
+    p_branch: storedBranch(branch),
+    p_answers: offer.answers,
+  });
+  if (error) return { error: `Dash could not record the choice: ${error.message}` };
+  // The run's rows exist now, so a kick that does not land loses nothing: the daily cron starts it.
+  await kickPreparation(await requestOrigin(), subjectId.data, branch.key);
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { done: 'picked' };
+}
+
+// latency: pending
+export async function dismissDirection(_prev: DirectionPressState, formData: FormData): Promise<DirectionPressState> {
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+  const { supabase, offer } = await offerFor(subjectId.data);
+  if (!offer) return { done: 'dismissed' };
+  const { error } = await supabase.rpc('dismiss_subject_direction', { p_subject: subjectId.data, p_answers: offer.answers });
+  if (error) return { error: `Dash could not put the offer away: ${error.message}` };
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { done: 'dismissed' };
 }

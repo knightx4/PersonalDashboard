@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { answerCourseExplain } from '@/lib/learn/evidence/course-explain-store';
+import type { TopicResult } from '@/lib/learn/evidence/course-explain';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createYouClient } from '@/lib/you/auth/server';
 import {
@@ -244,4 +247,59 @@ export async function removeTranscriptAction(form: FormData): Promise<RemoveResu
   }
   revalidatePath(EDUCATION_HREF);
   return { ok: true };
+}
+
+export type CourseExplainState = {
+  error?: string;
+  /** What the answer showed on each topic it went to (plan #2172.4.2). */
+  results?: TopicResult[];
+  /** The answer as sent, kept in the box when grading fails. */
+  response?: string;
+};
+
+const ExplainInput = z.object({
+  id: z.string().uuid(),
+  response: z.string().trim().min(1).max(8_000),
+});
+
+/**
+ * Answer a graded course's one explain prompt (plan #2172.4.2). The answer is
+ * graded against the topics the course was named for, and on each topic it
+ * reached the course's band gives way to the level it showed
+ * (lib/learn/evidence/course-explain-store.ts).
+ */
+// latency: pending
+export async function answerCourseExplainAction(
+  prev: CourseExplainState,
+  form: FormData,
+): Promise<CourseExplainState> {
+  const user = await requireUser();
+  const parsed = ExplainInput.safeParse({ id: form.get('id'), response: form.get('response') });
+  if (!parsed.success) return { ...prev, error: 'Write an answer first.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Grading needs ANTHROPIC_API_KEY to be set.', response: parsed.data.response };
+
+  const you = await createYouClient();
+  const { data: course } = await you
+    .from('courses')
+    .select('id, code, title, grade, year')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!course) return { error: 'That course could not be found.' };
+
+  const learn = await createLearnClient();
+  const spend = collectSpend();
+  const result = await answerCourseExplain(learn, user.id, {
+    course: course as { id: string; code: string | null; title: string; grade: string | null; year: number | null },
+    response: parsed.data.response,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'grade-course-explain', spend.reports);
+
+  if (!result.ok) return { error: result.error, response: parsed.data.response };
+  revalidatePath(EDUCATION_HREF);
+  return { results: result.results };
 }

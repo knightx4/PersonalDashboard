@@ -2,8 +2,7 @@
 
 import { useActionState } from 'react';
 import { Banner } from '@/components/ui/banner';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { writeYearReview, type WriteYearState } from '../../actions';
 
 /**
@@ -18,10 +17,17 @@ export function WriteYearButton({ year, again }: { year: number; again: boolean 
     <div className="space-y-2">
       <form action={run} className="flex items-center gap-1">
         <input type="hidden" name="year" value={year} />
-        <PaidHint action="app/timeline/actions.ts#writeYearReview" what="Cost of writing the review" />
-        <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        <DashAction
+          type="submit"
+          size="sm"
+          variant="secondary"
+          pending={pending}
+          paid="app/timeline/actions.ts#writeYearReview"
+          what="Cost of writing the review"
+          hintFirst
+        >
           {pending ? 'Writing…' : again ? 'Write it again' : 'Write the review'}
-        </Button>
+        </DashAction>
       </form>
       {state.status === 'failed' && !pending && <Banner tone="bad">{state.message}</Banner>}
     </div>

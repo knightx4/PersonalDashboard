@@ -1,14 +1,12 @@
-import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
+import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /** The sections of Learn's nav its rows sit under (app/learn/layout.tsx). */
 const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
-/** Briefs are listed on Now (app/learn/now/briefs-list.tsx). */
-const NOW: Section = { href: '/learn/now', label: 'Now' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
-const GOALS_HOME: Section = { href: '/goals', label: 'Home' };
+const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
 
 /**
  * Learn's tables, as Goals reads them (lib/sources/types.ts). What someone
@@ -46,6 +44,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['asked'],
       title: 'asked',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects'], ['concept_id', 'learn.concepts']),
     },
     {
       table: 'learn.tracks',
@@ -75,6 +74,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['topic', 'question', 'summary'],
       title: 'topic',
+      parent: parentByFirst(['subject_id', 'learn.subjects'], ['essay_id', 'learn.essays']),
       note: 'Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.',
     },
     {
@@ -103,6 +103,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title', 'covers', 'outcome'],
       title: 'title',
+      parent: parentBy('subject_id', 'learn.subjects'),
     },
     {
       table: 'learn.plan_pieces',
@@ -111,6 +112,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['title'],
       title: 'title',
+      parent: parentByFirst(['unit_id', 'learn.curriculum_units'], ['subject_id', 'learn.subjects']),
     },
     {
       table: 'learn.piece_checks',
@@ -119,6 +121,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('piece_id', 'learn.plan_pieces'),
     },
     {
       table: 'learn.review_questions',
@@ -127,6 +130,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['question', 'response'],
       title: 'question',
+      parent: parentBy('concept_id', 'learn.concepts'),
       note: 'concept_id is the idea in learn.concepts; its next due date is review_due_on in learn.concept_state.',
     },
     {
@@ -164,6 +168,7 @@ export const learnSources: ModuleSources = {
       weight: 'record',
       search: ['raw_text', 'source_hint'],
       title: 'source_hint',
+      parent: parentBy('track_id', 'learn.tracks'),
     },
     {
       table: 'learn.card_notes',
@@ -172,6 +177,7 @@ export const learnSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentByFirst(['concept_id', 'learn.concepts'], ['card_id', 'learn.feed_cards']),
       note: 'concept_id is the idea a note is about, whose page is /learn/c/<concept_id>; card_id is the Learn now card it was written on, null when written on the idea page or once the card is gone.',
     },
     {
@@ -181,6 +187,7 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['phrase', 'explanation'],
       title: 'phrase',
+      parent: parentBy('card_id', 'learn.feed_cards'),
       note: 'card_id is the Learn now card the phrase was on; made_card_id is set when they asked for a card of its own.',
     },
     {
@@ -190,6 +197,12 @@ export const learnSources: ModuleSources = {
       weight: 'incidental',
       search: ['summary', 'takeaway', 'why', 'theme_name', 'aim_name'],
       title: 'summary',
+      parent: parentByFirst(
+        ['subject_id', 'learn.subjects'],
+        ['aim_id', 'learn.aims'],
+        ['concept_id', 'learn.concepts'],
+        ['reading_id', 'learn.readings'],
+      ),
       note: 'status says what they did with a card; saved and tested cards say more than drawn ones.',
     },
     {
@@ -204,6 +217,7 @@ export const learnSources: ModuleSources = {
       ref: 'video_id',
       href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
       newest: 'added_at',
+      parent: parentBy('subject_id', 'learn.subjects'),
       // The title is on catalogue_items, which a ref's page cannot join to.
       page: {
         title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
@@ -232,7 +246,7 @@ export const learnSources: ModuleSources = {
       search: ['basis'],
       title: 'basis',
       newest: 'found_at',
-      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with any link is unlocked, and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
+      note: 'target_id is the idea in learn.concepts when target_kind is idea, and the Level 3 or 4 topic in learn.area_check_articles when target_kind is topic: a topic with a link that has no held_reason is unlocked (a name match the text is not about is kept with a reason and does not count), and matched_by says whether the source names it or its vector agreed. source_kind and source_id name the note, course, work entry, reading, video or (for a topic) idea. Found by the daily run, not written by hand; weight is how much a link counts, from the kind of source.',
     },
     {
       table: 'learn.briefs',
@@ -247,15 +261,78 @@ export const learnSources: ModuleSources = {
       parent: parentBy('track_id', 'learn.tracks'),
       note: 'Dash wrote the sections and, until short_answer_by is you, the short answer; the question and angle are theirs. The sources it found are readings on the track_id list, with brief_id set.',
     },
+    {
+      table: 'learn.brief_findings',
+      module: 'Learn',
+      holds: 'Findings they asked Dash to add to a research brief after its run, each with the sources it rests on.',
+      weight: 'intent',
+      search: ['body'],
+      title: 'body',
+      parent: parentBy('brief_id', 'learn.briefs'),
+      note: 'Each sits under the sub-question sub_question_id names on the brief, or under Added findings when it is null. sources holds each source\'s title, link and the words quoted from it; they are not readings.',
+    },
+    {
+      table: 'learn.topics',
+      module: 'Learn',
+      holds: 'Topics they study, each with what it covers and how deep it goes, on a ladder of ten levels.',
+      weight: 'intent',
+      search: ['name', 'scope'],
+      title: 'name',
+      facts: ['status', 'ceiling'],
+      href: (id) => `/learn/topics/${id}`,
+      section: SUBJECTS,
+      note: 'A topic with no user_id is on the shared map that every account reads; one with theirs is personal to them. Their evidence (cell_evidence) is always theirs. A draft topic has not been approved and nothing is asked about it; asked is the goal they named when it was drafted, and wanted lists topics its links need that are not on the map yet. Their level on a topic is computed from cell_evidence and cell_links (lib/learn/levels/model.ts), never stored.',
+    },
+    {
+      table: 'learn.cell_evidence',
+      module: 'Learn',
+      holds: 'What their answers showed about one level of a topic: met, not met, or said they already knew it.',
+      weight: 'record',
+      search: ['quote'],
+      title: 'verdict',
+      facts: ['verdict', 'observed_at'],
+      newest: 'observed_at',
+      note: 'One row per verdict on a cell (learn.topic_cells, one level of a topic); the latest row for a cell is the one that counts. The quote is the part of their answer that met the level.',
+    },
+    {
+      table: 'learn.lenses',
+      module: 'Learn',
+      holds: 'Named sets of topics they are working towards, each topic with a target level.',
+      weight: 'intent',
+      search: ['name'],
+      title: 'name',
+      facts: ['origin'],
+      href: (id) => `/learn/lens/${id}`,
+      parent: parentByFirst(['aim_id', 'learn.aims'], ['subject_id', 'learn.subjects']),
+      section: SUBJECTS,
+      note: 'Every subject has one (subject_id; learn 0137), which its learning goals read rather than keeping one of their own (learn 0177; aim_id is set only on goal lenses made before it), and a vault theme can have one made at the end of a practice run (theme_id; learn 0143). The topics and targets are in learn.lens_targets. Progress is computed, never stored.',
+    },
   ],
   notSources: [
+    {
+      table: 'learn.external_checks',
+      reason:
+        'Published question sets the person sat once, kept with their score as an anchor for lens progress. The questions are not theirs and nothing on the map reads or changes because of a row.',
+    },
+    { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
+    { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
+    { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
+    { table: 'learn.lens_offer_declines', reason: 'Bookkeeping: the vault themes whose offer of a lens they said no to, so it is not made again.' },
+    { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
+    { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
+    { table: 'learn.cell_questions', reason: 'Questions asked about a level of a topic and the answers to them; what each answer showed is read through cell_evidence.' },
+    { table: 'learn.graph_moves', reason: 'Bookkeeping for moving each claims-graph subject onto topics: moved or failed, and the lens it became.' },
+    { table: 'learn.move_reviews', reason: 'Bookkeeping for the placements and edges the move from the claims graph left for them to settle.' },
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
+    { table: 'learn.essay_vault_notes', reason: 'Join rows attaching a vault note to an essay; the note is read from the vault source and the essay from learn.essays.' },
     { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
+    { table: 'learn.essay_log', reason: 'Bookkeeping on how an essay was worked out: stages opened and the model calls made, with their responses.' },
     {
       table: 'learn.area_check_articles',
       reason:
         "Wikipedia's Level 3 and Level 4 topics, shared reference data; level, aliases, parent and the embedding columns are bookkeeping for matching and nesting them.",
     },
+    { table: 'learn.topic_structure_pulls', reason: 'Bookkeeping for the daily pull of structure documents: which lit topics have had one, and the day.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
@@ -265,6 +342,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_passages', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_providers', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
+    { table: 'learn.catalogue_structures', reason: 'Syllabi and tables of contents pulled into the shared catalogue, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },
@@ -280,8 +358,20 @@ export const learnSources: ModuleSources = {
       table: 'learn.course_embeddings',
       reason: 'Each transcript course as the text and vector it is matched to ideas by; the course is in you.courses and the links in evidence_links.',
     },
+    {
+      table: 'learn.course_topics',
+      reason: 'The topics a model call named for each graded course, worked out from the course; the course is in you.courses and its bands in evidence_links.',
+    },
+    {
+      table: 'learn.course_explains',
+      reason: 'The one explain prompt answered about each graded course and its grade; what each answer showed is read through evidence_links, as cell_questions is read through cell_evidence.',
+    },
     { table: 'learn.concept_state', reason: 'Per-concept mastery; read through concepts.' },
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
+    {
+      table: 'learn.idea_pair_reviews',
+      reason: 'Which near-identical pairs of ideas were merged or kept, so a settled pair is not listed again.',
+    },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },
     { table: 'learn.note_reads', reason: 'Counts from reading a note for concepts, for the report on approval.' },
     { table: 'learn.opening_questions', reason: 'Placement questions for a new subject.' },
@@ -302,6 +392,9 @@ export const learnSources: ModuleSources = {
     { table: 'learn.quiz_sources', reason: 'Material a quiz was written from.' },
     { table: 'learn.settings', reason: 'Settings for how Learn behaves.' },
     { table: 'learn.subject_channels', reason: 'YouTube channels Dash found and judged for a subject; what was kept is read through watch_list.' },
+    { table: 'learn.subject_sources', reason: 'Join rows naming the catalogue documents added to a subject; the documents are read through the catalogue.' },
+    { table: 'learn.subject_preparations', reason: 'Bookkeeping for preparing a subject: which step its run is on and why it stopped.' },
+    { table: 'learn.subject_preparation_steps', reason: 'Bookkeeping for preparing a subject: the steps of its run and what each produced.' },
     { table: 'learn.theme_fields', reason: 'Model placement of vault themes.' },
     { table: 'learn.track_offers', reason: 'Tracks the feed offered.' },
     { table: 'learn.transcript_calls', reason: 'Transcript fetch bookkeeping.' },

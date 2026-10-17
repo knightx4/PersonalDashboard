@@ -94,6 +94,30 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Learn: tracks and their questions.
   'generate-chain': run(SONNET, 4_000, 3_000),
   'generate-track-from-theme': run(SONNET, 10_000, 5_000),
+
+  // Learn: drafting a topic with its levels (plan #2138.2). The map's topic
+  // names go in, ten levels of checks and the links come out; the scope is
+  // embedded in the same press to find a duplicate. Since plan #2138.11 the
+  // call runs twice per press, with the sources given, so the guess is two
+  // calls' worth.
+  'draft-topic': run(SONNET, 12_000, 9_000),
+  'embed-topic-scope': run(VOYAGE_LITE, 60, 0),
+  // Drafting a territory from stored documents (plan #2247.10): a goal and
+  // its performances embedded as queries, and one Haiku call per provider
+  // naming documents to fetch.
+  'match-structure-units': run(VOYAGE_LITE, 200, 0),
+  'propose-structure-sources': run(HAIKU, 400, 200),
+  // Compiling a subject's territory (plan #2276.4): up to eight documents'
+  // ordered units and forty frame titles in, thirty to fifty topics out.
+  'compile-territory': run(SONNET, 25_000, 6_000),
+  // The daily pull for a topic that just lit (plan #2247.11): one proposing call.
+  'pull-lit-topic-structure': background(run(HAIKU, 400, 200)),
+  // Moving a subject from the claims graph (plan #2138.4): its claims and the
+  // map's topics go in, a topic and level per claim come out.
+  'assign-topics': run(SONNET, 4_000, 1_500),
+  // One graded course and its shortlist of frame topics in, a depth and up to
+  // eight topics out (plan #2172.4.1). From the daily run.
+  'name-course-topics': background(unit(HAIKU, 1_500, 200)),
   'write-probe': run(HAIKU, 2_000, 200),
   'write-probe-ahead': background(unit(HAIKU, 1_800, 170)),
   'name-misconception': run(HAIKU, 1_500, 200),
@@ -112,11 +136,18 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'grade-quiz-answer': run(HAIKU, 1_500, 200),
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
+  'grade-cell-answer': run(HAIKU, 3_000, 600),
+  // An explanation of one course against levels 1 to 3 of up to eight topics
+  // (plan #2172.4.2): twenty-four cells in, a verdict on each out.
+  'grade-course-explain': run(HAIKU, 4_000, 2_400),
+  'write-cell-case': run(HAIKU, 1_200, 500),
+  'write-goal-case': background(unit(HAIKU, 1_200, 500)),
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),
   'place-track': run(SONNET, 3_000, 400),
   'place-aim': run(SONNET, 2_500, 300),
+  'classify-goal-kind': run(HAIKU, 1_500, 250),
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.
@@ -231,11 +262,25 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // cache after a run's first call), and one paragraph in; at most one
   // finding out. Per paragraph the check reads.
   'check-essay-paragraph': unit(SONNET, 3_000, 200),
-  // An essay's first research pass (plan #1863.9): four searches at most.
-  // Search results come back as input and every round of the server's loop
-  // reads them again, so the prompt passes Haiku's 100,000-token line, past
-  // which the long-prompt rate applies, about $0.10 in all.
-  'research-essay-question': searching(run(HAIKU, 110_000, 5_000), 4),
+  // An essay's research, written up for the writer: one Sonnet call with up
+  // to eight searches. Dynamic filtering keeps only the relevant parts of
+  // each result, but the server's loop reads them again each round.
+  'research-essay-question': searching(run(SONNET, 110_000, 5_000), 6),
+  // Kept for the spend rows recorded before research became one call.
+  'write-essay-research': run(SONNET, 30_000, 2_000),
+  // The guided essay's calls: the rules and the brief (and the plan, where
+  // it reads one) in; a few short lines out.
+  'read-essay-brief': run(SONNET, 1_500, 300),
+  'find-essay-points': run(SONNET, 2_500, 400),
+  'shape-essay-plan': run(SONNET, 1_800, 600),
+  'review-essay-plan': run(SONNET, 2_500, 300),
+  'word-point-question': run(SONNET, 1_500, 60),
+  // A narrow search for one point: up to four searches, three short items out.
+  'find-point-evidence': searching(run(SONNET, 40_000, 1_200), 3),
+  // The rules and a notes page of a few thousand words in; a JSON map out.
+  'map-essay-notes': run(SONNET, 6_000, 1_500),
+  // The rules and the notes in; an essay of about 800 words out.
+  'draft-essay-model': run(SONNET, 6_000, 1_400),
   // The deeper pass gathering: up to eight searches and five pages of about
   // 6,000 tokens each, all read again on each round.
   'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),
@@ -289,6 +334,13 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'classify-job-email': background(unit(HAIKU, 1_500, 100)),
   'match-evidence': run(OPUS, 10_000, 3_000),
   'draft-answer': run(OPUS, 6_000, 800),
+  // Everything gathered for the application (up to about 28,000 tokens,
+  // usually far less) in; a letter of about 300 words, its citations and a
+  // few questions out, with the thinking before it.
+  'draft-cover-letter': run(OPUS, 15_000, 2_500),
+  // The gathered material (up to about 28,000 tokens, cached) and the
+  // questions in; several answers and their asks out.
+  'draft-application': run(OPUS, 25_000, 4_000),
   // The bank, the description and the thread in; a few sentences out, or a
   // whole cover letter when one is asked for.
   'reply-to-role-comment': run(SONNET, 10_000, 1_000),
@@ -344,6 +396,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // review and the home page's observations; up to five observations and a
   // change out. The brief's own estimate for a heavy week.
   'write-week-review': background(run(SONNET, 20_000, 2_000)),
+  // A week of Ask Dash chats, the person's turns whole and Dash's cut to 600
+  // characters, about 70,000 characters; a short list of flags out.
+  'check-ask-replies': background(run(HAIKU, 20_000, 600)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.

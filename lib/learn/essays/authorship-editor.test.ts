@@ -1,7 +1,13 @@
 import { EditorState, type Transaction, type TransactionSpec } from '@codemirror/state';
 import { history, redo, undo } from '@codemirror/commands';
 import { describe, expect, it } from 'vitest';
-import { authorMarks, authorship, insertedBy, showSuggestion, suggestionField } from './authorship-editor';
+import {
+  authorMarks,
+  authorship,
+  insertedBy,
+  showSuggestion,
+  suggestionField,
+} from './authorship-editor';
 import type { AuthorMark } from './authorship';
 
 /**
@@ -46,7 +52,11 @@ describe('authorMarks', () => {
     expect(e.marks()).toEqual([{ ...dash, from: 6, to: 13 }]);
 
     const f = editor('Mine. Old. Mine.');
-    f.apply({ changes: { from: 6, to: 10, insert: 'New one.' }, annotations: insertedBy.of(dash), userEvent: 'rephrase' });
+    f.apply({
+      changes: { from: 6, to: 10, insert: 'New one.' },
+      annotations: insertedBy.of(dash),
+      userEvent: 'rephrase',
+    });
     expect(f.marks()).toEqual([{ ...dash, from: 6, to: 14 }]);
     f.undo();
     expect(f.state.doc.toString()).toBe('Mine. Old. Mine.');

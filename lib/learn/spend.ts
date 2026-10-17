@@ -67,6 +67,16 @@ export const LEARN_OPERATIONS = [
   'grade-quiz-answer',
   'write-applied-case',
   'grade-applied-answer',
+  // Grading an explanation against the levels of a topic (LEARN-LEVELS-SPEC,
+  // "How answers are graded"; plan #2138.5): one Haiku call per answer, reading
+  // the asked cell, its neighbours and the cells it requires.
+  'grade-cell-answer',
+  // Writing the case a level 4 to 6 cell is asked as (plan #2138.8): one Haiku
+  // call when the cell is first asked, none when an unanswered one is reused.
+  'write-cell-case',
+  // A worked case with figures on a goal's idea, one in three of a goal's
+  // Practice Flow questions (plan #2164.3), written ahead like the idea.
+  'write-goal-case',
   // The catalogue embedding sweep, which records through its own postgres
   // connection rather than through `recordLearnSpend`: it runs from a script,
   // and reaching the ledger the usual way would pull `next/headers` in. The
@@ -111,6 +121,10 @@ export const LEARN_OPERATIONS = [
   // is retried by the next save; kept apart from 'place-track' so the cost of
   // goals can be read on its own.
   'place-aim',
+  // Sorting a learning goal into one of six kinds before any source is tried
+  // (plan #2247.2). One Haiku call carries every goal not yet sorted, run
+  // after a goal in the Learn area is saved or reworded.
+  'classify-goal-kind',
   // Naming the Wikipedia sections a Learn now card is made from (plan #806).
   // One Sonnet call per target, recorded through the service role from the
   // picking pass against the account the target belongs to.
@@ -261,7 +275,8 @@ export const LEARN_OPERATIONS = [
   // chat on a reading's page (plan #1876.5) records here too, one Sonnet call
   // per question over the reading's text (at most 200,000 characters, cached
   // across a thread): the same kind of reply, kept to one operation by the
-  // conversational-model-paths count.
+  // conversational-model-paths count. A question asked in a piece's
+  // conversation on Now (plan #2164.5) records here for the same reason.
   'reply-about-card',
   // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
   // call per phrase per card; selecting it again reads the stored one.
@@ -333,7 +348,7 @@ export const LEARN_OPERATIONS = [
   // also finds the notes to compare with, under 'embed-note-match'.
   'check-essay-paragraph',
   // Research on an essay, at the level whose button was pressed (plan
-  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // #1863.9). The first is one Sonnet call with up to eight web searches.
   // The deeper pass is one Haiku call with up to eight searches and five
   // pages read, then one Sonnet call marking the draft's claims against the
   // pages; apart, so each model's share can be read.
@@ -359,6 +374,64 @@ export const LEARN_OPERATIONS = [
   // by whatever started the run; the weekly check for new sources on a brief
   // (plan #2023.6) records here too.
   'research-topic',
+  // The guided essay (LEARN-ESSAYS-SPEC, "The stages"), one Sonnet call per
+  // press unless said: Dash's read of the brief, once when the interview
+  // ends and on each Read again; the points found word for word in what the
+  // person wrote; the shapes the essay could take; Dash's notes on the plan;
+  // and the next question about one point.
+  'read-essay-brief',
+  'find-essay-points',
+  'shape-essay-plan',
+  'review-essay-plan',
+  'word-point-question',
+  // Evidence of one kind for one point of an essay (LEARN-ESSAYS-SPEC,
+  // "Evidence on a point"): one Sonnet call with up to four web searches.
+  'find-point-evidence',
+  // The notes-first essay (LEARN-ESSAYS-SPEC, "Notes first"): one Sonnet
+  // call reading the whole notes page into a map, on each press of Update
+  // the map, and one writing a model draft from the notes.
+  'map-essay-notes',
+  'draft-essay-model',
+  // The essay's research written up as a map (plan stage Research): the
+  // Sonnet calls framing the question and writing from the pages read. The
+  // Haiku search and reading in between records under
+  // 'research-essay-question'.
+  'write-essay-research',
+  // Drafting a topic with its ten levels from a goal the person named
+  // (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"; plan #2138.2). One Sonnet
+  // call per draft. The first twenty are the measurement for the spec's
+  // missing cost line, so it stays apart from 'generate-chain'.
+  'draft-topic',
+  // Embedding a drafted topic's scope to find a topic it duplicates. Apart
+  // from 'embed-claim' so the cost of deduplication can be read on its own.
+  'embed-topic-scope',
+  // Moving the claims graph onto topics (plan #2138.4): one Sonnet call per
+  // subject placing its concepts on topics and levels. The topics it names
+  // that the map lacks are drafted under 'draft-topic'.
+  'assign-topics',
+  // Naming the frame topics a graded course covered, its depth with them
+  // (plan #2172.4.1): one Haiku call per course, from the daily run, and again
+  // only when what the course is known by changes.
+  'name-course-topics',
+  // Grading the one explain prompt on a graded course (plan #2172.4.2): one
+  // Haiku call per answer, reading levels 1 to 3 of every topic the course
+  // was named for. Apart from 'grade-cell-answer', whose answers are about
+  // one level of one topic.
+  'grade-course-explain',
+  // Proposing the structure documents a goal's kind calls for (plan
+  // #2247.10): one Haiku call per provider when a territory is drafted, each
+  // candidate then confirmed by a fetch before anything is stored.
+  'propose-structure-sources',
+  // Embedding a goal and its performances as queries to find the stored weeks
+  // and chapters about it (plan #2247.10). One call per territory tick.
+  'match-structure-units',
+  // Proposing and confirming one structure document for a topic that just lit
+  // (plan #2247.11): the daily run's own pulls, at most five a day.
+  'pull-lit-topic-structure',
+  // Compiling a subject's territory from its stored documents (plan
+  // #2276.4): one Sonnet call per preparation, laying out thirty to fifty
+  // topics with their frames, targets and source lines.
+  'compile-territory',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

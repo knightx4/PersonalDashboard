@@ -4,11 +4,11 @@ import { useActionState, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { FieldError, Input, Label } from '@/components/ui/field';
+import { Segmented } from '@/components/ui/segmented';
 import { CAPTURE_TOKEN_LABEL_MAX } from '@/lib/capture/token-label';
-import type { CaptureTokenListing } from '@/lib/capture/tokens';
+import type { CaptureTokenListing, DashTokenKind } from '@/lib/capture/tokens';
 import {
   makeCaptureTokenAction,
   revokeCaptureTokenAction,
@@ -17,11 +17,16 @@ import {
 import { whenDay } from '@/lib/core/when';
 
 /**
- * Personal capture tokens (plan #1705): what lets a Siri Shortcut or another
- * tool add things to the app without signing in. The list is read on the
- * server (lib/capture/tokens.ts); a token is shown here once, right after it
- * is made, and only its hash is kept.
+ * Personal tokens (plan #1705): what lets a Siri Shortcut or another tool add
+ * things to the app, or ask Dash a question, without signing in. The list is
+ * read on the server (lib/capture/tokens.ts); a token is shown here once,
+ * right after it is made, and only its hash is kept.
  */
+
+const KINDS: { value: DashTokenKind; label: string }[] = [
+  { value: 'capture', label: 'Adds only' },
+  { value: 'ask', label: 'Asks Dash' },
+];
 export function CaptureTokensSection({
   tokens,
   failed,
@@ -33,11 +38,12 @@ export function CaptureTokensSection({
   failed: string | null;
   timezone: string;
   /** The gallery's: a token as it shows straight after it is made. */
-  justMade?: { label: string; token: string };
+  justMade?: { label: string; token: string; kind?: DashTokenKind };
 }) {
   // The name box opens only when asked for, and closes once the token is made,
   // so the token just shown sits directly above its own row.
   const [making, setMaking] = useState(false);
+  const [kind, setKind] = useState<DashTokenKind>('capture');
   const [state, action, pending] = useActionState<MakeTokenState, FormData>(
     async (prev, formData) => {
       const next = await makeCaptureTokenAction(prev, formData);
@@ -51,9 +57,9 @@ export function CaptureTokensSection({
   const when = (at: string) => whenDay(at, { timeZone: timezone });
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
+    <section>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-body font-semibold text-ink">Capture tokens</h2>
+        <h3 className="text-ui font-semibold text-ink">Tokens</h3>
         {!making && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMaking(true)}>
             Make a token
@@ -61,12 +67,17 @@ export function CaptureTokensSection({
         )}
       </div>
       <p className="mt-0.5 text-ui text-ink-muted">
-        A token lets a Siri Shortcut or another tool add things to Dash without signing in. It can
-        only add, never read, and you can revoke it here at any time.
+        A token lets a Siri Shortcut or another tool use Dash without signing in. A token that adds
+        only can never read anything. A token that asks Dash can read and change whatever Dash can,
+        so keep it to your own phone. You can revoke either here at any time.
       </p>
 
       {making && (
         <form action={action} className="mt-4 flex flex-wrap items-end gap-2">
+          <input type="hidden" name="kind" value={kind} />
+          <div className="w-full">
+            <Segmented label="What the token may do" value={kind} options={KINDS} onChange={setKind} disabled={pending} />
+          </div>
           <div className="min-w-48 flex-1">
             <Label htmlFor="capture-token-label">Name it for the phone or tool that will use it</Label>
             <Input
@@ -114,7 +125,7 @@ export function CaptureTokensSection({
 }
 
 /** The token just made, with its one chance to be copied. */
-function MadeToken({ made }: { made: { label: string; token: string } }) {
+function MadeToken({ made }: { made: { label: string; token: string; kind?: DashTokenKind } }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-4 space-y-2">
@@ -154,6 +165,7 @@ function MadeToken({ made }: { made: { label: string; token: string } }) {
 
 function TokenRow({ token, when }: { token: CaptureTokenListing; when: (at: string) => string }) {
   const used = token.lastUsedAt ? `last used ${when(token.lastUsedAt)}` : 'never used';
+  const may = token.kind === 'ask' ? 'Asks Dash' : 'Adds only';
   return (
     <li className="row-pad flex items-start justify-between gap-3">
       <span className="min-w-0 flex-1">
@@ -161,14 +173,14 @@ function TokenRow({ token, when }: { token: CaptureTokenListing; when: (at: stri
           {token.label}
         </span>
         <span className="block text-small text-ink-muted">
-          Made {when(token.createdAt)} · {used}
+          {may} · made {when(token.createdAt)} · {used}
           {token.revokedAt && ` · revoked ${when(token.revokedAt)}`}
         </span>
       </span>
       {!token.revokedAt && (
         <ConfirmStep
           variant="secondary"
-          prompt={`Anything using ${token.label} stops being able to add to Dash at once. This cannot be undone.`}
+          prompt={`Anything using ${token.label} stops being able to ${token.kind === 'ask' ? 'ask Dash' : 'add to Dash'} at once. This cannot be undone.`}
           confirmLabel="Yes, revoke"
           pendingLabel="Revoking…"
           action={revokeCaptureTokenAction}

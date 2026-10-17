@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { Target } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -9,13 +10,30 @@ import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
 import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
-import { practiceHref } from '@/lib/learn/flow/href';
+import { firstParam, practiceHref } from '@/lib/learn/flow/href';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
+import { loadOfferSubjects } from '@/lib/learn/offer-setting';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
+import { askCell } from '@/lib/learn/levels/answer-store';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { CellAnswer } from '@/components/learn/cell-answer';
+import { CellQuestionSkeleton } from '@/components/learn/cell-answer-view';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { roleWhy } from '@/lib/learn/levels/role-line';
+import { roleLineFinder } from '@/lib/learn/levels/role-match';
+import { LevelsFlow } from './levels';
+import { PlacementFlow } from './placement';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
+
+/** Whether you have any topic, draft or approved: the flow asks about levels from then on. */
+async function hasTopics(learn: LearnSupabaseClient): Promise<boolean> {
+  const { count, error } = await learn.from('topics').select('id', { count: 'exact', head: true });
+  return !error && (count ?? 0) > 0;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,7 +69,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * back to the empty states.
  *
  * `?only=goals` is the Goals only filter (plan #1387), which asks about your
- * goals and nothing else. `?goal=<aim id>` is a goal's Practise link on the
+ * goals and nothing else. While Goals only is on in Learn settings (plan
+ * #2164.1) it is the default in place of Mixed, `?only=all` is Everything,
+ * and no filter asks about a subject in the vault. `?goal=<aim id>` is a goal's Practise link on the
  * Goals page: it asks about that goal alone, with no filter shown, the way
  * `?track=` focuses a track. A goal with a track of its own goes to that
  * track's questions, and an archived or unknown goal back to the unfocused ones.
@@ -63,23 +83,110 @@ export async function PracticeFlow({
   track: trackParam,
   only,
   goal: goalParam,
+  cell: cellParam,
+  run,
+  end,
+  after,
+  placement,
+  skip,
 }: {
   track?: string | string[];
   only?: string | string[];
   goal?: string | string[];
+  cell?: string | string[];
+  /** When the practice run began (plan #2138.6). */
+  run?: string | string[];
+  /** The run to sum up. */
+  end?: string | string[];
+  /** The question just answered; only part of the key. */
+  after?: string | string[];
+  /** `placement=1` with a track: the placement before its first lesson (plan #2292.2). */
+  placement?: string | string[];
+  /** `skip=1` on a placement's end: straight on to the lesson. */
+  skip?: string | string[];
 }) {
+  // `?cell=<id>` asks an explain question about one level of a topic (plan
+  // #2138.5), graded against that level and the ones around it. Without it,
+  // placement and the fringe choose the level (#2138.6, ./levels.tsx).
+  if (cellParam !== undefined) {
+    const cellId = typeof cellParam === 'string' && UUID.test(cellParam) ? cellParam : null;
+    if (!cellId) redirect(practiceHref());
+    const user = await requireUser();
+    const spend = collectSpend();
+    const cellLearn = await createLearnClient();
+    const asked = await askCell(
+      cellLearn,
+      user.id,
+      cellId,
+      process.env.ANTHROPIC_API_KEY ? { anthropicApiKey: process.env.ANTHROPIC_API_KEY, onSpend: spend.sink } : undefined,
+      undefined,
+      roleLineFinder(cellLearn, user.id),
+    );
+    await recordLearnSpend(user.id, 'write-cell-case', spend.reports);
+    return (
+      <div className="mt-6">
+        {asked.ok ? (
+          <CellAnswer key={asked.asked.questionId} asked={{ ...asked.asked, why: asked.asked.role ? roleWhy(asked.asked.role) : undefined }} nextHref={practiceHref()} />
+        ) : (
+          <EmptyState
+            icon={Target}
+            title="That level cannot be asked"
+            description={asked.error}
+            action={{ label: 'Practice', href: practiceHref() }}
+          />
+        )}
+      </div>
+    );
+  }
+
   const trackId = typeof trackParam === 'string' && UUID.test(trackParam) ? trackParam : null;
   if (trackParam !== undefined && trackId === null) redirect(practiceHref());
   const goalId =
     trackId === null && typeof goalParam === 'string' && UUID.test(goalParam) ? goalParam : null;
   if (trackId === null && goalParam !== undefined && goalId === null) redirect(practiceHref());
-  // A focused flow asks about one track or goal already, so the filter has nothing to add.
-  const filter: FlowOnly =
-    trackId === null && goalId === null && (only === 'tracks' || only === 'goals') ? only : null;
-  const tracksOnly = filter === 'tracks';
-
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  // Goals only on Learn settings (plan #2164.1), an opt-in (#2302.1): while it
+  // is on the flow opens on Goals only and no filter asks a survey question.
+  // Off, the levels flow asks about every prepared subject and goal subject.
+  const goalsOnly = await goalsOnlyOrDefault(supabase, user.id);
+
+  // A focused flow asks about one track or goal already, so the filter has
+  // nothing to add. With no filter named, Goals only is the default while the
+  // setting is on; Everything is written as `only=all` to get past it.
+  const filter: FlowOnly =
+    trackId !== null || goalId !== null
+      ? null
+      : only === 'tracks' || only === 'goals'
+        ? only
+        : only === undefined && goalsOnly
+          ? 'goals'
+          : null;
+  const tracksOnly = filter === 'tracks';
+
+  // Once you have topics, the flow asks about their levels (plan #2138.6),
+  // and the claims graph is no longer asked about or written from here. A
+  // goal, or Goals only, still asks the goal questions.
+  if (goalId === null && filter !== 'goals' && (await hasTopics(supabase))) {
+    const subjects = trackId ? await loadSubjects(supabase) : [];
+    const focused = trackId ? subjects.find((subject) => subject.id === trackId) : undefined;
+    if (trackId && !focused) redirect(practiceHref());
+    const subject = focused ? { id: focused.id, name: focused.name } : null;
+    return (
+      <div>
+        {subject ? <FlowFocus name={subject.name} back="All subjects" /> : <ScopeFilter filter={filter} />}
+        <div className="mt-6">
+          <Suspense key={`${subject?.id ?? 'all'}:${firstParam(run) ?? ''}:${firstParam(end) ?? ''}:${firstParam(after) ?? ''}`} fallback={<CellQuestionSkeleton />}>
+            {subject && firstParam(placement) === '1' ? (
+              <PlacementFlow userId={user.id} subject={subject} run={run} end={end} skip={firstParam(skip) === '1'} />
+            ) : (
+              <LevelsFlow userId={user.id} subject={subject} only={filter} run={run} end={end} />
+            )}
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
 
   const named = goalId ? await loadFlowGoal(supabase, goalId) : null;
   if (goalId && !named) redirect(practiceHref());
@@ -114,7 +221,7 @@ export async function PracticeFlow({
   const answered = lastAnsweredLine(answeredAt, new Date(), settings.timezone);
 
   // With no filter, a goal or the survey can still ask when the tracks have nothing.
-  const surveys = !track && !tracksOnly && !aboutGoals;
+  const surveys = !track && !tracksOnly && !aboutGoals && !goalsOnly;
 
   // Resumed rather than taken fresh, so a reload shows the question already
   // on the screen instead of spending another one.
@@ -128,6 +235,7 @@ export async function PracticeFlow({
             tracksOnly,
             goalsOnly: filter === 'goals',
             aim: goal?.id ?? null,
+            noSurvey: goalsOnly,
             vault,
           }),
         );
@@ -139,7 +247,14 @@ export async function PracticeFlow({
   // theme from your notes is offered as the way on (plan #778). Not when
   // focused, where the empty state points back at the other tracks instead.
   const offer =
-    picked.kind === 'nothing' && !asking && !track && !aboutGoals
+    picked.kind === 'nothing' &&
+    !asking &&
+    !track &&
+    !aboutGoals &&
+    // A theme from your notes is not one of your goals (plan #2164.1).
+    !goalsOnly &&
+    // Switched off on Learn settings (plan #1937.10); a failed read leaves it on.
+    (await loadOfferSubjects(supabase, user.id).catch(() => true))
       ? await loadTrackOffer(supabase, vault)
       : null;
 
@@ -178,7 +293,7 @@ export async function PracticeFlow({
             }
             action={
               goal
-                ? { label: 'Ask about everything', href: practiceHref() }
+                ? { label: 'Ask about everything', href: practiceHref({ only: 'all' }) }
                 : { label: 'Your learning goals', href: await loadLearnAreaHref() }
             }
           />
@@ -195,7 +310,7 @@ export async function PracticeFlow({
             description="You have answered everything in this subject for now. The other subjects may still have questions."
             tone="finished"
             seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-track`}
-            action={{ label: 'All subjects', href: practiceHref() }}
+            action={{ label: 'All subjects', href: practiceHref({ only: 'all' }) }}
           />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState

@@ -25,6 +25,9 @@ import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageWide } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { Banner } from '@/components/ui/banner';
+import Link from '@/components/ui/link';
+import { duplicatePairs } from '@/lib/jobs/companies/same-company';
 
 export const metadata = { title: 'Companies' };
 
@@ -56,7 +59,7 @@ export default async function CompaniesPage({
   const { data } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, roles ( id, applications ( status ) )',
+      'id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, ats_type, ats_board_token, roles ( id, applications ( status ) )',
     )
     .eq('user_id', user.id)
     .order('name');
@@ -73,6 +76,8 @@ export default async function CompaniesPage({
     website: string | null;
     careers_url: string | null;
     logo_url: string | null;
+    ats_type: string;
+    ats_board_token: string | null;
     roles: Array<{ id: string; applications: Array<{ status: ApplicationStatus }> }>;
   }>;
 
@@ -83,6 +88,10 @@ export default async function CompaniesPage({
     company.roles.some((role) =>
       role.applications.some((application) => IN_PROCESS_OR_LATER.includes(application.status)),
     );
+
+  // Two rows for one employer split its roles and mail between them, so the
+  // pairs are named here with the merge one click away on either page.
+  const duplicates = duplicatePairs(companies);
 
   const priority = PRIORITIES.find((p) => p === params.priority);
   const activeOnly = params.active === '1';
@@ -191,6 +200,31 @@ export default async function CompaniesPage({
               priority and pursuing rails, the sort, the grouping and the
               hidden columns are all on the URL and the field carries them, so
               searching from a narrowed table stays narrowed. */}
+          {duplicates.length > 0 && (
+            <Banner tone="warn" className="mb-4">
+              <div className="space-y-1">
+                <p>
+                  {duplicates.length === 1
+                    ? 'These two look like the same company.'
+                    : `${duplicates.length} pairs look like the same company.`}{' '}
+                  Open the one to keep and use Merge to fold the other into it.
+                </p>
+                <ul className="text-small">
+                  {duplicates.map(({ a, b, reason }) => (
+                    <li key={`${a.id}-${b.id}`}>
+                      <Link href={`/jobs/companies/${a.slug}`}>{a.name}</Link> and{' '}
+                      <Link href={`/jobs/companies/${b.slug}`}>{b.name}</Link>
+                      <span className="text-ink-muted">
+                        {' '}
+                        · {reason === 'board' ? 'same job board' : reason === 'domain' ? 'same domain' : 'same name'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Banner>
+          )}
+
           <div className="mb-4">
             <SearchField placeholder="Search company, industry, location or domain" />
           </div>

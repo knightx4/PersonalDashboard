@@ -6,10 +6,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { Popover, scrim } from '@/components/ui/popover';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 import { Tooltip } from '@/components/ui/tooltip';
+import { isAskPath } from '@/lib/ask/page-name';
 
 export type WorkspaceId = ModuleId;
 
@@ -17,6 +18,42 @@ export type WorkspaceId = ModuleId;
 export type SwitcherCounts = Partial<Record<ModuleId, string>>;
 
 const LAST_PATH_KEY = 'pt_last_path';
+
+/** One row of the switcher: Home, Dash, or a workspace. */
+type SwitcherRow = {
+  key: string;
+  id: ModuleId | null;
+  dash?: true;
+  href: string;
+  label: string;
+  description: string;
+};
+
+/** Home and Dash, the two rows above the workspaces. */
+const TOP_ROWS: readonly SwitcherRow[] = [
+  { key: 'home', id: null, href: '/home', label: 'Home', description: '' },
+  { key: 'dash', id: null, dash: true, href: '/ask', label: 'Dash', description: 'Your chats with Dash' },
+];
+
+function switcherRows(modules: readonly AppModule[]): SwitcherRow[] {
+  return [
+    ...TOP_ROWS,
+    ...modules.map((module) => ({
+      key: module.id,
+      id: module.id as ModuleId | null,
+      href: module.home,
+      label: module.label,
+      description: module.description,
+    })),
+  ];
+}
+
+/** Whether a row is where you are standing: Dash on /ask, Home on any other page outside a workspace. */
+function rowIsCurrent(row: SwitcherRow, current: ModuleId | null, onDash: boolean): boolean {
+  if (row.dash) return onDash;
+  if (row.id === null) return current === null && !onDash;
+  return row.id === current;
+}
 
 /**
  * Where you were, per workspace.
@@ -46,8 +83,8 @@ function rememberPath(module: ModuleId, path: string) {
 
 /**
  * Where switching to a module should land: where you last were in it, or its
- * home. A module marked `alwaysHome` always lands on its home. Exported because the phone's dock offers the same list from a sheet of
- * its own, and two rules for "where does Jobs go" is one rule too many.
+ * home. A module marked `alwaysHome` always lands on its home. Exported because the search box offers the same list from the phone's dock
+ * (note 5f3ef44f), and two rules for "where does Jobs go" is one rule too many.
  */
 export function rememberedPath(module: ModuleId | null, fallback: string): string {
   if (!module || moduleById(module)?.alwaysHome) return fallback;
@@ -96,8 +133,11 @@ export function WorkspaceSwitcher({
   counts = {},
   onShell = false,
   compact = false,
+  dash,
 }: {
   current: WorkspaceId | null;
+  /** Standing on Dash's page; read from the address when left out. */
+  dash?: boolean;
   enabled?: readonly ModuleId[];
   counts?: SwitcherCounts;
   /**
@@ -122,7 +162,6 @@ export function WorkspaceSwitcher({
   const pathname = usePathname();
 
   const workspace = moduleById(current);
-  const active = workspace ?? HOME_MARK;
 
   // A stable key for the visible set, so the memo below does not rebuild on
   // every render of a parent that passes a fresh array.
@@ -139,23 +178,9 @@ export function WorkspaceSwitcher({
 
   // Home first, then the modules. One flat list so the arrow keys do not have
   // to know about sections. Memoised because the keyboard effect depends on it.
-  const rows = useMemo(
-    () => [
-      {
-        id: null as ModuleId | null,
-        href: '/home',
-        label: 'Home',
-        description: '',
-      },
-      ...visible.map((module) => ({
-        id: module.id as ModuleId | null,
-        href: module.home,
-        label: module.label,
-        description: module.description,
-      })),
-    ],
-    [visible],
-  );
+  const rows = useMemo(() => switcherRows(visible), [visible]);
+  const onDash = dash ?? (current === null && isAskPath(pathname ?? ''));
+  const activeLabel = workspace?.label ?? (onDash ? 'Dash' : HOME_MARK.label);
 
   // Remember where we are, so switching back returns here.
   useEffect(() => {
@@ -211,7 +236,7 @@ export function WorkspaceSwitcher({
 
   return (
     <div className="relative shrink-0">
-      <Tooltip label={compact ? `Switch from ${active.label} to another workspace` : 'Switch workspace'}
+      <Tooltip label={compact ? `Switch from ${activeLabel} to another workspace` : 'Switch workspace'}
         className="flex w-full"
       >
         <button
@@ -220,7 +245,7 @@ export function WorkspaceSwitcher({
           onClick={() => {
             // Start on the current workspace rather than at the top, so the
             // first arrow press moves somewhere useful.
-            if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => row.id === current)));
+            if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => rowIsCurrent(row, current, onDash))));
             setOpen((v) => !v);
           }}
           aria-haspopup="menu"
@@ -243,7 +268,7 @@ export function WorkspaceSwitcher({
                 : 'hover:bg-sunken',
           )}
         >
-          <ModuleMark module={current} size="md" />
+          <ModuleMark module={onDash ? 'dash' : current} size="md" />
           <span
             className={cn(
               'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
@@ -251,7 +276,7 @@ export function WorkspaceSwitcher({
               compact && 'sr-only',
             )}
           >
-            {active.label}
+            {activeLabel}
           </span>
           <ChevronsUpDown
             className={cn(
@@ -281,15 +306,15 @@ export function WorkspaceSwitcher({
           className="w-72"
         >
           {rows.map((row, index) => {
-            const isCurrent = row.id === current;
+            const isCurrent = rowIsCurrent(row, current, onDash);
             const count = row.id ? counts[row.id] : undefined;
             return (
               <Link
-                key={row.id ?? 'home'}
+                key={row.key}
                 ref={(node) => {
                   itemRefs.current[index] = node;
                 }}
-                href={hrefFor(row.id, row.href)}
+                href={row.dash ? row.href : hrefFor(row.id, row.href)}
                 role="menuitem"
                 tabIndex={index === activeIndex ? 0 : -1}
                 aria-current={isCurrent ? 'true' : undefined}
@@ -302,6 +327,7 @@ export function WorkspaceSwitcher({
               >
                 <WorkspaceRowBody
                   id={row.id}
+                  dash={row.dash}
                   label={row.label}
                   detail={count ?? row.description}
                   isCurrent={isCurrent}
@@ -323,18 +349,20 @@ export function WorkspaceSwitcher({
  */
 function WorkspaceRowBody({
   id,
+  dash,
   label,
   detail,
   isCurrent,
 }: {
   id: ModuleId | null;
+  dash?: boolean;
   label: string;
   detail: string;
   isCurrent: boolean;
 }) {
   return (
     <>
-      <ModuleMark module={id} size="sm" className="mt-0.5" />
+      <ModuleMark module={dash ? 'dash' : id} size="sm" className="mt-0.5" />
       <span className="min-w-0 flex-1">
         <span className={cn('block text-ui font-medium', isCurrent ? 'text-accent' : 'text-ink')}>
           {label}
@@ -350,94 +378,5 @@ function WorkspaceRowBody({
         <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
       )}
     </>
-  );
-}
-
-/**
- * The same list, as a sheet up from the foot of the phone.
- *
- * A dropdown anchored to a control sitting on the bottom edge opens off the
- * screen, so the phone gets a sheet rather than the column's menu. It is the
- * same rows in the same order for the same reason -- switching workspace
- * should not feel like a different act depending on the width of the window.
- */
-export function WorkspaceSheet({
-  current,
-  enabled,
-  counts = {},
-  open,
-  onClose,
-}: {
-  current: WorkspaceId | null;
-  enabled?: readonly ModuleId[];
-  counts?: SwitcherCounts;
-  open: boolean;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const rows = [
-    { id: null as ModuleId | null, href: '/home', label: 'Home', description: '' },
-    ...visibleModules(enabled, current).map((module) => ({
-      id: module.id as ModuleId | null,
-      href: module.home,
-      label: module.label,
-      description: module.description,
-    })),
-  ];
-
-  return (
-    <div className="fixed inset-0 z-overlay lg:hidden">
-      <button
-        type="button"
-        aria-label="Close the workspace list"
-        onClick={onClose}
-        className={scrim}
-      />
-      <div
-        role="menu"
-        aria-label="Workspaces"
-        /* ui-ok: a sheet against the foot of the screen, not a card -- it is rounded and bordered only on the one edge that meets the page */
-        className="popover-panel absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
-      >
-        {rows.map((row) => {
-          const isCurrent = row.id === current;
-          const count = row.id ? counts[row.id] : undefined;
-          return (
-            <Link
-              key={row.id ?? 'home'}
-              href={rememberedPath(row.id, row.href)}
-              role="menuitem"
-              aria-current={isCurrent ? 'true' : undefined}
-              onClick={onClose}
-              className={cn(
-                'flex items-start gap-2.5 rounded-control px-2 py-3',
-                isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
-              )}
-            >
-              <WorkspaceRowBody
-                id={row.id}
-                label={row.label}
-                detail={count ?? row.description}
-                isCurrent={isCurrent}
-              />
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }

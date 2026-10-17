@@ -33,7 +33,11 @@ export async function loadEssays(supabase: LearnSupabaseClient): Promise<EssaySu
 
 /** One essay, or null when it is not theirs or does not exist. */
 export async function loadEssay(supabase: LearnSupabaseClient, id: string): Promise<Essay | null> {
-  const { data, error } = await supabase.from('essays').select(ESSAY_COLUMNS).eq('id', id).maybeSingle();
+  const { data, error } = await supabase
+    .from('essays')
+    .select(ESSAY_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw new Error(`Could not read the essay: ${error.message}`);
   return data ? toEssay(data as EssayRow) : null;
 }
@@ -59,7 +63,8 @@ export async function createEssay(
     })
     .select('id')
     .single();
-  if (error || !data) throw new Error(`Could not start an essay: ${error?.message ?? 'no row came back'}`);
+  if (error || !data)
+    throw new Error(`Could not start an essay: ${error?.message ?? 'no row came back'}`);
   return (data as { id: string }).id;
 }
 
@@ -77,7 +82,12 @@ export async function saveDraft(
   const updatedAt = new Date().toISOString();
   const { data, error } = await supabase
     .from('essays')
-    .update({ draft_body: body, draft_authorship: draftMarksJson(marks), unsaved: true, updated_at: updatedAt })
+    .update({
+      draft_body: body,
+      draft_authorship: draftMarksJson(marks),
+      unsaved: true,
+      updated_at: updatedAt,
+    })
     .eq('id', id)
     .select('id')
     .maybeSingle();
@@ -87,7 +97,10 @@ export async function saveDraft(
 }
 
 /** The brief's jsonb as stored, for a write that changes part of it. */
-export async function loadBriefJson(supabase: LearnSupabaseClient, id: string): Promise<{ brief: unknown } | null> {
+export async function loadBriefJson(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<{ brief: unknown } | null> {
   const { data, error } = await supabase.from('essays').select('brief').eq('id', id).maybeSingle();
   if (error) throw new Error(`Could not read the essay: ${error.message}`);
   return data ? { brief: (data as { brief: unknown }).brief } : null;
@@ -98,7 +111,11 @@ export async function loadCheckEssay(
   supabase: LearnSupabaseClient,
   id: string,
 ): Promise<{ brief: unknown; noteId: string | null } | null> {
-  const { data, error } = await supabase.from('essays').select('brief, note_id').eq('id', id).maybeSingle();
+  const { data, error } = await supabase
+    .from('essays')
+    .select('brief, note_id')
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw new Error(`Could not read the essay: ${error.message}`);
   if (!data) return null;
   const row = data as { brief: unknown; note_id: string | null };
@@ -125,7 +142,11 @@ export async function loadStudyEssay(
 const HIDDEN_MAX = 200;
 
 /** Hide one study item for this essay. Hiding one already hidden changes nothing. */
-export async function hideStudyItem(supabase: LearnSupabaseClient, id: string, key: string): Promise<void> {
+export async function hideStudyItem(
+  supabase: LearnSupabaseClient,
+  id: string,
+  key: string,
+): Promise<void> {
   const essay = await loadStudyEssay(supabase, id);
   if (!essay) throw new Error('That essay is not there any more.');
   if (essay.hidden.includes(key)) return;
@@ -169,7 +190,10 @@ export async function saveWordTarget(
 }
 
 /** The essay as the vault save reads it (plan #1866). */
-export async function loadVaultEssay(supabase: LearnSupabaseClient, id: string): Promise<VaultEssay | null> {
+export async function loadVaultEssay(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<VaultEssay | null> {
   const { data, error } = await supabase
     .from('essays')
     .select('id, path, note_id, blob_sha, slug, brief, draft_body, draft_authorship')
@@ -201,8 +225,15 @@ export async function loadVaultEssay(supabase: LearnSupabaseClient, id: string):
 }
 
 /** The slugs the person's other essays hold. */
-export async function takenEssaySlugs(supabase: LearnSupabaseClient, exceptId: string): Promise<Set<string>> {
-  const { data, error } = await supabase.from('essays').select('slug').neq('id', exceptId).not('slug', 'is', null);
+export async function takenEssaySlugs(
+  supabase: LearnSupabaseClient,
+  exceptId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('slug')
+    .neq('id', exceptId)
+    .not('slug', 'is', null);
   if (error) throw new Error(`Could not read your essays: ${error.message}`);
   return new Set(((data ?? []) as { slug: string }[]).map((row) => row.slug));
 }
@@ -255,4 +286,48 @@ export async function adoptNoteVersion(
     })
     .eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+/** What the guided essay's actions read: the brief and the plan (LEARN-ESSAYS-SPEC, "The stages"). */
+export async function loadPlanContext(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<{ brief: unknown; plan: unknown } | null> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('brief, plan')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  return data ? (data as { brief: unknown; plan: unknown }) : null;
+}
+
+/** The plan as the person now has it. */
+export async function savePlanJson(
+  supabase: LearnSupabaseClient,
+  id: string,
+  plan: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('essays')
+    .update({ plan, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('That essay is not there any more.');
+}
+
+/** The length the person is aiming at, for the model draft. */
+export async function loadEssayDraftTarget(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('word_target')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  return (data as { word_target: number | null } | null)?.word_target ?? null;
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { DashMark, type DashRunner } from '@/components/ui/dash-mark';
-import type { FeatureProgress } from '@/lib/digest/night';
+import type { FeatureProgress, FeatureStep } from '@/lib/digest/night';
 import { Meter } from '@/components/ui/meter';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
@@ -51,18 +51,101 @@ const RUNNERS: Record<SlotId, DashRunner> = {
 };
 
 /**
- * The pill's second line, in a word or two. The full reason, and the run's
- * lines, are in the panel the pill opens: four quarter-width pills cut any
+ * The pill's second line while it sleeps or is off, in a word or two. The full
+ * reason is in the panel the pill opens: four quarter-width pills cut any
  * sentence off, so a pill says only what fits.
  */
-function pillStatus(slot: RunnerSlot, held: boolean, progress: FeatureProgress | null): string {
-  if (slot.state === 'working') {
-    return [slot.work.elapsed, progress ? `${progress.done} of ${progress.total} steps` : null]
-      .filter(Boolean)
-      .join(' · ');
-  }
+function idleStatus(slot: RunnerSlot, held: boolean): string {
   if (slot.state === 'asleep') return slot.line === SLOT_NOTHING_READY ? 'Nothing ready' : 'Free';
   return held ? 'Held' : 'Not running';
+}
+
+/** The steps a builder is on now, in plan order. Several go at once when they touch different files. */
+function stepsOn(steps: readonly FeatureStep[]): FeatureStep[] {
+  return steps.filter((step) => step.status === 'in_progress');
+}
+
+/**
+ * The pill's second line while it works: the step being built, by its number
+ * under the feature and its title, so the pill says what is happening and not
+ * only how far along. Before the session claims a step it says how many are
+ * done; a goals run says what it is doing.
+ */
+function WorkingLine({ slot, progress }: { slot: RunnerSlot & { state: 'working' }; progress: FeatureProgress | null }) {
+  const { work } = slot;
+  const on = stepsOn(work.steps);
+  const feature = work.ref ?? '';
+  let said: React.ReactNode;
+  if (on.length > 0) {
+    const first = on[0];
+    said = (
+      <>
+        <span className="sr-only">On step </span>
+        <span className="tabular text-ink-ghost">{first.ref.startsWith(feature) ? first.ref.slice(feature.length) : first.ref}</span>{' '}
+        <span>{first.title}</span>
+        {on.length > 1 && <span className="tabular text-ink-ghost"> +{on.length - 1}</span>}
+      </>
+    );
+  } else if (progress) {
+    said = `${progress.done} of ${progress.total} steps done`;
+  } else {
+    said = work.doing ?? work.ref ?? '';
+  }
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-small text-ink-muted">
+      <ModuleCapsule name={slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App')} />
+      <span className="min-w-0 flex-1 truncate">{said}</span>
+      {work.elapsed && <span className="tabular shrink-0 text-ink-ghost">{work.elapsed}</span>}
+    </span>
+  );
+}
+
+/** Where a step stands, as its segment in the pill's bar. */
+const SEGMENT: Record<FeatureStep['status'], string> = {
+  done: 'bg-accent',
+  in_progress: 'bg-accent/45 motion-safe:animate-pulse',
+  blocked: 'bg-caution',
+  not_started: 'bg-canvas',
+  proposed: 'bg-canvas',
+  dropped: 'bg-canvas',
+};
+
+/** More steps than this and the segments are too thin to tell apart, so the bar is a meter. */
+const MOST_SEGMENTS = 16;
+
+/**
+ * The bar under a working pill: one segment for each step of the feature,
+ * filled when done and pulsing while a builder is on it, so "two done, one
+ * going, one to go" is read without a number.
+ */
+function StepBar({ slot, progress }: { slot: RunnerSlot & { state: 'working' }; progress: FeatureProgress | null }) {
+  const { steps, ref } = slot.work;
+  const done = steps.filter((step) => step.status === 'done').length;
+  if (steps.length > 0 && steps.length <= MOST_SEGMENTS) {
+    return (
+      <span
+        role="img"
+        aria-label={`${ref ?? 'The feature'}: ${done} of ${steps.length} steps done`}
+        className="flex h-1.5 gap-0.5"
+      >
+        {steps.map((step) => (
+          <span key={step.ref} className={`min-w-0 flex-1 rounded-full ${SEGMENT[step.status]}`} />
+        ))}
+      </span>
+    );
+  }
+  if (progress) {
+    return (
+      <Meter
+        value={progress.done}
+        max={progress.total}
+        label={`${ref ?? 'The feature'}: ${progress.done} of ${progress.total} steps done`}
+        minFraction={0.04}
+        moves
+      />
+    );
+  }
+  return <span aria-hidden className="block h-1.5 rounded-full bg-canvas" />;
 }
 
 /**
@@ -90,25 +173,29 @@ const CAPSULE_HUES: Record<ModuleId, string> = {
 function ModuleCapsule({ name }: { name: string }) {
   const workspace = MODULES.find((m) => m.label === name || m.id === name.toLowerCase());
   const hue = workspace ? CAPSULE_HUES[workspace.id] : 'bg-canvas text-ink-muted';
-  return <span className={`mr-1.5 inline-block rounded-full px-2 text-small font-medium ${hue}`}>{name}</span>;
+  return <span className={`inline-block shrink-0 rounded-full px-1.5 text-micro font-medium ${hue}`}>{name}</span>;
 }
 
-/** The pill's first line: the workspace and the feature's number, or the seat's name. */
+/**
+ * The pill's first line: the feature's name, or the seat's name. The name,
+ * not the number, because "#2124" says nothing at a glance; the number is in
+ * the tip and in the panel the pill opens. It has the row to itself, with the
+ * workspace on the line under it, so as much of the name shows as fits.
+ */
 function PillName({ slot }: { slot: RunnerSlot }) {
   if (slot.state !== 'working') return <>{slot.slot === 'goals' ? 'Goals' : slot.label}</>;
   const { work } = slot;
-  const name = slot.slot === 'goals' ? 'Goals' : (work.module ?? 'App');
   const title = work.title ?? 'A run with no step recorded';
+  const tip = work.ref ? `${work.ref} ${title}` : title;
   return (
     <>
       <span className="sr-only">Working on </span>
-      <ModuleCapsule name={name} />
-      {/* The title is long and the pill is a quarter of the card, so it
-          waits in a tip on the number, and in the panel the pill opens. */}
-      <Tooltip label={title}>
-        <span className="tabular font-medium">{work.ref ?? title}</span>
+      {/* Cut at the edge; the whole of it waits in a tip, and in the panel
+          the pill opens. */}
+      <Tooltip label={tip} className="block min-w-0">
+        <span className="block min-w-0 truncate font-medium">{title}</span>
       </Tooltip>
-      <span className="sr-only">, {title}</span>
+      {work.ref && <span className="sr-only">, {work.ref}</span>}
     </>
   );
 }
@@ -139,7 +226,7 @@ function Pill({
       aria-expanded={open}
       aria-controls={panel}
       onClick={onPress}
-      className={`flex w-full min-w-0 items-center gap-3 rounded-control border px-3 py-2.5 text-left transition-colors ${
+      className={`flex w-full min-w-0 items-center gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors ${
         open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
       }`}
     >
@@ -153,24 +240,22 @@ function Pill({
         // Only a slot at work glows; asleep or off, its Dash sits unlit.
         still={!working}
       />
-      {/* Every pill has the same three rows, a meter track included, so the
-          four stand the same height whatever their slots are doing. */}
+      {/* Every pill has the same three rows, a bar included, so the four
+          stand the same height side by side whatever their slots are doing:
+          the feature, the step being built with the clock, and a segment for
+          each step. */}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={`block truncate text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
+        <span className={`block min-w-0 text-ui ${working ? 'text-ink' : 'text-ink-muted'}`}>
           <span className="sr-only">{slot.label}: </span>
           <PillName slot={slot} />
         </span>
-        <span className="block truncate text-small text-ink-muted tabular">
-          {pillStatus(slot, held, progress)}
-        </span>
-        {progress ? (
-          <Meter
-            value={progress.done}
-            max={progress.total}
-            label={`${working ? (slot.work.ref ?? 'The feature') : slot.label}: ${progress.done} of ${progress.total} steps done`}
-            minFraction={0.04}
-            moves
-          />
+        {working ? (
+          <WorkingLine slot={slot} progress={progress} />
+        ) : (
+          <span className="block truncate text-small text-ink-muted">{idleStatus(slot, held)}</span>
+        )}
+        {working ? (
+          <StepBar slot={slot} progress={progress} />
         ) : (
           <span aria-hidden className="block h-1.5 rounded-full bg-canvas" />
         )}
@@ -234,6 +319,9 @@ function Focus({
           // options show here to answer.
           state={newest?.kind === 'question' ? 'waiting' : 'live'}
           answer={answerPlanRunAction}
+          // A feature session's lines fold under the feature's steps, and
+          // what it wrote about other features is left out.
+          feature={work.ref && work.steps.length > 0 ? { ref: work.ref, steps: work.steps } : undefined}
         />
       ) : (
         <p className="text-small text-ink-muted">This run left no record to follow.</p>
@@ -272,6 +360,10 @@ export function RunnerCrew({
     <div className="flex flex-col gap-3">
       <ul
         aria-label="What each of the runner's four sessions is doing"
+        // The four slots sit side by side, as the person asked: four across
+        // from laptop width, two by two on a tablet, one column only where a
+        // phone has no room. Do not redraw them as stacked rows; a design
+        // check did that once (#2074) and it undid the person's layout.
         className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
       >
         {slots.map((slot) => (

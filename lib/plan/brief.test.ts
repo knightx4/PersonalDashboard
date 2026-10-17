@@ -470,6 +470,7 @@ describe('the gallery surfaces in a brief', () => {
     expect(brief).toContain('## Gallery surfaces');
     expect(brief).toContain('- news-saved: /preview?s=news-saved, for /news/saved');
     expect(brief).toContain('- news-saved-empty: /preview?s=news-saved-empty');
+    expect(brief).toContain('read .claude/skills/plan/reference/screen.md');
   });
 
   it('adds the surfaces its changed files serve', () => {
@@ -579,6 +580,92 @@ describe('the reference design in a brief', () => {
   it('says nothing for a step with no reference and no surface that has one', () => {
     expect(planBrief(sections, findNode(sections, 'later')!, { references: {} })).not.toContain('## Reference');
     expect(planBrief(sections, findNode(sections, 'plain')!, { references })).not.toContain('## Reference');
+  });
+});
+
+/**
+ * An approved mockup reaches the brief of every build step it is for
+ * (the design audit of 15 October 2026). Each case is a way one was lost:
+ * Goals #1072 and the night sky #1997 put the link on the feature's row,
+ * Idea Space #1890 wrote it in the step's prose without a `Reference:` line,
+ * and the hats #1702 kept the chosen drawing on the decision above it.
+ */
+describe('an approved mockup in a brief', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Rebuild the Goals pages',
+        module: 'goals',
+        status: 'in_progress',
+        detail: 'The reference is the mockup at https://claude.ai/artifact/Ctagg4hMJvxssVkSgVvedS, built from the real goals.',
+        acceptance: 'Opening Goals says what to do today.',
+      }),
+      item({
+        id: 'look',
+        title: 'Which look for the goal page?',
+        parentId: 'feature',
+        kind: 'decision',
+        status: 'done',
+        resolution: 'B — Stages as one list',
+      }),
+      item({
+        id: 'open',
+        title: 'Which colour for a late goal?',
+        parentId: 'feature',
+        kind: 'decision',
+      }),
+      item({ id: 'home', title: 'Rebuild the Goals home page', parentId: 'feature', detail: 'Built with Card.' }),
+      item({
+        id: 'prose',
+        title: 'Redraw Idea Space',
+        module: 'learn',
+        detail: 'Idea Space will look like the sketch you preferred. The sketch is at https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6.',
+      }),
+      item({ id: 'none', title: 'Store the saved day', module: 'news' }),
+    ],
+    dependencies: [],
+  });
+  const pictures = {
+    look: [
+      { id: 'pic-a', caption: 'A: Stages as sections' },
+      { id: 'pic-b', caption: 'B: Stages as one list' },
+    ],
+    open: [{ id: 'pic-red', caption: 'A: Red' }],
+  };
+
+  it('carries a mockup linked on the feature above the step', () => {
+    const brief = planBrief(sections, findNode(sections, 'home')!, { references: {}, pictures });
+    expect(brief).toContain('## Reference');
+    expect(brief).toContain('https://claude.ai/artifact/Ctagg4hMJvxssVkSgVvedS');
+  });
+
+  it('carries the picture of the option chosen on a decision above it, and not the others', () => {
+    const brief = planBrief(sections, findNode(sections, 'home')!, { references: {}, pictures });
+    expect(brief).toContain('pic-b');
+    expect(brief).toContain('B: Stages as one list');
+    expect(brief).not.toContain('pic-a');
+  });
+
+  it('leaves out pictures on a decision not yet answered', () => {
+    const brief = planBrief(sections, findNode(sections, 'home')!, { references: {}, pictures });
+    expect(brief).not.toContain('pic-red');
+  });
+
+  it('carries a mockup linked in the step itself without a Reference line', () => {
+    const brief = planBrief(sections, findNode(sections, 'prose')!, { references: {} });
+    expect(brief).toContain('## Reference');
+    expect(brief).toContain('https://claude.ai/artifact/3E323KJwCFnieg42cqsrK6');
+  });
+
+  it('tells the builder the critic judges against it', () => {
+    const brief = planBrief(sections, findNode(sections, 'home')!, { references: {}, pictures });
+    expect(brief).toContain('Register');
+    expect(brief).toContain('critic');
+  });
+
+  it('says nothing about mockups for a step with none', () => {
+    expect(planBrief(sections, findNode(sections, 'none')!, { references: {} })).not.toContain('## Reference');
   });
 });
 

@@ -3,20 +3,25 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Plus } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { buttonVariants } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { ComposeBody, ComposeBox, ComposeTitle } from '@/components/ui/field';
 import { createCustomTrack, type CustomTrackState } from './actions';
 
 function MakeButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="primary" pending={pending}>
-      <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="primary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#createCustomTrack"
+      what="Cost of making the subject"
+    >
       {pending ? 'Writing the curriculum…' : 'Make the subject'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -71,10 +76,6 @@ export function CustomTrackForm() {
         )}
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
           <MakeButton />
-          <PaidHint
-            action="app/learn/know/actions.ts#createCustomTrack"
-            what="Cost of making the subject"
-          />
           <Link href="/learn/know" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
             Cancel
           </Link>

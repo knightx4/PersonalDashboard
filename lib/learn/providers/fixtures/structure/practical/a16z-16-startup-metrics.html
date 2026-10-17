@@ -1,0 +1,569 @@
+<!-- Excerpt of https://a16z.com/16-startup-metrics/, fetched 2026-10-16: the title and the page from the h1 to the end of the article, scripts and styles removed. -->
+<html><head><title>16 Startup Metrics | Andreessen Horowitz</title></head><body>
+<h1 class="component-hero--title text-h1 font-primary mb-4">16 Startup Metrics</h1>
+          <span class="component-hero--author block"><a href="https://a16z.com/author/jeff-jordan/" class="transition-colors hover:text-[--post-link-color] focus-visible:text-[--post-link-color]">Jeff Jordan</a>, Anu Hariharan, Frank Chen, and Preethi Kasireddy</span>
+                    <span class="component-hero--date block">
+            Posted
+            August 21, 2015          </span>
+          <div class="relative mt-3 group/drop inline-block" data-dropdown="language-switcher-18669">
+    <button class="cursor-pointer inline-flex items-center gap-2.5 text-p-small font-secondary text-truffle transition-colors hover:text-black group-[.active]/drop:text-black" data-dropdown-trigger>
+      <span>Available in</span>
+      <i class="icon-chevron-down text-[8px] group-[.active]/drop:rotate-180 group-[.active]/drop:-mt-0.5"></i>
+    </button>
+    <ul class="absolute -inset-x-4 -top-2 pt-8 pb-1 bg-white shadow-sdw-1 z-10 opacity-0 invisible transition-all group-[.active]/drop:opacity-100 group-[.active]/drop:visible" data-dropdown-panel>
+                        <li>
+            <a href="https://a16z.com/es/16-metricas-de-inicio/" class="block px-4 py-1.5 text-p-small font-secondary text-truffle hover:text-black hover:bg-travertine-p5 transition-colors whitespace-nowrap">
+              Espa&ntilde;ol            </a>
+          </li>
+                                <li>
+            <a href="https://a16z.com/pt/16-metricas-de-startups/" class="block px-4 py-1.5 text-p-small font-secondary text-truffle hover:text-black hover:bg-travertine-p5 transition-colors whitespace-nowrap">
+              Portugu&ecirc;s            </a>
+          </li>
+                  </ul>
+  </div>
+        </div>
+      </div>
+            <div x-data="{ isSticky: false, offset: 0, rect: {}, stickyTop: 0 }" x-init="
+          offset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hs')) || 80;
+          rect = $el.getBoundingClientRect();
+          $watch('isSticky', value =&gt; { if(value) rect = $el.getBoundingClientRect(); });
+        " x-on:scroll.window="
+          const boundary = document.querySelector('.component-recommended--footer') || document.querySelector('.subscription-panel') || document.querySelector('footer');
+          const boundaryTop = boundary ? boundary.getBoundingClientRect().top : Infinity;
+          const buttonHeight = 48; 
+          isSticky = (window.innerWidth &gt;= 1024) &amp;&amp; ($el.getBoundingClientRect().top &lt;= offset); 
+          if (isSticky) {
+             const maxTop = boundaryTop - buttonHeight - 20;
+             stickyTop = Math.min(offset, maxTop);
+          }
+          rect = $el.getBoundingClientRect();
+        " x-on:resize.window="
+          isSticky = (window.innerWidth &gt;= 1024) &amp;&amp; ($el.getBoundingClientRect().top &lt;= offset); 
+          rect = $el.getBoundingClientRect(); 
+          offset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hs')) || 80;
+        " class="max-md:flex max-md:w-full inline-flex justify-center items-center min-w-[144px] h-[48px]">
+        <button x-on:click.prevent="document.body.classList.toggle('subscription-popup-active');" :style="isSticky ? `position: fixed; top: ${stickyTop}px; left: ${rect.left}px; width: ${rect.width}px; z-index: 90;` : ''" class="inline-flex justify-center items-center border border-[--post-accent-color] text-[--post-accent-color] p-2 rounded text-p-small uppercase font-secondary transition-[background-color,color,opacity] bg-travertine-p5 hover:bg-[--post-accent-color-hover] hover:text-white min-w-[144px] h-[48px] w-full">Subscribe</button>
+      </div>
+          </div>
+    <div x-data="sharePanel()" :class="{'active' : dropShare}" class="lg:relative lg:hover:z-[10] inline-block group/share lg:hidden" data-share-url="https://a16z.com/16-startup-metrics/" data-share-title="16 Startup Metrics">
+  <button x-on:click="dropShare = !dropShare" class="inline-flex items-center gap-2 text-body-lg text-[--post-link-color] transition-all hover:text-[--post-link-color-hover] group-hover/share:text-[--post-link-color-hover] font-light font-secondary relative z-[2]">
+    <i class="icon-share text-[12px]"></i> Share  </button>
+  <div class="max-lg:fixed max-lg:inset-0 max-lg:bg-black/20 max-lg:z-[10000] max-lg:transiton-all max-lg:duration-300 max-lg:opacity-0 max-lg:invisible max-lg:group-[.active]/share:opacity-100 max-lg:group-[.active]/share:visible">
+    <div class="max-lg:bg-[#fcfbf9] max-lg:pt-[32px] max-lg:px-[32px] max-lg:pb-10">
+      <button x-on:click="dropShare = false" class="icon-cross text-[14px] absolute top-[12px] right-8 text-black lg:hidden transition-all hover:text-jade"> </button>
+      <div class="mb-8 lg:hidden">
+        <span class="inline-flex items-center gap-2 text-body-lg text-[--post-link-color] transition-all hover:text-[--post-link-color-hover] group-hover/share:text-[--post-link-color-hover] font-light font-secondary relative z-[2]">
+          <i class="icon-share text-[12px]"></i> Share        </span>
+      </div>
+      <div class="text-[--share-color,#000] grid grid-cols-3 gap-2 max-lg:max-w-[600px] lg:absolute lg:-left-[32px] lg:w-[374px] lg:bg-white lg:px-8 lg:shadow-sdw-6 lg:z-[1] lg:opacity-0 lg:invisible lg:group-hover/share:opacity-100 lg:group-hover/share:visible transition-all duration-300 group-[.active]/share:opacity-100 group-[.active]/share:visible" :class="{
+          'lg:-mb-[60px] lg:bottom-full lg:pt-8 lg:pb-[84px]': !showBelow,
+          'lg:-mt-[60px] lg:top-full lg:pt-[84px] lg:pb-8': showBelow
+        }">
+        <a href="#" x-on:click.prevent="copyLink()" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-link"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary" x-text="copied ? 'Copied!' : 'Copy Link'"></span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareEmail()" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-email"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Email</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('twitter')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-x"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">X</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('linkedin')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-linkedin"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">LinkedIn</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('facebook')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-facebook"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Facebook</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('hackernews')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-hacker"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Hacker News</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('whatsapp')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-whatsapp-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">WhatsApp</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('flipboard')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-flipboard-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Flipboard</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('reddit')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-reddit-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Reddit</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>  </div>
+  </div>
+    <div class="py-12 max-lg:py-0 max-lg:pb-6 bg-travertine-p5">
+      <div class="w-full mx-auto px-8 max-w-[1440px] 1xl:px-14">
+        <div class="lg:flex lg:gap-5 xl:gap-[60px] ">
+          <div class="lg:w-[240px] xl:w-[276px] max-lg:bg-travertine-p5 z-[49]">
+            <div class="lg:sticky top-0 lg:top-[calc(var(--hs)+20px)] z-10">
+              <div x-data="sharePanel()" :class="{'active' : dropShare}" class="lg:relative lg:hover:z-[10] inline-block group/share mt-8 max-lg:hidden" data-share-url="https://a16z.com/16-startup-metrics/" data-share-title="16 Startup Metrics">
+  <button x-on:click="dropShare = !dropShare" class="inline-flex items-center gap-2 text-body-lg text-[--post-link-color] transition-all hover:text-[--post-link-color-hover] group-hover/share:text-[--post-link-color-hover] font-light font-secondary relative z-[2]">
+    <i class="icon-share text-[12px]"></i> Share  </button>
+  <div class="max-lg:fixed max-lg:inset-0 max-lg:bg-black/20 max-lg:z-[10000] max-lg:transiton-all max-lg:duration-300 max-lg:opacity-0 max-lg:invisible max-lg:group-[.active]/share:opacity-100 max-lg:group-[.active]/share:visible">
+    <div class="max-lg:bg-[#fcfbf9] max-lg:pt-[32px] max-lg:px-[32px] max-lg:pb-10">
+      <button x-on:click="dropShare = false" class="icon-cross text-[14px] absolute top-[12px] right-8 text-black lg:hidden transition-all hover:text-jade"> </button>
+      <div class="mb-8 lg:hidden">
+        <span class="inline-flex items-center gap-2 text-body-lg text-[--post-link-color] transition-all hover:text-[--post-link-color-hover] group-hover/share:text-[--post-link-color-hover] font-light font-secondary relative z-[2]">
+          <i class="icon-share text-[12px]"></i> Share        </span>
+      </div>
+      <div class="text-[--share-color,#000] grid grid-cols-3 gap-2 max-lg:max-w-[600px] lg:absolute lg:-left-[32px] lg:w-[374px] lg:bg-white lg:px-8 lg:shadow-sdw-6 lg:z-[1] lg:opacity-0 lg:invisible lg:group-hover/share:opacity-100 lg:group-hover/share:visible transition-all duration-300 group-[.active]/share:opacity-100 group-[.active]/share:visible" :class="{
+          'lg:-mb-[60px] lg:bottom-full lg:pt-8 lg:pb-[84px]': !showBelow,
+          'lg:-mt-[60px] lg:top-full lg:pt-[84px] lg:pb-8': showBelow
+        }">
+        <a href="#" x-on:click.prevent="copyLink()" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-link"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary" x-text="copied ? 'Copied!' : 'Copy Link'"></span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareEmail()" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-email"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Email</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('twitter')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-x"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">X</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('linkedin')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-linkedin"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">LinkedIn</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('facebook')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-facebook"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Facebook</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('hackernews')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-hacker"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Hacker News</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('whatsapp')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-whatsapp-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">WhatsApp</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('flipboard')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-flipboard-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Flipboard</span>
+          </div>
+        </a>
+        <a href="#" x-on:click.prevent="shareNetwork('reddit')" class="group/share-icon max-lg:aspect-square lg:size-[98px] text-center flex items-center justify-center bg-travertine-p5 transition-all hover:bg-pearl-bush">
+          <div>
+            <div class="size-10 mx-auto bg-pearl-bush rounded-full flex items-center justify-center transition-all group-hover/share-icon:bg-white">
+              <i class="icon-reddit-a"></i>
+            </div>
+            <span class="block mt-2 text-caption text-black font-secondary">Reddit</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>            </div>
+          </div>
+          <div class="max-lg:pt-8 lg:flex-1 lg:w-[calc(100%-580px)] xl:w-[calc(100%-676px)]">
+            <div class="tombstone-enable js-article-content [&amp;&gt;h1]:text-h1 [&amp;&gt;h1]:font-primary [&amp;&gt;h1]:mb-4 [&amp;&gt;h2]:text-h2 [&amp;&gt;h2]:font-primary [&amp;&gt;h2]:mt-[56px] [&amp;&gt;h2:first-of-type]:mt-14 [&amp;&gt;h2]:mb-4 [&amp;&gt;h3]:text-h3 [&amp;&gt;h3]:font-tertiary [&amp;&gt;h3]:mt-12 md:[&amp;&gt;h3]:mt-[56px] [&amp;&gt;h3:first-child]:mt-0 [&amp;&gt;h3]:mb-4 [&amp;&gt;h4]:text-h4 [&amp;&gt;h4]:mt-12 md:[&amp;&gt;h4]:mt-[56px] [&amp;&gt;h4:first-child]:mt-0 [&amp;&gt;h4]:font-medium [&amp;&gt;h4]:mb-4 [&amp;&gt;h5]:text-h5 [&amp;&gt;h5]:mt-[56px] [&amp;&gt;h5:first-child]:mt-0 [&amp;&gt;h5]:font-medium [&amp;&gt;h5]:mb-4 [&amp;_a:not([class])]:text-[--post-link-color] [&amp;_a:not([class]):hover]:text-[--post-link-color-hover] [&amp;_strong]:font-bold [&amp;&gt;p:first-of-type]:mt-4 [&amp;_p]:mb-7 [&amp;&gt;ul_li]:pl-6 [&amp;&gt;ul]:mb-7 [&amp;&gt;ul_li+li]:mt-3 [&amp;&gt;ul_li]:relative [&amp;&gt;ul_li]:before:content-[''] [&amp;&gt;ul_li]:before:size-1 [&amp;&gt;ul_li]:before:rounded-full [&amp;&gt;ul_li]:before:bg-black [&amp;&gt;ul_li]:before:absolute [&amp;&gt;ul_li]:before:left-[10px] [&amp;&gt;ul_li]:before:top-[13px] [&amp;_figure]:my-6 [&amp;_figure_img]:w-full [&amp;_figure_figcaption]:mt-2 [&amp;_figure_figcaption]:text-caption [&amp;_figure_figcaption]:text-truffle [&amp;_figure_figcaption]:font-secondary [&amp;_figure_figcaption]:flex max-md:[&amp;_figure_figcaption]:flex-wrap [&amp;_figure_figcaption]:gap-2 [&amp;_figure_figcaption]:justify-between [&amp;_figure_figcaption]:italic [&amp;_figure_figcaption_a]:not-italic [&amp;&gt;h5+ol]:-mt-2 [&amp;_ol]:list-decimal [&amp;_ol]:list-inside [&amp;_ol]:my-4 [&amp;_ol]:ml-4 [&amp;_ol&gt;li+li]:mt-2 [&amp;&gt;*:first-child]:mt-0 [&amp;_.wp-caption-text]:italic [&amp;_.wp-caption-text]:text-[#727069] [&amp;_.wp-caption]:my-6 [&amp;_iframe]:w-full [&amp;_iframe]:mb-4 [&amp;&gt;strong+p]:mt-4 [&amp;&gt;blockquote]:py-6 [&amp;&gt;blockquote_p]:m-0 [&amp;&gt;blockquote_p]:italic [&amp;&gt;blockquote_p]:text-h3 [&amp;&gt;blockquote]:relative [&amp;&gt;blockquote]:pl-[26px] [&amp;&gt;blockquote_p]:before:content-[''] [&amp;&gt;blockquote_p]:before:bg-quote [&amp;&gt;blockquote_p]:before:bg-[length:24px_24px] [&amp;&gt;blockquote_p]:before:size-6 [&amp;&gt;blockquote_p]:before:absolute [&amp;&gt;blockquote_p]:before:left-0 [&amp;&gt;blockquote_p]:before:top-[2px]">
+                            <p><span style="font-weight: 400;">We have the privilege of meeting with thousands of entrepreneurs every year, and in the course of those discussions are presented with all kinds of numbers, measures, and metrics that illustrate the promise and health of a particular company. Sometimes, however, the metrics may not be the best gauge of what&rsquo;s actually happening in the business, or people may use different definitions of the same metric in a way that makes it hard to understand the health of the business.</span></p>
+<p><span style="font-weight: 400;">So, while some of this may be obvious to many of you who live and breathe these metrics all day long, we compiled a list of the most common or confusing ones. Where appropriate, we tried to add some notes on why investors focus on those metrics. Ultimately, though, good metrics </span><i><span style="font-weight: 400;">aren&rsquo;t</span></i><span style="font-weight: 400;"> about </span><a href="https://a16z.com/16-common-questions-about-fundraising/" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">raising money</span></a><span style="font-weight: 400;"> from VCs&mdash;they&rsquo;re about running the business in a way where founders know how and why certain things are working (or not) &hellip; and can address or adjust accordingly.</span></p>
+<h2>Business and financial metrics</h2>
+<h3>1. Bookings vs. revenue</h3>
+<p><span style="font-weight: 400;">A common mistake is to use bookings and revenue interchangeably, but they aren&rsquo;t the same thing. </span></p>
+<p><b>Bookings&nbsp;</b><span style="font-weight: 400;">is the value of a contract between the company and the customer. It reflects a contractual obligation on the part of the customer to pay the company. </span></p>
+<p><b>Revenue</b><span style="font-weight: 400;">&nbsp;is recognized when the service is actually provided or ratably over the life of the subscription agreement. How and when revenue is recognized is governed by GAAP.</span></p>
+<p><span style="font-weight: 400;">Letters of intent and verbal agreements are neither revenue nor bookings. </span></p>
+<h3>2. Recurring revenue vs. Total revenue</h3>
+<p><span style="font-weight: 400;">Investors more highly value companies where the majority of total revenue comes from product revenue (vs. from services). Why? Services revenue is non-recurring, has much lower margins, and is less scalable. Product revenue is the what you generate from the sale of the software or product itself.</span></p>
+<p><b>ARR (annual recurring revenue)&nbsp;</b><span style="font-weight: 400;">is a measure of revenue components that are recurring in nature. It should exclude one-time (non-recurring) fees and professional service fees.</span></p>
+<p><b>ARR per customer: </b><span style="font-weight: 400;">Is this flat or growing? If you are upselling or cross-selling your customers, then it should be growing, which is a positive indicator for a healthy business.</span></p>
+<p><b>MRR (monthly recurring revenue): </b><span style="font-weight: 400;">Often, people will multiply one month&rsquo;s all-in bookings&nbsp;by 12 to get to ARR. Common mistakes with this method include: (1) counting non-recurring fees such as hardware, setup, installation, professional services/ consulting agreements; (2) counting bookings (see #1).</span></p>
+<h3>3. Gross profit</h3>
+<p><span style="font-weight: 400;">While top-line bookings growth is super important, investors want to understand </span><i><span style="font-weight: 400;">how profitable</span></i><span style="font-weight: 400;"> that revenue stream is. Gross profit provides that measure.</span></p>
+<p><span style="font-weight: 400;">What&rsquo;s included in gross profit may vary by company, but in general all costs associated with the manufacturing, delivery, and support of a product/service should be included. </span></p>
+<p><span style="font-weight: 400;">So be prepared to break down what&rsquo;s included in&mdash;and excluded&mdash;from that gross profit figure.</span></p>
+<h3>4. Total contract value (TCV) vs. annual contract value (ACV)</h3>
+<p><b>TCV (total contract value)</b><span style="font-weight: 400;"> is the total value of the contract, and can be shorter or longer in duration. Make sure TCV also includes the value from one-time charges, professional service fees, and recurring charges. &nbsp;&nbsp;</span></p>
+<p><b>ACV (annual contract value)</b><span style="font-weight: 400;">, on the other hand, measures the value of the contract over a 12-month period.&nbsp;</span><span style="font-weight: 400;">Questions to ask about ACV: &nbsp;</span></p>
+<p><em>What is the size?</em> Are you getting a few hundred dollars per month from your customers, or are you able to close large deals? Of course, this depends on the market you are targeting (SMB vs. mid-market vs. enterprise).</p>
+<p><span style="font-weight: 400;"><em>Is it growing</em> (and especially&nbsp;not shrinking)? If it&rsquo;s growing, it means customers are paying you more on average for your product over time. That implies either your product is fundamentally doing more (adding features and capabilities) to warrant that increase, or is delivering so much value customers (improved functionality over alternatives) that they are willing to pay more for it. </span></p>
+<p><span style="font-weight: 400;">See also </span><a href="http://www.quora.com/What-was-the-average-ACV-Annual-Contract-Value-for-the-fastest-growing-enterprise-software-SaaS-companies-in-their-first-year-or-two-of-operations" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">this post</span></a><span style="font-weight: 400;"> on ACV. </span></p>
+<h3>5. LTV (lifetime value)</h3>
+<p><span style="font-weight: 400;">Lifetime value is the present value of the future </span><i><span style="font-weight: 400;">net profit</span></i><span style="font-weight: 400;"> from the customer over the duration of the relationship. It helps determine the long-term value of the customer and how much net value you generate per customer after accounting for customer acquisition costs (CAC). </span></p>
+<p><span style="font-weight: 400;">A common mistake is to estimate the LTV as a </span><i><span style="font-weight: 400;">present value of revenue</span></i><span style="font-weight: 400;"> or even </span><i><span style="font-weight: 400;">gross margin of the customer</span></i><span style="font-weight: 400;"> instead of calculating it as </span><i><span style="font-weight: 400;">net profit of the customer</span></i><span style="font-weight: 400;"> over the life of the relationship. </span></p>
+<p><strong>Reminder, here&rsquo;s a way to calculate LTV:</strong></p>
+<ul>
+<li><b>Revenue per customer (per month)</b> = average order value multiplied by the number of orders.</li>
+<li><b>Contribution margin per customer (per month)&nbsp;</b>= revenue from customer minus variable costs associated with a customer. Variable costs include selling, administrative and any operational costs associated with serving the customer.</li>
+<li><b>Avg. life span of customer (in months)&nbsp;</b>= 1 / by your monthly churn.&nbsp;<b>LTV&nbsp;</b>= Contribution margin from customer multiplied by the average lifespan of customer.</li>
+</ul>
+<p><span style="font-weight: 400;">Note,</span> <span style="font-weight: 400;">if you have only few months of data, the conservative way to measure LTV is to look at historical value to date. Rather than predicting average life span and estimating how the retention curves might look, we prefer to measure 12 month and 24 month LTV.</span></p>
+<p><span style="font-weight: 400;">Another important calculation here is </span><b>LTV as it contributes to margin</b><span style="font-weight: 400;">. This is important because a revenue or gross margin LTV suggests a higher upper limit on what you can spend on customer acquisition. </span><b>Contribution Margin LTV to CAC ratio</b><span style="font-weight: 400;"> is also a good measure to determine CAC payback and manage your advertising and marketing spend accordingly. </span></p>
+<p><span style="font-weight: 400;">See also Bill Gurley on the &ldquo;</span><a href="http://abovethecrowd.com/2012/09/04/the-dangerous-seduction-of-the-lifetime-value-ltv-formula/" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">dangerous seductions</span></a><span style="font-weight: 400;">&rdquo; of the lifetime value formula. </span></p>
+<h3>6. Gross merchandise value (GMV) vs. revenue</h3>
+<p><span style="font-weight: 400;">In marketplace businesses, these are frequently used interchangeably. But GMV does not equal revenue!</span></p>
+<p><b>GMV (gross merchandise volume)</b><span style="font-weight: 400;">&nbsp;is the total sales dollar volume of merchandise transacting through the marketplace in a specific period. It&rsquo;s the real top line, what the consumer side of the marketplace is spending. It is a useful measure of the size of the marketplace and can be useful as a &ldquo;current run rate&rdquo; measure based on annualizing the most recent month or quarter.</span></p>
+<p><b>Revenue</b><span style="font-weight: 400;">&nbsp;is the portion of GMV that the marketplace &ldquo;takes&rdquo;. Revenue consists of the various fees that the marketplace gets for providing its services; most typically these are transaction fees based on GMV successfully transacted on the marketplace, but can also include ad revenue, sponsorships, etc. These fees are usually a fraction of GMV.</span></p>
+<h3>7. Unearned or deferred revenue&mdash;and billings</h3>
+<p><span style="font-weight: 400;">In a SaaS business,</span> <span style="font-weight: 400;">this is the cash you collect at the time of the booking in advance of when the revenues will actually be realized. </span></p>
+<p><span style="font-weight: 400;">As we&rsquo;ve </span><a href="https://a16z.com/understanding-saas-why-the-pundits-have-it-wrong/" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">shared previously</span></a><span style="font-weight: 400;">, SaaS companies only get to recognize revenue over the term of the deal as the service is delivered&mdash;</span><i><span style="font-weight: 400;">even if a customer signs a huge up-front deal</span></i><span style="font-weight: 400;">. So in most cases, that &ldquo;booking&rdquo; goes onto the balance sheet in a liability line item called deferred revenue. (Because the balance sheet has to &ldquo;balance,&rdquo; the corresponding entry on the assets side of the balance sheet is &ldquo;cash&rdquo; if the customer pre-paid for the service or &ldquo;accounts receivable&rdquo; if the company expects to bill for and receive it in the future). As the company starts to recognize revenue from the software as service, it reduces its deferred revenue balance and increases revenue: for a 24-month deal, as each month goes by deferred revenue drops by 1/24th and revenue increases by 1/24th.</span></p>
+<p><span style="font-weight: 400;">A good proxy to measure the growth&mdash;and ultimately the health&mdash;of a SaaS company is to look at </span><b>billings</b><span style="font-weight: 400;">, which is calculated by taking the revenue in one quarter and adding the change in deferred revenue from the prior quarter to the current quarter. If a SaaS company is growing its bookings (whether through new business or upsells/renewals to existing customers), billings will increase.</span></p>
+<p><span style="font-weight: 400;">Billings is a much better forward-looking indicator of the health of a SaaS company than simply looking at revenue because revenue understates the true value of the customer, which gets recognized ratably. But i</span><span style="font-weight: 400;">t&rsquo;s also tricky because of the very nature of recurring revenue itself: A SaaS company could show stable revenue for a long time&mdash;just by working off its billings backlog&mdash;which would make the business <em>seem</em> healthier than it truly is. This is something we therefore watch out for when evaluating the unit economics of such businesses. </span></p>
+<h3>8. CAC (customer acquisition cost)&mdash;blended vs. paid, organic vs. inorganic</h3>
+<p><span style="font-weight: 400;">Customer acquisition cost or CAC</span> <span style="font-weight: 400;">should be the </span><i><span style="font-weight: 400;">full</span></i><span style="font-weight: 400;"> cost of acquiring users, stated on a per user basis. </span><span style="font-weight: 400;">Unfortunately, CAC metrics come in all shapes and sizes. </span></p>
+<p><span style="font-weight: 400;">One common problem with CAC metrics is failing to include all the costs incurred in user acquisition such as referral fees, credits, or discounts. Another common problem is to calculate CAC as a &ldquo;blended&rdquo; cost (including users acquired organically) rather than isolating users acquired through &ldquo;paid&rdquo; marketing. While </span><b>blended CAC</b><span style="font-weight: 400;"> [total acquisition cost / total new customers acquired across all channels] isn&rsquo;t wrong, it doesn&rsquo;t inform how well your paid campaigns are working and whether they&rsquo;re profitable. </span></p>
+<p><span style="font-weight: 400;">This is why investors consider </span><b>paid CAC</b><span style="font-weight: 400;"> [total acquisition cost/ new customers acquired through paid marketing] to be more important than blended CAC in evaluating the viability of a business&mdash;it informs whether a company can scale up its user acquisition budget profitably. While an argument can be made in some cases that paid acquisition contributes to organic acquisition, one would need to demonstrate proof of that effect to put weight on blended CAC.</span></p>
+<p>Many investors do like seeing both, however: the blended number as well as the CAC, broken out by paid/unpaid. We also like seeing the breakdown by dollars of paid customer acquisition channels: for example, how much does a paying customer cost if they were acquired via Facebook?</p>
+<p><span style="font-weight: 400;">Counterintuitively, it turns out that costs typically go </span><i><span style="font-weight: 400;">up</span></i><span style="font-weight: 400;"> as you try and reach a larger audience. So it might cost you $1 to acquire your first 1,000 users, $2 to acquire your next 10,000, and $5 to $10 to acquire your next 100,000. That&rsquo;s why you can&rsquo;t afford to ignore the metrics about volume of users acquired via each channel. </span></p>
+<h2>Product and engagement metrics</h2>
+<h3>9. Active users</h3>
+<p><span style="font-weight: 400;">Different companies have almost unlimited definitions for what &ldquo;active&rdquo; means. Some charts don&rsquo;t even define what that activity is, while others include inadvertent activity&mdash;such as having a high proportion of first-time users or accidental one-time users. </span></p>
+<p>Be clear on how you define &ldquo;active.&rdquo;</p>
+<h3><b>10. Month-on-month (MoM) growth</b></h3>
+<p><span style="font-weight: 400;">Often this measured as the simple average of monthly growth rates. But investors often prefer to measure it as </span><b>CMGR (Compounded Monthly Growth Rate)</b><span style="font-weight: 400;"> since CMGR measures the periodic growth, especially for a marketplace. </span></p>
+<p><span style="font-weight: 400;">Using CMGR [CMGR = (Latest Month/ First Month)^(1/# of Months) -1] also helps you benchmark growth rates with other companies. This would otherwise be difficult to compare due to volatility and other factors. The CMGR will be smaller than the simple average in a growing business.</span></p>
+<h3>11. Churn</h3>
+<p><span style="font-weight: 400;">There&rsquo;s all kinds of churn&mdash;dollar churn, customer churn, net dollar churn&mdash;and there are varying definitions for how churn is measured. For example, some companies measure it on a revenue basis annually, which blends upsells with churn.</span></p>
+<p><strong>Investors look at it the following way:</strong></p>
+<ul>
+<li><b>Monthly unit churn</b><span style="font-weight: 400;"> = lost customers/prior month total</span></li>
+<li><b>Retention by cohort</b>
+<ul>
+<li><b>Month 1</b><span style="font-weight: 400;"> = 100% of installed base</span></li>
+<li><b>Latest Month</b><span style="font-weight: 400;"> = % of original installed base that are still transacting</span></li>
+</ul>
+</li>
+</ul>
+<h4>It is also important to differentiate between gross churn and net revenue churn:</h4>
+<ul>
+<li><b>Gross churn</b><span style="font-weight: 400;">: MRR </span><i><span style="font-weight: 400;">lost</span></i><span style="font-weight: 400;"> in a given month/MRR at the beginning of the month.</span></li>
+<li><b>Net churn</b>: (MRR lost <i>minus</i> MRR from upsells) in a given month/MRR at the beginning of the month.</li>
+</ul>
+<p><span style="font-weight: 400;">The difference between the two is significant. Gross churn estimates the actual loss to the business, while net revenue churn understates the losses (as it blends upsells with absolute churn).</span></p>
+<h3>12. Burn rate</h3>
+<p><span style="font-weight: 400;">Burn rate is the rate at which cash is decreasing. Especially in&nbsp;early stage startups, it&rsquo;s important to know and monitor burn rate as companies fail when they are running out of cash and don&rsquo;t have enough time left to raise funds or reduce expenses. </span></p>
+<p><strong>As a reminder, here&rsquo;s a simple calculation:</strong></p>
+<ul>
+<li><strong>Monthly cash burn</strong> = cash balance at the beginning of the year <i>minus</i> cash balance end of the year / 12</li>
+</ul>
+<p><strong>It&rsquo;s also important to measure net burn vs. gross burn:</strong></p>
+<ul>
+<li><b>Net burn</b><span style="font-weight: 400;"> [revenues (including all incoming cash you have a high probability of receiving) &ndash; gross burn] is the true measure of amount of cash your company is burning every month. </span></li>
+<li><b>Gross burn</b><span style="font-weight: 400;"> on the other hand only looks at your monthly expenses + any other cash outlays.</span></li>
+</ul>
+<p><span style="font-weight: 400;">Investors tend to focus on net burn to understand how long the money you have left in the bank will last for you to run the company. They will also take into account the rate at which your revenues and expenses grow as monthly burn may not be a constant number.</span></p>
+<p><span style="font-weight: 400;">See also Fred Wilson on </span><a href="http://avc.com/2011/12/burn-rate/" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">burn rate</span></a><span style="font-weight: 400;">. </span></p>
+<h3>13. Downloads</h3>
+<p><span style="font-weight: 400;">Downloads (or number of apps delivered by distribution deals) are really just a vanity metric. </span></p>
+<p><span style="font-weight: 400;">Investors want to see </span><i><span style="font-weight: 400;">engagement</span></i><span style="font-weight: 400;">, ideally expressed as cohort retention on metrics that matter for that business&mdash;for example, DAU (daily active users), MAU (monthly active users), photos shared, photos viewed, and so on. </span></p>
+<h2><b>Presenting metrics generally</b></h2>
+<h3><b>14.</b> <b>Cumulative charts (vs. growth metrics)</b></h3>
+<p><span style="font-weight: 400;">Cumulative charts by definition always go up and to the right for any business that is showing any kind of activity. But they are not a valid measure of growth&mdash;they can go up-and-to-the-right </span><i><span style="font-weight: 400;">even when</span></i><span style="font-weight: 400;"> a business is shrinking. Thus, the metric is not a useful indicator of a company&rsquo;s health.</span></p>
+<p><span style="font-weight: 400;">Investors like to look at monthly GMV, monthly revenue, or new users/customers per month to assess the growth in early stage businesses. Quarterly charts can be used for later-stage businesses or businesses with a lot of month-to-month volatility in metrics.</span></p>
+<h3>15. Chart tricks</h3>
+<p><span style="font-weight: 400;">There a number of </span><a href="http://nautil.us/issue/19/illusions/five-ways-to-lie-with-charts" target="_blank" rel="noopener noreferrer"><span style="font-weight: 400;">such tricks</span></a><span style="font-weight: 400;">, but a few common ones include not labeling the Y-axis; shrinking scale to exaggerate growth; and only presenting percentage gains without presenting the absolute numbers. (This last one is misleading since percentages can sound impressive off a small base, but are not an indicator of the future trajectory.)</span></p>
+<h3>16. Order of operations</h3>
+<p><span style="font-weight: 400;">It&rsquo;s fine to present metrics in any order as you tell your story. </span></p>
+<p><span style="font-weight: 400;">When initially evaluating businesses, investors often look at GMV, revenue, and bookings first because they&rsquo;re an indicator of the size of the business. Once investors have a sense of the the size of the business, they&rsquo;ll want to understand growth to see how well the company is performing. These basic metrics, if interesting, then compel us to look even further. </span></p>
+<p>As one of our partners who recently had a baby observes here: It&rsquo;s almost like doing a health check for your baby at the pediatrician&rsquo;s office. Check weight and height, and then compare to previous estimates to make sure things look healthy before you go any deeper!</p>
+            </div>
+            <div class="pt-5 border-t border-black mt-12 md:mt-14 ">
+  <span class="block text-p-large font-secondary font-light mb-8 md:mb-6">
+    About the Contributors  </span>
+  <div class="space-y-8">
+              <div class="flex flex-wrap gap-4 md:gap-6 text-p-small font-secondary cursor-pointer" data-author-url="https://a16z.com/author/jeff-jordan/">
+      <div class="size-[64px] md:size-[120px] rounded-full overflow-hidden flex items-end bg-travertine-3 relative ">
+      <div class="relative z-[1]">
+      <img src="https://d1lamhf6l6yk6d.cloudfront.net/uploads/2023/04/Jeff-Jordan.png" alt="">
+    </div>
+  </div>
+      <div x-data="{morePost: false}" :class="{'active' : morePost}" class="group/info flex-1 relative">
+                <div class="w-full md:min-h-[120px] md:flex md:flex-col md:justify-start">
+          <div class="md:pb-2 md:flex md:flex-1 md:flex-col">
+            <div class="max-w-[370px] mb-0 md:mb-1.5">
+              <div class="mb-2 md:mb-1.5 max-md:flex max-md:justify-between max-md:flex-wrap max-md:items-center max-md:gap-2">
+                <h4 class="text-h4 font-light font-tertiary">Jeff Jordan</h4>
+                <ul class="flex items-center gap-2 md:hidden">
+  <li><a href="https://x.com/jeff_jordan" class="icon-x flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">X</span></a></li>
+  <li><a href="https://www.linkedin.com/in/jeffjordan1/" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+              </div>
+                              <p>is an a16z General Partner focused on consumer companies. </p>
+                          </div>
+            <div class="flex gap-[50px] md:mt-auto">
+              <div class="flex flex-1 min-h-[40px] border-b border-travertine-3">
+              <button class="w-full flex items-center justify-between transition-all hover:text-jade" :class="{'text-jade': morePost}" x-on:click="morePost = !morePost">
+                <span>More From this Contributor</span>
+                <span class="size-2 flex items-center justify-center relative [&amp;_svg]:text-[8px]">
+                  <span class="icon-plus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 group-[.active]/info:hidden"></span>
+                  <span class="icon-minus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden group-[.active]/info:block"></span>
+                </span>
+              </button>
+              </div>
+              <ul class="flex items-center gap-2 max-md:hidden">
+  <li><a href="https://x.com/jeff_jordan" class="icon-x flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">X</span></a></li>
+  <li><a href="https://www.linkedin.com/in/jeffjordan1/" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+            </div>
+          </div>
+        </div>
+        <div x-ref="infoContainer" x-bind:style="morePost ? 'max-height: ' + $refs.infoContainer.scrollHeight + 'px;' : 'max-height: 0;'" class="md:group-[.active]/info:mt-4 max-md:-ml-[88px] overflow-hidden transition-all duration-500">
+  <div class="bg-travertine-1">
+    <ul>
+            <li>
+        <a href="https://a16z.com/podcast/the-what-who-and-when-with-ipos/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">The What, Who, and When with IPOs</strong>
+          <span class="block text-p-small text-truffle">Jeff Jordan, J.D. Moriarty, and Sonal Chokshi</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/instacart/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">Instacart</strong>
+          <span class="block text-p-small text-truffle">Jeff Jordan</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/hiring-a-chief-financial-officer/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">Hiring a Chief Financial Officer</strong>
+          <span class="block text-p-small text-truffle">Matt Oberhardt and Jeff Jordan</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/a-personal-update/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">A Personal Update</strong>
+          <span class="block text-p-small text-truffle">Jeff Jordan</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/announcement/investing-in-codi/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">Investing in Codi</strong>
+          <span class="block text-p-small text-truffle">Jeff Jordan</span>
+        </a>
+      </li>
+          </ul>
+  </div>
+</div>
+      </div>
+    </div>
+              <div class="flex flex-wrap gap-4 md:gap-6 text-p-small font-secondary cursor-default">
+      <div class="size-[64px] md:size-[120px] rounded-full overflow-hidden flex items-end bg-travertine-3 relative disabled">
+  </div>
+      <div x-data="{morePost: false}" :class="{'active' : morePost}" class="group/info flex-1 relative">
+                <div class="w-full md:min-h-[120px] md:flex md:flex-col md:justify-start">
+          <div class="md:pb-2 md:flex md:flex-1 md:flex-col">
+            <div class="max-w-[370px] mb-0 md:mb-1.5">
+              <div class="mb-2 md:mb-1.5 max-md:flex max-md:justify-between max-md:flex-wrap max-md:items-center max-md:gap-2">
+                <h4 class="text-h4 font-light font-tertiary">Anu Hariharan</h4>
+                <ul class="flex items-center gap-2 md:hidden">
+  <li><a href="https://http://www.linkedin.com/in/anuhariharan" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+              </div>
+                              <p>LinkedIn</p>
+                          </div>
+            <div class="flex gap-[50px] md:mt-auto">
+              <div class="flex flex-1 min-h-[40px] border-b border-travertine-3">
+              <button class="w-full flex items-center justify-between transition-all hover:text-jade" :class="{'text-jade': morePost}" x-on:click="morePost = !morePost">
+                <span>More From this Contributor</span>
+                <span class="size-2 flex items-center justify-center relative [&amp;_svg]:text-[8px]">
+                  <span class="icon-plus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 group-[.active]/info:hidden"></span>
+                  <span class="icon-minus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden group-[.active]/info:block"></span>
+                </span>
+              </button>
+              </div>
+              <ul class="flex items-center gap-2 max-md:hidden">
+  <li><a href="https://http://www.linkedin.com/in/anuhariharan" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+            </div>
+          </div>
+        </div>
+        <div x-ref="infoContainer" x-bind:style="morePost ? 'max-height: ' + $refs.infoContainer.scrollHeight + 'px;' : 'max-height: 0;'" class="md:group-[.active]/info:mt-4 max-md:-ml-[88px] overflow-hidden transition-all duration-500">
+  <div class="bg-travertine-1">
+    <ul>
+            <li>
+        <a href="https://a16z.com/podcast/a16z-podcast-not-all-network-effects-are-created-equal/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">a16z Podcast: Not all Network Effects Are Created Equal</strong>
+          <span class="block text-p-small text-truffle">James Currier and Anu Hariharan</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/a16z-podcast-we-gotta-talk-pokemon-go/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">a16z Podcast: We Gotta Talk Pok&eacute;mon Go</strong>
+          <span class="block text-p-small text-truffle">Sonal Chokshi, Anu Hariharan, Kyle Russell, and Ryan Hoover</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/a16z-podcast-getting-network-effects/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">a16z Podcast: Getting Network Effects</strong>
+          <span class="block text-p-small text-truffle">Anu Hariharan, Jeff Jordan, and Sonal Chokshi</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/a16z-podcast-e-commerce-payments-more-in-indias-evolving-retail-landscape/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">a16z Podcast: Ecommerce, Payments, and More in India&rsquo;s Evolving Retail Landscape</strong>
+          <span class="block text-p-small text-truffle">Sonal Chokshi, Kunal Bahl, Rohit Bansal, and Anu Hariharan</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://future.com/all-about-network-effects/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">All about Network Effects</strong>
+          <span class="block text-p-small text-truffle">Anu Hariharan</span>
+        </a>
+      </li>
+          </ul>
+  </div>
+</div>
+      </div>
+    </div>
+              <div class="flex flex-wrap gap-4 md:gap-6 text-p-small font-secondary cursor-default">
+      <div class="size-[64px] md:size-[120px] rounded-full overflow-hidden flex items-end bg-travertine-3 relative disabled">
+      <div class="relative z-[1]">
+      <img src="https://d1lamhf6l6yk6d.cloudfront.net/uploads/2023/04/Frank-Chen.png" alt="">
+    </div>
+  </div>
+      <div x-data="{morePost: false}" :class="{'active' : morePost}" class="group/info flex-1 relative">
+                <div class="w-full md:min-h-[120px] md:flex md:flex-col md:justify-start">
+          <div class="md:pb-2 md:flex md:flex-1 md:flex-col">
+            <div class="max-w-[370px] mb-0 md:mb-1.5">
+              <div class="mb-2 md:mb-1.5 max-md:flex max-md:justify-between max-md:flex-wrap max-md:items-center max-md:gap-2">
+                <h4 class="text-h4 font-light font-tertiary">Frank Chen</h4>
+                <ul class="flex items-center gap-2 md:hidden">
+  <li><a href="https://x.com/withfries2" class="icon-x flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">X</span></a></li>
+  <li><a href="https://www.linkedin.com/in/frankchen/" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+              </div>
+                              <p>heads our Early Stage Venture (ESV) Programs team and is responsible for developing company-building enablement products.</p>
+                          </div>
+            <div class="flex gap-[50px] md:mt-auto">
+              <div class="flex flex-1 min-h-[40px] border-b border-travertine-3">
+              <button class="w-full flex items-center justify-between transition-all hover:text-jade" :class="{'text-jade': morePost}" x-on:click="morePost = !morePost">
+                <span>More From this Contributor</span>
+                <span class="size-2 flex items-center justify-center relative [&amp;_svg]:text-[8px]">
+                  <span class="icon-plus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 group-[.active]/info:hidden"></span>
+                  <span class="icon-minus absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden group-[.active]/info:block"></span>
+                </span>
+              </button>
+              </div>
+              <ul class="flex items-center gap-2 max-md:hidden">
+  <li><a href="https://x.com/withfries2" class="icon-x flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">X</span></a></li>
+  <li><a href="https://www.linkedin.com/in/frankchen/" class="icon-linkedin flex items-center justify-center size-[32px] md:size-[40px] rounded-full bg-travertine-1 text-[14px] md:text-[20px] transition-all hover:bg-travertine-2" target="_blank" rel="noopener noreferrer"><span class="sr-only">Linkedin</span></a></li>
+</ul>
+            </div>
+          </div>
+        </div>
+        <div x-ref="infoContainer" x-bind:style="morePost ? 'max-height: ' + $refs.infoContainer.scrollHeight + 'px;' : 'max-height: 0;'" class="md:group-[.active]/info:mt-4 max-md:-ml-[88px] overflow-hidden transition-all duration-500">
+  <div class="bg-travertine-1">
+    <ul>
+            <li>
+        <a href="https://a16z.com/podcast/16-minutes-57-semiconductor-shortage-and-the-global-supply-chain-squeeze/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">16 Minutes #57: Semiconductor Shortage and the Global Supply Chain Squeeze</strong>
+          <span class="block text-p-small text-truffle">Frank Chen and Zoran Basich</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/16-minutes-on-the-news-52-dall-e-ai-for-images-direct-listings-sec-ruling-for-issuing-shares/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">16 Minutes on the News #52: Dall-E AI for Images; Direct Listings, SEC Ruling for Issuing Shares</strong>
+          <span class="block text-p-small text-truffle">Frank Chen, Scott Kupor, and Zoran Basich</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/16-minutes-on-the-news-42-nvidia-arm/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">16 Minutes on the News #42: Nvidia + Arm</strong>
+          <span class="block text-p-small text-truffle">Steven Sinofsky, Frank Chen, and Sonal Chokshi</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/gpt-3-whats-hype-whats-real-on-the-latest-in-ai/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">GPT-3: What&rsquo;s Hype, What&rsquo;s Real on the Latest in AI</strong>
+          <span class="block text-p-small text-truffle">Sonal Chokshi and Frank Chen</span>
+        </a>
+      </li>
+            <li>
+        <a href="https://a16z.com/podcast/16-minutes-on-the-news-37-gpt-3-beyond-the-hype/" class="block py-[14px] px-[17px] font-secondary [&amp;:hover_strong]:text-jade">
+          <strong class="block text-p-large text-black transition-colors">16 Minutes on the News #37: GPT-3, Beyond the Hype</strong>
+          <span class="block text-p-small text-truffle">Frank Chen and Sonal Chokshi</span>
+        </a>
+      </li>
+          </ul>
+  </div>
+</div>
+      </div>
+    </div>
+              <div class="flex flex-wrap gap-4 md:gap-6 text-p-small font-secondary cursor-default">
+      <div class="size-[64px] md:size-[120px] rounded-full overflow-hidden flex items-end bg-travertine-3 relative disabled">
+  </div>
+      <div x-data="{morePost: false}" :class="{'active' : morePost}" class="group/info flex-1 relative">
+                <div class="w-full md:flex md:flex-col md:justify-start">
+          <div class="md:pb-2 md:flex md:flex-1 md:flex-col">
+            <div class="max-w-[370px] mb-0 md:mb-1.5">
+              <div class="mb-2 md:mb-1.5 max-md:flex max-md:justify-between max-md:flex-wrap max-md:items-center max-md:gap-2">
+                <h4 class="text-h4 font-light font-tertiary">Preethi Kasireddy</h4>
+</body></html>

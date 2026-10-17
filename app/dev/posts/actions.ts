@@ -14,11 +14,14 @@ import {
   MAX_POST_ASK,
   MAX_POST_IMAGES,
   MAX_THREAD_POSTS,
+  OPEN_POST_STATUSES,
   ownsPostImagePath,
   parsePostedUrl,
   POST_IMAGES_BUCKET,
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
+import { POST_WANTS_MAX } from '@/lib/dev/posts-page';
+import { formatNumber } from '@/lib/money';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { freshXAccessToken, hasXMediaScope, hasXWriteScope, loadXAccount, XDisconnectedError } from '@/lib/x/account';
 import { requestOrigin } from '@/lib/auth/origin';
@@ -139,7 +142,7 @@ export async function suggestPostAbout(
     .from('social_posts')
     .select('id')
     .eq('user_id', user.id)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .contains('source_plan_item_ids', [step.id])
     .limit(1);
   if (waitingError) return { error: waitingError.message };
@@ -194,13 +197,41 @@ export async function editPostBody(
     .update({ body })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .select('id');
   if (error) return { error: error.message };
   if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
 
   revalidatePath(POSTS_PATH);
   return { message: 'Saved.' };
+}
+
+/**
+ * What the person wants from their posts (plan #2227.2): the box under the
+ * heading. The text is trimmed and kept as one row per person; emptied, the
+ * row is deleted, so the next run drafts as it did before anything was said.
+ */
+// latency: pending
+export async function savePostWants(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const raw = formData.get('wants');
+  const wants = typeof raw === 'string' ? raw.trim() : '';
+  if (wants.length > POST_WANTS_MAX) {
+    return { error: `Keep it under ${formatNumber(POST_WANTS_MAX)} characters.` };
+  }
+
+  const { error } = wants
+    ? await supabase.from('post_preferences').upsert({ user_id: user.id, wants }, { onConflict: 'user_id' })
+    : await supabase.from('post_preferences').delete().eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: wants ? 'Saved.' : 'Cleared.' };
 }
 
 /**
@@ -268,7 +299,7 @@ export async function editPostAngle(
     .update({ angle })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .select('id');
   if (error) return { error: error.message };
   if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
@@ -299,7 +330,7 @@ export async function addPostImage(
     .select('image_paths')
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .maybeSingle();
   if (readError) return { error: readError.message };
   if (!row) return { error: 'This draft is no longer waiting to be posted.' };
@@ -311,7 +342,7 @@ export async function addPostImage(
     .update({ image_paths: [...current, path] })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested');
+    .in('status', OPEN_POST_STATUSES);
   if (error) return { error: error.message };
 
   revalidatePath(POSTS_PATH);
@@ -340,7 +371,7 @@ export async function removePostImage(
     .select('image_paths')
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .maybeSingle();
   if (readError) return { error: readError.message };
   if (!row) return { error: 'This draft is no longer waiting to be posted.' };
@@ -352,7 +383,7 @@ export async function removePostImage(
     .update({ image_paths: current.filter((p) => p !== path) })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested');
+    .in('status', OPEN_POST_STATUSES);
   if (error) return { error: error.message };
 
   if (isUploadedPostImage(path) && ownsPostImagePath(user.id, path)) {
@@ -383,7 +414,7 @@ export async function markPostPosted(
     .update({ status: 'posted', posted_url: link.url, posted_at: new Date().toISOString(), x_candidate_id: null })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .select('id');
   if (error) return { error: error.message };
   if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
@@ -432,7 +463,7 @@ export async function confirmXMatch(
     .eq('user_id', user.id)
     .eq('id', id.data)
     .eq('x_candidate_id', xPostId)
-    .in('status', ['suggested', 'dropped'])
+    .in('status', [...OPEN_POST_STATUSES, 'dropped'])
     .is('posted_url', null)
     .select('id');
   if (error) return { error: error.message };
@@ -501,14 +532,68 @@ export async function dropPost(
     .update({ status: 'dropped', dropped_at: new Date().toISOString() })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested');
+    .in('status', OPEN_POST_STATUSES);
   if (error) return { error: error.message };
 
   revalidatePath(POSTS_PATH);
   return { message: 'Dropped.' };
 }
 
-/** The way back from the dropped fold, as a suggested draft. */
+/**
+ * Promote a suggested draft to planned (plan #2261.2). Changes the status and
+ * nothing else; a press on a card that is no longer suggested does nothing.
+ */
+// latency: pending
+export async function promotePost(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ status: 'planned' })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested');
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Planned.' };
+}
+
+/** The way back from planned, as a suggested draft (plan #2261.2). */
+// latency: pending
+export async function demotePost(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ status: 'suggested' })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'planned');
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Back with the suggestions.' };
+}
+
+/**
+ * The way back from the dropped fold, as a suggested draft. A dropped planned
+ * post comes back suggested too: the row keeps no memory of what it was.
+ */
 // latency: pending
 export async function restorePost(
   _prev: PostsActionState,
@@ -632,7 +717,7 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
     .select('id, body, x_thread_ids, image_paths')
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .maybeSingle();
   if (readError) return { ok: false, error: readError.message };
   if (!row) return { ok: false, error: 'This draft is no longer waiting to be posted.' };
@@ -661,7 +746,7 @@ export async function postToX(formData: FormData): Promise<{ ok: boolean; error?
     .update({ x_sending_at: claimedAt.toISOString() })
     .eq('user_id', user.id)
     .eq('id', id.data)
-    .eq('status', 'suggested')
+    .in('status', OPEN_POST_STATUSES)
     .or(`x_sending_at.is.null,x_sending_at.lt.${staleBefore}`)
     .select('id');
   if (claimError) return { ok: false, error: claimError.message };

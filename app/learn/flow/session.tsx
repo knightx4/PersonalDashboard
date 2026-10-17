@@ -1,9 +1,10 @@
 'use client';
 
+import { closedToast } from '@/lib/core/lifecycle';
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sprout } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,6 +12,11 @@ import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
 import { practiceHref } from '@/lib/learn/flow/href';
+import { AskButton, DontKnowButton, EndHereButton, NotNowButton } from './buttons';
+import { RunSummaryPanel } from './summary-card';
+import { Button } from '@/components/ui/button';
+import { ExplainCard } from './explain-card';
+import { CaseCard } from './case-card';
 import {
   answerTrackOffer,
   fillFlowQueue,
@@ -55,20 +61,6 @@ const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
   'all-settled': 'Every idea in every subject is known. Nothing left to ask.',
 };
 
-function AskButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  // Usually the next question was written ahead and comes straight back. The
-  // wait is only long when the queue ran dry and it is being written now.
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Button type="submit" pending={pending}>
-        {pending ? 'Getting the next question…' : label}
-      </Button>
-      <PaidHint action="app/learn/flow/actions.ts#flowStep:ask" what="Cost of the next question" />
-    </span>
-  );
-}
-
 /**
  * The track the answer belonged to, and its bar moving from where it stood to
  * where the answer left it. Drawn at the old width first and moved on the next
@@ -112,54 +104,21 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
   );
 }
 
-/**
- * "I don't know" (note a62b132f): a submit on the answer form carrying no
- * index. It counts as a miss, and the right answer and its reason come back
- * the same as after a wrong pick.
- */
-function DontKnowButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      variant="link"
-      type="submit"
-      name="dontKnow"
-      value="1"
-      pending={pending}
-    >
-      I don&rsquo;t know
-    </Button>
-  );
-}
-
-/**
- * Later (note 7ccc6f99, plan #1957.3): the question goes back to the end of
- * the queue with nothing recorded against it, and the next one comes up, so
- * there is nothing for an Undo to take back. On the answer form so it sits
- * beside I don't know, and told apart by its own field.
- */
-function NotNowButton() {
-  const { pending } = useFormStatus();
-  return (
-    <CloseButton
-      lifecycle="later"
-      variant="link"
-      type="submit"
-      name="notNow"
-      value="1"
-      pending={pending}
-    />
-  );
-}
-
 function StartButton() {
   const { pending } = useFormStatus();
   // One call to write the track's ideas and one to write its first question,
   // so this is the slowest press in the flow and says so.
   return (
-    <Button type="submit" variant="secondary" size="sm" pending={pending}>
-      {pending ? 'Writing the subject…' : 'Start'}
-    </Button>
+    <DashAction
+      type="submit"
+      variant="secondary"
+      size="sm"
+      pending={pending}
+      paid="app/learn/flow/actions.ts#flowStep:start-track"
+      what="Cost of starting the subject"
+    >
+      {pending ? 'Writing the subject…' : 'Start this subject'}
+    </DashAction>
   );
 }
 
@@ -192,7 +151,7 @@ function TrackOfferCard({
     setHidden(true);
     await answerTrackOffer(formData);
     toast({
-      text: formData.get('outcome') === 'never' ? 'Declined' : 'Later',
+      text: closedToast(formData.get('outcome') === 'never' ? 'declined' : 'later', offer.name),
       undo: async () => {
         await takeBackOfferAnswer({ themeId: offer.themeId });
         setHidden(false);
@@ -218,13 +177,7 @@ function TrackOfferCard({
             <input type="hidden" name="intent" value="start-track" />
             <input type="hidden" name="themeId" value={offer.themeId} />
             <TrackField track={track} only={only} goal={null} />
-            <span className="inline-flex items-center gap-1">
-              <StartButton />
-              <PaidHint
-                action="app/learn/flow/actions.ts#flowStep:start-track"
-                what="Cost of starting the subject"
-              />
-            </span>
+            <StartButton />
           </form>
           {(['not_now', 'never'] as const).map((outcome) => (
             <form key={outcome} action={setAside}>
@@ -274,12 +227,28 @@ export function FlowSession({
   const trackId = track?.id ?? null;
   const goalId = goal?.id ?? null;
   const aboutGoals = goal !== null || (track === null && only === 'goals');
+  // End here (plan #2164.6) swaps the card for what the last hour moved.
+  const [ended, setEnded] = useState(false);
 
   // Once per visit: the queue may have run down while you were away, and
   // filling it now means the question after this one is ready in time.
   useEffect(() => {
     void fillFlowQueue({ track: trackId, only, goal: goalId });
   }, [trackId, only, goalId]);
+
+  if (ended) {
+    return (
+      <div className="space-y-4">
+        <RunSummaryPanel
+          foot={
+            <Button type="button" size="lg" onClick={() => setEnded(false)}>
+              Keep going
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   if (!live.question || !live.options) {
     // Nothing left to ask, and a theme from your notes to start on: the offer
@@ -306,24 +275,54 @@ export function FlowSession({
           : NOTHING_TO_ASK[live.nothing]
       : null;
     return (
-      <form action={step}>
-        <input type="hidden" name="intent" value="ask" />
-        <TrackField track={track} only={only} goal={goal} />
-        <EmptyState
-          size="box"
-          title={nothingText ?? live.error ?? ''}
-          action={
-            live.nothing && track
-              ? { label: 'Ask across all subjects', href: practiceHref() }
-              : live.nothing && aboutGoals
-                ? { label: 'Ask about everything', href: practiceHref() }
-                : undefined
-          }
-        >
-          {live.error && <AskButton label="Try again" />}
-          {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
-        </EmptyState>
-      </form>
+      <div className="space-y-4">
+        <form action={step}>
+          <input type="hidden" name="intent" value="ask" />
+          <TrackField track={track} only={only} goal={goal} />
+          <EmptyState
+            size="box"
+            title={nothingText ?? live.error ?? ''}
+            action={
+              live.nothing && track
+                ? { label: 'Ask across all subjects', href: practiceHref() }
+                : live.nothing && aboutGoals
+                  ? { label: 'Ask about everything', href: practiceHref() }
+                  : undefined
+            }
+          >
+            {live.error && <AskButton label="Try again" />}
+            {nothingText && live.error && <span className="text-ui text-danger">{live.error}</span>}
+          </EmptyState>
+        </form>
+        {/* Nothing left to ask ends the run: say what it moved. */}
+        {live.nothing && <RunSummaryPanel />}
+      </div>
+    );
+  }
+
+  // A worked case (plan #2164.3): figures and a task, graded as applied.
+  if (live.case) {
+    return (
+      <CaseCard
+        key={live.probeId}
+        live={live}
+        step={step}
+        fields={<TrackField track={track} only={only} goal={goal} />}
+        onEnd={() => setEnded(true)}
+      />
+    );
+  }
+
+  // A goal question (plan #2164.2): explained in your own words and marked.
+  if (live.explain) {
+    return (
+      <ExplainCard
+        key={live.probeId}
+        live={live}
+        step={step}
+        fields={<TrackField track={track} only={only} goal={goal} />}
+        onEnd={() => setEnded(true)}
+      />
     );
   }
 
@@ -349,9 +348,7 @@ export function FlowSession({
       )}
       {/* A goal question (plan #1385) is named after the goal above, which is
           not in your list of tracks either, so where it comes from is said. */}
-      {live.goal && (
-        <p className="mt-0.5 text-small text-ink-muted">From your learning goals.</p>
-      )}
+      {live.goal && <p className="mt-0.5 text-small text-ink-muted">From your learning goals.</p>}
       {/* Said before the question rather than after the answer: being asked
           about something you settled months ago looks like the app having lost
           track until you know it is deliberate. Which of the two settled it is
@@ -376,12 +373,10 @@ export function FlowSession({
         <ProbeOptions options={live.options} answered={live.answered ?? null} />
         {!live.answered && (
           <div className="flex flex-wrap items-center gap-4 pt-1">
-            <span className="inline-flex items-center gap-1">
-              <DontKnowButton />
-              <PaidHint action="app/learn/flow/actions.ts#flowStep:answer" what="Cost of answering" />
-            </span>
+            <DontKnowButton />
             <span className="inline-flex items-center gap-1">
               <NotNowButton />
+              {/* dash-action-ok: the hint sits beside the Later close button, which does not run the model. */}
               <PaidHint
                 action="app/learn/flow/actions.ts#flowStep:ask"
                 what="Cost of the next question"
@@ -412,9 +407,7 @@ export function FlowSession({
 
           {/* Keyed by the question, so each answer mounts a new bar that starts
               at the old width instead of reusing the last one's. */}
-          {live.track && (
-            <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />
-          )}
+          {live.track && <TrackBar key={live.probeId} name={live.subjectName} move={live.track} />}
 
           {live.offer && (
             <TrackOfferCard
@@ -430,7 +423,10 @@ export function FlowSession({
           <form action={step} className="mt-4">
             <input type="hidden" name="intent" value="ask" />
             <TrackField track={track} only={only} goal={goal} />
-            <AskButton label="Next" />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <AskButton label="Next" />
+              <EndHereButton onEnd={() => setEnded(true)} />
+            </div>
           </form>
         </div>
       )}

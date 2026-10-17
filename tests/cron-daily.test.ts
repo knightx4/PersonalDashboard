@@ -141,10 +141,13 @@ vi.mock('@/inngest/dev/digest', () => ({
   runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
 }));
 vi.mock('@/inngest/learn/embeddings-daily', () => ({
-  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, aims: [], parents: { topics: 0, ideas: 0, calls: 1, stoppedEarly: false }, places: [], dust: [], noteEvidence: [], courses: [], work: [], topics: [] })),
+  runLearnEmbeddingsDaily: vi.fn(async () => ({ skipped: 'no-key', users: [], fields: null, aims: [], parents: { topics: 0, ideas: 0, calls: 1, stoppedEarly: false }, places: [], dust: [], noteEvidence: [], courses: [], work: [], topics: [], courseBands: [] })),
 }));
 vi.mock('@/inngest/learn/brief-watch', () => ({
   runBriefWatch: vi.fn(async () => ({ due: 1, checked: [], cards: 0 })),
+}));
+vi.mock('@/inngest/learn/prepare', () => ({
+  runPreparationsDaily: vi.fn(async () => ({ unfinished: 1, started: 1 })),
 }));
 vi.mock('@/inngest/dev/idea-scores', () => ({
   runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),

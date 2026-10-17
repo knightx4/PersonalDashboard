@@ -6,6 +6,7 @@ import {
   STRONG_SIMILARITY,
   buildTopicNames,
   decideTopicUnlocks,
+  HELD_REASON,
   findTopicNames,
   staleTopicLinkIds,
   topicSource,
@@ -99,6 +100,15 @@ describe('deciding unlocks', () => {
     ]);
   });
 
+  it('does not let a loose name be confirmed by a second document', () => {
+    const name = { name: 'Valley', sure: false };
+    const rows = decideTopicUnlocks([
+      { topicId: 'v', source: source('a'), name, similarity: 0.2 },
+      { topicId: 'v', source: source('b'), name, similarity: 0.3 },
+    ]);
+    expect(rows.map((r) => r.held_reason)).toEqual([HELD_REASON, HELD_REASON]);
+  });
+
   it('does not count two passages of one document as two sources', () => {
     const resume = { kind: 'work' as const, document: 'resume-1' };
     const rows = decideTopicUnlocks([
@@ -108,9 +118,9 @@ describe('deciding unlocks', () => {
     expect(rows).toEqual([]);
   });
 
-  it('unlocks on a sure name alone and records why', () => {
+  it('counts a name where the text is about the topic, and records why', () => {
     const rows = decideTopicUnlocks([
-      { topicId: 'ev', source: source('a', { weight: 0.25 }), name: { name: 'Expected value', sure: true }, similarity: null },
+      { topicId: 'ev', source: source('a', { weight: 0.25 }), name: { name: 'Expected value', sure: true }, similarity: 0.6 },
     ]);
     expect(rows).toEqual([
       {
@@ -118,22 +128,44 @@ describe('deciding unlocks', () => {
         target_id: 'ev',
         source_kind: 'note',
         source_id: 'a',
-        similarity: 0,
+        similarity: 0.6,
         weight: 0.25,
         basis: 'named in your note a',
         matched_by: 'name',
+        held_reason: null,
       },
     ]);
   });
 
-  it('believes a loose name only where the text is about the topic', () => {
-    const loose = { name: 'Time', sure: false };
-    expect(
-      decideTopicUnlocks([{ topicId: 'time', source: source('a'), name: loose, similarity: NAME_CONFIRM_SIMILARITY - 0.01 }]),
-    ).toEqual([]);
-    expect(
-      decideTopicUnlocks([{ topicId: 'time', source: source('a'), name: loose, similarity: NAME_CONFIRM_SIMILARITY }]),
-    ).toHaveLength(1);
+  it('holds a name alone, sure or loose, when the text is under 0.5 close', () => {
+    for (const name of [{ name: 'Venice', sure: true }, { name: 'Time', sure: false }]) {
+      const below = decideTopicUnlocks([{ topicId: 't', source: source('a'), name, similarity: NAME_CONFIRM_SIMILARITY - 0.01 }]);
+      expect(below).toHaveLength(1);
+      expect(below[0]).toMatchObject({ matched_by: 'name', held_reason: HELD_REASON });
+      const none = decideTopicUnlocks([{ topicId: 't', source: source('a'), name, similarity: null }]);
+      expect(none[0].held_reason).toBe(HELD_REASON);
+      const at = decideTopicUnlocks([{ topicId: 't', source: source('a'), name, similarity: NAME_CONFIRM_SIMILARITY }]);
+      expect(at[0].held_reason).toBeNull();
+    }
+  });
+
+  it('counts a weak name when two different documents name the topic', () => {
+    const name = { name: 'Venice', sure: true };
+    const rows = decideTopicUnlocks([
+      { topicId: 'v', source: source('a'), name, similarity: 0.2 },
+      { topicId: 'v', source: source('b'), name, similarity: null },
+    ]);
+    expect(rows.map((r) => r.held_reason)).toEqual([null, null]);
+  });
+
+  it('does not count two passages of one document as two names', () => {
+    const name = { name: 'Venice', sure: true };
+    const doc = { document: 'resume-1', kind: 'work' as const };
+    const rows = decideTopicUnlocks([
+      { topicId: 'v', source: source('p1', doc), name, similarity: null },
+      { topicId: 'v', source: source('p2', doc), name, similarity: null },
+    ]);
+    expect(rows.map((r) => r.held_reason)).toEqual([HELD_REASON, HELD_REASON]);
   });
 
   it('merges a name and a vector from one source into one name link', () => {

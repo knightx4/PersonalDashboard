@@ -2,9 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Pencil, Sparkles } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card, cardVariants } from '@/components/ui/card';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -38,26 +38,36 @@ import { Note } from '@/components/ui/note';
 function AskButton({ pending }: { pending: boolean }) {
   return (
     // Without this the mousedown that starts the click collapses the
-    // selection, the offer unmounts, and the click lands on nothing.
-    <Button
-      type="submit"
-      variant="secondary"
-      size="sm"
-      pending={pending}
-      onMouseDown={(event) => event.preventDefault()}
-    >
-      <Sparkles className="size-3.5" strokeWidth={1.75} aria-hidden />
-      {pending ? 'Laying it out…' : 'Learn this'}
-    </Button>
+    // selection, the offer unmounts, and the click lands on nothing. The
+    // same holds for pinning the figure beside it, so the whole span keeps
+    // the mousedown.
+    <span onMouseDown={(event) => event.preventDefault()}>
+      <DashAction
+        type="submit"
+        variant="secondary"
+        size="sm"
+        pending={pending}
+        paid="app/learn/c/[id]/actions.ts#proposeBranch"
+        what="Cost of laying it out"
+      >
+        {pending ? 'Laying it out…' : 'Learn this'}
+      </DashAction>
+    </span>
   );
 }
 
 function ApproveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" pending={pending}>
+    <DashAction
+      type="submit"
+      size="sm"
+      pending={pending}
+      paid="app/learn/c/[id]/actions.ts#approveBranch"
+      what="Cost of saving it"
+    >
       {pending ? 'Saving…' : 'Approve and save'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -131,7 +141,6 @@ function Proposal({
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <ApproveButton />
-        <PaidHint action="app/learn/c/[id]/actions.ts#approveBranch" what="Cost of saving it" />
         <Button type="button" variant="ghost" size="sm" onClick={onDiscard}>
           Discard
         </Button>
@@ -321,14 +330,6 @@ export function BranchFromClaim({
               ) : (
                 <>
                   <AskButton pending={asking} />
-                  {/* Kept off the mousedown for the same reason as the button:
-                      pinning the figure must not collapse the selection. */}
-                  <span onMouseDown={(event) => event.preventDefault()}>
-                    <PaidHint
-                      action="app/learn/c/[id]/actions.ts#proposeBranch"
-                      what="Cost of laying it out"
-                    />
-                  </span>
                   <span className="text-small text-ink-muted">
                     Lays out what “{selection}” rests on, in this track. Nothing is saved
                     until you have read it.

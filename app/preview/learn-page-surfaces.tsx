@@ -5,6 +5,8 @@ import { ListsView } from '@/app/learn/lists/lists-view';
 import { OpeningView } from '@/app/learn/opening/[id]/opening-view';
 import { QuizView } from '@/app/learn/quiz/[id]/quiz-view';
 import { TakeQuizView } from '@/app/learn/quiz/[id]/take/take-view';
+import { ExternalChecksView } from '@/app/learn/settings/external/external-view';
+import { ExternalItemView, ExternalScoreView } from '@/app/learn/settings/external/sit-view';
 import { ReadingView } from '@/app/learn/r/[id]/reading-view';
 import { SetTab } from './set-tab';
 import { PiecePageView } from '@/app/learn/s/[id]/p/[piece]/piece-page-view';
@@ -23,6 +25,7 @@ import type { CardNote } from '@/lib/learn/notes/notes';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
 import type { TrackSummary, ReadingDetail } from '@/lib/learn/tracks/load';
 import type { Quiz } from '@/lib/learn/quiz/model';
+import type { ExternalCheck, ExternalCheckListItem, ExternalItem } from '@/lib/learn/external/model';
 import type { QuizMaterial } from '@/lib/learn/quiz/material';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
 import type { PracticeView } from '@/lib/learn/lessons/practice';
@@ -255,7 +258,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'course',
     sourceId: 'course-1',
     similarity: 0.71,
-    weight: 0.95,
+    kind: 'course',
+    ceiling: 0.95,
     basis: 'from MGT 541 Corporate Finance, HH, 2026',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -266,7 +270,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'note',
     sourceId: 'note-1',
     similarity: 0.68,
-    weight: 0.9,
+    kind: 'note',
+    ceiling: 0.5,
     basis: 'you wrote about this in Corporate Finance week 6: WACC, the cost of capital and why the terminal year carries the valuation',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -277,7 +282,8 @@ const dcfEvidence: EvidenceLink[] = [
     sourceKind: 'work',
     sourceId: 'work-1',
     similarity: 0.63,
-    weight: 0.85,
+    kind: 'work',
+    ceiling: 0.85,
     basis: 'From your résumé: "Built the three-statement model for a 40 million dollar carve-out and took the client CFO through its sensitivities"',
     foundAt: '2026-10-14T06:00:00Z',
   },
@@ -432,7 +438,7 @@ export function LearnOpeningSurface() {
           runs: 9,
           basis: 'measured',
           per: 'run',
-          models: [MODELS.learnOpeningClaims, MODELS.learnGraphGenerate],
+          models: [MODELS.learnTopicDraft],
         },
       }}
     >
@@ -515,6 +521,65 @@ export function LearnQuizSurface() {
 
 export function LearnQuizTakeSurface() {
   return <TakeQuizView quiz={quiz} current={quiz.questions[3]} />;
+}
+
+// ---- External check (plan #2179.4) ----------------------------------------------
+// Fixtures only: the preview draws the page with placeholder items, not a real set.
+
+const externalSample: Array<[string, string]> = [
+  ['Sample question one, written to fill the card the way a long published question would, with a clause and a figure in it?', 'The sample answer the set gives for question one.'],
+  ['Sample question two?', 'The sample answer for question two.'],
+  ['Sample question three?', 'The sample answer for question three.'],
+  ['Sample question four?', 'The sample answer for question four.'],
+  ['Sample question five?', 'The sample answer for question five.'],
+  ['Sample question six?', 'The sample answer for question six.'],
+];
+
+function externalItems(answered: number, rightUpTo: number): ExternalItem[] {
+  return externalSample.map(([question, expected], at) => ({
+    question,
+    expected,
+    response: at < answered ? (at === 3 ? '' : `What was written for question ${at + 1}.`) : null,
+    correct: at < answered ? at < rightUpTo : null,
+  }));
+}
+
+const externalSitting: ExternalCheck = {
+  id: 'ec1',
+  name: 'Sample set, six questions',
+  items: externalItems(3, 3),
+  correctCount: null,
+  scoredAt: null,
+  createdAt: '2026-10-15T09:00:00Z',
+  updatedAt: '2026-10-15T09:10:00Z',
+};
+
+const externalScored: ExternalCheck = {
+  ...externalSitting,
+  items: externalItems(6, 3),
+  correctCount: 3,
+  scoredAt: '2026-10-15T09:30:00Z',
+};
+
+const externalList: ExternalCheckListItem[] = [
+  { id: 'ec1', name: 'Sample set, six questions', total: 6, answered: 3, correctCount: null, on: '2026-10-15T09:00:00Z', scored: false },
+  { id: 'ec2', name: 'A sample set with a name long enough to need cutting short on a phone screen', total: 30, answered: 30, correctCount: 21, on: '2026-09-28T09:00:00Z', scored: true },
+];
+
+export function LearnExternalSurface() {
+  return <ExternalChecksView checks={externalList} />;
+}
+
+export function LearnExternalNewSurface() {
+  return <ExternalChecksView checks={[]} />;
+}
+
+export function LearnExternalItemSurface() {
+  return <ExternalItemView check={externalSitting} index={3} />;
+}
+
+export function LearnExternalScoreSurface() {
+  return <ExternalScoreView check={externalScored} />;
 }
 
 // ---- One reading ---------------------------------------------------------------
@@ -692,6 +757,31 @@ export function LearnReadingUnreadableSurface() {
   );
 }
 
+/** A reading queued for a gap, just marked read: Check it now and Not now under the status buttons (plan #2152.1). */
+export function LearnReadingCheckSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: elasticity.id }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+      checkOffered={{ href: `/learn/s/${SUBJECT.id}/probe?concept=${elasticity.id}` }}
+    />
+  );
+}
+
+/** A reading you added yourself, marked read: no concept, so nothing is offered (plan #2152.1). */
+export function LearnReadingCheckOwnSurface() {
+  return (
+    <ReadingView
+      reading={{ ...reading, status: 'read', finishedAt: '2026-10-14T18:20:00Z', conceptId: null, why: null }}
+      subjects={[SUBJECT]}
+      alreadyRead={null}
+      origin={null}
+    />
+  );
+}
+
 // ---- One piece of a learning goal's plan ------------------------------------------
 
 const piecePage: PiecePage = {
@@ -727,6 +817,11 @@ const piecePage: PiecePage = {
       },
     },
   ],
+  cells: [
+    { cellId: 'cl1', topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4, status: 'open' },
+    { cellId: 'cl2', topicId: 'tp2', topicName: 'Total revenue and how a price change moves it', level: 3, status: 'implied' },
+    { cellId: 'cl3', topicId: 'tp3', topicName: 'Percentage change', level: 2, status: 'shown' },
+  ],
   check: null,
 };
 
@@ -757,14 +852,66 @@ const reviews: DueReview[] = [
   },
 ];
 
+/* Typical figures for the piece's two marked presses, so their hints draw
+ * inside the Dash buttons as the learn layout would hand them (plan #1964.1.2). */
+const PIECE_RUN = {
+  lowMicros: 2_000,
+  medianMicros: 4_000,
+  highMicros: 9_000,
+  runs: 14,
+  basis: 'measured',
+  per: 'run',
+  models: [MODELS.learnProbe],
+} as const;
+
 export function LearnPieceSurface() {
   return (
-    <PiecePageView
-      page={piecePage}
-      practice={practice}
-      standing={{ practicePassed: false, checkPassed: false }}
-      reviews={reviews}
-    />
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={piecePage}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={reviews}
+      />
+    </PaidCostsProvider>
+  );
+}
+
+/** The piece's check asked on one of its cells and answered right (plan #2138.13). */
+export function LearnPieceCellCheckSurface() {
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          cells: piecePage.cells.map((cell) => (cell.cellId === 'cl1' ? { ...cell, status: 'shown' } : cell)),
+          check: {
+            id: 'cq1',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response:
+              'Price up 20%, seats down 10%, so elasticity is 0.5 and demand is inelastic. Takings went from £6,000 to £6,480, so they rose.',
+            correct: true,
+            why: 'The answer works out both percentage changes, gets 0.5 and ties the inelastic reading to the rise in takings.',
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: true }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
   );
 }
 

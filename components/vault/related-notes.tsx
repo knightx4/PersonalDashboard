@@ -66,7 +66,7 @@ function RelatedNotesList({
           <li key={note.noteId}>
             <Link
               href={note.href}
-              className={`inline-flex max-w-full items-baseline gap-1.5 text-ui ${linkVariants()}`}
+              className={`inline-flex max-w-full items-baseline gap-1.5 text-ui max-sm:min-h-11 max-sm:items-center ${linkVariants()}`}
             >
               <FileText
                 className="size-3.5 shrink-0 translate-y-0.5"

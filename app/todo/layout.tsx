@@ -1,5 +1,6 @@
 import { loadTodoBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
+import { tabsFor } from '@/lib/shell/tabs';
 
 /**
  * Shell for the todo workspace.
@@ -16,18 +17,14 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   return shellFor({
     module: 'todo',
     /**
-     * Four questions, four sections. "Agenda" is what needs you next;
-     * "Waiting" is what someone else has to move first (plan #1475);
-     * "Calendar" is how the month is shaped; "All" is everything, including what
-     * is finished. Anything a fifth section would answer is probably a filter on
-     * one of these.
+     * Now and Inbox first, as in every workspace (plan #1937.6). "Now" is the
+     * agenda, what needs you next; "Inbox" is what is on you with its verbs on
+     * the row; "Waiting" is what someone else has to move first (plan #1475);
+     * "Calendar" is how the month is shaped; "All" is everything, including
+     * what is finished. Anything another section would answer is probably a
+     * filter on one of these.
      */
-    sections: [
-      { href: '/todo', label: 'Agenda', icon: 'agenda', exact: true },
-      { href: '/todo/waiting', label: 'Waiting', icon: 'waiting' },
-      { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
-      { href: '/todo/all', label: 'All', icon: 'tasks' },
-    ],
+    sections: ({ owner }) => tabsFor('todo', owner),
     settingsHref: '/todo/settings',
     settingsLabel: 'Todo settings',
     brief: ({ user, settings }) => loadTodoBrief(user.id, settings.timezone),

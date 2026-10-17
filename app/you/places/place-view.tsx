@@ -9,10 +9,13 @@ import Link from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { formatRoughDate, isCurrent, placeHref, timeThere, type Place } from '@/lib/you/places';
+import { positionOf } from '@/lib/you/places-map';
+import { PlaceMapSection } from './place-map-section';
 
 /**
  * One place they lived (plan #1991.5), in the list-and-detail pattern: the
- * header with Edit and Remove, the facts as a grid, then the note.
+ * header with Edit and Remove, the facts as a grid, then the note, then
+ * where it is on the map (plan #2091.5).
  *
  * `remove` is the server action, passed in so the gallery can draw the page
  * without one. `thisMonth` is 'YYYY-MM', for how long they have lived in a
@@ -23,12 +26,15 @@ export function PlaceView({
   thisMonth,
   remove,
   subject,
+  map,
 }: {
   place: Place;
   thisMonth: string;
   /** The path from the catalogue (rowSubject); the gallery passes none and gets it from the place. */
   subject?: Subject;
   remove?: (form: FormData) => Promise<unknown>;
+  /** Where it is on the map (plan #2091.5): the section's drawing, actions and, for the gallery, its opening state. */
+  map?: Omit<React.ComponentProps<typeof PlaceMapSection>, 'placeId' | 'positioned'>;
 }) {
   const header = (
     <PageHeader
@@ -103,6 +109,8 @@ export function PlaceView({
           </section>
         ) : undefined
       }
-    />
+    >
+      {map && <PlaceMapSection placeId={place.id} positioned={positionOf(place) !== null} {...map} />}
+    </DetailPage>
   );
 }

@@ -10,6 +10,8 @@ import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/
 import { EducationSection } from './education-section';
 import { JobsSection } from './jobs-section';
 import { sectionSubject } from '@/lib/core/section-path';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadCourseExplains } from '@/lib/learn/evidence/course-explain-store';
 
 export const metadata = { title: 'Work & school' };
 
@@ -70,6 +72,13 @@ export default async function Page() {
       }),
   ]);
 
+  // The explain prompt on each graded course named for its topics (plan
+  // #2172.4.2). A failed read leaves the rows without it rather than the tab blank.
+  const explains = await loadCourseExplains(await createLearnClient(), courses).catch((error: unknown) => {
+    console.error('[you work] course explains', error instanceof Error ? error.message : error);
+    return {};
+  });
+
   const courseCounts: Record<string, number> = {};
   for (const course of courses) courseCounts[course.transcript_id] = (courseCounts[course.transcript_id] ?? 0) + 1;
 
@@ -88,6 +97,7 @@ export default async function Page() {
         courseCounts={courseCounts}
         transcripts={transcripts.length}
         courses={courses.length}
+        explains={explains}
       />
     </PageColumn>
   );

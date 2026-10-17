@@ -8,12 +8,6 @@
   "anatomy-settings": {
     "targets": 1
   },
-  "ask-dash-changes": {
-    "targets": 1
-  },
-  "ask-made-changes": {
-    "targets": 3
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 3
@@ -63,9 +57,6 @@
   "jobs-role-timeline": {
     "targets": 2
   },
-  "jobs-settings": {
-    "targets": 1
-  },
   "learn-course-check": {
     "targets": 4
   },
@@ -73,7 +64,7 @@
     "targets": 1
   },
   "learn-goals-list": {
-    "targets": 5
+    "targets": 2
   },
   "learn-subject-chain": {
     "targets": 4
@@ -84,23 +75,8 @@
   "news-issue-digest-no-pictures": {
     "targets": 2
   },
-  "news-quick-essay": {
-    "targets": 1
-  },
-  "news-quick-in-shell": {
-    "targets": 5
-  },
-  "news-quick-page": {
-    "targets": 5
-  },
-  "news-quick-page-full": {
-    "targets": 5
-  },
-  "news-quick-story": {
-    "targets": 5
-  },
   "news-saved": {
-    "targets": 3
+    "targets": 2
   },
   "news-story-grid": {
     "targets": 4

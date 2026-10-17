@@ -8,6 +8,8 @@ import { PlanSection } from '@/app/learn/s/[id]/plan';
 import { ChatLearningSection } from '@/app/learn/s/[id]/chat-learning';
 import { openingAsk } from '@/lib/learn/essays/interview';
 import type { Essay, EssayPin, EssaySummary } from '@/lib/learn/essays/model';
+import { EMPTY_PLAN } from '@/lib/learn/essays/plan';
+import type { NoteMap } from '@/lib/learn/essays/notebook';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
@@ -135,7 +137,13 @@ const rephraseCost: CostEstimate = {
 };
 
 /** About what one paragraph's check costs, as the Learn layout would give it. */
-const checkCost: CostEstimate = { ...rephraseCost, per: 'unit', lowMicros: 9_000, medianMicros: 12_000, highMicros: 18_000 };
+const checkCost: CostEstimate = {
+  ...rephraseCost,
+  per: 'unit',
+  lowMicros: 9_000,
+  medianMicros: 12_000,
+  highMicros: 18_000,
+};
 
 /** About what one study search costs: one small embedding, often cached. */
 const studyCost: CostEstimate = {
@@ -213,7 +221,8 @@ const studyItems: StudyItem[] = [
     kind: 'reading',
     title: 'Walzer - Spheres of Justice ch4',
     context: 'Chapter 4, pages 95 to 103',
-    sentence: 'Money is the universal pander, and it slips across every boundary the other spheres draw.',
+    sentence:
+      'Money is the universal pander, and it slips across every boundary the other spheres draw.',
     href: '/learn/r/00000000-0000-4000-8000-0000000000b1',
     link: null,
     pinned: true,
@@ -221,9 +230,11 @@ const studyItems: StudyItem[] = [
   {
     key: 'passage:00000000-0000-4000-8000-0000000000e1:Why cash loses value',
     kind: 'passage',
-    title: 'Inflation, savings and the strange patience of people who keep cash in a drawer for decades',
+    title:
+      'Inflation, savings and the strange patience of people who keep cash in a drawer for decades',
     context: 'Economics › Why cash loses value',
-    sentence: 'A pound in a drawer loses about two pence a year, and almost nobody notices because nothing else they own keeps its value either.',
+    sentence:
+      'A pound in a drawer loses about two pence a year, and almost nobody notices because nothing else they own keeps its value either.',
     href: '/vault/notes/Economics/Inflation%20and%20savings.md',
     link: 'Inflation and savings',
     pinned: false,
@@ -243,7 +254,8 @@ const studyItems: StudyItem[] = [
     kind: 'log',
     title: 'Hyperinflation in Weimar Germany',
     context: null,
-    sentence: 'Once prices doubled every few days, people spent wages within the hour rather than hold marks overnight.',
+    sentence:
+      'Once prices doubled every few days, people spent wages within the hour rather than hold marks overnight.',
     href: '/learn/s/00000000-0000-4000-8000-0000000000e5',
     link: null,
     pinned: false,
@@ -253,7 +265,8 @@ const studyItems: StudyItem[] = [
     kind: 'card',
     title: 'Your note on Store of value',
     context: null,
-    sentence: 'Bread spoils, coats wear thin, and money is the thing we use to carry value across the gap.',
+    sentence:
+      'Bread spoils, coats wear thin, and money is the thing we use to carry value across the gap.',
     href: '/learn/c/00000000-0000-4000-8000-0000000000e7',
     link: null,
     pinned: false,
@@ -266,6 +279,7 @@ export function LearnEssaySurface() {
   return (
     <WithCosts>
       <EssayView
+        initialView="draft"
         essay={essay}
         study={STUDY_FOUND}
         path={sectionSubject('/learn/essays', 'Essays', {
@@ -294,10 +308,30 @@ const firstPass: EssayResearch = {
     'hyperinflation demand for money collapse',
   ],
   sources: [
-    { url: 'https://history.example.org/money-and-trust', title: 'Money and trust: a short history', domain: 'history.example.org', text: null },
-    { url: 'https://econbrief.example.com/store-of-value', title: 'What makes a store of value?', domain: 'econbrief.example.com', text: null },
-    { url: 'https://goldreview.example.net/centuries', title: 'Gold across five centuries of prices', domain: 'goldreview.example.net', text: null },
-    { url: 'https://history.example.org/weimar', title: 'The Weimar inflation, week by week', domain: 'history.example.org', text: null },
+    {
+      url: 'https://history.example.org/money-and-trust',
+      title: 'Money and trust: a short history',
+      domain: 'history.example.org',
+      text: null,
+    },
+    {
+      url: 'https://econbrief.example.com/store-of-value',
+      title: 'What makes a store of value?',
+      domain: 'econbrief.example.com',
+      text: null,
+    },
+    {
+      url: 'https://goldreview.example.net/centuries',
+      title: 'Gold across five centuries of prices',
+      domain: 'goldreview.example.net',
+      text: null,
+    },
+    {
+      url: 'https://history.example.org/weimar',
+      title: 'The Weimar inflation, week by week',
+      domain: 'history.example.org',
+      text: null,
+    },
   ],
   positions: [
     {
@@ -306,24 +340,43 @@ const firstPass: EssayResearch = {
         'Historians of money describe its value as a shared expectation rather than a property of the coin or note, which is why it can vanish quickly.',
       citations: [
         { source: 0, quote: 'A coin is worth what the next person will give for it, and no more' },
-        { source: 3, quote: 'by November 1923 shopkeepers refused marks that had been good in the morning' },
+        {
+          source: 3,
+          quote: 'by November 1923 shopkeepers refused marks that had been good in the morning',
+        },
       ],
     },
     {
       title: 'Money holds value only as long as its supply is kept scarce.',
-      summary: 'Economists who stress supply point to central banks and the fixed stock of gold as what stops money wearing out.',
-      citations: [{ source: 1, quote: 'a store of value must be costly to produce more of, or its holders will be diluted' }],
+      summary:
+        'Economists who stress supply point to central banks and the fixed stock of gold as what stops money wearing out.',
+      citations: [
+        {
+          source: 1,
+          quote:
+            'a store of value must be costly to produce more of, or its holders will be diluted',
+        },
+      ],
     },
     {
       title: 'Gold shows a good can hold value for centuries without being money for everything.',
       summary:
         'Price series for gold suggest it kept its purchasing power over long periods even where it was not used to buy ordinary goods.',
       citations: [
-        { source: 2, quote: 'an ounce bought roughly the same quantity of bread in 1600 as in 1900' },
+        {
+          source: 2,
+          quote: 'an ounce bought roughly the same quantity of bread in 1600 as in 1900',
+        },
       ],
     },
   ],
   claims: [],
+  summary:
+    'Most writers on money say its value is a shared expectation: a coin is worth what the next person will give for it. Others put the weight on scarcity, and point to central banks and the fixed stock of gold. A [price series for gold](https://goldreview.example.net/centuries) is the awkward case, since gold kept its value for centuries without being used to buy everyday goods.',
+  asks: [
+    'If money is only a shared expectation, what is the difference between it and gold in your essay?',
+    'Which of the Weimar examples would your reader find most convincing, and why?',
+  ],
   costMicros: 64_000,
   createdAt: '2026-10-12T14:40:00Z',
 };
@@ -332,11 +385,30 @@ const deeperPass: EssayResearch = {
   id: '00000000-0000-4000-8000-0000000000d2',
   level: 'deeper',
   question: essay.brief.question,
-  queries: ['money spheres Walzer criticism', 'gold purchasing power long run', 'hyperinflation flight from money'],
+  queries: [
+    'money spheres Walzer criticism',
+    'gold purchasing power long run',
+    'hyperinflation flight from money',
+  ],
   sources: [
-    { url: 'https://philosophy.example.org/walzer-spheres', title: 'Walzer’s spheres of justice, explained', domain: 'philosophy.example.org', text: null },
-    { url: 'https://goldreview.example.net/centuries', title: 'Gold across five centuries of prices', domain: 'goldreview.example.net', text: null },
-    { url: 'https://history.example.org/weimar', title: 'The Weimar inflation, week by week', domain: 'history.example.org', text: null },
+    {
+      url: 'https://philosophy.example.org/walzer-spheres',
+      title: 'Walzer’s spheres of justice, explained',
+      domain: 'philosophy.example.org',
+      text: null,
+    },
+    {
+      url: 'https://goldreview.example.net/centuries',
+      title: 'Gold across five centuries of prices',
+      domain: 'goldreview.example.net',
+      text: null,
+    },
+    {
+      url: 'https://history.example.org/weimar',
+      title: 'The Weimar inflation, week by week',
+      domain: 'history.example.org',
+      text: null,
+    },
   ],
   positions: [],
   claims: [
@@ -346,8 +418,16 @@ const deeperPass: EssayResearch = {
       supporting: 1,
       opposing: 1,
       citations: [
-        { source: 0, quote: 'money alone among goods is wanted for what it can become', stance: 'for' },
-        { source: 1, quote: 'gold, land and fine wine have each kept value over long periods without use', stance: 'against' },
+        {
+          source: 0,
+          quote: 'money alone among goods is wanted for what it can become',
+          stance: 'for',
+        },
+        {
+          source: 1,
+          quote: 'gold, land and fine wine have each kept value over long periods without use',
+          stance: 'against',
+        },
       ],
     },
     {
@@ -355,7 +435,13 @@ const deeperPass: EssayResearch = {
       verdict: 'supported',
       supporting: 1,
       opposing: 0,
-      citations: [{ source: 2, quote: 'wages were spent within the hour, before the next price list went up', stance: 'for' }],
+      citations: [
+        {
+          source: 2,
+          quote: 'wages were spent within the hour, before the next price list went up',
+          stance: 'for',
+        },
+      ],
     },
     {
       claim: 'Walzer calls money the universal pander.',
@@ -365,6 +451,8 @@ const deeperPass: EssayResearch = {
       citations: [],
     },
   ],
+  summary: '',
+  asks: [],
   costMicros: 238_000,
   createdAt: '2026-10-12T14:55:00Z',
 };
@@ -373,7 +461,12 @@ const deeperPass: EssayResearch = {
 export function LearnEssayResearchSurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} study={STUDY_WAITING} research={{ first: firstPass, deeper: deeperPass }} />
+      <EssayView
+        initialView="draft"
+        essay={essay}
+        study={STUDY_WAITING}
+        research={{ first: firstPass, deeper: deeperPass }}
+      />
     </WithCosts>
   );
 }
@@ -386,6 +479,7 @@ export function LearnEssayStudyEmptySurface() {
   return (
     <WithCosts>
       <EssayView
+        initialView="draft"
         essay={{ ...essay, brief: { ...essay.brief, pinned: [] } }}
         study={{ kind: 'found', items: [], searched: true, indexed: false }}
       />
@@ -402,6 +496,7 @@ export function LearnEssayFinishSurface() {
   return (
     <WithCosts>
       <EssayView
+        initialView="draft"
         essay={{ ...essay, finishedAt: '2026-10-12T15:00:00Z', unsaved: false }}
         study={STUDY_WAITING}
         finishStage="seedling"
@@ -411,13 +506,18 @@ export function LearnEssayFinishSurface() {
           claims: [
             {
               name: 'Money is a shared expectation',
-              claim: 'Money keeps its value in a drawer only because everyone expects others to accept it later.',
+              claim:
+                'Money keeps its value in a drawer only because everyone expects others to accept it later.',
               existing: null,
             },
             {
               name: 'Scarcity alone does not make money',
-              claim: 'Gold and bitcoin are scarce, but what makes them money is that people agree to take them in payment.',
-              existing: { title: 'Medium of exchange', href: '/vault/n/Concepts/Medium%20of%20exchange.md' },
+              claim:
+                'Gold and bitcoin are scarce, but what makes them money is that people agree to take them in payment.',
+              existing: {
+                title: 'Medium of exchange',
+                href: '/vault/n/Concepts/Medium%20of%20exchange.md',
+              },
             },
             {
               name: 'Inflation is the price of holding the expectation',
@@ -440,6 +540,7 @@ export function LearnEssayPublishSurface() {
   return (
     <WithCosts>
       <EssayView
+        initialView="draft"
         essay={{
           ...essay,
           finishedAt: '2026-10-12T15:00:00Z',
@@ -458,6 +559,7 @@ export function LearnEssayPublishSurface() {
 export function LearnEssayChangedSurface() {
   return (
     <EssayView
+      initialView="draft"
       essay={essay}
       initialVault={{ kind: 'failed', reason: 'changed', error: ESSAY_VAULT_ERRORS.changed }}
       study={STUDY_WAITING}
@@ -467,7 +569,7 @@ export function LearnEssayChangedSurface() {
 
 /** The brief unfolded above the draft (plan #1867), with an answer long enough to wrap. */
 export function LearnEssayBriefSurface() {
-  return <EssayView essay={essay} briefOpen study={STUDY_WAITING} />;
+  return <EssayView initialView="draft" essay={essay} briefOpen study={STUDY_WAITING} />;
 }
 
 // The first paragraph, so the suggestion is inside a phone's first screen,
@@ -481,6 +583,7 @@ export function LearnEssayRephraseSurface() {
   return (
     <WithCosts>
       <EssayView
+        initialView="draft"
         essay={essay}
         initialSuggestion={{
           from: objectionAt,
@@ -512,7 +615,10 @@ function noteOn(
     ladder,
     why: 'Counterpoint looks for the strongest objection a reader who disagrees would raise, which the essay does not answer.',
     status,
-    anchor: at >= 0 ? makeAnchor(draft, at, at + quote.length) : { quote, prefix: '', suffix: '', offset: null },
+    anchor:
+      at >= 0
+        ? makeAnchor(draft, at, at + quote.length)
+        : { quote, prefix: '', suffix: '', offset: null },
     createdAt: `2026-10-12T14:0${id.slice(-1)}:00Z`,
   };
 }
@@ -526,24 +632,44 @@ const essayNotes: EssayNotes = {
       'Flour and tinned food keep for years; the essay rests on goods that spoil, and a reader will think of ones that do not.',
       'Narrow the claim to goods you use up, or answer the tinned-food case in a sentence.',
     ]),
-    noteOn('00000000-0000-4000-8000-0000000000d2', 'the_claim', 'Every good you buy wears out, gets eaten or goes out of fashion.', 1, [
-      'Is this the claim you set out to argue, or the ground for it?',
-      'The brief claims money holds value because it can become every other good; the opening argues that goods wear out.',
-      'Say the brief\u2019s claim in the first paragraph, or change the brief to match what the essay argues.',
-    ]),
-    noteOn('00000000-0000-4000-8000-0000000000d3', 'writing_guide', 'A coat is worth less after a winter.', 0, [
-      'Would one example do the work of two?',
-      'Two short examples in a row read as a list.',
-      'Keep the loaf or the coat.',
-    ]),
-    noteOn('00000000-0000-4000-8000-0000000000d4', 'missing_step', 'Bread goes to the hungry, offices to the qualified.', 1, [
-      'q', 'h', 'd',
-    ], 'waiting'),
-    noteOn('00000000-0000-4000-8000-0000000000d5', 'fact_to_verify', 'Gold held its value for exactly four thousand years.', 1, [
-      'Where does that figure come from?',
-      'h',
-      'd',
-    ], 'detached'),
+    noteOn(
+      '00000000-0000-4000-8000-0000000000d2',
+      'the_claim',
+      'Every good you buy wears out, gets eaten or goes out of fashion.',
+      1,
+      [
+        'Is this the claim you set out to argue, or the ground for it?',
+        'The brief claims money holds value because it can become every other good; the opening argues that goods wear out.',
+        'Say the brief\u2019s claim in the first paragraph, or change the brief to match what the essay argues.',
+      ],
+    ),
+    noteOn(
+      '00000000-0000-4000-8000-0000000000d3',
+      'writing_guide',
+      'A coat is worth less after a winter.',
+      0,
+      [
+        'Would one example do the work of two?',
+        'Two short examples in a row read as a list.',
+        'Keep the loaf or the coat.',
+      ],
+    ),
+    noteOn(
+      '00000000-0000-4000-8000-0000000000d4',
+      'missing_step',
+      'Bread goes to the hungry, offices to the qualified.',
+      1,
+      ['q', 'h', 'd'],
+      'waiting',
+    ),
+    noteOn(
+      '00000000-0000-4000-8000-0000000000d5',
+      'fact_to_verify',
+      'Gold held its value for exactly four thousand years.',
+      1,
+      ['Where does that figure come from?', 'h', 'd'],
+      'detached',
+    ),
   ],
   stopped: ['so_what'],
 };
@@ -552,7 +678,13 @@ const essayNotes: EssayNotes = {
 export function LearnEssayNotesSurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} notes={essayNotes} initialNoteOpen={COUNTERPOINT_ID} study={STUDY_WAITING} />
+      <EssayView
+        initialView="draft"
+        essay={essay}
+        notes={essayNotes}
+        initialNoteOpen={COUNTERPOINT_ID}
+        study={STUDY_WAITING}
+      />
     </WithCosts>
   );
 }
@@ -561,7 +693,7 @@ export function LearnEssayNotesSurface() {
 export function LearnEssayMarksSurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} initialAskMarks study={STUDY_WAITING} />
+      <EssayView initialView="draft" essay={essay} initialAskMarks study={STUDY_WAITING} />
     </WithCosts>
   );
 }
@@ -589,62 +721,10 @@ const blank: Essay = {
   updatedAt: '2026-10-12T15:00:00Z',
 };
 
-/** "Write about this" on a finished goal: the interview opens naming it (plan #1867). */
+/** "Write about this" on a finished goal: a new essay opens on an empty notes page. */
 export function LearnEssayInterviewSurface() {
-  return <EssayView essay={blank} study={STUDY_WAITING} />;
+  return <EssayView essay={blank} initialView="notes" planFrozen study={STUDY_WAITING} />;
 }
-
-/** Three answers in, on the fourth question as Dash worded it. */
-export function LearnEssayInterviewLaterSurface() {
-  return (
-    <WithCosts>
-      <EssayView
-        essay={{
-          ...blank,
-          brief: {
-            ...blank.brief,
-            question:
-              'Why does a quarter-point rate rise move house prices more than it moves anything else?',
-            claim:
-              'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment.',
-            reader: 'My sister, who is buying her first flat next spring',
-          },
-          interview: {
-            status: 'asking',
-            field: 'origin',
-            ask: 'What did you see that made you think of a house price as a monthly payment rather than a price?',
-          },
-        }}
-        study={STUDY_WAITING}
-        originStudy={{ kind: 'found', items: originItems, searched: true, indexed: true }}
-      />
-    </WithCosts>
-  );
-}
-
-/** What Dash offers for "What made you think this?" (spec, question 4): two finds from the person's study. */
-const originItems: StudyItem[] = [
-  {
-    key: 'passage:00000000-0000-4000-8000-0000000000f1:Mortgage maths',
-    kind: 'passage',
-    title: 'Buying a flat',
-    context: 'Mortgage maths',
-    sentence: 'The agent never asked what we could pay for the flat, only what we could pay each month.',
-    href: '/vault/notes/Home/Buying%20a%20flat.md',
-    link: 'Buying a flat',
-    pinned: false,
-  },
-  {
-    key: 'log:00000000-0000-4000-8000-0000000000f2',
-    kind: 'log',
-    title: 'How the Bank of England sets Bank Rate',
-    context: null,
-    sentence: 'A quarter point on a 25-year mortgage changes the payment more than a year of wage growth does.',
-    href: null,
-    link: null,
-    pinned: false,
-  },
-];
 
 const finishedUnits: PlanUnit[] = [
   {
@@ -712,7 +792,8 @@ export function LearnSubjectConversationsSurface() {
         sessions: [
           {
             id: '00000000-0000-4000-8000-0000000000a1',
-            topic: 'Why a rent cap helps the people already housed and does little for anyone still looking',
+            topic:
+              'Why a rent cap helps the people already housed and does little for anyone still looking',
             summary:
               'You worked through who a cap protects, why landlords stop listing in capped areas, and what the listings data from your own city shows.',
             ideas: ['Rent control', 'Supply elasticity', 'Insider-outsider markets'],
@@ -728,5 +809,139 @@ export function LearnSubjectConversationsSurface() {
         ],
       }}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notes first (LEARN-ESSAYS-SPEC, "Notes first")
+// ---------------------------------------------------------------------------
+
+const houseNotes = `Rate rises move house prices more than anything else because a house is bought almost entirely with borrowed money.
+
+The agent never asked what we could pay for the flat, only what we could pay each month.
+
+So the price is really a monthly payment. Buyers and agents talk about what they can afford each month, and a rate rise changes that number for everyone at once.
+
+Every lender reprices new loans within weeks, and everyone buying is a new loan.
+
+But cash buyers pay the same price. Maybe because they are bidding against borrowers?
+
+Prices kept rising in 2021 even as rates went up, at least where we live. Not sure how that fits.
+
+Who is this for: my sister, buying her first flat next spring. She should look at the payment, not the asking price.`;
+
+const houseMap: NoteMap = {
+  at: '2026-10-12T15:10:00Z',
+  claims: [
+    'So the price is really a monthly payment.',
+    'Rate rises move house prices more than anything else because a house is bought almost entirely with borrowed money.',
+  ],
+  clusters: [
+    {
+      id: 'c1',
+      label: 'Buyers think in monthly payments',
+      quotes: [
+        'The agent never asked what we could pay for the flat, only what we could pay each month.',
+        'Buyers and agents talk about what they can afford each month',
+      ],
+      support: 'thin',
+      gap: 'One anecdote; nothing shows this is how most buyers set a budget.',
+    },
+    {
+      id: 'c2',
+      label: 'A rate rise hits every buyer at once',
+      quotes: ['Every lender reprices new loans within weeks, and everyone buying is a new loan.'],
+      support: 'none',
+      gap: 'No figure for how fast lenders reprice, or by how much.',
+    },
+    {
+      id: 'c3',
+      label: 'Cash buyers follow the borrowers',
+      quotes: [
+        'But cash buyers pay the same price. Maybe because they are bidding against borrowers?',
+      ],
+      support: 'none',
+      gap: 'Still a question in your notes.',
+    },
+    {
+      id: 'c4',
+      label: 'What your sister should do',
+      quotes: ['She should look at the payment, not the asking price.'],
+      support: 'ok',
+      gap: '',
+    },
+  ],
+  tensions: [
+    {
+      a: 'a rate rise changes that number for everyone at once.',
+      b: 'Prices kept rising in 2021 even as rates went up, at least where we live.',
+      note: 'If rates set the price, rising prices through rate rises need explaining.',
+    },
+  ],
+  questions: [
+    'What happened in 2021 that kept prices rising where you live while rates went up?',
+    'Is the essay telling your sister what prices will do, or how to judge the price she pays?',
+  ],
+  ordered: true,
+};
+
+const notesEssay: Essay = {
+  ...blank,
+  id: '00000000-0000-4000-8000-000000000005',
+  brief: {
+    ...blank.brief,
+    question:
+      'Why does a quarter-point rate rise move house prices more than it moves anything else?',
+    reader: 'My sister, who is buying her first flat next spring',
+  },
+  interview: { status: 'skipped' },
+  wordTarget: 800,
+  plan: {
+    ...EMPTY_PLAN,
+    notes: houseNotes,
+    noteMap: houseMap,
+    found: [
+      {
+        label: 'A rate rise hits every buyer at once',
+        items: [
+          {
+            id: 'f1',
+            kind: 'rule',
+            sourceType: 'regulator',
+            title: 'Lenders must test affordability at a higher rate',
+            summary:
+              'The regulator’s mortgage rules require lenders to check a borrower could still pay if rates rose.',
+            quote:
+              'assess whether the borrower could afford the payments if interest rates were to rise',
+            url: 'https://regulator.example.gov/mortgage-rules',
+            sourceTitle: 'Mortgage conduct rules',
+            domain: 'regulator.example.gov',
+            take: '',
+          },
+        ],
+      },
+    ],
+    modelDraft: {
+      text: `My sister will hear one number at every viewing, and it is not the price.\n\nAgents ask what buyers can pay each month, because almost every buyer borrows. That makes the monthly payment the real price of a home, and the rate on the loan sets it. [gap: how fast lenders pass on a rate rise]\n\nCash buyers might seem to break this, but they bid against borrowers, so they pay what borrowers can afford.`,
+      at: '2026-10-12T15:30:00Z',
+    },
+  },
+};
+
+/** The notes page with Dash’s map beside it: claims, threads with their gaps, a tension, two questions, a source found. */
+export function LearnEssayNotesMapSurface() {
+  return (
+    <WithCosts>
+      <EssayView essay={notesEssay} initialView="notes" planFrozen study={STUDY_WAITING} />
+    </WithCosts>
+  );
+}
+
+/** The draft view of the same essay, empty, with Assemble and the model draft beside it. */
+export function LearnEssayDraftFromNotesSurface() {
+  return (
+    <WithCosts>
+      <EssayView essay={notesEssay} initialView="draft" planFrozen study={STUDY_WAITING} />
+    </WithCosts>
   );
 }

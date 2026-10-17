@@ -4,9 +4,8 @@ import { Equal, EqualNot } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { DashMark } from '@/components/ui/dash-mark';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import { readCount, type PersonalityRead, type ReadStatus } from '@/lib/you/personality/model';
@@ -133,15 +132,16 @@ export function PersonalityReadPanel({
 
       {status !== 'pending' ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="inline-flex items-center gap-1">
-            <Button variant="secondary" size="sm" onClick={readAgain} pending={pending}>
-              {pending ? 'Reading…' : read ? 'Read again' : status === 'failed' ? 'Try again' : 'Ask Dash to read it'}
-            </Button>
-            <PaidHint
-              action="app/you/personality/actions.ts#readAgainAction"
-              what="Cost of a fresh read from Dash"
-            />
-          </span>
+          <DashAction
+            variant="secondary"
+            size="sm"
+            onClick={readAgain}
+            pending={pending}
+            paid="app/you/personality/actions.ts#readAgainAction"
+            what="Cost of a fresh read from Dash"
+          >
+            {pending ? 'Reading…' : read ? 'Read again' : status === 'failed' ? 'Try again' : 'Read it against my notes'}
+          </DashAction>
           {read ? (
             <span className="text-small text-ink-muted">Read {formatDay(read.at.slice(0, 10), true)}</span>
           ) : null}

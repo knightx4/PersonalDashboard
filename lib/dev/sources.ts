@@ -1,4 +1,6 @@
 import { planRefHref } from '@/lib/comments/refs';
+import { planRunTitle } from '@/lib/plan/run-touched';
+import { runHref } from '@/lib/core/run-link';
 import { parentBy, type ModuleSources, type Page, type Section } from '@/lib/sources/types';
 
 /**
@@ -23,6 +25,13 @@ const PAGES: Record<string, Page> = {
     section: { href: '/dev/plan', label: 'Plan' },
     // A step sits under its feature, and a sub-step under its step.
     parent: parentBy('parent_id', 'public.plan_items'),
+  },
+  // A run opens on its own page (plan #1964.2.4), under the step it was sent at.
+  'public.plan_runs': {
+    title: { reads: ['job'], of: (row) => planRunTitle(row.job) },
+    href: (row) => runHref('plan_runs', String(row.id)),
+    section: { href: '/dev/plan', label: 'Plan' },
+    parent: parentBy('plan_item_id', 'public.plan_items'),
   },
   'public.ideas': {
     title: 'body',
@@ -95,6 +104,7 @@ export const devSources: ModuleSources = {
     'public.plan_dependencies',
     'public.plan_history',
     'public.plan_item_pictures',
+    'public.post_preferences',
     'public.plan_runs',
     'public.plan_commit_checks',
     'public.plan_main_checks',
@@ -122,9 +132,11 @@ export const devSources: ModuleSources = {
     reason:
       table === 'public.x_accounts'
         ? 'The X connection and its encrypted tokens.'
-        : table === 'public.x_reads'
-          ? 'A log of each request made to X and how many posts it read, for checking the bill.'
-          : ABOUT_THE_APP,
+        : table === 'public.post_preferences'
+          ? 'A setting: the text they wrote about what they want from their posts.'
+          : table === 'public.x_reads'
+            ? 'A log of each request made to X and how many posts it read, for checking the bill.'
+            : ABOUT_THE_APP,
     page: PAGES[table],
   })),
 };

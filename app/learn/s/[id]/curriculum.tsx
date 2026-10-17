@@ -2,19 +2,22 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { ListOrdered } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
 import { writeTrackCurriculum, type CurriculumState } from './actions';
 
 function WriteButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="primary" pending={pending}>
-      <ListOrdered className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      variant="primary"
+      pending={pending}
+      paid="app/learn/s/[id]/actions.ts#writeTrackCurriculum"
+      what="Cost of writing the curriculum"
+    >
       {pending ? 'Writing the curriculum…' : 'Write the curriculum'}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -38,13 +41,27 @@ export function WriteCurriculum({ subjectId }: { subjectId: string }) {
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <WriteButton />
-          <PaidHint
-            action="app/learn/s/[id]/actions.ts#writeTrackCurriculum"
-            what="Cost of writing the curriculum"
-          />
           {state.error && <span className="text-ui text-danger">{state.error}</span>}
         </div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * Where the curriculum will be while the subject is being prepared: the
+ * preparation writes the opening units at its own step, so there is nothing
+ * to press yet (plan #2276.9).
+ */
+export function CurriculumComing({ position, total }: { position: number; total: number }) {
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum</h2>
+      <Card padding="dense">
+        <p className="text-ui text-ink-muted">
+          The opening units are written at step {position} of {total}, once the topics are drafted.
+        </p>
+      </Card>
+    </section>
   );
 }

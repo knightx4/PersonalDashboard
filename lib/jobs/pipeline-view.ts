@@ -72,6 +72,14 @@ export type PipelineParams = {
   stage?: string;
   /** A number of days: only what was sent within that many days, live or closed. */
   sent?: string;
+  /** `yes` ready to apply, `no` not marked ready (plan #2102.3). */
+  ready?: string;
+  /** `yes` all its questions added, `no` not marked so. */
+  questions?: string;
+  /** `yes` has a cover letter, `no` marked as having none; unanswered is neither. */
+  letter?: string;
+  /** A company's slug: only its applications, set from the table's Company column. */
+  company?: string;
   page?: string;
   sort?: string;
   group?: string;
@@ -89,11 +97,24 @@ export type PipelineState = {
   stage: PipelineStage | null;
   /** Sent within this many days, or null for any time. */
   sentDays: number | null;
+  /** Ready to apply (true), not marked ready (false), or either (null). */
+  ready: boolean | null;
+  /** All questions added (true), not marked so (false), or either (null). */
+  questions: boolean | null;
+  /** Has a cover letter (true), marked as having none (false), or either (null). */
+  letter: boolean | null;
+  /** A company's slug, or null for every company. */
+  company: string | null;
   /** One-based. */
   page: number;
 };
 
 export const EXCITEMENT_MINIMUMS = [5, 4, 3] as const;
+
+/** `yes` is true, `no` is false, anything else is no filter. */
+function parseYesNo(value: string | undefined): boolean | null {
+  return value === 'yes' ? true : value === 'no' ? false : null;
+}
 
 export function parsePipeline(params: PipelineParams): PipelineState {
   const scope: PipelineScope =
@@ -108,6 +129,10 @@ export function parsePipeline(params: PipelineParams): PipelineState {
   return {
     stage: PIPELINE_STAGES.find((stage) => stage.key === params.stage) ?? null,
     sentDays: Number.isInteger(sent) && sent >= 1 && sent <= SENT_MAX_DAYS ? sent : null,
+    ready: parseYesNo(params.ready),
+    questions: parseYesNo(params.questions),
+    letter: parseYesNo(params.letter),
+    company: params.company?.trim() || null,
     view,
     scope,
     source: APPLICATION_SOURCES.find((s) => s === params.source) ?? null,
@@ -138,8 +163,13 @@ export function filterPipeline(
   const filtered = scoped.filter(
     (row) =>
       (!state.source || row.source === state.source) &&
+      (!state.company || row.companySlug === state.company) &&
       (!state.stage || (state.stage.statuses as readonly ApplicationStatus[]).includes(row.status)) &&
       (state.sentDays === null || sentWithin(row, state.sentDays, now)) &&
+      (state.ready === null || row.readyToApply === state.ready) &&
+      (state.questions === null || row.allQuestionsAdded === state.questions) &&
+      // Only an answer of no is without a letter: an unanswered role is in neither list.
+      (state.letter === null || row.hasCoverLetter === state.letter) &&
       (!state.excitement || (row.excitement ?? 0) >= state.excitement) &&
       // A row not scored passes, as an unscored opening passes the openings' filters.
       passesMinimum(row.scoreNote, state.minimum) &&

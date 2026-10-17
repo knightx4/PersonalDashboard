@@ -9,16 +9,25 @@ import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
-import { ideaGraph, openedFrom, paramsFor, type IdeaGraph } from '@/lib/learn/map/place-graph';
+import {
+  ideaGraph,
+  openedFrom,
+  paramsFor,
+  territoryGraph,
+  type IdeaGraph,
+  type Ladder,
+} from '@/lib/learn/map/place-graph';
 import { TOUR_DWELL_MS, tourScript, type TourScript } from '@/lib/learn/map/tour';
-import { dustAt } from '@/lib/learn/map/sky';
+import { dustAt, FAINTEST_MARK } from '@/lib/learn/map/sky';
 import { LIT_DELAY_MS, LIT_MS, lightingUp, litLine, recentlyLit } from '@/lib/learn/map/lights-up';
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
 import { usePick, viewOnClick } from './pick';
-import { StarSky, type SkyName, type SkyTopic, type Star } from './star-sky';
+import { StarSky, type Constellation, type SkyName, type SkyTopic, type Star } from './star-sky';
+import { ringRadius } from '@/lib/learn/map/goals';
 import { StarSwatch, TopicSwatch } from './swatch';
 import { MapTimeline } from './timeline';
+import { MapPanels } from './map-panels';
 import { backedByText } from '@/lib/learn/evidence/model';
 
 /**
@@ -47,6 +56,7 @@ export function MapSection({
   pointingAt,
   daysAgo,
   zoomOn,
+  pickThen,
 }: {
   view: IdeaMapView;
   pointingAt?: string | null;
@@ -54,6 +64,8 @@ export function MapSection({
   daysAgo?: number;
   /** The gallery opens the sky flown into this topic. */
   zoomOn?: string | null;
+  /** The gallery draws the day picker under the map open (plan #2187.6). */
+  pickThen?: boolean;
 }) {
   const { params, set } = usePick();
   const domains = useMemo(() => ideaDomains(view.ideas), [view.ideas]);
@@ -70,10 +82,12 @@ export function MapSection({
         stateRow: idea.stateRow,
         strength: idea.strength,
         haze: idea.haze,
+        exposure: idea.exposure,
         slot: idea.domain ? (slots.get(idea.domain.id) ?? 'other') : 'none',
         domainId: idea.domain?.id ?? null,
         neighbours: idea.neighbours.map((n) => n.id),
         backedBy: backedByText(idea.evidence),
+        levels: idea.levels,
       })),
     [view.ideas, layout, slots],
   );
@@ -88,6 +102,21 @@ export function MapSection({
     [view.topics, layout],
   );
   const graph = useOpenGraph(view);
+  // The goal chosen in the rail, as lines and rings (plan #2187.2).
+  const constellation: Constellation | null = useMemo(() => {
+    const goal = params.goal ? view.goals?.find((g) => g.id === params.goal) : undefined;
+    if (!goal) return null;
+    const at = (star: (typeof goal.stars)[number]) => (layout === 'axes' ? star.pca : star.neighbourMap);
+    const byId = new Map(goal.stars.map((star) => [star.topicId, at(star)]));
+    return {
+      stars: goal.stars.map((star) => ({ id: star.topicId, name: star.name, at: at(star), ring: ringRadius(star.targetLevel) })),
+      lines: goal.links.flatMap((link) => {
+        const from = byId.get(link.from);
+        const to = byId.get(link.to);
+        return from && to ? [{ from, to }] : [];
+      }),
+    };
+  }, [params.goal, view.goals, layout]);
 
   // The timeline: the day shown, and the map relit as it stood then.
   const today = useMemo(() => new Date(view.asOf), [view.asOf]);
@@ -116,7 +145,7 @@ export function MapSection({
     () => (replay ? ideaDomains(view.ideas.filter((idea) => replay.has(idea.id))) : domains),
     [replay, view.ideas, domains],
   );
-  const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
+  const lights: readonly (Pick<LightThen, 'strength' | 'haze' | 'exposure' | 'state'>)[] = replay ? [...replay.values()] : view.ideas;
   const lighting = useLightsUp(view, !!graph);
 
 
@@ -171,9 +200,10 @@ export function MapSection({
             dust={dust}
             asOf={replay ? momentOf(span, shownDay, today).toISOString() : view.asOf}
             replay={replay ?? lighting.replay}
-            label={`A night sky of ${plural(view.ideas.length, 'idea')}, each a star as bright as you know it`}
+            label={`A night sky of ${plural(view.ideas.length, 'topic')}, each a star as bright as your answers say you know it`}
             pointingAt={pointingAt}
             graph={graph}
+            constellation={constellation}
           />
           {!graph && <AxisEndsBelow axes={axes} />}
         </div>
@@ -186,6 +216,7 @@ export function MapSection({
           <MapNotes view={view} params={params} graph={graph} past={past} litNames={lighting.names} />
         </div>
       </Card>
+      <MapPanels view={view} params={params} set={set} pickOpen={pickThen} />
     </section>
   );
 }
@@ -257,19 +288,45 @@ function MapNotes({
   litNames: readonly string[];
 }) {
   const bright = past
-    ? 'A star is as bright as you knew the idea on the day shown.'
-    : 'A star is as bright as you know the idea today.';
+    ? 'A star is as bright as your answers said you knew the topic on the day shown. A gold ring is one met in a course or your writing, or one you said you know.'
+    : 'A star is as bright as your answers say you know the topic today. A gold ring is one met in a course or your writing, or one you said you know.';
+  if (graph?.ladders) {
+    const requires = graph.edges.some((edge) => edge.requires);
+    const missed = [...graph.ladders.values()].some((ladder) => ladder.missed.length > 0);
+    return (
+      <div className="mt-2 space-y-1 text-ui text-ink-muted">
+        <p>
+          {requires
+            ? 'Every topic of this subject is a star, and each line points at a topic it requires.'
+            : 'Every topic of this subject is a star. None of them requires another yet, so no line joins them.'}{' '}
+          The arc round a star is how far up its ladder you are, solid as far as an answer showed and faint where you
+          hold it without one; the dashed ring is its target
+          {missed ? ', and a red ring marks a level you missed.' : '.'}
+          {requires && ' Point at or tap a star to see everything it requires and the level each needs.'}
+        </p>
+        {graph.route && graph.route.length > 0 ? (
+          <p>
+            A pulsing gold ring marks a star you are ready for now. The numbers and the dotted line are the order to
+            take them in, and Start here opens the first.
+          </p>
+        ) : (
+          <p>Nothing in this subject is ready to practise yet.</p>
+        )}
+        {graph.next.length > 0 && <p>The faint topics round the edge are next door. Tap one to go there.</p>}
+      </div>
+    );
+  }
   if (graph) {
     return (
       <div className="mt-2 space-y-1 text-ui text-ink-muted">
         <p>
           {graph.opened.kind === 'place'
-            ? 'Every idea in this place is named in full'
-            : 'This idea and its six nearest are named in full'}
-          , and lines join the ideas most alike; the thicker the line, the closer the two. Point at or tap an idea
+            ? 'Every topic in this subject is named in full'
+            : 'This topic and its six nearest are named in full'}
+          , and lines join the topics most alike; the thicker the line, the closer the two. Point at or tap a topic
           to see all its links and their scores.
         </p>
-        {graph.next.length > 0 && <p>The faint ideas round the edge are next door. Tap one to go there.</p>}
+        {graph.next.length > 0 && <p>The faint topics round the edge are next door. Tap one to go there.</p>}
       </div>
     );
   }
@@ -277,23 +334,23 @@ function MapNotes({
     <div className="mt-2 space-y-1 text-ui text-ink-muted">
       {params.layout === 'axes' ? (
         <p>
-          {bright} Ideas sit along the two directions that keep{' '}
+          {bright} Topics sit along the two directions that keep{' '}
           {Math.round((view.variance.first + view.variance.second) * 100)}% of how they differ, so two close here
           can still be far apart.
         </p>
       ) : (
         <p>
-          {bright} Only nearness means anything here: close stars are ideas
+          {bright} Only nearness means anything here: close stars are topics
           about the same thing.
         </p>
       )}
       {!past && litLine(litNames) && <p className="text-ink">{litLine(litNames)}</p>}
       {view.places.length === 0 ? (
-        <p>Your places are named by the daily run; until then the map names domains.</p>
+        <p>No subject has its topics placed yet, so the map names domains.</p>
       ) : (
-        <p>Tap a place&rsquo;s name to open it as a graph, or a topic&rsquo;s name to fly into it.</p>
+        <p>Tap a subject&rsquo;s name to open its topics with the levels you hold, or a Wikipedia topic&rsquo;s name to fly into it.</p>
       )}
-      {!view.topics && <p>The topics could not be read just now, so the map shows your ideas without them.</p>}
+      {!view.topics && <p>The Wikipedia topics could not be read just now, so the map shows your topics without them.</p>}
     </div>
   );
 }
@@ -306,10 +363,10 @@ function MapNotes({
  */
 function TopicLegend({ counts }: { counts: NonNullable<IdeaMapView['topics']>['counts'] }) {
   const marks: { key: string; swatch: React.ReactNode; label: string; count: number }[] = [
-    { key: 'lit', swatch: <TopicSwatch kind="lit" />, label: 'Topic lit', count: counts.lit },
-    { key: 'unlocked', swatch: <TopicSwatch kind="unlocked" />, label: 'Topic unlocked', count: counts.unlocked },
-    { key: 'landmark', swatch: <TopicSwatch kind="landmark" />, label: 'Level 3 topic, not touched yet', count: counts.untouched },
-    { key: 'hidden', swatch: null, label: 'Level 4 topics hidden until something touches them', count: counts.hidden },
+    { key: 'lit', swatch: <TopicSwatch kind="lit" />, label: 'Wikipedia topic lit', count: counts.lit },
+    { key: 'unlocked', swatch: <TopicSwatch kind="unlocked" />, label: 'Wikipedia topic unlocked', count: counts.unlocked },
+    { key: 'landmark', swatch: <TopicSwatch kind="landmark" />, label: 'Level 3 Wikipedia topic, not touched yet', count: counts.untouched },
+    { key: 'hidden', swatch: null, label: 'Level 4 Wikipedia topics hidden until something touches them', count: counts.hidden },
   ];
   return (
     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-small text-ink-muted" aria-label="What the diamonds mean">
@@ -339,9 +396,10 @@ function ideaDomains(ideas: readonly IdeaOnMap[]): { id: string; name: string; i
 }
 
 /**
- * What the sky shows, with how many of each: brightness, haze, the ring for
- * an idea held wrongly, the dust, and every domain's colour, which can be
- * pressed to pick out its ideas.
+ * What the sky shows, with how many of each: brightness for what answers
+ * lit, the gold halo for what you met untested, haze for what sits near what
+ * you know (plan #2187.1), the ring for an idea held wrongly, the dust, and
+ * every domain's colour, which can be pressed to pick out its ideas.
  */
 function Legend({
   params,
@@ -354,15 +412,16 @@ function Legend({
   params: MapParams;
   set: (change: Partial<MapParams>) => void;
   /** Every idea on the map on the day shown, lit as it was then. */
-  lights: readonly Pick<LightThen, 'strength' | 'haze' | 'state'>[];
+  lights: readonly Pick<LightThen, 'strength' | 'haze' | 'exposure' | 'state'>[];
   domains: { id: string; name: string; ideaCount: number }[];
   slots: Map<string, number>;
   dust: number;
 }) {
   const [allDomains, setAllDomains] = useState(false);
   const lit = lights.filter((idea) => idea.strength > 0).length;
-  const hazed = lights.filter((idea) => idea.strength <= 0 && idea.haze > 0.02).length;
+  const hazed = lights.filter((idea) => idea.strength <= 0 && idea.haze > FAINTEST_MARK).length;
   const dark = lights.length - lit - hazed;
+  const met = lights.filter((idea) => idea.exposure > FAINTEST_MARK).length;
   const mixedUp = lights.filter((idea) => idea.state === 'misconception').length;
 
   const marks: { key: string; swatch: React.ReactNode; label: string; count: number }[] = [
@@ -375,11 +434,17 @@ function Legend({
           <StarSwatch strength={1} />
         </span>
       ),
-      label: 'Known, dim to bright',
+      label: 'Tested, dim to bright',
       count: lit,
     },
-    { key: 'haze', swatch: <StarSwatch strength={0} haze={1} />, label: 'Not known, beside ideas you know', count: hazed },
-    { key: 'dark', swatch: <StarSwatch strength={0} />, label: 'Not known yet', count: dark },
+    {
+      key: 'halo',
+      swatch: <StarSwatch strength={0} exposure={1} />,
+      label: 'Met, not tested yet',
+      count: met,
+    },
+    { key: 'haze', swatch: <StarSwatch strength={0} haze={1} />, label: 'Near what you know', count: hazed },
+    { key: 'dark', swatch: <StarSwatch strength={0} />, label: 'Not tested yet', count: dark },
     { key: 'mixed', swatch: <StarSwatch strength={0} mixedUp />, label: 'Mixed up', count: mixedUp },
     { key: 'dust', swatch: <StarSwatch strength={0} dust />, label: 'Vault notes', count: dust },
   ];
@@ -410,7 +475,7 @@ function Legend({
             'flex gap-x-4 gap-y-1 text-small text-ink-muted sm:flex-wrap',
             allDomains ? 'flex-wrap' : 'flex-nowrap overflow-hidden',
           )}
-          aria-label="Domains, by colour; press one to pick out its ideas"
+          aria-label="Domains, by colour; press one to pick out its topics"
         >
           {ordered.map((domain, i) => {
             const on = params.domain === domain.id;
@@ -463,8 +528,20 @@ export function useOpenGraph(view: IdeaMapView): IdeaGraph | null {
   const { params } = usePick();
   return useMemo(() => {
     const opened = openedFrom(params);
+    if (opened?.kind === 'territory') {
+      const territory = view.territories?.find((t) => t.id === opened.id);
+      return territory ? territoryGraph(territory, opened.topic, view.ideas, view.places, params.layout) : null;
+    }
+    // A subject's place is its territory (plan #2317.2): it opens on the first
+    // topic you are ready for, or its first topic.
+    const territory = opened?.kind === 'place' ? view.territories?.find((t) => t.id === opened.id) : undefined;
+    if (territory) {
+      const first = territory.ready?.find((cell) => territory.topics.some((t) => t.id === cell.topicId))?.topicId;
+      const topic = first ?? territory.topics[0]?.id;
+      return topic ? territoryGraph(territory, topic, view.ideas, view.places, params.layout) : null;
+    }
     return opened ? ideaGraph(view.ideas, view.places, opened) : null;
-  }, [view.ideas, view.places, params]);
+  }, [view.ideas, view.places, view.territories, params]);
 }
 
 /** Above an open graph: the way back to the whole map, and what is open. */
@@ -481,7 +558,7 @@ function GraphBar({
   set: (change: Partial<MapParams>) => void;
   tour: Tour;
 }) {
-  const back = { place: null, around: null };
+  const back = { place: null, around: null, topic: null };
   const strengthOf = new Map(view.ideas.map((idea) => [idea.id, idea.strength]));
   const known = graph.core.filter((id) => (strengthOf.get(id) ?? 0) > 0).length;
   return (
@@ -496,14 +573,23 @@ function GraphBar({
         Whole map
       </Link>
       <h2 className="min-w-0 text-body font-medium text-ink">
-        {graph.opened.kind === 'place' ? graph.title : `Around \u201c${graph.title}\u201d`}
+        {graph.opened.kind === 'around' ? `Around \u201c${graph.title}\u201d` : graph.title}
         <span className="tabular ml-2 text-ui font-normal text-ink-muted">
-          {plural(graph.core.length, 'idea')}, {countText(known)} known
+          {graph.ladders
+            ? `${plural(graph.core.length, 'topic')}, ${countText(atTarget(graph.ladders))} at target`
+            : `${plural(graph.core.length, 'topic')}, ${countText(known)} known`}
         </span>
       </h2>
       <TourButton tour={tour} />
     </div>
   );
+}
+
+/** How many of a territory's topics hold their target level; a topic with no target is not counted. */
+function atTarget(ladders: ReadonlyMap<string, Ladder>): number {
+  let n = 0;
+  for (const ladder of ladders.values()) if (ladder.target !== null && ladder.held >= ladder.target) n += 1;
+  return n;
 }
 
 // -- An idea lights up (plan #1997.10) -----------------------------------------

@@ -1,4 +1,5 @@
 import { SectionHeading } from '@/components/ui/section-heading';
+import type { CourseExplain } from '@/lib/learn/evidence/course-explain';
 import type { SchoolGroup } from '@/lib/you/education';
 import { AddTranscript } from './add-transcript';
 import { SchoolCourses } from './course-list';
@@ -16,11 +17,17 @@ export function EducationSection({
   courseCounts,
   transcripts,
   courses,
+  explains,
+  explaining,
 }: {
   groups: SchoolGroup[];
   courseCounts: Record<string, number>;
   transcripts: number;
   courses: number;
+  /** Each graded course's explain prompt or what its answer showed (plan #2172.4.2). */
+  explains?: Record<string, CourseExplain>;
+  /** The gallery's way to draw one course with its prompt open. */
+  explaining?: string;
 }) {
   return (
     <section aria-labelledby="education">
@@ -36,7 +43,13 @@ export function EducationSection({
       />
       <AddTranscript empty={transcripts === 0} />
       {groups.map((group) => (
-        <SchoolCourses key={group.school} group={group} courseCounts={courseCounts} />
+        <SchoolCourses
+          key={group.school}
+          group={group}
+          courseCounts={courseCounts}
+          explains={explains}
+          explaining={explaining}
+        />
       ))}
     </section>
   );

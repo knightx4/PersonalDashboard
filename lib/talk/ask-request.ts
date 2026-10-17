@@ -1,10 +1,25 @@
 import 'server-only';
 
 import { createClient, requireUser } from '@/lib/auth/server';
-import { confirmChange, declineChange, reopenChange,
-  undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
+import {
+  confirmChange,
+  declineChange,
+  reopenChange,
+  undoChange,
+  writeChange,
+  type ChangeDeps,
+  type ChangeOutcome,
+} from '@/lib/ask/changes';
+import { readSubject } from '@/lib/core/dash-actions';
 import { executeProposal } from '@/lib/ask/propose';
-import { executeAskTool } from '@/lib/ask/tools';
+import { estimatePaidActions } from '@/lib/core/spend/paid-actions';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { queuePaidPress, type PaidEstimator } from '@/lib/dash/paid';
+import { dashTool, type DashPaidTool } from '@/lib/dash/registry';
+import { executeAskTool, lookupInScope } from '@/lib/ask/tools';
+import { HIT_TABLES } from '@/lib/ask/lookups';
+import type { ModuleId } from '@/lib/modules';
+import type { AskMention } from './ask-input';
 import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
 import { resolveFilteredList } from '@/lib/ask/filtered-list';
@@ -12,6 +27,7 @@ import { ASK_LISTS, type AskListFilter } from '@/lib/ask/list-filter';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-answer';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
@@ -20,6 +36,7 @@ import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { fileVaultNote, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
+import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
@@ -31,14 +48,31 @@ import {
   discardProposals,
   insertMadeChange,
   insertProposal,
+  insertThreadProposal,
   loadChanges,
   loadMadeChanges,
   type DashChange,
   type MadeChange,
 } from './changes';
-import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
-import type { TalkTurn } from './talk';
+import {
+  appendTurns,
+  editAskChat,
+  listAskChats,
+  listConversations,
+  loadAskChatMeta,
+  loadConversation,
+  searchAskChats,
+  startAsk,
+  type AskChatEdit,
+  type AskChatHit,
+  type ConversationSummary,
+} from './store';
+import type { AskChat } from './ask-chats';
+import { chatCostMicros, chatSpan } from './chat-trail';
+import { RECALL_OPERATION } from '@/lib/memory/search';
+import type { TalkCitation, TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
+import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -71,6 +105,14 @@ export async function askDashInRequest(input: {
   onLookup?: (event: AskLookupEvent) => void;
   /** Hears the answer's text as it is written (plan #1902): the streaming route listens. */
   onText?: (piece: string) => void;
+  /** Hears the question once it is kept (plan #1899.5): the streaming route tells the browser. */
+  onAsked?: Parameters<typeof askDash>[0]['onAsked'];
+  /** Aborts when the person stops the answer (plan #1899.5); what was written is kept. */
+  signal?: AbortSignal;
+  /** Rows added with @, already checked (parseAskMentions). */
+  mentions?: readonly AskMention[];
+  /** The workspace the lookups are kept to, already checked; null for every one. */
+  scope?: ModuleId | null;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -86,6 +128,11 @@ export async function askDashInRequest(input: {
   // Dash is offered the hand-off only when the backup routine can be started.
   const backup = dashBackupRoutine();
   const canHandOff = Boolean(backup.id && backup.token);
+  // A question kept to one workspace (plan #1899.5) looks only there: its
+  // lookups run as though that were the only workspace switched on, and
+  // one outside it is refused. Writes and the page keep the full context.
+  const scope = input.scope && settings.enabledModules.includes(input.scope) ? input.scope : null;
+  const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
 
   return askDash(
     {
@@ -94,7 +141,10 @@ export async function askDashInRequest(input: {
       files: input.files,
       page,
       today,
-      execute: (name, args) => executeAskTool(name, args, ctx),
+      execute: (name, args) =>
+        scope && !lookupInScope(name, scope)
+          ? Promise.resolve({ ok: false as const, error: 'That lookup is outside the workspace this question is kept to.' })
+          : executeAskTool(name, args, lookIn),
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
@@ -103,9 +153,16 @@ export async function askDashInRequest(input: {
           { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, fileQuickNote: (text) => fileVaultNote(user.id, text) },
           args,
         ),
+      // A paid press is checked and priced as the person, and only queued (plan #2228.1).
+      queue: (tool, args, seen) =>
+        queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, user.id)),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
+      onAsked: input.onAsked,
+      signal: input.signal,
+      mentions: mentionCitations(input.mentions ?? []),
+      scope,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -151,6 +208,11 @@ export async function askDashInRequest(input: {
   );
 }
 
+/** The rows added with @ as the question keeps them: an answer's citation shape, by search's tables. */
+export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[] {
+  return mentions.map((m) => ({ table: HIT_TABLES[m.kind], ref: m.id, title: m.title, href: m.href }));
+}
+
 /**
  * What a thread needs to reply through the shared loop (plan #1465): the
  * signed-in person's lookups, their writes through their own clients, and
@@ -176,7 +238,20 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
         args,
       ),
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
+    queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
+    saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
   };
+}
+
+/** Prices a paid press by its button's key, as its $ hint does, against the person's own ledger. */
+function paidEstimator(core: CoreSupabaseClient, userId: string): PaidEstimator {
+  return async (action) => (await estimatePaidActions(core, userId, [action]))[action] ?? null;
+}
+
+/** The paid tool of that name in Dash's registry, for an approval to run (plan #2228.1). */
+function paidToolNamed(name: string): DashPaidTool | undefined {
+  const tool = dashTool(name);
+  return tool?.kind === 'paid' ? tool : undefined;
 }
 
 /**
@@ -220,6 +295,7 @@ function askContext(
     // Gmail as it is now, through the person's own mailboxes; nothing is kept.
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
     readMail: async (message) => readMail(await createCoreClient(), userId, message),
+    readJobBoard,
   };
 }
 
@@ -229,12 +305,72 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
   return listConversations(await createCoreClient(), 'ask', limit);
 }
 
+/** The person's chats with Dash for the list on /ask (plan #1899.2), with the workspaces each touched. */
+export async function listAskChatsInRequest(timezone: string, limit = 200): Promise<AskChat[]> {
+  await requireUser();
+  return listAskChats(await createCoreClient(), timezone, limit);
+}
+
+/** Rename, pin or archive one of the person's chats (plan #1899.6); false when it is not theirs or not there. */
+export async function editAskChatInRequest(ref: string, edit: AskChatEdit): Promise<boolean> {
+  await requireUser();
+  return editAskChat(await createCoreClient(), ref, edit);
+}
+
+/** The person's chats in which `query` was said, by them or by Dash (plan #1899.6). */
+export async function searchAskChatsInRequest(query: string): Promise<AskChatHit[]> {
+  await requireUser();
+  return searchAskChats(await createCoreClient(), query);
+}
+
+/** One chat's own name and whether it is archived, or null when it is not theirs or not there. */
+export async function loadAskChatMetaInRequest(ref: string) {
+  await requireUser();
+  return loadAskChatMeta(await createCoreClient(), ref);
+}
+
 /** One past question's turns, oldest first, with each answer's lookups and citations; empty when it is not theirs or not there. */
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
   const core = await createCoreClient();
   return withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref }));
 }
+
+/**
+ * What asking Dash cost while one chat's answers were written (plan
+ * #1899.4), in micro-dollars, or null when the ledger holds nothing for it.
+ * The ledger does not name the chat, so this reads the asking rows in the
+ * chat's span and keeps those between each question and its answer
+ * (chatCostMicros). Never throws: a failed read says nothing was recorded.
+ */
+export async function loadAskChatCost(turns: readonly TalkTurn[]): Promise<number | null> {
+  const span = chatSpan(turns);
+  if (!span) return null;
+  try {
+    await requireUser();
+    const core = await createCoreClient();
+    const { data, error } = await core
+      .from('model_spend')
+      .select('created_at, cost_micros')
+      .eq('module', 'core')
+      .in('operation', ASK_SPEND_OPERATIONS)
+      .gte('created_at', span.from)
+      .lte('created_at', span.to)
+      .limit(500);
+    if (error) throw new Error(error.message);
+    const marks = ((data ?? []) as { created_at: string; cost_micros: number | null }[]).map((row) => ({
+      createdAt: row.created_at,
+      costMicros: row.cost_micros,
+    }));
+    return chatCostMicros(turns, marks);
+  } catch (error) {
+    console.error('ask chat cost was not read', error);
+    return null;
+  }
+}
+
+/** The ledger's operations for answering a question: the answer, and recalling notes for it. */
+const ASK_SPEND_OPERATIONS = ['ask-dash', RECALL_OPERATION];
 
 /**
  * How many requests in one past question are still with the backup routine
@@ -282,6 +418,7 @@ async function changeDeps(): Promise<ChangeDeps> {
     createTask,
     // A quick note's file comes out of the vault too (plan #1894.2).
     undoVaultNote: (action) => undoVaultCapture({ userId: user.id, core, db: requestAskDb() }, action),
+    paidTool: paidToolNamed,
   };
 }
 
@@ -303,4 +440,94 @@ export async function reopenAskChange(id: string): Promise<ChangeOutcome> {
 /** Take a confirmed change back and mark it undone, or say why not. */
 export async function undoAskChange(id: string): Promise<ChangeOutcome> {
   return undoChange(await changeDeps(), id);
+}
+
+/**
+ * Make one of Dash's answers a todo or a quick note in the vault (plan
+ * #1899.7), as the signed-in person, kept as a change under that answer so
+ * its card offers Undo. The conversation is read through their own client,
+ * so an answer that is not theirs is not found.
+ */
+export async function saveAskAnswer(ref: string, turnId: string, to: SaveAnswerTo): Promise<SaveAnswerOutcome> {
+  const deps = await changeDeps();
+  const db = requestAskDb();
+  return saveAnswer(
+    {
+      enabledModules: deps.enabledModules,
+      turns: (conversationId) => loadConversation(deps.core, { kind: 'ask', ref: conversationId }),
+      writeTodo: (input) => writeChange(deps, { kind: 'add_todo', input }),
+      fileNote: (text, title) => fileVaultNote(deps.userId, text, title),
+      readRow: async (subjectRef) => {
+        try {
+          return await readSubject(db, subjectRef);
+        } catch (error) {
+          console.error(`saving an answer: reading ${subjectRef} for the record failed`, error);
+          return null;
+        }
+      },
+      keep: (conversationId, made) => insertMadeChange(deps.core, deps.userId, conversationId, made),
+      attach: (changeId, answerId) => attachProposals(deps.core, [changeId], answerId),
+    },
+    ref,
+    turnId,
+    to,
+  );
+}
+
+/**
+ * A thumbs up or down on one of Dash's answers (plan #2285.2), as the
+ * signed-in person. The chat must be one of their Ask Dash chats and the
+ * turn one of Dash's in it; every read and the write also name their id, so
+ * nobody else's turn is reached even past RLS.
+ */
+export async function rateAskAnswer(
+  ref: string,
+  turnId: string,
+  rating: AnswerRating | null,
+  note: string | null,
+): Promise<RateAnswerOutcome> {
+  const user = await requireUser();
+  const core = await createCoreClient();
+  return rateAnswer(
+    {
+      readRole: async (conversationId, id) => {
+        const [chat, turn] = await Promise.all([
+          core
+            .from('conversations')
+            .select('id')
+            .eq('id', conversationId)
+            .eq('user_id', user.id)
+            .eq('subject_kind', 'ask')
+            .maybeSingle(),
+          core
+            .from('conversation_turns')
+            .select('role')
+            .eq('id', id)
+            .eq('conversation_id', conversationId)
+            .eq('user_id', user.id)
+            .maybeSingle(),
+        ]);
+        if (chat.error) throw new Error(`Reading the chat failed: ${chat.error.message}`);
+        if (turn.error) throw new Error(`Reading the answer failed: ${turn.error.message}`);
+        if (!chat.data || !turn.data) return null;
+        return (turn.data as { role: string }).role === 'assistant' ? 'assistant' : 'user';
+      },
+      write: async (conversationId, id, patch) => {
+        const { data, error } = await core
+          .from('conversation_turns')
+          .update(patch)
+          .eq('id', id)
+          .eq('conversation_id', conversationId)
+          .eq('user_id', user.id)
+          .eq('role', 'assistant')
+          .select('id');
+        if (error) throw new Error(`Keeping the rating failed: ${error.message}`);
+        return (data ?? []).length;
+      },
+    },
+    ref,
+    turnId,
+    rating,
+    note,
+  );
 }

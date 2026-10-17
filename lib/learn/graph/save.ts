@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { placeTrackAfterResponse, type TrackTheme } from '@/lib/learn/areas/place-track';
+import { prepareSubjectAfterResponse } from '@/lib/learn/prepare/kick';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedIdeaClaims } from '@/lib/learn/embed/idea-embedding';
 import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
@@ -63,6 +64,10 @@ function fail(action: string, error: { message: string }): Error {
  * one subject, and ending up with two half-graphs of the same field is the
  * failure the spec warns about specifically.
  *
+ * `note` is written on a subject made here (a learning goal's line, plan
+ * #2302.2), so its preparation reads what the goal is about; an existing
+ * subject keeps its own.
+ *
  * `placed` says whether the subject has a placement in the areas yet. A new
  * one never has, and an old one lacks it only when placing it failed.
  */
@@ -70,6 +75,7 @@ export async function findOrCreateSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   name: string,
+  options: { note?: string | null } = {},
 ): Promise<{ id: string; created: boolean; placed: boolean }> {
   const { data, error } = await supabase
     .from('subjects')
@@ -92,13 +98,15 @@ export async function findOrCreateSubject(
         .update({ survey: false })
         .eq('id', found.id);
       if (takeError) throw fail('Turning the survey topic into a subject', takeError);
+      // Now a subject, it is prepared like a new one (plan #2276.1).
+      prepareSubjectAfterResponse(found.id);
     }
     return { id: found.id, created: false, placed: Boolean(found.placed_at) };
   }
 
   const { data: created, error: createError } = await supabase
     .from('subjects')
-    .insert({ user_id: userId, name })
+    .insert({ user_id: userId, name, ...(options.note?.trim() ? { note: options.note.trim() } : {}) })
     .select('id')
     .single();
 
@@ -106,7 +114,10 @@ export async function findOrCreateSubject(
   if (createError || !created) {
     throw fail('Creating the subject', createError ?? { message: 'no row' });
   }
-  return { id: (created as { id: string }).id, created: true, placed: false };
+  const id = (created as { id: string }).id;
+  // The insert opened its preparation run (0167); start it once the response has gone.
+  prepareSubjectAfterResponse(id);
+  return { id, created: true, placed: false };
 }
 
 /**

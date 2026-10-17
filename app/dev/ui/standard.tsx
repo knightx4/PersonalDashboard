@@ -59,6 +59,8 @@ import { ANATOMIES } from './anatomy';
 import * as C from './content';
 import * as M from './measurements';
 import { CorrectionsChart } from './corrections';
+import { SentBackChart } from './sent-back';
+import type { SentBackWeek } from '@/lib/plan/sent-back';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { PageColumn } from '@/components/shell/page-width';
@@ -674,10 +676,13 @@ const NO_OUTLINES: OutlineIndex = new Map();
  */
 export function UiStandard({
   corrections,
+  sentBack,
   removedTaste,
   outlines = NO_OUTLINES,
 }: {
   corrections: readonly CorrectionWeek[] | null;
+  /** Screen steps shipped and sent back each week (plan #2215.5); null when unreadable. */
+  sentBack: readonly SentBackWeek[] | null;
   /** Ids of the preferences the person removed (`public.ui_taste_removals`). */
   removedTaste: readonly string[];
   /**
@@ -789,6 +794,14 @@ export function UiStandard({
         lead="Each week, the share of your notes filed on a screen that a step changed in the 30 days before. If the critic and your preferences are working, it falls."
       >
         <CorrectionsChart weeks={corrections} />
+      </Section>
+
+      <Section
+        id="sent-back"
+        title="How many new screens you send back"
+        lead="Each week since 31 August, the share of screen steps that shipped which you sent back or complained about the look of. If building to the mockup you approved is working, it falls."
+      >
+        <SentBackChart weeks={sentBack} />
       </Section>
 
       <Section
@@ -1699,12 +1712,13 @@ export function UiStandard({
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a deep shape in the workspace's hue behind a pane in its own colour, solid so it reads on any ground, with a sheen and a lit edge to make it glass. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for Home, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Each workspace mark is two layers of one object: a deep shape in the workspace's hue behind a pane in its own colour, solid so it reads on any ground, with a sheen and a lit edge to make it glass. Dash's mark is a glass capsule visor with a glowing core; it takes the colour of where it sits unless it is the subject, when it wears the brand ramp. The four runners each have their own visor shape and colour. Every state, and each kind of work Dash can show, has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">
             <li className="card-pad-x row-pad flex flex-wrap items-center gap-3">
               <ModuleMark module={null} />
+              <ModuleMark module="dash" />
               {MODULES.map((m) => (
                 <ModuleMark key={m.id} module={m.id} />
               ))}

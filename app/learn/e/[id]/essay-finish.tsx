@@ -5,7 +5,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { Button } from '@/components/ui/button';
 import { CloseButton } from '@/components/inbox/close-button';
 import { Card, CardSection } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { EssayClaim, OfferedClaim } from '@/lib/learn/essays/finish';
 import type { EssayStage } from '@/lib/learn/essays/note';
 import { acceptEssayFinish, type AcceptFinishResult, type FinishResult } from './actions';
@@ -56,7 +56,9 @@ export function addLabel(notes: number, evidence: boolean): string {
 
 /** The line under the heading once the essay is finished, naming its stage when this press set it. */
 export function finishedLine(date: string, stage: EssayStage | null): string {
-  const saved = stage ? `Saved to your vault as ${stage === 'evergreen' ? 'an' : 'a'} ${stage}` : 'Saved to your vault';
+  const saved = stage
+    ? `Saved to your vault as ${stage === 'evergreen' ? 'an' : 'a'} ${stage}`
+    : 'Saved to your vault';
   return `Finished on ${date}. ${saved} and added to your learning log.`;
 }
 
@@ -73,7 +75,9 @@ function Offering({
   onSkip: () => void;
 }) {
   const fresh = offers.claims.filter((claim) => !claim.existing);
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set(fresh.map((claim) => claim.name)));
+  const [picked, setPicked] = useState<ReadonlySet<string>>(
+    () => new Set(fresh.map((claim) => claim.name)),
+  );
   const [evidence, setEvidence] = useState(!offers.inEvidenceBank);
   const toggle = (name: string) =>
     setPicked((now) => {
@@ -132,13 +136,17 @@ function Offering({
         })}
       </ul>
       {fresh.length > 0 && (
-        <p className="mt-2 text-small text-ink-muted">Ticked claims become short notes in your Inbox.</p>
+        <p className="mt-2 text-small text-ink-muted">
+          Ticked claims become short notes in your Inbox.
+        </p>
       )}
       <div className="mt-3 flex gap-2 border-t border-border pt-3">
         {offers.inEvidenceBank ? (
           <>
             <span aria-hidden className="mt-1 size-4 shrink-0" />
-            <p className="text-small text-ink-muted">This essay is already in your evidence bank.</p>
+            <p className="text-small text-ink-muted">
+              This essay is already in your evidence bank.
+            </p>
           </>
         ) : (
           <>
@@ -284,7 +292,7 @@ export function EssayFinishCard({
   );
 
   const running = view.kind === 'running';
-  const label = running ? 'Finishing…' : finished ? 'Finish again' : 'Finish';
+  const label = running ? 'Finishing…' : finished ? 'Finish it again' : 'Finish the essay';
 
   return (
     <Card padding="none" className={className}>
@@ -298,17 +306,19 @@ export function EssayFinishCard({
           <p className="mt-1 text-small text-ink-muted">It is in your evidence bank.</p>
         )}
         <div className="mt-2 flex items-center justify-end gap-1">
-          <PaidHint action="app/learn/e/[id]/actions.ts#finishEssay" what="Cost of finishing" />
-          <Button
+          <DashAction
             type="button"
             variant="secondary"
             size="sm"
             disabled={!canFinish || running || view.kind === 'adding'}
             pending={running}
             onClick={() => void finish()}
+            paid="app/learn/e/[id]/actions.ts#finishEssay"
+            what="Cost of finishing"
+            hintFirst
           >
             {label}
-          </Button>
+          </DashAction>
         </div>
         {(view.kind === 'offers' || view.kind === 'adding') && (
           <Offering

@@ -24,6 +24,8 @@ export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
+  /** lib/ask/reply-check-model.ts, the weekly check of Ask Dash replies that went badly */
+  askReplyCheck: HAIKU,
   /** inngest/dev/suggest.ts */
   devDigestSuggest: HAIKU,
   /** lib/books/receipt-photo.ts */
@@ -58,6 +60,10 @@ export const MODELS = {
   jobsCompanyEnrich: HAIKU,
   /** lib/jobs/evidence/draft.ts */
   jobsEvidenceDraft: OPUS,
+  /** lib/jobs/drafting/draft-cover-letter.ts */
+  jobsCoverLetterDraft: OPUS,
+  /** lib/jobs/drafting/draft-application.ts, every answer on an application in one call */
+  jobsApplicationDraft: OPUS,
   /** lib/jobs/evidence/match.ts */
   jobsEvidenceMatch: OPUS,
   /** lib/jobs/evidence/propose.ts */
@@ -76,6 +82,10 @@ export const MODELS = {
   jobsDiscoverShortlist: SONNET,
   /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
   learnAreaPlace: SONNET,
+  /** lib/learn/goal-kind-call.ts; one call sorts every goal not yet sorted, with a reason each */
+  learnGoalKind: HAIKU,
+  /** lib/learn/catalogue/ocw-structure-pull.ts; names candidate courses for a goal, each confirmed by a fetch */
+  learnStructurePropose: HAIKU,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
   /** lib/learn/places/name.ts; a few words for each place on Idea Space, daily */
@@ -106,6 +116,12 @@ export const MODELS = {
   learnGraphFromPrior: SONNET,
   /** lib/learn/graph/generate.ts */
   learnGraphGenerate: SONNET,
+  /** lib/learn/levels/draft.ts; a topic's ten levels, drafted from a goal */
+  learnTopicDraft: SONNET,
+  /** lib/learn/prepare/compile-territory.ts; one call per subject lays out its thirty to fifty topics */
+  learnTerritoryCompile: SONNET,
+  /** lib/learn/levels/move-call.ts; one call per subject moved from the claims graph */
+  learnTopicAssign: SONNET,
   /** lib/learn/graph/misconception.ts */
   learnMisconception: HAIKU,
   /** lib/learn/graph/opening-claims.ts */
@@ -114,6 +130,16 @@ export const MODELS = {
   learnOpeningProbe: HAIKU,
   /** lib/learn/graph/probe.ts */
   learnProbe: HAIKU,
+  /** lib/learn/levels/grade-call.ts, an explanation graded against several levels at once */
+  learnLevelGrade: HAIKU,
+  /** lib/learn/levels/grade-call.ts, the second grader of the same answer; kept for agreement, writes no evidence */
+  learnLevelGradeSecond: SONNET,
+  /** lib/learn/evidence/course-band-call.ts, the frame topics one graded course covered (plan #2172.4.1) */
+  learnCourseTopics: HAIKU,
+  /** lib/learn/levels/case-call.ts, a case written for a level 4 to 6 cell */
+  learnLevelCase: HAIKU,
+  /** lib/learn/lessons/match-piece-cells.ts, the cells each piece of a unit teaches */
+  learnPieceCells: HAIKU,
   /** lib/learn/chat/subjects.ts */
   learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */
@@ -140,6 +166,8 @@ export const MODELS = {
   learnSurveyGoalIdea: HAIKU,
   /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
   learnEssayInterview: SONNET,
+  /** lib/learn/essays/guide-model.ts, the guided essay: reading the brief, finding points, shapes, plan notes, questions on a point, and writing up the research */
+  learnEssayGuide: SONNET,
   /** lib/learn/essays/rephrase-model.ts, Rephrase on a selected sentence of an essay */
   learnEssayRephrase: SONNET,
   /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */

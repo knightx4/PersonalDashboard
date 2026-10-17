@@ -2,9 +2,9 @@
 
 import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { FileText, Network } from 'lucide-react';
+import { Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { ChipSelect, ComposeBody, ComposeBox, Checkbox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -39,19 +39,32 @@ const key = (name: string) => name.trim().toLowerCase();
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" pending={pending}>
-      <FileText className="size-4" strokeWidth={1.75} aria-hidden />
+    <DashAction
+      type="submit"
+      size="sm"
+      variant="secondary"
+      pending={pending}
+      paid="app/learn/know/actions.ts#proposeBrief"
+      what="Cost of reading the briefing"
+      hintFirst
+      wrapperClassName="ml-auto"
+    >
       {pending ? 'Reading it…' : 'Read the briefing'}
-    </Button>
+    </DashAction>
   );
 }
 
 function ImportButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending || count === 0}>
+    <DashAction
+      type="submit"
+      disabled={pending || count === 0}
+      paid="app/learn/know/actions.ts#approveBrief"
+      what="Cost of saving them"
+    >
       {pending ? 'Saving…' : `Add ${count} ${count === 1 ? 'idea' : 'ideas'} to learn`}
-    </Button>
+    </DashAction>
   );
 }
 
@@ -173,7 +186,6 @@ export function Proposal({ chain, onDiscard }: { chain: ProposedChain; onDiscard
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <ImportButton count={adding} />
-        <PaidHint action="app/learn/know/actions.ts#approveBrief" what="Cost of saving them" />
         {/* Writes nothing and asks nothing again: the proposal is thrown away
             and the paste box comes back. */}
         <Button type="button" variant="ghost" onClick={onDiscard}>
@@ -237,13 +249,7 @@ export function BriefForm({
               ))}
             </ChipSelect>
           )}
-          <span className="ml-auto flex items-center gap-1">
-            <PaidHint
-              action="app/learn/know/actions.ts#proposeBrief"
-              what="Cost of reading the briefing"
-            />
-            <ReadButton />
-          </span>
+          <ReadButton />
         </div>
       </ComposeBox>
       {state.error && (

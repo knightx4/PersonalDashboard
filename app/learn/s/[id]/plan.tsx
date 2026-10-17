@@ -48,7 +48,7 @@ export function PlanSection({
   /** The final project, or null before its brief is written. */
   project: ProjectView | null;
   /** The learning goal the plan is for, which a finished plan offers to write about. */
-  goal?: { aimId: string; name: string } | null;
+  goal?: { aimId: string | null; name: string } | null;
 }) {
   const progress = planProgress(units);
   const finished = planFinished(progress, project?.passed ?? false);
@@ -90,7 +90,7 @@ export function PlanSection({
       ) : finished && goal ? (
         // The line above already says it is finished, so the one thing left
         // to offer is an essay on it (plan #1867).
-        <WriteAboutThis kind="goal" refId={goal.aimId} title={goal.name} className="mb-4" />
+        <WriteAboutThis kind="goal" refId={goal.aimId ?? subjectId} title={goal.name} className="mb-4" />
       ) : (
         <EmptyState
           size="box"

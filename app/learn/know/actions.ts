@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { generateChain, type SweptClaim } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
 import { conceptsFromCourse, courseLabel } from '@/lib/learn/graph/from-course';
 import { conceptsAfterRead } from '@/lib/learn/graph/course-reads';
@@ -14,23 +13,12 @@ import {
   conceptsFromBrief,
   MAX_BRIEFING_CHARS,
 } from '@/lib/learn/graph/from-brief';
-import { declareKnown, existingConcepts, findOrCreateSubject, saveChain } from '@/lib/learn/graph/save';
-import { parseOwnUnits } from '@/lib/learn/graph/curriculum-payload';
-import { placeTrackAfterResponse } from '@/lib/learn/areas/place-track';
-import { ensureCurriculum, fileGoalUnder } from '@/lib/learn/graph/curriculum-store';
+import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { makeCustomSubject } from '@/lib/learn/graph/curriculum-run';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
-import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
-import { MIN_CLAIMS } from '@/lib/learn/graph/opening-payload';
-import { writeOpeningQuestions } from '@/lib/learn/graph/opening-probe';
-import {
-  attachSweepToSubject,
-  loadSweep,
-  seedFromSweep,
-  sweepForGoal,
-  writeSweep,
-  type OpeningSweep,
-} from '@/lib/learn/graph/opening';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { runTopicDraft } from '@/lib/learn/levels/draft-run';
+import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
 import { classifyNote } from '@/lib/learn/vault/classify';
 import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -43,256 +31,62 @@ import {
 } from '@/lib/learn/graph/chain-payload';
 
 /**
- * Naming a goal, and deciding what to do with what comes back.
- *
- * Two steps and a person between them. `proposeGoal` calls the model and
- * writes nothing; `approveChain` writes what came back, and only after
- * somebody has read it.
- *
- * That gap is the cheapest check available on a generated graph and the only
- * one there is before anything gets taught. A wrong reading list is a few
- * unticked rows; a wrong graph is what every later question is asked against.
+ * Naming a goal drafts its topic (plan #2138.4). This was the claims graph's
+ * way in: a chain of claims laid out, approved, and written to the subject.
+ * The graph is now only read, so the goal goes to drafting a topic with its
+ * ten levels (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"), the same press
+ * as New topic on /learn/topics, and lands on the draft's page to be read and
+ * approved. Nothing is asked about it until then.
  */
 
-export type ProposeState = {
-  error?: string;
-  /** Proposed, not saved. Nothing reaches the graph until you approve it. */
-  chain?: ProposedChain;
-  /** The words that were typed, kept for the approval that follows. */
-  asked?: string;
-  /** The curriculum unit this goal opens, carried to the approval. */
-  unitId?: string;
-};
-
-export type ApproveState = { error?: string };
-
-const ProposeInput = z.object({
-  goal: z
-    .string()
-    .trim()
-    .min(1, 'Say what you want to understand.')
-    .max(300, 'Shorter is better here — the narrower the goal, the better this works.'),
-  subjectId: z.string().uuid().nullable(),
-  /** Set once the opening questions have been asked, so they are not asked twice. */
-  sweepId: z.string().uuid().nullable(),
-  /** The curriculum unit being opened, when the goal came from one. */
-  unitId: z.string().uuid().nullable(),
-});
+export type ProposeState = { error?: string };
 
 /** A form field that is either a uuid or left empty. */
 function optionalId(value: FormDataEntryValue | null): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-/** The answered questions from a sweep, as generation reads them. */
-function sweptClaims(sweep: OpeningSweep | null): SweptClaim[] {
-  if (!sweep) return [];
-  return sweep.questions
-    .filter((question) => question.outcome !== null)
-    .map((question) => ({
-      name: question.claimName,
-      claim: question.claim,
-      outcome: question.outcome as SweptClaim['outcome'],
-    }));
-}
-
-/**
- * The ten questions, when this is a subject you have never worked on.
- *
- * Returns the sweep to send somebody to, or null to carry straight on to the
- * chain. Null covers every ordinary reason not to ask: a goal typed inside a
- * subject, a subject you already have, something too broad to have shared
- * ground in it, and a call that came back with too little to ask about. None
- * of those is worth stopping the person for -- the sweep is an addition to the
- * flow that works today, not a gate in front of it.
- */
-async function openingSweepFor(
-  supabase: Awaited<ReturnType<typeof createLearnClient>>,
-  userId: string,
-  goal: string,
-): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  const spend = collectSpend();
-  const named = await nameOpeningClaims({ asked: goal, anthropicApiKey: apiKey, onSpend: spend.sink });
-  await recordLearnSpend(userId, 'name-opening-claims', spend.reports);
-  if (!named.ok) return null;
-
-  // A subject already in the graph has a starting state already, and asking
-  // ten questions to establish one would be measuring what is on the screen.
-  const subjects = await loadSubjects(supabase);
-  if (subjects.some((subject) => subject.name.toLowerCase() === named.subject.toLowerCase())) {
-    return null;
-  }
-
-  const writing = collectSpend();
-  const written = await writeOpeningQuestions({
-    subject: named.subject,
-    claims: named.claims,
-    anthropicApiKey: apiKey,
-    onSpend: writing.sink,
-  });
-  await recordLearnSpend(userId, 'write-opening-question', writing.reports);
-  if (written.questions.length < MIN_CLAIMS) return null;
-
-  const sweep = await writeSweep(supabase, userId, {
-    asked: goal,
-    subjectName: named.subject,
-    questions: written.questions,
-  });
-  return sweep.id;
-}
+const GoalInput = z
+  .string()
+  .trim()
+  .min(2, 'Say what you want to understand.')
+  .max(300, 'Shorter is better here. Name one topic, such as DCF.');
 
 // latency: pending
-export async function proposeGoal(
-  _prev: ProposeState,
-  formData: FormData,
-): Promise<ProposeState> {
+export async function proposeGoal(_prev: ProposeState, formData: FormData): Promise<ProposeState> {
   const user = await requireUser();
-
-  const raw = formData.get('subjectId');
-  const sweptRaw = formData.get('sweepId');
-  const parsed = ProposeInput.safeParse({
-    goal: formData.get('goal') ?? '',
-    subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
-    sweepId: typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null,
-    unitId: optionalId(formData.get('unitId')),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Could not read that goal.' };
-  }
+  const goal = GoalInput.safeParse(formData.get('goal') ?? '');
+  if (!goal.success) return { error: goal.error.issues[0]?.message ?? 'Could not read that goal.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Laying out a goal needs ANTHROPIC_API_KEY to be set.' };
+  if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
+
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
 
   const supabase = await createLearnClient();
-
-  // Before anything is laid out for a subject you have never worked on: ten
-  // questions across it, answered from memory. Skipped when the goal was typed
-  // inside a subject, and skipped once the questions have been asked.
-  if (!parsed.data.subjectId && !parsed.data.sweepId) {
-    const sweepId = await openingSweepFor(supabase, user.id, parsed.data.goal);
-    if (sweepId) redirect(`/learn/opening/${sweepId}`);
-  }
-
-  // Inside a subject, the generator is told what that subject already holds so
-  // it does not propose it again. Outside one, it names the subject itself and
-  // there is nothing yet to dedupe against.
-  const subject = parsed.data.subjectId
-    ? await loadSubject(supabase, parsed.data.subjectId)
-    : null;
-  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
-
-  // What they could produce about this before reading anything. Found by the
-  // words when the sweep id was not carried through, so a chain laid out days
-  // later still starts from where they were.
-  const swept = parsed.data.sweepId
-    ? await loadSweep(supabase, parsed.data.sweepId)
-    : await sweepForGoal(supabase, parsed.data.goal);
-
-  const spend = collectSpend();
-  const result = await generateChain({
-    goal: parsed.data.goal,
-    subject: subject?.name ?? null,
-    existing,
-    swept: sweptClaims(swept),
-    anthropicApiKey: apiKey,
-    onSpend: spend.sink,
-  });
-  await recordLearnSpend(user.id, 'generate-chain', spend.reports);
-
-  if (!result.ok) return { error: result.detail };
-  return { chain: result.chain, asked: parsed.data.goal, unitId: parsed.data.unitId ?? undefined };
-}
-
-// latency: pending
-export async function approveChain(
-  _prev: ApproveState,
-  formData: FormData,
-): Promise<ApproveState> {
-  const user = await requireUser();
-
-  const asked = z
-    .string()
-    .trim()
-    .min(1)
-    .max(300)
-    .safeParse(formData.get('asked'));
-  if (!asked.success) return { error: 'Could not work out which goal this was.' };
-
-  const raw = formData.get('chain');
-  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
-
-  let payload: unknown;
+  let id: string;
   try {
-    payload = JSON.parse(raw);
-  } catch {
-    return { error: 'That proposal did not survive the trip. Ask again.' };
-  }
-
-  const safe = approvedChainSchema.safeParse(payload);
-  if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
-
-  const sweptRaw = formData.get('sweepId');
-  const sweepId = typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null;
-  const unit = z.string().uuid().safeParse(formData.get('unitId'));
-  const unitId = unit.success ? unit.data : null;
-
-  const supabase = await createLearnClient();
-  let subjectId: string;
-  let goalId: string | null;
-  try {
-    const saved = await saveChain(supabase, user.id, safe.data as ProposedChain, asked.data, { unitId });
-    subjectId = saved.subjectId;
-    goalId = saved.goalId;
+    const result = await runTopicDraft(supabase, user.id, { goal: goal.data, anthropicApiKey: apiKey });
+    if (!result.ok) return { error: result.detail };
+    id = result.id;
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not save that chain.' };
+    return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
 
-  // A track gets its curriculum the first time a chain is approved into it
-  // (LEARN-GRAPH-SPEC, "The curriculum"), and the goal just approved is filed
-  // under the unit it falls in. A failure here costs the track its curriculum
-  // for now, never the chain: the track page offers to write it again.
-  if (!unitId) {
+  // Named on a subject's page, the topic joins that subject's lens, the one
+  // lens its goals read too (plan #2138.7, #2302.3). The draft is kept even
+  // if this fails: it is on the map and can be added again.
+  if (subjectId.success) {
     try {
-      const curriculum = await ensureCurriculum(
-        supabase,
-        user.id,
-        { id: subjectId, name: (safe.data as ProposedChain).subject },
-        asked.data,
-      );
-      if (curriculum.ok && curriculum.goalUnitId && goalId) {
-        await fileGoalUnder(supabase, goalId, curriculum.goalUnitId);
-      }
+      await addToSubjectLens(supabase, user.id, subjectId.data, id);
+      revalidatePath('/learn/know');
     } catch (error) {
-      console.error('[learn curriculum]', error instanceof Error ? error.message : error);
+      console.error('[learn goal] subject lens', error instanceof Error ? error.message : error);
     }
   }
 
-  // What they showed before any of this was laid out becomes the state the
-  // subject starts in. Only ever on the way in: a claim that matches nothing
-  // changes nothing, and what it seeded is counted on the subject page rather
-  // than left in a log, because a concept marked known is one the views stop
-  // showing you.
-  let seeded = '';
-  const sweep = sweepId ? await loadSweep(supabase, sweepId) : await sweepForGoal(supabase, asked.data);
-  if (sweep) {
-    try {
-      const concepts = await existingConcepts(supabase, subjectId);
-      const result = await seedFromSweep(supabase, user.id, sweep, concepts);
-      await attachSweepToSubject(supabase, sweep.id, subjectId);
-      seeded = `?known=${result.known}&shaky=${result.shaky}&unmatched=${result.unmatched.length}`;
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : 'Could not record what you already knew.',
-      };
-    }
-  }
-
-  revalidatePath('/learn/know');
-  revalidatePath(`/learn/s/${subjectId}`);
-  redirect(`/learn/s/${subjectId}${seeded}`);
+  revalidatePath('/learn/topics');
+  redirect(`/learn/topics/${id}`);
 }
 
 /**
@@ -860,53 +654,15 @@ export async function createCustomTrack(
     units: formData.get('units') ?? '',
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Could not read that.' };
-  const own = parseOwnUnits(parsed.data.units);
-  if (!own.ok) return { error: own.detail };
-
   const supabase = await createLearnClient();
-  const name = parsed.data.name;
-  const want = parsed.data.want || null;
-
-  let subject: { id: string; created: boolean; placed: boolean };
-  try {
-    subject = await findOrCreateSubject(supabase, user.id, name);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not make that subject.' };
-  }
-
-  if (subject.created) {
-    if (want) await supabase.from('subjects').update({ note: want }).eq('id', subject.id);
-    // Placed in the areas once the response has gone, as a track from a
-    // chain is; a track with no field yet is still a track.
-    placeTrackAfterResponse(supabase, user.id, {
-      id: subject.id,
-      name,
-      context: [want ? `aimed at: ${want}` : '', own.titles.length > 0 ? `units: ${own.titles.join('; ')}` : '']
-        .filter(Boolean)
-        .join('. '),
-    });
-  }
-
-  const curriculum = await ensureCurriculum(
-    supabase,
-    user.id,
-    { id: subject.id, name },
-    want,
-    own.titles,
-  ).catch((error: unknown) => ({
-    ok: false as const,
-    detail: error instanceof Error ? error.message : 'Could not write the curriculum.',
-  }));
-  // An existing track with a curriculum already keeps it; say so rather than
-  // quietly dropping the units that were typed.
-  if (!subject.created && curriculum.ok && !curriculum.written && own.titles.length > 0) {
-    return {
-      error: `You already have a subject called ${name}, and its curriculum is fixed.`,
-      existing: { id: subject.id, name },
-    };
-  }
+  const made = await makeCustomSubject(supabase, user.id, {
+    name: parsed.data.name,
+    want: parsed.data.want || null,
+    units: parsed.data.units,
+  });
+  if (!made.ok) return made.existing ? { error: made.detail, existing: made.existing } : { error: made.detail };
 
   revalidatePath('/learn/know');
   // A failed curriculum still leaves the track, whose page offers to write it.
-  redirect(`/learn/s/${subject.id}`);
+  redirect(`/learn/s/${made.id}`);
 }

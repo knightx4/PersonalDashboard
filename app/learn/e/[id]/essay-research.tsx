@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useState, type RefObject } from 'react';
+import { LinkedText } from '@/components/ui/linked-text';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { MarkdownEditorHandle } from '@/components/learn/markdown-editor';
 import { cn } from '@/lib/cn';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
@@ -11,7 +12,6 @@ import {
   countLine,
   DEEPER_PAGES,
   DEEPER_SEARCHES,
-  FIRST_PASS_SEARCHES,
   footnoteFor,
   NO_RESEARCH,
   textFragmentUrl,
@@ -22,6 +22,7 @@ import {
   type ResearchLevel,
   type ResearchSource,
 } from '@/lib/learn/essays/research';
+import { MAP_SEARCHES } from '@/lib/learn/essays/research-map';
 import { researchEssay } from './actions';
 import { linkVariants } from '@/components/ui/link';
 
@@ -114,7 +115,10 @@ function Quote({
           href={textFragmentUrl(source.url, citation.quote)}
           target="_blank"
           rel="noreferrer"
-          className={cn('inline-flex min-h-11 min-w-0 flex-1 items-center px-2 text-small lg:min-h-8', linkVariants())}
+          className={cn(
+            'inline-flex min-h-11 min-w-0 flex-1 items-center px-2 text-small lg:min-h-8',
+            linkVariants(),
+          )}
           title={source.title}
         >
           <span className="truncate">{source.domain || source.title}</span>
@@ -153,6 +157,13 @@ function Quotes({
   );
 }
 
+/** What each finding of a write-up for the writer is, said above it. */
+const KIND_LABELS = {
+  for: 'Supports your answer',
+  against: 'Pushes back',
+  use: 'You could use',
+} as const;
+
 function FirstPass({
   run,
   onCite,
@@ -161,15 +172,31 @@ function FirstPass({
   onCite: (source: ResearchSource, quote: string) => void;
 }) {
   return (
-    <ol className="flex flex-col divide-y divide-border">
-      {run.positions.map((position, i) => (
-        <li key={i} className="py-3 first:pt-0 last:pb-0">
-          <p className="text-ui font-medium text-ink">{position.title}</p>
-          {position.summary && <p className="mt-1 text-small text-ink-muted">{position.summary}</p>}
-          <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
-        </li>
-      ))}
-    </ol>
+    <>
+      {run.summary && (
+        <p className="mb-3 text-small text-ink">
+          <LinkedText text={run.summary} refs={false} />
+        </p>
+      )}
+      <ol className="flex flex-col divide-y divide-border">
+        {run.positions
+          .filter((position) => position.kind !== 'debate')
+          .map((position, i) => (
+            <li key={i} className="py-3 first:pt-0 last:pb-0">
+              {position.kind && position.kind !== 'debate' && (
+                <p className="text-small text-ink-muted">{KIND_LABELS[position.kind]}</p>
+              )}
+              <p className="text-ui font-medium text-ink">{position.title}</p>
+              {position.summary && (
+                <p className="mt-1 text-small text-ink-muted">
+                  <LinkedText text={position.summary} refs={false} />
+                </p>
+              )}
+              <Quotes citations={position.citations} sources={run.sources} onCite={onCite} />
+            </li>
+          ))}
+      </ol>
+    </>
   );
 }
 
@@ -230,7 +257,7 @@ function Level({
 }) {
   const running = pending === 'running';
   const error = typeof pending === 'object' ? pending.error : null;
-  const label = running ? 'Searching…' : run ? 'Run again' : 'Run';
+  const label = running ? 'Searching…' : run ? 'Search again' : 'Search';
   return (
     <CardSection title={title}>
       {run ? (
@@ -239,18 +266,7 @@ function Level({
         <p className="text-small text-ink-muted">{about}</p>
       )}
       <div className="mt-2 flex items-center justify-end gap-1">
-        {level === 'first' ? (
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#researchEssay:first"
-            what="Cost of a first pass"
-          />
-        ) : (
-          <PaidHint
-            action="app/learn/e/[id]/actions.ts#researchEssay:deeper"
-            what="Cost of a deeper pass"
-          />
-        )}
-        <Button
+        <DashAction
           type="button"
           variant="secondary"
           size="sm"
@@ -258,9 +274,16 @@ function Level({
           pending={running}
           onClick={() => onRun(level)}
           aria-label={`${label}: ${title}`}
+          paid={
+            level === 'first'
+              ? 'app/learn/e/[id]/actions.ts#researchEssay:first'
+              : 'app/learn/e/[id]/actions.ts#researchEssay:deeper'
+          }
+          what={level === 'first' ? 'Cost of a first pass' : 'Cost of a deeper pass'}
+          hintFirst
         >
           {label}
-        </Button>
+        </DashAction>
       </div>
       {run && (
         <div aria-busy={running || undefined} className="mt-3">
@@ -295,7 +318,7 @@ export function EssayResearchCard({ api, className }: { api: ResearchApi; classN
       <Level
         level="first"
         title="Research the question"
-        about={`Up to ${FIRST_PASS_SEARCHES} web searches on your question, and the 3 to 5 positions people take on it, each with its sources. Nothing from your notes goes into a search.`}
+        about={`Dash searches up to ${MAP_SEARCHES} times for evidence for and against your answer and material you could use, with sources. Nothing from your notes goes into a search. Insert puts a quote at the cursor, as a footnote.`}
         run={api.runs.first}
         pending={api.pending.first}
         onRun={(level) => void api.run(level)}

@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { Button, type ButtonProps } from '@/components/ui/button';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import type { PressState } from './actions';
@@ -41,10 +41,22 @@ export function Press({
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      <Button type="submit" size="sm" variant={variant} pending={pending}>
-        {pending ? pendingLabel : label}
-      </Button>
-      {cost && <PaidHint action={cost} what="Cost of embedding what it fetches" className="-ml-2" />}
+      {cost ? (
+        <DashAction
+          type="submit"
+          size="sm"
+          variant={variant}
+          pending={pending}
+          paid={cost}
+          what="Cost of embedding what it fetches"
+        >
+          {pending ? pendingLabel : label}
+        </DashAction>
+      ) : (
+        <Button type="submit" size="sm" variant={variant} pending={pending}>
+          {pending ? pendingLabel : label}
+        </Button>
+      )}
       {state.error ? (
         <span role="alert" className="text-small text-danger">
           {state.error}

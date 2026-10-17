@@ -162,21 +162,30 @@ far, which concepts you know, and which you rated too hard or kept for work,
 so the new unit builds on what you have shown. Tracks written before this keep
 all their units, and new ones are added after the last.
 
-### A goal's track is outlined whole
+On a prepared subject the call is also given its territory (plan #2307.5): the
+topics no unit names yet, in the order the documents teach them, each with the
+weeks that put it on the list. The unit names in what it covers the topics it
+teaches, and the weeks of those topics are cited after that line ("Follows MIT
+14.01: Week 4: elasticity."), so the course keeps the shape the syllabi gave
+it. Write the curriculum reads a prepared subject's opening units off its
+territory in the same way as the preparation's write_units step.
 
-Plan #1139. A learning goal's track gets every unit in one call when the goal
-is saved, so the whole course shows from the start. The count follows the
-goal's depth: 5 to 8 units for familiar, 8 to 12 for solid, 12 to 16 for deep
-(`OUTLINE_UNITS` in `lib/learn/graph/curriculum-payload.ts`). A track that
-already had units keeps them, and the outline is written after them.
-`learn.subjects.outlined_at` records that a track has its outline (learn 0072).
+### A goal points at a subject
 
-No unit is written one at a time for an outlined track: the top-up raises no
-`all-units-done`, `last-unit-short` or `no-curriculum` need for it. A goal's
-track that has no outline yet, because the call failed when the goal was saved
-or the goal was set before outlines, raises `no-outline` instead, and the top-up
-writes the outline (`ensureOutline` in `lib/learn/lessons/outline.ts`). Tracks
-not made from a goal still get their units as they go.
+Plan #2302.2, replacing the whole-track outline of plan #1139. Saving a
+learning goal links it to the subject it is about (`aims.subject_id`): the
+subject of that name, or a new one made from the goal's name and line
+(`lib/learn/goal-saved.ts`). A new subject opens its preparation like any other
+(learn 0167), and the preparation sorts its kind, finds its structure and
+writes its opening units. The goal writes no outline, track or kind of its own;
+its page shows and changes the subject's kind and shows the preparation in one
+line.
+
+The tracks outlined before keep their units, and `learn.subjects.outlined_at`
+(learn 0072) still marks them: no unit is written one at a time for an
+outlined track, so the top-up raises no `all-units-done`, `last-unit-short` or
+`no-curriculum` need for it. Tracks not made from a goal still get their units
+as they go.
 
 ### A goal's units are split into pieces
 
@@ -203,7 +212,24 @@ on every run, whether or not the deck is short, a pass finds laid-out units of
 goal tracks with no pieces and writes up to two (`writeDuePieces` in
 `lib/learn/lessons/pieces.ts`). The pass covers units laid out any other way,
 such as by opening the unit on the track page, and the units laid out before
-pieces existed. Tracks not made from a goal get no pieces.
+pieces existed.
+
+A subject whose preparation has finished gets pieces the same way without a
+goal (plan #2292.1). The preparation's last step, `first_lesson`
+(`lib/learn/prepare/first-lesson-step.ts`), lays out unit 1 with the unit's
+own question, splits it into pieces, matches them to the territory's cells and
+writes the lessons of the first piece's ideas, so the subject has a lesson to
+read when the run ends. After that the top-up treats the subject as it treats
+a goal's track: `planSubjects` in `lib/learn/lessons/plan-store.ts` returns the
+active goals' tracks and the prepared subjects, and the plan pass, the pieces
+pass and the lay-out port all read it. Later units are laid out one ahead of
+the person and split as they are reached. A track that is neither a goal's nor
+a prepared subject still gets no pieces.
+
+The lesson's catalogue search reads one more kind of source for every track:
+units of stored structure documents whose licence is show
+(`learn.nearest_lesson_segments`, learn 0174). A structure_only or never_feed
+unit is never given to the lesson call.
 
 ### A piece is worked through on its own page
 
@@ -233,6 +259,59 @@ piece's `passed_at` only when the practice is passed too (plan #1142). A wrong a
 answer expected, and offers another question, written knowing the ones already
 asked so it is not the same one reworded. Nothing on the page marks a piece
 passed any other way.
+
+### A piece names the cells it teaches
+
+Plan #2138.13. A piece also names the cells of its goal's territory that it
+teaches (docs/LEARN-LEVELS-SPEC.md), in `plan_pieces.cell_ids` (learn 0146).
+The territory is every approved topic on the lens of the track's subject or of
+a learning goal whose track it is, each up to the target that lens sets
+(`loadTrackTerritory` in `lib/learn/lessons/piece-cells-store.ts`). When a
+unit's pieces are written, one Haiku call matches them against it
+(`matchPieceCells`), at most four cells a piece, and `cells_matched_at`
+records that it ran. A piece written before its goal had a territory keeps an
+empty list with no date, and the pieces pass of the top-up matches up to two
+such units a run once a territory exists (`fillDuePieceCells`). The call is
+recorded as `write-plan-pieces`.
+
+The piece's page lists its cells under "What this piece teaches", each with
+where you stand on it and a link to its topic's ladder. A piece with a cell it
+can ask about checks with a cell question in place of its own: on the highest
+level among its cells that is asked in writing (not level 10), preferring one
+you do not hold yet (`checkCell` in `lib/learn/lessons/piece-cells.ts`). The
+question is a `learn.cell_questions` row with `piece_id` set, asked and graded
+as Practice Flow asks and grades any cell (`askCell` and `answerCell`), so
+the answer writes `cell_evidence` for every cell it reached and the topic
+ladder shows it. The check is right when the answer showed the asked cell; it
+then marks the piece's ideas tested and passes the piece with its practice, as
+a right answer to the piece's own question does. A case's expected answer
+stays with the grader and is never shown. A piece with no cells it can ask
+about keeps the check above.
+
+### A placement passes the pieces you already hold
+
+Plan #2292.2. Before a subject's first lesson you can answer a few questions
+so Dash knows where to start you. A placement is a Practice Flow run on the
+subject's lens with `placement=1` in `practiceHref`
+(`app/learn/flow/placement.tsx`). It asks up to eight questions and nothing
+but placement: the lens's topics in the order the laid-out pieces first name
+their cells, then the lens's other topics in the order they joined it, each
+topic's levels bisected by the placement rule in `nextQuestion` before the
+next topic starts (`pickPlacement` in `lib/learn/levels/placement.ts`).
+Answers go through Practice Flow's own action, so they write `cell_evidence`
+and move the lens as any practice answer does.
+
+Every question carries Skip to the lesson where a practice run has End run.
+The placement ends on the eighth answer, when no topic has a level left to
+place, or on Skip. At the end, every piece of the subject's laid-out units
+whose matched cells are all held is passed with `passed_reason = 'placement'`
+(learn 0175); a piece with no cells on the map is never passed this way, and
+its ideas are not put on the review schedule, since nothing here taught them.
+The end page lists each topic answered on with the level it now stands at and
+the pieces passed, and its forward action opens the first piece not passed.
+Skip goes straight to that piece. A piece's own check now writes
+`passed_reason = 'check'`; a piece passed before learn 0175 has no reason and
+was passed by its check.
 
 ### A piece has a practice task
 

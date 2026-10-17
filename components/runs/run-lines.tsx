@@ -1,5 +1,8 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -13,6 +16,8 @@ import { exactTime, shortWhen } from '@/lib/comments/when';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { useClockNow } from '@/lib/use-clock-now';
 import { cn } from '@/lib/cn';
+import type { FeatureStep } from '@/lib/digest/night';
+import { featureLines, type LineGroup, type StepBucket } from '@/lib/plan/feature-lines';
 
 /**
  * Where a run stands, as its lines are drawn (plan #1826).
@@ -86,6 +91,7 @@ export function RunLinesView({
   acknowledge,
   answer,
   arrived,
+  feature,
   className,
 }: {
   lines: readonly RunActivity[];
@@ -97,6 +103,12 @@ export function RunLinesView({
   answer?: AnswerRunAction;
   /** Ids of lines that came in while the page was open; each rises in once. */
   arrived?: ReadonlySet<string>;
+  /**
+   * The feature a session is building, with its steps: the lines fold under
+   * the step each is about, and lines about other features are left out
+   * (lib/plan/feature-lines.ts). Left out, the lines are one list.
+   */
+  feature?: { ref: string; steps: readonly FeatureStep[] };
   className?: string;
 }) {
   const now = useClockNow();
@@ -108,8 +120,11 @@ export function RunLinesView({
       Dash&rsquo;s lines
     </span>
   );
-  const list = (
-    <LineList lines={lines} now={now} arrived={arrived} open={open && answer ? { id: open.id, action: answer } : null} />
+  const asking = open && answer ? { id: open.id, action: answer } : null;
+  const list = feature ? (
+    <StepLines lines={lines} feature={feature} now={now} arrived={arrived} open={asking} />
+  ) : (
+    <LineList lines={lines} now={now} arrived={arrived} open={asking} />
   );
 
   if (state === 'ended') {
@@ -177,6 +192,321 @@ function LineList({
   );
 }
 
+/** What a step's fold says about where it stands. */
+const STEP_STATE: Record<FeatureStep['status'], string> = {
+  in_progress: 'Being built',
+  blocked: 'Blocked',
+  done: 'Done',
+  not_started: 'Not started',
+  proposed: 'Not started',
+  dropped: 'Dropped',
+};
+
+/**
+ * A feature session's lines, with the newest pinned on top under "Now" so
+ * what Dash is doing reads first, then one fold for each step. The fold
+ * holding the newest line, a question waiting on you or a step being built
+ * opens by itself, and the rest fold to their state and how many lines they
+ * hold. An open step's lines scroll in their own box (StepBody).
+ */
+function StepLines({
+  lines,
+  feature,
+  now,
+  open,
+  arrived,
+}: {
+  lines: readonly RunActivity[];
+  feature: { ref: string; steps: readonly FeatureStep[] };
+  now: number;
+  arrived?: ReadonlySet<string>;
+  open: { id: string; action: AnswerRunAction } | null;
+}) {
+  const { buckets, hidden } = featureLines(lines, feature.ref, feature.steps);
+  let newest: { group: LineGroup; bucket: StepBucket } | null = null;
+  for (const bucket of buckets) {
+    for (const group of bucket.groups) {
+      if (!newest || group.at >= newest.group.at) newest = { group, bucket };
+    }
+  }
+  const newestId = newest?.group.lastId ?? null;
+
+  const [toggled, setToggled] = useState<Readonly<Record<string, boolean>>>({});
+
+  // What is going on now comes first: the steps a builder is on, and the
+  // heading holding the newest line. Everything else, done or not started,
+  // sits below them, quieter.
+  const active = buckets.filter(
+    (bucket) => bucket.status === 'in_progress' || bucket.status === 'blocked' || bucket === newest?.bucket,
+  );
+  const rest = buckets.filter((bucket) => !active.includes(bucket));
+  const fold = (bucket: StepBucket, quiet: boolean) => {
+    // Only the step holding the newest line opens by itself, or one with a
+    // question waiting on you; the other steps being built show their last
+    // line on the closed row.
+    const auto = bucket.groups.some((group) => group.line.id === open?.id || group.lastId === newestId);
+    const isOpen = toggled[bucket.key] ?? auto;
+    return (
+      <li key={bucket.key}>
+        <StepFold
+          bucket={bucket}
+          lines={lines}
+          now={now}
+          arrived={arrived}
+          open={open}
+          isOpen={isOpen}
+          live={bucket === newest?.bucket}
+          quiet={quiet}
+          onToggle={() => setToggled((was) => ({ ...was, [bucket.key]: !isOpen }))}
+        />
+      </li>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {newest && (
+        <div className="flex gap-3 rounded-card bg-accent-tint px-3.5 py-3">
+          <DashMark size="sm" decorative {...runPose(newest.group.line)} />
+          <div className="min-w-0 flex-1">
+            <p className="flex min-w-0 items-baseline gap-x-2 text-small">
+              <span className="font-medium text-accent">Now</span>
+              {newest.bucket.ref && <span className="tabular shrink-0 text-ink-muted">{newest.bucket.ref}</span>}
+              <span className="min-w-0 truncate text-ink-muted">{newest.bucket.title}</span>
+              <time dateTime={newest.group.at} className="tabular ml-auto shrink-0 text-ink-muted">
+                {shortWhen(newest.group.at, now)}
+              </time>
+            </p>
+            <p className="mt-0.5 line-clamp-3 text-body font-medium break-words text-ink">
+              {newest.group.summary ?? <LinkedText text={newest.group.line.body} />}
+            </p>
+          </div>
+        </div>
+      )}
+      {active.length > 0 && (
+        <section className="space-y-1">
+          <h3 className="text-small font-medium text-ink-muted">
+            {active.length === 1 ? 'Being built' : `Being built · ${active.length} at once`}
+          </h3>
+          <ol className="space-y-1">{active.map((bucket) => fold(bucket, false))}</ol>
+        </section>
+      )}
+      {rest.length > 0 && (
+        <section className="space-y-0.5">
+          <h3 className="text-small font-medium text-ink-muted">The other steps</h3>
+          <ol>{rest.map((bucket) => fold(bucket, true))}</ol>
+        </section>
+      )}
+      {hidden > 0 && (
+        <p className="text-small text-ink-ghost">
+          {hidden} {hidden === 1 ? 'line' : 'lines'} about other features left out
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StepFold({
+  bucket,
+  lines,
+  now,
+  arrived,
+  open,
+  isOpen,
+  live,
+  quiet,
+  onToggle,
+}: {
+  bucket: StepBucket;
+  lines: readonly RunActivity[];
+  now: number;
+  arrived?: ReadonlySet<string>;
+  open: { id: string; action: AnswerRunAction } | null;
+  isOpen: boolean;
+  /** Holds the newest line. */
+  live: boolean;
+  /** A step not being built: drawn as a plain row, not a panel. */
+  quiet: boolean;
+  onToggle: () => void;
+}) {
+  const last = bucket.groups[bucket.groups.length - 1] ?? null;
+  const said = bucket.count === 0 ? null : bucket.count === 1 ? '1 line' : `${bucket.count} lines`;
+  const meta = [bucket.status ? STEP_STATE[bucket.status] : null, said].filter(Boolean).join(' · ');
+  const body = `step-lines-${bucket.key.replace(/\W/g, '-')}`;
+  return (
+    <div className={cn('rounded-control', !quiet && 'bg-surface')}>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={body}
+        onClick={onToggle}
+        className={cn(
+          'press flex w-full min-w-0 items-start gap-2 text-left',
+          quiet ? 'px-2.5 py-1 text-small' : 'px-2.5 py-2 text-ui',
+        )}
+      >
+        <ChevronRight
+          aria-hidden
+          strokeWidth={1.75}
+          className={cn(
+            'mt-0.5 size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick',
+            isOpen && 'rotate-90',
+          )}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            {bucket.ref && (
+              <span className={cn('tabular shrink-0', live ? 'text-accent' : 'text-ink-ghost')}>{bucket.ref}</span>
+            )}
+            <span className={cn('min-w-0 flex-1 truncate', quiet ? 'text-ink-muted' : 'font-medium text-ink')}>
+              {bucket.title}
+            </span>
+          </span>
+          {/* A step being built shows its last line while closed, so each
+              builder says what it is doing without being opened. */}
+          {!quiet && !isOpen && last && (
+            <span className="mt-0.5 flex min-w-0 items-baseline gap-2 text-small text-ink-muted">
+              <span className="min-w-0 flex-1 truncate">{last.summary ?? last.line.body}</span>
+              <span className="tabular shrink-0 text-ink-ghost">{shortWhen(last.at, now)}</span>
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5 text-small text-ink-muted">
+          {bucket.status && <StatusGlyph glyph={STEP_GLYPH[bucket.status]} size={12} />}
+          <span className="max-sm:sr-only">{meta}</span>
+        </span>
+      </button>
+      {isOpen && (
+        <StepBody id={body} lastId={bucket.groups[bucket.groups.length - 1]?.lastId ?? null}>
+          {bucket.groups.length === 0 ? (
+            <p className="pl-5.5 text-small text-ink-muted">Nothing written about this step yet.</p>
+          ) : (
+            <ol>
+              {bucket.groups.map((group) =>
+                group.line.kind === 'question' || group.line.kind === 'response' ? (
+                  <RunLine
+                    key={group.line.id}
+                    line={group.line}
+                    group={group}
+                    now={now}
+                    arrived={arrived?.has(group.line.id) ?? false}
+                    answer={group.line.kind === 'question' ? answerAfter(lines, lines.indexOf(group.line)) : null}
+                    answerWith={open?.id === group.line.id ? open.action : undefined}
+                  />
+                ) : (
+                  <CompactLine key={group.line.id} group={group} now={now} arrived={arrived?.has(group.line.id) ?? false} />
+                ),
+              )}
+            </ol>
+          )}
+        </StepBody>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A step's lines in a box of fixed height that scrolls on its own, opened at
+ * its newest line and kept there as lines arrive. Scrolling up to read older
+ * lines stops it following until it is scrolled back to the foot.
+ */
+function StepBody({ id, lastId, children }: { id: string; lastId: string | null; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && follow.current) el.scrollTop = el.scrollHeight;
+  }, [lastId]);
+
+  return (
+    <div
+      id={id}
+      ref={box}
+      onScroll={(event) => {
+        const el = event.currentTarget;
+        follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
+      className="mx-2.5 mb-2 max-h-64 overflow-y-auto overscroll-contain"
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The shape each step's state takes beside it, from the plan's own set. */
+const STEP_GLYPH: Record<FeatureStep['status'], GlyphName> = {
+  in_progress: 'three-quarters',
+  blocked: 'cross',
+  done: 'check',
+  not_started: 'empty',
+  proposed: 'empty',
+  dropped: 'empty',
+};
+
+/** Past this many characters a line is cut at two lines until pressed. */
+const LONG_LINE = 180;
+
+/** One line under a step, on one row: what kind, what it said, and when. */
+function CompactLine({ group, now, arrived }: { group: LineGroup; now: number; arrived: boolean }) {
+  const { line } = group;
+  const [whole, setWhole] = useState(false);
+  // A paragraph-long line is cut at two lines so one report does not push
+  // the rest out of the box; pressing it shows the whole of it.
+  const long = !group.summary && line.body.length > LONG_LINE;
+  return (
+    <li
+      data-line={group.lastId}
+      className={cn(
+        'grid grid-cols-[4.5rem_minmax(0,1fr)_auto] gap-x-3 border-t border-border/60 py-1.5 first:border-t-0',
+        'max-sm:grid-cols-[minmax(0,1fr)_auto]',
+        arrived && 'run-line-in',
+      )}
+    >
+      <span
+        className={cn(
+          'pt-px text-small max-sm:col-span-2',
+          line.kind === 'error' ? 'text-danger' : 'text-ink-ghost',
+        )}
+      >
+        {RUN_ACTIVITY_LABEL[line.kind]}
+        {group.repeats > 1 && <span className="tabular"> &times;{group.repeats}</span>}
+      </span>
+      <span className="min-w-0 text-ui break-words text-ink">
+        {long ? (
+          <button
+            type="button"
+            aria-expanded={whole}
+            onClick={() => setWhole((was) => !was)}
+            className={cn('block w-full text-left', !whole && 'line-clamp-2')}
+            title={whole ? undefined : 'Show the whole line'}
+          >
+            {line.body}
+          </button>
+        ) : (
+          (group.summary ?? <LinkedText text={line.body} />)
+        )}
+        {group.files.length > 0 && (
+          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+            {group.files.map((file) => (
+              <span key={file} className="min-w-0 font-mono text-small break-all text-ink-muted">
+                {file}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+      <time
+        dateTime={group.at}
+        title={exactTime(group.at)}
+        className="tabular pt-px text-small text-ink-ghost"
+      >
+        {shortWhen(group.at, now)}
+      </time>
+    </li>
+  );
+}
+
 /** The answer written under a question: the next response, before any later question. */
 function answerAfter(lines: readonly RunActivity[], index: number): string | null {
   for (const next of lines.slice(index + 1)) {
@@ -188,12 +518,15 @@ function answerAfter(lines: readonly RunActivity[], index: number): string | nul
 
 function RunLine({
   line,
+  group,
   now,
   arrived,
   answer,
   answerWith,
 }: {
   line: RunActivity;
+  /** The repeats and file runs folded into this line, under a step (feature-lines.ts). */
+  group?: LineGroup;
   now: number;
   arrived: boolean;
   answer: string | null;
@@ -203,18 +536,32 @@ function RunLine({
   const yours = line.kind === 'response';
 
   return (
-    <li className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
+    <li data-line={group?.lastId ?? line.id} className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
       <p className="flex flex-wrap items-baseline gap-x-2 text-small">
         <span className={cn('font-medium', line.kind === 'error' ? 'text-danger' : 'text-ink-muted')}>
           {RUN_ACTIVITY_LABEL[line.kind]}
         </span>
-        <time dateTime={line.created_at} title={exactTime(line.created_at)} className="tabular text-ink-ghost">
-          {shortWhen(line.created_at, now)}
+        <time dateTime={group?.at ?? line.created_at} title={exactTime(group?.at ?? line.created_at)} className="tabular text-ink-ghost">
+          {shortWhen(group?.at ?? line.created_at, now)}
         </time>
+        {group && group.repeats > 1 && (
+          <span className="tabular text-ink-ghost" title={`Written ${group.repeats} times in a row`}>
+            &times;{group.repeats}
+          </span>
+        )}
       </p>
       <p className="text-ui break-words whitespace-pre-wrap text-ink">
-        <LinkedText text={line.body} />
+        {group?.summary ?? <LinkedText text={line.body} />}
       </p>
+      {group && group.files.length > 0 && (
+        <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5" aria-label="The files">
+          {group.files.map((file) => (
+            <li key={file} className="min-w-0 font-mono text-small break-all text-ink-muted">
+              {file}
+            </li>
+          ))}
+        </ul>
+      )}
       {answerWith ? (
         <RunAnswer runId={line.run_id} options={line.options} action={answerWith} />
       ) : line.options && (

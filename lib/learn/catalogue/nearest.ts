@@ -246,6 +246,19 @@ function toNearbySegment(row: NearestRow): NearbySegment {
 }
 
 /**
+ * Which search the index runs. `claims` is the catalogue without structure
+ * documents, for the read button and the claim judge. `lessons` adds the units
+ * of structure documents whose licence is show, never structure_only or
+ * never_feed ones, for the lesson writer (learn 0174, plan #2292.1).
+ */
+export type CatalogueSearch = 'claims' | 'lessons';
+
+const SEARCH_FUNCTIONS: Record<CatalogueSearch, 'nearest_catalogue_segments' | 'nearest_lesson_segments'> = {
+  claims: 'nearest_catalogue_segments',
+  lessons: 'nearest_lesson_segments',
+};
+
+/**
  * The live index, through the session client.
  *
  * A function rather than a select because PostgREST has no way to order by an
@@ -258,10 +271,10 @@ function toNearbySegment(row: NearestRow): NearbySegment {
  * worth having on this side: a short vector reaches the database as a cast
  * error with no indication of which caller sent it.
  */
-export function rpcSegmentIndex(supabase: LearnSupabaseClient): SegmentIndex {
+export function rpcSegmentIndex(supabase: LearnSupabaseClient, search: CatalogueSearch = 'claims'): SegmentIndex {
   return {
     async nearest({ vector, limit, minSimilarity, embeddingModel }) {
-      const { data, error } = await supabase.rpc('nearest_catalogue_segments', {
+      const { data, error } = await supabase.rpc(SEARCH_FUNCTIONS[search], {
         query_embedding: vectorLiteral(vector),
         match_limit: limit,
         min_similarity: minSimilarity,
@@ -339,11 +352,11 @@ export async function nearestSegmentsForClaim(
 export async function findNearestSegments(
   supabase: LearnSupabaseClient,
   claim: string,
-  options: NearestOptions & { apiKey?: string | null; client?: EmbeddingClient } = {},
+  options: NearestOptions & { apiKey?: string | null; client?: EmbeddingClient; search?: CatalogueSearch } = {},
 ): Promise<NearestOutcome> {
   return nearestSegmentsForClaim(
     {
-      index: rpcSegmentIndex(supabase),
+      index: rpcSegmentIndex(supabase, options.search),
       embed: ({ text, model, onSpend }) =>
         embedOne(text, {
           model,

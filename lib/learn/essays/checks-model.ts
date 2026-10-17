@@ -3,7 +3,13 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { readFinding, type ComparedNote, type EssayCheck, type Finding, type Paragraph } from './checks';
+import {
+  readFinding,
+  type ComparedNote,
+  type EssayCheck,
+  type Finding,
+  type Paragraph,
+} from './checks';
 
 /**
  * A model check on one part of an essay (plan #1869): one Sonnet call that
@@ -51,18 +57,28 @@ number of the note concerned.`;
 export function describeEssay(input: { claim: string; reader: string; doc: string }): string {
   const parts: string[] = [];
   parts.push(`The writer's claim, from their brief: ${input.claim.trim() || '(not written yet)'}`);
-  parts.push(`The reader it is for, from their brief: ${input.reader.trim() || '(not written yet)'}`);
+  parts.push(
+    `The reader it is for, from their brief: ${input.reader.trim() || '(not written yet)'}`,
+  );
   parts.push(`<essay>\n${input.doc}\n</essay>`);
   return parts.join('\n\n');
 }
 
 /** The check, the part it reads and, for Already Said, the notes to compare with. */
-export function describeTask(check: EssayCheck, unit: Paragraph | null, notes: readonly ComparedNote[]): string {
+export function describeTask(
+  check: EssayCheck,
+  unit: Paragraph | null,
+  notes: readonly ComparedNote[],
+): string {
   const parts: string[] = [`Check: ${check.name}`, check.instruction];
-  parts.push(unit ? `<part>\n${unit.text}\n</part>` : 'The part to check is the whole essay above.');
+  parts.push(
+    unit ? `<part>\n${unit.text}\n</part>` : 'The part to check is the whole essay above.',
+  );
   if (notes.length > 0) {
     parts.push(
-      notes.map((note, i) => `<note number="${i + 1}" title="${note.title}">\n${note.text}\n</note>`).join('\n'),
+      notes
+        .map((note, i) => `<note number="${i + 1}" title="${note.title}">\n${note.text}\n</note>`)
+        .join('\n'),
     );
   }
   return parts.join('\n\n');

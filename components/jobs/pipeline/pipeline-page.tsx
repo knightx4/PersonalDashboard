@@ -20,6 +20,7 @@ import { askListFilter } from '@/lib/ask/list-filter';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
 import { openApplications } from '@/lib/jobs/board-moment';
+import { pipelineColumnFilters } from '@/lib/jobs/pipeline-columns';
 import {
   filterPipeline,
   pageOf,
@@ -61,6 +62,7 @@ export function PipelinePage({
   working = [],
   hasInbox = false,
   timezone = 'UTC',
+  openColumn,
 }: {
   /** Every application, live and closed, with its fit and chance. */
   rows: readonly PipelineRow[];
@@ -72,6 +74,8 @@ export function PipelinePage({
   hasInbox?: boolean;
   /** The person's zone, for the next interview's date and time. */
   timezone?: string;
+  /** For the gallery: the table column whose filter menu is drawn open. */
+  openColumn?: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -111,6 +115,14 @@ export function PipelinePage({
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of scoped) countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
+  const marks = {
+    ready: scoped.filter((row) => row.readyToApply).length,
+    notReady: scoped.filter((row) => !row.readyToApply).length,
+    questions: scoped.filter((row) => row.allQuestionsAdded).length,
+    noQuestions: scoped.filter((row) => !row.allQuestionsAdded).length,
+    letter: scoped.filter((row) => row.hasCoverLetter === true).length,
+    noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
+  };
   const scored = rows.some((row) => row.scoreNote);
 
   const askFilter = askListFilter('pipeline', params);
@@ -144,6 +156,8 @@ export function PipelinePage({
               (source) => [source, countsBySource.get(source) ?? 0] as const,
             )}
             scored={scored}
+            marks={marks}
+            companyName={state.company ? rows.find((row) => row.companySlug === state.company)?.companyName : undefined}
           />
         </div>
         <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />
@@ -195,6 +209,7 @@ export function PipelinePage({
   }
 
   const paged = pageOf(sortRows(filtered, display), state.page);
+  const columnFilters = pipelineColumnFilters(params, state, scoped, rows, scored);
   const sections = groupRows(paged.rows, display.groupBy);
 
   return (
@@ -211,7 +226,13 @@ export function PipelinePage({
             <div key={section.key} className="space-y-2">
               {display.group !== NO_GROUP && <GroupHeader label={section.label} count={section.count} />}
               <Card className="overflow-hidden">
-                <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
+                <RolesTable
+                  rows={section.rows}
+                  sorts={menu.sorts}
+                  hidden={display.hidden}
+                  filters={columnFilters}
+                  openFilter={section === sections[0] ? openColumn : undefined}
+                />
               </Card>
             </div>
           ))}

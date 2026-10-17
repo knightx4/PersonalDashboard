@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { describeRephrase, REPHRASE_MAX, rephraseContext, rephraseProblem, usableRephrase } from './rephrase';
+import {
+  describeRephrase,
+  REPHRASE_MAX,
+  rephraseContext,
+  rephraseProblem,
+  usableRephrase,
+} from './rephrase';
 
 describe('rephraseProblem', () => {
   it('needs words, and no more than a few sentences', () => {
@@ -11,7 +17,9 @@ describe('rephraseProblem', () => {
 
 describe('usableRephrase', () => {
   it('keeps the selection’s own spaces and takes off quotation marks around the whole reply', () => {
-    expect(usableRephrase('“Money keeps its value.”', ' Money holds value. ')).toBe(' Money keeps its value. ');
+    expect(usableRephrase('“Money keeps its value.”', ' Money holds value. ')).toBe(
+      ' Money keeps its value. ',
+    );
   });
 
   it('refuses commentary, the same text, an empty reply and a reply far longer than the selection', () => {
@@ -30,7 +38,13 @@ describe('rephraseContext and describeRephrase', () => {
     expect(before.startsWith('old line')).toBe(true);
     expect(before.endsWith('Before it. ')).toBe(true);
     expect(after).toBe(' After it.\nNext line.');
-    const turn = describeRephrase({ claim: 'Money is odd.', reader: '', before, selection: ' Selected words. ', after });
+    const turn = describeRephrase({
+      claim: 'Money is odd.',
+      reader: '',
+      before,
+      selection: ' Selected words. ',
+      after,
+    });
     expect(turn).toContain('<selected>\nSelected words.\n</selected>');
     expect(turn).toContain("The essay's claim, in the writer's words: Money is odd.");
     expect(turn).not.toContain('Who it is for');

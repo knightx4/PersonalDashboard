@@ -84,6 +84,17 @@ export function lifecycleLabel(lifecycle: Lifecycle): {
   };
 }
 
+/**
+ * What the toast says once a row has closed (plan #1957.8): the ending, then
+ * the row it closed, as in "Dropped: Book the boiler service". The toast cuts
+ * a long name off at its edge, so the name goes in whole. With no name to
+ * hand the ending stands alone.
+ */
+export function closedToast(lifecycle: Lifecycle, name?: string | null): string {
+  const title = name?.replace(/\s+/g, ' ').trim();
+  return title ? `${LIFECYCLE_WORD[lifecycle]}: ${title}` : LIFECYCLE_WORD[lifecycle];
+}
+
 /** One status word's ending: a word of the four, or `null` while the row is still open. */
 export type Ending = Lifecycle | null;
 
@@ -270,7 +281,7 @@ export const LIFECYCLE_SOURCES = {
     dir: 'migrations',
     kind: 'check',
     name: 'social_posts_status_ck',
-    words: { suggested: null, posted: 'done', dropped: 'dropped' },
+    words: { suggested: null, planned: null, posted: 'done', dropped: 'dropped' },
   },
   'public.spec_changes.status': {
     dir: 'migrations',
@@ -341,6 +352,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   sync_run_status: 'state of a background sync',
   vault_connection_status: 'connection state of a vault',
   parse_status: 'whether an email was read',
+  topics_status_ck: 'whether a topic is still a draft or approved to ask about',
+  graph_moves_status_ck: 'whether a claims-graph subject has been moved onto topics',
   recurring_messages_status_ck: 'whether an email was read',
   appointment_messages_status_ck: 'whether an email was read',
   order_status: 'where an order is in the post',
@@ -359,6 +372,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   watches_status_ck: 'state of a Dash watch',
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
   briefs_status_check: 'state of a research run',
+  subject_preparations_status_ck: 'state of a subject\'s preparation run',
+  subject_preparation_steps_status_ck: 'state of a step in a subject\'s preparation run',
   video_transcripts_state_ck: 'state of a transcript fetch',
   inspiration_videos_transcript_state_ck: 'state of a transcript fetch',
   knowledge_state: 'how well something is known, a ladder with no ending',

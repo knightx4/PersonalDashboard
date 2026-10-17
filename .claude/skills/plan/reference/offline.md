@@ -1,7 +1,9 @@
 # When the CLI cannot run
 
-`DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
-exits immediately there. Fall back to the **`Supabase`** connector against
+A cloud session runs `scripts/plan.ts` over HTTPS when
+`SUPABASE_SERVICE_ROLE_KEY` is set, and that is the way to work. This file is
+for when it cannot: neither key nor `DATABASE_URL` is set, or `plan.ts` fails
+to reach the database. Then fall back to the **`Supabase`** connector against
 `plan_items` and `plan_dependencies` (both in `public`; project ref
 `asjztutnqxbecruvyrbj`), and do not spend the session diagnosing it. The
 brief a routine was fired with is the plan as it stood; trust it, and re-read
@@ -224,24 +226,25 @@ where id = (select id from plan_runs where user_id = '…'
 -- what it needs, rewritten on every block and read by Dash and the plan row;
 -- the dated line is the history and is appended. Clear `block_ask` whenever
 -- the step stops being blocked -- start, reopen, done and drop all do.
--- `block_kind` says who clears it and the database refuses a blocked row
--- without one: 'steps' when the block is waiting on the steps it names, which
--- clears itself when they close, and 'outside' when it is waiting for the
--- person to answer or decide something. A key or an account is not a block at
--- all now; it is a setup step, above. Use 'steps' only with the
--- dependency rows to match; 'outside' otherwise. Cleared with the ask.
--- Never write a block whose ask says nothing is needed from the person
--- ("nothing needed from you", "just waiting on the run"): a block is listed
--- under what they have to do. A step that only waits on time or a scheduled
--- run stays in progress and gets a check_backs row instead, so it shows as
--- waiting on:
+-- A block always waits on steps (`block_kind = 'steps'`), named by
+-- plan_dependencies rows written first, and clears itself when they close.
+-- Never block a step on the person: the database refuses `block_kind =
+-- 'outside'` from anyone but the person signed in (0245). What the step needs
+-- goes to one of three places first (SKILL.md, "When a step cannot finish"):
+-- a decision step for something they decide, a setup step for something they
+-- do, and for anything a run can do -- a refused permission, a failed write, a
+-- check to settle -- handle it now, or a ready step a later run picks up.
+--   insert into plan_dependencies (user_id, item_id, depends_on_id)
+--   values ('…', '<the stopped step id>', '<the step it waits on>');
+-- A step that only waits on time or a scheduled run stays in progress and
+-- gets a check_backs row instead, so it shows as waiting on:
 --   insert into check_backs (user_id, title, detail, due_at, plan_item_id, source)
 --   values ('…', '<what to look at>', '<what to check>', now() + interval '2 hours',
 --           '<the step id>', 'plan #<outline>');
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',
-    block_kind = 'outside',
-    comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
+    block_kind = 'steps',
+    comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <what it waits on>'
 where id = '…';
 
 -- raise: what you need from the person, when it belongs to no step. `source`

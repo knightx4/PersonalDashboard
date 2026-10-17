@@ -44,6 +44,7 @@ import {
   askMessage,
   ideaContext,
   noteContext,
+  postContext,
   raiseContext,
   specChangeContext,
   specContext,
@@ -93,8 +94,9 @@ export const DEV_REPLY_MODEL = DASH_MODELS.devThread;
 /** What a reply on a dev row is told, after the rules every thread shares. */
 const DEV_RULES = `THIS THREAD IS ON ONE ROW OF THEIR DEVELOPMENT PAGES: a plan step, a
 question under a plan feature, an idea, a bug report they filed, something a
-previous session raised with them, a spec section, an inspiration takeaway, or
-a proposed change to one of their specs. The message names which. Most
+previous session raised with them, a spec section, an inspiration takeaway, a
+proposed change to one of their specs, or an X post draft on the Posts tab.
+The message names which. Most
 comments are questions about what is written on the row; some are
 instructions. You are talking to the person who owns the app, so no file paths
 unless they asked about one.
@@ -133,6 +135,15 @@ than describing it:
   raise that already describes the work. Pick add_step when they are adding
   something to the plan for later, and build_step when they are telling you
   to do the work now.
+- On an X post draft, a request for a change to its text ("make this
+  shorter", "split it in two", "drop the second post") means calling
+  rewrite_post with the draft's ref and the whole new thread, keeping what
+  they did not ask to change. A refusal comes back with its reasons: fix
+  them and try again, or say why it could not be done. Its pictures are not
+  yours to change: asked to, change nothing and say they are added and
+  removed on the draft itself. Never post it to X and never change its
+  status (posted, dropped); say those are theirs, made with the buttons on
+  the draft.
 
 Six moves are theirs and stay theirs however the comment was phrased:
 approving a proposal, answering a question put to them, answering or
@@ -294,6 +305,33 @@ async function subjectRowOf(input: AskInput): Promise<Subject | null> {
     };
   }
 
+  // An X post draft (plan #2202.2): the text as it stands and as Dash first
+  // drafted it, so a request to rewrite it is read against both.
+  if (target === 'post') {
+    const { data } = await supabase
+      .from('social_posts')
+      .select('angle, status, body, draft, image_paths, x_thread_ids')
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    const row = data as unknown as Record<string, unknown>;
+    const strings = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
+    const angle = String(row.angle ?? '');
+    return {
+      context: postContext({
+        angle,
+        status: String(row.status),
+        body: strings(row.body),
+        draft: strings(row.draft),
+        images: strings(row.image_paths).length,
+        onX: strings(row.x_thread_ids).length,
+      }),
+      thread: [],
+      label: `the post draft "${angle}"`,
+    };
+  }
+
   const { data } = await supabase
     .from('feedback_items')
     .select(FEEDBACK_COLUMNS)
@@ -375,9 +413,10 @@ function sessionTurn(
   const opening = instruction
     ? `Carry out an instruction left on ${subject.label}, in the app. Read the code it is ` +
       'about, do what it asks inside the list below, and write into the thread on that row ' +
-      'what you did.'
+      'what you did, following .claude/skills/plan/reference/comments.md.'
     : `Answer a question asked on ${subject.label}, in the app. Read the code it is about, ` +
-      'write the answer into the thread on that row, and then stop.';
+      'write the answer into the thread on that row, and then stop, following ' +
+      '.claude/skills/plan/reference/comments.md.';
 
   return (
     `${opening}\n\n` +

@@ -19,7 +19,10 @@ import {
   type InterviewChangeInput,
   type InterviewChangeKind,
 } from '@/lib/ask/interview-changes';
+import { POST_CHANGE_KINDS, type PostChangeInput, type PostChangeKind } from '@/lib/ask/post-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import type { PaidActionInput } from '@/lib/dash/paid-input';
+import type { DeleteRowsInput } from '@/lib/ask/delete-rows';
 
 /**
  * The changes Dash proposes in an Ask Dash answer (feature #1186), kept in
@@ -57,6 +60,12 @@ export const DASH_CHANGE_KINDS = [
   'move_roles',
   'set_goal_done_when',
   'add_quick_note',
+  // A build started on a plan step, proposed for a Confirm (plan #2106.1).
+  'start_build',
+  // A paid button Dash pressed for an approval (plan #2228.1, lib/dash/paid.ts).
+  'paid_action',
+  // Rows Dash proposed deleting, removed only on a Confirm (plan #2232.1, lib/ask/delete-rows.ts).
+  'delete_rows',
   // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
   ...LEARN_CHANGE_KINDS,
   // Todo's newer ones, in the same shape (lib/ask/todo-changes.ts, plan #1894.9.1).
@@ -75,6 +84,8 @@ export const DASH_CHANGE_KINDS = [
   ...JOBS_CHANGE_KINDS,
   // A round on a role, in the same shape (lib/ask/interview-changes.ts, plan #2044.1).
   ...INTERVIEW_CHANGE_KINDS,
+  // A post draft's text rewritten, in the same shape (lib/ask/post-changes.ts, plan #2202.1).
+  ...POST_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -139,6 +150,22 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  (plan #2044.1), in the same shape. The record keeps that
  *                  conversation as it was made in `undo.interview`, so Undo
  *                  can tell whether anything was written on it since.
+ * start_build      a session sent at a plan step (plan #2106.1), proposed
+ *                  for a Confirm: the step's id and number, its outline and
+ *                  title for the card, and whether its last run had gone quiet, in
+ *                  which case Confirm writes that run off as the plan page's
+ *                  Send does (`confirmQuiet` in lib/plan/handover.ts).
+ * paid_action      a press of a button that spends money, queued by a paid
+ *                  tool (plan #2228.1, lib/dash/paid.ts) for an approval:
+ *                  the tool and the button's key in PAID_ACTIONS, the
+ *                  checked arguments its run takes, the line the card shows,
+ *                  and the estimate the button's hint would show. Approving
+ *                  runs the function the button calls; it cannot be undone.
+ * delete_rows      rows of an allowed table Dash proposed removing (plan
+ *                  #2232.1, lib/ask/delete-rows.ts): the table, a snapshot of
+ *                  every row, what each is called and the page they are on.
+ *                  Confirming deletes them and keeps the removed rows in
+ *                  `undo.rows`, which Undo inserts again.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -188,6 +215,9 @@ export type DashChangeInput = {
   };
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
   add_quick_note: { noteId: string; title: string; path: string; body: string };
+  start_build: { stepId: string; number: number; outline: string; title: string; quiet: boolean };
+  paid_action: PaidActionInput;
+  delete_rows: DeleteRowsInput;
 } & Record<LearnChangeKind, LearnChangeInput> &
   Record<TodoChangeKind, TodoChangeInput> &
   Record<YouChangeKind, YouChangeInput> &
@@ -196,10 +226,15 @@ export type DashChangeInput = {
   Record<ShoppingChangeKind, ShoppingChangeInput> &
   Record<VaultChangeKind, VaultChangeInput> &
   Record<JobsChangeKind, JobsChangeInput> &
-  Record<InterviewChangeKind, InterviewChangeInput>;
+  Record<InterviewChangeKind, InterviewChangeInput> &
+  Record<PostChangeKind, PostChangeInput>;
 
-/** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
-export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];
+/**
+ * The kinds Dash proposes for a Confirm: the four from before plan #1440,
+ * which keep their own undo in lib/ask/changes.ts, and a build started on a
+ * plan step (plan #2106.1), which cannot be undone.
+ */
+export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch', 'start_build'];
 
 /** A proposal as the loop hands it to be kept, or a change Dash has just made. */
 export type NewDashChange = {
@@ -223,6 +258,8 @@ export type DashChange = NewDashChange & {
   doneAt: string | null;
   declinedAt: string | null;
   undoneAt: string | null;
+  /** What the write said it did, once done: a paid press's result line (plan #2228.2). */
+  summary?: string | null;
 };
 
 type DashChangeRow = {
@@ -238,10 +275,11 @@ type DashChangeRow = {
   done_at: string | null;
   declined_at: string | null;
   undone_at: string | null;
+  summary?: string | null;
 };
 
 export const DASH_CHANGE_SELECT =
-  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at';
+  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary';
 
 export function toDashChange(row: DashChangeRow): DashChange {
   const subject = row.subject_ref ? parseRef(row.subject_ref) : null;
@@ -260,6 +298,7 @@ export function toDashChange(row: DashChangeRow): DashChange {
     doneAt: row.done_at,
     declinedAt: row.declined_at,
     undoneAt: row.undone_at,
+    summary: row.summary ?? null,
   } as DashChange;
 }
 
@@ -277,6 +316,34 @@ export async function insertProposal(
     .single();
   assertSchemaExposed(error, CORE_SCHEMA);
   if (error) throw new Error(`Keeping the proposal failed: ${error.message}`);
+  return toDashChange(data as DashChangeRow);
+}
+
+/**
+ * Keeps one paid press a thread queued (plan #2228.1), under the comment that
+ * asked for it: surface 'thread', proposed, with the comment as its turn so
+ * the card can gather the items one comment queued.
+ */
+export async function insertThreadProposal(
+  core: CoreSupabaseClient,
+  userId: string,
+  cause: ThreadCause,
+  change: NewDashChange,
+): Promise<DashChange> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .insert({
+      user_id: userId,
+      conversation_id: cause.conversationId,
+      turn_id: cause.turnId,
+      surface: 'thread',
+      kind: change.kind,
+      input: change.input,
+    })
+    .select(DASH_CHANGE_SELECT)
+    .single();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Keeping the queued press failed: ${error.message}`);
   return toDashChange(data as DashChangeRow);
 }
 

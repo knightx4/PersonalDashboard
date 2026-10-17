@@ -73,7 +73,8 @@ export function pickupTurn(input: {
   const said = threadText(input.history);
   return (
     'Pick up a raise the person has answered, in the app. Read the code it is about, do what ' +
-    'the answer says, and write into the thread on that raise what you did.\n\n' +
+    'the answer says, and write into the thread on that raise what you did, following ' +
+    '.claude/skills/plan/reference/raising.md.\n\n' +
     `${raiseContext(input.row).trimEnd()}\n\n` +
     (said ? `${said.trimEnd()}\n\n` : '') +
     `## Their answer\n\n${input.answer}\n\n` +

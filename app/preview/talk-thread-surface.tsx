@@ -1,17 +1,20 @@
 'use client';
 
-import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
+import { Thread, type TalkSend } from '@/components/thread/thread';
+import type { DashChart } from '@/lib/talk/chart';
 import { Card } from '@/components/ui/card';
 import { CostHint } from '@/components/ui/cost-hint';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { sumEstimates, type CostEstimate } from '@/lib/core/spend/estimate-types';
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
 import type { TalkToolCall, TalkTurn } from '@/lib/talk/talk';
 import { PageColumn } from '@/components/shell/page-width';
+import { AskDashProvider, AskThread, type AskSource } from '@/components/shell/ask-dash';
 
 /**
- * The Ask Dash thread on its own (plan #1708): components/talk/talk-thread.tsx
+ * The Ask Dash thread on its own (plan #1708): components/thread/thread.tsx
  * with nothing of the sheet or a page around it, which is where a change to
  * the thread is looked at (COMPONENT_SURFACES in lib/preview/routes.ts)
  * instead of on every page that imports it.
@@ -23,9 +26,8 @@ import { PageColumn } from '@/components/shell/page-width';
  * the thread draws them as soon as it draws charts; until then their words
  * stand alone, and are written to.
  *
- * It is drawn on a card with `onCard`, so Dash's turns take the recessed
- * ground (taste `no-bare-text`). A host that draws the thread bare does not
- * set it yet.
+ * It is drawn on a card, and Dash's turns take the recessed ground of his
+ * voice (taste `no-bare-text`), as they do on every thread (plan #1964.3).
  */
 
 // Fixed times, so the server's render and the browser's agree.
@@ -33,15 +35,9 @@ const at = (hour: number, minute = 0) =>
   `2026-09-28T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
 
 /** A `show_chart` call as a kept turn holds it: the tool's result is the chart. */
-function chartCall(chart: {
-  kind: 'bar' | 'table';
-  title: string;
-  rows: { label: string; value: number }[];
-  currency: string | null;
-  unit: string | null;
-  columns: [string, string] | null;
-}): TalkToolCall {
-  return { name: 'show_chart', input: chart, result: { ok: true, chart } };
+function chartCall(chart: Omit<DashChart, 'reference'> & { reference?: DashChart['reference'] }): TalkToolCall {
+  const kept = { reference: null, ...chart };
+  return { name: 'show_chart', input: kept, result: { ok: true, chart: kept } };
 }
 
 /** Twelve shops, the most a chart draws, with the longest name a shop is given. */
@@ -166,6 +162,41 @@ const TURNS: TalkTurn[] = [
       }),
     ],
   },
+  { id: 'q5', role: 'user', body: 'What did I spend on food delivery in September?', createdAt: at(11) },
+  {
+    id: 'a5',
+    role: 'assistant',
+    body:
+      'You spent $412.80 on food delivery in September across 19 orders. That is 38% more than your June to August average of $299 a month, and the first month this year over your $300 budget.',
+    createdAt: at(11),
+    toolCalls: [
+      chartCall({
+        kind: 'figure',
+        title: 'Food delivery, September',
+        rows: [{ label: 'September, 19 orders', value: 412.8 }],
+        currency: 'USD',
+        unit: null,
+        columns: null,
+        reference: { label: 'Jun to Aug average', value: 299 },
+      }),
+      chartCall({
+        kind: 'columns',
+        title: 'Food delivery by month, 2026',
+        rows: [
+          { label: 'Apr', value: 262.4 },
+          { label: 'May', value: 281 },
+          { label: 'Jun', value: 305 },
+          { label: 'Jul', value: 276 },
+          { label: 'Aug', value: 316 },
+          { label: 'Sep', value: 412.8 },
+        ],
+        currency: 'USD',
+        unit: null,
+        columns: null,
+        reference: { label: 'Budget', value: 300 },
+      }),
+    ],
+  },
 ];
 
 /** The gallery cannot ask: a follow-up is answered with a fixed line after a moment. */
@@ -188,20 +219,27 @@ const send: TalkSend = async (body) => {
 export function TalkThreadSurface() {
   return (
     <PageColumn className="py-4">
-      <Card padding="standard">
-        <TalkThread
-          id="talk-thread-preview"
-          turns={TURNS}
-          send={send}
-          label="Ask a follow-up"
-          placeholder="Ask more about this"
-          onCard
-          withFiles
-        />
-      </Card>
+      {/* The figure an answer costs, as the ledger would give it, so the $
+          beside "Ask a follow-up" draws as it does in the sheet. */}
+      <PaidCostsProvider costs={{ [ASK_ACTION]: ANSWER_COST }}>
+        <Card padding="standard">
+          <Thread
+            id="talk-thread-preview"
+            turns={TURNS}
+            send={send}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
+            withFiles
+            cost={{ action: ASK_ACTION, what: 'Cost of each answer from Dash' }}
+          />
+        </Card>
+      </PaidCostsProvider>
     </PageColumn>
   );
 }
+
+/** The action an Ask Dash answer is priced by (app/api/ask/route.ts). */
+const ASK_ACTION = 'app/api/ask/route.ts#POST';
 
 /** A bill photographed and its PDF, added to a question before it is sent. */
 const BILL_FILES: UploadedAttachment[] = [
@@ -241,13 +279,12 @@ export function TalkThreadFilesSurface() {
   return (
     <PageColumn className="py-4">
       <Card padding="standard">
-        <TalkThread
+        <Thread
           id="talk-thread-files-preview"
           turns={[]}
           send={send}
           label="Ask a question"
           placeholder="What did I spend on eBay this month?"
-          onCard
           withFiles
           startWriting
           initialDraft="What is the due date on this bill, and how much is it?"
@@ -267,5 +304,52 @@ export function TalkThreadFilesSurface() {
         />
       </Card>
     </PageColumn>
+  );
+}
+
+/** Nothing in the gallery answers: every call waits, so the chat stays mid-answer. */
+const never = () => new Promise<never>(() => {});
+const WAITING_SOURCE: AskSource = {
+  ask: never,
+  recent: never,
+  open: never,
+  poll: never,
+  costs: never,
+  label: never,
+  confirm: never,
+  decline: never,
+  undo: never,
+  save: never,
+  rate: never,
+};
+
+/**
+ * A chat in the middle of an answer (plan #2262.2): Dash's earlier message
+ * once, the follow-up just sent, and the loading line under it. The loading
+ * state is the surface itself; nothing is hovered or open.
+ */
+export function TalkThreadWaitingSurface() {
+  return (
+    <AskDashProvider source={WAITING_SOURCE}>
+      <PageColumn className="py-4">
+        <Card padding="standard">
+          <AskThread
+            id="talk-thread-waiting-preview"
+            conversationRef="00000000-0000-4000-8000-000000000062"
+            turns={[
+              { id: 'q1', role: 'user', body: 'What did I spend on food delivery in July?', createdAt: at(11) },
+              {
+                id: 'a1',
+                role: 'assistant',
+                body: 'You spent $299.40 on food delivery in July across 14 orders, which is close to your usual $300 a month.',
+                createdAt: at(11),
+              },
+            ]}
+            label="Ask a follow-up"
+            pendingQuestion="And in August?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
   );
 }

@@ -7,7 +7,7 @@
 # before merging, which left out tests/ (it needs a database) and the UI-law
 # and contrast checks. On 23 September 2026 every one of the seven failures
 # that kept main red came through those gaps. This is the same list as
-# .github/workflows/ci.yml's check and design jobs, so a merge that passes here
+# .github/workflows/ci.yml's three jobs, so a merge that passes here
 # should pass there. When a step is added to CI, add it here too.
 #
 # Run it after merging origin/main into the working branch, so it checks what
@@ -37,6 +37,9 @@ export TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgresql://postgres@localhost:5
 export NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
 export NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}"
 export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+# The Typecheck lane checks types before its build, so the build skips its own
+# check (next.config.ts), as CI's does.
+export SKIP_BUILD_TYPECHECK=1
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT

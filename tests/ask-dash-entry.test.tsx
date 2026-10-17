@@ -18,10 +18,10 @@ import {
   type AskSource,
 } from '@/components/shell/ask-dash';
 import { useSearchRows } from '@/components/shell/use-search-rows';
-import { TalkThread } from '@/components/talk/talk-thread';
+import { Thread } from '@/components/thread/thread';
 import { scopeForModule } from '@/lib/search/scope';
 import { SYSTEM_THEME } from '@/lib/theme';
-import type { TalkSend } from '@/components/talk/talk-thread';
+import type { TalkSend } from '@/components/thread/thread';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
@@ -41,6 +41,8 @@ const SOURCE: AskSource = {
   confirm: never,
   decline: never,
   undo: never,
+  save: never,
+  rate: never,
 };
 
 function Probe({ query }: { query: string }) {
@@ -103,7 +105,7 @@ describe('an answer in the thread', () => {
 
   it('links each row it used', () => {
     const html = renderToStaticMarkup(
-      <TalkThread id="t" turns={turns} send={never} label="Ask a follow-up" />,
+      <Thread id="t" turns={turns} send={never} label="Ask a follow-up" />,
     );
     expect(html).toContain('href="/shopping/orders/o1"');
     expect(html).toContain('Catan lot');
@@ -111,7 +113,7 @@ describe('an answer in the thread', () => {
 
   it('draws a card or story thread as before, with no list of rows', () => {
     const html = renderToStaticMarkup(
-      <TalkThread id="t" turns={turns.map((turn) => ({ ...turn, citations: undefined }))} send={never} label="Reply" />,
+      <Thread id="t" turns={turns.map((turn) => ({ ...turn, citations: undefined }))} send={never} label="Reply" />,
     );
     expect(html).not.toContain('What this answer used');
   });
@@ -173,8 +175,8 @@ describe('the page the sheet will tell Dash', () => {
       // Then the listener for the lookups as they run (plan #1438), the files
       // sent with it (plan #1715), the list sent with it (plan #1658) and the
       // listener for the answer as it is written (plan #1902).
-      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined, null, expect.any(Function)],
-      ['And after that?', null, null, expect.any(Function), undefined, null, expect.any(Function)],
+      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined, null, expect.any(Function), undefined],
+      ['And after that?', null, null, expect.any(Function), undefined, null, expect.any(Function), undefined],
     ]);
   });
 });

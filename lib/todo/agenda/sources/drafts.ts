@@ -3,7 +3,7 @@ import 'server-only';
 import { sessionClients } from '@/lib/todo/agenda/clients';
 import { draftExpiry, draftTitle, type DraftKind } from '@/lib/drafts/find';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
-import { addDays, todayIn } from '@/lib/todo/tasks/model';
+import { todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -17,7 +17,7 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * the second tap, in Gmail.
  *
  * Done marks it sent, "Not this one" dismisses it, and "Later" moves it to
- * tomorrow with three more days to run. A draft nobody touches stops
+ * the day chosen with three more days to run from there. A draft nobody touches stops
  * showing three days after it appeared: `expires_at` is compared with the
  * clock here, so nothing has to run for it to go.
  */
@@ -39,6 +39,7 @@ export const draftsSource: AgendaSource = {
   id: 'drafts',
   label: 'Follow-ups and return requests',
   module: 'todo',
+  crossesWorkspaces: true,
   description:
     'A follow-up on an application that has gone quiet, or a return request before the window closes, written by Dash and ready to send from Gmail.',
 
@@ -108,6 +109,7 @@ export const draftsSource: AgendaSource = {
         },
         detail: row.reason,
         completable: true,
+        workspace: row.kind === 'return_request' ? 'shopping' : 'jobs',
       };
     });
   },
@@ -121,14 +123,13 @@ export const draftsSource: AgendaSource = {
       .eq('user_id', ctx.userId);
   },
 
-  async defer(ctx, key) {
-    const tomorrow = addDays(todayIn(ctx.timezone, ctx.now), 1);
+  async defer(ctx, key, until) {
     const core = await (ctx.clients ?? sessionClients).core();
     await core
       .from('drafted_messages')
       .update({
-        show_on: tomorrow,
-        expires_at: draftExpiry(new Date(ctx.now.getTime() + 24 * 60 * 60 * 1000)),
+        show_on: todayIn(ctx.timezone, until),
+        expires_at: draftExpiry(until),
       })
       .eq('id', idOf(key))
       .eq('user_id', ctx.userId);

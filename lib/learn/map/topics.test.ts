@@ -38,7 +38,7 @@ function rows(extra: Partial<TopicRows> = {}): TopicRows {
       { concept_id: 'i2', topic_id: 'L4-sets' },
     ],
     links: [
-      { target_id: 'L4-cells', weight: 1, similarity: 0.8, found_at: '2026-10-01T00:00:00Z', matched_by: 'name' },
+      { target_id: 'L4-cells', kind: 'work', ceiling: 1, similarity: 0.8, found_at: '2026-10-01T00:00:00Z', matched_by: 'name' },
     ],
     ...extra,
   };

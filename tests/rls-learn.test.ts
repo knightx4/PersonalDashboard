@@ -105,6 +105,7 @@ describe('RLS coverage', () => {
       'area_check_articles',
       'area_domains',
       'area_fields',
+      'brief_findings',
       'briefs',
       'card_notes',
       'catalogue_course_items',
@@ -114,25 +115,42 @@ describe('RLS coverage', () => {
       'catalogue_passages',
       'catalogue_providers',
       'catalogue_segments',
+      'catalogue_structures',
+      'cell_claims',
+      'cell_evidence',
+      'cell_links',
+      'cell_questions',
       'concept_edges',
       'concept_mentions',
       'concept_state',
       'concept_subjects',
       'concepts',
       'course_embeddings',
+      'course_explains',
       'course_reads',
+      'course_topics',
       'curriculum_units',
+      'essay_log',
       'essay_notes',
       'essay_research',
+      'essay_vault_notes',
       'essays',
       'evidence_links',
+      'external_checks',
       'feed_cards',
       'goals',
+      'graph_moves',
+      'idea_pair_reviews',
       'idea_place_members',
       'idea_places',
       'idea_topic_parents',
       'imports',
       'learning_log',
+      'lens_offer_declines',
+      'lens_targets',
+      'lenses',
+      'link_reviews',
+      'move_reviews',
       'next_outcomes',
       'note_reads',
       'opening_questions',
@@ -154,8 +172,14 @@ describe('RLS coverage', () => {
       'settings',
       'sources',
       'subject_channels',
+      'subject_preparation_steps',
+      'subject_preparations',
+      'subject_sources',
       'subjects',
       'theme_fields',
+      'topic_cells',
+      'topic_structure_pulls',
+      'topics',
       'track_offers',
       'tracks',
       'transcript_calls',
@@ -221,6 +245,80 @@ describe('what a chat adds (plan #1807)', () => {
         insert into reading_subjects (user_id, reading_id, subject_id)
         values (${userB}, ${readingA}, ${subjectB})`),
     ).rejects.toThrow();
+  });
+});
+
+describe('a subject\'s preparation run (plan #2276.1)', () => {
+  // The trigger on subjects opens a run with its seven steps for a subject
+  // made any way; the person may read theirs, and only the service role writes.
+  let subjectA = '';
+
+  beforeAll(async () => {
+    [{ id: subjectA }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Urban economics') returning id`;
+  });
+
+  it('opens a run with its eight steps when a subject is made', async () => {
+    const runs = await admin<{ id: string; status: string }[]>`
+      select id, status from subject_preparations where subject_id = ${subjectA}`;
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe('pending');
+    const steps = await admin<{ key: string }[]>`
+      select key from subject_preparation_steps where preparation_id = ${runs[0].id} order by ordinal`;
+    expect(steps.map((s) => s.key)).toEqual([
+      'classify', 'pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'write_units', 'finish', 'first_lesson',
+    ]);
+  });
+
+  it('opens none for a hidden survey subject until it becomes a real one', async () => {
+    const [{ id }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name, survey) values (${userA}, 'A survey theme', true) returning id`;
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(0);
+    await admin`update subjects set survey = false where id = ${id}`;
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(1);
+  });
+
+  it('shows the owner their run and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(1);
+    // B has runs of their own, for B's subjects; none of A's shows.
+    const mine = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparations`);
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((r) => r.user_id === userB)).toBe(true);
+    const steps = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparation_steps`);
+    expect(steps.every((r) => r.user_id === userB)).toBe(true);
+    expect(await asUser(userB, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(0);
+  });
+
+  it('lets no session write a run, even its owner', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`update subject_preparations set status = 'done' where subject_id = ${subjectA}`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`insert into subject_preparations (user_id, subject_id) values (${userA}, ${subjectA})`),
+    ).rejects.toThrow();
+  });
+
+  it('opens a branch run of five steps when the owner picks a direction, and only the owner (plan #2276.7)', async () => {
+    const branch = { key: 'land-use', frame: 'Land use', name: 'Land use', asks: ['Bid rent'] };
+    await expect(
+      asUser(userB, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`),
+    ).rejects.toThrow();
+
+    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`);
+    // A second press on the same branch opens nothing more.
+    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 32)`);
+    const runs = await admin<{ id: string; branch_key: string | null; direction: { state?: string; answers?: number } | null }[]>`
+      select id, branch_key, direction from subject_preparations where subject_id = ${subjectA} order by created_at`;
+    expect(runs.map((r) => r.branch_key)).toEqual([null, 'land-use']);
+    expect(runs[0].direction).toMatchObject({ state: 'picked', answers: 32 });
+    const steps = await admin<{ key: string }[]>`
+      select key from subject_preparation_steps where preparation_id = ${runs[1].id} order by ordinal`;
+    expect(steps.map((s) => s.key)).toEqual(['pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'finish']);
+
+    await asUser(userA, (tx) => tx`select learn.dismiss_subject_direction(${subjectA}, 40)`);
+    const [own] = await admin<{ direction: { state?: string; answers?: number } }[]>`
+      select direction from subject_preparations where subject_id = ${subjectA} and branch_key is null`;
+    expect(own.direction).toMatchObject({ state: 'dismissed', answers: 40 });
   });
 });
 
@@ -413,7 +511,15 @@ describe('the catalogue, which belongs to nobody', () => {
   // one person's graph -- and it gets the usual treatment.
   // catalogue_passages (learn 0070) is shared the same way: paragraph cuts of
   // article sections, searched but never anybody's.
-  const SHARED = ['catalogue_providers', 'catalogue_items', 'catalogue_segments', 'catalogue_passages'];
+  // catalogue_structures (learn 0160) holds what a syllabus or table of
+  // contents carries beyond its units, shared the same way.
+  const SHARED = [
+    'catalogue_providers',
+    'catalogue_items',
+    'catalogue_segments',
+    'catalogue_passages',
+    'catalogue_structures',
+  ];
 
   it('lets any signed-in user read the shared catalogue', async () => {
     await admin`
@@ -2318,6 +2424,23 @@ describe('places on Idea Space (plan #1997.2)', () => {
     ).rejects.toThrow();
     await admin`delete from concepts where id = ${conceptA}`;
     expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(0);
+  });
+});
+
+describe('settled idea pairs (plan #2147.2)', () => {
+  it('shows the owner their reviews and nobody else, and leaves the writing to the functions', async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Pairs subject') returning id`;
+    const ids = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      select ${userA}, ${subject.id}, n, 'A claim.', 'Written by hand for this test.'
+      from unnest(array['Pair one', 'Pair two']) n returning id`;
+    const [low, high] = ids.map((r) => r.id).sort();
+    await admin`insert into idea_pair_reviews (user_id, concept_low, concept_high, decision, similarity)
+                values (${userA}, ${low}, ${high}, 'kept', 0.9)`;
+    expect(await asUser(userA, (tx) => tx`select 1 from idea_pair_reviews`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select 1 from idea_pair_reviews`)).toHaveLength(0);
+    await expect(asUser(userA, (tx) => tx`delete from idea_pair_reviews`)).rejects.toThrow();
   });
 });
 

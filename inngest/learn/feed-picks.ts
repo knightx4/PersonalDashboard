@@ -5,9 +5,11 @@ import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { AIM_COLUMNS, cardDepthForAim, toAim, type AimRow } from '@/lib/learn/aims';
 import { loadAimAreaNames } from '@/lib/learn/aims-store';
 import { loadAreas } from '@/lib/learn/areas/load';
+import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { cardTitle, isCardDifficulty } from '@/lib/learn/feed/card';
@@ -125,12 +127,17 @@ async function loadGoals(
 ): Promise<{ goals: FeedGoal[]; since: string | null }> {
   const { data, error } = await learn
     .from('aims')
-    .select(AIM_COLUMNS)
+    .select(`${AIM_COLUMNS}, subject_id`)
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: true });
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
-  const all = ((data ?? []) as AimRow[]).map(toAim);
+  // A goal whose subject has a finished preparation is covered by it: no
+  // section cards are drawn for it (plan #2297.4).
+  const prepared = await preparedSubjectIds(learn, userId);
+  const all = ((data ?? []) as (AimRow & { subject_id: string | null })[])
+    .filter((row) => !row.subject_id || !prepared.has(row.subject_id))
+    .map(toAim);
   const listed = all.filter((aim) => aim.listSource);
   const open = all.filter((aim) => !aim.listSource);
   const next = open.length > 0 ? await loadNextGoals(learn, userId) : null;
@@ -209,7 +216,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     segment: { heading: string | null } | null;
   };
 
-  const [placements, themes, cards, tests, { goals, since: goalsSince }] = await Promise.all([
+  const [placements, themes, cards, tests, { goals, since: goalsSince }, goalsOnly] = await Promise.all([
     readAll<Placement>(
       (from, to) =>
         learn
@@ -246,6 +253,8 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     ),
     learn.rpc('feed_field_tests', { p_user_id: userId }),
     loadGoals(learn, fields, userId),
+    // Goals only (plan #2164.1): no theme or gap is drawn while it is on.
+    goalsOnlyOrDefault(learn, userId),
   ]);
   if (tests.error) throw new Error(`Reading what you have been tested on failed: ${tests.error.message}`);
 
@@ -343,6 +352,7 @@ async function loadPerson(learn: LearnSupabaseClient, fields: FeedField[], userI
     // Known and review swipes, and the difficulty ratings, set how deep the
     // next picks go (depth.ts).
     progress: progressFrom(swiped),
+    goalsOnly,
     picked,
     articlesHeld: [...new Set(cards.flatMap((card) => (card.named_article ? [card.named_article] : [])))],
   };

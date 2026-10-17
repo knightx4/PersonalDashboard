@@ -19,7 +19,7 @@ import type { ItemSellQuote } from '@/lib/sell/item-quote';
 import { formatRange } from '@/lib/sell/price-evidence';
 import { PriceEvidenceDetail } from './price-evidence-detail';
 import type { SellPath } from '@/lib/sell/route';
-import { PaidHint } from '@/components/ui/paid-hint';
+import { BilledPress } from '@/app/shopping/sell/billed-press';
 
 const PATH_LABEL: Record<SellPath, string> = {
   list_individually: 'List individually',
@@ -75,30 +75,33 @@ export function ItemSellPanel({
                 this is the one button that works on an unpriceable item. */}
             <form action={searchAction}>
               <input type="hidden" name="inventory_item_id" value={itemId} />
-              <Button type="submit" size="sm" variant="secondary" pending={searchPending}>
-                {searchPending ? 'Searching…' : searchLabel}
-              </Button>
-            </form>
-            {billed && (
-              <PaidHint
-                action="app/shopping/sell/actions.ts#searchItemPrice"
+              <BilledPress
+                billed={billed}
+                type="submit"
+                size="sm"
+                variant="secondary"
+                pending={searchPending}
+                paid="app/shopping/sell/actions.ts#searchItemPrice"
                 count={1}
                 what="Cost of the search"
-              />
-            )}
+              >
+                {searchPending ? 'Searching…' : searchLabel}
+              </BilledPress>
+            </form>
             <form action={priceAction}>
               <input type="hidden" name="inventory_item_id" value={itemId} />
-              <Button type="submit" size="sm" pending={pricePending}>
-                {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
-              </Button>
-            </form>
-            {billed && (
-              <PaidHint
-                action="app/shopping/sell/actions.ts#priceOneItem"
+              <BilledPress
+                billed={billed}
+                type="submit"
+                size="sm"
+                pending={pricePending}
+                paid="app/shopping/sell/actions.ts#priceOneItem"
                 count={1}
                 what="Cost of pricing it"
-              />
-            )}
+              >
+                {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
+              </BilledPress>
+            </form>
           </div>
         ) : undefined
       }

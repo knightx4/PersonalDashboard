@@ -1,4 +1,4 @@
-import type { ModuleSources, Section } from '@/lib/sources/types';
+import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 /**
  * The app's own pages that core rows open under. They belong to no
@@ -41,6 +41,7 @@ export const coreSources: ModuleSources = {
       weight: 'record',
       search: ['request'],
       title: 'request',
+      parent: parentBy('conversation_id', 'core.conversations'),
       facts: ['status', 'error', 'conversation_id', 'run_id'],
       note: "status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.",
     },
@@ -51,6 +52,7 @@ export const coreSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
+      parent: parentBy('conversation_id', 'core.conversations'),
       note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.",
     },
     {
@@ -127,6 +129,7 @@ export const coreSources: ModuleSources = {
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
+    { table: 'core.ask_reply_checks', reason: 'Bookkeeping for the weekly check of Ask Dash replies that went badly: the week, what it flagged and the Dev note it wrote; the thumbs themselves are on core.conversation_turns.' },
     { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },

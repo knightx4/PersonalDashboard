@@ -47,6 +47,12 @@ export const coreActions: ModuleActions = {
     declineDashChange: none('theirs'),
     undoDashChange: none('theirs'),
     reopenDashChange: none('theirs', 'Undo: takes back their own decline.'),
+    saveDashAnswer: tool('add_todo', 'add_quick_note'),
+    pinDashChat: none('setting', 'Arranges the person\'s own list of chats with Dash.'),
+    renameDashChat: none('setting', 'Names a chat in the person\'s own list of chats with Dash.'),
+    archiveDashChat: none('setting', 'Clears a chat out of the person\'s own list; nothing is lost.'),
+    searchDashChats: none('page'),
+    rateDashAnswer: none('theirs', "The person's verdict on a Dash answer."),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
@@ -55,7 +61,8 @@ export const coreActions: ModuleActions = {
   },
   'app/timeline/actions.ts': {
     markObservationNotUseful: none('theirs'),
-    writeYearReview: none('spends'),
+    // Queued for an approval, since it spends (plan #2228.1).
+    writeYearReview: tool('write_year_review'),
   },
   'app/s/[token]/actions.ts': {
     respondToShare: none(

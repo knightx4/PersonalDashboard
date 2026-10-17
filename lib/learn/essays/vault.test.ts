@@ -1,9 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseNote } from '@/lib/vault/markdown/note';
 import { VaultConflictError, type VaultSource } from '@/lib/vault/providers/types';
-import { blockMarks, blockMatches, graphemeStarts, readAuthorshipBlock, stripAuthorshipBlock, type AuthorMark } from './authorship';
+import {
+  blockMarks,
+  blockMatches,
+  graphemeStarts,
+  readAuthorshipBlock,
+  stripAuthorshipBlock,
+  type AuthorMark,
+} from './authorship';
 import { readEssayFrontmatter } from './note';
-import { essayFromVault, saveEssayToVault, type EssayVaultPatch, type EssayVaultPorts, type VaultEssay } from './vault';
+import {
+  essayFromVault,
+  saveEssayToVault,
+  type EssayVaultPatch,
+  type EssayVaultPorts,
+  type VaultEssay,
+} from './vault';
 
 /**
  * An in-memory vault: the repository's files by path, the stored notes the
@@ -13,7 +26,10 @@ import { essayFromVault, saveEssayToVault, type EssayVaultPatch, type EssayVault
 function world(essay: Partial<VaultEssay> = {}) {
   const files = new Map<string, { text: string; blob: string }>();
   const blobs = new Map<string, string>();
-  const notes = new Map<string, { id: string; path: string; title: string; body: string; blobSha: string }>();
+  const notes = new Map<
+    string,
+    { id: string; path: string; title: string; body: string; blobSha: string }
+  >();
   const commits: Array<{ path: string; message: string; text: string }> = [];
   let n = 0;
   const blobFor = (text: string) => {
@@ -69,13 +85,24 @@ function world(essay: Partial<VaultEssay> = {}) {
     takenSlugs: async () => new Set(['money-odd-good-out']),
     storeEssay: async (_id, patch) => {
       stored.push(patch);
-      Object.assign(row, { noteId: patch.noteId, path: patch.path, blobSha: patch.blobSha, slug: patch.slug });
+      Object.assign(row, {
+        noteId: patch.noteId,
+        path: patch.path,
+        blobSha: patch.blobSha,
+        slug: patch.slug,
+      });
     },
     create: {
       openSource: async () => source,
       storeNote: async (note) => {
         const id = `note-${notes.size + 1}`;
-        notes.set(id, { id, path: note.path, title: note.title, body: note.body, blobSha: note.blobSha });
+        notes.set(id, {
+          id,
+          path: note.path,
+          title: note.title,
+          body: note.body,
+          blobSha: note.blobSha,
+        });
         return id;
       },
       afterSave: () => undefined,
@@ -85,7 +112,8 @@ function world(essay: Partial<VaultEssay> = {}) {
       openSource: async () => source,
       storeNote: async (id, expected, saved) => {
         const note = notes.get(id);
-        if (note && note.blobSha === expected) Object.assign(note, { title: saved.title, body: saved.body, blobSha: saved.blobSha });
+        if (note && note.blobSha === expected)
+          Object.assign(note, { title: saved.title, body: saved.body, blobSha: saved.blobSha });
       },
       afterSave: () => undefined,
     },
@@ -107,9 +135,20 @@ const DRAFT = '# Why money is the odd good out\n\nEvery good you buy wears out.'
 describe('saveEssayToVault', () => {
   it('writes the first save as one commit adding Essays/<title>.md with the essay frontmatter', async () => {
     const w = world();
-    const result = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const result = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
 
-    expect(result).toMatchObject({ ok: true, path: 'Essays/Why money is the odd good out.md', commitSha: 'commit-1' });
+    expect(result).toMatchObject({
+      ok: true,
+      path: 'Essays/Why money is the odd good out.md',
+      commitSha: 'commit-1',
+    });
     expect(w.commits).toHaveLength(1);
     expect(w.commits[0]!.message).toBe('Add Why money is the odd good out from Dash');
     const parsed = parseNote(w.files.get('Essays/Why money is the odd good out.md')!.text, 'x');
@@ -140,11 +179,25 @@ describe('saveEssayToVault', () => {
 
   it('edits the same note in place on the next save, from the blob the editor opened', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     if (!first.ok) throw new Error(first.error);
 
     const next = `${DRAFT}\n\nA loaf is worth less on Thursday.`;
-    const second = await saveEssayToVault(w.ports, { id: 'essay-1', body: next, blobSha: first.blobSha, today: '2026-10-13', marks: [], self: 'Selvey' });
+    const second = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: next,
+      blobSha: first.blobSha,
+      today: '2026-10-13',
+      marks: [],
+      self: 'Selvey',
+    });
 
     expect(second).toMatchObject({ ok: true, path: first.path, commitSha: 'commit-2' });
     expect(w.files.size).toBe(1);
@@ -157,36 +210,88 @@ describe('saveEssayToVault', () => {
 
   it('raises the stage to seedling when finishing, on a first save and on a later one, and never lowers it', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey', stage: 'seedling' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+      stage: 'seedling',
+    });
     if (!first.ok) throw new Error(first.error);
     expect(w.files.get(first.path)!.text).toContain('stage: seedling\n');
     expect(first.stage).toBe('seedling');
 
     const w2 = world();
-    const draft = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const draft = await saveEssayToVault(w2.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     if (!draft.ok) throw new Error(draft.error);
     expect(w2.files.get(draft.path)!.text).toContain('stage: draft\n');
-    const finished = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: draft.blobSha, today: '2026-10-13', marks: [], self: 'Selvey', stage: 'seedling' });
+    const finished = await saveEssayToVault(w2.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: draft.blobSha,
+      today: '2026-10-13',
+      marks: [],
+      self: 'Selvey',
+      stage: 'seedling',
+    });
     if (!finished.ok) throw new Error(finished.error);
     expect(w2.files.get(draft.path)!.text).toContain('stage: seedling\n');
     expect(finished.stage).toBe('seedling');
 
-    const again = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: finished.blobSha, today: '2026-10-14', marks: [], self: 'Selvey', stage: 'seedling' });
+    const again = await saveEssayToVault(w2.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: finished.blobSha,
+      today: '2026-10-14',
+      marks: [],
+      self: 'Selvey',
+      stage: 'seedling',
+    });
     expect(again).toMatchObject({ ok: true, commitSha: null, stage: 'seedling' });
   });
 
   it('makes no commit when the vault already has the text', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     if (!first.ok) throw new Error(first.error);
-    const again = await saveEssayToVault(w.ports, { id: 'essay-1', body: `\n${DRAFT}\n`, blobSha: first.blobSha, today: '2026-10-13', marks: [], self: 'Selvey' });
+    const again = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: `\n${DRAFT}\n`,
+      blobSha: first.blobSha,
+      today: '2026-10-13',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(again).toMatchObject({ ok: true, commitSha: null });
     expect(w.commits).toHaveLength(1);
   });
 
   it('does not overwrite a note changed in Obsidian since the editor opened it', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     if (!first.ok) throw new Error(first.error);
     const theirs = w.files.get(first.path)!.text.replace('wears out.', 'wears out, they wrote.');
     w.editInObsidian(first.path, theirs);
@@ -207,19 +312,47 @@ describe('saveEssayToVault', () => {
 
   it('is refused by the repository too when the sync has not caught up', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     if (!first.ok) throw new Error(first.error);
     w.files.set(first.path, { text: 'changed in Obsidian', blob: 'blob-theirs' });
 
-    const result = await saveEssayToVault(w.ports, { id: 'essay-1', body: `${DRAFT} Mine.`, blobSha: first.blobSha, today: '2026-10-13', marks: [], self: 'Selvey' });
+    const result = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: `${DRAFT} Mine.`,
+      blobSha: first.blobSha,
+      today: '2026-10-13',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(result).toMatchObject({ ok: false, reason: 'changed' });
     expect(w.files.get(first.path)!.text).toBe('changed in Obsidian');
   });
 
   it('treats a tab that opened before the first save as out of date', async () => {
     const w = world();
-    await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
-    const stale = await saveEssayToVault(w.ports, { id: 'essay-1', body: 'Other tab', blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
+    const stale = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: 'Other tab',
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(stale).toMatchObject({ ok: false, reason: 'changed' });
     expect(w.commits).toHaveLength(1);
   });
@@ -231,18 +364,42 @@ describe('saveEssayToVault', () => {
       blobSha: 'blob-gone',
       slug: 'money-odd-good-out',
     });
-    const result = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: 'blob-gone', today: '2026-10-12', marks: [], self: 'Selvey' });
+    const result = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: 'blob-gone',
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(result).toMatchObject({ ok: true, path: 'Essays/Why money is the odd good out.md' });
     expect(w.stored[0]).toMatchObject({ noteId: 'note-1', slug: 'money-odd-good-out' });
   });
 
   it('numbers the file when Essays already has a note of that name, and writes nothing for an empty draft', async () => {
     const w = world();
-    w.files.set('Essays/Why money is the odd good out.md', { text: 'someone else', blob: 'blob-x' });
-    const result = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    w.files.set('Essays/Why money is the odd good out.md', {
+      text: 'someone else',
+      blob: 'blob-x',
+    });
+    const result = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body: DRAFT,
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(result).toMatchObject({ ok: true, path: 'Essays/Why money is the odd good out 2.md' });
 
-    const empty = await saveEssayToVault(world().ports, { id: 'essay-1', body: ' \n ', blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    const empty = await saveEssayToVault(world().ports, {
+      id: 'essay-1',
+      body: ' \n ',
+      blobSha: null,
+      today: '2026-10-12',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(empty).toMatchObject({ ok: false, reason: 'empty' });
   });
 });
@@ -252,11 +409,20 @@ describe('the authorship block (plan #1868)', () => {
   // Leading blank lines, which the note drops, so the marks have to move with them.
   const body = `\n\n${DRAFT}\n\n${REPHRASED}\n\nThe rest is mine.`;
   const at = body.indexOf(REPHRASED);
-  const marks: AuthorMark[] = [{ author: 'dash', from: at, to: at + REPHRASED.length, name: 'claude-sonnet-5-5' }];
+  const marks: AuthorMark[] = [
+    { author: 'dash', from: at, to: at + REPHRASED.length, name: 'claude-sonnet-5-5' },
+  ];
 
   it('saves one accepted rephrase as Dash’s span and the rest as the person’s', async () => {
     const w = world();
-    const result = await saveEssayToVault(w.ports, { id: 'essay-1', body, blobSha: null, today: '2026-10-12', marks, self: 'Selvey' });
+    const result = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body,
+      blobSha: null,
+      today: '2026-10-12',
+      marks,
+      self: 'Selvey',
+    });
     if (!result.ok) throw new Error(result.error);
     const file = w.files.get(result.path)!.text;
     const block = readAuthorshipBlock(file)!;
@@ -275,12 +441,33 @@ describe('the authorship block (plan #1868)', () => {
 
   it('rewrites the block on a later save, makes no commit when only the date would change, and commits a change to the marks alone', async () => {
     const w = world();
-    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body, blobSha: null, today: '2026-10-12', marks, self: 'Selvey' });
+    const first = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body,
+      blobSha: null,
+      today: '2026-10-12',
+      marks,
+      self: 'Selvey',
+    });
     if (!first.ok) throw new Error(first.error);
-    const same = await saveEssayToVault(w.ports, { id: 'essay-1', body, blobSha: first.blobSha, today: '2026-10-13', marks, self: 'Selvey' });
+    const same = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body,
+      blobSha: first.blobSha,
+      today: '2026-10-13',
+      marks,
+      self: 'Selvey',
+    });
     expect(same).toMatchObject({ ok: true, commitSha: null });
 
-    const cleared = await saveEssayToVault(w.ports, { id: 'essay-1', body, blobSha: first.blobSha, today: '2026-10-13', marks: [], self: 'Selvey' });
+    const cleared = await saveEssayToVault(w.ports, {
+      id: 'essay-1',
+      body,
+      blobSha: first.blobSha,
+      today: '2026-10-13',
+      marks: [],
+      self: 'Selvey',
+    });
     expect(cleared).toMatchObject({ ok: true, commitSha: 'commit-2' });
     const file = w.files.get(first.path)!.text;
     expect(file.match(/^---$/gm)).toHaveLength(3);
@@ -299,10 +486,18 @@ describe('essayFromVault', () => {
 
   it('takes the marks from a block that still matches, counted from the start of the body', async () => {
     const { authorshipBlock } = await import('./authorship');
-    const written = authorshipBlock(`${fm}${text}`, [{ ...dash, from: fm.length + at, to: fm.length + at + 16 }], { self: 'Self' });
+    const written = authorshipBlock(
+      `${fm}${text}`,
+      [{ ...dash, from: fm.length + at, to: fm.length + at + 16 }],
+      { self: 'Self' },
+    );
     const file = `${fm}${text}\n\n${written.block}\n`;
     const noteBody = file.slice(fm.length);
-    expect(essayFromVault(file, noteBody, { body: '', marks: [] })).toEqual({ body: `${text}\n`, marks: [dash], askMarks: false });
+    expect(essayFromVault(file, noteBody, { body: '', marks: [] })).toEqual({
+      body: `${text}\n`,
+      marks: [dash],
+      askMarks: false,
+    });
   });
 
   it('asks when the note was edited elsewhere, offering the old marks moved to where their words are', () => {
@@ -315,7 +510,9 @@ describe('essayFromVault', () => {
   });
 
   it('asks when the block went, and does not ask about an essay that had no marks', () => {
-    expect(essayFromVault(`${fm}${text}\n`, `${text}\n`, { body: text, marks: [dash] })).toMatchObject({ askMarks: true });
+    expect(
+      essayFromVault(`${fm}${text}\n`, `${text}\n`, { body: text, marks: [dash] }),
+    ).toMatchObject({ askMarks: true });
     expect(essayFromVault(`${fm}${text}\n`, `${text}\n`, { body: text, marks: [] })).toEqual({
       body: `${text}\n`,
       marks: [],

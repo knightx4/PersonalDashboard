@@ -5,11 +5,11 @@ import { Briefcase } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
-import { PaidHint } from '@/components/ui/paid-hint';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { useToast } from '@/components/ui/toast';
 import { dateLabel, jobAnchor, jobDates, RESUMES_HREF, type Job } from '@/lib/you/work-history';
@@ -156,10 +156,16 @@ function ReadButton({ label, size }: { label: string; size?: 'sm' }) {
     });
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <Button type="button" size={size} pending={reading} onClick={read}>
+      <DashAction
+        type="button"
+        size={size}
+        pending={reading}
+        onClick={read}
+        paid={READ_ACTION}
+        what="Cost of reading the résumé"
+      >
         {reading ? 'Reading…' : label}
-      </Button>
-      <PaidHint action={READ_ACTION} what="Cost of reading the résumé" />
+      </DashAction>
       {error && (
         <span className="basis-full">
           <FieldError>{error}</FieldError>

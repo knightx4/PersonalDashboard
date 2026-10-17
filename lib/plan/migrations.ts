@@ -61,8 +61,48 @@ function numberOf(name: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * The newest file per folder that may be recorded under a loose name.
+ *
+ * The rule above, "ends with the file's name, number or no number", reads
+ * across folders: a later `migrations-vault/0040_merge_ideas.sql` would have
+ * counted as applied because `learn_0154_merge_ideas` ends with `_merge_ideas`,
+ * and the workflow on main would never have applied it. Files after this
+ * line must be recorded under a name that belongs to their own folder:
+ * `liveMigrationName`, or for the core folder the name without its number,
+ * which is what CLAUDE.md asks for and what scripts/apply-migrations.ts
+ * writes. Files at or below it keep the loose rule, because some were
+ * applied under a bare name with no folder (`message_role_hint` for
+ * migrations-job-search/0044) and holding them to the strict rule would have
+ * the workflow apply them a second time.
+ */
+export const LOOSE_NAMES_THROUGH: Readonly<Record<string, number>> = {
+  migrations: 251,
+  'migrations-goals': 78,
+  'migrations-job-search': 57,
+  'migrations-learn': 164,
+  'migrations-news': 20,
+  'migrations-todo': 17,
+  'migrations-vault': 36,
+  'migrations-you': 7,
+};
+
+/** The names a file may be recorded under once the loose rule no longer covers it. */
+function ownNames(file: MigrationFile): string[] {
+  const stem = file.name.replace(/\.sql$/, '');
+  const bare = stem.replace(/^\d+_/, '');
+  const own = liveMigrationName(`${file.dir}/${file.name}`);
+  if (file.dir === 'migrations') return [stem, bare];
+  return [own, own.replace(stem, bare)];
+}
+
 /** Whether a live history name records this file. */
 export function migrationApplied(file: MigrationFile, applied: ReadonlySet<string>): boolean {
+  const n = numberOf(file.name);
+  const line = LOOSE_NAMES_THROUGH[file.dir];
+  if (line === undefined || n === null || n > line) {
+    return ownNames(file).some((name) => applied.has(name));
+  }
   const stem = file.name.replace(/\.sql$/, '');
   const bare = stem.replace(/^\d+_/, '');
   if (applied.has(stem) || applied.has(bare)) return true;
@@ -104,4 +144,69 @@ export function unappliedSentence(paths: readonly string[]): string | null {
   const more = paths.length > 3 ? ` and ${paths.length - 3} more` : '';
   const noun = paths.length === 1 ? 'migration is' : 'migrations are';
   return `${paths.length} ${noun} on main but not applied to the live database: ${named}${more}.`;
+}
+
+/**
+ * The name a file is applied under: the file's own name, with its folder in
+ * front for every folder but `migrations`. `migrations-learn/0154_merge_ideas.sql`
+ * goes in as `learn_0154_merge_ideas`, the shape CLAUDE.md asks sessions for
+ * and `migrationApplied` reads back.
+ */
+export function liveMigrationName(path: string): string {
+  const [dir, file] = path.split('/');
+  const stem = file.replace(/\.sql$/, '');
+  if (dir === 'migrations') return stem;
+  return `${dir.replace(/^migrations-/, '').replace(/-/g, '_')}_${stem}`;
+}
+
+/**
+ * The order to apply `folder/file` paths in: the core folder first, because
+ * the modules' tables refer to its tables and never the other way, then each
+ * module folder by name, and by file name within a folder.
+ */
+export function applyOrder(paths: readonly string[]): string[] {
+  const core = (path: string) => (path.startsWith('migrations/') ? 0 : 1);
+  return [...paths].sort((a, b) => core(a) - core(b) || a.localeCompare(b));
+}
+
+/**
+ * Statements a rehearsal cannot run: they end the transaction it rolls back
+ * (so the file's changes would stay), or Postgres refuses them inside one.
+ * Read with comments and dollar-quoted bodies taken out, so a function's own
+ * `begin ... end` does not count.
+ */
+const NOT_IN_A_TRANSACTION =
+  /(^|;)\s*(begin|commit|rollback|end|start\s+transaction|savepoint|release|vacuum|alter\s+system|create\s+database|drop\s+database)\b|\bconcurrently\b/i;
+
+function withoutBodies(sql: string): string {
+  return sql
+    .replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, "''")
+    .replace(/--[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+/** Why a file cannot be rehearsed, or null when it can. */
+export function cannotRehearse(sql: string): string | null {
+  const match = NOT_IN_A_TRANSACTION.exec(withoutBodies(sql));
+  if (!match) return null;
+  return `it runs \`${match[0].replace(/^[;\s]+/, '').trim().toLowerCase()}\`, which cannot run inside the transaction a rehearsal rolls back`;
+}
+
+/**
+ * The script that runs files against the live database and keeps nothing.
+ *
+ * One transaction, rolled back at the end, so every statement runs against
+ * the real rows and none of it stays. The timeouts keep a rehearsal from
+ * holding a lock the app is waiting on: a migration that needs longer than
+ * that on live data is worth knowing about before main applies it.
+ */
+export function rehearsalScript(files: ReadonlyArray<{ path: string; sql: string }>): string {
+  const body = files.map((file) => `-- ${file.path}\n${file.sql.trim()}\n`).join('\n');
+  return [
+    'begin;',
+    "set local lock_timeout = '5s';",
+    "set local statement_timeout = '120s';",
+    body,
+    'rollback;',
+  ].join('\n');
 }

@@ -3,6 +3,9 @@ import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 import type { DevComment } from '@/lib/comments/load';
+import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import type { StoredAsk } from '@/lib/jobs/drafting/store';
+import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 
 /** Everything the role page hands its tabs, loaded once by page.tsx. */
 export interface PanelProps {
@@ -28,6 +31,12 @@ export interface PanelProps {
   bankSize: number;
   /** The cover letter for this application, private; empty when none is written. */
   coverLetter: string;
+  /** Marked ready to apply. */
+  readyToApply: boolean;
+  /** Every question the application form asks has been added. */
+  allQuestionsAdded: boolean;
+  /** Your yes/no answer to "has a cover letter"; null until answered. */
+  hasCoverLetter: boolean | null;
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
   focusInterviewId?: string | null;
@@ -91,9 +100,27 @@ export interface PanelProps {
     /** What a previous draft cited, and what it could not ground. */
     evidenceItemIds: string[];
     unsupportedClaims: string[];
+    /** application_answers.word_limit; the question's own wording can set a limit too. */
+    wordLimit: number | null;
   }>;
+  /** Dash's drafts waiting beside the answers, by answer id, from application_drafts (plan #2130.4). */
+  answerDrafts: Record<string, AnswerDraft>;
+  /** The questions Dash asked back while drafting the answers, with any replies. */
+  dashAsks: StoredAsk[];
+  /** For the preview gallery: Draft all answers drawn mid-run, or failed. */
+  draftRun?: { pending: boolean; error: string | null };
+  /** Dash's drafted cover letter waiting beside the editor, with its questions; null when none (plan #2135.2). */
+  coverLetterDraft: CoverLetterDraftView | null;
+  /** For the preview gallery: Draft a cover letter drawn mid-run, or failed. */
+  coverLetterRun?: { pending: boolean; error: string | null };
   /** The comment thread on the role, oldest first: your notes and Dash's replies. */
   thread: DevComment[];
+  /**
+   * The threads under each answer and under the cover letter (note
+   * be3c6616), keyed by ref: job_search.application_answers:<id> and
+   * job_search.applications:<id>. Absent in the gallery means none.
+   */
+  answerThreads?: Record<string, DevComment[]>;
   /** The rounds of the process. Every interview is inside one of these. */
   interviewGroups: Array<{
     id: string;
