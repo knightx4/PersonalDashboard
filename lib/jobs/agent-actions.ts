@@ -51,6 +51,7 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/contacts/actions.ts': {
     createContact: tool('change_contact'),
     updateContact: tool('change_contact'),
+    draftContactMessage: none('spends', 'Shows a draft on the page and keeps nothing; Dash can write the same message in Ask without a second run.'),
     logTouch: tool('change_touch'),
     updateTouch: tool('change_touch'),
     markTouchAnswered: tool('change_touch'),

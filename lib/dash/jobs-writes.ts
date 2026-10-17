@@ -2443,6 +2443,10 @@ async function changeContact(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (given(args, 'relationship')) values.relationship = oneOf(args, 'relationship', RELATIONSHIPS, false);
   if (given(args, 'how_we_connect')) values.how_we_connect = clearable(args, 'how_we_connect', NOTES_MAX);
   if (given(args, 'notes')) values.notes = clearable(args, 'notes', NOTES_MAX);
+  if (given(args, 'potential_lead')) {
+    if (typeof args.potential_lead !== 'boolean') throw new JobsRefused('potential_lead is true or false.');
+    values.potential_lead = args.potential_lead;
+  }
   if (given(args, 'company')) {
     const name = clearable(args, 'company', COMPANY_MAX);
     if (name === null) values.company_id = null;
@@ -2458,7 +2462,7 @@ async function changeContact(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (before) {
     const update = Object.fromEntries(Object.entries(values).filter(([key, value]) => before[key] !== value));
     if (Object.keys(update).length === 0) {
-      throw new JobsRefused('Nothing to change: give full_name, title, company, linkedin_url, email, relationship, how_we_connect or notes, with a new value.');
+      throw new JobsRefused('Nothing to change: give full_name, title, company, linkedin_url, email, relationship, how_we_connect, notes or potential_lead, with a new value.');
     }
     const written = await changeKept(env, undo, 'contacts', before, update);
     if (!written) throw new Error('Changing the contact failed: no row');
@@ -3094,7 +3098,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_contact',
     description:
-      "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words) and notes. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
+      "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words), notes, and whether they are a potential lead. An agent that finds people for them marks each one potential_lead and says in notes why it picked them. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
     input_schema: {
       type: 'object',
       properties: {
@@ -3107,6 +3111,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         relationship: { type: 'string', enum: [...RELATIONSHIPS], description: 'How they know them; cold when they do not.' },
         how_we_connect: { type: 'string', description: `How they know them, in their words. ${CLEARABLE}` },
         notes: { type: 'string', description: `Notes on them, in full, replacing what is there. ${CLEARABLE}` },
+        potential_lead: { type: 'boolean', description: 'True when they could lead to a job: someone worth reaching out to, which the Contacts page filters on. False to take the mark off.' },
       },
       additionalProperties: false,
     },

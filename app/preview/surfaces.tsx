@@ -1317,6 +1317,7 @@ const contactRows: ContactListRow[] = [
     companySlug: 'de-shaw',
     lastTouchAt: '2026-08-21T08:30:00.000Z',
     pendingReplies: 0,
+    potentialLead: false,
   },
   {
     id: 'c2',
@@ -1328,6 +1329,7 @@ const contactRows: ContactListRow[] = [
     companySlug: 'de-shaw',
     lastTouchAt: '2026-09-02T11:00:00.000Z',
     pendingReplies: 1,
+    potentialLead: true,
   },
   {
     id: 'c3',
@@ -1339,6 +1341,7 @@ const contactRows: ContactListRow[] = [
     companySlug: 'tallow',
     lastTouchAt: null,
     pendingReplies: 0,
+    potentialLead: false,
   },
   {
     id: 'c4',
@@ -1350,6 +1353,7 @@ const contactRows: ContactListRow[] = [
     companySlug: 'kestrel-bank',
     lastTouchAt: '2026-08-30T09:10:00.000Z',
     pendingReplies: 2,
+    potentialLead: true,
   },
   {
     id: 'c5',
@@ -1361,6 +1365,7 @@ const contactRows: ContactListRow[] = [
     companySlug: null,
     lastTouchAt: '2026-07-19T20:00:00.000Z',
     pendingReplies: 0,
+    potentialLead: false,
   },
 ];
 
@@ -1374,6 +1379,7 @@ const contact: ContactRow = {
   email: 'aoife@kestrelbank.example',
   howWeConnect: 'Spoke at the same meetup in March; she remembered the talk.',
   notes: 'Owns the platform group. Prefers a short note to a long one.',
+  potentialLead: true,
   companyName: 'Kestrel Bank',
   companySlug: 'kestrel-bank',
   touches: [

@@ -350,6 +350,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // to five searches whose results come back as input; three people with a
   // message each out.
   'suggest-outreach': searching(run(SONNET, 50_000, 2_500), 3),
+  // The career goals, a CV excerpt, the contact and their sends, and a few
+  // sent emails in; one short message out, with the thinking before it.
+  'draft-outreach': run(SONNET, 8_000, 1_500),
   // The career goals and the companies already applied to, then up to five
   // searches whose results come back as input; five postings out.
   'find-openings': searching(run(SONNET, 50_000, 2_500), 3),

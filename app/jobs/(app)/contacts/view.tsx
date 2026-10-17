@@ -7,7 +7,9 @@ import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, FieldError, Input, Select } from '@/components/ui/field';
+import { CheckRow, Field, FieldError, Input, Select } from '@/components/ui/field';
+import { Segmented } from '@/components/ui/segmented';
+import { Chip } from '@/components/ui/chip';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { createContact } from './actions';
@@ -32,6 +34,7 @@ export interface ContactRow {
   email: string | null;
   howWeConnect: string | null;
   notes: string | null;
+  potentialLead: boolean;
   companyName: string | null;
   companySlug: string | null;
   touches: Array<{
@@ -55,6 +58,8 @@ export interface ContactListRow {
   companySlug: string | null;
   lastTouchAt: string | null;
   pendingReplies: number;
+  /** Someone who could lead to a job, marked on their page or by an agent that found them. */
+  potentialLead: boolean;
 }
 
 export function ContactsView({
@@ -70,6 +75,10 @@ export function ContactsView({
   // seven-field form used to stand open beside the list, longer than the list
   // itself, and filled the right column on a laptop.
   const [adding, setAdding] = useState(false);
+  // Everyone, or only the people marked as potential leads.
+  const [show, setShow] = useState<'all' | 'leads'>('all');
+  const leadCount = contacts.filter((c) => c.potentialLead).length;
+  const shown = show === 'leads' ? contacts.filter((c) => c.potentialLead) : contacts;
 
   const addButton = (
     <Button type="button" variant="secondary" size="sm" onClick={() => setAdding(true)}>
@@ -79,6 +88,36 @@ export function ContactsView({
 
   return (
     <div className="space-y-4">
+      {/* Adding someone sits above the list, where the eye starts, so a long
+        * list does not push it out of sight. */}
+      {contacts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Segmented
+            label="Which contacts to show"
+            value={show}
+            onChange={setShow}
+            options={[
+              { value: 'all', label: `Everyone ${contacts.length}` },
+              { value: 'leads', label: `Potential leads ${leadCount}` },
+            ]}
+          />
+          {!adding && <span className="ml-auto">{addButton}</span>}
+        </div>
+      )}
+
+      {adding && (
+        <CardSection id="add-contact" title="Add someone">
+          <AddContactForm companies={companies} onCancel={() => setAdding(false)} />
+        </CardSection>
+      )}
+
+      {contacts.length > 0 && shown.length === 0 && (
+        <p className="text-ui text-ink-muted">
+          Nobody is marked as a potential lead yet. Mark someone on their page, or have an agent
+          mark the people it finds.
+        </p>
+      )}
+
       {contacts.length === 0 ? (
         adding ? null : (
           <EmptyState
@@ -96,7 +135,7 @@ export function ContactsView({
             * every row took five lines a person. */}
           <Card padding="none" className="md:hidden">
             <ul className="divide-y divide-border">
-              {contacts.map((contact) => (
+              {shown.map((contact) => (
                 <li key={contact.id} className="relative card-pad-x row-pad hover:bg-sunken">
                   <p className="min-w-0 truncate text-ui">
                     <Link
@@ -106,6 +145,7 @@ export function ContactsView({
                       {contact.fullName}
                     </Link>
                     {contact.title && <span className="ml-1.5 text-ink-muted">{contact.title}</span>}
+                    {contact.potentialLead && <Chip className="ml-1.5">lead</Chip>}
                   </p>
                   {/* The date keeps its place at the right end; what comes
                     * before it is what shortens when the line runs out. */}
@@ -136,10 +176,11 @@ export function ContactsView({
                 </TR>
               </THead>
               <TBody>
-                {contacts.map((contact) => (
+                {shown.map((contact) => (
                   <TR key={contact.id} href={`/jobs/contacts/${contact.id}`}>
                     <TD primary>
                       {contact.fullName}
+                      {contact.potentialLead && <Chip className="ml-1.5">lead</Chip>}
                       {/* Under the name, so the name column does not crowd
                         * the date off the table's edge (law 18). */}
                       {contact.title && (
@@ -174,15 +215,7 @@ export function ContactsView({
               </TBody>
             </Table>
           </Card>
-
-          {!adding && addButton}
         </>
-      )}
-
-      {adding && (
-        <CardSection id="add-contact" title="Add someone">
-          <AddContactForm companies={companies} onCancel={() => setAdding(false)} />
-        </CardSection>
       )}
     </div>
   );
@@ -255,6 +288,7 @@ function AddContactForm({
           <Input id="email" name="email" type="email" />
         </Field>
       </div>
+      <CheckRow name="potentialLead" title="Potential lead" hint="Someone who could lead to a job." />
 
       {/* The action returns one error for the whole form, not one per field,
           so it sits under the fields rather than beside one of them. */}

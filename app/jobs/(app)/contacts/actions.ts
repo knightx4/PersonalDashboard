@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { draftOutreach, type OutreachDraft } from '@/lib/jobs/contacts/draft-outreach';
+import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordSessionSpend } from '@/lib/core/spend/session';
 
 /**
  * Contacts hold other people's data.
@@ -22,6 +25,7 @@ const contactSchema = z.object({
     .default('cold'),
   howWeConnect: z.string().trim().optional(),
   notes: z.string().trim().optional(),
+  potentialLead: z.boolean().default(false),
 });
 
 // latency: pending
@@ -38,6 +42,7 @@ export async function createContact(
     relationship: formData.get('relationship') ?? 'cold',
     howWeConnect: formData.get('howWeConnect') ?? '',
     notes: formData.get('notes') ?? '',
+    potentialLead: formData.get('potentialLead') === 'on',
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -55,6 +60,7 @@ export async function createContact(
     relationship: parsed.data.relationship,
     how_we_connect: parsed.data.howWeConnect || null,
     notes: parsed.data.notes || null,
+    potential_lead: parsed.data.potentialLead,
   });
 
   if (error) return { error: error.message };
@@ -64,48 +70,64 @@ export async function createContact(
   return { message: 'Added.' };
 }
 
-const contactEditSchema = z.object({
-  fullName: z.string().trim().min(1, 'A name is needed.'),
-  title: z.string().trim().optional(),
-  linkedinUrl: z.string().trim().url().optional().or(z.literal('')),
-  email: z.string().trim().email().optional().or(z.literal('')),
-  howWeConnect: z.string().trim().optional(),
-  notes: z.string().trim().optional(),
-});
+const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
+const STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'] as const;
+
+const contactPatchSchema = z
+  .object({
+    fullName: z.string().trim().min(1, 'A name is needed.'),
+    title: z.string().trim(),
+    linkedinUrl: z.string().trim().url('That is not a link.').or(z.literal('')),
+    email: z.string().trim().email('That is not an email address.').or(z.literal('')),
+    howWeConnect: z.string().trim(),
+    notes: z.string().trim(),
+    relationship: z.enum(RELATIONSHIPS),
+    status: z.enum(STATUSES),
+    potentialLead: z.boolean(),
+  })
+  .partial();
+
+export type ContactPatch = z.input<typeof contactPatchSchema>;
+
+const COLUMNS: Record<keyof ContactPatch, string> = {
+  fullName: 'full_name',
+  title: 'title',
+  linkedinUrl: 'linkedin_url',
+  email: 'email',
+  howWeConnect: 'how_we_connect',
+  notes: 'notes',
+  relationship: 'relationship',
+  status: 'status',
+  potentialLead: 'potential_lead',
+};
 
 /**
- * Fill in what a contact created from mail never had: a name is all the
- * inbox can give you, so title, LinkedIn and how you actually know them stay
- * blank until you add them by hand.
+ * Change one or more of a contact's details where the page shows them. A
+ * contact created from mail arrives with only a name, so title, LinkedIn and
+ * how you actually know them are filled in here, one value at a time; an
+ * empty text clears the value.
  */
-// latency: pending
+// latency: optimistic -- each value shows its new text at once
 export async function updateContact(
   contactId: string,
-  input: {
-    fullName: string;
-    title: string;
-    linkedinUrl: string;
-    email: string;
-    howWeConnect: string;
-    notes: string;
-  },
+  patch: ContactPatch,
 ): Promise<{ error: string | null }> {
-  const parsed = contactEditSchema.safeParse(input);
+  const parsed = contactPatchSchema.safeParse(patch);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const update: Record<string, string | boolean | null> = {};
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (value === undefined) continue;
+    update[COLUMNS[key as keyof ContactPatch]] = value === '' ? null : value;
+  }
+  if (Object.keys(update).length === 0) return { error: null };
 
   const user = await requireUser();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from('contacts')
-    .update({
-      full_name: parsed.data.fullName,
-      title: parsed.data.title || null,
-      linkedin_url: parsed.data.linkedinUrl || null,
-      email: parsed.data.email || null,
-      how_we_connect: parsed.data.howWeConnect || null,
-      notes: parsed.data.notes || null,
-    })
+    .update(update)
     .eq('id', contactId)
     .eq('user_id', user.id);
 
@@ -114,6 +136,39 @@ export async function updateContact(
   revalidatePath('/jobs/contacts/[id]', 'page');
   revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
+}
+
+const DraftRequest = z.object({
+  contactId: z.string().uuid(),
+  channel: z.enum(['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other']),
+  aim: z.string().max(1_000).default(''),
+});
+
+/**
+ * Draft a message to this contact (lib/jobs/contacts/draft-outreach.ts).
+ * Nothing is kept: the draft comes back to the page, and becomes a send in
+ * the log only when it is logged as sent.
+ */
+// latency: pending -- a model call; the button says it is working
+export async function draftContactMessage(input: {
+  contactId: string;
+  channel: string;
+  aim?: string;
+}): Promise<{ error: string | null; draft?: OutreachDraft }> {
+  const parsed = DraftRequest.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Drafting is not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const spend: SpendReport[] = [];
+  const result = await draftOutreach(supabase, user.id, parsed.data, {
+    apiKey,
+    onSpend: (report) => spend.push(report),
+  });
+  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-outreach' }, spend);
+  return result.ok ? { error: null, draft: result.draft } : { error: result.error };
 }
 
 const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
