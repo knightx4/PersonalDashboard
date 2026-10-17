@@ -904,7 +904,7 @@ export function AppShell({
             {/* The brief goes down here from lg up, which is exactly the width
             this line is drawn at, so the two copies above and this one never
             show at once. */}
-            <StatusLine lines={activity} brief={brief} main={mainCheck} />
+            <StatusLine lines={activity} brief={brief} main={mainCheck} owner={isOwner} />
 
             <nav
               // Named for what is actually in it: on home and the account page it
