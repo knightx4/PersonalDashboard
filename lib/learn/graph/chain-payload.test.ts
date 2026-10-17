@@ -116,6 +116,26 @@ describe('joining what is already there', () => {
     expect(chain).toBeNull();
   });
 
+  it('keeps a chain whose goal the model named differently from its node', () => {
+    // The unit "Economic reasoning and ways of seeing the city" came back
+    // with goal_concept "Economic reasoning about cities" and no node of that
+    // name; the chain is still for that goal, so it stands with the closest
+    // node as its end rather than being refused as nothing new.
+    const chain = normaliseChain(
+      parse({
+        subject: 'Urban economics',
+        goal_concept: 'Economic reasoning about cities',
+        concepts: [node('Opportunity cost'), node('Economic reasoning and ways of seeing the city')],
+        edges: [edge('Opportunity cost', 'Economic reasoning and ways of seeing the city')],
+      }),
+      nothingExists,
+    );
+
+    expect(chain).not.toBeNull();
+    expect(chain!.goalConcept).toBe('Economic reasoning and ways of seeing the city');
+    expect(chain!.nodes).toHaveLength(2);
+  });
+
   it('drops a concept the model proposed twice', () => {
     const chain = normaliseChain(
       parse({
@@ -234,20 +254,21 @@ describe('when there is nothing to propose', () => {
     ).toBeNull();
   });
 
-  it('says so when the goal node itself never turned up', () => {
-    // Without the node the goal resolves to, there is no goal -- only a pile
-    // of concepts around where it should have been.
-    expect(
-      normaliseChain(
-        parse({
-          subject: 'Economics',
-          goal_concept: 'The point of all this',
-          concepts: [node('A'), node('B')],
-          edges: [edge('A', 'B')],
-        }),
-        nothingExists,
-      ),
-    ).toBeNull();
+  it('takes the last node as the goal when the goal node itself never turned up', () => {
+    // The chain was written for the goal even when the model named it in
+    // other words than its node; the end of the chain stands for it. Refusing
+    // it as nothing new is what sank the first prepared subject's lesson.
+    const chain = normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'The point of all this',
+        concepts: [node('A'), node('B')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+    expect(chain).not.toBeNull();
+    expect(chain!.goalConcept).toBe('B');
   });
 
   it('says so for an empty proposal', () => {
