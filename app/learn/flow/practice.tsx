@@ -25,6 +25,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { roleWhy } from '@/lib/learn/levels/role-line';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { LevelsFlow } from './levels';
+import { PlacementFlow } from './placement';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
 
@@ -86,6 +87,8 @@ export async function PracticeFlow({
   run,
   end,
   after,
+  placement,
+  skip,
 }: {
   track?: string | string[];
   only?: string | string[];
@@ -97,6 +100,10 @@ export async function PracticeFlow({
   end?: string | string[];
   /** The question just answered; only part of the key. */
   after?: string | string[];
+  /** `placement=1` with a track: the placement before its first lesson (plan #2292.2). */
+  placement?: string | string[];
+  /** `skip=1` on a placement's end: straight on to the lesson. */
+  skip?: string | string[];
 }) {
   // `?cell=<id>` asks an explain question about one level of a topic (plan
   // #2138.5), graded against that level and the ones around it. Without it,
@@ -169,7 +176,11 @@ export async function PracticeFlow({
         {subject ? <FlowFocus name={subject.name} back="All subjects" /> : <ScopeFilter filter={filter} />}
         <div className="mt-6">
           <Suspense key={`${subject?.id ?? 'all'}:${firstParam(run) ?? ''}:${firstParam(end) ?? ''}:${firstParam(after) ?? ''}`} fallback={<CellQuestionSkeleton />}>
-            <LevelsFlow userId={user.id} subject={subject} only={filter} run={run} end={end} />
+            {subject && firstParam(placement) === '1' ? (
+              <PlacementFlow userId={user.id} subject={subject} run={run} end={end} skip={firstParam(skip) === '1'} />
+            ) : (
+              <LevelsFlow userId={user.id} subject={subject} only={filter} run={run} end={end} />
+            )}
           </Suspense>
         </div>
       </div>

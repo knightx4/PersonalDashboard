@@ -203,7 +203,24 @@ on every run, whether or not the deck is short, a pass finds laid-out units of
 goal tracks with no pieces and writes up to two (`writeDuePieces` in
 `lib/learn/lessons/pieces.ts`). The pass covers units laid out any other way,
 such as by opening the unit on the track page, and the units laid out before
-pieces existed. Tracks not made from a goal get no pieces.
+pieces existed.
+
+A subject whose preparation has finished gets pieces the same way without a
+goal (plan #2292.1). The preparation's last step, `first_lesson`
+(`lib/learn/prepare/first-lesson-step.ts`), lays out unit 1 with the unit's
+own question, splits it into pieces, matches them to the territory's cells and
+writes the lessons of the first piece's ideas, so the subject has a lesson to
+read when the run ends. After that the top-up treats the subject as it treats
+a goal's track: `planSubjects` in `lib/learn/lessons/plan-store.ts` returns the
+active goals' tracks and the prepared subjects, and the plan pass, the pieces
+pass and the lay-out port all read it. Later units are laid out one ahead of
+the person and split as they are reached. A track that is neither a goal's nor
+a prepared subject still gets no pieces.
+
+The lesson's catalogue search reads one more kind of source for every track:
+units of stored structure documents whose licence is show
+(`learn.nearest_lesson_segments`, learn 0174). A structure_only or never_feed
+unit is never given to the lesson call.
 
 ### A piece is worked through on its own page
 
@@ -261,6 +278,31 @@ then marks the piece's ideas tested and passes the piece with its practice, as
 a right answer to the piece's own question does. A case's expected answer
 stays with the grader and is never shown. A piece with no cells it can ask
 about keeps the check above.
+
+### A placement passes the pieces you already hold
+
+Plan #2292.2. Before a subject's first lesson you can answer a few questions
+so Dash knows where to start you. A placement is a Practice Flow run on the
+subject's lens with `placement=1` in `practiceHref`
+(`app/learn/flow/placement.tsx`). It asks up to eight questions and nothing
+but placement: the lens's topics in the order the laid-out pieces first name
+their cells, then the lens's other topics in the order they joined it, each
+topic's levels bisected by the placement rule in `nextQuestion` before the
+next topic starts (`pickPlacement` in `lib/learn/levels/placement.ts`).
+Answers go through Practice Flow's own action, so they write `cell_evidence`
+and move the lens as any practice answer does.
+
+Every question carries Skip to the lesson where a practice run has End run.
+The placement ends on the eighth answer, when no topic has a level left to
+place, or on Skip. At the end, every piece of the subject's laid-out units
+whose matched cells are all held is passed with `passed_reason = 'placement'`
+(learn 0175); a piece with no cells on the map is never passed this way, and
+its ideas are not put on the review schedule, since nothing here taught them.
+The end page lists each topic answered on with the level it now stands at and
+the pieces passed, and its forward action opens the first piece not passed.
+Skip goes straight to that piece. A piece's own check now writes
+`passed_reason = 'check'`; a piece passed before learn 0175 has no reason and
+was passed by its check.
 
 ### A piece has a practice task
 

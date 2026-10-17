@@ -6,12 +6,13 @@ import { rowSubject, type TalkTurn } from '@/lib/talk/talk';
 import { loadConversation } from '@/lib/talk/store';
 import { parsePieceTalk, type PieceTalkState } from './piece-talk';
 import { loadPiecePage, type PiecePage } from './piece-store';
-import { goalsWithTracks } from './plan-store';
+import { planEntries } from './plan-store';
 import { chooseTodaysPiece, type TodaysPieceGoal } from './todays-piece';
 
 /**
  * The reads behind today's piece on Now (plan #2164.4, `todays-piece.ts`):
- * the active goals' units and pieces, which pieces have a check answered
+ * the units of each goal's track and of each prepared subject with no goal
+ * (plan #2292.4) and pieces, which pieces have a check answered
  * right and when each goal's checks were last asked, then the chosen piece
  * as its own page reads it.
  */
@@ -61,9 +62,9 @@ export async function loadTodaysPiece(
   /** Reads the piece's conversation; left out, the thread opens empty. */
   core?: CoreSupabaseClient,
 ): Promise<TodaysPiece | null> {
-  const aims = await goalsWithTracks(learn, userId);
+  const aims = await planEntries(learn, userId);
   if (aims.length === 0) return null;
-  const subjectIds = [...new Set(aims.map((aim) => aim.subject_id))];
+  const subjectIds = [...new Set(aims.map((aim) => aim.subjectId))];
 
   const [units, pieces] = await Promise.all([
     learn.from('curriculum_units').select('id, subject_id, ordinal').eq('user_id', userId).in('subject_id', subjectIds),
@@ -95,12 +96,12 @@ export async function loadTodaysPiece(
   }
 
   const goals: TodaysPieceGoal[] = aims.map((aim) => ({
-    aimId: aim.id,
+    aimId: aim.aimId,
     name: aim.name,
-    subjectId: aim.subject_id,
-    lastWorked: lastWorked.get(aim.subject_id) ?? null,
+    subjectId: aim.subjectId,
+    lastWorked: lastWorked.get(aim.subjectId) ?? null,
     units: unitRows
-      .filter((unit) => unit.subject_id === aim.subject_id)
+      .filter((unit) => unit.subject_id === aim.subjectId)
       .map((unit) => ({
         id: unit.id,
         ordinal: unit.ordinal,

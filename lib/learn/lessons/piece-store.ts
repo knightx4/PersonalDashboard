@@ -348,7 +348,7 @@ export async function markPiecePassed(learn: LearnSupabaseClient, userId: string
   const now = new Date().toISOString();
   const { data, error } = await learn
     .from('plan_pieces')
-    .update({ passed_at: now })
+    .update({ passed_at: now, passed_reason: 'check' })
     .eq('id', pieceId)
     .eq('user_id', userId)
     .is('passed_at', null)

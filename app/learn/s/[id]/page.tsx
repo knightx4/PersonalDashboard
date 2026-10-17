@@ -37,6 +37,8 @@ import { PreparationBlock } from './prepare';
 import { DirectionOffer } from './direction';
 import { directionOffer } from '@/lib/learn/prepare/branch';
 import { SourcesSection, StartHere } from './sources';
+import { loadPlacementPieces } from '@/lib/learn/levels/placement-store';
+import { firstNotHeld } from '@/lib/learn/levels/placement';
 import { loadDirection, loadPreparation, loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { loadStartTopic } from '@/lib/learn/prepare/start-load';
 import { branchPreparationView, preparationSources, preparationView, unitsComeAtStep } from '@/lib/learn/prepare/view';
@@ -331,6 +333,13 @@ export default async function SubjectPage({
   const startTopic = sources?.start.topic
     ? await loadStartTopic(supabase, user.id, sources.start.topic.id).catch(() => null)
     : null;
+  // The first lesson Start here opens: the first piece not passed. A subject
+  // whose pieces cannot be read, or has none, keeps the practice press.
+  const startPieces =
+    sources && !showEverything
+      ? await loadPlacementPieces(supabase, user.id, id).catch(() => null)
+      : null;
+  const startPiece = startPieces ? firstNotHeld(startPieces) : null;
   // The card stays until the first unit is done; the curriculum's Next takes over from there.
   const firstRow = unitRows[0] ?? null;
   const showStart = sources !== null && (firstRow === null || firstRow.state !== 'done');
@@ -464,6 +473,9 @@ export default async function SubjectPage({
           unit={firstRow ? { ordinal: firstRow.unit.ordinal, title: firstRow.unit.title, covers: firstRow.unit.covers } : null}
           topic={startTopic}
           draftedName={sources.start.topic?.name ?? null}
+          subjectId={id}
+          lesson={startPiece ? { pieceId: startPiece.id, title: startPiece.title } : null}
+          lessonPending={startPieces !== null && startPieces.length === 0}
         />
       )}
       {!showEverything &&

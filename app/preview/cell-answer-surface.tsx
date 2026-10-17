@@ -8,6 +8,7 @@ import {
 } from '@/components/learn/cell-answer-view';
 import { NoTopicToPlace, PracticeError } from '@/components/learn/practice-states';
 import { RunSummaryView } from '@/components/learn/run-summary-view';
+import { PlacementEndView } from '@/components/learn/placement-end-view';
 import type { ThemeOffer } from '@/lib/learn/levels/theme-offer';
 import type { RunSummary } from '@/lib/learn/levels/run';
 import { ThemeLensOffer } from '@/components/learn/theme-lens-offer';
@@ -285,4 +286,91 @@ export function CellAnswerPreview({
       />
     </PaidCostsProvider>
   );
+}
+
+/** A placement on Urban Economics before its first lesson (plan #2292.2). */
+const placementAsked: AskedCellView = {
+  questionId: '00000000-0000-4000-8000-000000002292',
+  topicName: 'Bid-rent curves',
+  level: 3,
+  step: 'Question 2 of up to 8',
+  question:
+    'Explain why land rent falls with distance from the city centre, and what decides how steeply it falls for each kind of land use.',
+  why: 'Finding your level on Bid-rent curves. You hold it to level 2, and this splits what is still unknown above that in half.',
+};
+
+const placementMoved: Moved = {
+  reached: [
+    {
+      cellId: 'rent3',
+      topicName: 'Bid-rent curves',
+      level: 3,
+      how: 'shown',
+      asked: true,
+      quote:
+        'Firms that gain most from being central, like offices, will pay the most for land near the centre, so their curve is the steepest.',
+      via: null,
+      descriptor: check(
+        'Can say why rent falls with distance from the centre',
+        'Can explain why each land use has its own slope',
+      ),
+    },
+    {
+      cellId: 'rent2',
+      topicName: 'Bid-rent curves',
+      level: 2,
+      how: 'implied',
+      asked: false,
+      quote: null,
+      via: { topicName: 'Bid-rent curves', level: 3 },
+      descriptor: check('Can draw a bid-rent curve'),
+    },
+  ],
+  doubted: [],
+};
+
+const PLACEMENT_RUN = `/learn/now?practice=1&track=urban&run=${encodeURIComponent(RUN)}&placement=1`;
+const PLACEMENT_SKIP = `/learn/now?practice=1&track=urban&end=${encodeURIComponent(RUN)}&placement=1&skip=1`;
+
+export function PlacementPreview({ state }: { state: 'question' | 'answered' | 'end' | 'end-none' }) {
+  switch (state) {
+    case 'question':
+    case 'answered':
+      return (
+        <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>
+          <CellAnswerView
+            asked={placementAsked}
+            state={state === 'answered' ? { moved: placementMoved, error: null } : { moved: null, error: null }}
+            nextHref={PLACEMENT_RUN}
+            endHref={PLACEMENT_SKIP}
+            endLabel="Skip to the lesson"
+            endShort="Skip"
+            holdForward
+            openWhy={state === 'question'}
+          />
+        </PaidCostsProvider>
+      );
+    case 'end':
+      return (
+        <PlacementEndView
+          topics={[
+            { topicId: 'rent', name: 'Bid-rent curves', level: 3 },
+            { topicId: 'agg', name: 'Agglomeration economies and the productivity of dense labour markets', level: 1 },
+            { topicId: 'zone', name: 'Zoning', level: 0 },
+          ]}
+          passed={['Why land near the centre costs more', 'Drawing the bid-rent curve for offices and homes']}
+          lesson={{ title: 'Why firms cluster: sharing, matching and learning', href: '/learn/s/urban/p/piece-3' }}
+          subjectHref="/learn/s/urban"
+        />
+      );
+    case 'end-none':
+      return (
+        <PlacementEndView
+          topics={[{ topicId: 'rent', name: 'Bid-rent curves', level: 0 }]}
+          passed={[]}
+          lesson={{ title: 'Why land near the centre costs more', href: '/learn/s/urban/p/piece-1' }}
+          subjectHref="/learn/s/urban"
+        />
+      );
+  }
 }

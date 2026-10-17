@@ -9,10 +9,24 @@ import { CellAnswerView, type AskedCellView, type CellAnswerState } from './cell
  * The screen itself is `CellAnswerView`, which the gallery draws in each
  * state.
  */
-export function CellAnswer({ asked, nextHref, endHref }: { asked: AskedCellView; nextHref: string; endHref?: string }) {
+export function CellAnswer({
+  asked,
+  nextHref,
+  endHref,
+  endLabel,
+  endShort,
+  holdForward,
+}: {
+  asked: AskedCellView;
+  nextHref: string;
+  endHref?: string;
+  endLabel?: string;
+  endShort?: string;
+  holdForward?: boolean;
+}) {
   const [state, action] = useActionState<CellAnswerState, FormData>(answerCellQuestion, {
     moved: null,
     error: null,
   });
-  return <CellAnswerView asked={asked} state={state} action={action} nextHref={nextHref} endHref={endHref} />;
+  return <CellAnswerView asked={asked} state={state} action={action} nextHref={nextHref} endHref={endHref} endLabel={endLabel} endShort={endShort} holdForward={holdForward} />;
 }

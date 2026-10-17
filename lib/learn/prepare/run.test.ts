@@ -112,6 +112,7 @@ describe('runPreparation', () => {
       },
       write_units: async () => ({ state: 'done', counts: { units: 5 } }),
       finish: finishStep,
+      first_lesson: async () => ({ state: 'done', counts: { pieces: 4, lessons: 3 } }),
     });
     box.m = m;
 
@@ -128,6 +129,7 @@ describe('runPreparation', () => {
       'draft_topics',
       'write_units',
       'finish',
+      'first_lesson',
     ]);
     expect([...m.steps.values()].every((s) => s.status === 'done')).toBe(true);
     expect(m.steps.get('draft_topics')).toMatchObject({ calls: 3, summary: '6 topics drafted', counts: { drafted: 6, remaining: 0 } });
@@ -159,7 +161,7 @@ describe('runPreparation', () => {
     expect(second).toEqual({ outcome: 'paused', step: 'finish', ran: ['compile_territory', 'draft_topics', 'write_units'] });
 
     const third = await runPreparation(m.ports, SUBJECT, budget);
-    expect(third).toEqual({ outcome: 'finished', ran: ['finish'] });
+    expect(third).toEqual({ outcome: 'finished', ran: ['finish', 'first_lesson'] });
 
     // No step was worked twice.
     expect(m.calls).toEqual([...PREPARATION_STEPS]);

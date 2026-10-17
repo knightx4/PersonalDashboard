@@ -3,8 +3,9 @@
  *
  * Pure, so the subject page (#2276.2) can draw the list before a step's code
  * has landed. The keys are also in the trigger that opens a run
- * (supabase/migrations-learn/0167_subject_preparations.sql) and in its check
- * constraint; steps.test.ts holds the two lists equal.
+ * (supabase/migrations-learn/0173_subject_preparation_first_lesson.sql, which
+ * added first_lesson to 0167's seven) and in its check constraint;
+ * steps.test.ts holds the lists equal.
  */
 
 export const PREPARATION_STEPS = [
@@ -15,6 +16,7 @@ export const PREPARATION_STEPS = [
   'draft_topics',
   'write_units',
   'finish',
+  'first_lesson',
 ] as const;
 
 export type PreparationStepKey = (typeof PREPARATION_STEPS)[number];
@@ -35,6 +37,7 @@ export const PREPARATION_STEP_LABELS: Record<PreparationStepKey, { label: string
   draft_topics: { label: 'Draft the topics and their checks', builtBy: '#2276.5' },
   write_units: { label: 'Write the opening units', builtBy: '#2276.5' },
   finish: { label: 'Finish', builtBy: '#2276.1' },
+  first_lesson: { label: 'Write the first lesson', builtBy: '#2292.1' },
 };
 
 /** The line a step gets when its code is not on main yet. */

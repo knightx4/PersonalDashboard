@@ -34,8 +34,8 @@ describe('preparationView', () => {
     if (view.kind !== 'working') return;
     expect(view.starting).toBe(true);
     expect(view.position).toBe(1);
-    expect(view.total).toBe(7);
-    expect(view.lines.map((l) => l.state)).toEqual(['current', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+    expect(view.total).toBe(8);
+    expect(view.lines.map((l) => l.state)).toEqual(['current', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
     expect(view.lines[0].detail).toBe('Starting in a moment.');
   });
 
@@ -135,7 +135,7 @@ describe('branchPreparationView (plan #2276.7)', () => {
 describe('unitsComeAtStep', () => {
   it('names the write_units step while the run is working towards it', () => {
     const view = preparationView({ run: run({ status: 'pending', startedAt: null }), steps: freshSteps() });
-    expect(unitsComeAtStep(view)).toEqual({ position: 6, total: 7 });
+    expect(unitsComeAtStep(view)).toEqual({ position: 6, total: 8 });
   });
 
   it('says nothing once that step has gone, or when the run failed or has none', () => {

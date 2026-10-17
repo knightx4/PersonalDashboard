@@ -29,6 +29,13 @@ export type PracticeScope = {
    * going on is a fresh render rather than the cached page of the last one.
    */
   after?: string | null;
+  /**
+   * A placement before the subject's first lesson (plan #2292.2): up to eight
+   * questions on `track`'s lens that only place you, ending on the lesson.
+   */
+  placement?: boolean;
+  /** With `placement` and `end`: go straight on to the lesson rather than show the end. */
+  skip?: boolean;
 };
 
 export function practiceHref(scope: PracticeScope = {}): string {
@@ -40,6 +47,8 @@ export function practiceHref(scope: PracticeScope = {}): string {
   if (scope.run) params.set('run', scope.run);
   if (scope.end) params.set('end', scope.end);
   if (scope.after) params.set('after', scope.after);
+  if (scope.placement) params.set('placement', '1');
+  if (scope.skip) params.set('skip', '1');
   return `${NOW_HREF}?${params.toString()}`;
 }
 

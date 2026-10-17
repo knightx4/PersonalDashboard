@@ -52,6 +52,15 @@ describe('nowHref', () => {
   });
 });
 
+describe('practiceHref placement', () => {
+  it('writes a placement on a subject, and the skip from it', () => {
+    expect(practiceHref({ track: 's1', placement: true })).toBe('/learn/now?practice=1&track=s1&placement=1');
+    expect(practiceHref({ track: 's1', placement: true, end: 'T', skip: true })).toBe(
+      '/learn/now?practice=1&track=s1&end=T&placement=1&skip=1',
+    );
+  });
+});
+
 describe('firstParam', () => {
   it('takes the first of a repeated parameter', () => {
     expect(firstParam(['a', 'b'])).toBe('a');

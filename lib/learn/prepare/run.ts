@@ -11,7 +11,7 @@ import type { PreparationBranch } from './branch';
 /**
  * The preparation runner (plan #2276.1).
  *
- * Goes down a subject's seven steps in order. Each step is a function that is
+ * Goes down a subject's eight steps in order. Each step is a function that is
  * safe to call again: it reads what earlier calls wrote and carries on. A call
  * works until its budget is nearly spent, then stops between steps (or between
  * two calls of one step) and leaves the run where the next call picks it up.

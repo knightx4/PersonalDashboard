@@ -110,6 +110,8 @@ export default async function NowPage({
     run?: string | string[];
     end?: string | string[];
     after?: string | string[];
+    placement?: string | string[];
+    skip?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -184,6 +186,8 @@ export default async function NowPage({
           run={params.run}
           end={params.end}
           after={params.after}
+          placement={params.placement}
+          skip={params.skip}
         />
       </PageColumn>
     );

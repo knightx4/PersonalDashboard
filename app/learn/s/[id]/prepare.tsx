@@ -15,7 +15,7 @@ import { continuePreparation, type PreparationPressState } from './actions';
 /**
  * A subject's preparation, on its page (plan #2276.2).
  *
- * While the run works, this block leads the page: the seven steps in order,
+ * While the run works, this block leads the page: the eight steps in order,
  * the one being worked marked with what it is doing, the ones done with what
  * they found, the ones to come in a lighter ink. It re-reads the page every
  * few seconds, as a researching brief does (app/learn/b/[id]/brief-view.tsx),

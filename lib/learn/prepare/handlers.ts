@@ -23,6 +23,11 @@ import { approveDraft, uncitedRows } from '@/lib/learn/levels/store';
 import { draftTopicsStep, writeUnitsStep, type KeptDraft, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishPreparationStep } from './finish-step';
+import { firstLessonStep } from './first-lesson-step';
+import { writeLessonCard } from '@/inngest/learn/lesson-top-up';
+import { layOutNextUnit } from '@/lib/learn/lessons/lay-out-unit';
+import { writeUnitPiecesRecorded } from '@/lib/learn/lessons/pieces';
+import { loadLessons } from '@/lib/learn/lessons/piece-store';
 import type { StepHandler } from './run';
 import { loadRunTerritory, saveRunTerritory } from './store';
 import type { PreparationStepKey } from './steps';
@@ -34,7 +39,8 @@ import { classifyStep, matchStep, pullStep, type PulledDocument, type SubjectKin
  * A key missing here is skipped by the runner with the plan step that builds
  * it, so the run still reaches its end. classify, pull_documents and
  * match_weeks are here from #2276.3, compile_territory from #2276.4,
- * draft_topics and write_units from #2276.5, and finish from #2276.6.
+ * draft_topics and write_units from #2276.5, finish from #2276.6, and
+ * first_lesson from #2292.1.
  */
 export type PreparationDeps = {
   learn: LearnSupabaseClient;
@@ -460,6 +466,75 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     return outcome;
   };
 
+  const firstLesson = firstLessonStep({
+    async firstUnit(subjectId) {
+      const { data, error } = await learn
+        .from('curriculum_units')
+        .select('id, title')
+        .eq('user_id', userId)
+        .eq('subject_id', subjectId)
+        .order('ordinal', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`Reading the first unit failed: ${error.message}`);
+      const unit = data as { id: string; title: string } | null;
+      if (!unit) return null;
+      // Laid out as nextUnitToOpen reads it: a goal not abandoned is filed under it.
+      const { count, error: goalsError } = await learn
+        .from('goals')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('unit_id', unit.id)
+        .neq('status', 'abandoned');
+      if (goalsError) throw new Error(`Reading the first unit's goals failed: ${goalsError.message}`);
+      return { id: unit.id, title: unit.title, laidOut: (count ?? 0) > 0 };
+    },
+    async layOut(subjectId) {
+      if (!deps.anthropicApiKey) return { outcome: 'failed', detail: 'No ANTHROPIC_API_KEY is set.' };
+      return layOutNextUnit(learn, core, userId, subjectId, deps.anthropicApiKey);
+    },
+    async pieces(subjectId, unitId) {
+      const { data, error } = await learn
+        .from('plan_pieces')
+        .select('id, title, concept_ids')
+        .eq('user_id', userId)
+        .eq('subject_id', subjectId)
+        .eq('unit_id', unitId)
+        .order('ordinal');
+      if (error) throw new Error(`Reading the unit's pieces failed: ${error.message}`);
+      return ((data ?? []) as { id: string; title: string; concept_ids: string[] | null }[]).map((p) => ({
+        id: p.id,
+        title: p.title,
+        conceptIds: p.concept_ids ?? [],
+      }));
+    },
+    writePieces: (subjectId, unitId) => writeUnitPiecesRecorded(learn, core, userId, { subjectId, unitId }, deps.anthropicApiKey),
+    async lessons(conceptIds) {
+      return new Set((await loadLessons(learn, userId, conceptIds)).keys());
+    },
+    async writeLesson(subjectId, unitId, conceptId) {
+      if (!deps.anthropicApiKey) return { outcome: 'failed', detail: 'No ANTHROPIC_API_KEY is set.' };
+      const [subject, concept] = await Promise.all([
+        learn.from('subjects').select('name').eq('id', subjectId).eq('user_id', userId).maybeSingle(),
+        learn.from('concepts').select('id, name, claim, mastery').eq('id', conceptId).eq('user_id', userId).maybeSingle(),
+      ]);
+      if (subject.error || !subject.data) return { outcome: 'failed', detail: 'The subject is no longer there.' };
+      if (concept.error || !concept.data) return { outcome: 'failed', detail: 'The idea is no longer there.' };
+      const row = concept.data as { id: string; name: string; claim: string; mastery: unknown };
+      return writeLessonCard({ learn, core, apiKey: deps.anthropicApiKey }, userId, {
+        subjectId,
+        subjectName: (subject.data as { name: string }).name,
+        unitId,
+        concept: {
+          id: row.id,
+          name: row.name,
+          claim: row.claim,
+          mastery: Array.isArray(row.mastery) ? row.mastery.filter((m): m is string => typeof m === 'string') : [],
+        },
+      });
+    },
+  });
+
   return {
     classify,
     pull_documents: pull,
@@ -468,5 +543,6 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
     draft_topics: draftTopics,
     write_units: writeUnits,
     finish: finishAndPlace,
+    first_lesson: firstLesson,
   };
 }

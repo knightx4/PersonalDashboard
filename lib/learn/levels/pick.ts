@@ -68,7 +68,7 @@ export type PickOptions = {
 };
 
 /** The cells with their own evidence inside the rest window. */
-function restingCells(map: TopicMap, now: Date): Set<string> {
+export function restingCells(map: TopicMap, now: Date): Set<string> {
   const since = new Date(now.getTime() - REST_HOURS * 60 * 60 * 1000).toISOString();
   const out = new Set<string>();
   for (const row of map.evidence) if (new Date(row.observedAt).toISOString() >= since) out.add(row.cellId);
@@ -93,7 +93,7 @@ function lastAnswered(map: TopicMap): Map<string, string> {
  * over a missed one is in doubt, and asking it again at once would only
  * repeat the answer just given; it is asked once it has rested.
  */
-function withoutRestingDoubt(readings: Readings, resting: ReadonlySet<string>): Readings {
+export function withoutRestingDoubt(readings: Readings, resting: ReadonlySet<string>): Readings {
   const out: Readings = new Map();
   for (const [id, r] of readings) out.set(id, r.inDoubt && resting.has(id) ? { ...r, inDoubt: false, doubtedBy: [] } : r);
   return out;
