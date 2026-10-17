@@ -146,7 +146,7 @@ export function Conversation({
             <h2 className="font-display text-title font-semibold tracking-tight text-ink">{label}</h2>
             <span className="flex items-center gap-1">
               {/* New chat sits by the heading, as a compact button, as chat apps put it. */}
-              <Link href={newChat.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Link href={newChat.href} className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), '[&_svg]:size-4')}>
                 <SquarePen strokeWidth={1.75} aria-hidden />
                 {newChat.label}
               </Link>
