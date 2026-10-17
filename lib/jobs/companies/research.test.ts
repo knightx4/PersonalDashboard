@@ -62,6 +62,8 @@ describe('company research rows', () => {
       companySlug: 'acme',
       previousId: 'r1',
     });
-    expect(brief).toBe('Company research r2\nuser_id u1\ncompany Acme (acme)\nrefresh of r1');
+    expect(brief).toBe(
+      'Follow .claude/skills/company-research/SKILL.md\nCompany research r2\nuser_id u1\ncompany Acme (acme)\nrefresh of r1',
+    );
   });
 });

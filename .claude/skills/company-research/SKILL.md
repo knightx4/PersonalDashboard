@@ -1,6 +1,6 @@
 ---
 name: company-research
-description: Prepare research on one company the person wants to work at, the reading they would otherwise do in four or five hours, and write it into job_search.company_research for the Research section on the company's Perspective tab. Read the company's own materials, filings, news, talks and podcasts, job postings, and the person's own mail and notes about it; write a cited write-up with a link on every claim and a list of every page read; suggest answers to the Perspective questions. Use when the company research routine is fired with "Company research <id>", or the user says "research <company>".
+description: Prepare research on one company the person wants to work at, the reading they would otherwise do in four or five hours, and write it into job_search.company_research for the Research section on the company's Perspective tab. Read the company's own materials, filings, news, talks and podcasts, job postings, and the person's own mail and notes about it; write a cited write-up with a link on every claim and a list of every page read; suggest answers to the Perspective questions. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/company-research/SKILL.md" and names "Company research <id>", or the user says "research <company>".
 ---
 
 # Preparing research on a company
@@ -38,9 +38,10 @@ there is a gap to name in the write-up, not a reason to stop.
 
 ## 1. Read the brief and the row
 
-The brief is:
+The brief comes through the goals routine, Dash's general routine, and is:
 
 ```
+Follow .claude/skills/company-research/SKILL.md
 Company research <research id>
 user_id <uuid>
 company <name> (<slug>)

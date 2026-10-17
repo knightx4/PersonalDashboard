@@ -21,7 +21,7 @@ import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
-import { companyResearchRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
+import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 
 /**
@@ -607,12 +607,12 @@ async function buildPatch(
 }
 
 /**
- * Start the company research routine on one company: the Research button on
- * its Perspective tab.
+ * Start research on one company: the Research button on its Perspective tab.
  *
- * The row is made first, queued, so the tab can show the run at once and the
- * routine has something to write into; the routine is then fired with a brief
- * naming that row. A run left queued or researching past STALE_AFTER_MS is
+ * It runs on the goals routine, Dash's general routine: the brief's first line
+ * hands the session to .claude/skills/company-research. The row is made first,
+ * queued, so the tab can show the run at once and the session has something
+ * to write into; the routine is then fired with a brief naming that row. A run left queued or researching past STALE_AFTER_MS is
  * marked failed before the check, so a session that died does not block the
  * next press. A fire that fails marks the new row failed with Anthropic's
  * answer, which is what the tab then shows.
@@ -623,11 +623,11 @@ export async function startCompanyResearch(
 ): Promise<{ error: string | null }> {
   if (!z.string().uuid().safeParse(companyId).success) return { error: 'That is not a company.' };
 
-  const routine = companyResearchRoutine();
+  const routine = goalsRoutine();
   if (!routine.id || !routine.token) {
     return {
       error:
-        'Research is not set up on this deployment yet: it needs CLAUDE_COMPANY_RESEARCH_ROUTINE_ID and CLAUDE_COMPANY_RESEARCH_ROUTINE_TOKEN.',
+        'Research runs on the goals routine, which is not set up on this deployment: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
     };
   }
 

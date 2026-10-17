@@ -149,8 +149,10 @@ export function sourcesByKind(
 }
 
 /**
- * The brief the routine is fired with. The skill reads the row by its id and
- * the user id, so nothing else it needs has to fit in here.
+ * The brief the goals routine is fired with. Its first line hands the session
+ * to the company research skill (the goals skill, "Jobs that follow another
+ * skill"); the skill reads the row by its id and the user id, so nothing else
+ * it needs has to fit in here.
  */
 export function researchBrief(input: {
   researchId: string;
@@ -160,6 +162,7 @@ export function researchBrief(input: {
   previousId: string | null;
 }): string {
   return [
+    'Follow .claude/skills/company-research/SKILL.md',
     `Company research ${input.researchId}`,
     `user_id ${input.userId}`,
     `company ${input.companyName} (${input.companySlug})`,

@@ -16,6 +16,22 @@ do, you gather the facts you can find, and you make the choices you can make
 with judgement, so the person's part is doing the steps. Ask a question only
 when you cannot settle it yourself (see "Decide first, ask last").
 
+## Jobs that follow another skill
+
+The goals routine is also Dash's general routine: a press anywhere in the app
+that needs a long session and has no routine of its own fires this one with a
+brief whose first line is
+
+```
+Follow .claude/skills/<name>/SKILL.md
+```
+
+When the brief starts that way, read the skill it names and follow it instead
+of this one, from its first step to its last. It keeps its own run record (the
+company research skill, for one, writes `job_search.company_research`), so
+write no `goals.runs` row and none of this skill's rules apply, beyond scoping
+every read and write to the `user_id` in the brief.
+
 ## How you read and write
 
 Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded with

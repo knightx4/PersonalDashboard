@@ -128,8 +128,8 @@ export function ResearchPanel({
 
         {!available && !running && (
           <p className="text-ui text-ink-muted">
-            Research is not set up on this deployment yet. It needs the company research
-            routine&rsquo;s token in CLAUDE_COMPANY_RESEARCH_ROUTINE_TOKEN.
+            Research is not set up on this deployment yet. It runs on the goals routine,
+            which needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.
           </p>
         )}
 

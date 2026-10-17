@@ -16,7 +16,7 @@ import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 import { PERSPECTIVE_COLUMNS, perspectiveOf } from '@/lib/jobs/companies/perspective';
 import { RESEARCH_COLUMNS, researchFromRow } from '@/lib/jobs/companies/research';
-import { companyResearchRoutine } from '@/lib/feedback/routine';
+import { goalsRoutine } from '@/lib/feedback/routine';
 
 export const metadata = { title: 'Company' };
 
@@ -242,7 +242,7 @@ export default async function CompanyDetailPage({
         perspectiveUpdatedAt={(company.perspective_updated_at as string | null) ?? null}
         researchLatest={researchLatest}
         researchShown={researchShown}
-        researchAvailable={Boolean(companyResearchRoutine().id && companyResearchRoutine().token)}
+        researchAvailable={Boolean(goalsRoutine().id && goalsRoutine().token)}
         domains={((company.domains as string[]) ?? []).join(', ')}
         industry={(company.industry as string) ?? ''}
         hqLocation={(company.hq_location as string) ?? ''}
