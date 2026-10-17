@@ -1,5 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants, PRESS_AREA } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
 import { cardVariants } from '@/components/ui/card';
@@ -136,11 +136,14 @@ function TestSection({
 
 /** A typed-in result in its test's slot, with Dash's read of it folded under. */
 function TypedSlot({ slot, now }: { slot: Slot; now: number }) {
-  const take = slot.href ? (
-    <a href={slot.href} target="_blank" rel="noreferrer" className={linkVariants()}>
-      Take it at {slot.site}
-    </a>
-  ) : null;
+  // In the empty slot's sentence the link is text; on its own line under a
+  // result it is a press target, and takes the phone's 44px press area.
+  const take = (alone: boolean) =>
+    slot.href ? (
+      <a href={slot.href} target="_blank" rel="noreferrer" className={cn(linkVariants(), alone && PRESS_AREA)}>
+        Take it at {slot.site}
+      </a>
+    ) : null;
   return (
     <TestSection
       title={slot.name}
@@ -152,7 +155,7 @@ function TypedSlot({ slot, now }: { slot: Slot; now: number }) {
       }
     >
       {slot.results.length === 0 ? (
-        <p className="text-ui text-ink-muted">Not taken yet. {take}</p>
+        <p className="text-ui text-ink-muted">Not taken yet. {take(false)}</p>
       ) : (
         <>
           {slot.results.map((t) => {
@@ -172,7 +175,7 @@ function TypedSlot({ slot, now }: { slot: Slot; now: number }) {
               </div>
             );
           })}
-          {take && <p className="text-small text-ink-muted">{take}</p>}
+          {slot.href && <p className="text-small text-ink-muted">{take(true)}</p>}
         </>
       )}
     </TestSection>
