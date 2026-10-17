@@ -5,7 +5,8 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
  * `learn.settings.goals_only`. While it is on, Now's deck draws no vault
  * theme or gap field (`targets.ts`) and deals none already picked, and
  * Practice Flow asks no survey question (`rate.ts`) and opens on Goals only.
- * On by default, and with no row.
+ * Off by default, and with no row (plan #2302.1): Practice asks about every
+ * prepared subject unless you narrow it.
  */
 export async function loadGoalsOnly(learn: LearnSupabaseClient, userId: string): Promise<boolean> {
   const { data, error } = await learn
@@ -15,14 +16,14 @@ export async function loadGoalsOnly(learn: LearnSupabaseClient, userId: string):
     .maybeSingle();
   if (error) throw new Error(`Reading your Learn settings failed: ${error.message}`);
   const on = (data as { goals_only: boolean } | null)?.goals_only;
-  return typeof on === 'boolean' ? on : true;
+  return typeof on === 'boolean' ? on : false;
 }
 
-/** The same, for a reader that would rather go on than fail: a failed read is on, the default. */
+/** The same, for a reader that would rather go on than fail: a failed read is off, the default. */
 export function goalsOnlyOrDefault(learn: LearnSupabaseClient, userId: string): Promise<boolean> {
   return loadGoalsOnly(learn, userId).catch((error: unknown) => {
     console.error('[learn] goals-only setting', error instanceof Error ? error.message : error);
-    return true;
+    return false;
   });
 }
 

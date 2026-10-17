@@ -146,8 +146,9 @@ export async function PracticeFlow({
   if (trackId === null && goalParam !== undefined && goalId === null) redirect(practiceHref());
   const user = await requireUser();
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
-  // Goals only on Learn settings (plan #2164.1): the flow opens on Goals only,
-  // and no filter asks a survey question.
+  // Goals only on Learn settings (plan #2164.1), an opt-in (#2302.1): while it
+  // is on the flow opens on Goals only and no filter asks a survey question.
+  // Off, the levels flow asks about every prepared subject and goal subject.
   const goalsOnly = await goalsOnlyOrDefault(supabase, user.id);
 
   // A focused flow asks about one track or goal already, so the filter has

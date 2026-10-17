@@ -33,7 +33,7 @@ export function LearnSettingsView({ settings }: { settings: LearnSettings }) {
           content: (
             <SettingSwitch
               title="Only from your goals"
-              hint="Now and Practice draw only from the goals you set. Turn it off to mix in themes from your notes, fields you have not been tested in, and questions about subjects in your notes."
+              hint="Off, Practice asks about every subject you have prepared, and Now mixes in themes from your notes and fields you have not been tested in. On, both draw only from the subjects your goals point at."
               defaultChecked={settings.goalsOnly}
               save={setGoalsOnly}
             />
