@@ -804,7 +804,7 @@ export function LearnSubjectPlanSurface() {
     <PlanSection
       subjectId="00000000-0000-4000-8000-0000000000d1"
       units={midUnits}
-      project={{ ...passedProject, passed: false }}
+      project={passedProject}
       goal={{ aimId: null, name: 'Urban economics' }}
     />
   );

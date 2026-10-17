@@ -153,7 +153,7 @@ function PlanUnitRow({
           </h3>
           <span className="text-small text-ink-muted tabular-nums">
             {unit.pieces.length === 0
-              ? 'Not written yet'
+              ? null
               : passed === unit.pieces.length
                 ? 'Done'
                 : `${passed} of ${unit.pieces.length} passed`}
@@ -177,7 +177,7 @@ function PlanUnitRow({
       {unit.pieces.length > 0 ? (
         // The unit with the next piece opens on it; the rest stay a line each.
         <SectionFold
-          title="Pieces"
+          title={<span className="text-ui font-normal text-ink-muted">Pieces</span>}
           count={unit.pieces.length}
           defaultOpen={unit.pieces.some((piece) => piece.id === nextId)}
           className="mt-2"
@@ -198,24 +198,23 @@ function PlanUnitRow({
 function PieceRow({ piece, href, next }: { piece: PlanPiece; href: string; next: boolean }) {
   const words = PIECE_STATE_WORDS[piece.state];
   return (
-    <li className="flex flex-wrap items-baseline gap-x-2 text-ui">
+    <li className="flex items-baseline gap-2 text-ui">
       <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
-      <Link href={href} className={cn('inline-flex min-h-11 min-w-0 items-center lg:min-h-0', linkVariants())}>
-        {piece.title}
-      </Link>
-      {next && (
-        <Chip tone="accent">
-          Next
-        </Chip>
-      )}
-      {piece.state === 'passed' ? (
-        <span className="inline-flex shrink-0 items-center gap-0.5 text-small text-ink-muted">
-          <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {words}
-        </span>
-      ) : (
-        words && <span className="shrink-0 text-small text-ink-muted">{words}</span>
-      )}
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <Link href={href} className={cn('inline-flex min-h-11 min-w-0 items-center lg:min-h-0', linkVariants())}>
+            {piece.title}
+          </Link>
+          {next && <Chip tone="accent">Next</Chip>}
+          {piece.state === 'passed' && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-small text-ink-muted">
+              <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {words}
+            </span>
+          )}
+        </div>
+        {piece.state !== 'passed' && words && <p className="text-small text-ink-muted">{words}</p>}
+      </div>
     </li>
   );
 }
