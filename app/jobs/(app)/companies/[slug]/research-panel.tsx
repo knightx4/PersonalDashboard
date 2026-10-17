@@ -149,19 +149,31 @@ export function ResearchPanel({
 
 const linkOnly = (href: string | undefined) => safeUrl(href);
 
+/**
+ * The write-up's inline links drawn as links. Markdown leaves an anchor
+ * unstyled, so a citation such as "(TechCrunch)" read as plain text in the
+ * paragraph it sat in; these are linkVariants' inline tone, set on every
+ * anchor inside, with the phone press area.
+ */
+const PROSE = cn(
+  'text-ui text-ink',
+  '[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-accent/40',
+  'hover:[&_a]:decoration-accent [&_a]:press-area',
+);
+
 function ResearchWriteUp({ research }: { research: CompanyResearch }) {
   const groups = sourcesByKind(research.sources);
 
   return (
     <div className="space-y-3">
       {research.summary && (
-        <Markdown markdown={research.summary} resolveHref={linkOnly} className="text-ui text-ink" />
+        <Markdown markdown={research.summary} resolveHref={linkOnly} className={PROSE} />
       )}
 
       <div className="space-y-1">
         {research.sections.map((section, index) => (
           <Disclosure key={section.key} title={section.title} defaultOpen={index === 0}>
-            <Markdown markdown={section.body} resolveHref={linkOnly} className="text-ui text-ink" />
+            <Markdown markdown={section.body} resolveHref={linkOnly} className={PROSE} />
           </Disclosure>
         ))}
       </div>

@@ -154,6 +154,16 @@ person cannot check, so it does not go in. The links in the text are part of
 the write-up; the source list below is every page you read, whether or not
 the text quotes it.
 
+Each reference is its own link, every time. Never write "(same source)",
+"(ibid.)", "(see above)" or a bare name such as "(TechCrunch)" without its
+URL: repeat the link instead. Link to the exact page the claim is on, not the
+site's homepage, and to a time stamp in a talk. Name the publisher in the link
+text where it helps, and keep it short: `([TechCrunch](https://...))`.
+
+Before saving, check every section and the summary: each sentence that states
+a fact has a `](https://` in it or in the sentence it continues. Add the
+missing links; drop a claim you cannot link.
+
 **summary** (markdown, 4 to 6 sentences): who they are, where they are now,
 and the one or two things most worth knowing for this person's search.
 
