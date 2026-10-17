@@ -259,9 +259,7 @@ export function TodaysPieceSurface() {
             followUpId: '5d000000-0000-4000-8000-000000000502',
           },
         })}
-      >
-        {null}
-      </PieceFirst>
+       />
     </Costs>
   );
 }
@@ -270,9 +268,7 @@ export function TodaysPieceSurface() {
 export function TodaysPieceCheckSurface() {
   return (
     <Costs>
-      <PieceFirst piece={piece({ turns: thread('check'), state: { stage: 'check', checkId: CHECK.id } })}>
-        {null}
-      </PieceFirst>
+      <PieceFirst piece={piece({ turns: thread('check'), state: { stage: 'check', checkId: CHECK.id } })} />
     </Costs>
   );
 }
@@ -284,9 +280,7 @@ export function TodaysPieceDoneSurface() {
       <PieceFirst
         piece={piece({ turns: thread('done'), state: { stage: 'done' } })}
         summary={<SummaryView summary={PIECE_SUMMARY} />}
-      >
-        {null}
-      </PieceFirst>
+       />
     </Costs>
   );
 }
@@ -298,9 +292,7 @@ const FIRST_ANSWER =
 export function TodaysPieceLoadingSurface() {
   return (
     <Costs>
-      <PieceFirst piece={piece()} sent={{ body: FIRST_ANSWER }}>
-        {null}
-      </PieceFirst>
+      <PieceFirst piece={piece()} sent={{ body: FIRST_ANSWER }} />
     </Costs>
   );
 }
@@ -312,18 +304,12 @@ export function TodaysPieceErrorSurface() {
       <PieceFirst
         piece={piece()}
         sent={{ body: FIRST_ANSWER, error: 'Marking failed: Dash did not answer in time. Your answer is kept; send it again.' }}
-      >
-        {null}
-      </PieceFirst>
+       />
     </Costs>
   );
 }
 
-/** A goal with no pieces written yet, above the cards. */
-export function TodaysPieceNoneSurface({ cards }: { cards: ReactNode }) {
-  return (
-    <PieceFirst piece={{ kind: 'no-pieces', goalName: 'Financial modeling in Excel for operators', subjectId: SUBJECT_ID }}>
-      {cards}
-    </PieceFirst>
-  );
+/** A goal with no pieces written yet. */
+export function TodaysPieceNoneSurface() {
+  return <PieceFirst piece={{ kind: 'no-pieces', goalName: 'Financial modeling in Excel for operators', subjectId: SUBJECT_ID }} />;
 }

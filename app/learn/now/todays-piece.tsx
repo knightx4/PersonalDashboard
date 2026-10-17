@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ArrowRight } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Thread, ThreadTurn, type TalkSend } from '@/components/thread/thread';
 import { CommentBody } from '@/components/dev/comment-body';
@@ -38,11 +37,11 @@ import { talkPiece, type PieceTalkResult } from './piece-talk-actions';
  * (plan #2164.6) shows under it. Every answer is marked and kept as evidence
  * on its idea; the marks are Dash's reply.
  *
- * Cards instead goes straight to the cards for this visit and leaves the
- * piece where it was; the thread opens there again next time.
+ * The practice press follows it on Now (plan #2313.1), so a finished piece
+ * hands on to practice rather than to a deck of cards.
  *
  * A goal with no pieces written yet draws a short card pointing at its
- * outline, above the cards rather than in their place.
+ * outline instead.
  */
 
 /** An answer the gallery sends as the thread appears. */
@@ -50,14 +49,11 @@ export type SentForGallery = { body: string; error?: string };
 
 export function PieceFirst({
   piece,
-  children,
   write = true,
   summary,
   sent,
 }: {
   piece: TodaysPiece | null;
-  /** The cards, drawn once the piece is finished or set aside. */
-  children: ReactNode;
   /** False writes no missing lesson; the gallery draws one being written with it. */
   write?: boolean;
   /** Drawn in place of the summary's read, for the gallery. */
@@ -68,33 +64,26 @@ export function PieceFirst({
    */
   sent?: SentForGallery;
 }) {
-  const [cards, setCards] = useState(false);
-
-  if (!piece || cards) return <>{children}</>;
+  if (!piece) return null;
   if (piece.kind === 'no-pieces') {
     return (
-      <>
-        <Card padding="standard" className="mb-4">
-          <p className="text-small font-medium text-accent">Today&rsquo;s piece</p>
-          <h2 className="mt-0.5 text-body font-semibold text-ink">{piece.goalName} has no pieces yet</h2>
-          <p className="mt-1 text-ui text-ink-muted">
-            Its outline is split into pieces a unit or two an hour, and the first one opens here once it is
-            written.
-          </p>
-          <Link
-            href={`/learn/s/${piece.subjectId}`}
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mt-3')}
-          >
-            Open the outline
-          </Link>
-        </Card>
-        {children}
-      </>
+      <Card padding="standard" className="mb-4">
+        <p className="text-small font-medium text-accent">Today&rsquo;s piece</p>
+        <h2 className="mt-0.5 text-body font-semibold text-ink">{piece.goalName} has no pieces yet</h2>
+        <p className="mt-1 text-ui text-ink-muted">
+          Its outline is split into pieces a unit or two an hour, and the first one opens here once it is
+          written.
+        </p>
+        <Link
+          href={`/learn/s/${piece.subjectId}`}
+          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mt-3')}
+        >
+          Open the outline
+        </Link>
+      </Card>
     );
   }
-  return (
-    <PieceThread piece={piece} write={write} summary={summary} sent={sent} onCards={() => setCards(true)} />
-  );
+  return <PieceThread piece={piece} write={write} summary={summary} sent={sent} />;
 }
 
 function PieceThread({
@@ -102,13 +91,11 @@ function PieceThread({
   write,
   summary,
   sent,
-  onCards,
 }: {
   piece: Extract<TodaysPiece, { kind: 'piece' }>;
   write: boolean;
   summary?: ReactNode;
   sent?: SentForGallery;
-  onCards: () => void;
 }) {
   const { page, goalName, talk } = piece;
   const { ideas, writing } = useWrittenLessons(page.subject.id, page.piece.id, page.ideas, write);
@@ -177,23 +164,13 @@ function PieceThread({
         )}
       </ThreadPanel>
       {finished && <div className="mt-4">{summary ?? <RunSummaryPanel />}</div>}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        {finished ? (
-          <>
-            <Link href={pieceHref} className={cn('press-area px-2 text-ui', linkVariants({ tone: 'quiet' }))}>
-              Open the piece
-            </Link>
-            <Button type="button" onClick={onCards}>
-              Go on to cards
-              <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
-            </Button>
-          </>
-        ) : (
-          <Button type="button" variant="ghost" size="sm" onClick={onCards}>
-            Cards instead
-          </Button>
-        )}
-      </div>
+      {finished && (
+        <div className="mt-3">
+          <Link href={pieceHref} className={cn('press-area px-2 text-ui', linkVariants({ tone: 'quiet' }))}>
+            Open the piece
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

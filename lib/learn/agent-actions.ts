@@ -188,10 +188,6 @@ export const learnActions: ModuleActions = {
     answerRestingTrack: none('theirs'),
     explainBack: none('own'),
     setTeachBackEvery: none('setting'),
-    generateSubjectCards: none(
-      'spends',
-      "Generate more on an empty subject's Now writes its next lessons while the person waits, through the background top-up, which no estimate prices.",
-    ),
   },
   'app/learn/opening/[id]/actions.ts': {
     answerOpening: none('own'),
