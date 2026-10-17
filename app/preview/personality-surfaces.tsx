@@ -3,7 +3,6 @@ import { BigFiveTest } from '@/app/you/personality/big-five-test';
 import { OtherTests } from '@/app/you/personality/other-tests';
 import { PersonalitySection } from '@/app/you/personality/personality-section';
 import { MODELS } from '@/lib/core/models';
-import { formatDay } from '@/lib/goals/dates';
 import { IPIP_ITEM_COUNT } from '@/lib/you/personality/ipip';
 import type { BigFiveResult, PersonalityRead, TypedResult } from '@/lib/you/personality/model';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
@@ -237,19 +236,14 @@ const TYPED_READ: TypedResult[] = [
 ];
 
 /** The Personality tab's header, as app/you/personality/page.tsx draws it. */
-function TabHeader({ takenAt }: { takenAt: string | null }) {
-  return (
-    <PageHeader
-      title="Personality"
-      description={takenAt ? `Big Five, taken ${formatDay(takenAt, true)}` : undefined}
-    />
-  );
+function TabHeader() {
+  return <PageHeader title="Personality" description="Your results from each test, side by side." />;
 }
 
 export function YouPersonalitySurface() {
   return (
     <>
-      <TabHeader takenAt={RESULT.takenAt} />
+      <TabHeader />
       <PersonalitySection
         latest={{ ...RESULT, read: READ }}
         earlier={EARLIER}
@@ -265,7 +259,7 @@ export function YouPersonalitySurface() {
 export function YouPersonalityReadingSurface() {
   return (
     <>
-      <TabHeader takenAt={RESULT.takenAt} />
+      <TabHeader />
       <PersonalitySection
         latest={{ ...RESULT, createdAt: '2026-10-07T18:38:30Z' }}
         earlier={[]}
@@ -280,7 +274,7 @@ export function YouPersonalityReadingSurface() {
 export function YouPersonalityEmptySurface() {
   return (
     <>
-      <TabHeader takenAt={null} />
+      <TabHeader />
       <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} now={NOW} />
     </>
   );
