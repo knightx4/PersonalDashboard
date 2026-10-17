@@ -972,7 +972,8 @@ describe('questions that need several lookups (plan #1437)', () => {
     const { client } = stubClient([
       reply([use('u1', 'nope', {})]),
       reply([], 'end_turn'),
-      // Asked once more for its answer, it still gives none.
+      // Asked once more for its answer, it still gives none, nor in words.
+      reply([], 'end_turn'),
       reply([], 'end_turn'),
     ]);
     const { execute } = stubExecute();
@@ -985,6 +986,28 @@ describe('questions that need several lookups (plan #1437)', () => {
     });
     expect(answer).toMatchObject({ ok: false });
     expect(!answer.ok && answer.detail).toContain('reported nothing');
+  });
+
+  it('asks for the answer in words when the model twice ends its turn with nothing to show', async () => {
+    // Sonnet 5.5 hands back longer prose as an empty thinking block.
+    const hidden = { type: 'thinking', thinking: '', signature: 's' };
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'first' })]),
+      reply([hidden], 'end_turn'),
+      reply([hidden], 'end_turn'),
+      reply([{ type: 'text', text: 'It waits on #1172.2.2.' }], 'end_turn'),
+    ]);
+    const { execute } = stubExecute();
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'what is this waiting on?' }],
+      today: '2026-10-17',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    expect(sent).toHaveLength(4);
+    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
+    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'It waits on #1172.2.2.' });
   });
 
   it('leads with the reason and lists only the last lookup, up to the cap, with no "more" line', () => {
@@ -1011,6 +1034,7 @@ describe('questions that need several lookups (plan #1437)', () => {
     const { client } = stubClient([
       reply([use('u1', 'search', { query: 'first' })]),
       reply([use('u2', 'search', { query: 'second' })]),
+      reply([], 'end_turn'),
       reply([], 'end_turn'),
       reply([], 'end_turn'),
     ]);
