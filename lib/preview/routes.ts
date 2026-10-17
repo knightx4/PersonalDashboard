@@ -211,6 +211,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-placement-end': ['/learn/now'],
   'learn-placement-end-none': ['/learn/now'],
   'learn-subject-chain': ['/learn/s/[id]'],
+  'learn-subject-header': ['/learn/s/[id]'],
   'learn-lens': ['/learn/lens/[id]'],
   'learn-lens-fringe': ['/learn/lens/[id]'],
   'learn-lens-edit': ['/learn/lens/[id]'],
@@ -236,10 +237,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-topic-draft-match': ['/learn/topics/[id]'],
   'learn-topic-draft-checks': ['/learn/topics/[id]'],
   'learn-topic-draft-comment': ['/learn/topics/[id]'],
-  'learn-subject-articles': ['/learn/s/[id]'],
-  'learn-subject-articles-loading': ['/learn/s/[id]'],
-  'learn-subject-articles-empty': ['/learn/s/[id]'],
-  'learn-subject-articles-error': ['/learn/s/[id]'],
+  'learn-subject-add-source': ['/learn/s/[id]'],
+  'learn-subject-add-source-open': ['/learn/s/[id]'],
+  'learn-subject-add-source-fetching': ['/learn/s/[id]'],
+  'learn-subject-add-source-error': ['/learn/s/[id]'],
   'jobs-interviews': ['/jobs/interviews'],
   'shell-display-options': [
     '/jobs/pipeline',
@@ -633,6 +634,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // A subject's preparation block (plan #2276.2), drawn at each stage of a run.
   'learn-subject-prepare': ['app/learn/s/[id]/prepare.tsx'],
+  // The header and its presses (plan #2307.1).
+  'learn-subject-header': ['app/learn/s/[id]/header.tsx'],
   'learn-subject-prepare-starting': ['app/learn/s/[id]/prepare.tsx'],
   'learn-subject-prepare-failed': ['app/learn/s/[id]/prepare.tsx'],
   'learn-subject-prepare-finished': ['app/learn/s/[id]/prepare.tsx'],
@@ -642,6 +645,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-start-pending': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-empty': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-folded': ['app/learn/s/[id]/sources.tsx'],
+  // Add a source (plan #2307.4), closed, open, fetching and failed.
+  'learn-subject-add-source': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-open': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-fetching': ['app/learn/s/[id]/add-source.tsx'],
+  'learn-subject-add-source-error': ['app/learn/s/[id]/add-source.tsx'],
   'learn-subject-prepare-direction': ['app/learn/s/[id]/direction.tsx'],
   'learn-subject-prepare-branch': ['app/learn/s/[id]/prepare.tsx'],
   // The one thread (plan #1964.3), with a subject or none: a change to it is

@@ -31,6 +31,8 @@ export type SourceDocument = {
   units: number | null;
   /** The territory was compiled from it. */
   used: boolean;
+  /** The person added it with Add a source (plan #2307.4); its weeks are in match_weeks. */
+  added?: boolean;
 };
 
 /** What the catalogue holds on a stored document, for the facts the pull did not record. */

@@ -115,6 +115,26 @@ export async function planGoalFor(
   return aim ? { aimId: aim.id, name: aim.name } : null;
 }
 
+/**
+ * Whose plan this track is, for the page and the edits (plan #2307.3): the
+ * goal's when a goal points at it, else the subject's own when its
+ * preparation has finished. `aimId` is null for the second. Null for a
+ * track that is neither, which has no plan.
+ */
+export async function planOwnerFor(
+  learn: LearnSupabaseClient,
+  userId: string,
+  subjectId: string,
+): Promise<{ aimId: string | null; name: string } | null> {
+  const goal = await planGoalFor(learn, userId, subjectId);
+  if (goal) return goal;
+  if (!(await preparedSubjectIds(learn, userId)).has(subjectId)) return null;
+  const { data, error } = await learn.from('subjects').select('name').eq('user_id', userId).eq('id', subjectId).maybeSingle();
+  if (error) throw new Error(`Reading the subject failed: ${error.message}`);
+  const name = (data as { name: string } | null)?.name;
+  return name === undefined ? null : { aimId: null, name };
+}
+
 async function loadPieces(learn: LearnSupabaseClient, userId: string, subjectIds: readonly string[]): Promise<PieceRow[]> {
   if (subjectIds.length === 0) return [];
   const { data, error } = await learn

@@ -3,6 +3,8 @@ import {
   bandCounts,
   fieldLevels,
   goalTargetLevel,
+  heldLine,
+  lensHeld,
   lensDetail,
   lensLine,
   meanText,
@@ -88,6 +90,20 @@ describe('summariseLens', () => {
     const m = map();
     expect(lensLine(summariseLens(lens, m, readCells(m), NAMES))).toBe('A draft topic to approve');
     expect(lensLine(summariseLens({ ...LENS, targets: [] }, m, readCells(m), NAMES))).toBe('No topics yet');
+  });
+});
+
+describe('heldLine', () => {
+  it('keeps tested and inferred apart, over the levels to reach', () => {
+    // Return 2 met directly shows Return 1 as implied; nothing else is touched.
+    const m = map([{ cellId: 'return2', verdict: 'met', observedAt: '2026-10-02T10:00:00Z' }]);
+    const held = lensHeld(LENS, m, readCells(m), NAMES);
+    expect(held).toEqual({ tested: 1, inferred: 1, declared: 0, total: 7 });
+    expect(heldLine(held)).toBe('1 of 7 levels tested · 1 inferred');
+  });
+
+  it('says nothing for a lens with no levels to reach', () => {
+    expect(heldLine({ tested: 0, inferred: 0, declared: 0, total: 0 })).toBeNull();
   });
 });
 

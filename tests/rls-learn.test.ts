@@ -174,6 +174,7 @@ describe('RLS coverage', () => {
       'subject_channels',
       'subject_preparation_steps',
       'subject_preparations',
+      'subject_sources',
       'subjects',
       'theme_fields',
       'topic_cells',

@@ -222,10 +222,28 @@ export type MatchPorts = {
   find: (subject: { name: string; note: string | null }) => Promise<
     { ok: true; weeks: MatchedWeek[] } | { ok: false; detail: string }
   >;
+  /**
+   * Every unit of the documents the person added with Add a source (plan
+   * #2307.4), with its similarity to the subject. They join the weeks whatever
+   * their similarity, and the cap never cuts them.
+   */
+  added?: (subject: { id: string; name: string; note: string | null }) => Promise<{ itemIds: string[]; weeks: MatchedWeek[] }>;
 };
 
 /** Weeks kept on the step for the territory step to read. */
 export const MATCHED_WEEKS_KEPT = 150;
+
+/**
+ * The weeks match_weeks keeps once added documents are in: what it found,
+ * with every unit of an added document joined in and none twice, closest
+ * first. Added weeks are never cut by the cap on found weeks, since the
+ * person asked for them.
+ */
+export function withAddedWeeks(found: readonly MatchedWeek[], added: readonly MatchedWeek[], cap: number): MatchedWeek[] {
+  const addedIds = new Set(added.map((w) => w.segmentId));
+  const kept = [...found].filter((w) => !addedIds.has(w.segmentId)).sort((a, b) => b.similarity - a.similarity).slice(0, cap);
+  return [...kept, ...added].sort((a, b) => b.similarity - a.similarity);
+}
 
 export function matchStep(ports: MatchPorts): StepHandler {
   return async (ctx) => {
@@ -234,16 +252,18 @@ export function matchStep(ports: MatchPorts): StepHandler {
 
     const found = await ports.find(searchSubject(ctx.subject));
     if (!found.ok) throw new Error(`Matching the weeks failed: ${found.detail}`);
-    const weeks = [...found.weeks].sort((a, b) => b.similarity - a.similarity).slice(0, MATCHED_WEEKS_KEPT);
-    const documents = new Set(found.weeks.map((w) => w.itemId)).size;
+    // A branch run searches beneath its branch; what the person added is the subject's own.
+    const added = ports.added && !ctx.subject.branch ? await ports.added(ctx.subject) : { itemIds: [], weeks: [] };
+    const weeks = withAddedWeeks(found.weeks, added.weeks, MATCHED_WEEKS_KEPT);
+    const documents = new Set(weeks.map((w) => w.itemId)).size;
     return {
       state: 'done',
       summary:
-        found.weeks.length === 0
+        weeks.length === 0
           ? 'No stored week covers this subject yet.'
-          : `Found ${plural(found.weeks.length, 'week')} that cover it, across ${plural(documents, 'document')}.`,
-      counts: { weeks: found.weeks.length, documents },
-      detail: { weeks },
+          : `Found ${plural(weeks.length, 'week')} that cover it, across ${plural(documents, 'document')}.`,
+      counts: { weeks: weeks.length, documents },
+      detail: added.itemIds.length > 0 ? { weeks, added: added.itemIds } : { weeks },
     };
   };
 }

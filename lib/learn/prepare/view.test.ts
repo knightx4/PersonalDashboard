@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { freshSteps, type PreparationRow, type PreparationStepRow } from './run';
 import type { PreparationStepKey } from './steps';
 import { BRANCH_STEPS } from './branch';
-import { branchPreparationView, countsLine, preparationLine, preparationView, tookLine, unitsComeAtStep } from './view';
+import {
+  branchPreparationView,
+  countsLine,
+  offersWriteCurriculum,
+  preparationLine,
+  preparationView,
+  tookLine,
+  unitsComeAtStep,
+  withAddedSources,
+} from './view';
 
 function run(patch: Partial<PreparationRow> = {}): PreparationRow {
   return {
@@ -176,5 +185,42 @@ describe('unitsComeAtStep', () => {
     });
     expect(unitsComeAtStep(failed)).toBeNull();
     expect(unitsComeAtStep(preparationView(null))).toBeNull();
+  });
+});
+
+describe('withAddedSources (plan #2307.4)', () => {
+  const doc = (itemId: string, used = true) => ({ itemId, title: itemId, provider: 'P', url: null, licence: 'show', units: 3, used });
+
+  it('leaves the run\'s list alone when nothing was added', () => {
+    expect(withAddedSources(null, [])).toBeNull();
+  });
+
+  it('marks a listed document added and puts new ones after the run\'s', () => {
+    const base = { summary: 'Prepared', start: { unit: null, topic: null }, documents: [doc('a'), doc('b')], frames: [] };
+    const out = withAddedSources(base, [doc('b', false), doc('c', false)])!;
+    expect(out.documents.map((d) => [d.itemId, d.added ?? false])).toEqual([
+      ['a', false],
+      ['b', true],
+      ['c', true],
+    ]);
+  });
+
+  it('lists the added ones alone with no finished run', () => {
+    const out = withAddedSources(null, [doc('c', false)])!;
+    expect(out.documents).toHaveLength(1);
+    expect(out.frames).toEqual([]);
+  });
+});
+
+describe('offersWriteCurriculum (plan #2307.4)', () => {
+  const steps = (writeStatus: PreparationStepRow['status']) =>
+    freshSteps().map((s) => (s.key === 'write_units' ? { ...s, status: writeStatus } : s));
+
+  it('offers the card only on a run that failed before write_units', () => {
+    expect(offersWriteCurriculum({ run: run({ status: 'failed' }), steps: steps('pending') })).toBe(true);
+    expect(offersWriteCurriculum({ run: run({ status: 'failed' }), steps: steps('done') })).toBe(false);
+    expect(offersWriteCurriculum({ run: run({ status: 'running' }), steps: steps('pending') })).toBe(false);
+    expect(offersWriteCurriculum({ run: run({ status: 'done' }), steps: steps('skipped') })).toBe(false);
+    expect(offersWriteCurriculum(null)).toBe(false);
   });
 });
