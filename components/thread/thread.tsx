@@ -1375,7 +1375,8 @@ function TalkThread({
         </ul>
       )}
 
-      {!ended && above}
+      {/* Docked, it rides at the foot with the box instead (below). */}
+      {!ended && !dock && above}
 
       {ended ? (
         <p className="text-ui text-ink-muted">{ended}</p>
@@ -1446,7 +1447,12 @@ function TalkThread({
             return false;
           }}
           over={
-            menuOpen &&
+            <>
+            {/* Docked, what goes above the box (the page Dash will be told)
+                sits with it at the pane's foot, not stranded over the space
+                between the last turn and the box. */}
+            {dock && above && <div className="mb-2">{above}</div>}
+            {menuOpen &&
             menu && (
               <div
                 id={`${id}-menu`}
@@ -1479,7 +1485,8 @@ function TalkThread({
                   ))
                 )}
               </div>
-            )
+            )}
+            </>
           }
           send={
             stopping ? (
