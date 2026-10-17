@@ -73,9 +73,9 @@ export async function proposeGoal(_prev: ProposeState, formData: FormData): Prom
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
 
-  // Named on a subject's page, the topic joins that subject's lens, and the
-  // lens of every goal on the subject with it (plan #2138.7). The draft is
-  // kept even if this fails: it is on the map and can be added again.
+  // Named on a subject's page, the topic joins that subject's lens, the one
+  // lens its goals read too (plan #2138.7, #2302.3). The draft is kept even
+  // if this fails: it is on the map and can be added again.
   if (subjectId.success) {
     try {
       await addToSubjectLens(supabase, user.id, subjectId.data, id);

@@ -47,15 +47,15 @@ const PLACED = new Map<string, TopicPlacement>([
 ]);
 
 describe('goalsOnMap', () => {
-  it('keeps goals only, with each topic placed and ringed at its target', () => {
+  it('draws each lens a goal reads, with each topic placed and ringed at its target', () => {
     const m = map();
     const goals = goalsOnMap(
-      [lens('g', 'goal', [['capm', 4], ['return', 3], ['dcf', 5]]), lens('s', 'subject', [['beta', 3]])],
+      [lens('g', 'subject', [['capm', 4], ['return', 3], ['dcf', 5]]), lens('s', 'subject', [['beta', 3]])],
       m,
       readCells(m),
       PLACED,
     );
-    expect(goals.map((g) => g.id)).toEqual(['g']);
+    expect(goals.map((g) => g.id)).toEqual(['g', 's']);
     const [goal] = goals;
     expect(goal!.stars.map((s) => [s.topicId, s.targetLevel])).toEqual([
       ['capm', 4],
@@ -67,14 +67,14 @@ describe('goalsOnMap', () => {
 
   it('draws one line per pair of its own topics, never to a topic outside it', () => {
     const m = map();
-    const [goal] = goalsOnMap([lens('g', 'goal', [['capm', 4], ['return', 3]])], m, readCells(m), PLACED);
+    const [goal] = goalsOnMap([lens('g', 'subject', [['capm', 4], ['return', 3]])], m, readCells(m), PLACED);
     expect(goal!.links).toEqual([{ from: 'capm', to: 'return' }]);
   });
 
   it('leaves a topic with no place off the sky', () => {
     const m = map();
     const [goal] = goalsOnMap(
-      [lens('g', 'goal', [['capm', 4], ['return', 3]])],
+      [lens('g', 'subject', [['capm', 4], ['return', 3]])],
       m,
       readCells(m),
       new Map([['capm', at(0.1)]]),
@@ -85,16 +85,16 @@ describe('goalsOnMap', () => {
 
   it('names the next rung as the lowest level it is ready for', () => {
     const m = map([{ cellId: 'return1', verdict: 'met', observedAt: '2026-10-10T09:00:00Z' }]);
-    const [goal] = goalsOnMap([lens('g', 'goal', [['capm', 4], ['return', 3]])], m, readCells(m), PLACED);
+    const [goal] = goalsOnMap([lens('g', 'subject', [['capm', 4], ['return', 3]])], m, readCells(m), PLACED);
     expect(goal!.next).toBe('Next: CAPM at level 1, place it');
     expect(goal!.line).toBe('2 topics · 1 of 7 levels held');
   });
 
   it('says every target is held once they are, and nothing for drafts alone', () => {
     const m = map([{ cellId: 'return3', verdict: 'met', observedAt: '2026-10-10T09:00:00Z' }]);
-    const [held] = goalsOnMap([lens('g', 'goal', [['return', 3]])], m, readCells(m), PLACED);
+    const [held] = goalsOnMap([lens('g', 'subject', [['return', 3]])], m, readCells(m), PLACED);
     expect(held!.next).toBe('Every target held');
-    const [drafts] = goalsOnMap([lens('d', 'goal', [['dcf', 5]])], m, readCells(m), PLACED);
+    const [drafts] = goalsOnMap([lens('d', 'subject', [['dcf', 5]])], m, readCells(m), PLACED);
     expect(drafts!.next).toBeNull();
     expect(drafts!.line).toBe('A draft topic to approve');
   });
@@ -109,7 +109,7 @@ describe('territoriesOnMap', () => {
       { cellId: 'capm1', verdict: 'not_met', observedAt: '2026-10-11T09:00:00Z' },
     ]);
     const [territory] = territoriesOnMap(
-      [lens('g', 'goal', [['capm', 4], ['return', 3], ['dcf', 5]]), lens('s', 'subject', [['beta', 3]])],
+      [lens('g', 'subject', [['capm', 4], ['return', 3], ['dcf', 5]]), lens('s', 'subject', [['beta', 3]])],
       m,
       readCells(m),
       PLACED,
@@ -130,7 +130,7 @@ describe('territoriesOnMap', () => {
   it('lists what is ready inside the targets in engine order, the miss first and never a draft', () => {
     const m = map([{ cellId: 'capm1', verdict: 'not_met', observedAt: '2026-10-11T09:00:00Z' }]);
     const readings = readCells(m);
-    const [territory] = territoriesOnMap([lens('g', 'goal', [['capm', 4], ['return', 3], ['dcf', 5]])], m, readings, PLACED, AROUND);
+    const [territory] = territoriesOnMap([lens('g', 'subject', [['capm', 4], ['return', 3], ['dcf', 5]])], m, readings, PLACED, AROUND);
     const ready = territory!.ready!;
     expect(ready[0]).toMatchObject({ topicId: 'capm', level: 1, cellId: 'capm1' });
     expect(ready.some((r) => r.topicId === 'dcf')).toBe(false);
@@ -140,7 +140,7 @@ describe('territoriesOnMap', () => {
   it('leaves a topic with no place out, and its links with it', () => {
     const m = map();
     const [territory] = territoriesOnMap(
-      [lens('g', 'goal', [['capm', 4], ['return', 3]])],
+      [lens('g', 'subject', [['capm', 4], ['return', 3]])],
       m,
       readCells(m),
       new Map([['capm', at(0.1)]]),
@@ -153,7 +153,7 @@ describe('territoriesOnMap', () => {
 });
 
 describe('territory standing', () => {
-  const GOAL = [lens('g', 'goal', [['capm', 4], ['return', 3]])];
+  const GOAL = [lens('g', 'subject', [['capm', 4], ['return', 3]])];
   const standingOf = (m: TopicMap, topic: string) =>
     territoriesOnMap(GOAL, m, readCells(m), PLACED, new Map())[0]!.standing!.find((s) => s.topicId === topic);
 

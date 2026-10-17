@@ -146,13 +146,21 @@ describe('loadIdeaMap', () => {
   });
 
   it('places each goal topic among the ideas its scope is about (plan #2187.2)', async () => {
+    // A goal reads its subject's lens (plan #2302.3): 'g' is the lens of the
+    // subject the goal points at, 'old' a goal lens from before learn 0176,
+    // and 'n' the lens of a subject no goal points at.
     const { client } = fakeClient({
       ...ROWS,
+      aims: [{ id: 'a', goal_id: null, name: 'SaaS metrics goal', subject_id: 's9', archived_at: null }],
       lenses: [
-        { id: 'g', name: 'SaaS metrics goal', origin: 'goal', subject_id: null, aim_id: 'a', created_at: '2026-10-01T00:00:00Z' },
-        { id: 's', name: 'A subject', origin: 'subject', subject_id: 's1', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
+        { id: 'g', name: 'SaaS metrics', origin: 'subject', subject_id: 's9', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
+        { id: 'old', name: 'SaaS metrics goal', origin: 'goal', subject_id: null, aim_id: 'a', created_at: '2026-10-01T00:00:00Z' },
+        { id: 'n', name: 'No goal', origin: 'subject', subject_id: 's8', aim_id: null, created_at: '2026-10-01T00:00:00Z' },
       ],
-      lens_targets: [{ lens_id: 'g', topic_id: 't1', target_level: 5, created_at: '2026-10-01T00:00:00Z' }],
+      lens_targets: [
+        { lens_id: 'g', topic_id: 't1', target_level: 5, created_at: '2026-10-01T00:00:00Z' },
+        { lens_id: 'old', topic_id: 't1', target_level: 2, created_at: '2026-10-01T00:00:00Z' },
+      ],
       topics: [{ id: 't1', name: 'Churn maths', ceiling: 10, status: 'approved', scope_embedding: stored(0, 0.05) }],
     });
     const view = await loadIdeaMap(client);

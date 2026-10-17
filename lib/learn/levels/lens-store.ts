@@ -6,10 +6,13 @@ import { SUBJECT_GOAL_TARGET, type LensRecord, type TopicName } from '@/lib/lear
 /**
  * Reading and writing lenses (learn 0133 and 0137; plan #2138.7).
  *
- * Every subject and learning goal has a lens, which learn 0137's triggers
- * make and keep named. A survey subject's lens is hidden with its subject,
- * and an archived goal's with its goal. Progress is computed by
- * lib/learn/levels/lenses.ts on read, never stored here.
+ * Every subject has one lens, which learn 0137's trigger makes and keeps
+ * named, and which goes with the subject (learn 0176). A learning goal has no
+ * lens of its own: it reads the lens of the subject it points at
+ * (aims.subject_id; plan #2302.3), through `goalLensId` and `goalsBySubject`.
+ * A survey subject's lens is hidden with its subject. Goal lenses made before
+ * learn 0176 may remain in other accounts and are skipped. Progress is
+ * computed by lib/learn/levels/lenses.ts on read, never stored here.
  */
 
 type Client = LearnSupabaseClient;
@@ -41,23 +44,71 @@ function toRecord(lens: RawLens, targets: readonly RawTarget[]): LensRecord {
 
 const LENS_COLUMNS = 'id, name, origin, subject_id, aim_id, created_at';
 
-/** The lenses the Know page lists: real subjects' and open goals', by name. */
+/** The lenses the Know page lists: real subjects' and themes', by name. */
 export async function listLenses(client: Client): Promise<LensRecord[]> {
-  const [lenses, targets, hiddenSubjects, closedAims] = await Promise.all([
+  const [lenses, targets, hiddenSubjects] = await Promise.all([
     client.from('lenses').select(LENS_COLUMNS).order('name'),
     client.from('lens_targets').select('lens_id, topic_id, target_level, created_at'),
     client.from('subjects').select('id').eq('survey', true),
-    client.from('aims').select('id').not('archived_at', 'is', null),
   ]);
-  for (const read of [lenses, targets, hiddenSubjects, closedAims]) {
+  for (const read of [lenses, targets, hiddenSubjects]) {
     if (read.error) throw new Error(`Reading your lenses failed: ${read.error.message}`);
   }
   const hidden = new Set(((hiddenSubjects.data ?? []) as { id: string }[]).map((s) => s.id));
-  const closed = new Set(((closedAims.data ?? []) as { id: string }[]).map((a) => a.id));
   const rows = ((targets.data ?? []) as RawTarget[]);
   return ((lenses.data ?? []) as RawLens[])
-    .filter((l) => !(l.subject_id && hidden.has(l.subject_id)) && !(l.aim_id && closed.has(l.aim_id)))
+    .filter((l) => l.origin !== 'goal' && !(l.subject_id && hidden.has(l.subject_id)))
     .map((l) => toRecord(l, rows));
+}
+
+/** An open learning goal on the subject it points at. */
+export type GoalOnSubject = { aimId: string; goalId: string | null; name: string };
+
+/**
+ * The open learning goals by the subject each points at (aims.subject_id),
+ * oldest first. A goal reads that subject's lens (plan #2302.3), so this is
+ * how a subject's row names its goals and how the goal rail finds its lenses.
+ */
+export async function goalsBySubject(client: Client): Promise<Map<string, GoalOnSubject[]>> {
+  const { data, error } = await client
+    .from('aims')
+    .select('id, goal_id, name, subject_id, archived_at, created_at')
+    .is('archived_at', null)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`Reading your learning goals failed: ${error.message}`);
+  const out = new Map<string, GoalOnSubject[]>();
+  for (const aim of (data ?? []) as {
+    id: string;
+    goal_id: string | null;
+    name: string;
+    subject_id: string | null;
+    archived_at: string | null;
+  }[]) {
+    if (!aim.subject_id || aim.archived_at) continue;
+    const list = out.get(aim.subject_id) ?? [];
+    list.push({ aimId: aim.id, goalId: aim.goal_id, name: aim.name });
+    out.set(aim.subject_id, list);
+  }
+  return out;
+}
+
+/**
+ * The lens a learning goal reads: the lens of the subject it points at
+ * (plan #2302.3). Null when the goal is gone, points at no subject, or the
+ * subject has no lens.
+ */
+export async function goalLensId(client: Client, aimId: string): Promise<string | null> {
+  const { data: aim, error } = await client.from('aims').select('subject_id').eq('id', aimId).maybeSingle();
+  if (error) throw new Error(`Reading the goal failed: ${error.message}`);
+  const subjectId = (aim as { subject_id: string | null } | null)?.subject_id ?? null;
+  if (!subjectId) return null;
+  const { data: lens, error: lensError } = await client
+    .from('lenses')
+    .select('id')
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+  if (lensError) throw new Error(`Reading the goal's lens failed: ${lensError.message}`);
+  return (lens as { id: string } | null)?.id ?? null;
 }
 
 /** What a lens came from, for its page: the subject's name, or the goal's. */
@@ -158,8 +209,9 @@ export async function setLensTargets(
 /**
  * Put a topic on a subject's lens, as a topic drafted from the subject's page
  * is (plan #2138.7): at solid, never above the topic's ceiling. A topic
- * already on the lens keeps its target. The lens's goals take it in through
- * learn 0137's trigger. Returns the lens, or null when the subject has none.
+ * already on the lens keeps its target. The subject's goals read this same
+ * lens, so nothing is copied (plan #2302.3). Returns the lens, or null when
+ * the subject has none.
  */
 export async function addToSubjectLens(
   client: Client,

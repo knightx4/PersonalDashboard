@@ -43,7 +43,7 @@ import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
-import { FieldLevels, GoalLenses, SubjectLenses, type SubjectLensRow } from './lens-lists';
+import { FieldLevels, SubjectLenses, type SubjectLensRow } from './lens-lists';
 import { loadKnowLenses } from './lens-load';
 
 export const dynamic = 'force-dynamic';
@@ -134,9 +134,10 @@ export default async function KnowPage({
   );
   const rows = graphs.map(({ subject, graph }) => ({ subject, counts: countStates(graph) }));
 
-  // Every subject and goal is a lens (plan #2138.7). A failed read keeps the
-  // subjects list on the claims graph's counts and says the fields are
-  // missing, rather than taking the page.
+  // Every subject is a lens (plan #2138.7), and a learning goal reads its
+  // subject's, so the subject's row names its goals (plan #2302.3). A failed
+  // read keeps the subjects list on the claims graph's counts and says the
+  // fields are missing, rather than taking the page.
   const lenses = await loadKnowLenses(supabase, user.id);
   const subjectRows: SubjectLensRow[] = rows.map(({ subject, counts }) => {
     const lens = lenses?.bySubject.get(subject.id) ?? null;
@@ -147,6 +148,7 @@ export default async function KnowPage({
       lens,
       graphLine: settledLine(counts),
       comments: lens ? (lenses?.comments.get(lens.id) ?? 0) : 0,
+      goals: lenses?.goalNames.get(subject.id) ?? [],
     };
   });
 
@@ -263,8 +265,6 @@ export default async function KnowPage({
       ) : (
         <SubjectLenses rows={subjectRows} />
       )}
-
-      <GoalLenses goals={lenses?.goals ?? []} comments={lenses?.comments ?? new Map()} />
 
       <FieldLevels fields={lenses?.fields ?? []} failed={lenses === null} />
 
