@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
@@ -902,6 +903,13 @@ const COMPANY_FIELDS = [
   { arg: 'website', column: 'website', said: 'the website', max: LINK_MAX },
   { arg: 'careers_url', column: 'careers_url', said: 'the careers page', max: LINK_MAX },
   { arg: 'linkedin_url', column: 'linkedin_url', said: 'the LinkedIn page', max: LINK_MAX },
+  // The Perspective tab's six answers, by their column names.
+  ...PERSPECTIVE_QUESTIONS.map((question) => ({
+    arg: question.column,
+    column: question.column,
+    said: `the perspective's "${question.label}"`,
+    max: RESEARCH_MAX,
+  })),
 ] as const;
 
 async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
@@ -941,6 +949,7 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     if (!given(args, field.arg)) continue;
     update[field.column] = clearable(args, field.arg, field.max);
     changed.push(field.said);
+    if (field.column.startsWith('perspective_')) update.perspective_updated_at = new Date().toISOString();
   }
   if (given(args, 'domains')) {
     update.domains = domainsOf(args.domains);
@@ -2952,7 +2961,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_company',
     description:
-      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page. Give only the fields to change. Name the company by company_ref, or by its name in company.",
+      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company.",
     input_schema: {
       type: 'object',
       properties: {
@@ -2970,6 +2979,12 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         website: { type: 'string', description: `The homepage link. ${CLEARABLE}` },
         careers_url: { type: 'string', description: `The careers page link. ${CLEARABLE}` },
         linkedin_url: { type: 'string', description: `The LinkedIn page link. ${CLEARABLE}` },
+        ...Object.fromEntries(
+          PERSPECTIVE_QUESTIONS.map((question) => [
+            question.column,
+            { type: 'string', description: `Perspective, ${question.label}: ${question.prompt} In full, replacing what is there. ${CLEARABLE}` },
+          ]),
+        ),
       },
       additionalProperties: false,
     },

@@ -30,6 +30,7 @@ describe('company tabs', () => {
   it('opens on Roles, and on a named tab when the address has one', () => {
     expect(companyTabFrom(null)).toBe('roles');
     expect(companyTabFrom('people')).toBe('people');
+    expect(companyTabFrom('perspective')).toBe('perspective');
     expect(companyTabFrom('nonsense')).toBe('roles');
   });
 });

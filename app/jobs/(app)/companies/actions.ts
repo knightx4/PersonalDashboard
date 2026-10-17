@@ -19,6 +19,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
+import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 
 /**
@@ -61,6 +62,14 @@ const updateSchema = z.object({
   careersUrl: z.string().optional(),
   linkedinUrl: z.string().optional(),
   website: z.string().optional(),
+  /** Answers on the Perspective tab, by question key; a blank one clears it. */
+  perspective: z
+    .object(
+      Object.fromEntries(
+        PERSPECTIVE_QUESTIONS.map((question) => [question.key, z.string().max(20_000).optional()]),
+      ) as Record<(typeof PERSPECTIVE_QUESTIONS)[number]['key'], z.ZodOptional<z.ZodString>>,
+    )
+    .optional(),
 });
 
 // latency: pending
@@ -81,6 +90,13 @@ export async function updateCompany(
   if (parsed.data.careersUrl !== undefined) patch.careers_url = parsed.data.careersUrl || null;
   if (parsed.data.linkedinUrl !== undefined) patch.linkedin_url = parsed.data.linkedinUrl || null;
   if (parsed.data.website !== undefined) patch.website = parsed.data.website || null;
+  const perspective = parsed.data.perspective ?? {};
+  for (const question of PERSPECTIVE_QUESTIONS) {
+    const answer = perspective[question.key];
+    if (answer === undefined) continue;
+    patch[question.column] = answer.trim() || null;
+    patch.perspective_updated_at = new Date().toISOString();
+  }
   if (parsed.data.domains !== undefined) {
     // Domains drive email linking, so they are normalised rather than trusted:
     // a stray "https://" here means mail from that company never links.
@@ -98,6 +114,7 @@ export async function updateCompany(
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
 

@@ -159,6 +159,10 @@ The cost is one more join and the risk of the UI feeling bureaucratic. Neutraliz
 | priority | enum | `target`, `interested`, `backup`, `passed` |
 | research | text | markdown. The one long-form field, for what you know about the place |
 | status | enum | derived: `no_activity`, `active`, `closed_out` |
+| perspective_business, perspective_why_now, perspective_problem, perspective_why_me, perspective_unknowns, perspective_next_move | text | the person's own view of the company, one short answer each, on the Perspective tab |
+| perspective_updated_at | timestamptz | when any of the six last changed |
+
+The perspective is for the few companies the person most wants. They mark one Target on its Perspective tab and answer six questions there: what it does, why now, the problem they would solve, why them, what they do not know yet, and their next move (`lib/jobs/companies/perspective.ts`). The Companies page lists the targets above the table with how many of the six each has, its next move and when the view last changed, the stalest first. Dash's change_company writes the same six fields.
 
 `domains` is what lets a message from a recruiter's personal work address find its company. Populate it from the website, or from the careers URL when that is on the employer's own host, and let it be edited. A board or job-site host (jobs.ashbyhq.com, a Greenhouse board, Built In) is never stored there: it is shared by every employer on that board, and while one sat in Heron Data's list the mail from herondata.io went to a second Heron row instead. `isSharedHost` in `lib/jobs/companies/same-company.ts` and `job_search.is_shared_host` hold the list.
 

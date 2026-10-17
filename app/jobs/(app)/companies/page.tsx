@@ -28,6 +28,14 @@ import { sectionSubject } from '@/lib/core/section-path';
 import { Banner } from '@/components/ui/banner';
 import Link from '@/components/ui/link';
 import { duplicatePairs } from '@/lib/jobs/companies/same-company';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { formatDate } from '@/lib/jobs/applications/load';
+import {
+  answeredCount,
+  PERSPECTIVE_COLUMNS,
+  PERSPECTIVE_QUESTIONS,
+  perspectiveOf,
+} from '@/lib/jobs/companies/perspective';
 
 export const metadata = { title: 'Companies' };
 
@@ -59,7 +67,7 @@ export default async function CompaniesPage({
   const { data } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, ats_type, ats_board_token, roles ( id, applications ( status ) )',
+      `id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, ats_type, ats_board_token, ${PERSPECTIVE_COLUMNS}, roles ( id, applications ( status ) )`,
     )
     .eq('user_id', user.id)
     .order('name');
@@ -78,6 +86,7 @@ export default async function CompaniesPage({
     logo_url: string | null;
     ats_type: string;
     ats_board_token: string | null;
+    perspective_updated_at: string | null;
     roles: Array<{ id: string; applications: Array<{ status: ApplicationStatus }> }>;
   }>;
 
@@ -94,8 +103,26 @@ export default async function CompaniesPage({
   const duplicates = duplicatePairs(companies);
 
   const priority = PRIORITIES.find((p) => p === params.priority);
+
+  // The companies marked Target, with how far the view of each has got, led
+  // with the ones whose view has not moved for longest. Shown above the table
+  // whenever the list is not narrowed to something else.
+  const targets = companies
+    .filter((company) => company.priority === 'target')
+    .map((company) => {
+      const perspective = perspectiveOf(company as unknown as Record<string, unknown>);
+      return { company, answered: answeredCount(perspective), nextMove: perspective.nextMove };
+    })
+    .sort(
+      (a, b) =>
+        (a.company.perspective_updated_at ?? '').localeCompare(b.company.perspective_updated_at ?? '') ||
+        a.company.name.localeCompare(b.company.name),
+    );
   const activeOnly = params.active === '1';
   const terms = searchTerms(params.q);
+  const showTargets = terms.length === 0 && !activeOnly && (!priority || priority === 'target');
+  const { data: profile } = await supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle();
+  const timezone = (profile?.timezone as string | undefined) ?? 'UTC';
 
   let filtered = priority ? companies.filter((c) => c.priority === priority) : companies;
   if (activeOnly) filtered = filtered.filter(isActive);
@@ -224,6 +251,70 @@ export default async function CompaniesPage({
                 </ul>
               </div>
             </Banner>
+          )}
+
+          {showTargets && (
+            <section className="mb-6" aria-label="Targets">
+              <SectionHeading title="Targets" count={targets.length} className="mb-2" />
+              {targets.length === 0 ? (
+                <p className="text-ui text-ink-muted">
+                  No targets yet. Open a company you most want and mark it Target on its
+                  Perspective tab.
+                </p>
+              ) : (
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Company</TH>
+                      <TH>Your view</TH>
+                      <TH>Next move</TH>
+                      <TH>Updated</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {targets.map(({ company, answered, nextMove }) => (
+                      <TR key={company.id} href={`/jobs/companies/${company.slug}?tab=perspective`}>
+                        <TD primary>
+                          <span className="flex items-center gap-2">
+                            <CompanyAvatar
+                              company={{
+                                name: company.name,
+                                logoUrl: company.logo_url,
+                                domains: company.domains,
+                                website: company.website,
+                                careersUrl: company.careers_url,
+                              }}
+                              className="size-5 rounded-control"
+                              imageClassName="size-4"
+                            />
+                            <span className="min-w-0">{company.name}</span>
+                          </span>
+                        </TD>
+                        <TD label="Your view" muted>
+                          <span className="tabular">
+                            {answered} of {PERSPECTIVE_QUESTIONS.length}
+                          </span>
+                        </TD>
+                        <TD label="Next move" muted>
+                          {nextMove.trim() ? (
+                            <span className="line-clamp-2">{nextMove}</span>
+                          ) : (
+                            'None yet'
+                          )}
+                        </TD>
+                        <TD label="Updated" muted>
+                          <span className="tabular">
+                            {company.perspective_updated_at
+                              ? formatDate(company.perspective_updated_at, timezone)
+                              : 'Never'}
+                          </span>
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              )}
+            </section>
           )}
 
           <div className="mb-4">

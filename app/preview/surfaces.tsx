@@ -1008,13 +1008,24 @@ const companyPanels = {
   companyId: 'co-1',
   research:
     'Systematic manager, roughly 500 people in London. The research platform team owns the backtester and the data pipeline; the posting is on that team.\n\nThey moved off a vendor risk system in 2024, which is what the "market data at scale" line in the posting is about.',
+  // Half written, as a view is a few weeks in: the facts and the fit, with
+  // the open questions and the next move still to come.
+  perspective: {
+    business: 'Systematic hedge fund. Earns management and performance fees on its own funds; the research platform is the internal product every strategy runs on.',
+    whyNow: 'Rebuilt the risk stack off a vendor in 2024 and is hiring into market data, so the platform is being built rather than kept running.',
+    problem: 'Turning a pile of new data feeds into something researchers trust: cost per feed, which ones earn their keep, and what to cut.',
+    whyMe: '',
+    unknowns: '',
+    nextMove: '',
+  },
+  perspectiveUpdatedAt: '2026-09-28T09:00:00.000Z',
   domains: 'halloran.example, halloran.co.uk',
   industry: 'Quantitative investment management',
   hqLocation: 'New York, NY',
   careersUrl: 'https://www.halloran.example/careers',
   linkedinUrl: 'https://www.linkedin.com/company/de-shaw',
   website: 'https://www.halloran.example',
-  priority: 'high',
+  priority: 'target',
   timezone: 'Europe/London',
   contacts: [
     {
@@ -5049,6 +5060,14 @@ export const SURFACES: readonly Surface[] = [
         <CompanyPanels {...companyPanels} />
       </PaidCostsProvider>
     ),
+  },
+  {
+    /* The Perspective tab: how much you want the place, then your view of it. */
+    id: 'jobs-company-perspective',
+    label: 'Company · Perspective',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompanyPanels {...companyPanels} opensOn="perspective" />,
   },
   {
     /* The About tab: details, then what you know about the place (plan #1628). */
