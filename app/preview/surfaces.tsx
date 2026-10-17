@@ -408,6 +408,12 @@ import {
 } from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import {
+  NowPageEmptySurface,
+  NowPageLoadingSurface,
+  NowPagePracticeSurface,
+  NowPageSurface,
+} from './learn-now-page-surfaces';
+import {
   SubjectArticlesEmptySurface,
   SubjectArticlesErrorSurface,
   SubjectArticlesLoadingSurface,
@@ -5709,10 +5715,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReviewListSurface folded />,
   },
   {
-    /* Learn now as a deck: one card, the three swipes at its foot. Nothing
-     * here is recorded; the swipes only reach the server from the real page. */
+    /* Cards, the deck of cards written before Now led with today's piece
+     * (plan #2313.1): one card, the three swipes at its foot. Nothing here is
+     * recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
-    label: 'Now · One card at a time',
+    label: 'Cards · One card at a time',
     module: 'learn',
     width: 'narrow',
     interaction: {
@@ -5722,7 +5729,7 @@ export const SURFACES: readonly Surface[] = [
     },
     // On its second card (plan #1931.5): the first is passed, so Previous shows.
     render: () => (
-      <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
+      <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} />
     ),
   },
   /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
@@ -5769,18 +5776,38 @@ export const SURFACES: readonly Surface[] = [
     label: 'Now · A goal with no pieces yet',
     module: 'learn',
     width: 'narrow',
-    render: () => (
-      // Enough cards that the deck does not reach for more, which the gallery cannot load.
-      <TodaysPieceNoneSurface
-        cards={
-          <LearnNowFeed
-            first={[...deckCards, ...deckCards.map((card, index) => ({ ...card, id: `${card.id.slice(0, -1)}${'abc'[index]}` }))]}
-            ready={20}
-            low={10}
-          />
-        }
-      />
-    ),
+    render: () => <TodaysPieceNoneSurface />,
+  },
+  /* Now as it opens (plan #2313.1): today's piece, the practice press and the
+   * rail, and its hidden parts: no piece today, no prepared subject, and the
+   * page loading. learn-now-page-surfaces.tsx. */
+  {
+    id: 'learn-now-page',
+    label: 'Now · Today’s piece and practice',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageSurface />,
+  },
+  {
+    id: 'learn-now-page-practice',
+    label: 'Now · No piece today, practice leads',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPagePracticeSurface />,
+  },
+  {
+    id: 'learn-now-page-empty',
+    label: 'Now · No prepared subject yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageEmptySurface />,
+  },
+  {
+    id: 'learn-now-page-loading',
+    label: 'Now · Loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageLoadingSurface />,
   },
   {
     /* Now opened from a subject's page (plan #1698), with nothing of it
@@ -5794,7 +5821,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <NowHeader practice={false} subject={nowSubjectLong} />
-        <LearnNowFeed first={[]} ready={0} low={10} subjectId={nowSubjectLong.id} />
+        <LearnNowFeed first={[]} subjectId={nowSubjectLong.id} />
       </>
     ),
   },

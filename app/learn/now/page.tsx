@@ -1,29 +1,27 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { after } from 'next/server';
 import { z } from 'zod';
 import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
-import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
-import { READY_LOW } from '@/lib/learn/feed/top-up';
 import { loadReadNow, type ReadingDetail } from '@/lib/learn/tracks/load';
 import { REVIEWS_IN_LEARN_NOW, type DueReview } from '@/lib/learn/lessons/review';
 import { loadDueReviews } from '@/lib/learn/lessons/review-store';
-import { loadActiveAims } from '@/lib/learn/aims-store';
-import { loadPlannedGoals } from '@/lib/learn/lessons/plan-store';
-import { countGoalsWithoutPlan, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
+import { readWaiting, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
 import { firstParam, wantsPractice } from '@/lib/learn/flow/href';
 import { loadSubject } from '@/lib/learn/graph/load';
+import { loadPreparingSubjects, preparedSubjectIds, type PreparingSubject } from '@/lib/learn/prepare/store';
+import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
+import { loadWorkspaceInbox } from '@/lib/inbox/workspace-inbox';
 import { PracticeFlow } from '../flow/practice';
-import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { ReviewList } from '../review/review-list';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
 import { NowHeader } from './header';
+import { NowView } from './now-view';
 import { WaitingStrip } from './waiting-strip';
 import { BriefsList } from './briefs-list';
 import { PieceFirst } from './todays-piece';
@@ -40,54 +38,54 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Now' };
 
 /**
- * The most due ideas read, for the strip's count. The query behind the
+ * The most due ideas read, for the waiting count. The query behind the
  * reviews stops at two hundred as well, so a larger limit would count no
- * more. The list below the strip shows the first few of the same read.
+ * more. The list under the practice press shows the first few of the same read.
  */
 const REVIEWS_COUNTED = 200;
 
 /**
- * Long enough for the page's actions and what they start afterwards. Test me
- * on this writes a track while you wait, and every action may top the feed up
- * inside `after()`, which runs within this same limit (plan #808).
+ * Long enough for the page's actions. Test me on this writes a track while
+ * you wait, and the piece's thread marks an answer with a model call.
  */
 export const maxDuration = 300;
 
+/** Logs a read that failed and gives the page its fallback, so one failed read never fails Now. */
+function orElse<T>(what: string, fallback: T) {
+  return (error: unknown): T => {
+    console.error(`[learn] now: ${what}`, error instanceof Error ? error.message : error);
+    return fallback;
+  };
+}
+
+/** A count already read, for `readWaiting`: null (a read that failed) leaves the count unread. */
+function counted(rows: readonly unknown[] | null): () => Promise<number> {
+  return async () => {
+    if (rows === null) throw new Error('not read');
+    return rows.length;
+  };
+}
+
 /**
- * Now, Learn's first tab and the one place to start (plan #1486), as the
- * endless feed of docs/LEARN-NOW-SPEC.md (plan #808). It was Learn now, the
- * tab after Home, until Home and Practice Flow were folded into it.
+ * Now, Learn's first tab and the one place to start (plan #1486). Since plan
+ * #2313.1 it opens on today's piece from a prepared subject and the press to
+ * practise across your prepared subjects (`./now-view.tsx`), with nothing to
+ * swipe. Beside them, as the page's rail: what is waiting for you (the inbox,
+ * ideas due for review, readings you said you would read, and the cards
+ * written before), and the subjects still being prepared with the step each
+ * run is on. Under the practice press, the topics Dash researched for you,
+ * the readings you queued and the ideas due for review.
  *
- * At the top, what is waiting for you, as one short strip (Home's list until
- * plan #1486): ideas due for review, readings you said you would read, and
- * goals with no plan yet. Beside the title, the Practice only switch:
- * `?practice=1` shows Practice Flow's questions (`../flow/practice.tsx`) in
- * place of the feed, and an old flow link's `track`, `goal` or `only` turns it
- * on too (`lib/learn/flow/href.ts`). Each learning goal's plan, which Home
- * listed, is on its subject's page.
+ * Three other views share the address:
  *
- * The readings you queued come first, in the order you queued them, as the
- * thin shelf they always were: what it is, why you put it there, Open, and
- * Read it. Nothing on it asks you a question before you can read, and all the
- * rest is on the reading's own page, one click away.
- *
- * The deck opens on today's piece of your course (plan #2164.4,
- * `./todays-piece.tsx`): its lessons one at a time, its check, and a
- * finished state that hands on to the cards.
- *
- * Then the cards the app wrote, one at a time (`./feed.tsx`), with the next
- * few already loaded behind the one on screen.
- *
- * Track offers, a new theme or a resting track, are on Tracks rather than
- * here (note 8a1789df): the deck is for reading.
- *
- * Above the deck, the ideas of passed pieces that are due for review (plan
- * #1145), up to five, most overdue first.
- *
- * `?track=<subject>` without the switch is one subject's Now (plan #1698),
- * opened from the subject's page: only its cards, a link back to it above the
- * title, and none of the strip, the shelf or the reviews, which are about
- * everything you are learning rather than this one subject.
+ * - `?practice=1` shows Practice Flow's questions (`../flow/practice.tsx`),
+ *   and an old flow link's `goal` or `only` turns it on too
+ *   (`lib/learn/flow/href.ts`).
+ * - `?cards=1` is Cards: the cards written before, one at a time
+ *   (`./feed.tsx`), until none are left. No more are written. A morning
+ *   notification that names a card (`?card=`, plan #2164.7) opens here on it.
+ * - `?track=<subject>` without the switch is one subject's cards (plan
+ *   #1698), opened from the subject's page, with a link back to it.
  *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
@@ -99,6 +97,7 @@ export default async function NowPage({
 }: {
   searchParams: Promise<{
     practice?: string | string[];
+    cards?: string | string[];
     track?: string | string[];
     goal?: string | string[];
     only?: string | string[];
@@ -126,58 +125,61 @@ export default async function NowPage({
     <NowHeader description={description} practice={practice} subject={subject} />
   );
 
-  if (subject && !practice) {
-    const [cards, ready] = await Promise.all([
-      loadFeedPage(supabase, [], { subjectId: subject.id }),
-      countReadyCards(supabase, subject.id),
-    ]);
-    after(() => topUpFeedAfterResponse(user.id, subject.id));
+  // The morning notification opens on its first card (plan #2164.7); the
+  // press also counts as the brief opened, as it does on Home (plan #1242).
+  const pinned = z.string().uuid().safeParse(firstParam(params.card));
+  const pushDay = openedFromPush(params, '');
+  if (pushDay) await createCoreClient().then((core) => core.rpc('open_day_brief', { p_day: pushDay })).catch(() => null);
+
+  if (!practice && (subject || pinned.success || firstParam(params.cards) === '1')) {
+    const cards = await loadFeedPage(supabase, [], {
+      subjectId: subject?.id ?? null,
+      cardId: pinned.success ? pinned.data : null,
+    });
     const related = relatedNotesForCards(supabase, user.id, cards);
     return (
       <PageColumn>
-        {header()}
+        {subject ? (
+          header()
+        ) : (
+          <NowHeader
+            cards
+            practice={false}
+            description="Written before Now led with today’s piece. No new ones are written, so these end when you are through them."
+          />
+        )}
         <LearnNowFeed
           first={cards}
           firstRelated={Object.fromEntries(
             cards.map((card) => [card.id, related.then((found) => found.get(card.id) ?? [])]),
           )}
-          ready={ready}
-          low={READY_LOW}
-          subjectId={subject.id}
+          subjectId={subject?.id ?? null}
         />
       </PageColumn>
     );
   }
 
-  // Each read that feeds the strip fails on its own: a count that cannot be
-  // read is null and drops its line, and the lists below fall back to empty.
-  const [readings, reviews, goals] = await Promise.all([
-    loadReadNow(supabase).then(
-      (rows) => rows,
-      (): ReadingDetail[] | null => null,
-    ),
-    loadDueReviews(supabase, user.id, { limit: REVIEWS_COUNTED }).then(
-      (rows) => rows,
-      (): DueReview[] | null => null,
-    ),
-    Promise.all([loadActiveAims(supabase), loadPlannedGoals(supabase, user.id)]).then(
-      ([aims, planned]) => countGoalsWithoutPlan(aims, planned),
-      (): number | null => null,
-    ),
+  // Each read that feeds the waiting list fails on its own: a count that
+  // cannot be read is null and drops its line, and the lists below fall back
+  // to empty.
+  const [readings, reviews] = await Promise.all([
+    loadReadNow(supabase).catch(orElse<ReadingDetail[] | null>('readings', null)),
+    loadDueReviews(supabase, user.id, { limit: REVIEWS_COUNTED }).catch(orElse<DueReview[] | null>('reviews', null)),
   ]);
-  const counts = { reviews: reviews?.length ?? null, readings: readings?.length ?? null, goals };
-  // Goals without a plan open the Learn area on /goals (plan #1491); read
-  // only when that line shows.
-  const goalsHref = goals ? await loadLearnAreaHref() : undefined;
-  const strip = (
-    <WaitingStrip lines={waitingLines(counts, { goalsHref })} empty={waitingEmpty(counts)} />
-  );
+  const counts = await readWaiting({
+    inbox: () => loadWorkspaceInbox(user.id, 'learn').then((inbox) => inbox.rows.length),
+    reviews: counted(reviews),
+    readings: counted(readings),
+    cards: () => countReadyCards(supabase),
+  });
+  const lines = waitingLines(counts);
+  const empty = waitingEmpty(counts);
 
   if (practice) {
     return (
       <PageColumn>
         {header('Questions about what you are ready for next, for as long as you want to keep going.')}
-        {strip}
+        <WaitingStrip lines={lines} empty={empty} />
         <PracticeFlow
           track={params.track}
           goal={params.goal}
@@ -193,55 +195,35 @@ export default async function NowPage({
     );
   }
 
-  // The morning notification opens here on its first card (plan #2164.7); the
-  // press also counts as the brief opened, as it does on Home (plan #1242).
-  const pinned = z.string().uuid().safeParse(firstParam(params.card));
-  const pushDay = openedFromPush(params, '');
-  if (pushDay) await createCoreClient().then((core) => core.rpc('open_day_brief', { p_day: pushDay })).catch(() => null);
-
-  // Today's piece leads the deck (plan #2164.4), or the piece `?piece=` names;
-  // a card the notification named leads instead, since that is what it asked
-  // about. A piece that cannot be read leaves the cards first.
+  // Today's piece leads (plan #2164.4), or the piece `?piece=` names. A piece
+  // that cannot be read leaves the practice press first.
   const pinnedPiece = z.string().uuid().safeParse(firstParam(params.piece));
-
-  // The topics Dash researched for you (plan #2023.4); a list that cannot be
-  // read is left off rather than failing the page.
-  const [cards, ready, briefs, piece] = await Promise.all([
-    loadFeedPage(supabase, [], { cardId: pinned.success ? pinned.data : null }),
-    countReadyCards(supabase),
-    loadOpenBriefs(supabase).catch((): BriefSummary[] => []),
-    pinned.success
-      ? null
-      : createCoreClient()
-          .then((core) => loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null, core))
-          .catch(
-          (error: unknown): TodaysPiece | null => {
-            console.error('[learn] today’s piece', error instanceof Error ? error.message : error);
-            return null;
-          },
-        ),
+  const [briefs, piece, prepared, preparing] = await Promise.all([
+    // The topics Dash researched for you (plan #2023.4).
+    loadOpenBriefs(supabase).catch(orElse<BriefSummary[]>('briefs', [])),
+    createCoreClient()
+      .then((core) => loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null, core))
+      .catch(orElse<TodaysPiece | null>('today’s piece', null)),
+    preparedSubjectIds(supabase, user.id).catch(orElse('prepared subjects', new Set<string>())),
+    loadPreparingSubjects(supabase, user.id).catch(orElse<PreparingSubject[]>('preparing subjects', [])),
   ]);
-  // Opening the page counts as a response: when seven or fewer are ready,
-  // more are written while you read the first.
-  after(() => topUpFeedAfterResponse(user.id));
-  const related = relatedNotesForCards(supabase, user.id, cards);
-  const firstRelated = Object.fromEntries(
-    cards.map((card) => [card.id, related.then((found) => found.get(card.id) ?? [])]),
-  );
   const queued = readings ?? [];
 
   return (
-    <PageColumn>
-      {header(
-        queued.length === 0
-          ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
-          : 'What you said you would read next, then one card at a time.',
-      )}
-
-      {strip}
-
-      <NowDashToday workspace="learn" className="mb-6" />
-
+    <NowView
+      header={header()}
+      today={<PieceFirst piece={piece} />}
+      hasPiece={piece !== null}
+      prepared={prepared.size}
+      preparing={preparing.map((row) => ({
+        subjectId: row.subjectId,
+        name: row.name,
+        line: preparationLine(preparationView(row)),
+      }))}
+      waiting={lines}
+      waitingEmpty={empty}
+      dashToday={<NowDashToday workspace="learn" className="" />}
+    >
       <BriefsList briefs={briefs} />
 
       {queued.length > 0 && (
@@ -326,10 +308,6 @@ export default async function NowPage({
           showPlan
         />
       </div>
-
-      <PieceFirst piece={piece}>
-        <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
-      </PieceFirst>
-    </PageColumn>
+    </NowView>
   );
 }

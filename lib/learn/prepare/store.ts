@@ -212,6 +212,52 @@ export async function preparedSubjectIds(learn: LearnSupabaseClient, userId: str
   return new Set(((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id));
 }
 
+/** A subject whose own preparation has not finished, with its run, for Now's rail (plan #2313.1). */
+export type PreparingSubject = { subjectId: string; name: string; run: PreparationRow; steps: PreparationStepRow[] };
+
+/**
+ * Every subject of yours whose main run is unfinished, oldest run first:
+ * pending, working, or stopped on a failed step. Survey subjects are left
+ * out, since nobody chose them. Three reads whatever the number of subjects.
+ */
+export async function loadPreparingSubjects(learn: LearnSupabaseClient, userId: string): Promise<PreparingSubject[]> {
+  const { data, error } = await learn
+    .from('subject_preparations')
+    .select(RUN_COLUMNS)
+    .eq('user_id', userId)
+    .neq('status', 'done')
+    .is('branch_key', null)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`Reading the preparations failed: ${error.message}`);
+  const runs = ((data ?? []) as RunDb[]).map(toRun);
+  if (runs.length === 0) return [];
+  const [steps, subjects] = await Promise.all([
+    learn
+      .from('subject_preparation_steps')
+      .select(`preparation_id, ${STEP_COLUMNS}`)
+      .eq('user_id', userId)
+      .in('preparation_id', runs.map((run) => run.id)),
+    learn
+      .from('subjects')
+      .select('id, name, survey')
+      .eq('user_id', userId)
+      .in('id', runs.map((run) => run.subjectId)),
+  ]);
+  if (steps.error) throw new Error(`Reading the preparations' steps failed: ${steps.error.message}`);
+  if (subjects.error) throw new Error(`Reading the preparing subjects failed: ${subjects.error.message}`);
+  const named = new Map(
+    ((subjects.data ?? []) as { id: string; name: string; survey: boolean }[])
+      .filter((subject) => !subject.survey)
+      .map((subject) => [subject.id, subject.name]),
+  );
+  const stepRows = (steps.data ?? []) as (StepDb & { preparation_id: string })[];
+  return runs.flatMap((run) => {
+    const name = named.get(run.subjectId);
+    if (!name) return [];
+    return [{ subjectId: run.subjectId, name, run, steps: toSteps(stepRows.filter((row) => row.preparation_id === run.id)) }];
+  });
+}
+
 /** The territory a run compiled (plan #2276.4), by the run's id; null before compile_territory has kept one. */
 export async function loadRunTerritory(learn: LearnSupabaseClient, userId: string, runId: string): Promise<Territory | null> {
   const { data, error } = await learn
