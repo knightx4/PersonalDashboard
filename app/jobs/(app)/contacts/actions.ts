@@ -143,6 +143,27 @@ export async function updateContact(
   return { error: null };
 }
 
+/**
+ * Delete a contact (note 8902b443). Their logged sends, notes, reminders and
+ * interview places go with them, by the foreign keys; a referral on an
+ * application keeps the application and loses the name. The page asks first.
+ */
+// latency: pending
+export async function deleteContact(contactId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(contactId);
+  if (!parsed.success) return { error: 'That is not a contact.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('contacts').delete().eq('id', parsed.data).eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  return { error: null };
+}
+
 const DraftRequest = z.object({
   contactId: z.string().uuid(),
   channel: z.enum(['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other']),

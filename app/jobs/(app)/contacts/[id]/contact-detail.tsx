@@ -1,6 +1,7 @@
 'use client';
 
 import { ExternalLink, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CopyText } from '../../roles/[id]/copy-text';
 import {
+  deleteContact,
   draftContactMessage,
   logTouch,
   markTouchAnswered,
@@ -73,6 +75,54 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
           }}
         />
       </CardSection>
+      <DeleteContact contactId={contact.id} name={contact.fullName} />
+    </div>
+  );
+}
+
+/** Delete, asked first, at the foot of the page (note 8902b443). */
+function DeleteContact({ contactId, name }: { contactId: string; name: string }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function remove() {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteContact(contactId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push('/jobs/contacts');
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {confirming ? (
+        <>
+          <span className="text-small text-ink-muted">
+            Delete {name}? Their logged sends and notes go too.
+          </span>
+          <Button type="button" variant="danger" size="xs" pending={pending} onClick={remove}>
+            Delete
+          </Button>
+          <Button type="button" variant="ghost" size="xs" disabled={pending} onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <Button type="button" variant="link" className="hover:text-danger" onClick={() => setConfirming(true)}>
+          Delete contact
+        </Button>
+      )}
+      {error && (
+        <p role="alert" className="w-full text-right text-small text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
