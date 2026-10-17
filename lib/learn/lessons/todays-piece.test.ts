@@ -43,6 +43,11 @@ describe('nextUnfinishedPiece', () => {
 });
 
 describe('chooseTodaysPiece', () => {
+  it('gives a piece of a subject that is no goal’s track', () => {
+    const subject: TodaysPieceGoal = { ...goal('m', [['open']]), aimId: null, name: 'Music theory' };
+    expect(chooseTodaysPiece([subject])).toMatchObject({ kind: 'piece', aimId: null, goalName: 'Music theory', pieceId: 'm-u1-p1' });
+  });
+
   it('takes the oldest goal when none has been worked', () => {
     expect(chooseTodaysPiece([goal('a', [['open']]), goal('b', [['open']])])).toMatchObject({
       kind: 'piece',

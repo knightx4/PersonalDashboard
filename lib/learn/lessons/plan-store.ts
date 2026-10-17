@@ -66,6 +66,31 @@ export async function planSubjectIds(learn: LearnSupabaseClient, userId: string)
   return new Set((await planSubjects(learn, userId)).map((one) => one.subjectId));
 }
 
+/** A plan the person works: a goal's, named for the goal, or a prepared subject's, named for the subject. */
+export type PlanEntry = { aimId: string | null; name: string; subjectId: string };
+
+/**
+ * `planSubjects` with the name each plan goes by (plan #2292.4): the goal's
+ * for a track, the subject's own for a prepared subject with no goal. What
+ * today's piece and the plan progress read, so a subject needs no goal to
+ * be worked from Now.
+ */
+export async function planEntries(learn: LearnSupabaseClient, userId: string): Promise<PlanEntry[]> {
+  const [aims, subjects] = await Promise.all([goalsWithTracks(learn, userId), planSubjects(learn, userId)]);
+  const goalName = new Map(aims.map((aim) => [aim.id, aim.name]));
+  const bare = subjects.filter((one) => one.aimId === null).map((one) => one.subjectId);
+  const subjectName = new Map<string, string>();
+  if (bare.length > 0) {
+    const { data, error } = await learn.from('subjects').select('id, name').eq('user_id', userId).in('id', bare);
+    if (error) throw new Error(`Reading your subjects failed: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; name: string }[]) subjectName.set(row.id, row.name);
+  }
+  return subjects.flatMap((one) => {
+    const name = one.aimId ? goalName.get(one.aimId) : subjectName.get(one.subjectId);
+    return name === undefined ? [] : [{ aimId: one.aimId, name, subjectId: one.subjectId }];
+  });
+}
+
 /**
  * The active goals that have a plan, by id: those whose track has been made.
  * What the waiting strip on Now counts goals without a plan against, without
@@ -75,7 +100,9 @@ export async function loadPlannedGoals(
   learn: LearnSupabaseClient,
   userId: string,
 ): Promise<{ aimId: string }[]> {
-  return (await goalsWithTracks(learn, userId)).map((aim) => ({ aimId: aim.id }));
+  const out: { aimId: string }[] = [];
+  for (const one of await planSubjects(learn, userId)) if (one.aimId) out.push({ aimId: one.aimId });
+  return out;
 }
 
 /** The goal whose plan this track is, or null for a track that is no goal's. */
@@ -173,7 +200,8 @@ export async function loadPlan(learn: LearnSupabaseClient, userId: string, subje
  * final project passed with every piece passed (plan #1146).
  */
 export type PlanSummary = {
-  aimId: string;
+  /** Null for a prepared subject that is no goal's track. */
+  aimId: string | null;
   name: string;
   subjectId: string;
   progress: PlanProgress;
@@ -182,14 +210,14 @@ export type PlanSummary = {
 };
 
 /**
- * Every active goal's plan with its progress, oldest goal first. Next up is
+ * Every plan with its progress: the active goals' oldest first, then prepared subjects with no goal (`planEntries`). Next up is
  * read from passed pieces only: a half-done piece is still the next one, and
  * which half is done is shown on the plan page.
  */
 export async function loadPlans(learn: LearnSupabaseClient, userId: string): Promise<PlanSummary[]> {
-  const aims = await goalsWithTracks(learn, userId);
-  if (aims.length === 0) return [];
-  const subjectIds = [...new Set(aims.map((aim) => aim.subject_id))];
+  const entries = await planEntries(learn, userId);
+  if (entries.length === 0) return [];
+  const subjectIds = [...new Set(entries.map((entry) => entry.subjectId))];
   const [units, pieces, projectsPassed] = await Promise.all([
     learn
       .from('curriculum_units')
@@ -203,10 +231,10 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
   if (units.error) throw new Error(`Reading the plans' units failed: ${units.error.message}`);
   const unitRows = (units.data ?? []) as { id: string; subject_id: string; ordinal: number; title: string }[];
 
-  return aims.map((aim) => {
+  return entries.map((aim) => {
     const progress = planProgress(
       unitRows
-        .filter((unit) => unit.subject_id === aim.subject_id)
+        .filter((unit) => unit.subject_id === aim.subjectId)
         .map((unit) => ({
           id: unit.id,
           ordinal: unit.ordinal,
@@ -223,11 +251,11 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
             })),
         })),
     );
-    const projectPassed = projectsPassed.has(aim.subject_id);
+    const projectPassed = projectsPassed.has(aim.subjectId);
     return {
-      aimId: aim.id,
+      aimId: aim.aimId,
       name: aim.name,
-      subjectId: aim.subject_id,
+      subjectId: aim.subjectId,
       progress,
       projectPassed,
       finished: planFinished(progress, projectPassed),

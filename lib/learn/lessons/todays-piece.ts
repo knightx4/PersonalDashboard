@@ -20,7 +20,8 @@
  */
 
 export type TodaysPieceGoal = {
-  aimId: string;
+  /** Null for a prepared subject with no goal; `name` is then the subject's. */
+  aimId: string | null;
   name: string;
   subjectId: string;
   /** Units in their suggested order, with their pieces. */
@@ -34,8 +35,8 @@ export type TodaysPieceGoal = {
 };
 
 export type TodaysPieceChoice =
-  | { kind: 'piece'; aimId: string; goalName: string; subjectId: string; pieceId: string }
-  | { kind: 'no-pieces'; aimId: string; goalName: string; subjectId: string };
+  | { kind: 'piece'; aimId: string | null; goalName: string; subjectId: string; pieceId: string }
+  | { kind: 'no-pieces'; aimId: string | null; goalName: string; subjectId: string };
 
 /** The first piece of a goal not finished on Now, in the suggested order. */
 export function nextUnfinishedPiece(goal: TodaysPieceGoal): string | null {
