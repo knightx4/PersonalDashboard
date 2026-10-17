@@ -752,7 +752,7 @@ export function AppShell({
               {/* Below lg the bar is 5rem tall and its icons were the desk's
               16px in 32px buttons, too small to hit or read on a phone (note
               55df4819): there they are 20px in 40px buttons, the dock's size. */}
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5 max-lg:[&_button_[data-dash-state]]:size-5">
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
@@ -838,7 +838,9 @@ export function AppShell({
                 {/* What is left here belongs to the person, not to the workspace:
                 their theme, their feedback, their account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
-                <div className="flex shrink-0 items-center sm:gap-0.5">
+                {/* From lg up its buttons are 36px with 18px icons rather than
+                the desk's 32 and 16, so they are easier to hit (note 5c94a19a). */}
+                <div className="flex shrink-0 items-center sm:gap-0.5 lg:gap-1 lg:[&_button]:size-9 lg:[&_button_svg]:size-[18px]">
                   {/* No search or switcher here below lg: the dock's centre
                   button is both (note 5f3ef44f). From lg up the field is in
                   the bar a few inches to the left. */}
@@ -853,7 +855,7 @@ export function AppShell({
                   <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
                     <Link
                       href="/account"
-                      className="press press-area flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
+                      className="press press-area flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
                     >
                       {initial}
                       <span className="sr-only">Account</span>
