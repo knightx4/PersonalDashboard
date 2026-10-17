@@ -82,7 +82,7 @@ function wideTrack(id: string, count: number): LessonTrack {
 const weight = (value: number, stopped = false): TrackWeight => ({ weight: value, stopped });
 
 describe("a goal's outlined track (plan #1139)", () => {
-  const doneTrack = (outline?: 'written' | 'wanted'): LessonTrack => ({
+  const doneTrack = (outline?: 'written'): LessonTrack => ({
     subjectId: 's',
     name: 'S',
     units: [{ id: 'u1' }, { id: 'u2' }],
@@ -106,18 +106,15 @@ describe("a goal's outlined track (plan #1139)", () => {
     expect(planTrack(track, new Set())).toMatchObject({ kind: 'need', need: { because: 'no-chain', unitId: 'u2' } });
   });
 
-  it("asks for the outline of a goal's track that has none, in place of a next unit", () => {
+  it("asks nothing of a goal's track that was never outlined, and deals none of its lessons (plan #2302.2)", () => {
     const choice = chooseLessons({
-      tracks: [doneTrack('wanted'), { ...chainTrack('t'), outline: 'wanted' }],
+      tracks: [doneTrack(), chainTrack('t')],
       weights: new Map(),
       carded: new Set(),
       goalTracks: new Set(['s', 't']),
       slots: 2,
     });
-    expect(choice.needs).toEqual([
-      { subjectId: 's', subjectName: 'S', because: 'no-outline', unitId: 'u2' },
-      { subjectId: 't', subjectName: 'T', because: 'no-outline', unitId: 't-u1' },
-    ]);
+    expect(choice.needs).toEqual([]);
     // A goal's lessons are on its plan, not in Learn now (plan #1143).
     expect(choice.picks).toEqual([]);
   });

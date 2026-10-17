@@ -147,13 +147,8 @@ export async function loadLessonInput(
         loadGoals(supabase, subject.id, userId),
         loadCurriculum(supabase, subject.id, userId),
       ]);
-      const outline: LessonTrack['outline'] = outlined.has(subject.id)
-        ? 'written'
-        : goalTracks.has(subject.id)
-          ? 'wanted'
-          : undefined;
       const track: LessonTrack = { subjectId: subject.id, name: subject.name, units, goals, graph };
-      return outline ? { ...track, outline } : track;
+      return outlined.has(subject.id) ? { ...track, outline: 'written' as const } : track;
     }),
   );
 

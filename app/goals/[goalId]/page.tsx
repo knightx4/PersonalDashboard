@@ -46,7 +46,10 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadAimForGoal, loadLevel3Counts } from '@/lib/learn/aims-store';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { loadSubjectKind } from '@/lib/learn/goal-kind-store';
 import { loadPlans } from '@/lib/learn/lessons/plan-store';
+import { loadPreparation } from '@/lib/learn/prepare/store';
+import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
 import { progressLine } from '@/lib/learn/lessons/plan-view';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { FileLinks } from '@/components/files/file-links';
@@ -247,25 +250,42 @@ async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, 
   const aim = await loadAimForGoal(learn, goalId).catch(() => null);
   if (!aim) return null;
   const level3 = aim.listSource === 'level3';
-  const [plans, level3Counts] = await Promise.all([
+  const [plans, level3Counts, subject] = await Promise.all([
     loadPlans(learn, userId).catch(() => []),
     level3 ? loadLevel3Counts(learn).catch(() => null) : null,
+    level3 ? null : loadGoalSubject(learn, userId, aim.id).catch(() => null),
   ]);
   const plan = plans.find((p) => p.aimId === aim.id);
   return {
-    aim: {
-      id: aim.id,
-      name: aim.name,
-      depth: aim.depth,
-      level3,
-      kind: aim.kind,
-      kindReason: aim.kindReason,
-      kindBy: aim.kindBy,
-    },
+    aim: { id: aim.id, name: aim.name, depth: aim.depth, level3, subject },
     plan: plan
       ? { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress, plan.finished) }
       : null,
     level3Counts,
+  };
+}
+
+/**
+ * The subject a learning goal points at, with its kind and its preparation in
+ * one line (plan #2302.2); null while the goal points at none.
+ */
+async function loadGoalSubject(learn: LearnSupabaseClient, userId: string, aimId: string) {
+  const { data, error } = await learn.from('aims').select('subject_id').eq('id', aimId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const subjectId = (data as { subject_id: string | null } | null)?.subject_id;
+  if (!subjectId) return null;
+  const [kind, preparation] = await Promise.all([
+    loadSubjectKind(learn, subjectId),
+    loadPreparation(learn, userId, subjectId),
+  ]);
+  const view = preparationView(preparation);
+  return {
+    id: subjectId,
+    kind: kind.kind,
+    kindReason: kind.reason,
+    kindBy: kind.by,
+    preparation: preparationLine(view),
+    stopped: view.kind === 'failed',
   };
 }
 

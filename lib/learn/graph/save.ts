@@ -64,6 +64,10 @@ function fail(action: string, error: { message: string }): Error {
  * one subject, and ending up with two half-graphs of the same field is the
  * failure the spec warns about specifically.
  *
+ * `note` is written on a subject made here (a learning goal's line, plan
+ * #2302.2), so its preparation reads what the goal is about; an existing
+ * subject keeps its own.
+ *
  * `placed` says whether the subject has a placement in the areas yet. A new
  * one never has, and an old one lacks it only when placing it failed.
  */
@@ -71,6 +75,7 @@ export async function findOrCreateSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   name: string,
+  options: { note?: string | null } = {},
 ): Promise<{ id: string; created: boolean; placed: boolean }> {
   const { data, error } = await supabase
     .from('subjects')
@@ -101,7 +106,7 @@ export async function findOrCreateSubject(
 
   const { data: created, error: createError } = await supabase
     .from('subjects')
-    .insert({ user_id: userId, name })
+    .insert({ user_id: userId, name, ...(options.note?.trim() ? { note: options.note.trim() } : {}) })
     .select('id')
     .single();
 

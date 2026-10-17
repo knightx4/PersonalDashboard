@@ -24,17 +24,23 @@ export type LensScope = {
 
 /**
  * The subjects Practice Flow asks about when none is focused (plan #2302.1):
- * every subject whose preparation has finished, and every subject a goal
- * points at. Hidden survey subjects are not subjects to ask about.
+ * every subject whose preparation has finished, and every subject an open goal
+ * points at through `aims.subject_id` (plan #2302.2), which is how a goal names
+ * its subject. A hidden survey subject's `subjects.aim_id` is not followed.
  */
 export async function practiceSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
   const [prepared, goals] = await Promise.all([
     preparedSubjectIds(learn, userId),
-    learn.from('subjects').select('id').eq('user_id', userId).not('aim_id', 'is', null).eq('survey', false),
+    learn
+      .from('aims')
+      .select('subject_id')
+      .eq('user_id', userId)
+      .is('archived_at', null)
+      .not('subject_id', 'is', null),
   ]);
   if (goals.error) throw new Error(`Reading your goals' subjects failed: ${goals.error.message}`);
   const ids = new Set(prepared);
-  for (const row of (goals.data ?? []) as { id: string }[]) ids.add(row.id);
+  for (const row of (goals.data ?? []) as { subject_id: string }[]) ids.add(row.subject_id);
   return ids;
 }
 

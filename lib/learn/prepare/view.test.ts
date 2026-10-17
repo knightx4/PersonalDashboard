@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { freshSteps, type PreparationRow, type PreparationStepRow } from './run';
 import type { PreparationStepKey } from './steps';
 import { BRANCH_STEPS } from './branch';
-import { branchPreparationView, countsLine, preparationView, tookLine, unitsComeAtStep } from './view';
+import { branchPreparationView, countsLine, preparationLine, preparationView, tookLine, unitsComeAtStep } from './view';
 
 function run(patch: Partial<PreparationRow> = {}): PreparationRow {
   return {
@@ -89,6 +89,32 @@ describe('preparationView', () => {
       }),
     });
     expect(view).toEqual({ kind: 'finished', summary: 'Prepared in 7 minutes · 4 documents stored, 31 topics drafted' });
+  });
+});
+
+describe('preparationLine (plan #2302.2)', () => {
+  it('reads each shape of run as one line', () => {
+    expect(preparationLine(preparationView(null))).toBe('Not prepared yet');
+    expect(preparationLine(preparationView({ run: run({ status: 'pending', startedAt: null }), steps: freshSteps() }))).toBe(
+      'Preparing · starting in a moment',
+    );
+    expect(
+      preparationLine(
+        preparationView({
+          run: run({ currentStep: 'compile_territory' }),
+          steps: steps({ classify: { status: 'done' }, pull_documents: { status: 'done' }, match_weeks: { status: 'done' } }),
+        }),
+      ),
+    ).toBe('Preparing · step 4 of 8, Lay out the territory');
+    expect(
+      preparationLine(
+        preparationView({
+          run: run({ status: 'failed', currentStep: 'pull_documents', error: 'boom' }),
+          steps: steps({ classify: { status: 'done' }, pull_documents: { status: 'failed', error: 'boom' } }),
+        }),
+      ),
+    ).toBe('Preparation stopped · step 2 of 8, Find syllabi and other structure documents');
+    expect(preparationLine({ kind: 'finished', summary: 'Prepared in 7 minutes' })).toBe('Prepared in 7 minutes');
   });
 });
 
