@@ -1,8 +1,16 @@
 # Learn lessons: curriculum first
 
-Decided by the owner on 24 September 2026. Step 1 of the build order at the end
-is built (plan #978), and "Step 1 as built" says how it works. The other steps
-are not built yet.
+Decided by the owner on 24 September 2026. The six steps of the build order at
+the end are built, and the "as built" sections say how each works.
+
+Since plan #2313 Learn now no longer opens on a deck. A subject whose
+preparation has finished is taught through the pieces of its units: Now opens on
+today's piece, and the subject's page holds the plan ("A goal's units are split
+into pieces" onward, which holds for a prepared subject as well). The sections
+up to "Units are written as you go" describe lessons dealt as cards, which
+the top-up still does for a track with no finished preparation that is not a
+goal's. Those cards are read on Cards (`/learn/now?cards=1`,
+[LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)), not on Now.
 
 ## Why this changes
 
@@ -32,13 +40,13 @@ lesson and the place to read more.
 | Concept | One claim you can be right or wrong about, with prerequisite edges to others. | `learn.concepts`, `learn.concept_edges` |
 | Lesson | The card that teaches one concept. | `learn.feed_cards` |
 
-Learn now is the mixed feed: lessons from all your tracks, interleaved, with
-exploratory cards among them. The Tracks tab is where one track is seen on its
-own, with its units and where you stand in each.
+The dealt cards are lessons from your tracks, interleaved, with exploratory
+cards among them. A subject's page is where one subject is seen on its own,
+with its units and where you stand in each.
 
 ## What the feed deals
 
-A slot in the feed goes to one of four things:
+A slot in the deck goes to one of four things:
 
 1. **A lesson** from one of your tracks, for most slots.
 2. **An exploratory card**, one slot in five: an idea near your themes that
@@ -511,10 +519,15 @@ alone never does.
 - **Goals set on the Goals page** get a track each, since you set them on
   purpose. Their card share was one lesson slot in three until plan #1143
   moved a goal's lessons onto its plan.
-- **Idea cards already written** stay in the feed until they are used up.
-- **Hidden per-article subjects** made for idea cards are no longer made. The
-  ones that exist keep their concepts; pressing Test me on this, or Make this a
-  track, turns one into a track as today.
+- **Idea cards already written** stay on Cards until they are used up.
+- **A prepared subject** gets no cards or concept lessons from the top-up
+  (plan #2297.4). Its lessons are those of its pieces, and Now opens on the
+  next piece.
+- **Hidden subjects** are no longer made for idea cards or for survey and goal
+  questions (plan #2313.2). An idea is filed under a subject you chose, or kept
+  on the card with no concept. The hidden subjects that exist keep their
+  concepts; pressing Test me on this, or Make this a track, turns one into a
+  track as today.
 
 ## Cost
 

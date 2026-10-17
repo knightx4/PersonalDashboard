@@ -72,9 +72,10 @@ cover it? Economics yes. Philosophy yes. Machine learning yes. Science no. The
 humanities no.
 
 When a typed goal resolves to a subject you already have, it joins it. When it
-does not, the app proposes a subject and you can override it in one click.
-Nothing is auto-created silently, because the subject is the thing that
-accumulates and getting it wrong twice leaves you with two half-graphs.
+does not, saving the goal makes a subject from its name and prepares it
+(plan #2302.2), and the goal's page shows and lets you change the subject's
+kind. The subject is the thing that accumulates, so a goal never makes a
+second subject for a name you already have one under.
 
 ## The curriculum
 
@@ -82,44 +83,51 @@ Decided by the owner on 23 September 2026. A track used to be only the chains
 its goals laid out, so its shape was whatever had been asked about so far. A
 track you create now starts with a fixed curriculum.
 
-- **Written as you go.** When the first chain is approved into a new track, one
-  Sonnet call lays out the first three or four units in teaching order. Each
-  has a title, one or two sentences on what it covers, and one sentence on
-  what you can do once it is learned. The same call names the unit your first
-  question falls in, and that goal is filed under it; a question past those
-  units is filed under none. Later units are written one at a time as you
-  finish these (LEARN-LESSONS-SPEC, "Units are written as you go"; plan #969).
-  Tracks made before that keep the six to twelve units they were given.
+- **Prepared first.** A subject you add or make opens a preparation (learn
+  0167) that sorts its kind, finds syllabi and other structure documents,
+  lays out the territory of topics, drafts their checks and writes the
+  opening units from that territory. Its last step lays out unit 1, splits it
+  into pieces and writes the first piece's lessons, so the subject has
+  something to read when the run ends ([LEARN-LESSONS-SPEC](LEARN-LESSONS-SPEC.md),
+  "Units are written as you go"). Each unit has a title, one or two sentences
+  on what it covers and one on what you can do once it is learned. Later units
+  are written one at a time as you finish these, one ahead of you. Tracks made
+  before this keep the six to twelve units they were given.
+- **A goal points at a subject.** Saving a learning goal links it to the
+  subject of that name, or makes one, and the subject is prepared like any
+  other (plan #2302.2). The goal writes no outline or curriculum of its own.
 - **Fixed once written.** Nothing regenerates, reorders or edits a unit. The
-  table takes inserts and reads only, and the units go when the track is
+  table takes inserts and reads only, and the units go when the subject is
   deleted.
-- **Detail comes per unit.** Opening a unit runs the ordinary goal form with
-  the unit's title and outcome filled in, inside the track. The approved chain
-  is filed under the unit with `goals.unit_id`, and "Go deeper in this unit"
-  adds more goals to it later. This is how the graph gets more granular over
-  time without the top level moving.
-- **On the track page** the curriculum comes first. A unit reads as not
-  opened, in progress (with the ideas left across its goals), or done. The
-  first unit that is not done is marked Next. Goals asked outside the
-  curriculum are listed after it.
-- **Making a track by name.** The Tracks page leads with "Make a track": a
-  name, optionally what you want out of it, and optionally your own units,
-  one per line, up to twelve. The track and its curriculum are written at
-  once. Units you wrote are kept exactly and in your order; the model only
-  writes what each covers and its outcome, and if that call fails the units
-  are kept with their titles alone. A name you already have a track under
-  goes to that track rather than making a second one. Starting from one
-  question is still there, folded underneath.
-- **Tracks without one** (made before this, started from a Learn now card or a
-  briefing, or whose first attempt failed) show a "Write the curriculum"
-  button that makes the same call.
+- **Detail comes per unit, as pieces.** A unit opens into the pieces it was
+  split into (LEARN-LESSONS-SPEC), each with its passed mark, and the unit
+  holding the next piece is folded open. A unit not yet split says its pieces
+  are written as you reach it. No goal form stands on the page: the goal form
+  that opened a unit or went deeper in one is gone (plan #2307.2), and the
+  ideas behind a unit are reached from the concept page.
+- **On the subject page** the preparation comes first while it runs, shown as
+  the step it is on, and folds to one line when it has finished. The plan
+  follows, or the curriculum for a subject with none: units in order, the
+  first unit with an unpassed piece holding Next.
+- **Making a subject by name.** The Subjects page (`/learn/know`) leads with
+  Make a subject: a name, optionally what you want out of it, and optionally
+  your own units, one per line, up to twelve. The subject and its curriculum
+  are written at once. Units you wrote are kept exactly and in your order; the
+  model only writes what each covers and its outcome, and if that call fails
+  the units are kept with their titles alone. A name you already have a
+  subject under goes to that subject rather than making a second one.
+  Starting from one question, from what you already know, from your courses,
+  from a briefing and from a note are folded underneath.
+- **Subjects without one.** A subject whose preparation failed before the
+  units were written shows a Write the curriculum button that makes the same
+  call, and one with no preparation at all is offered Prepare instead.
 
 Tables: `learn.curriculum_units`, and `learn.goals.unit_id`. Code:
 `lib/learn/graph/curriculum.ts`, `curriculum-payload.ts`, `curriculum-store.ts`
 and `curriculum-view.ts`. Cost: one Sonnet call per track, recorded as
 `write-curriculum`.
 
-A track can be deleted from its page. Its units, ideas, states and probes go
+A subject can be deleted from its page. Its units, ideas, states and probes go
 on the cascades; readings that pointed at one of its ideas stay on their lists.
 
 ## What a concept is
@@ -379,23 +387,21 @@ about the same part of one.
 
 ## What to do next
 
-Since plan #773 there is no `/learn/next` page. Practice Flow at `/learn/flow`
-asks the claims to start and the ones worth checking again. From #773 to #805
-it also offered a queued reading under an answer; since #805 it asks questions
-and offers new tracks, and queued readings are on Learn now
-([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)). What follows describes the list as it
-was, and the ordering it used still lives in `lib/learn/next/rank.ts`.
+Since plan #773 there is no `/learn/next` page. Today's piece and the press to
+practise are on Now ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)), and Practice asks
+about levels of topics, which LEARN-LEVELS-SPEC, "Choosing the next question",
+describes. What follows describes the list as it was, and the ordering it used
+still lives in `lib/learn/next/rank.ts`.
 
-Since plan #780 the mixed flow shares its questions between tracks by weight
-(`lib/learn/flow/interest.ts`). A track's weight comes from the last four
+A subject's weight (`lib/learn/flow/interest.ts`) comes from the last four
 weeks: (answered + 1) / (skipped + Not now + 1), between a quarter and four. A
-track you answered before, and not since while answering others, weighs a
-half. Each ordinary question comes from the track furthest behind its share,
-and one in five goes to the track asked about least. Inside the track, the
-order is still nearest to a goal first. The track's page states its weight and
-the counts behind it. The same weights lean the new-track offer: a theme's
-strength is multiplied by how many notes it shares with the theme behind each
-weighted track, and with any offer you pressed Never on.
+subject you answered before, and not since while answering others, weighs a
+half. Answers on topic cells count for every subject whose lens holds the
+topic, as answers on ideas do. The subject's page states its weight and the
+counts behind it. The weights lean which subject the next lesson is chosen
+for, and the new-subject offer: a theme's strength is multiplied by how many
+notes it shares with the theme behind each weighted subject, and with any
+offer you pressed Never on.
 
 `/learn/next` answered "what is the one next thing worth learning" once, across
 every subject, instead of a subject and a goal at a time. It is read straight
@@ -547,9 +553,11 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question at whichever rung is next, the bar, and afterwards the reason or the answer that was expected |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
-| `/learn` | redirects to Now at `/learn/now` (plan #1486; Home from #1313 and Learn now from #805 until then), or to Now's practice questions on that track when the link carries `?track=` |
-| `/learn/now?practice=1` | Practice Flow, behind Now's Practice only switch since plan #1486: one question after another across every track, and a new track offered when it runs low. It was `/learn` from plan #773 to #805. Since #842 it also asks about subjects in your notes that are not tracks, unless Tracks only is set ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md), "Practice Flow"). `/learn/flow` and `/learn/home` redirect to Now with their query kept |
-| `/learn/next` | redirects to `/learn/now` (plan #1486). Its list went in plan #773: the flow asks its re-checks and Learn now holds its readings |
+| `/learn` | redirects to Now at `/learn/now` (plan #1486; Home from #1313 and Learn now from #805 until then), or to Practice on that subject when the link carries `?track=` |
+| `/learn/now` | Now: today's piece from a prepared subject, a press to practise across prepared subjects, and a rail of what is waiting and which subjects are still being prepared (plan #2313.1, [LEARN-NOW-SPEC](LEARN-NOW-SPEC.md)) |
+| `/learn/now?practice=1` | Practice, behind Now's Practice switch: one question after another about levels of topics, across every prepared subject and every goal's subject, or one subject with `?track=`. It was `/learn` from plan #773 to #805, and asked about survey and goal questions too until plan #2313.2. `/learn/flow` and `/learn/home` redirect to Now with their query kept |
+| `/learn/now?cards=1` | Cards, the deck of cards written before Now changed, until none is left |
+| `/learn/next` | redirects to `/learn/now` (plan #1486). Its list went in plan #773: Practice asks its re-checks and Now holds its readings |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one

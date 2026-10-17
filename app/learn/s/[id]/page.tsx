@@ -11,12 +11,9 @@ import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
 import { SubjectPresses, subjectDescription } from './header';
 import { loadSubjectLens } from './lens-held';
-import { GoalForm } from '@/app/learn/know/goal-form';
-import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { SectionFold } from '@/components/ui/disclosure';
 import { loadCurriculum, type StoredUnit } from '@/lib/learn/graph/curriculum-store';
-import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view';
 import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
 import { loadPlan, planOwnerFor } from '@/lib/learn/lessons/plan-store';
@@ -50,15 +47,7 @@ import {
 } from '@/lib/learn/prepare/view';
 import { loadAddedSources } from '@/lib/learn/prepare/add-source-run';
 import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
-import {
-  countStates,
-  learningOrder,
-  pruneForGoal,
-  readyNow,
-  type Graph,
-} from '@/lib/learn/graph/model';
-import { Chip } from '@/components/ui/chip';
-import { EmptyState } from '@/components/ui/empty-state';
+import { countStates } from '@/lib/learn/graph/model';
 import { PageColumn } from '@/components/shell/page-width';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
@@ -73,99 +62,36 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * One subject: its goals, and the chain still standing between you and each.
+ * One subject: its units and their pieces (plan #2307.2).
  *
- * The pruned view is the default and the whole graph is behind ?all=1, because
- * the pruned one is the useful one and the full one is what you want when you
- * suspect something is missing. It is a link rather than a control because the
- * page holds no state of its own -- the graph is the state.
+ * A subject with a plan lists its units in the Plan section, each unit's
+ * pieces folded open on the one holding the next piece, and a unit not yet
+ * split says its pieces are written as you reach it. One without a plan lists
+ * its units as a curriculum with the same line. No goal form and no section of
+ * the claims graph stands here: a concept is reached from its own page.
  *
- * The track's curriculum leads (LEARN-GRAPH-SPEC, "The curriculum"): a fixed
- * list of units, written once when the track was made. Each unit is opened on
- * its own, which lays out its chain of ideas as a goal filed under it, and a
- * chain is shown inside the unit it belongs to. Goals asked outside the
- * curriculum come after it.
+ * Below the plan, the readings related to the subject from any list and the
+ * conversations logged about it (plan #1814).
  *
- * Below the goals, the readings related to the subject from any list and
- * the conversations logged about it (plan #1814), apart from the graph
- * because neither says what you know.
- *
- * Writes from here: opening a unit or naming another goal, which saves nothing
- * until the chain is approved; writing a curriculum for a track that has
- * none; deleting the track; finding YouTube channels for it and unfollowing
- * one (the owner only); and naming Wikipedia articles at the foot of the
- * page, which stores them in the shared catalogue.
- *
- * Four states and three ways of establishing them, and the screen shows both.
- * "You told me you knew this" and "you answered three questions on it" are
- * different claims, and a page that rendered them identically would be
- * overstating one of them every time.
+ * Writes from here: writing a curriculum for a track that has none; deleting
+ * the track; finding YouTube channels for it and unfollowing one (the owner
+ * only); and naming Wikipedia articles at the foot of the page, which stores
+ * them in the shared catalogue.
  */
 
-function GoalSection({
-  graph,
-  goalName,
-  conceptId,
-  subjectId,
-  timezone,
-}: {
-  graph: Graph;
-  goalName: string;
-  conceptId: string;
-  subjectId: string;
-  timezone: string;
-}) {
-  const kept = pruneForGoal(graph, conceptId);
-  const chain = learningOrder(graph, kept);
-  const next = readyNow(graph, kept)[0] ?? null;
-
-  return (
-    <section className="mt-6">
-      <h2 className="mb-2 text-ui font-semibold text-ink-muted">{goalName}</h2>
-
-      {chain.length === 0 ? (
-        <EmptyState size="box" title="Nothing left standing between you and this one." />
-      ) : (
-        <>
-          <p className="mb-2 text-ui text-ink-muted">
-            {chain.length === 1
-              ? 'One thing left, in the order it would be learned.'
-              : `${chain.length} things left, in the order they would be learned. What you already know is not shown.`}
-          </p>
-          <ConceptList
-            concepts={chain}
-            nextId={next?.id ?? null}
-            subjectId={subjectId}
-            timezone={timezone}
-          />
-        </>
-      )}
-    </section>
-  );
-}
-
-const UNIT_STATE: Record<UnitRow<StoredUnit>['state'], string> = {
-  'not-opened': 'Not opened',
-  'in-progress': 'In progress',
-  done: 'Done',
-};
-
-/** One unit of the curriculum: what it covers, and its chain once opened. */
+/** One unit of the curriculum on a subject with no plan: what it covers, and its pieces. */
 function UnitSection({
   row,
-  graph,
   subjectId,
-  timezone,
   pieces,
 }: {
   row: UnitRow<StoredUnit>;
-  graph: Graph;
   subjectId: string;
-  timezone: string;
-  /** The unit's pieces, on a learning goal's track once they are written (plan #1140). */
+  /** The unit's pieces, once they are written (plan #1140). */
   pieces: readonly PieceSibling[];
 }) {
   const { unit } = row;
+  const passed = pieces.filter((piece) => piece.passed).length;
   return (
     <li className="card-pad">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -173,18 +99,11 @@ function UnitSection({
           <span className="mr-1.5 text-ink-muted tabular-nums">{unit.ordinal}.</span>
           {unit.title}
         </h3>
-        <span className="flex items-baseline gap-2 text-small">
-          {row.next && (
-            <Chip tone="accent">
-              Next
-            </Chip>
-          )}
-          <span className="text-ink-muted">
-            {row.state === 'in-progress'
-              ? `${row.left} ${row.left === 1 ? 'idea' : 'ideas'} left`
-              : UNIT_STATE[row.state]}
+        {pieces.length > 0 && (
+          <span className="text-small text-ink-muted tabular-nums">
+            {passed === pieces.length ? 'Done' : `${passed} of ${pieces.length} passed`}
           </span>
-        </span>
+        )}
       </div>
       {unit.covers && <p className="mt-1 text-ui text-ink-muted">{unit.covers}</p>}
       {unit.outcome && (
@@ -195,7 +114,7 @@ function UnitSection({
       )}
 
       {/* Each piece opens on its own page, in any order (plan #1141). */}
-      {pieces.length > 0 && (
+      {pieces.length > 0 ? (
         <ol className="mt-2 space-y-1">
           {pieces.map((piece) => (
             <li key={piece.id} className="flex items-baseline gap-2 text-ui">
@@ -207,30 +126,8 @@ function UnitSection({
             </li>
           ))}
         </ol>
-      )}
-
-      {row.state === 'not-opened' ? (
-        // Opening a unit is the same goal form, pointed at the unit: its words
-        // are filled in, and the chain it lays out is filed under the unit.
-        <SectionFold title="Open this unit" defaultOpen={false} className="mt-2">
-          <GoalForm subjectId={subjectId} unitId={unit.id} goal={unitGoal(unit)} bare />
-        </SectionFold>
       ) : (
-        <SectionFold title="The ideas in this unit" defaultOpen={row.next} className="mt-2">
-          {row.goals.map((goal) => (
-            <GoalSection
-              key={goal.id}
-              graph={graph}
-              goalName={goal.asked}
-              conceptId={goal.conceptId!}
-              subjectId={subjectId}
-              timezone={timezone}
-            />
-          ))}
-          <SectionFold title="Go deeper in this unit" defaultOpen={false} className="mt-4">
-            <GoalForm subjectId={subjectId} unitId={unit.id} bare />
-          </SectionFold>
-        </SectionFold>
+        <p className="mt-2 text-ui text-ink-muted">Its pieces are written as you reach it.</p>
       )}
     </li>
   );
@@ -269,11 +166,10 @@ export default async function SubjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ all?: string; known?: string; shaky?: string; unmatched?: string }>;
+  searchParams: Promise<{ known?: string; shaky?: string; unmatched?: string }>;
 }) {
   const { id } = await params;
-  const { all, known, shaky, unmatched } = await searchParams;
-  const showEverything = all === '1';
+  const { known, shaky, unmatched } = await searchParams;
   const seeded = seededLine(known, shaky, unmatched);
 
   const user = await requireUser();
@@ -332,7 +228,7 @@ export default async function SubjectPage({
     ? await loadSubjectChannels(supabase, user.id, id).catch(() => ({ channels: [], kept: new Set<string>() }))
     : null;
   const counts = countStates(graph);
-  const { rows: unitRows, outside } = curriculumRows(units, goals, graph);
+  const { rows: unitRows } = curriculumRows(units, goals, graph);
   // Where a finished preparation says to start, and what it came from (plan
   // #2276.6). The topic is read as it stands, since it is approved after the
   // run; one that cannot be read leaves the name the run recorded.
@@ -345,7 +241,7 @@ export default async function SubjectPage({
   // The first lesson Start here opens: the first piece not passed. A subject
   // whose pieces cannot be read, or has none, keeps the practice press.
   const startPieces =
-    sources && !showEverything
+    sources
       ? await loadPlacementPieces(supabase, user.id, id).catch(() => null)
       : null;
   const startPiece = startPieces ? firstNotHeld(startPieces) : null;
@@ -368,11 +264,6 @@ export default async function SubjectPage({
     return view ? [view] : [];
   });
   const comingAt = units.length === 0 && preparation ? unitsComeAtStep(preparationView(preparation)) : null;
-  const live =
-    units.length > 0
-      ? outside
-      : goals.filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null);
-
   return (
     <PageColumn>
 
@@ -382,14 +273,6 @@ export default async function SubjectPage({
         description={subjectDescription(held, counts)}
         actions={
           <>
-            {counts.total > 0 && (
-              <Link
-                href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
-                className="text-ui text-ink-muted hover:text-ink"
-              >
-                {showEverything ? 'Show what is left' : 'Show the whole graph'}
-              </Link>
-            )}
             <SubjectPresses id={id} lensId={lensId} owner={owner} />
             <ConfirmStep
               action={deleteSubject}
@@ -435,10 +318,10 @@ export default async function SubjectPage({
           is finished it is one line (plan #2276.2). */}
       {/* Finished, it gives way to the Start here card, and its line opens
           the Sources section under the curriculum (plan #2276.6). */}
-      {preparation !== undefined && !showEverything && !sources && (
+      {preparation !== undefined && !sources && (
         <PreparationBlock subjectId={id} view={preparationView(preparation)} />
       )}
-      {sources && showStart && !showEverything && (
+      {sources && showStart && (
         <StartHere
           unit={firstRow ? { ordinal: firstRow.unit.ordinal, title: firstRow.unit.title, covers: firstRow.unit.covers } : null}
           topic={startTopic}
@@ -448,13 +331,12 @@ export default async function SubjectPage({
           lessonPending={startPieces !== null && startPieces.length === 0}
         />
       )}
-      {!showEverything &&
-        branchRuns.map((b) => (
+      {branchRuns.map((b) => (
           <PreparationBlock key={b.key} subjectId={id} view={b.view} branch={{ key: b.key, name: b.name }} />
         ))}
-      {offer && !showEverything && <DirectionOffer subjectId={id} offer={offer} />}
+      {offer && <DirectionOffer subjectId={id} offer={offer} />}
 
-      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
+      {plan && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
       {units.length === 0 ? (
         // While the run is going its write_units step writes them (plan
@@ -466,111 +348,25 @@ export default async function SubjectPage({
           offersWriteCurriculum(preparation) && <WriteCurriculum subjectId={id} />
         )
       ) : (
-        !showEverything &&
-        (plan ? (
-          // The plan lists the pieces; the ideas behind each unit stay a fold
-          // away, with the forms that open a unit or go deeper in one.
-          <SectionFold title="The ideas behind each unit" defaultOpen={false} className="mb-6">
-            <ol className={cn(cardVariants(), 'divide-y divide-border')}>
-              {unitRows.map((row) => (
-                <UnitSection
-                  key={row.unit.id}
-                  row={row}
-                  graph={graph}
-                  subjectId={id}
-                  timezone={settings.timezone}
-                  pieces={[]}
-                />
-              ))}
-            </ol>
-          </SectionFold>
-        ) : (
+        // A subject with a plan lists its units and their pieces in the Plan
+        // section above; one without lists the units here (plan #2307.2).
+        !plan && (
           <section className="mb-6">
-            <h2 className="mb-2 text-ui font-semibold text-ink-muted">
-              Curriculum · {unitRows.filter((row) => row.state === 'done').length} of{' '}
-              {unitRows.length} units done
-            </h2>
+            <h2 className="mb-2 text-ui font-semibold text-ink-muted">Curriculum</h2>
             <ol className={cn(cardVariants(), 'divide-y divide-border')}>
               {unitRows.map((row) => (
-                <UnitSection
-                  key={row.unit.id}
-                  row={row}
-                  graph={graph}
-                  subjectId={id}
-                  timezone={settings.timezone}
-                  pieces={pieces.get(row.unit.id) ?? []}
-                />
+                <UnitSection key={row.unit.id} row={row} subjectId={id} pieces={pieces.get(row.unit.id) ?? []} />
               ))}
             </ol>
-          </section>
-        ))
-      )}
-
-      {units.length > 0 && !showEverything ? (
-        live.length > 0 && (
-          <section className="mt-2">
-            <h2 className="text-ui font-semibold text-ink-muted">Asked outside the curriculum</h2>
-            {live.map((goal) => (
-              <GoalSection
-                key={goal.id}
-                graph={graph}
-                goalName={goal.asked}
-                conceptId={goal.conceptId!}
-                subjectId={id}
-                timezone={settings.timezone}
-              />
-            ))}
           </section>
         )
-      ) : counts.total === 0 ? (
-        <EmptyState
-          size="box"
-          title="No ideas in this subject yet."
-          description="An idea is one thing you can be right or wrong about, not a heading."
-        />
-      ) : showEverything ? (
-        <>
-          <p className="mb-2 text-ui text-ink-muted">
-            Everything in this subject, prerequisites first, including what you already know.
-          </p>
-          <ConceptList
-            concepts={learningOrder(
-              graph,
-              graph.concepts.map((concept) => concept.id),
-            )}
-            nextId={null}
-            subjectId={id}
-            timezone={settings.timezone}
-          />
-        </>
-      ) : live.length === 0 ? (
-        <EmptyState
-          size="box"
-          title="No goals in this subject yet."
-          description="A goal is what you actually want to understand, and the chain leading to it is what gets shown here."
-        />
-      ) : (
-        live.map((goal) => (
-          <GoalSection
-            key={goal.id}
-            graph={graph}
-            goalName={goal.asked}
-            conceptId={goal.conceptId!}
-            subjectId={id}
-            timezone={settings.timezone}
-          />
-        ))
       )}
 
-      {sourceList && !showEverything && (
+      {sourceList && (
         <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} />
       )}
       {/* One press feeds the bank the preparation reads (plan #2307.4). */}
-      {!showEverything && <AddSource subjectId={id} />}
-
-      {/* A second goal in a subject you already have is the cheap case: the
-          generator is told what is here and proposes only what is missing. */}
-      <GoalForm subjectId={subject.id} />
+      <AddSource subjectId={id} />
 
       <ChatLearningSection learning={learning} timezone={settings.timezone} />
 
