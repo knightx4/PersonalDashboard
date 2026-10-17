@@ -257,7 +257,7 @@ describe('a subject\'s preparation run (plan #2276.1)', () => {
       insert into subjects (user_id, name) values (${userA}, 'Urban economics') returning id`;
   });
 
-  it('opens a run with its seven steps when a subject is made', async () => {
+  it('opens a run with its eight steps when a subject is made', async () => {
     const runs = await admin<{ id: string; status: string }[]>`
       select id, status from subject_preparations where subject_id = ${subjectA}`;
     expect(runs).toHaveLength(1);
@@ -265,7 +265,7 @@ describe('a subject\'s preparation run (plan #2276.1)', () => {
     const steps = await admin<{ key: string }[]>`
       select key from subject_preparation_steps where preparation_id = ${runs[0].id} order by ordinal`;
     expect(steps.map((s) => s.key)).toEqual([
-      'classify', 'pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'write_units', 'finish',
+      'classify', 'pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'write_units', 'finish', 'first_lesson',
     ]);
   });
 
