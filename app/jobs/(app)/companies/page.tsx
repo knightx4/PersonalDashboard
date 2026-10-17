@@ -1,4 +1,4 @@
-import { AimButton } from '@/components/shell/aim-button';
+import { AddCompany } from './add-company';
 import { Building2 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -136,8 +136,9 @@ export default async function CompaniesPage({
           icon={Building2}
           title="No companies yet"
           description="A company appears here the moment you add a role at it. You can also add a few up front so inbound mail has something to match against on the first inbox scan."
-          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
-        />
+        >
+          <AddCompany variant="secondary" />
+        </EmptyState>
       </PageWide>
     );
   }
@@ -155,7 +156,7 @@ export default async function CompaniesPage({
         actions={
           <>
             <DisplayMenu menu={menu} />
-            <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
+            <AddCompany />
           </>
         }
       />
@@ -196,7 +197,7 @@ export default async function CompaniesPage({
 
         <div className="min-w-0 flex-1">
           {/* Directly above the table it narrows, like every other list in the
-              app. It sat in the header row beside Add a role until now. The
+              app. It sat in the header row beside the Add press until now. The
               priority and pursuing rails, the sort, the grouping and the
               hidden columns are all on the URL and the field carries them, so
               searching from a narrowed table stays narrowed. */}
