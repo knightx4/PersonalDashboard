@@ -17,6 +17,7 @@ export const jobsActions: ModuleActions = {
     mergeRoles: tool('merge_roles'),
     mergeCompanies: none('deletes', 'Folds one company into another and deletes the emptied row, which nothing can put back.'),
     addCompany: tool('add_job_lead', 'add_discovered_company'),
+    startCompanyResearch: none('spends', 'Starts a research routine that reads for half an hour; Dash in a conversation can search and read for the person directly.'),
   },
   'app/jobs/(app)/_home/actions.ts': {
     completeReminder: tool('change_reminder'),

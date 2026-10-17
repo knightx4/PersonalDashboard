@@ -182,7 +182,7 @@ function ResearchWriteUp({ research }: { research: CompanyResearch }) {
                         className={cn(linkVariants(), 'press-area inline-flex items-baseline gap-1')}
                       >
                         {source.title}
-                        <ExternalLink aria-hidden className="size-3 shrink-0 self-center" />
+                        <ExternalLink aria-hidden strokeWidth={1.75} className="size-3 shrink-0 self-center" />
                       </a>
                       {(source.publisher || source.publishedOn) && (
                         <span className="text-small text-ink-muted">
