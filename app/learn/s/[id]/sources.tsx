@@ -18,8 +18,9 @@ import type { SubjectReading } from '@/lib/learn/chat/subject-load';
  * What a finished preparation leaves on the subject's page (plan #2276.6).
  *
  * StartHere leads the page in place of the folded preparation line: the first
- * unit, the first topic at level 1, and one press into Practice Flow on that
- * level. A topic still a draft cannot be asked about, so until it is
+ * unit, the first topic at level 1, and the first lesson to open (plan #2292.3)
+ * with a placement run beside it; Practice Flow on level 1 stays as a quiet
+ * link, and is the primary press while the unit has no piece to open. A topic still a draft cannot be asked about, so until it is
  * approved the press opens the topic to approve it.
  *
  * SourcesSection sits under the curriculum: the preparation's line, every
@@ -42,16 +43,27 @@ const READINGS_SHOWN = 5;
 
 export type StartUnit = { ordinal: number; title: string; covers: string | null };
 
+/** The first piece not passed, where Start here opens (plan #2292.3). */
+export type StartLesson = { pieceId: string; title: string };
+
 export function StartHere({
   unit,
   topic,
   draftedName,
+  subjectId,
+  lesson = null,
+  lessonPending = false,
 }: {
   unit: StartUnit | null;
   /** The first topic as it stands now; null when it could not be read. */
   topic: StartTopicNow | null;
   /** The topic's name as the run recorded it, for when it could not be read. */
   draftedName: string | null;
+  subjectId?: string;
+  /** The first piece not passed; null when the unit has none or all are passed. */
+  lesson?: StartLesson | null;
+  /** The first unit has no pieces yet, because laying it out failed. */
+  lessonPending?: boolean;
 }) {
   const name = topic?.name ?? draftedName;
   if (!unit && !name) return null;
@@ -81,25 +93,57 @@ export function StartHere({
           </div>
         )}
       </dl>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        {practise ? (
-          <Link href={practise} className={buttonVariants({ variant: 'primary' })}>
-            Practice level 1
-          </Link>
-        ) : (
-          topic && (
-            <>
-              <Link href={`/learn/topics/${topic.id}`} className={buttonVariants({ variant: 'primary' })}>
-                Approve the topic to practice it
+      {lesson && subjectId ? (
+        <>
+          <p className="mt-3 text-ui text-ink-muted">
+            First lesson: <span className="font-semibold text-ink">{lesson.title}</span>
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Link href={`/learn/s/${subjectId}/p/${lesson.pieceId}`} className={buttonVariants({ variant: 'primary' })}>
+              Start the first lesson
+            </Link>
+            <Link href={practiceHref({ track: subjectId, placement: true })} className={buttonVariants({ variant: 'secondary' })}>
+              Place me first
+            </Link>
+            <span className="text-small text-ink-muted">About ten minutes, skip any time</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {practise && (
+              <Link href={practise} className={cn(linkVariants({ tone: 'quiet' }), '-my-3 inline-block py-3 text-ui')}>
+                Practice level 1 instead
               </Link>
-              <span className="text-small text-ink-muted">Its checks are drafts until you approve them.</span>
-            </>
-          )
-        )}
-        <a href={`#${SOURCES_ID}`} className={cn(linkVariants({ tone: 'quiet' }), '-my-3 inline-block py-3 text-ui')}>
-          Where this came from
-        </a>
-      </div>
+            )}
+            <a href={`#${SOURCES_ID}`} className={cn(linkVariants({ tone: 'quiet' }), '-my-3 inline-block py-3 text-ui')}>
+              Where this came from
+            </a>
+          </div>
+        </>
+      ) : (
+        <>
+          {lessonPending && (
+            <p className="mt-3 text-ui text-ink-muted">The first lesson is being written. Dash will add it here.</p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {practise ? (
+              <Link href={practise} className={buttonVariants({ variant: 'primary' })}>
+                Practice level 1
+              </Link>
+            ) : (
+              topic && (
+                <>
+                  <Link href={`/learn/topics/${topic.id}`} className={buttonVariants({ variant: 'primary' })}>
+                    Approve the topic to practice it
+                  </Link>
+                  <span className="text-small text-ink-muted">Its checks are drafts until you approve them.</span>
+                </>
+              )
+            )}
+            <a href={`#${SOURCES_ID}`} className={cn(linkVariants({ tone: 'quiet' }), '-my-3 inline-block py-3 text-ui')}>
+              Where this came from
+            </a>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

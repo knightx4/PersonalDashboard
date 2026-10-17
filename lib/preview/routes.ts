@@ -577,6 +577,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-finished': ['/learn/s/[id]'],
   'learn-subject-prepare-empty': ['/learn/s/[id]'],
   'learn-subject-prepare-start': ['/learn/s/[id]'],
+  'learn-subject-prepare-start-pending': ['/learn/s/[id]'],
   'learn-subject-prepare-sources-empty': ['/learn/s/[id]'],
   'learn-subject-prepare-sources-folded': ['/learn/s/[id]'],
   'learn-subject-prepare-direction': ['/learn/s/[id]'],
@@ -638,6 +639,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-empty': ['app/learn/s/[id]/prepare.tsx'],
   // What a finished preparation leaves (plan #2276.6): Start here and Sources.
   'learn-subject-prepare-start': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-prepare-start-pending': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-empty': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-folded': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-direction': ['app/learn/s/[id]/direction.tsx'],

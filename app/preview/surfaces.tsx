@@ -270,6 +270,7 @@ import {
   LearnSubjectPrepareSourcesFoldedSurface,
   LearnSubjectPrepareStartingSurface,
   LearnSubjectPrepareStartSurface,
+  LearnSubjectPrepareStartPendingSurface,
   LearnSubjectPrepareSurface,
 } from './learn-prepare-surfaces';
 import {
@@ -9273,6 +9274,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareStartSurface />,
+  },
+  {
+    id: 'learn-subject-prepare-start-pending',
+    label: 'Subject · Start here, first lesson still being written',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectPrepareStartPendingSurface />,
   },
   {
     id: 'learn-subject-prepare-sources-empty',

@@ -320,9 +320,27 @@ export function LearnSubjectPrepareStartSurface() {
         unit={UNIT}
         topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: true, cellId: '00000000-0000-4000-8000-00000000f276' }}
         draftedName="Monthly recurring revenue"
+        subjectId={SUBJECT_ID}
+        lesson={{ pieceId: '00000000-0000-4000-8000-00000000f277', title: 'What counts as recurring revenue, and what does not' }}
       />
       <Curriculum />
       <SourcesSection live={false} subjectId={SUBJECT_ID} sources={finishedSources(FINISH_DETAIL)} readings={READINGS} />
+    </div>
+  );
+}
+
+/** The first unit has no pieces yet: the practice press leads, and the card says the lesson is being written. */
+export function LearnSubjectPrepareStartPendingSurface() {
+  return (
+    <div>
+      <StartHere
+        unit={UNIT}
+        topic={{ id: START_TOPIC_ID, name: 'Monthly recurring revenue', approved: true, cellId: '00000000-0000-4000-8000-00000000f276' }}
+        draftedName="Monthly recurring revenue"
+        subjectId={SUBJECT_ID}
+        lessonPending
+      />
+      <Curriculum />
     </div>
   );
 }
