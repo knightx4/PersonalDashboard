@@ -1,5 +1,7 @@
 import type { CellEvidence } from '@/lib/learn/levels/model';
+import type { GoalOnMap, GoalStar } from '@/lib/learn/map/goals';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
+import type { StrengthInput } from '@/lib/learn/strength';
 import type { SkyTerritory, TerritoryLinkIn, TerritoryStanding, TerritoryTopicIn } from '@/lib/learn/map/place-graph';
 import type { GoalLevels } from '@/lib/learn/map/panels';
 import { domainSlot } from '@/lib/learn/map/view';
@@ -16,13 +18,12 @@ import { domainSlot } from '@/lib/learn/map/view';
 export const TERRITORY_GOAL = 'lens-saas';
 /** The topic the territory is opened on in the gallery. */
 export const TERRITORY_OPEN = 'tp-nrr';
-/** The topic held pointed at in the hover shot: the one with the most links. */
-export const TERRITORY_POINTED = 'tp-unit';
+/** The topic held pointed at in the hover shot: the one most others need, tested and held apart. */
+export const TERRITORY_POINTED = 'tp-arr';
 
 type Seed = Omit<TerritoryTopicIn, 'slot' | 'pca' | 'neighbourMap' | 'ideaIds'> & {
   /** Offset from the business field, in layout units. */
   d: { x: number; y: number };
-  ideas: string[];
 };
 
 const SEEDS: Seed[] = [
@@ -35,7 +36,6 @@ const SEEDS: Seed[] = [
     target: 6,
     missed: [],
     d: { x: -0.12, y: -0.04 },
-    ideas: ['Annual recurring revenue', 'The rule of 40'],
   },
   {
     id: 'tp-churn',
@@ -46,7 +46,6 @@ const SEEDS: Seed[] = [
     target: 6,
     missed: [4],
     d: { x: 0.1, y: -0.08 },
-    ideas: ['Churn compounds monthly', 'Cohort analysis of retention'],
   },
   {
     id: 'tp-nrr',
@@ -57,7 +56,6 @@ const SEEDS: Seed[] = [
     target: 5,
     missed: [],
     d: { x: 0, y: 0.06 },
-    ideas: ['Net revenue retention above 100%', 'Annual recurring revenue', 'Cohort analysis of retention'],
   },
   {
     id: 'tp-cac',
@@ -68,7 +66,6 @@ const SEEDS: Seed[] = [
     target: 5,
     missed: [],
     d: { x: 0.18, y: 0.1 },
-    ideas: ['Customer acquisition cost payback', 'Lifetime value to CAC ratio'],
   },
   {
     id: 'tp-ltv',
@@ -79,7 +76,6 @@ const SEEDS: Seed[] = [
     target: 5,
     missed: [],
     d: { x: 0.08, y: 0.16 },
-    ideas: ['Lifetime value to CAC ratio', 'Churn compounds monthly', 'Contribution margin per unit'],
   },
   {
     id: 'tp-unit',
@@ -90,7 +86,6 @@ const SEEDS: Seed[] = [
     target: 4,
     missed: [],
     d: { x: 0.14, y: 0.24 },
-    ideas: ['Contribution margin per unit', 'Lifetime value to CAC ratio', 'Customer acquisition cost payback'],
   },
   {
     id: 'tp-margin',
@@ -101,7 +96,6 @@ const SEEDS: Seed[] = [
     target: 4,
     missed: [],
     d: { x: -0.06, y: 0.2 },
-    ideas: ['Gross margin of a software business', 'Contribution margin per unit'],
   },
   {
     id: 'tp-rule40',
@@ -112,7 +106,6 @@ const SEEDS: Seed[] = [
     target: 3,
     missed: [],
     d: { x: -0.2, y: 0.12 },
-    ideas: ['The rule of 40', 'Burn multiple'],
   },
   {
     id: 'tp-burn',
@@ -123,7 +116,6 @@ const SEEDS: Seed[] = [
     target: null,
     missed: [],
     d: { x: -0.24, y: -0.02 },
-    ideas: ['Burn multiple', 'Working capital ties up cash'],
   },
 ];
 
@@ -198,15 +190,113 @@ const cellId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, 
 /** Where the business field sits in each layout (idea-space-surfaces.tsx FIELDS). */
 const FIELD = { neighbourMap: { x: -0.1, y: 0.7 }, pca: { x: 0.05, y: 0.45 } };
 
-export function territoryFixture(ideas: readonly IdeaOnMap[]): SkyTerritory {
-  const byName = new Map(ideas.map((idea) => [idea.name, idea.id]));
-  const slot = domainSlot('Social sciences');
-  const topics: TerritoryTopicIn[] = SEEDS.map(({ d, ideas: names, ...seed }) => ({
-    ...seed,
-    slot,
+const SUBJECT = 'Read a SaaS company’s numbers';
+
+function placed(d: { x: number; y: number }) {
+  return {
     neighbourMap: { x: FIELD.neighbourMap.x + d.x, y: FIELD.neighbourMap.y - d.y },
     pca: { x: FIELD.pca.x + d.x * 0.8, y: FIELD.pca.y - d.y * 0.8 },
-    ideaIds: names.map((name) => byName.get(name)).filter((id): id is string => id !== undefined),
+  };
+}
+
+/** The claims-graph ideas attached to some of the territory's topics, as the card lists them. */
+const IDEAS_UNDER: Record<string, string[]> = {
+  'tp-arr': ['Annual recurring revenue is twelve times the monthly run rate', 'One-off fees are left out of recurring revenue'],
+  'tp-churn': ['Churn compounds monthly', 'A cohort chart shows churn by the month customers joined'],
+  'tp-nrr': [
+    'Net revenue retention above 100% means the base grows without new customers',
+    'Expansion revenue can hide logo churn',
+    'NRR is measured over a twelve-month cohort',
+  ],
+  'tp-cac': ['CAC payback is months of gross margin per customer won'],
+  'tp-margin': ['Software gross margin is high because copies cost almost nothing'],
+};
+
+/**
+ * The territory's topics as stars on the sky (plan #2317.2): each lit from
+ * its ladder as the loader lights it, with the ideas of IDEAS_UNDER under
+ * it. Strength, haze and the halo are left for the fixture to work out with
+ * the rest of the sky; neighbours too.
+ */
+export function territoryStars(): IdeaOnMap[] {
+  const since = new Map(STANDING.map(([topicId, , , daysAgo]) => [topicId, new Date(TODAY - daysAgo * DAY_MS).toISOString()]));
+  return SEEDS.map((seed) => {
+    const at = since.get(seed.id) ?? new Date(TODAY - 20 * DAY_MS).toISOString();
+    const share = Math.max(seed.tested, seed.held) / seed.ceiling;
+    const state = share >= 0.85 ? 'sharp' : share >= 0.5 ? 'known' : share > 0 ? 'recognised' : 'unknown';
+    const stateRow: StrengthInput | null =
+      seed.tested > 0
+        ? { state, established: 'tested', tested_at: at, declared_at: null, review_interval_days: null }
+        : seed.held > 0
+          ? { state, established: 'inferred', tested_at: null, declared_at: at, review_interval_days: null }
+          : null;
+    return {
+      id: seed.id,
+      name: seed.name,
+      claim: `${seed.name}: what the topic covers, as the preparation scoped it, in a sentence or two.`,
+      state,
+      stateRow,
+      strength: 0,
+      haze: 0,
+      exposure: 0,
+      placeId: TERRITORY_GOAL,
+      createdAt: new Date(TODAY - 60 * DAY_MS).toISOString(),
+      evidence: [],
+      ...placed(seed.d),
+      neighbours: [],
+      track: { id: TERRITORY_GOAL, name: SUBJECT },
+      field: { id: 'f-business', name: 'Business and management' },
+      domain: { id: 'social', name: 'Social sciences' },
+      levels: { tested: seed.tested, held: Math.max(seed.held, seed.tested), ceiling: seed.ceiling },
+      ideasUnder: (IDEAS_UNDER[seed.id] ?? []).map((name, i) => ({ id: `${seed.id}-idea-${i}`, name })),
+    };
+  });
+}
+
+/** The territory as the subjects card lists it, with the goal that reads it. */
+export function territoryGoal(): GoalOnMap {
+  const stars: GoalStar[] = SEEDS.flatMap((seed) =>
+    seed.target === null
+      ? []
+      : [{ topicId: seed.id, name: seed.name, targetLevel: seed.target, level: seed.held, ...placed(seed.d) }],
+  );
+  const held = SEEDS.reduce((n, s) => n + (s.target === null ? 0 : Math.min(s.held, s.target)), 0);
+  const total = SEEDS.reduce((n, s) => n + (s.target ?? 0), 0);
+  const on = new Set(stars.map((s) => s.topicId));
+  const seen = new Set<string>();
+  const links = LINKS.flatMap(([a, , b]) => {
+    const key = [a, b].sort().join('|');
+    if (!on.has(a) || !on.has(b) || seen.has(key)) return [];
+    seen.add(key);
+    return [{ from: a, to: b }];
+  });
+  return {
+    id: TERRITORY_GOAL,
+    name: SUBJECT,
+    goalNames: ['Move into strategy and operations at a SaaS company'],
+    line: `${SEEDS.length} topics · ${held} of ${total} levels held`,
+    held,
+    total,
+    next: 'Next: Churn and retention at level 4, work out a case with it',
+    stars,
+    links,
+  };
+}
+
+export function territoryFixture(): SkyTerritory {
+  const slot = domainSlot('Social sciences');
+  // The ideas under each topic are listed in its card, never drawn round the edge (plan #2317.2).
+  const topics: TerritoryTopicIn[] = SEEDS.map((s) => ({
+    id: s.id,
+    name: s.name,
+    ceiling: s.ceiling,
+    tested: s.tested,
+    held: s.held,
+    target: s.target,
+    missed: s.missed,
+    slot,
+    ...placed(s.d),
+    ideaIds: [],
   }));
   const links: TerritoryLinkIn[] = LINKS.map(([a, at, b, needs]) => ({
     requiringTopicId: a,
@@ -236,7 +326,7 @@ export function territoryFixture(ideas: readonly IdeaOnMap[]): SkyTerritory {
       via,
     };
   });
-  return { id: TERRITORY_GOAL, name: 'Read a SaaS company’s numbers', topics, links, ready, standing };
+  return { id: TERRITORY_GOAL, name: SUBJECT, topics, links, ready, standing };
 }
 
 /**
@@ -282,7 +372,7 @@ export function territoryLevels(asOf: string, options: { thin?: boolean } = {}):
     lenses: [
       {
         id: TERRITORY_GOAL,
-        name: 'Read a SaaS company’s numbers',
+        name: SUBJECT,
         targets: SEEDS.flatMap((seed) => (seed.target === null ? [] : [{ topicId: seed.id, targetLevel: seed.target }])),
       },
     ],

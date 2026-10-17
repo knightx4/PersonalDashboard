@@ -26,7 +26,9 @@ import { KIND_WORDS } from '@/lib/learn/evidence/kinds';
 import { practiceHref } from '@/lib/learn/flow/href';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 import type { Layers } from '@/lib/learn/map/layers';
-import type { SkyTerritory, TerritoryStanding } from '@/lib/learn/map/place-graph';
+import { readableName, type SkyTerritory, type TerritoryStanding } from '@/lib/learn/map/place-graph';
+import { levelsText } from '@/lib/learn/map/topic-stars';
+import { countText } from '@/lib/learn/map/view';
 import { dueText, answerLine, quoteLabel, requirementsOf, standingText } from '@/lib/learn/map/why';
 
 /**
@@ -65,9 +67,9 @@ export function LayerSwitch({
   return (
     <fieldset className={className}>
       <legend className="text-ui font-semibold text-ink">On the sky</legend>
-      {row('answers', 'Answers', 'Brightness, and the levels held in a goal')}
+      {row('answers', 'Answers', 'Brightness, and the levels held in a subject')}
       {row('courses', 'Courses and work', 'A pale ring')}
-      {row('writing', 'Writing', 'A pale ring, and the dust of your notes')}
+      {row('writing', 'Writing', 'A pale ring')}
     </fieldset>
   );
 }
@@ -82,8 +84,64 @@ function markLine(link: IdeaOnMap['evidence'][number]): string {
   return `${KIND_WORDS[link.kind]}${band} · rings it, never brightens it`;
 }
 
+/** One note, course or piece of work that touched a star, with its kind and what it does to the star. */
+function item(link: IdeaOnMap['evidence'][number]) {
+  const Icon = KIND_ICON[link.sourceKind];
+  return (
+    <li key={link.id} className="flex items-start gap-2 text-ui text-ink">
+      <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <span className="min-w-0">
+        <span className="block break-words">{basisSentence(link.basis)}</span>
+        <span className="block text-small text-ink-muted">{markLine(link)}</span>
+      </span>
+    </li>
+  );
+}
+
+/** How many of the ideas under a topic show before the rest fold away. */
+const IDEAS_SHOWN = 3;
+
 /**
- * Why an idea is lit, as the layers on show have it: what your answers made
+ * The claims-graph ideas under a topic (plan #2317.2): they are no longer
+ * stars, so a topic lists the ones attached to the Wikipedia topic it
+ * refines, each opening its own page. Nothing is drawn for a topic with none.
+ */
+export function IdeasUnder({
+  ideas = [],
+  className,
+}: {
+  ideas?: readonly { id: string; name: string }[];
+  className?: string;
+}) {
+  if (ideas.length === 0) return null;
+  const row = (idea: { id: string; name: string }) => (
+    <li key={idea.id}>
+      <Link
+        href={`/learn/c/${idea.id}`}
+        className="flex min-h-11 items-center py-1.5 text-ui text-ink hover:text-accent"
+      >
+        {readableName(idea.name)}
+      </Link>
+    </li>
+  );
+  return (
+    <section className={className} aria-label="Your ideas under it">
+      <h3 className="text-ui font-semibold text-ink">
+        Your ideas under it
+        <span className="tabular ml-2 font-normal text-ink-muted">{countText(ideas.length)}</span>
+      </h3>
+      <ul className="mt-1 divide-y divide-border">{ideas.slice(0, IDEAS_SHOWN).map(row)}</ul>
+      {ideas.length > IDEAS_SHOWN && (
+        <Disclosure title={`${ideas.length - IDEAS_SHOWN} more`} className="mt-1" bodyClassName="pl-0">
+          <ul className="divide-y divide-border">{ideas.slice(IDEAS_SHOWN).map(row)}</ul>
+        </Disclosure>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Why a star is lit, as the layers on show have it: what your answers made
  * of it, then each note, course or piece of work that touched it, strongest
  * first, and where it fades. Replaces the shared "What backs it" list here,
  * which counts evidence towards strength and so is wrong on this page.
@@ -110,19 +168,6 @@ export function IdeaWhy({
   const near = idea.strength <= 0 && idea.haze > 0.05;
   const nothing = !answer && idea.evidence.length === 0 && !near;
   const practice = idea.track ? practiceHref({ track: idea.track.id }) : null;
-
-  const item = (link: IdeaOnMap['evidence'][number]) => {
-    const Icon = KIND_ICON[link.sourceKind];
-    return (
-      <li key={link.id} className="flex items-start gap-2 text-ui text-ink">
-        <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-        <span className="min-w-0">
-          <span className="block break-words">{basisSentence(link.basis)}</span>
-          <span className="block text-small text-ink-muted">{markLine(link)}</span>
-        </span>
-      </li>
-    );
-  };
 
   return (
     <section className={className} aria-label="Why it is lit">
@@ -171,7 +216,7 @@ export function IdeaWhy({
       )}
       {near && (
         <p className="mt-1.5 text-small text-ink-muted">
-          It glows faintly because ideas near it are ones you have been tested on.
+          It glows faintly because topics near it are ones you have been tested on.
         </p>
       )}
       {practice && (
@@ -188,15 +233,18 @@ export function IdeaWhy({
 }
 
 /**
- * Why a goal's topic stands where it does, for the topic open in a
- * territory: the level held and what holds it, the words of the answer
- * (folded until asked for), when it falls due a re-check, what it needs and
- * what needs it, and what you are ready for on it. With nothing held it says
- * so, and what would change that.
+ * Why a subject's topic stands where it does, for the topic open in a
+ * territory: the levels held, tested and held without a test apart, and what
+ * holds the highest, the words of the answer (folded until asked for), when
+ * it falls due a re-check, what you are ready for on it, what it needs and
+ * what needs it, the notes, courses and work that touched it (plan #2317.2)
+ * and your ideas under it. With nothing held it says so, and what would
+ * change that.
  */
 export function TopicWhy({
   territory,
   topicId,
+  star,
   asOf,
   layers,
   onLayers,
@@ -204,6 +252,8 @@ export function TopicWhy({
 }: {
   territory: SkyTerritory;
   topicId: string;
+  /** The topic as the sky draws it, with its evidence and the ideas under it, where it is on the sky. */
+  star?: IdeaOnMap;
   asOf: string;
   layers: Layers;
   onLayers: (next: Layers) => void;
@@ -219,15 +269,15 @@ export function TopicWhy({
   const next = ready[0];
   const { needs, neededBy } = requirementsOf(territory, topicId);
   const recheck = standing ? practiceHref({ cell: standing.cellId }) : null;
+  const met = star?.evidence ?? [];
 
   return (
     <>
       <Card padding="standard">
         <h2 className="text-body font-medium text-ink">{topic.name}</h2>
         <p className="tabular text-small text-ink-muted">
-          {topic.target === null
-            ? `Level ${topic.held} held, no target in this goal`
-            : `Level ${topic.held} held, target ${topic.target}`}
+          {`${topic.held > 0 ? 'Level ' : ''}${levelsText({ held: topic.held, tested: topic.tested, ceiling: topic.ceiling })}`}
+          {topic.target === null ? ', no target in this subject' : `, target ${topic.target}`}
         </p>
 
         <h3 className="mt-3 text-ui font-semibold text-ink">
@@ -304,6 +354,20 @@ export function TopicWhy({
             </ul>
           </>
         )}
+
+        {met.length > 0 && (
+          <>
+            <h3 className="mt-4 text-ui font-semibold text-ink">Met in your notes, courses and work</h3>
+            <ul className="mt-1.5 space-y-1.5">{met.slice(0, CARD_EVIDENCE_LIMIT).map(item)}</ul>
+            {met.length > CARD_EVIDENCE_LIMIT && (
+              <Disclosure title={`${met.length - CARD_EVIDENCE_LIMIT} more`} className="mt-1" bodyClassName="mt-1 pl-0">
+                <ul className="space-y-1.5">{met.slice(CARD_EVIDENCE_LIMIT).map(item)}</ul>
+              </Disclosure>
+            )}
+          </>
+        )}
+
+        <IdeasUnder ideas={star?.ideasUnder} className="mt-4" />
       </Card>
       <Card padding="standard">
         <LayerSwitch layers={layers} onChange={onLayers} />

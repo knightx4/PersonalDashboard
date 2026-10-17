@@ -2,8 +2,8 @@ import type { GoalLink, GoalOnMap, GoalStar } from '@/lib/learn/map/goals';
 import type { IdeaOnMap } from '@/lib/learn/map/load';
 
 /**
- * Learning goals for the Idea Space gallery (plan #2187.2): three open
- * goals, the first with a dozen topics whose names are as long as the live
+ * Prepared subjects for the Idea Space gallery (plan #2187.2, #2317.2): three
+ * subjects, the SaaS one with a dozen topics whose names are as long as the live
  * ones, a second at a familiar depth, and a third whose topics are all
  * drafts. Each topic sits beside an idea of the fixture, as the scope's
  * embedding would put it near the ideas it is about.
@@ -86,6 +86,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-behavioural',
       name: 'Behavioural economics for pricing',
+      // A subject prepared with no goal on it (plan #2317.1).
       goalNames: [],
       line: '5 draft topics to approve',
       held: 0,
@@ -97,7 +98,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-accounts',
       name: "Read a company's accounts",
-      goalNames: [],
+      goalNames: ['Pass the CFA Level 1 exam', 'Read an annual report without help'],
       line: `${ACCOUNTS.length} topics · ${a.held} of ${a.total} levels held`,
       ...a,
       next: 'Next: Accrual accounting at level 2, define it accurately in your own words',
@@ -112,7 +113,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-saas',
       name: 'SaaS and subscription business metrics',
-      goalNames: [],
+      goalNames: ['Move into strategy and operations at a SaaS company'],
       line: `${SAAS.length} topics · ${s.held} of ${s.total} levels held`,
       ...s,
       next: 'Next: Gross margin in software at level 2, define it accurately in your own words',

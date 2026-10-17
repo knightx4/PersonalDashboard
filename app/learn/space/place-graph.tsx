@@ -216,9 +216,15 @@ export function PlaceGraph({
     const own = nodeBox(n, p);
     const others = laid.nodes.filter((other) => other.id !== n.id).map((other) => nodeBox(other, at(other.id)));
     const lift = stop.has(n.id) ? 9 : 0;
-    const above = { x: p.x - w / 2, y: own.y - SCORE_H - 4 - lift, w, h: SCORE_H };
-    const below = { x: p.x - w / 2, y: own.y + own.h + 3, w, h: SCORE_H };
-    const box = others.some((other) => overlaps(above, other)) && !others.some((other) => overlaps(below, other)) ? below : above;
+    // Kept whole inside the frame, however near its edge the star sits.
+    const x = Math.min(Math.max(p.x - w / 2, 4), Math.max(4, frame.w - w - 4));
+    const above = { x, y: own.y - SCORE_H - 4 - lift, w, h: SCORE_H };
+    const below = { x, y: own.y + own.h + 3, w, h: SCORE_H };
+    // Start here is a label too, and the forward one: the level line keeps off it.
+    const start = first ? startBox(first) : null;
+    if (start) others.push(start);
+    const clear = (b: typeof above) => b.y >= 0 && b.y + b.h <= frame.h && !others.some((other) => overlaps(b, other));
+    const box = !clear(above) && clear(below) ? below : above;
     return { text, box };
   };
 
@@ -230,8 +236,9 @@ export function PlaceGraph({
     const p = at(n.id);
     const own = nodeBox(n, p);
     const others = laid.nodes.filter((other) => other.id !== n.id).map((other) => nodeBox(other, at(other.id)));
-    const below = { x: p.x - START_W / 2, y: own.y + own.h + 3, w: START_W, h: START_H };
-    const above = { x: p.x - START_W / 2, y: own.y - START_H - 3, w: START_W, h: START_H };
+    const x = Math.min(Math.max(p.x - START_W / 2, 4), Math.max(4, frame.w - START_W - 4));
+    const below = { x, y: own.y + own.h + 3, w: START_W, h: START_H };
+    const above = { x, y: own.y - START_H - 3, w: START_W, h: START_H };
     const fits = (b: typeof below) => b.y >= 0 && b.y + b.h <= frame.h && !others.some((other) => overlaps(b, other));
     return fits(below) || !fits(above) ? below : above;
   };
@@ -239,7 +246,8 @@ export function PlaceGraph({
   const scores = (id: string | null) => {
     if (!id) return [];
     const level = levelLine(id);
-    const boxes = [...nodeBoxes(), ...(level ? [level.box] : [])];
+    const start = first ? startBox(first) : null;
+    const boxes = [...nodeBoxes(), ...(level ? [level.box] : []), ...(start ? [start] : [])];
     const placed: { key: string; x: number; y: number; w: number; text: string }[] = [];
     for (const x of graph.edges.filter((edge) => edge.a === id || edge.b === id)) {
       // A territory's line to an idea next door has no score worth reading.
@@ -309,7 +317,7 @@ export function PlaceGraph({
   };
 
   return (
-    <div className="absolute inset-0" role="group" aria-label={`${graph.title}, as a graph of its ideas`}>
+    <div className="absolute inset-0" role="group" aria-label={`${graph.title}, as a graph of its topics`}>
       <svg aria-hidden className="absolute inset-0 size-full" viewBox={`0 0 ${frame.w} ${frame.h}`}>
         {graph.ladders && (
           <defs>

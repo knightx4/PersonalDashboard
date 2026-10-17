@@ -6792,12 +6792,12 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouPersonalityEmptySurface />,
   },
   {
-    /* Idea Space (plan #1857), a night sky since plan #1997.6: every idea a
-     * star as bright as you know it, places named, one idea open in the rail
-     * with its nearest six, the two lists below it, and ideas still waiting
-     * for a place. Fixtures in idea-space-surfaces.tsx. */
+    /* Idea Space (plan #1857), a night sky since plan #1997.6 and of your
+     * prepared topics since plan #2317.2: every topic a star as bright as you
+     * know it, subjects named, one topic open in the rail with the ideas under
+     * it and its nearest six. Fixtures in idea-space-surfaces.tsx. */
     id: 'learn-idea-space',
-    label: 'Learn · Idea Space, an idea open',
+    label: 'Learn · Idea Space, a topic open',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceSurface />,
@@ -6831,18 +6831,18 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceReplaySurface />,
   },
   {
-    /* One place opened as a graph (plan #1997.7), with one idea pointed at
-     * so its links show their scores, and the ideas next door round the edge. */
+    /* A subject's name pressed (plan #2317.2): its place is its territory,
+     * opened on the first topic you are ready for. */
     id: 'learn-idea-space-place',
-    label: 'Learn · Idea Space, a place opened',
+    label: 'Learn · Idea Space, a subject opened',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpacePlaceSurface />,
   },
   {
-    /* An idea in no place opened as its neighbourhood (plan #1997.7). */
+    /* A topic opened as its neighbourhood (plan #1997.7): itself and its six nearest. */
     id: 'learn-idea-space-around',
-    label: 'Learn · Idea Space, an idea in no place opened',
+    label: 'Learn · Idea Space, a topic’s neighbourhood',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
@@ -6901,8 +6901,8 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaSpaceLightsSurface />,
   },
   {
-    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
-     * places and the ideas in them read "A private place" and "Private idea". */
+    /* Recording mode on (plan #1997.9), a subject's territory open: the hidden
+     * subjects and the topics in them read "A private subject" and "Private topic". */
     id: 'learn-idea-space-recording',
     label: 'Learn · Idea Space, recording mode on',
     module: 'learn',
@@ -6953,17 +6953,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <IdeaPairsErrorSurface />,
   },
   {
-    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    /* Recording mode off, two subjects ticked to hide, in the rail's card. */
     id: 'learn-idea-space-recording-choose',
-    label: 'Learn · Idea Space, choosing places to hide',
+    label: 'Learn · Idea Space, choosing subjects to hide',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceRecordingChooseSurface />,
   },
   {
-    /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */
+    /* Ten thousand test topics, for the frame rate the sky has to hold (plan #1997.6). */
     id: 'learn-idea-space-dense',
-    label: 'Learn · Idea Space, ten thousand ideas',
+    label: 'Learn · Idea Space, ten thousand topics',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceDenseSurface />,
@@ -6974,7 +6974,7 @@ export const SURFACES: readonly Surface[] = [
      * tested, is open in the rail and pointed at, so both cards say what
      * backs it. */
     id: 'learn-idea-space-evidence',
-    label: 'Learn · Idea Space, an idea your notes back',
+    label: 'Learn · Idea Space, a topic your notes back',
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceEvidenceSurface />,

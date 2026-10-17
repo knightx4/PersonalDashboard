@@ -82,6 +82,32 @@ describe('recording mode', () => {
     ).toBe(true);
   });
 
+  it('renames a hidden subject in its territory and the subjects card too (plan #2317.2)', () => {
+    const { ideas, places } = fixture();
+    const hiddenStar = ideas.find((i) => i.placeId === 'B')!.id;
+    const territory = (id: string) => ({
+      id,
+      name: `Subject ${id}`,
+      topics: [{ id: id === 'B' ? hiddenStar : 'X', name: 'Secret topic' }],
+      links: [],
+      standing: [{ topicId: id === 'B' ? hiddenStar : 'X', quote: 'My words', via: null }],
+    });
+    const goal = (id: string) => ({ id, name: `Subject ${id}`, goalNames: ['A goal'], next: 'Next', stars: [{ topicId: 'X', name: 'Secret topic' }] });
+    const view = redactView(
+      { ideas, places, territories: [territory('A'), territory('B')], goals: [goal('A'), goal('B')] } as unknown as IdeaMapView,
+      new Set(['B']),
+    );
+    const [open, closed] = view.territories!;
+    expect(open!.name).toBe('Subject A');
+    expect(open!.standing![0]!.quote).toBe('My words');
+    expect(closed!.name).toBe(PRIVATE_PLACE);
+    expect(closed!.topics[0]!.name).toBe(PRIVATE_IDEA);
+    expect(closed!.standing![0]!.quote).toBeNull();
+    expect(view.goals!.map((g) => g.name)).toEqual(['Subject A', PRIVATE_PLACE]);
+    expect(view.goals![1]!.goalNames).toEqual([]);
+    expect(redactView({ ideas, places, goals: null } as unknown as IdeaMapView, new Set(['B'])).goals).toBeNull();
+  });
+
   it('shows everything while it is off', () => {
     const base = { ideas: fixture().ideas, places: fixture().places } as IdeaMapView;
     expect(viewFor(base, { on: false, hidden: ['B'] })).toBe(base);
