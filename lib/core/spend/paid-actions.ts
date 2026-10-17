@@ -221,7 +221,7 @@ export const PAID_ACTIONS = {
   // An Add button aimed at a goal (plan #1950.5): one in the Learn area is
   // placed and given a plan after the response (plan #1490), as one added
   // from the old New goal form was.
-  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
+  'app/capture-actions.ts#makeAimedCapture:goal': ['place-aim'],
   // The header's notes button (plan #1950.5): the note is triaged once it
   // has saved (plan #1179), as it was from the old popover.
   'app/capture-actions.ts#makeAimedCapture:dev-note': ['triage-note'],
@@ -236,7 +236,7 @@ export const PAID_ACTIONS = {
   'app/goals/home-actions.ts#askDashAction': ['reply-to-goal-comment'],
   // A new goal from Ask Dash in the Learn area is placed and given a plan, as
   // Add goal's is (plan #1490). The hint shows for that area alone.
-  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim', 'classify-goal-kind', 'write-curriculum'],
+  'app/goals/home-actions.ts#askDashAction:new-goal': ['place-aim'],
 
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)
