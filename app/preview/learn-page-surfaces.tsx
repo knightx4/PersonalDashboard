@@ -1,4 +1,7 @@
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { tableKind } from '@/lib/learn/figures/kinds/table';
+import { figureKind } from '@/lib/learn/figures/registry';
+import { LessonCard } from '@/app/learn/s/[id]/p/[piece]/piece-view';
 import { MODELS } from '@/lib/core/models';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
 import { ListsView } from '@/app/learn/lists/lists-view';
@@ -814,6 +817,7 @@ const piecePage: PiecePage = {
           'A café puts its flat white up from £3.20 to £3.60, 12.5%, and sells 10% fewer. It now takes £324 from 90 cups where it took £320 from 100.',
         question: 'Petrol goes up 10% and people buy 2% less. Does the government’s fuel duty take go up or down?',
         answer: 'Up: demand for petrol is inelastic, so the quantity falls by much less than the price rose.',
+        figures: [tableKind.example].map((example) => ({ kind: tableKind.id, ...example })),
       },
     },
   ],
@@ -942,6 +946,25 @@ export function LearnPieceHeldSurface() {
         reviews={[]}
       />
     </PaidCostsProvider>
+  );
+}
+
+/**
+ * One figure kind drawn on a lesson, its phone fold open (plan #2321.1). Every
+ * kind in lib/learn/figures/registry.ts has one of these, named
+ * learn-figure-<id>, and draws its own example.
+ */
+export function LearnFigureSurface({ kind: id }: { kind: string }) {
+  const kind = figureKind(id);
+  if (!kind) return null;
+  const idea = piecePage.ideas[0];
+  return (
+    <LessonCard
+      idea={{ ...idea, lesson: idea.lesson && { ...idea.lesson, figures: [{ kind: kind.id, ...kind.example }] } }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
   );
 }
 

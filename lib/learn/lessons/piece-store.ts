@@ -6,6 +6,8 @@ import { scheduleIdeas } from './review-store';
 import { passedState, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
 import { pieceCheckCell, type PieceCellView } from './piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from './piece-cells-store';
+import { readStoredFigures } from '@/lib/learn/figures/registry';
+import type { FigureBlock } from '@/lib/learn/figures/types';
 
 /**
  * The reads and writes behind a piece's page (plan #1141). Shared by the page
@@ -22,6 +24,8 @@ export type LessonView = {
   example: string | null;
   question: string | null;
   answer: string | null;
+  /** Drawn after the example, each by its kind (plan #2321.1). Empty for none. */
+  figures: FigureBlock[];
 };
 
 /** One idea of the piece, with its lesson once one is written. */
@@ -95,6 +99,7 @@ type LessonRow = {
   check_question: string | null;
   check_answer: string | null;
   drop_reason: string | null;
+  figures: unknown;
 };
 
 const PIECE_COLUMNS = 'id, subject_id, unit_id, ordinal, title, concept_ids, cell_ids, passed_at, held_at';
@@ -148,7 +153,7 @@ export async function loadLessons(
   if (conceptIds.length === 0) return found;
   const { data, error } = await learn
     .from('feed_cards')
-    .select('concept_id, status, takeaway, context, hook, summary, example, check_question, check_answer, drop_reason')
+    .select('concept_id, status, takeaway, context, hook, summary, example, check_question, check_answer, drop_reason, figures')
     .eq('user_id', userId)
     .eq('reason', 'lesson')
     .in('concept_id', [...conceptIds]);
@@ -167,6 +172,7 @@ export async function loadLessons(
         example: row.example,
         question: row.check_question,
         answer: row.check_answer,
+        figures: readStoredFigures(row.figures),
       },
       dropped: null,
     });

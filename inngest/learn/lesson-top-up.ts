@@ -144,6 +144,7 @@ export async function writeLessonCard(
           example: result.card.example,
           check_question: result.card.question,
           check_answer: result.card.answer,
+          figures: result.figures,
           why: lessonWhy(pick.subjectName, prerequisites),
         }
       : { status: 'dropped', drop_reason: result.reason }),
