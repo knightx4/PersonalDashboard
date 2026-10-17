@@ -1,7 +1,9 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { practiceHref } from '@/lib/learn/flow/href';
-import type { FlowOnly } from './session';
+
+/** Practice's filter: prepared subjects only, goals' subjects only, or both (null). */
+export type FlowOnly = 'tracks' | 'goals' | null;
 
 /**
  * The line above a flow focused on one track (plan #779) or one goal (plan
@@ -22,9 +24,8 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
 }
 
 /**
- * What the mixed flow asks about (plan #842): everything, which mixes in
- * questions about subjects in your notes that are not tracks and about your
- * goals, your tracks alone, or your goals alone (plan #1387). Links onto the
+ * What the mixed flow asks about (plan #842): everything, your prepared
+ * subjects alone, or your goals' subjects alone (plan #1387). Links onto the
  * page's own search parameter, as the ideas page's arrangement rows are, so
  * the choice survives a reload and the back button.
  */

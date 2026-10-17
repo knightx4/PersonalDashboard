@@ -278,7 +278,7 @@ export async function writePickedCard(
     const saved = await saveIdeas(
       learn,
       userId,
-      { article: card.article, section: card.section },
+      { article: card.article, section: card.section, cardId: card.id },
       result.ideas,
       (report) => embedSpend.push(report),
     );

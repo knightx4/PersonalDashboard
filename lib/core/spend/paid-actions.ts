@@ -11,9 +11,9 @@ import type { OperationName } from '@/lib/core/spend/guesses';
  * so a test can find the function and follow it to the ledger writers
  * (paid-actions.test.ts, through action-graph.ts). An action that does
  * different paid work depending on which button sent it gets one key per
- * button, with the button after a colon: the flow's `flowStep` asks, answers
- * and starts offered tracks, and one hint for all three would price an answer
- * at the cost of writing a track.
+ * button, with the button after a colon: an essay's research has a first and
+ * a deeper pass, and one hint for both would price the first at the cost of
+ * the second.
  *
  * The same list prices the hint and is checked against the code, which is
  * what makes "pressing it records what the hint named" true rather than hoped:
@@ -128,18 +128,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/probe/actions.ts#answerQuestion': ['name-misconception', 'grade-applied-answer'],
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
-  'app/learn/flow/actions.ts#flowStep:ask': ['write-probe'],
-  'app/learn/flow/actions.ts#flowStep:answer': [
-    'name-misconception',
-    'grade-applied-answer',
-    'mark-teach-back',
-  ],
-  'app/learn/flow/actions.ts#flowStep:follow-up': ['mark-teach-back'],
-  'app/learn/flow/actions.ts#flowStep:start-track': [
-    'generate-track-from-theme',
-    'place-track',
-    'write-probe',
-  ],
   // Learn: an explanation graded against the levels of a topic (plan #2138.5)
   'app/learn/flow/cell-actions.ts#answerCellQuestion': ['grade-cell-answer'],
   'app/learn/opening/[id]/actions.ts#answerOpening': ['grade-opening-answer'],

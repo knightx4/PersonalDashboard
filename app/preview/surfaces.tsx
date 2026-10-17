@@ -175,8 +175,6 @@ import {
 import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
-import { FlowExplainPreview } from './learn-flow-explain-surfaces';
-import { FlowCasePreview } from './learn-flow-case-surfaces';
 import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
   LearnTopicDraftCommentPreview,
@@ -5903,58 +5901,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FlowScopePreview />,
   },
   {
-    /* A goal question in Practice Flow (plan #2164.2): an idea to explain in a
-     * few sentences, with the box to write in, Mark it, I don't know and Later. */
-    id: 'learn-flow-explain',
-    label: 'Practice Flow · An explain question',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="ask" />,
-  },
-  {
-    /* The explanation marked: what was right, what was missing, the example
-     * line, and the one follow-up with its own box. Next skips it. */
-    id: 'learn-flow-explain-marked',
-    label: 'Practice Flow · Explanation marked, with the follow-up',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="marked" />,
-  },
-  {
-    /* The follow-up marked too: where the idea now stands, the idea as
-     * written, and Next. */
-    id: 'learn-flow-explain-done',
-    label: 'Practice Flow · Follow-up marked',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="done" />,
-  },
-  {
-    /* Mark it pressed: the press held while Dash marks the explanation. */
-    id: 'learn-flow-explain-grading',
-    label: 'Practice Flow · Marking the explanation',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="grading" />,
-  },
-  {
-    /* A worked case on a goal's idea (plan #2164.3): figures and a task, the
-     * box to write a number or two sentences in, and Later. */
-    id: 'learn-flow-case',
-    label: 'Practice Flow · A worked case',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowCasePreview stage="ask" />,
-  },
-  {
-    /* The case answered: Dash's sentence, the answer expected, and Next. */
-    id: 'learn-flow-case-answered',
-    label: 'Practice Flow · Case answered',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowCasePreview stage="answered" />,
-  },
-  {
     /* What a session moved (plan #2164.6): the card that ends a Practice Flow
      * run, with the ideas shown and missed quoted and what came onto the fringe. */
     id: 'learn-flow-summary',
@@ -5962,14 +5908,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowSummaryPreview />,
-  },
-  {
-    /* Marking failed: the explanation stays in its box, with the reason under the card. */
-    id: 'learn-flow-explain-error',
-    label: 'Practice Flow · Marking failed',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="error" />,
   },
   {
     /* An explain question about one level of a topic, before an answer
