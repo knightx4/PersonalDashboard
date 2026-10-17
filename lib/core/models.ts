@@ -24,6 +24,8 @@ export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
+  /** lib/ask/reply-check-model.ts, the weekly check of Ask Dash replies that went badly */
+  askReplyCheck: HAIKU,
   /** inngest/dev/suggest.ts */
   devDigestSuggest: HAIKU,
   /** lib/books/receipt-photo.ts */
