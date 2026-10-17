@@ -15,8 +15,9 @@ import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { Maximize2, SquarePen, X } from 'lucide-react';
+import { Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
@@ -765,6 +766,7 @@ export function AskDashPanel({
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
               <div className="flex min-h-8 items-center gap-2">
+                <ModuleMark module="dash" size="sm" />
                 <h2 id="ask-dash-title" className="text-ui font-semibold text-ink">
                   Ask Dash
                 </h2>
@@ -800,7 +802,9 @@ export function AskDashPanel({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+          {/* A column, so a thread fills it and its box docks at the foot,
+              as on the Dash page. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
             {view.kind === 'new' ? (
               <NewQuestion
                 key={threadKey}
@@ -851,7 +855,10 @@ function NewQuestion({
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));
-  const draft = useAskDash()?.draft;
+  const handle = useAskDash();
+  const draft = handle?.draft;
+  // A starter pressed: the thread is drawn again with it as its question.
+  const [starter, setStarter] = useState<string | null>(null);
   const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
     null,
   );
@@ -871,31 +878,51 @@ function NewQuestion({
 
   return (
     <>
-      <AskThread
-        id="ask-dash"
-        conversationRef={null}
-        page={page}
-        list={list}
-        turns={[]}
-        onConversation={onStarted}
-        label={asked ? 'Ask a follow-up' : 'Ask a question'}
-        placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'What did I spend on eBay this month?'}
-        startWriting
-        ask={ask}
-        initialDraft={draft}
-        // The empty state: said once, before the first question, as Dash's
-        // opening turn, and gone once there is an answer to read instead.
-        opening={
-          asked
-            ? undefined
-            : list
-              ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
-              : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'
-        }
-        above={lookingAt}
-        onSend={() => setAsked(true)}
-      />
-
+      {/* The empty state, before the first question: Dash's mark and what he
+          reads, the Dash page's opening at the sheet's size, gone once there
+          is an answer to read instead. Rows sent from a list are said in his
+          voice, since they are what he will read. */}
+      {!asked && (
+        <div className="pt-4">
+          <DashWelcome
+            compact
+            line={
+              list
+                ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
+                : undefined
+            }
+          />
+        </div>
+      )}
+      {/* Grows to the sheet's foot once a question is out, so the box docks there. */}
+      <div className={asked ? 'flex flex-1 flex-col' : undefined}>
+        <AskThread
+          key={starter ?? 'new'}
+          id="ask-dash"
+          conversationRef={null}
+          page={page}
+          list={list}
+          turns={[]}
+          onConversation={onStarted}
+          label={asked ? 'Ask a follow-up' : 'Ask a question'}
+          placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'Ask about your money, jobs, todos or notes'}
+          dock
+          ask={starter ?? ask}
+          initialDraft={draft}
+          above={lookingAt}
+          onSend={() => setAsked(true)}
+        />
+      </div>
+      {!asked && !list && (
+        <DashStarters
+          compact
+          workspaces={handle?.workspaces}
+          onAsk={(question) => {
+            setAsked(true);
+            setStarter(question);
+          }}
+        />
+      )}
       {!asked && <Earlier recent={recent} onReopen={onReopen} />}
     </>
   );
@@ -926,14 +953,15 @@ function Earlier({
           </Link>
         }
       />
-      <ul className="mt-1 divide-y divide-border">
+      <ul className="-mx-2 mt-1 space-y-0.5">
         {recent.conversations.map((conversation) => (
           <li key={conversation.id}>
             <button
               type="button"
               onClick={() => onReopen(conversation)}
-              className="flex w-full items-baseline gap-3 py-2 text-left hover:text-accent"
+              className="press flex min-h-11 w-full items-center gap-3 rounded-control px-2 text-left transition-colors duration-quick hover:bg-sunken sm:min-h-9"
             >
+              <MessageSquareText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
               <span className="min-w-0 flex-1 truncate text-ui text-ink">
                 {conversation.title ?? 'A question'}
               </span>
@@ -985,17 +1013,20 @@ function EarlierQuestion({
   return (
     <>
       {loaded.changesError && <p className="text-ui text-danger">{loaded.changesError}</p>}
-      <AskThread
-        id={`ask-${conversationRef}`}
-        conversationRef={conversationRef}
-        page={page}
-        turns={loaded.turns}
-        changes={loaded.changes}
-        openHandoffs={loaded.openHandoffs}
-        label="Ask a follow-up"
-        placeholder="Ask more about this"
-        above={lookingAt}
-      />
+      <div className="flex flex-1 flex-col">
+        <AskThread
+          id={`ask-${conversationRef}`}
+          conversationRef={conversationRef}
+          page={page}
+          turns={loaded.turns}
+          changes={loaded.changes}
+          openHandoffs={loaded.openHandoffs}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+          above={lookingAt}
+          dock
+        />
+      </div>
     </>
   );
 }
