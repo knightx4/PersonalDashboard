@@ -15,6 +15,8 @@ import { PageColumn } from '@/components/shell/page-width';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
 import { PERSPECTIVE_COLUMNS, perspectiveOf } from '@/lib/jobs/companies/perspective';
+import { RESEARCH_COLUMNS, researchFromRow } from '@/lib/jobs/companies/research';
+import { companyResearchRoutine } from '@/lib/feedback/routine';
 
 export const metadata = { title: 'Company' };
 
@@ -51,6 +53,7 @@ export default async function CompanyDetailPage({
     { data: notes },
     { data: profile },
     { data: others },
+    { data: researchRows },
   ] =
     await Promise.all([
       supabase
@@ -84,7 +87,20 @@ export default async function CompanyDetailPage({
         .eq('user_id', user.id)
         .neq('id', company.id)
         .order('name'),
+      supabase
+        .from('company_research')
+        .select(RESEARCH_COLUMNS)
+        .eq('company_id', company.id)
+        .eq('user_id', user.id)
+        .order('requested_at', { ascending: false })
+        .limit(10),
     ]);
+
+  // The newest run says whether one is going or the last one failed; the
+  // newest finished one is what the Research section shows meanwhile.
+  const researchRuns = ((researchRows ?? []) as unknown as Array<Record<string, unknown>>).map(researchFromRow);
+  const researchLatest = researchRuns[0] ?? null;
+  const researchShown = researchRuns.find((run) => run.status === 'ready') ?? null;
 
   // The companies this one could absorb, the ones that look like it first.
   const mergeCandidates = ((others ?? []) as unknown as Array<CompanyIdentity & { id: string }>).map(
@@ -224,6 +240,9 @@ export default async function CompanyDetailPage({
         research={(company.research as string) ?? ''}
         perspective={perspectiveOf(company as Record<string, unknown>)}
         perspectiveUpdatedAt={(company.perspective_updated_at as string | null) ?? null}
+        researchLatest={researchLatest}
+        researchShown={researchShown}
+        researchAvailable={Boolean(companyResearchRoutine().id && companyResearchRoutine().token)}
         domains={((company.domains as string[]) ?? []).join(', ')}
         industry={(company.industry as string) ?? ''}
         hqLocation={(company.hq_location as string) ?? ''}

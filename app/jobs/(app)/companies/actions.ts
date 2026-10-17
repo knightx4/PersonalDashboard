@@ -20,6 +20,8 @@ import { recordSessionSpend } from '@/lib/core/spend/session';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
+import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
+import { companyResearchRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 
 /**
@@ -602,4 +604,99 @@ async function buildPatch(
   }
 
   return proposedFields(entity, existing, { logoUrl: siteIcon });
+}
+
+/**
+ * Start the company research routine on one company: the Research button on
+ * its Perspective tab.
+ *
+ * The row is made first, queued, so the tab can show the run at once and the
+ * routine has something to write into; the routine is then fired with a brief
+ * naming that row. A run left queued or researching past STALE_AFTER_MS is
+ * marked failed before the check, so a session that died does not block the
+ * next press. A fire that fails marks the new row failed with Anthropic's
+ * answer, which is what the tab then shows.
+ */
+// latency: pending
+export async function startCompanyResearch(
+  companyId: string,
+): Promise<{ error: string | null }> {
+  if (!z.string().uuid().safeParse(companyId).success) return { error: 'That is not a company.' };
+
+  const routine = companyResearchRoutine();
+  if (!routine.id || !routine.token) {
+    return {
+      error:
+        'Research is not set up on this deployment yet: it needs CLAUDE_COMPANY_RESEARCH_ROUTINE_ID and CLAUDE_COMPANY_RESEARCH_ROUTINE_TOKEN.',
+    };
+  }
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('id, name, slug')
+    .eq('id', companyId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!company) return { error: 'That company is not one of yours.' };
+
+  await supabase
+    .from('company_research')
+    .update({ status: 'failed', error: 'The run stopped without finishing. Start it again.' })
+    .eq('company_id', companyId)
+    .eq('user_id', user.id)
+    .in('status', ['queued', 'researching'])
+    .lt('requested_at', new Date(Date.now() - STALE_AFTER_MS).toISOString());
+
+  const { data: previous } = await supabase
+    .from('company_research')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('user_id', user.id)
+    .eq('status', 'ready')
+    .order('requested_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: row, error } = await supabase
+    .from('company_research')
+    .insert({ user_id: user.id, company_id: companyId, status: 'queued' })
+    .select('id')
+    .single();
+  // The partial unique index allows one run at a time per company.
+  if (error?.code === '23505') return { error: 'Research on this company is already running.' };
+  if (error || !row) return { error: error?.message ?? 'Could not start the research.' };
+
+  const fired = await fireFeatureRoutine({
+    apiKey: routine.token,
+    routineId: routine.id,
+    text: researchBrief({
+      researchId: row.id as string,
+      userId: user.id,
+      companyName: company.name as string,
+      companySlug: company.slug as string,
+      previousId: (previous?.id as string | undefined) ?? null,
+    }),
+  });
+
+  if (!fired.ok) {
+    await supabase
+      .from('company_research')
+      .update({ status: 'failed', error: `Dash could not start the research. ${fired.error}` })
+      .eq('id', row.id)
+      .eq('user_id', user.id);
+    revalidatePath('/jobs/companies/[slug]', 'page');
+    return { error: fired.error };
+  }
+
+  const body = fired.body as Record<string, unknown> | null;
+  const runUrl = typeof body?.claude_code_session_url === 'string' ? body.claude_code_session_url : null;
+  if (runUrl) {
+    await supabase.from('company_research').update({ run_url: runUrl }).eq('id', row.id).eq('user_id', user.id);
+  }
+
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  return { error: null };
 }

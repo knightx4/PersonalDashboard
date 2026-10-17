@@ -245,7 +245,7 @@ Interviews, with their prep and what was asked.
 
 Companies they are tracking, with industry, stage and research notes.
 
-- Search: `name`, `industry`, `research`, `hq_location`
+- Search: `name`, `industry`, `research`, `hq_location`, `perspective_business`, `perspective_why_now`, `perspective_problem`, `perspective_why_me`, `perspective_unknowns`, `perspective_next_move`
 - Name a row by `name`; link it by `slug`
 - Opens at `/jobs/companies/<slug>`
 
@@ -616,6 +616,14 @@ Every post on their X account read by the dashboard, including ones they wrote t
 - created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.
 
 ## Mentions (leads only)
+
+### `job_search.company_research` (Job search)
+
+Research Dash prepared on a company they want, from its own materials, filings, news and talks, with a link for every claim.
+
+- Search: `summary`, `sections`
+- Name a row by `summary`; link it by `id`
+- Written by Dash, not the person: read it for facts about the company, never as what they want.
 
 ### `learn.phrase_explanations` (Learn)
 

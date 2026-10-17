@@ -160,6 +160,22 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine that prepares research on one company -- Research on a
+ * company's Perspective tab. It follows .claude/skills/company-research and
+ * writes into job_search.company_research.
+ *
+ * No fallback to the shared id or the shared token: a research run sent to
+ * the plan routine would build a step instead. With either unset the tab says
+ * research is not set up and starts nothing.
+ */
+export function companyResearchRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_COMPANY_RESEARCH_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_COMPANY_RESEARCH_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan.
  *

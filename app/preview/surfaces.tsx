@@ -108,6 +108,7 @@ import {
 } from '@/lib/core/spend/estimate';
 import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
+import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
@@ -1019,6 +1020,40 @@ const companyPanels = {
     nextMove: '',
   },
   perspectiveUpdatedAt: '2026-09-28T09:00:00.000Z',
+  researchLatest: null as CompanyResearch | null,
+  researchAvailable: true,
+  // A finished run, short, with a link on each claim and a suggestion for one
+  // of the blank questions.
+  researchShown: {
+    id: 'cr-1',
+    status: 'ready',
+    summary:
+      'A systematic manager of about 500 people in London, rebuilding its research platform after leaving a vendor risk system in [2024](https://example.com/press-2024).',
+    sections: [
+      {
+        key: 'business',
+        title: 'Business and how they make money',
+        body: 'Management and performance fees on its own funds ([annual letter](https://example.com/letter)). The research platform is internal and every strategy runs on it ([engineering blog](https://example.com/blog/platform)).',
+      },
+      {
+        key: 'changes',
+        title: 'What has changed in the last 12 months',
+        body: 'Three market data roles opened in August ([careers](https://example.com/careers)), and the head of data spoke about cutting feed costs ([podcast](https://example.com/podcast/42)).',
+      },
+    ],
+    sources: [
+      { url: 'https://example.com/letter', title: 'Annual letter to investors', kind: 'company', publisher: 'D. E. Shaw', publishedOn: '2026-02-01', note: null },
+      { url: 'https://example.com/blog/platform', title: 'How our research platform works', kind: 'company', publisher: null, publishedOn: null, note: null },
+      { url: 'https://example.com/podcast/42', title: 'The cost of data, episode 42', kind: 'talk', publisher: 'Flirting with Models', publishedOn: '2026-06-10', note: 'From 18:00, on which feeds earn their keep.' },
+      { url: 'https://example.com/press-2024', title: 'Fund moves risk in house', kind: 'news', publisher: 'Risk.net', publishedOn: '2024-11-03', note: null },
+      { url: 'https://example.com/careers', title: 'Market Data Engineer', kind: 'posting', publisher: null, publishedOn: null, note: null },
+    ],
+    drafts: { whyMe: 'Three years auditing revenue systems at EY, and a revenue tool built from scratch: both are about making a pile of inputs trustworthy.' },
+    error: null,
+    runUrl: null,
+    requestedAt: '2026-10-01T09:00:00.000Z',
+    finishedAt: '2026-10-01T09:34:00.000Z',
+  } as CompanyResearch | null,
   domains: 'halloran.example, halloran.co.uk',
   industry: 'Quantitative investment management',
   hqLocation: 'New York, NY',
