@@ -546,6 +546,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-reading-check-own': ['/learn/r/[id]'],
   'learn-piece': ['/learn/s/[id]/p/[piece]'],
   'learn-piece-cell-check': ['/learn/s/[id]/p/[piece]'],
+  'learn-piece-held': ['/learn/s/[id]/p/[piece]'],
   'learn-probe': ['/learn/s/[id]/probe'],
   'learn-videos': ['/learn/videos'],
   'learn-video': ['/learn/videos/[videoId]'],

@@ -202,24 +202,41 @@ export async function loadPieceCells(
   userId: string,
   cellIds: readonly string[],
 ): Promise<PieceCellView[]> {
-  if (cellIds.length === 0) return [];
+  return (await loadPieceCellsAndLadder(learn, userId, cellIds)).cells;
+}
+
+/**
+ * The piece's cells as `loadPieceCells` reads them, and `ladder`: every cell
+ * of the topics they sit on, lowest level first, which a held piece's check
+ * climbs (plan #2292.5).
+ */
+export async function loadPieceCellsAndLadder(
+  learn: LearnSupabaseClient,
+  userId: string,
+  cellIds: readonly string[],
+): Promise<{ cells: PieceCellView[]; ladder: PieceCellView[] }> {
+  if (cellIds.length === 0) return { cells: [], ladder: [] };
   const map = await loadGradeMap(learn, userId);
   const readings = readCells(map);
-  const cells = new Map(map.cells.map((cell) => [cell.id, cell]));
+  const byId = new Map(map.cells.map((cell) => [cell.id, cell]));
   const names = new Map(map.topics.map((topic) => [topic.id, topic.name]));
-  return cellIds.flatMap((id) => {
-    const cell = cells.get(id);
-    if (!cell) return [];
-    return [
-      {
-        cellId: id,
-        topicId: cell.topicId,
-        topicName: names.get(cell.topicId) ?? '',
-        level: cell.level,
-        status: readings.get(id)?.status ?? 'open',
-      },
-    ];
+  const view = (cell: { id: string; topicId: string; level: number }): PieceCellView => ({
+    cellId: cell.id,
+    topicId: cell.topicId,
+    topicName: names.get(cell.topicId) ?? '',
+    level: cell.level,
+    status: readings.get(cell.id)?.status ?? 'open',
   });
+  const cells = cellIds.flatMap((id) => {
+    const cell = byId.get(id);
+    return cell ? [view(cell)] : [];
+  });
+  const topics = new Set(cells.map((cell) => cell.topicId));
+  const ladder = map.cells
+    .filter((cell) => topics.has(cell.topicId))
+    .sort((a, b) => a.level - b.level)
+    .map(view);
+  return { cells, ladder };
 }
 
 const CELL_CHECK_COLUMNS =

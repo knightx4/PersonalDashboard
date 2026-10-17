@@ -11,7 +11,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { STATUS_GLYPH } from '@/app/learn/topics/[id]/ladder-view';
-import { checkCell, type PieceCellView } from '@/lib/learn/lessons/piece-cells';
+import type { PieceCellView } from '@/lib/learn/lessons/piece-cells';
 import { STATUS_WORDS } from '@/lib/learn/levels/standing';
 
 export type PiecePageProps = {
@@ -27,6 +27,8 @@ export type PiecePageProps = {
 /** One piece of a learning goal's plan, from what its page read (plan #1602). */
 export function PiecePageView({ page, practice, standing, reviews, path }: PiecePageProps) {
   const { piece, subject, unit, siblings } = page;
+  // A piece the placement found held opens short and asks a level higher (plan #2292.5).
+  const held = piece.heldAt !== null && piece.passedAt === null;
 
   return (
     <PageColumn>
@@ -35,7 +37,7 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
         subject={path}
         title={piece.title}
         description={`Unit ${unit.ordinal}, ${unit.title} · piece ${piece.ordinal} of ${siblings.length}${
-          piece.passedAt ? ' · passed' : ''
+          piece.passedAt ? ' · passed' : held ? ' · you hold this already' : ''
         }`}
       />
 
@@ -63,7 +65,15 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
         </p>
       ) : (
         <>
-          <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} />
+          {held && (
+            <Card padding="standard" className="mb-4">
+              <p className="text-ui text-ink-muted">
+                Your placement showed every level this piece teaches, so each lesson is folded to its takeaway
+                {page.checkOn ? ` and the question asks level ${page.checkOn.level}` : ''}.
+              </p>
+            </Card>
+          )}
+          <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} folded={held} />
           <div className="mt-6">
             <PiecePassing
               subjectId={subject.id}
@@ -73,7 +83,13 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
               passedAt={piece.passedAt}
               practicePassed={standing.practicePassed}
               checkPassed={standing.checkPassed}
-              checkOn={checkCell(page.cells)}
+              checkOn={
+                page.checkOn && {
+                  ...page.checkOn,
+                  // A held piece's question climbs above the cells it teaches (plan #2292.5).
+                  above: held && !page.cells.some((cell) => cell.cellId === page.checkOn!.cellId),
+                }
+              }
             />
           </div>
         </>
@@ -101,7 +117,11 @@ export function PiecePageView({ page, practice, standing, reviews, path }: Piece
                       {sibling.title}
                     </Link>
                   )}
-                  {sibling.passed && <span className="text-small text-ink-muted">passed</span>}
+                  {sibling.passed ? (
+                    <span className="text-small text-ink-muted">passed</span>
+                  ) : (
+                    sibling.held && <span className="text-small text-ink-muted">held</span>
+                  )}
                 </li>
               ))}
             </ol>
