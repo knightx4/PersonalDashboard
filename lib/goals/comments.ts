@@ -95,6 +95,9 @@ const STORED_FORM: Record<CollectionField['type'], string> = {
   yes_no: 'true or false',
   choice: 'one of the listed options exactly',
   link: 'a web address',
+  image: 'the web address of a picture',
+  place: 'the address on one line',
+  ref: 'a row in the app, as schema.table:id',
 };
 
 function stepLines(nodes: StepNode[], itemId: string, depth: number, out: string[]): void {

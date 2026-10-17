@@ -1128,8 +1128,10 @@ collection: loans   (one row per loan)
 
 Field types are a fixed list the app knows how to draw and check: text, long
 text, number, money, percent, date, day of month, yes/no, choice from a list,
-and link. Claude picks fields from that list and never writes a table or a
-migration.
+link, picture (`image`, the address of a picture), place (an address on one
+line, with a latitude and longitude or neither) and a row elsewhere in the app
+(`ref`, `schema.table:id`). Claude picks fields from that list and never
+writes a table or a migration.
 
 - **Collections** (`goals.collections`) hold each definition: a name, the
   fields, whether it is one record or a list, a version number, and the goals
@@ -1171,6 +1173,17 @@ migration.
 - **Changing a definition** raises its version. Existing records keep their
   values; a new field shows empty; a removed field is hidden but its values
   stay in the record.
+- **A goal's own lists** (plan #2330.2). A goal can keep any number of lists
+  of things that have no other home in the app, such as pantries to compare
+  or volunteer groups to try. Each is a collection with `goal_id` set and a
+  `position` among the goal's lists, and it serves that goal, so the goal's
+  number can be counted from it. Its name is unique among the goal's lists.
+  Pasting a product link reads the page (`lib/saved/scrape-product.ts`) and
+  adds a draft row with its name, picture, price and link, adding any of
+  those fields the list lacks; the person confirms it as they confirm any
+  draft. Dash starts, renames and archives lists and adds, changes, confirms
+  and archives their rows with `change_goal_list`. Readings, events, saved
+  products and contacts are linked rather than copied (`goals.links`).
 
 - **Worked-out answers.** A step exists to answer something, such as when
   the loan payments start or what they come to a month, and the fields are

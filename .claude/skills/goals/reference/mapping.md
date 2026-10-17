@@ -144,6 +144,9 @@ for a health goal.
    | `yes_no` | `true` or `false` | on autopay or not |
    | `choice` | one of `options`, exactly | federal or private |
    | `link` | an http or https address | the servicer's login page |
+   | `image` | an http or https address of a picture | a product photo |
+   | `place` | `{"address": "…", "lat": 53.8, "lng": -1.55}`, coordinates both or neither | a store, a venue |
+   | `ref` | a row in the app as `schema.table:id` | a reading in Learn |
 
    `key` is lower case letters, digits and `_`, at most 40 characters, and
    never changes. `tracked` goes only on `number`, `money` or `percent`, and

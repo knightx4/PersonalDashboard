@@ -44,6 +44,8 @@ import {
 } from '@/lib/goals/steps-store';
 import { parseAreaName, parseAreaNote, parseGoalFields, reorder } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { CHANGE_GOAL_LIST } from './goal-lists-writes';
+import { GoalsRefused } from './goals-refused';
 
 /**
  * The Goals changes an agent makes when asked, beyond the four Ask already
@@ -129,7 +131,7 @@ export type GoalsWrite = {
 };
 
 /** A refusal the model reads and says in words. */
-export class GoalsRefused extends Error {}
+export { GoalsRefused };
 
 type Args = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -1832,6 +1834,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
     },
     run: changeGoalsInbox,
   },
+  CHANGE_GOAL_LIST,
 ];
 
 /** Runs one Goals write. Never throws: a refusal or a failure is the sentence the model reads. */

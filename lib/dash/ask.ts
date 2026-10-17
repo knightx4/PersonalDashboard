@@ -159,7 +159,7 @@ reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
 links or an information step's form, call change_goal_number, change_goal_link
-or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox. In Shopping, to
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call

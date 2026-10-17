@@ -21,6 +21,7 @@
 
 import { sourceHref as catalogueHref, sourceModule } from '@/lib/sources/catalogue';
 import {
+  isPlace,
   liveFields,
   type CollectionField,
   type CollectionShape,
@@ -215,7 +216,7 @@ export function displayValue(field: CollectionField, value: FieldValue | undefin
     case 'yes_no':
       return value === true ? 'Yes' : value === false ? 'No' : String(value);
     default:
-      return String(value);
+      return isPlace(value) ? value.address : String(value);
   }
 }
 
@@ -226,6 +227,8 @@ export function inputValue(field: CollectionField, value: FieldValue | undefined
     // A string is already an input's value, as a filled-in preview holds it.
     return value === true ? 'yes' : value === false ? 'no' : typeof value === 'string' ? value : '';
   }
+  // A place is edited as its address; saving a changed one drops the coordinates with it.
+  if (isPlace(value)) return value.address;
   return String(value);
 }
 
