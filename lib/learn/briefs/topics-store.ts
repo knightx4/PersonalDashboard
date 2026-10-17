@@ -3,6 +3,7 @@ import 'server-only';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { readDrafting } from '@/lib/learn/levels/draft-sources';
 import { runTopicDraft, type DraftRunResult } from '@/lib/learn/levels/draft-run';
+import { goalLensId } from '@/lib/learn/levels/lens-store';
 import { goalTargetLevel } from '@/lib/learn/levels/lenses';
 import { FOUND_KIND_LABELS, readSections, type FoundKind } from './model';
 import { briefDraftSources, goalPerformances, readDraftedFromBrief, type BriefGoalOption, type BriefGoalPanel } from './topics';
@@ -50,12 +51,12 @@ export async function loadBriefGoalPanel(client: Client, briefId: string): Promi
 
 /** The performances drafted for the goal's topics so far, newest first. */
 async function performancesFor(client: Client, aimId: string): Promise<string[]> {
-  const { data: lens } = await client.from('lenses').select('id').eq('aim_id', aimId).maybeSingle();
-  if (!lens) return [];
+  const lensId = await goalLensId(client, aimId).catch(() => null);
+  if (!lensId) return [];
   const { data, error } = await client
     .from('lens_targets')
     .select('topics ( drafting, created_at )')
-    .eq('lens_id', (lens as { id: string }).id);
+    .eq('lens_id', lensId);
   if (error) return [];
   type Row = { topics: { drafting: unknown; created_at: string } | { drafting: unknown; created_at: string }[] | null };
   return goalPerformances(
@@ -113,8 +114,8 @@ export async function draftBriefTopic(
 }
 
 /**
- * After a topic drafted from a brief is approved: put it on the goal's lens
- * at the goal's depth (a target already there is kept) and record the goal
+ * After a topic drafted from a brief is approved: put it on the lens the goal
+ * reads, its subject's (plan #2302.3), at the goal's depth (a target already there is kept) and record the goal
  * on the brief. Returns the brief, or null for a topic no brief drafted.
  */
 export async function settleBriefTopic(
@@ -127,16 +128,15 @@ export async function settleBriefTopic(
   const from = readDraftedFromBrief((topic?.drafting as { brief?: unknown } | null)?.brief);
   if (!topic || !from) return null;
 
-  const [{ data: lens, error: lensError }, { data: aim }] = await Promise.all([
-    client.from('lenses').select('id').eq('aim_id', from.aimId).maybeSingle(),
+  const [lensId, { data: aim }] = await Promise.all([
+    goalLensId(client, from.aimId),
     client.from('aims').select('depth').eq('id', from.aimId).maybeSingle(),
   ]);
-  if (lensError) throw new Error(`Reading the goal's lens failed: ${lensError.message}`);
-  if (!lens) throw new Error('That goal is no longer there, so the topic was approved without it.');
+  if (!lensId) throw new Error('That goal is no longer there, so the topic was approved without it.');
   const { error: targetError } = await client.from('lens_targets').upsert(
     {
       user_id: userId,
-      lens_id: (lens as { id: string }).id,
+      lens_id: lensId,
       topic_id: topicId,
       target_level: goalTargetLevel((aim as { depth: string } | null)?.depth ?? 'solid', topic.ceiling as number),
     },

@@ -17,31 +17,19 @@ import { territoryCells, type PieceCellView, type PieceToMatch, type TerritoryCe
 
 /**
  * The cells a track's goal reaches: every approved topic on the lens of the
- * track's subject or of a learning goal whose track it is, up to the target
- * that lens sets. Empty before any topic is on such a lens.
+ * track's subject, which its learning goals read too (plan #2302.3), up to
+ * the target that lens sets. Empty before any topic is on it.
  */
 export async function loadTrackTerritory(
   learn: LearnSupabaseClient,
   userId: string,
   subjectId: string,
 ): Promise<TerritoryCell[]> {
-  const { data: aims, error: aimsError } = await learn
-    .from('aims')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('subject_id', subjectId);
-  if (aimsError) throw new Error(`Reading the track's goal failed: ${aimsError.message}`);
-  const aimIds = ((aims ?? []) as { id: string }[]).map((row) => row.id);
-
   const { data: lenses, error: lensError } = await learn
     .from('lenses')
     .select('id')
     .eq('user_id', userId)
-    .or(
-      aimIds.length > 0
-        ? `subject_id.eq.${subjectId},aim_id.in.(${aimIds.join(',')})`
-        : `subject_id.eq.${subjectId}`,
-    );
+    .eq('subject_id', subjectId);
   if (lensError) throw new Error(`Reading the track's lenses failed: ${lensError.message}`);
   const lensIds = ((lenses ?? []) as { id: string }[]).map((row) => row.id);
   if (lensIds.length === 0) return [];

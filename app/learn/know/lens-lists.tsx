@@ -10,8 +10,10 @@ import { lensLine, meanText, type FieldLevel, type LensSummary } from '@/lib/lea
  *
  * Every subject is a lens, so a subject's row says how far along it is to its
  * targets. The row opens the subject's own page, which links to the lens. A subject whose lens has no topics yet keeps
- * the claims graph's count until it is moved. The learning goals follow as
- * lenses of their own, then each field by the mean level of its topics.
+ * the claims graph's count until it is moved. A learning goal has no lens of
+ * its own: it reads its subject's, so the subject's row names the goals on it
+ * and the subject is listed once (plan #2302.3). Each field follows by the
+ * mean level of its topics.
  *
  * The page and the gallery both draw these, so they take rows and read
  * nothing.
@@ -26,7 +28,14 @@ export type SubjectLensRow = {
   /** The claims graph's line, for a lens with nothing on it yet. */
   graphLine: string;
   comments: number;
+  /** The open learning goals that point at this subject and read its lens. */
+  goals: readonly string[];
 };
+
+/** "Goal: …" or "Goals: …, …", naming the goals that read a subject's lens. */
+function goalsLine(goals: readonly string[]): string {
+  return `${goals.length === 1 ? 'Goal' : 'Goals'}: ${goals.join(', ')}`;
+}
 
 /** The lens's line, in the one measure the list uses; the graph's only for a subject with no lens. */
 function subjectLine(row: SubjectLensRow): string {
@@ -46,6 +55,9 @@ export function SubjectLenses({ rows }: { rows: readonly SubjectLensRow[] }) {
               <span className="min-w-0">
                 <span className="block truncate text-ui font-medium text-ink">{row.name}</span>
                 <span className="block truncate text-small text-ink-muted">{subjectLine(row)}</span>
+                {row.goals.length > 0 && (
+                  <span className="block text-small text-ink-muted">{goalsLine(row.goals)}</span>
+                )}
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 <CommentCount count={row.comments} />
@@ -70,50 +82,13 @@ function Share({ lens }: { lens: LensSummary }) {
   );
 }
 
-export function GoalLenses({
-  goals,
-  comments,
-}: {
-  goals: readonly LensSummary[];
-  comments: ReadonlyMap<string, number>;
-}) {
-  if (goals.length === 0) return null;
-  return (
-    <section aria-labelledby="goal-lenses-heading" className="mt-8">
-      <h2 id="goal-lenses-heading" className="mb-2 px-1 text-ui font-semibold text-ink">
-        Learning goals
-      </h2>
-      <Card padding="none">
-        <ul className="divide-y divide-border">
-          {goals.map((goal) => (
-            <li key={goal.id}>
-              <Link
-                href={`/learn/lens/${goal.id}`}
-                className="card-pad-x row-pad flex min-h-11 items-center justify-between gap-3 hover:bg-sunken"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-ui font-medium text-ink">{goal.name}</span>
-                  <span className="block truncate text-small text-ink-muted">{lensLine(goal)}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <CommentCount count={comments.get(goal.id) ?? 0} />
-                  {goal.total > 0 && <Share lens={goal} />}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </section>
-  );
-}
-
 /**
  * Each field by the mean level of the topics tagged with it, deepest first:
  * depth across a field, not only whether it has been touched. Before any
- * topic is tagged it is one line saying how a field fills.
+ * topic is tagged the section is left out (law 1).
  */
 export function FieldLevels({ fields, failed = false }: { fields: readonly FieldLevel[]; failed?: boolean }) {
+  if (!failed && fields.length === 0) return null;
   return (
     <section aria-labelledby="field-levels-heading" className="mt-8">
       <h2 id="field-levels-heading" className="mb-2 px-1 text-ui font-semibold text-ink">
@@ -122,13 +97,6 @@ export function FieldLevels({ fields, failed = false }: { fields: readonly Field
       {failed ? (
         <Card padding="dense">
           <p className="text-ui text-ink-muted">Your topics could not be read, so the fields are missing.</p>
-        </Card>
-      ) : fields.length === 0 ? (
-        <Card padding="dense">
-          <p className="text-ui text-ink-muted">
-            No topic is tagged with a field yet. A field shows here once an approved topic carries it, at the mean level
-            of its topics.
-          </p>
         </Card>
       ) : (
         <Card padding="none">
