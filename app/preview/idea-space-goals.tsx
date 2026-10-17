@@ -86,6 +86,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-behavioural',
       name: 'Behavioural economics for pricing',
+      goalNames: [],
       line: '5 draft topics to approve',
       held: 0,
       total: 0,
@@ -96,6 +97,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-accounts',
       name: "Read a company's accounts",
+      goalNames: [],
       line: `${ACCOUNTS.length} topics · ${a.held} of ${a.total} levels held`,
       ...a,
       next: 'Next: Accrual accounting at level 2, define it accurately in your own words',
@@ -110,6 +112,7 @@ export function goalsFor(ideas: readonly IdeaOnMap[]): GoalOnMap[] {
     {
       id: 'goal-saas',
       name: 'SaaS and subscription business metrics',
+      goalNames: [],
       line: `${SAAS.length} topics · ${s.held} of ${s.total} levels held`,
       ...s,
       next: 'Next: Gross margin in software at level 2, define it accurately in your own words',
