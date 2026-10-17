@@ -90,34 +90,38 @@ function ContactDetails({
     <Card padding="dense" data-slot="section">
       {/* The properties a list sorts and filters by, as chips on one line. */}
       <div className="flex flex-wrap items-center gap-2">
-        <ChipSelect
-          aria-label="How you know them"
-          value={contact.relationship}
-          onChange={(event) => {
-            const relationship = event.target.value as (typeof RELATIONSHIPS)[number];
-            save({ relationship }, { relationship });
-          }}
-        >
-          {RELATIONSHIPS.map((entry) => (
-            <option key={entry} value={entry}>
-              {words(entry)}
-            </option>
-          ))}
-        </ChipSelect>
-        <ChipSelect
-          aria-label="Where it stands"
-          value={contact.status}
-          onChange={(event) => {
-            const status = event.target.value as (typeof STATUSES)[number];
-            save({ status }, { status });
-          }}
-        >
-          {STATUSES.map((entry) => (
-            <option key={entry} value={entry}>
-              {words(entry)}
-            </option>
-          ))}
-        </ChipSelect>
+        <PressRoom>
+          <ChipSelect
+            aria-label="How you know them"
+            value={contact.relationship}
+            onChange={(event) => {
+              const relationship = event.target.value as (typeof RELATIONSHIPS)[number];
+              save({ relationship }, { relationship });
+            }}
+          >
+            {RELATIONSHIPS.map((entry) => (
+              <option key={entry} value={entry}>
+                {words(entry)}
+              </option>
+            ))}
+          </ChipSelect>
+        </PressRoom>
+        <PressRoom>
+          <ChipSelect
+            aria-label="Where it stands"
+            value={contact.status}
+            onChange={(event) => {
+              const status = event.target.value as (typeof STATUSES)[number];
+              save({ status }, { status });
+            }}
+          >
+            {STATUSES.map((entry) => (
+              <option key={entry} value={entry}>
+                {words(entry)}
+              </option>
+            ))}
+          </ChipSelect>
+        </PressRoom>
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-ui text-ink">
           <Switch
             checked={contact.potentialLead}
@@ -196,6 +200,15 @@ function ContactDetails({
   );
 }
 
+/**
+ * A chip select's press room on a phone: a label around it, as tall and wide
+ * as a thumb, which counts as part of the select's target without changing
+ * how the chip looks.
+ */
+function PressRoom({ children }: { children: React.ReactNode }) {
+  return <label className="inline-flex items-center max-sm:min-h-11 max-sm:min-w-11">{children}</label>;
+}
+
 /** One value, as an input set like the text it stands for; leaving it saves. */
 function DetailInput({
   label,
@@ -222,7 +235,7 @@ function DetailInput({
         type={type}
         defaultValue={value ?? ''}
         placeholder={placeholder}
-        className="-ml-1"
+        className="-ml-1 max-sm:min-h-11"
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur();
           if (event.key === 'Escape') {
@@ -242,7 +255,7 @@ function DetailInput({
           rel="noreferrer noopener"
           title={`Open ${label}`}
           aria-label={`Open ${label}`}
-          className="shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
+          className="press-area shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
         >
           <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
         </a>
@@ -350,23 +363,25 @@ function Outreach({
     >
       {/* Drafting: the channel, what it is for in a line, and the press. */}
       <div className="flex flex-wrap items-center gap-2">
-        <ChipSelect
-          aria-label="Draft it as"
-          value={channel}
-          onChange={(event) => setChannel(event.target.value as Channel)}
-        >
-          {CHANNELS.map((entry) => (
-            <option key={entry} value={entry}>
-              {words(entry)}
-            </option>
-          ))}
-        </ChipSelect>
+        <PressRoom>
+          <ChipSelect
+            aria-label="Draft it as"
+            value={channel}
+            onChange={(event) => setChannel(event.target.value as Channel)}
+          >
+            {CHANNELS.map((entry) => (
+              <option key={entry} value={entry}>
+                {words(entry)}
+              </option>
+            ))}
+          </ChipSelect>
+        </PressRoom>
         <InlineInput
           aria-label="What the message is for"
           value={aim}
           onChange={(event) => setAim(event.target.value)}
           placeholder="What it's for, if you want to say: ask about the role, follow up…"
-          className="min-w-48 flex-1"
+          className="min-w-48 flex-1 max-sm:min-h-11"
         />
         <DashAction
           type="button"
