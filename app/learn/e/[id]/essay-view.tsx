@@ -850,7 +850,7 @@ export function EssayView({
 
   // The tabs on the left; on the right, what the draft's tab can do to its text.
   const tabs = (
-    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2 min-[375px]:flex-nowrap">
       <Segmented
         label="Prepare, notes or draft"
         value={mode}
@@ -861,7 +861,7 @@ export function EssayView({
           { value: 'draft', label: 'Draft' },
         ]}
       />
-      <div className={cn('flex items-center gap-1', mode === 'prepare' && 'hidden')}>
+      <div className={cn('ml-auto flex items-center gap-1 max-sm:gap-0', mode === 'prepare' && 'hidden')}>
         <TextSizeControl scale={textScale} onStep={stepTextScale} />
         <DashAction
           paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"

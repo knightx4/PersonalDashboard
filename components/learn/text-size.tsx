@@ -57,6 +57,7 @@ export function TextSizeControl({ scale, onStep }: { scale: number; onStep: (ste
         type="button"
         variant="ghost"
         size="sm"
+        className="px-1.5"
         aria-label="Smaller text"
         disabled={scale <= TEXT_SCALES[0]}
         onClick={() => onStep(-1)}
@@ -67,6 +68,7 @@ export function TextSizeControl({ scale, onStep }: { scale: number; onStep: (ste
         type="button"
         variant="ghost"
         size="sm"
+        className="px-1.5"
         aria-label="Larger text"
         disabled={scale >= TEXT_SCALES[TEXT_SCALES.length - 1]}
         onClick={() => onStep(1)}
