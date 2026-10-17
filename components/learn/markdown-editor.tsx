@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, type CSSProperties, type Ref } from 'react';
 import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { caretRoom, essayHighlight, essayTheme, focusParagraph } from '@/lib/learn/essays/editor';
+import { livePreview } from '@/lib/learn/essays/live-preview';
 import type { AuthorMark } from '@/lib/learn/essays/authorship';
 import { definitionInsert } from '@/lib/learn/essays/research';
 import {
@@ -99,6 +100,7 @@ export function MarkdownEditor({
   onSaveNow,
   onSelect,
   onCaret,
+  textScale = 1,
 }: {
   initialDoc: string;
   /** The runs of `initialDoc` that are Dash's or quoted. */
@@ -124,6 +126,8 @@ export function MarkdownEditor({
   onSaveNow?: () => void;
   /** Where the cursor is, whenever it moves or the text changes (plan #1863.8). */
   onCaret?: (pos: number) => void;
+  /** The text's size as a multiple of 19px, from the page's text size control (note 210d50b9). */
+  textScale?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -166,6 +170,7 @@ export function MarkdownEditor({
           ]),
           markdown({ base: markdownLanguage }),
           essayHighlight,
+          livePreview,
           essayTheme,
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({
@@ -280,5 +285,15 @@ export function MarkdownEditor({
     [],
   );
 
-  return <div ref={host} className="min-h-[40vh]" />;
+  useEffect(() => {
+    view.current?.requestMeasure();
+  }, [textScale]);
+
+  return (
+    <div
+      ref={host}
+      className="min-h-[40vh]"
+      style={{ '--essay-scale': textScale } as CSSProperties}
+    />
+  );
 }

@@ -19,10 +19,11 @@ import { EASE, MOTION_MS } from '@/lib/motion';
 
 /**
  * The page's type. One column of about 66 characters at 19px and line height
- * 1.6. The colours are the app's tokens, so the four themes follow.
+ * 1.6, times the text size the person chose (`--essay-scale`, note 210d50b9).
+ * The colours are the app's tokens, so the four themes follow.
  */
 export const essayTheme = EditorView.theme({
-  '&': { fontSize: '19px', color: 'var(--color-ink)', backgroundColor: 'transparent' },
+  '&': { fontSize: 'calc(19px * var(--essay-scale, 1))', color: 'var(--color-ink)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.6', overflow: 'visible' },
   // 33em rather than 66ch: `ch` is the width of a zero, wider than the
@@ -35,8 +36,9 @@ export const essayTheme = EditorView.theme({
 });
 
 /**
- * Markdown symbols dimmed rather than hidden, so `#`, `*` and `>` stay where
- * you can see and delete them. Headings are larger.
+ * Markdown symbols dimmed where they show: on the cursor's line, and `>` and
+ * list marks everywhere. Elsewhere live-preview.ts hides them, as Obsidian's
+ * live preview does. Headings are larger.
  */
 export const essayHighlight = syntaxHighlighting(
   HighlightStyle.define([
