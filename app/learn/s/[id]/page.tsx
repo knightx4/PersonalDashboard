@@ -19,7 +19,7 @@ import { loadCurriculum, type StoredUnit } from '@/lib/learn/graph/curriculum-st
 import { unitGoal } from '@/lib/learn/graph/curriculum-payload';
 import { curriculumRows, type UnitRow } from '@/lib/learn/graph/curriculum-view';
 import { loadTrackPieces, type PieceSibling } from '@/lib/learn/lessons/piece-store';
-import { loadPlan, planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { loadPlan, planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { loadProjectView } from '@/lib/learn/lessons/project-store';
@@ -308,7 +308,7 @@ export default async function SubjectPage({
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
-  const planGoal = await planGoalFor(supabase, user.id, id).catch(() => null);
+  const planGoal = await planOwnerFor(supabase, user.id, id).catch(() => null);
   const [plan, project]: [PlanUnit[] | null, ProjectView | null] = planGoal
     ? await Promise.all([
         loadPlan(supabase, user.id, id).catch(() => null),

@@ -23,7 +23,7 @@ import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { writeSubjectCurriculum } from '@/lib/learn/graph/curriculum-run';
 import { queueConcept } from '@/lib/learn/graph/to-queue';
 import { addUnit, moveUnit, removeUnit } from '@/lib/learn/lessons/plan-edit';
-import { planGoalFor } from '@/lib/learn/lessons/plan-store';
+import { planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import { kickPreparation } from '@/lib/learn/prepare/kick';
 import { directionOffer, storedBranch } from '@/lib/learn/prepare/branch';
 import { loadDirection, loadSubjectTerritory } from '@/lib/learn/prepare/store';
@@ -479,10 +479,10 @@ export async function writeTrackCurriculum(_prev: CurriculumState, formData: For
 }
 
 /**
- * Changing a goal's plan from its page (plan #1144): move a unit a place up
+ * Changing a plan from its page (plan #1144): move a unit a place up
  * or down, remove one with no passed piece, or add one by name. Each returns
  * what went wrong rather than throwing, so the plan can say it in place. Only
- * a track that is a learning goal's plan takes these; the checks on whose
+ * a track that is a goal's plan, or a prepared subject's, takes these; the checks on whose
  * unit it is are in the database functions (learn 0076).
  */
 export type PlanEditState = { error?: string };
@@ -494,8 +494,8 @@ async function planTrackFor(formData: FormData) {
   const parsed = planEditSchema.safeParse({ subjectId: formData.get('subjectId') });
   if (!parsed.success) return { error: 'That plan could not be found.' } as const;
   const supabase = await createLearnClient();
-  const goal = await planGoalFor(supabase, user.id, parsed.data.subjectId);
-  if (!goal) return { error: 'Only a learning goal’s plan can be changed here.' } as const;
+  const owner = await planOwnerFor(supabase, user.id, parsed.data.subjectId);
+  if (!owner) return { error: 'Only the plan of a goal or a prepared subject can be changed here.' } as const;
   return { user, supabase, subjectId: parsed.data.subjectId } as const;
 }
 

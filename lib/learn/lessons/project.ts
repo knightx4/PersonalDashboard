@@ -42,6 +42,17 @@ export type PlanForProject = {
   units: readonly UnitForProject[];
 };
 
+/**
+ * How deep a prepared subject goes, as a goal's depth words it, from the
+ * target levels of its territory's topics (plan #2307.3): the mean target,
+ * under 4 familiar, under 5.5 solid, above that deep. Null for no topics.
+ */
+export function depthFromTargets(targets: readonly number[]): 'familiar' | 'solid' | 'deep' | null {
+  if (targets.length === 0) return null;
+  const mean = targets.reduce((sum, one) => sum + one, 0) / targets.length;
+  return mean < 4 ? 'familiar' : mean < 5.5 ? 'solid' : 'deep';
+}
+
 /** The lines that say which plan this is, for the writer and the marker. */
 export function planLines(plan: PlanForProject, withUnits: 'full' | 'titles'): string[] {
   const units = [...plan.units].sort((a, b) => a.ordinal - b.ordinal);
