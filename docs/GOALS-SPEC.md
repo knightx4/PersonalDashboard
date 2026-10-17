@@ -1376,7 +1376,13 @@ A sketch for the migration, not the migration itself.
   #1029).
 - `goals.item_goals`: extra goals a step counts towards, beyond its own
   parent.
-- `goals.links`: a goal or step to a Learn aim, a job application, a role.
+- `goals.links`: a goal or step to a Learn aim, a job application, a role,
+  or a row it lists from another workspace: a reading (`learn.readings`), an
+  event (`todo.events`), a saved product (`saved_items`) or a contact
+  (`job_search.contacts`). The goal points at the row and reads it live, so
+  finishing a reading in Learn shows on the goal (plan #2330.1).
+  `list_name` groups the links of one goal into lists; null is the kind's
+  own list (Reading, Events, Products, People).
 - `goals.history`: one row per change to any goals table, written by
   trigger: table, row id, action, old and new values, actor (`me`, `claude`,
   `capture`), capture id where there is one, and time. An Undo on a run's

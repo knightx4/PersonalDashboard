@@ -458,6 +458,101 @@ describe('the Goals writes', () => {
         'That goal is not linked to the job search.',
       );
     });
+
+    describe('rows a goal lists (plan #2330.1)', () => {
+      const READING = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      const EVENT = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+      const PANTRY = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+      const CONTACT = '12121212-1212-4212-8212-121212121212';
+      const THEIR_READING = '13131313-1313-4313-8313-131313131313';
+
+      function listTables(): FakeTables {
+        const data = formTables();
+        data['learn.readings'] = [
+          { id: READING, user_id: ME, title: 'The Power Broker' },
+          { id: THEIR_READING, user_id: THEM, title: 'Their book' },
+        ];
+        data['todo.events'] = [{ id: EVENT, user_id: ME, title: 'Parkrun meetup' }];
+        data['public.saved_items'] = [
+          { id: PANTRY, user_id: ME, title: 'HOMCOM 72 inch pantry' },
+          { id: 'p2', user_id: ME, title: 'HOMCOM 60 inch pantry' },
+        ];
+        data['job_search.contacts'] = [{ id: CONTACT, user_id: ME, full_name: 'Ana Ruiz' }];
+        return data;
+      }
+
+      it('lists a reading, an event, a saved product and a contact, each in its own list', async () => {
+        const data = listTables();
+        const reading = await made('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: 'the power broker' });
+        expect(reading.op).toBe('insert');
+        expect(reading.summary).toBe('Dash listed the reading "The Power Broker" in "Reading" on the goal "Run a half marathon".');
+        expect(reading.after).toMatchObject({ item_id: GOAL, kind: 'reading', target_id: READING, user_id: ME });
+        const event = await made('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'event', target: `todo.events:${EVENT}` });
+        expect(event.after).toMatchObject({ kind: 'event', target_id: EVENT });
+        const pantry = await made('change_goal_link', data, {
+          change: 'link_row',
+          goal_ref: GOAL,
+          kind: 'saved_item',
+          target: '72 inch',
+          list: ' Pantries to compare ',
+        });
+        expect(pantry.after).toMatchObject({ kind: 'saved_item', target_id: PANTRY, list_name: 'Pantries to compare' });
+        const contact = await made('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'contact', target: CONTACT });
+        expect(contact.summary).toBe('Dash listed the contact "Ana Ruiz" in "People" on the goal "Run a half marathon".');
+        // Nothing in the other workspaces was written.
+        expect(data['learn.readings']).toHaveLength(2);
+        expect(row(data, 'public.saved_items', PANTRY)).toEqual({ id: PANTRY, user_id: ME, title: 'HOMCOM 72 inch pantry' });
+      });
+
+      it("refuses another account's row, a name that matches two, and a ref of another table", async () => {
+        const data = listTables();
+        expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: THEIR_READING })).toBe(
+          'There is no reading of theirs with that ref. Look it up first.',
+        );
+        expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: 'Their book' })).toBe(
+          'They have no reading called "Their book". Look it up first.',
+        );
+        expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'saved_item', target: 'pantry' })).toMatch(
+          /More than one saved product of theirs matches "pantry"/,
+        );
+        expect(
+          await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'event', target: `learn.readings:${READING}` }),
+        ).toBe('That ref is not one of their events. Give a todo.events ref.');
+        expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'book', target: 'x' })).toMatch(
+          /kind must be one of reading, event, saved_item, contact/,
+        );
+        expect(data['goals.links']).toHaveLength(0);
+      });
+
+      it('moves a listed row to another list, refuses listing it twice, and takes it off', async () => {
+        const data = listTables();
+        await made('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: READING });
+        expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: READING })).toBe(
+          'That goal lists the reading "The Power Broker" in "Reading" already.',
+        );
+        const moved = await made('change_goal_link', data, {
+          change: 'link_row',
+          goal_ref: GOAL,
+          kind: 'reading',
+          target: READING,
+          list: 'Books on cities',
+        });
+        expect(moved.op).toBe('update');
+        expect(moved.summary).toBe('Dash moved the reading "The Power Broker" to the list "Books on cities" on the goal "Run a half marathon".');
+        expect(moved.after).toMatchObject({ list_name: 'Books on cities' });
+        const off = await made('change_goal_link', data, { change: 'unlink_row', goal_ref: GOAL, kind: 'reading', target: READING });
+        expect(off.summary).toBe('Dash took the reading "The Power Broker" off the list "Books on cities" on the goal "Run a half marathon".');
+        expect(off.after).toMatchObject({ archived_at: expect.any(String) });
+        expect(await refused('change_goal_link', data, { change: 'unlink_row', goal_ref: GOAL, kind: 'reading', target: READING })).toBe(
+          'That goal does not list the reading "The Power Broker".',
+        );
+        // Listing it again brings the same row back, in the list it had.
+        const back = await made('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: READING });
+        expect(back.op).toBe('update');
+        expect(back.after).toMatchObject({ archived_at: null, list_name: 'Books on cities' });
+        expect(data['goals.links']).toHaveLength(1);
+      });
+    });
   });
 
   describe('change_goal_form', () => {

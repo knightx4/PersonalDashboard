@@ -474,6 +474,77 @@ describe('goals links', () => {
     const seen = await asUser(userB, (tx) => tx`select id from links where user_id = ${userA}`);
     expect(seen).toHaveLength(0);
   });
+
+  it('lists readings, events, saved products and contacts of your own, under a list name (plan #2330.1)', async () => {
+    const [track] = await admin<{ id: string }[]>`
+      insert into learn.tracks (user_id, title) values (${userA}, 'Cities') returning id`;
+    const [reading] = await admin<{ id: string }[]>`
+      insert into learn.readings (user_id, track_id, locator_basis, title)
+      values (${userA}, ${track.id}, 'typed in', 'The Power Broker') returning id`;
+    const [event] = await admin<{ id: string }[]>`
+      insert into todo.events (user_id, title, starts_on, ends_on)
+      values (${userA}, 'Parkrun meetup', '2026-11-01', '2026-11-01') returning id`;
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url, title)
+      values (${userA}, 'https://shop.example/pantry', 'Pantry') returning id`;
+    const [contact] = await admin<{ id: string }[]>`
+      insert into job_search.contacts (user_id, full_name) values (${userA}, 'Ana Ruiz') returning id`;
+
+    const kinds = await asUser(userA, async (tx) => {
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'reading', ${reading.id})`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'event', ${event.id})`;
+      await tx`
+        insert into links (user_id, item_id, kind, target_id, list_name)
+        values (${userA}, ${goalA}, 'saved_item', ${saved.id}, 'Pantries to compare')`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'contact', ${contact.id})`;
+      return tx<{ kind: string; list_name: string | null }[]>`
+        select kind, list_name from links
+        where item_id = ${goalA} and kind in ('reading', 'event', 'saved_item', 'contact') order by kind`;
+    });
+    expect(kinds).toEqual([
+      { kind: 'contact', list_name: null },
+      { kind: 'event', list_name: null },
+      { kind: 'reading', list_name: null },
+      { kind: 'saved_item', list_name: 'Pantries to compare' },
+    ]);
+
+    // A blank list name is not a name.
+    await expect(
+      admin`update links set list_name = '  ' where kind = 'reading' and item_id = ${goalA}`,
+    ).rejects.toThrow(/links_list_name_ck/);
+  });
+
+  it("refuses to list another account's reading, event, saved product or contact", async () => {
+    const [track] = await admin<{ id: string }[]>`
+      insert into learn.tracks (user_id, title) values (${userB}, 'Theirs') returning id`;
+    const [reading] = await admin<{ id: string }[]>`
+      insert into learn.readings (user_id, track_id, locator_basis, title)
+      values (${userB}, ${track.id}, 'typed in', 'Their book') returning id`;
+    const [event] = await admin<{ id: string }[]>`
+      insert into todo.events (user_id, title, starts_on, ends_on)
+      values (${userB}, 'Their party', '2026-11-01', '2026-11-01') returning id`;
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url) values (${userB}, 'https://shop.example/theirs') returning id`;
+    const [contact] = await admin<{ id: string }[]>`
+      insert into job_search.contacts (user_id, full_name) values (${userB}, 'Their friend') returning id`;
+
+    const cases: [string, string][] = [
+      ['reading', reading.id],
+      ['event', event.id],
+      ['saved_item', saved.id],
+      ['contact', contact.id],
+    ];
+    for (const [kind, id] of cases) {
+      // Even with the service role, which sees every row.
+      await expect(
+        admin`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, ${kind}, ${id})`,
+      ).rejects.toThrow(new RegExp(`no ${kind}`));
+      await expect(
+        asUser(userA, (tx) => tx`
+          insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, ${kind}, gen_random_uuid())`),
+      ).rejects.toThrow(new RegExp(`no ${kind}`));
+    }
+  });
 });
 
 describe('goals and the account', () => {

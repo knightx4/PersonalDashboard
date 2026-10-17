@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { GoalsChangeInput, GoalsChangeKind } from '@/lib/ask/goals-changes';
-import { toRef } from '@/lib/core/refs';
+import { parseRef, toRef } from '@/lib/core/refs';
 import type { GoalsActor, GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { DUE_PRECISIONS } from '@/lib/goals/due-precision';
 import {
@@ -22,6 +22,7 @@ import type { CollectionField } from '@/lib/goals/collections';
 import { archiveRecord, restoreRecord } from '@/lib/goals/collections-store';
 import { KIND_NAME_MAX, RECOGNISE_MAX, SKIPPED_LABEL_MAX, SKIPPED_MAX, parseSenders } from '@/lib/goals/document-kinds';
 import { editKind, forgetKind } from '@/lib/goals/document-kinds-store';
+import { DEFAULT_LIST_NAMES, LISTED_KINDS, isListedKind, listNameOf, parseListName, type ListedKind } from '@/lib/goals/links';
 import { linkTarget, unlinkTarget } from '@/lib/goals/links-store';
 import { recordAttended } from '@/lib/goals/suggestions-store';
 import { snoozeRow, unsnoozeRow } from '@/lib/core/inbox-snooze-store';
@@ -60,7 +61,8 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   change_goal_number  a goal's unit and target set or cleared, or its
  *                     number worked out from a collection serving it.
  *   change_goal_link  a goal linked to a Learn goal or the job search, or
- *                     unlinked.
+ *                     unlinked; and a reading, event, saved product or
+ *                     contact listed on a goal or taken off (plan #2330.1).
  *   change_goal_form  an information step's questions set, a row archived or
  *                     brought back, and a kind of document edited or
  *                     forgotten (plan #1894.7.3).
@@ -1072,8 +1074,148 @@ async function changeGoalNumber(env: GoalsWriteEnv, args: Args): Promise<GoalsMa
     : report('Set', ' to take readings typed in', `Dash set the goal "${title}" to take its number from readings typed in.`);
 }
 
-const LINK_CHANGES = ['link_aim', 'unlink_aim', 'link_job_search', 'unlink_job_search'] as const;
+const LINK_CHANGES = ['link_aim', 'unlink_aim', 'link_job_search', 'unlink_job_search', 'link_row', 'unlink_row'] as const;
 const LINKS = 'goals.links';
+
+/**
+ * Where each kind of listed row lives, what names it, and how a sentence
+ * calls it (plan #2330.1). Dash finds the row by its ref or by its name among
+ * the person's own rows of that table.
+ */
+const LISTED: Record<ListedKind, { schema: string; table: string; name: string; noun: string }> = {
+  reading: { schema: 'learn', table: 'readings', name: 'title', noun: 'reading' },
+  event: { schema: 'todo', table: 'events', name: 'title', noun: 'event' },
+  saved_item: { schema: 'public', table: 'saved_items', name: 'title', noun: 'saved product' },
+  contact: { schema: 'job_search', table: 'contacts', name: 'full_name', noun: 'contact' },
+};
+
+/**
+ * One of the person's readings, events, saved products or contacts, by its
+ * ref (`learn.readings:<id>`, or the id alone) or by its name: the one whose
+ * name matches exactly, or the only one whose name holds the words.
+ */
+async function findListedRow(env: GoalsWriteEnv, kind: ListedKind, wanted: string): Promise<{ id: string; name: string }> {
+  const listed = LISTED[kind];
+  if (!wanted) throw new GoalsRefused(`target is missing: name the ${listed.noun}, or give the ref a lookup returned.`);
+  const ref = parseRef(wanted);
+  const id = ref ? ref.id : isUuid(wanted) ? wanted : null;
+  if (ref && ref.table !== `${listed.schema}.${listed.table}`) {
+    throw new GoalsRefused(`That ref is not one of their ${listed.noun}s. Give a ${listed.schema}.${listed.table} ref.`);
+  }
+  const table = env.goals.schema(listed.schema).from(listed.table);
+  if (id) {
+    const { data, error } = await table.select(`id, ${listed.name}`).eq('user_id', env.userId).eq('id', id).maybeSingle();
+    if (error) throw new Error(`Reading the ${listed.noun} failed: ${error.message}`);
+    const row = data as Row | null;
+    if (!row) throw new GoalsRefused(`There is no ${listed.noun} of theirs with that ref. Look it up first.`);
+    return { id: row.id as string, name: named(row[listed.name], `the ${listed.noun}`) };
+  }
+  const { data, error } = await table.select(`id, ${listed.name}`).eq('user_id', env.userId);
+  if (error) throw new Error(`Reading the ${listed.noun}s failed: ${error.message}`);
+  const rows = ((data ?? []) as Row[]).map((row) => ({ id: row.id as string, name: String(row[listed.name] ?? '').trim() }));
+  const key = wanted.toLowerCase();
+  const exact = rows.filter((row) => row.name.toLowerCase() === key);
+  const holding = exact.length > 0 ? exact : rows.filter((row) => row.name.toLowerCase().includes(key));
+  if (holding.length === 1) return { id: holding[0].id, name: named(holding[0].name, `the ${listed.noun}`) };
+  if (holding.length > 1) {
+    const some = holding.slice(0, 5).map((row) => `"${named(row.name, 'untitled')}"`).join(', ');
+    throw new GoalsRefused(`More than one ${listed.noun} of theirs matches "${wanted}": ${some}. Give its ref instead.`);
+  }
+  throw new GoalsRefused(`They have no ${listed.noun} called "${wanted}". Look it up first.`);
+}
+
+/**
+ * A goal listing one of the person's readings, events, saved products or
+ * contacts, or no longer (plan #2330.1). The goal points at the row; nothing
+ * is copied and nothing in the row's workspace changes. Linking a row the
+ * goal already lists under another list name moves it to that list.
+ */
+async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' | 'unlink_row'): Promise<GoalsMade> {
+  const kind = text(args, 'kind');
+  if (!isListedKind(kind)) throw new GoalsRefused(`kind must be one of ${LISTED_KINDS.join(', ')}.`);
+  const goal = await ownGoal(env, text(args, 'goal_ref'));
+  const goalId = goal.id as string;
+  const title = named(goal.title, 'the goal');
+  const target = await findListedRow(env, kind, text(args, 'target'));
+  const noun = LISTED[kind].noun;
+  const what = `the ${noun} "${target.name}"`;
+
+  const readLink = async (): Promise<Row | null> => {
+    const { data, error } = await env.goals
+      .from('links')
+      .select('*')
+      .eq('user_id', env.userId)
+      .eq('item_id', goalId)
+      .eq('kind', kind)
+      .eq('target_id', target.id)
+      .maybeSingle();
+    if (error) throw new Error(`Reading the goal's links failed: ${error.message}`);
+    return (data as Row | null) ?? null;
+  };
+  const before = await readLink();
+  const live = before != null && before.archived_at == null;
+  const linking = change === 'link_row';
+  // A name given is the list; none keeps a live link's list, or puts a new
+  // link in the kind's own.
+  const asked = 'list' in args ? parseListName(args.list) : undefined;
+
+  if (linking) {
+    const was = live ? listNameOf({ kind, listName: (before.list_name as string | null) ?? null }) : null;
+    const into = listNameOf({ kind, listName: asked === undefined ? ((before?.list_name as string | null) ?? null) : asked });
+    if (live && (asked === undefined || was?.toLowerCase() === into.toLowerCase())) {
+      throw new GoalsRefused(`That goal lists ${what} in "${was}" already.`);
+    }
+    const linked = await linkTarget(await env.write({}), env.userId, goalId, kind, target.id, asked);
+    if (!linked) throw new GoalsRefused(`That goal could not list ${what}.`);
+    const after = await readLink();
+    if (!after) throw new Error('The link was written but could not be read back.');
+    const moved = live;
+    return {
+      kind: 'change_goal_link',
+      input: {
+        verb: moved ? 'Moved' : 'Listed',
+        what: target.name,
+        rest: ` in "${into}" on ${title}`,
+        href: goalHref(goalId),
+        where: 'Open the goal',
+        paths: [...GOAL_PATHS, goalHref(goalId)],
+      },
+      subjectRef: toRef(LINKS, after.id as string),
+      op: before ? 'update' : 'insert',
+      before,
+      after,
+      undo: null,
+      summary: moved
+        ? `Dash moved ${what} to the list "${into}" on the goal "${title}".`
+        : `Dash listed ${what} in "${into}" on the goal "${title}".`,
+      row: { table: ITEM, ref: goalId, title, href: goalHref(goalId) },
+    };
+  }
+
+  if (!live) throw new GoalsRefused(`That goal does not list ${what}.`);
+  if (!(await unlinkTarget(await env.write({}), before.id as string))) throw new GoalsRefused('That link has already gone.');
+  const after = await readLink();
+  if (!after) throw new Error('The link was written but could not be read back.');
+  const from = listNameOf({ kind, listName: (before.list_name as string | null) ?? null });
+  return {
+    kind: 'change_goal_link',
+    input: {
+      verb: 'Took',
+      what: target.name,
+      rest: ` off "${from}" on ${title}`,
+      href: goalHref(goalId),
+      where: 'Open the goal',
+      paths: [...GOAL_PATHS, goalHref(goalId)],
+    },
+    subjectRef: toRef(LINKS, after.id as string),
+    op: 'update',
+    before,
+    after,
+    undo: null,
+    summary: `Dash took ${what} off the list "${from}" on the goal "${title}".`,
+    row: { table: ITEM, ref: goalId, title, href: goalHref(goalId) },
+  };
+}
 
 /** One of the person's live Learn goals, by its learn.aims ref or its name. */
 async function findAim(env: GoalsWriteEnv, wanted: string): Promise<Row> {
@@ -1099,6 +1241,7 @@ async function findAim(env: GoalsWriteEnv, wanted: string): Promise<Row> {
 /** Linking a goal to a Learn goal or to the job search, or no longer: a goals.links row, archived to unlink. */
 async function changeGoalLink(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
   const change = oneOf(args, LINK_CHANGES);
+  if (change === 'link_row' || change === 'unlink_row') return changeGoalRow(env, args, change);
   const goal = await ownGoal(env, text(args, 'goal_ref'));
   const goalId = goal.id as string;
   const title = named(goal.title, 'the goal');
@@ -1627,13 +1770,23 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_link',
     description:
-      "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Name the goal by the goals.items ref a lookup returned, and the Learn goal by its name as they have it. Nothing in Learn or the job search is changed.",
+      "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Or list one of their readings, calendar events, saved products or contacts on the goal, or take it off (link_row or unlink_row, with kind and target, and list for the list's name, such as \"Pantries to compare\"; a row already listed moves to the list named). Name the goal by the goals.items ref a lookup returned, the Learn goal by its name as they have it, and the row by its ref or its name. The goal points at the row rather than copying it, and nothing in Learn, Todo, Shopping or the job search is changed.",
     input_schema: {
       type: 'object',
       properties: {
         change: { type: 'string', enum: [...LINK_CHANGES], description: 'What to link or unlink.' },
         goal_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the goal.' },
         aim: { type: 'string', description: 'For link_aim and unlink_aim: the Learn goal, by its name or learn.aims ref.' },
+        kind: {
+          type: 'string',
+          enum: [...LISTED_KINDS],
+          description: 'For link_row and unlink_row: a reading (learn.readings), event (todo.events), saved_item (saved_items) or contact (job_search.contacts).',
+        },
+        target: { type: 'string', description: 'For link_row and unlink_row: the row, by the ref a lookup returned or its name.' },
+        list: {
+          type: 'string',
+          description: `For link_row: the list on the goal it goes in. Leave out for the kind's own list (${LISTED_KINDS.map((k) => `"${DEFAULT_LIST_NAMES[k]}"`).join(', ')}), or to keep the list it is in.`,
+        },
       },
       required: ['change', 'goal_ref'],
       additionalProperties: false,

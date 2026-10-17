@@ -91,6 +91,7 @@ export const goalsActions: ModuleActions = {
   'app/goals/[goalId]/link-actions.ts': {
     linkAimAction: tool('change_goal_link'),
     linkJobSearchAction: tool('change_goal_link'),
+    linkRowAction: tool('change_goal_link'),
     unlinkAction: tool('change_goal_link'),
   },
   'app/goals/[goalId]/reading-actions.ts': {
