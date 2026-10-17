@@ -8,7 +8,7 @@ import type {
   RunPatch,
   StepPatch,
 } from './run';
-import { isPreparationStepKey, PREPARATION_STEPS, type PreparationStepKey } from './steps';
+import { isPreparationStepKey, missingPreparationSteps, PREPARATION_STEPS, type PreparationStepKey } from './steps';
 import { readBranch, readDirection, type DirectionChoice } from './branch';
 
 /**
@@ -395,9 +395,25 @@ export function preparationStore(
       if (subjectRead.error) throw new Error(`Reading the subject failed: ${subjectRead.error.message}`);
       const subject = subjectRead.data as { id: string; user_id: string; name: string; note: string | null; kind: string | null } | null;
       if (!subject) return null;
+      let steps = toSteps((stepsRead.data ?? []) as StepDb[]);
+      // A subject's own run opened before a step was added (first_lesson,
+      // learn 0173) has no row for it, so a run reopened to that step would
+      // find nothing left and finish at once with nothing written (note
+      // b4a7a759). Add the missing rows before the run is worked.
+      const missing = run.branch || run.status === 'done' ? [] : missingPreparationSteps(steps);
+      if (missing.length > 0) {
+        const { error: addError } = await learn.from('subject_preparation_steps').upsert(
+          missing.map((s) => ({ preparation_id: run.id, user_id: userId, key: s.key, ordinal: s.ordinal })),
+          { onConflict: 'preparation_id,key', ignoreDuplicates: true },
+        );
+        if (addError) throw new Error(`Adding the preparation's missing steps failed: ${addError.message}`);
+        const reread = await learn.from('subject_preparation_steps').select(STEP_COLUMNS).eq('user_id', userId).eq('preparation_id', run.id);
+        if (reread.error) throw new Error(`Reading the preparation's steps failed: ${reread.error.message}`);
+        steps = toSteps((reread.data ?? []) as StepDb[]);
+      }
       return {
         run,
-        steps: toSteps((stepsRead.data ?? []) as StepDb[]),
+        steps,
         subject: {
           id: subject.id,
           userId: subject.user_id,
