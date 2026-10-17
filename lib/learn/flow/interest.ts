@@ -61,6 +61,42 @@ export type TrackActivity = {
   lastUsed?: string;
 };
 
+/** One question shown or answered, counted for one subject. */
+export type SubjectQuestion = { subjectId: string; answered_at: string | null; shown_at: string | null };
+
+/** A question about one level of a topic (`learn.cell_questions`). */
+export type CellQuestionRow = { cell_id: string; answered_at: string | null; shown_at: string | null };
+
+/**
+ * Questions about levels of topics as questions of the subjects they serve
+ * (plan #2313.2): one row for each subject whose lens holds the question's
+ * topic, so an answer moves every one of them. A question on a topic no
+ * subject's lens holds counts for none, and a subject is counted once per
+ * question however many of its lens rows name the topic.
+ */
+export function cellQuestionsBySubject(
+  questions: readonly CellQuestionRow[],
+  topicOfCell: ReadonlyMap<string, string>,
+  lensTopics: readonly { topicId: string; subjectId: string | null }[],
+): SubjectQuestion[] {
+  const subjectsOf = new Map<string, Set<string>>();
+  for (const row of lensTopics) {
+    if (!row.subjectId) continue;
+    const set = subjectsOf.get(row.topicId) ?? new Set<string>();
+    set.add(row.subjectId);
+    subjectsOf.set(row.topicId, set);
+  }
+  return questions.flatMap((question) => {
+    const topicId = topicOfCell.get(question.cell_id);
+    const subjects = topicId ? subjectsOf.get(topicId) : undefined;
+    return [...(subjects ?? [])].map((subjectId) => ({
+      subjectId,
+      answered_at: question.answered_at,
+      shown_at: question.shown_at,
+    }));
+  });
+}
+
 export type TrackWeight = {
   weight: number;
   /** You answered questions elsewhere in the window and none from this track. */

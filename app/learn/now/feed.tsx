@@ -1,6 +1,7 @@
 'use client';
 
 import Link, { linkVariants } from '@/components/ui/link';
+import { NOW_HREF } from '@/lib/learn/flow/href';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -33,7 +34,6 @@ import {
   appendCards,
   bringForward,
   canMakeTrack,
-  feedEnd,
   type CardDifficulty,
   PRELOAD_AHEAD,
   type FeedCard,
@@ -46,7 +46,6 @@ import {
   askAboutCard,
   deleteCardNote,
   dismissCard,
-  generateSubjectCards,
   loadMoreCards,
   makeTrackOfCard,
   openCardSource,
@@ -109,23 +108,9 @@ const SWIPE_LABEL: Record<SwipeAction, string> = {
 
 type MadeTrack = NonNullable<NewTrackResult['track']>;
 
-/**
- * What a subject's deck says once nothing of it is left to show (plan #1698).
- * The header above already names the subject, so this does not. Its cards are
- * its lessons, which are written as you work through the subject rather than
- * from what you write about; Generate more under it writes the next ones
- * while you wait (note 43b8d7ac).
- */
-function subjectEmpty(passed: number): string {
-  const start = passed === 0 ? 'Nothing here is ready.' : 'You are through every card here.';
-  return `${start} Generate more writes this subject's next lessons now, in a minute or two. Cards you skipped come back in three days.`;
-}
-
 export function LearnNowFeed({
   first,
   firstRelated,
-  ready: firstReady,
-  low,
   subjectId = null,
   earlier = [],
 }: {
@@ -138,9 +123,6 @@ export function LearnNowFeed({
    * as `relatedNotes`.
    */
   firstRelated?: Record<string, Promise<readonly RelatedNoteLink[]>>;
-  ready: number;
-  /** Below this many ready cards, loading more starts a top-up. */
-  low: number;
   /**
    * The subject this deck is narrowed to (plan #1698), whose cards alone it
    * loads. Null for the whole deck.
@@ -148,7 +130,6 @@ export function LearnNowFeed({
   subjectId?: string | null;
 }) {
   const [deck, setDeck] = useState(first);
-  const [ready, setReady] = useState(firstReady);
   const [ended, setEnded] = useState(first.length === 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +155,6 @@ export function LearnNowFeed({
       const more = await loadMoreCards(loaded.current, subjectId);
       loaded.current = [...loaded.current, ...more.cards.map((card) => card.id)];
       setDeck((current) => appendCards(current, more.cards));
-      setReady(more.ready);
       setEnded(more.cards.length === 0);
     } catch {
       setError('Could not load more cards. Try again in a moment.');
@@ -182,30 +162,6 @@ export function LearnNowFeed({
     } finally {
       busy.current = false;
       setLoading(false);
-    }
-  }, [subjectId]);
-
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<string | null>(null);
-  /** Generate more on an empty subject deck (note 43b8d7ac). */
-  const generate = useCallback(async () => {
-    if (!subjectId || busy.current) return;
-    busy.current = true;
-    setGenerating(true);
-    setGenerated(null);
-    setError(null);
-    try {
-      const made = await generateSubjectCards(subjectId, loaded.current);
-      loaded.current = [...loaded.current, ...made.cards.map((card) => card.id)];
-      setDeck((current) => appendCards(current, made.cards));
-      setReady(made.ready);
-      setGenerated(made.message);
-      if (made.cards.length > 0) setEnded(false);
-    } catch {
-      setGenerated('Could not write more for this subject just now. Try again in a moment.');
-    } finally {
-      busy.current = false;
-      setGenerating(false);
     }
   }, [subjectId]);
 
@@ -328,7 +284,6 @@ export function LearnNowFeed({
     return () => window.removeEventListener('keydown', onKey);
   }, [current, swipe]);
 
-  const end = feedEnd(ready, low);
   const ahead = Math.max(0, deck.length - 1);
 
   return (
@@ -406,39 +361,21 @@ export function LearnNowFeed({
             </p>
           ) : (
             <div className="space-y-3">
+              {/* No more cards are written (plan #2313.1): today's piece and
+                  practice on Now took their place, so the deck ends here. */}
               <p className="text-ui text-ink-muted">
                 {subjectId
-                  ? subjectEmpty(passed)
-                  : end === 'writing'
-                  ? passed === 0
-                    ? 'No cards are ready yet. New ones are being written from what you write about, a few minutes each.'
-                    : 'You are through every card ready now. More are being written, a few minutes each.'
-                  : 'You are through every card ready now. Cards you skipped come back in three days, and ones you want to work on in two.'}
+                  ? 'No cards are left for this subject. Its lessons are on its page, and cards you skipped come back in three days.'
+                  : passed === 0
+                    ? 'No cards are left. Today’s piece and practice are on Now, and cards you skipped come back in three days.'
+                    : 'You are through every card. Today’s piece and practice are on Now, and cards you skipped come back in three days.'}
               </p>
-              {subjectId ? (
-                <>
-                  {generated && (
-                    <p className="text-ui text-ink-muted" aria-live="polite">
-                      {generated}
-                    </p>
-                  )}
-                  <Button type="button" variant="secondary" pending={generating} onClick={generate}>
-                    {generating ? 'Writing lessons…' : 'Generate more'}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setEnded(false);
-                    setError(null);
-                    void loadMore();
-                  }}
-                >
-                  Check again
-                </Button>
-              )}
+              <Link
+                href={subjectId ? `/learn/s/${subjectId}` : NOW_HREF}
+                className={buttonVariants({ variant: 'secondary' })}
+              >
+                {subjectId ? 'Open the subject' : 'Back to Now'}
+              </Link>
             </div>
           )}
         </Card>

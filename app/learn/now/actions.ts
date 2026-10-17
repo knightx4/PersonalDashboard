@@ -1,9 +1,7 @@
 'use server';
 
-import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { practiceHref } from '@/lib/learn/flow/href';
@@ -19,13 +17,11 @@ import {
   type SwipeAction,
 } from '@/lib/learn/feed/card';
 import {
-  countReadyCards,
   loadFeedCardRow,
   loadFeedPage,
   recordFeedAction,
   setCardDifficulty,
 } from '@/lib/learn/feed/load';
-import { goalTrackIds } from '@/lib/learn/feed/plan-lessons';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
@@ -66,15 +62,15 @@ import { recordTeachBackProbe, saveTeachBackEvery, settleTeachBackState } from '
  * source, Save, Not interested, Test me on this, and the three swipes.
  * Loading more cards records nothing (LEARN-NOW-SPEC "What is recorded").
  *
- * Every action that can take a card out of the ready pool, and loading more,
- * asks for a top-up once the response has gone. It costs one count when
- * enough cards are ready, and writes fifteen more only when seven or fewer are.
+ * None of them asks for more cards any more (plan #2313.1): Now leads with
+ * today's piece and practice, and the cards already written are worked
+ * through from the Cards link until none are left.
  */
 
 const CardId = z.string().uuid();
 const CardIds = z.array(z.string().uuid()).max(1000);
 
-export type MoreCards = { cards: FeedCard[]; ready: number };
+export type MoreCards = { cards: FeedCard[] };
 
 /**
  * The next page of the deck, leaving out what it already holds. On a
@@ -88,11 +84,7 @@ export async function loadMoreCards(shown: string[], subjectId?: string | null):
   const subject = CardId.safeParse(subjectId);
   const only = subject.success ? subject.data : null;
   const supabase = await createLearnClient();
-  const [cards, ready] = await Promise.all([
-    loadFeedPage(supabase, exclude.success ? exclude.data : [], { subjectId: only }),
-    countReadyCards(supabase, only),
-  ]);
-  after(() => topUpFeedAfterResponse(user.id, only));
+  const cards = await loadFeedPage(supabase, exclude.success ? exclude.data : [], { subjectId: only });
   // These cards load behind the one on screen, so waiting for their related
   // notes here is not waiting in front of anybody (plan #1113).
   const related = await relatedNotesForCards(supabase, user.id, cards);
@@ -101,58 +93,7 @@ export async function loadMoreCards(shown: string[], subjectId?: string | null):
       const notes = related.get(card.id);
       return notes ? { ...card, relatedNotes: notes } : card;
     }),
-    ready,
   };
-}
-
-export type GeneratedCards = MoreCards & { written: number; message: string | null };
-
-/**
- * Generate more, on a subject's Now once its deck is empty (note 43b8d7ac).
- * Writes the subject's next lessons while the person waits, the same top-up
- * loading more starts after the response, and then deals what it wrote. A
- * subject with nothing ready to teach gets a line saying why instead.
- */
-// latency: pending -- a model call per lesson; the button says it is working
-export async function generateSubjectCards(subjectId: string, shown: string[]): Promise<GeneratedCards> {
-  const user = await requireUser();
-  const subject = CardId.safeParse(subjectId);
-  if (!subject.success) {
-    return { cards: [], ready: 0, written: 0, message: 'Could not tell which subject this is.' };
-  }
-  const supabase = await createLearnClient();
-  // A survey subject only holds the questions asked about a theme, so it has
-  // no curriculum and the top-up never writes it lessons (note 727c77a2).
-  const { data: row } = await supabase.from('subjects').select('survey').eq('id', subject.data).maybeSingle();
-  if ((row as { survey: boolean } | null)?.survey) {
-    return {
-      cards: [],
-      ready: 0,
-      written: 0,
-      message: 'This subject only holds the questions you were asked about it, so it has no lessons. Lessons come from subjects you follow.',
-    };
-  }
-  // A goal's lessons are on its plan, so its Now never deals them (plan #1143).
-  const goalTracks = await goalTrackIds(supabase, user.id);
-  if (goalTracks.includes(subject.data)) {
-    return {
-      cards: [],
-      ready: 0,
-      written: 0,
-      message: "This subject is a goal's, so its lessons are on the goal's plan rather than here.",
-    };
-  }
-  const summary = await topUpFeedAfterResponse(user.id, subject.data);
-  const more = await loadMoreCards(shown, subject.data);
-  const written = summary?.written ?? 0;
-  if (more.cards.length > 0) return { ...more, written, message: null };
-  const message =
-    summary === null
-      ? 'Could not write more for this subject just now. Try again in a moment.'
-      : summary.lessons?.held.includes(subject.data)
-        ? "This subject's next unit could not be written, so it rests for a day before Dash tries again."
-        : 'Nothing in this subject is ready to be taught yet. Its next lessons open as you pass the ones before them.';
-  return { ...more, written, message };
 }
 
 /**
@@ -161,12 +102,11 @@ export async function generateSubjectCards(subjectId: string, shown: string[]): 
  */
 // latency: optimistic
 export async function openCardSource(id: string): Promise<void> {
-  const user = await requireUser();
+  await requireUser();
   const card = CardId.safeParse(id);
   if (!card.success) return;
   const supabase = await createLearnClient();
-  const moved = await recordFeedAction(supabase, card.data, 'opened').catch(() => false);
-  if (moved) after(() => topUpFeedAfterResponse(user.id));
+  await recordFeedAction(supabase, card.data, 'opened').catch(() => false);
 }
 
 export type CardActionResult = { error?: string };
@@ -210,7 +150,7 @@ export async function deleteCardNote(id: string): Promise<CardActionResult> {
 
 // latency: optimistic
 export async function dismissCard(id: string): Promise<CardActionResult> {
-  const user = await requireUser();
+  await requireUser();
   const card = CardId.safeParse(id);
   if (!card.success) return { error: 'Could not tell which card that was.' };
   const supabase = await createLearnClient();
@@ -219,7 +159,6 @@ export async function dismissCard(id: string): Promise<CardActionResult> {
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not record that.' };
   }
-  after(() => topUpFeedAfterResponse(user.id));
   return {};
 }
 
@@ -269,7 +208,6 @@ export async function swipeCard(id: string, swipe: SwipeAction): Promise<CardAct
   // What the swipe says about the card's idea (LEARN-NOW-SPEC, "Where ideas
   // are kept"). Never fails the swipe.
   await settleIdeaFromSwipe(supabase, user.id, card.data, swipe);
-  after(() => topUpFeedAfterResponse(user.id));
   return {};
 }
 
@@ -304,7 +242,6 @@ export async function saveCard(id: string): Promise<SaveCardResult> {
       catalogueItemId: itemId,
     });
     await recordFeedAction(supabase, card.data, 'saved', { saved_reading_id: saved.readingId });
-    after(() => topUpFeedAfterResponse(user.id));
     return { list: { id: saved.trackId, title: SAVED_FROM_FEED } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save that.' };
@@ -329,7 +266,6 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
     if (!row.subject_id) return { error: 'The subject this lesson was from is no longer there.' };
     if (ACTION_FROM.tested.includes(row.status)) {
       await recordFeedAction(supabase, card.data, 'tested').catch(() => false);
-      after(() => topUpFeedAfterResponse(user.id));
     }
     redirect(practiceHref({ track: row.subject_id }));
   }
@@ -351,7 +287,6 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
   await recordFeedAction(supabase, card.data, 'tested', { subject_id: started.subjectId }).catch(
     () => false,
   );
-  after(() => topUpFeedAfterResponse(user.id));
   redirect(practiceHref({ track: started.subjectId }));
 }
 
@@ -378,7 +313,6 @@ export async function startTrackOffer(themeId: string): Promise<NewTrackResult> 
   );
   if (!started.ok) return { error: started.detail };
 
-  after(() => topUpFeedAfterResponse(user.id));
   return { track: { id: started.subjectId, name: started.name, units: started.units } };
 }
 
@@ -418,7 +352,6 @@ export async function makeTrackOfCard(id: string): Promise<NewTrackResult> {
       () => false,
     );
   }
-  after(() => topUpFeedAfterResponse(user.id));
   return { track: { id: made.subjectId, name: made.name, units: made.units } };
 }
 
@@ -739,7 +672,6 @@ export async function answerUnitCheck(id: string, response: string): Promise<Uni
     if ((moved ?? []).length === 0) return { error: 'That check has been dealt with.' };
 
     const tested = grade.correct ? await markUnitConceptsTested(supabase, user.id, conceptIds) : 0;
-    after(() => topUpFeedAfterResponse(user.id));
     return { marked: { correct: grade.correct, why: grade.why, expected: row.check_answer, tested } };
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };
@@ -772,7 +704,6 @@ export async function answerRestingTrack(
   if (kept === null) return { error: 'Could not keep that. Check your connection.' };
   if (!kept) return { error: 'That subject is no longer there.' };
 
-  if (answer.data === 'picked_up') after(() => topUpFeedAfterResponse(user.id));
   return {};
 }
 

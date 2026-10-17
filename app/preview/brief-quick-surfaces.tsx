@@ -135,7 +135,7 @@ const nowCards: FeedCard[] = [
 
 /** Learn now with a card from a brief's source on top. */
 export function LearnNowResearchPreview() {
-  return <LearnNowFeed first={nowCards} ready={12} low={10} />;
+  return <LearnNowFeed first={nowCards} />;
 }
 
 /**
@@ -146,8 +146,6 @@ export function LearnNowResearchNewPreview() {
   return (
     <LearnNowFeed
       first={nowCards.map((card, index) => (index === 0 ? { ...card, fresh: true } : card))}
-      ready={12}
-      low={10}
     />
   );
 }

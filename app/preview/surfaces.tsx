@@ -175,8 +175,6 @@ import {
 import { EducationSection } from '@/app/you/work/education-section';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
-import { FlowExplainPreview } from './learn-flow-explain-surfaces';
-import { FlowCasePreview } from './learn-flow-case-surfaces';
 import { FlowSummaryPreview } from './learn-flow-summary-surfaces';
 import {
   LearnTopicDraftCommentPreview,
@@ -416,6 +414,12 @@ import {
   GoalMetricPropsSurface,
 } from './goal-metric-props-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
+import {
+  NowPageEmptySurface,
+  NowPageLoadingSurface,
+  NowPagePracticeSurface,
+  NowPageSurface,
+} from './learn-now-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -5726,10 +5730,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReviewListSurface folded />,
   },
   {
-    /* Learn now as a deck: one card, the three swipes at its foot. Nothing
-     * here is recorded; the swipes only reach the server from the real page. */
+    /* Cards, the deck of cards written before Now led with today's piece
+     * (plan #2313.1): one card, the three swipes at its foot. Nothing here is
+     * recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
-    label: 'Now · One card at a time',
+    label: 'Cards · One card at a time',
     module: 'learn',
     width: 'narrow',
     interaction: {
@@ -5739,7 +5744,7 @@ export const SURFACES: readonly Surface[] = [
     },
     // On its second card (plan #1931.5): the first is passed, so Previous shows.
     render: () => (
-      <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} ready={20} low={10} />
+      <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} />
     ),
   },
   /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
@@ -5786,18 +5791,38 @@ export const SURFACES: readonly Surface[] = [
     label: 'Now · A goal with no pieces yet',
     module: 'learn',
     width: 'narrow',
-    render: () => (
-      // Enough cards that the deck does not reach for more, which the gallery cannot load.
-      <TodaysPieceNoneSurface
-        cards={
-          <LearnNowFeed
-            first={[...deckCards, ...deckCards.map((card, index) => ({ ...card, id: `${card.id.slice(0, -1)}${'abc'[index]}` }))]}
-            ready={20}
-            low={10}
-          />
-        }
-      />
-    ),
+    render: () => <TodaysPieceNoneSurface />,
+  },
+  /* Now as it opens (plan #2313.1): today's piece, the practice press and the
+   * rail, and its hidden parts: no piece today, no prepared subject, and the
+   * page loading. learn-now-page-surfaces.tsx. */
+  {
+    id: 'learn-now-page',
+    label: 'Now · Today’s piece and practice',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageSurface />,
+  },
+  {
+    id: 'learn-now-page-practice',
+    label: 'Now · No piece today, practice leads',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPagePracticeSurface />,
+  },
+  {
+    id: 'learn-now-page-empty',
+    label: 'Now · No prepared subject yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageEmptySurface />,
+  },
+  {
+    id: 'learn-now-page-loading',
+    label: 'Now · Loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageLoadingSurface />,
   },
   {
     /* Now opened from a subject's page (plan #1698), with nothing of it
@@ -5811,7 +5836,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <NowHeader practice={false} subject={nowSubjectLong} />
-        <LearnNowFeed first={[]} ready={0} low={10} subjectId={nowSubjectLong.id} />
+        <LearnNowFeed first={[]} subjectId={nowSubjectLong.id} />
       </>
     ),
   },
@@ -5918,58 +5943,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FlowScopePreview />,
   },
   {
-    /* A goal question in Practice Flow (plan #2164.2): an idea to explain in a
-     * few sentences, with the box to write in, Mark it, I don't know and Later. */
-    id: 'learn-flow-explain',
-    label: 'Practice Flow · An explain question',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="ask" />,
-  },
-  {
-    /* The explanation marked: what was right, what was missing, the example
-     * line, and the one follow-up with its own box. Next skips it. */
-    id: 'learn-flow-explain-marked',
-    label: 'Practice Flow · Explanation marked, with the follow-up',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="marked" />,
-  },
-  {
-    /* The follow-up marked too: where the idea now stands, the idea as
-     * written, and Next. */
-    id: 'learn-flow-explain-done',
-    label: 'Practice Flow · Follow-up marked',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="done" />,
-  },
-  {
-    /* Mark it pressed: the press held while Dash marks the explanation. */
-    id: 'learn-flow-explain-grading',
-    label: 'Practice Flow · Marking the explanation',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="grading" />,
-  },
-  {
-    /* A worked case on a goal's idea (plan #2164.3): figures and a task, the
-     * box to write a number or two sentences in, and Later. */
-    id: 'learn-flow-case',
-    label: 'Practice Flow · A worked case',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowCasePreview stage="ask" />,
-  },
-  {
-    /* The case answered: Dash's sentence, the answer expected, and Next. */
-    id: 'learn-flow-case-answered',
-    label: 'Practice Flow · Case answered',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowCasePreview stage="answered" />,
-  },
-  {
     /* What a session moved (plan #2164.6): the card that ends a Practice Flow
      * run, with the ideas shown and missed quoted and what came onto the fringe. */
     id: 'learn-flow-summary',
@@ -5977,14 +5950,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FlowSummaryPreview />,
-  },
-  {
-    /* Marking failed: the explanation stays in its box, with the reason under the card. */
-    id: 'learn-flow-explain-error',
-    label: 'Practice Flow · Marking failed',
-    module: 'learn',
-    width: 'narrow',
-    render: () => <FlowExplainPreview stage="error" />,
   },
   {
     /* An explain question about one level of a topic, before an answer

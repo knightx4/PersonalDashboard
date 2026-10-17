@@ -649,19 +649,6 @@ export const FEED_PAGE = 6;
 export const PRELOAD_AHEAD = 4;
 
 /**
- * What the foot of the feed says once a page came back short.
- *
- * `writing`: fewer than `low` cards are ready, so the top-up is running (the
- * action that loaded the page started it) and more will arrive.
- * `passed`: plenty are ready but all of them are already on the screen this
- * visit. The ones you have not scrolled past or pressed Next on are still
- * ready, and they come back next time.
- */
-export function feedEnd(ready: number, low: number): 'writing' | 'passed' {
-  return ready < low ? 'writing' : 'passed';
-}
-
-/**
  * Cards passed before the track offer comes up (plan #968). Not first, so a
  * visit opens on something to read, and early, so the offer is seen on a
  * short visit too.

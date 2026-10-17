@@ -97,36 +97,74 @@ export async function nearbyIdeas(
 }
 
 /**
- * The hidden subject a feed idea from `article` is filed under, made the first
- * time. A track already named after the article is used as it is.
+ * The subject a feed idea is filed under: one the person chose, never a hidden
+ * one made for it (plan #2313.2). In order, the subject the card was written
+ * for, the subject its goal points at, and a subject of theirs named after the
+ * article. Null when none of these is a chosen subject; the card's ideas are
+ * then not kept as concepts.
  */
-async function subjectForArticle(learn: LearnSupabaseClient, userId: string, article: string): Promise<string> {
-  const find = async (): Promise<string | null> => {
+async function chosenSubjectFor(
+  learn: LearnSupabaseClient,
+  userId: string,
+  cardId: string | null,
+  article: string,
+): Promise<string | null> {
+  const candidates: string[] = [];
+  if (cardId) {
+    const { data, error } = await learn
+      .from('feed_cards')
+      .select('subject_id, aim_id')
+      .eq('user_id', userId)
+      .eq('id', cardId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const card = data as { subject_id: string | null; aim_id: string | null } | null;
+    if (card?.subject_id) candidates.push(card.subject_id);
+    if (card?.aim_id) {
+      const { data: aim, error: aimError } = await learn
+        .from('aims')
+        .select('subject_id')
+        .eq('user_id', userId)
+        .eq('id', card.aim_id)
+        .maybeSingle();
+      if (aimError) throw new Error(aimError.message);
+      const subjectId = (aim as { subject_id: string | null } | null)?.subject_id;
+      if (subjectId) candidates.push(subjectId);
+    }
+  }
+
+  const chosen = new Set<string>();
+  if (candidates.length > 0) {
     const { data, error } = await learn
       .from('subjects')
       .select('id')
       .eq('user_id', userId)
-      .ilike('name', article)
-      .maybeSingle();
+      .eq('survey', false)
+      .in('id', candidates);
     if (error) throw new Error(error.message);
-    return (data as { id: string } | null)?.id ?? null;
-  };
-
-  const found = await find();
-  if (found) return found;
+    for (const row of (data ?? []) as { id: string }[]) chosen.add(row.id);
+  }
+  const first = candidates.find((id) => chosen.has(id));
+  if (first) return first;
 
   const { data, error } = await learn
     .from('subjects')
-    .insert({ user_id: userId, name: article, survey: true })
     .select('id')
-    .single();
-  if (error?.code === '23505') {
-    // Another write made it first.
-    const raced = await find();
-    if (raced) return raced;
-  }
-  if (error || !data) throw new Error(error?.message ?? 'no row');
-  return (data as { id: string }).id;
+    .eq('user_id', userId)
+    .eq('survey', false)
+    .ilike('name', article)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string }[])[0]?.id ?? null;
+}
+
+/**
+ * Attach a new idea to its nearest frame topic straight away, by the rule the
+ * daily sweep uses (learn 0179). A failure is logged and the sweep sets it.
+ */
+async function attachToTopic(learn: LearnSupabaseClient, userId: string, conceptId: string): Promise<void> {
+  const { error } = await learn.rpc('attach_idea_topic_parent', { p_concept: conceptId, p_user: userId });
+  if (error) warn('attaching the idea to its topic', error.message);
 }
 
 /** What saving one idea came to. */
@@ -138,7 +176,9 @@ export type SavedIdea =
   | { kind: 'unsaved' };
 
 /**
- * Save each idea as a concept, in the order given.
+ * Save each idea as a concept, in the order given, under the subject the
+ * person chose that it belongs to (`chosenSubjectFor`), and attach each new
+ * one to its frame topic. With no such subject every idea comes back unsaved.
  *
  * Every claim is embedded in one call. An idea whose claim sits within
  * `DUPLICATE_SIMILARITY` of a concept already held, or of an earlier idea in
@@ -147,7 +187,8 @@ export type SavedIdea =
 export async function saveIdeas(
   learn: LearnSupabaseClient,
   userId: string,
-  source: { article: string; section: string | null },
+  /** `cardId` is the feed card the ideas were written for, which names the subject they belong to. */
+  source: { article: string; section: string | null; cardId?: string | null },
   ideas: IdeaCard[],
   onSpend?: SpendSink,
 ): Promise<SavedIdea[]> {
@@ -161,13 +202,14 @@ export async function saveIdeas(
   });
   if (!embedded.ok) warn('embedding the claims', embedded.detail);
 
-  let subjectId: string;
+  let subjectId: string | null;
   try {
-    subjectId = await subjectForArticle(learn, userId, source.article);
+    subjectId = await chosenSubjectFor(learn, userId, source.cardId ?? null, source.article);
   } catch (error) {
-    warn('filing the ideas under their article', error);
+    warn('finding the subject the ideas belong to', error);
     return unsaved;
   }
+  if (!subjectId) return unsaved;
 
   const saved: SavedIdea[] = [];
   for (const [index, idea] of ideas.entries()) {
@@ -196,7 +238,9 @@ export async function saveIdeas(
         .select('id')
         .single();
       if (error || !data) throw new Error(error?.message ?? 'no row');
-      saved.push({ kind: 'new', conceptId: (data as { id: string }).id });
+      const conceptId = (data as { id: string }).id;
+      if (vector) await attachToTopic(learn, userId, conceptId);
+      saved.push({ kind: 'new', conceptId });
     } catch (error) {
       warn(`saving the idea "${idea.name}"`, error);
       saved.push({ kind: 'unsaved' });
