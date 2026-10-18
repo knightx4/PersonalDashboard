@@ -94,6 +94,28 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'A list as its own tab beside Steps, carrying its count: the add action on the toolbar line, then a table with a thumbnail column, the name in heavier type, the list\'s own columns with numbers lined up, a status in colour, and "Ruled out" folded at the foot.',
     from: '2330.3',
   },
+  // The goal page, which the person pointed at for a step's page (plan
+  // #2373). Photographed from its gallery drawings, one tab to each of the
+  // step's tabs, since the live page shows the person's own goals and the
+  // repository is public.
+  'goals-step': {
+    pictures: ['docs/references/goals-step/overview-laptop.png', 'docs/references/goals-step/overview-phone.png'],
+    link: '/preview?s=goals-page-top',
+    why: 'A step\'s page should read as a goal\'s does: the path, then the status mark and title with the menu on the same line and one quiet line under it, then the tabs, with the facts in a card in a column on the right from laptop width and the first few in one row on a phone. The Overview tab puts the done-when and the rest of the content on cards, each section headed in small type on the page.',
+    from: '2373.3',
+  },
+  'goals-step-substeps': {
+    pictures: ['docs/references/goals-step/steps-laptop.png', 'docs/references/goals-step/steps-phone.png'],
+    link: '/preview?s=goals-page-steps',
+    why: 'A step\'s Sub-steps tab should read as a goal\'s Steps tab: the same header and properties column, then the rows on one card under the column header, with the finished ones folded and the add line at the foot of the card.',
+    from: '2373.3',
+  },
+  'goals-step-comments': {
+    pictures: ['docs/references/goals-step/activity-laptop.png', 'docs/references/goals-step/activity-phone.png'],
+    link: '/preview?s=goals-page-activity',
+    why: 'A step\'s Activity tab should read as a goal\'s: the same header and properties column, then the runs and the thread, each on its own card.',
+    from: '2373.3',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */

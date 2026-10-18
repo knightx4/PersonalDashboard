@@ -105,11 +105,18 @@ export function QuestionRow({
   titles,
   actions,
   comments = PLAN_COMMENTS,
+  flat = false,
 }: {
   node: TreeQuestion;
   titles?: PlanRefTitles;
   actions: Pick<TreeActions, 'answer' | 'setStatus' | 'dismissQuestion'>;
   comments?: TreeComments;
+  /**
+   * Drawn on a card of the page's own rather than as a tinted panel inside
+   * the row's (plan #2373.3): no ground or edge of its own, so the card is
+   * the only box, and the mark beside it carries the state.
+   */
+  flat?: boolean;
 }) {
   const [answerState, answerAction, answerPending] = useActionState(
     actions.answer,
@@ -169,8 +176,10 @@ export function QuestionRow({
   return (
     <li
       className={cn(
-        'rounded-control px-3 py-2.5',
-        node.status === 'dropped'
+        flat ? 'py-2.5' : 'rounded-control px-3 py-2.5',
+        flat
+          ? null
+          : node.status === 'dropped'
           ? 'bg-sunken'
           : settled
             ? 'bg-positive-tint'
@@ -304,11 +313,18 @@ export function Questions({
   titles,
   actions,
   comments = PLAN_COMMENTS,
+  bare = false,
 }: {
   node: TreeQuestionHolder;
   titles?: PlanRefTitles;
   actions: Pick<TreeActions, 'answer' | 'setStatus' | 'dismissQuestion' | 'ask'>;
   comments?: TreeComments;
+  /**
+   * For a page that heads the questions itself and puts them on a card of
+   * their own, as a step's page does (plan #2373.3): no Questions label, and
+   * each question flat on that card under a rule rather than a tinted panel.
+   */
+  bare?: boolean;
 }) {
   const [asking, setAsking] = useState(false);
   const questions = node.children.filter((child) => child.kind === 'decision');
@@ -320,17 +336,19 @@ export function Questions({
 
   return (
     <div className="space-y-2">
-      <SectionLabel>
-        Questions
-        {unanswered > 0 && (
-          <span className="ml-1.5 font-normal normal-case tracking-normal text-caution">
-            {unanswered} unanswered
-          </span>
-        )}
-      </SectionLabel>
+      {!bare && (
+        <SectionLabel>
+          Questions
+          {unanswered > 0 && (
+            <span className="ml-1.5 font-normal normal-case tracking-normal text-caution">
+              {unanswered} unanswered
+            </span>
+          )}
+        </SectionLabel>
+      )}
 
       {questions.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul className={bare ? 'divide-y divide-border' : 'space-y-1.5'}>
           {questions.map((question) => (
             <QuestionRow
               key={question.id}
@@ -338,6 +356,7 @@ export function Questions({
               titles={titles}
               actions={actions}
               comments={comments}
+              flat={bare}
             />
           ))}
         </ul>

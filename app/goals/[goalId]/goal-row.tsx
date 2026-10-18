@@ -6,7 +6,12 @@ import { cn } from '@/lib/cn';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { AssigneeCell } from '@/components/plan-tree/assignee-cell';
-import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
+import {
+  TreeRow,
+  rowInset,
+  useTreeRow,
+  type TreeRowFrameParts,
+} from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
 import type { ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -112,6 +117,10 @@ const GOAL_COMMENTS = { target: 'goal' as const };
 
 /** What every row on one goal page shares. */
 const NO_FILES: LinkedFile[] = [];
+/** The step page's panel inset (plan #2373.1), the same as TreeRow gives a heading row's panel. */
+const PAGE_INSET = { paddingLeft: '0.75rem' };
+/** A line on a card of its own, which pads it already. */
+const NO_INSET = {};
 
 export type GoalRowContext = {
   goalId: string;
@@ -280,6 +289,11 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
   );
 }
 
+/** Whether a run has a line to say: one going, one that failed, or one that summed itself up. */
+function runSays(run: StepRunView | undefined): run is StepRunView {
+  return Boolean(run && (run.running || run.error || run.summary));
+}
+
 /**
  * A sent or prepared step's latest run on its row (plan #1044): "Dash is on
  * it" and what it is on now while it goes, then why it failed or what it said it did, with the run's
@@ -412,6 +426,7 @@ export function GoalRow({
   fromGoal,
   unfolded,
   page = false,
+  frame,
 }: {
   node: GoalRowNode;
   trail: readonly boolean[];
@@ -430,6 +445,8 @@ export function GoalRow({
    * and its panel does not link to the page it is already on.
    */
   page?: boolean;
+  /** The step page's frame (plan #2373.1), which takes the row's title, status and menu. */
+  frame?: (parts: TreeRowFrameParts) => React.ReactNode;
 }) {
   // Status and order change on the row when pressed and come back if the
   // write is refused, with the reason in a toast (plan #1851). `served` is
@@ -631,9 +648,15 @@ export function GoalRow({
       : [];
   const askable = context.canRun && offersAsk(step);
   const askLabel = askDashLabel(step);
-  const askItems: ActionMenuItem[] = askable
-    ? [{ id: 'ask', label: askLabel, formAction: askAction, formFields: { id: step.id } }]
-    : [];
+  // On the step's own page the menu is the one place Ask Dash is offered, so
+  // it opens the box for what you want rather than sending straight away
+  // (plan #2373.1); on the goal page the opened row has the button for that.
+  const framed = page && Boolean(frame);
+  const askItems: ActionMenuItem[] = !askable
+    ? []
+    : framed
+      ? [{ id: 'ask', label: askLabel, onSelect: () => setAsking(true) }]
+      : [{ id: 'ask', label: askLabel, formAction: askAction, formFields: { id: step.id } }];
   const run = context.runs[step.id];
   const stepFiles = context.files?.[step.id] ?? NO_FILES;
   const prep = context.prepFor?.[step.id];
@@ -646,6 +669,10 @@ export function GoalRow({
   // press's message said and more, so the message gives way to it. A refusal
   // is still said: it started nothing.
   const pressNote = askState.error ?? (run?.running ? undefined : askState.message);
+  // What sits under the title lines up with the panel: in from the tree on
+  // the goal page, and on the step's own page level with the panel's text,
+  // which the frame's card holds (plan #2373.1).
+  const inset = page && frame ? PAGE_INSET : rowInset(trail);
   const menu: ActionMenuItem[] = [
     ...askItems,
     ...rhythmItems,
@@ -760,6 +787,28 @@ export function GoalRow({
         // Finished rows sit under a Finished fold that says so.
         dimClosed={false}
         heading={page}
+        // On the step's own page a proposal's Approve sits on the title's
+        // line before the menu, on the first screen at every width (plan
+        // #2373.2).
+        frame={
+          page && frame
+            ? (parts) =>
+                frame({
+                  ...parts,
+                  menu: proposed ? (
+                    <>
+                      <ProposalButtons node={step} heading />
+                      {parts.menu}
+                    </>
+                  ) : (
+                    parts.menu
+                  ),
+                })
+            : undefined
+        }
+        // On the Activity tab the run line sits on a card of its own, so it
+        // takes the card's inset rather than the panel's.
+        activity={framed && runSays(run) && <StepRunLine run={run} inset={NO_INSET} />}
         statusMenu={statusMenu}
         menu={menu}
         actions={GOAL_TREE_ACTIONS}
@@ -826,25 +875,26 @@ export function GoalRow({
         notices={
           <>
             {blocking && (
-              <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
+              <BlockForm node={node} inset={inset} onDone={() => setBlocking(false)} />
             )}
             {/* What the last Ask Dash started, or why it was refused, wherever it was pressed. */}
             {pressNote && (
-              <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
+              <li style={inset} className="pb-1.5 pr-3 text-small">
                 <FieldError>{askState.error}</FieldError>
                 {!askState.error && <span className="text-ink-muted">{askState.message}</span>}
               </li>
             )}
-            {/* The step's own latest run, read with the page (plan #1044). */}
-            {run && <StepRunLine run={run} inset={rowInset(trail)} />}
-            {draft && <DashDraft {...draft} inset={rowInset(trail)} />}
+            {/* The step's own latest run, read with the page (plan #1044). On
+                the step's own page it is on the Activity tab (plan #2373.2). */}
+            {run && !framed && <StepRunLine run={run} inset={inset} />}
+            {draft && <DashDraft {...draft} inset={inset} />}
             {stepOpen && (
               <ProgressLine
                 goalId={fromGoal?.id ?? context.goalId}
                 progress={progress}
                 beneath={context.progressBeneath?.[step.id]}
                 total={{ quantity: step.estimatedTotal, unit: step.totalUnit }}
-                inset={rowInset(trail)}
+                inset={inset}
               />
             )}
           </>
@@ -896,7 +946,7 @@ export function GoalRow({
           </>
         }
         meta={
-          <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
+          <p className="flex flex-wrap gap-x-3 text-small text-ink-muted empty:hidden">
             {/* On its own page the chips above already say the kind and the dates. */}
             {!page && <span>{STEP_KIND_LABELS[step.kind]}</span>}
             {fromGoal && (
@@ -948,11 +998,11 @@ export function GoalRow({
         }
         panelActions={
           <>
-            {proposed && <ProposalButtons node={step} />}
+            {proposed && !framed && <ProposalButtons node={step} />}
             {/* Ask Dash, with room to say what you want: the words go into the
               run's brief as a comment's would. Left empty, the step says it.
               The first press opens the box; the second sends. */}
-            {askable && !asking && (
+            {askable && !asking && !framed && (
               <Button
                 type="button"
                 size="sm"
@@ -1003,7 +1053,12 @@ export function GoalRow({
         }
         after={
           finished.length > 0 && (
-            <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
+            // On the step's own page the fold heads no deeper level: it sits
+            // at the foot of the Sub-steps card, as Finished does on a goal's.
+            <li
+              style={framed ? PAGE_INSET : rowInset([...trail, false])}
+              className={framed ? 'py-1.5 pr-3' : 'pb-1.5 pr-3'}
+            >
               <FinishedFold count={finished.length}>
                 {() => (
                   // Out to the row's own right edge, so the finished rows'

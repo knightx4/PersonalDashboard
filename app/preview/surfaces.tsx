@@ -411,10 +411,17 @@ import {
   GoalOpenedSurface,
   GoalStepSurface,
   GoalSubStepSurface,
+  GoalStepCommentsSurface,
+  GoalStepEmptySurface,
+  GoalStepSubstepsSurface,
+  GoalStepSubstepsEmptySurface,
+  GoalStepActivityEmptySurface,
+  GoalStepProposedSurface,
   GoalTreeSurface,
   GoalAssigneeTipSurface,
   GoalEmptySurface,
 } from './goal-surfaces';
+import { GoalStepEditingSurface, GoalStepMenuSurface } from './step-frame-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
@@ -4974,6 +4981,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* A step's page with its menu open from the title's line (plan #2373.1). */
+    id: 'goals-step-menu',
+    label: 'Goal · a step’s menu on its page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepMenuSurface />,
+  },
+  {
+    /* A step's page whose thread has a comment: the count on Activity (plan #2373.1). */
+    id: 'goals-step-comments',
+    label: 'Goal · a step’s comments on its Activity tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepCommentsSurface />,
+  },
+  {
+    /* A step lacking most facts: its properties say a dash (plan #2373.1). */
+    id: 'goals-step-empty',
+    label: 'Goal · a step with few facts, on its page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepEmptySurface />,
+  },
+  {
+    /* A step's Sub-steps tab: open sub-steps, Finished folded, the composer (plan #2373.2). */
+    id: 'goals-step-substeps',
+    label: 'Goal · a step’s Sub-steps tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepSubstepsSurface />,
+  },
+  {
+    /* A step with no sub-steps: the empty state that adds the first (plan #2373.2). */
+    id: 'goals-step-substeps-empty',
+    label: 'Goal · a step’s Sub-steps tab, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepSubstepsEmptySurface />,
+  },
+  {
+    /* A step's Activity tab with no run and no comment (plan #2373.2). */
+    id: 'goals-step-activity-empty',
+    label: 'Goal · a step’s Activity tab, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepActivityEmptySurface />,
+  },
+  {
+    /* A proposed step's Overview, with Accept and Decline (plan #2373.2). */
+    id: 'goals-step-proposed',
+    label: 'Goal · a proposed step on its page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepProposedSurface />,
+  },
+  {
+    /* A step's Overview with the done-when editor open (plan #2373.2). */
+    id: 'goals-step-editing',
+    label: 'Goal · a step’s done-when being written',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepEditingSurface />,
   },
   {
     /* A step Dash is doing on its own page (plan #2376.2): the switch for a
