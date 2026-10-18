@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { z } from 'zod';
+import type { PlaceLoader } from './places';
 import type { SeriesLoader } from './series-store';
 
 /**
@@ -23,8 +24,10 @@ import type { SeriesLoader } from './series-store';
  * - `series`: numbers fetched from a registered data source (plan #2321.3).
  * - `source`: a figure stored with a course, shown under its licence
  *   (plan #2321.4).
+ * - `places`: places the writer names, located by a registered geocoder
+ *   (plan #2321.6).
  */
-export type FigureData = 'none' | 'series' | 'source';
+export type FigureData = 'none' | 'series' | 'source' | 'places';
 
 /**
  * One figure as `learn.feed_cards.figures` stores it, in order.
@@ -153,4 +156,6 @@ export function figureSurface(kind: Pick<FigureKind, 'id'>): string {
 export type FigureResolveContext = {
   /** A registered data source's series, through the shared cache (`./series-store.ts`). */
   series: SeriesLoader;
+  /** Where a named place is, through the geocoder's cache (`./places.ts`, plan #2321.6). */
+  places: PlaceLoader;
 };

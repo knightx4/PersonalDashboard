@@ -20,7 +20,7 @@ import {
 } from './question';
 import type { FigureResolveContext } from './types';
 
-const noFetch: FigureResolveContext = { series: async () => null };
+const noFetch: FigureResolveContext = { series: async () => null, places: async () => null };
 
 describe('the figure question forms (plan #2321.5)', () => {
   it('offers fill_cell on the table and predict_direction on the chart', () => {

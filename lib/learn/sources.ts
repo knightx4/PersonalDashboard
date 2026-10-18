@@ -345,6 +345,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.catalogue_segments', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_structures', reason: 'Syllabi and tables of contents pulled into the shared catalogue, not theirs.' },
     { table: 'learn.figure_series', reason: 'Published data series fetched for lesson charts and kept, shared reference data, not theirs.' },
+    { table: 'learn.figure_places', reason: 'Places located by the geocoder for lesson maps and kept, shared reference data, not theirs.' },
     { table: 'learn.concept_edges', reason: 'Graph structure; read through concepts.' },
     { table: 'learn.idea_places', reason: 'Named groups of nearby ideas worked out daily from the embeddings for the Idea Space map; read through concepts.' },
     { table: 'learn.idea_topic_parents', reason: 'Which Wikipedia topic each idea sits under on the Idea Space map, worked out daily from the embeddings; read through concepts.' },

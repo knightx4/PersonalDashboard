@@ -1,4 +1,5 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { placeLoader, supabasePlaceCache } from './places';
 import { parseFigure } from './registry';
 import { seriesLoader, supabaseSeriesCache } from './series-store';
 import type { FigureBlock, FigureResolveContext } from './types';
@@ -39,14 +40,22 @@ export function needsResolving(blocks: readonly FigureBlock[]): boolean {
  * on a short timeout so a slow source cannot hold the page.
  */
 export function pageResolveContext(learn: LearnSupabaseClient): FigureResolveContext {
-  return { series: seriesLoader({ cache: supabaseSeriesCache(learn), timeoutMs: 4000 }) };
+  return {
+    series: seriesLoader({ cache: supabaseSeriesCache(learn), timeoutMs: 4000 }),
+    // The page reads located places and never asks the geocoder: its policy
+    // wants each answer kept, and only the writer can keep one.
+    places: placeLoader({ cache: supabasePlaceCache(learn) }),
+  };
 }
 
 /**
- * The lesson writer's context: the service-role client, so each series the
- * writer named is fetched once and kept, found or not, before the lesson is
- * stored.
+ * The lesson writer's context: the service-role client, so each series and
+ * each place the writer named is fetched once and kept, found or not, before
+ * the lesson is stored.
  */
 export function writerResolveContext(serviceLearn: LearnSupabaseClient): FigureResolveContext {
-  return { series: seriesLoader({ cache: supabaseSeriesCache(serviceLearn, { writable: true }) }) };
+  return {
+    series: seriesLoader({ cache: supabaseSeriesCache(serviceLearn, { writable: true }) }),
+    places: placeLoader({ cache: supabasePlaceCache(serviceLearn, { writable: true }), ask: { fetchImpl: fetch } }),
+  };
 }

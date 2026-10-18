@@ -4,6 +4,8 @@ import { figureKind } from '@/lib/learn/figures/registry';
 import { explorableKind } from '@/lib/learn/figures/kinds/explorable';
 import { ExplorableMoved } from '@/lib/learn/figures/kinds/explorable-view';
 import { explorableModel } from '@/lib/learn/figures/models/registry';
+import { mapKind } from '@/lib/learn/figures/kinds/map';
+import { MapPressed, type MapData } from '@/lib/learn/figures/kinds/map-view';
 import { LessonCard } from '@/app/learn/s/[id]/p/[piece]/piece-view';
 import { MODELS } from '@/lib/core/models';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
@@ -1017,6 +1019,66 @@ export function LearnExplorableSurface({ model: id }: { model?: string }) {
     />
   );
   return model ? <ExplorableMoved moved={{ [model.id]: model.example.moved }}>{card}</ExplorableMoved> : card;
+}
+
+/** Shenzhen from the Hong Kong border westward, located by Nominatim on 18 October 2026, with no years. */
+const SHENZHEN: MapData = {
+  area: 'Shenzhen, Guangdong',
+  places: [
+    { name: 'Luohu Station', note: 'The border crossing to Hong Kong, where the special economic zone of 1980 began.', year: null, lat: 22.53331, lon: 114.11318, url: 'https://www.openstreetmap.org/node/6753412235' },
+    { name: 'Huaqiangbei', note: 'The electronics market where hardware makers buy their parts by the reel.', year: null, lat: 22.54482, lon: 114.08154, url: 'https://www.openstreetmap.org/node/3373068621' },
+    { name: 'Shenzhen Stock Exchange', note: 'One of mainland China’s two stock exchanges, in the Futian business district.', year: null, lat: 22.54414, lon: 114.04881, url: 'https://www.openstreetmap.org/way/776182823' },
+    { name: 'Ping An Finance Center', note: 'The tallest tower in Futian, built on what was farmland in 1980.', year: null, lat: 22.53673, lon: 114.05036, url: 'https://www.openstreetmap.org/way/535860513' },
+    { name: 'Tencent Seafront Towers', note: 'Tencent’s headquarters in Nanshan, on land reclaimed from the bay.', year: null, lat: 22.52587, lon: 113.93041, url: 'https://www.openstreetmap.org/way/737149477' },
+    { name: 'Shekou', note: 'China Merchants opened an industrial zone here in 1979, a year before the zone itself.', year: null, lat: 22.49101, lon: 113.92248, url: 'https://www.openstreetmap.org/relation/9656468' },
+  ],
+  missing: [],
+};
+
+/**
+ * A lesson on a city carrying a map (plan #2321.6). By default the map
+ * kind's own example: the Big Dig in Boston, its places dated, so the year
+ * slider shows. `undated` draws Shenzhen with no years and no slider;
+ * `pressed` draws the Boston map with that place pressed, its note showing.
+ */
+export function LearnMapSurface({ undated = false, pressed }: { undated?: boolean; pressed?: number }) {
+  const figure = undated
+    ? {
+        kind: mapKind.id,
+        caption: 'Shenzhen from the Hong Kong border westward: where the special economic zone began and where its money and makers are now.',
+        spec: { area: SHENZHEN.area, places: SHENZHEN.places.map(({ name, note }) => ({ name, note })) },
+        resolved: SHENZHEN,
+      }
+    : { kind: mapKind.id, ...mapKind.example };
+  const idea = piecePage.ideas[0];
+  const card = (
+    <LessonCard
+      idea={{
+        ...idea,
+        name: undated ? 'How a special economic zone grows a city' : 'What a city buys when it buries a highway',
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          takeaway: undated
+            ? 'A zone with its own rules draws firms first to its edge with the outside world, then the city fills in behind them.'
+            : 'Moving a highway underground costs far more than building it, and pays back in the land and streets it gives the city.',
+          context: undated
+            ? 'Shenzhen went from a border town to a city of over seventeen million in forty years.'
+            : 'Boston’s Big Dig was the most expensive highway project in American history.',
+          summary: undated
+            ? 'The zone began at the Hong Kong crossing, where goods and money came in. Factories followed along the coast, then finance gathered in Futian and technology firms in Nanshan.'
+            : 'The elevated Central Artery cut downtown off from the waterfront. Replacing it took tunnels, a bridge and sixteen years, and left parks where the road had been.',
+          example: undated
+            ? 'Shekou’s industrial zone opened in 1979, a year before the zone was declared, as a trial run.'
+            : 'The harbour tunnel opened in 1995, the river bridge in 2003, and the parks on the old road’s line in 2008.',
+          figures: [figure],
+        },
+      }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
+  );
+  return pressed != null ? <MapPressed pressed={{ [undated ? SHENZHEN.area : mapKind.example.spec.area]: pressed }}>{card}</MapPressed> : card;
 }
 
 // ---- Questions on a subject ---------------------------------------------------------
