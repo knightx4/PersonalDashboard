@@ -91,6 +91,7 @@ describe('the operation names', () => {
       'write-note-connections',
       'write-maya-thought',
       'gate-maya-note',
+      'tag-note-voice',
       'reply-to-maya',
       'read-transcript',
       'read-work-history',

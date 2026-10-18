@@ -9,6 +9,7 @@ import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
 import { activeRun } from '@/lib/vault/sync/manual';
 import { indexNoteBlocks } from '@/lib/vault/notes/block-index';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
+import { noteVoicePorts } from '@/lib/vault/notes/voice';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -172,6 +173,7 @@ export async function syncOneConnection(
     const result = await runVaultSync({ connection, ports });
 
     const notesDated = await dateAfterSync(supabase, connection.id, ports.source);
+    await voicesByRuleAfterSync(supabase, connection.user_id);
 
     const a = result.attachments;
     if (a.copied || a.removed || a.pending || a.failed) {
@@ -255,6 +257,20 @@ async function dateAfterSync(
   } catch (err) {
     console.error('[vault sync] note dating', err instanceof Error ? err.message : err);
     return 0;
+  }
+}
+
+/**
+ * Tag the notes this sync wrote with their voice where a folder or credential
+ * rule decides it (plan #2413.3), so a note holding a password is secret
+ * before anything reads it. One statement and no model call; the map sweep's
+ * tick asks Haiku about the rest. Never throws: an untagged note stays due.
+ */
+async function voicesByRuleAfterSync(supabase: VaultSupabaseClient, userId: string): Promise<void> {
+  try {
+    await noteVoicePorts({ supabase, core: null, userId }).tagByRule();
+  } catch (err) {
+    console.error('[vault sync] note voices', err instanceof Error ? err.message : err);
   }
 }
 

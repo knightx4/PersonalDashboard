@@ -176,6 +176,10 @@ export const LEARN_OPERATIONS = [
   // of. One Jev call per note version, for an account that has opted in to
   // Jev. Recorded against the note's owner.
   'gate-maya-note',
+  // Tagging a vault note with whose words it is (plan #2413.3): one Haiku
+  // call per note version that no folder rule decides, from the map sweep's
+  // tick. Recorded against the note's owner.
+  'tag-note-voice',
   // Maya's answer to a reply in one of its threads (plan #1286): one Sonnet
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.
