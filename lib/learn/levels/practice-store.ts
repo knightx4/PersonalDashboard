@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { GradeMap } from '@/lib/learn/levels/grade';
 import type { RunSummary } from '@/lib/learn/levels/run';
@@ -33,11 +34,13 @@ export async function practiceSubjectIds(
   userId: string,
   only: 'tracks' | 'goals' | null = null,
 ): Promise<Set<string>> {
-  const [prepared, goals] = await Promise.all([
+  const [prepared, goals, archived] = await Promise.all([
     only === 'goals' ? [] : preparedSubjectIds(learn, userId),
     only === 'tracks' ? [] : goalSubjectIds(learn, userId),
+    archivedSubjectIds(learn, userId),
   ]);
-  return new Set([...prepared, ...goals]);
+  // Practice asks nothing of an archived subject until it is restored (plan #2355.3).
+  return new Set([...prepared, ...goals].filter((id) => !archived.has(id)));
 }
 
 /** The subjects your open goals point at (`aims.subject_id`), for the Goals only filter. */

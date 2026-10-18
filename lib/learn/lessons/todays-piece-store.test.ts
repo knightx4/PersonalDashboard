@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
+// The client below ignores filters, so it would call every subject archived.
+vi.mock('@/lib/learn/archived-subjects', () => ({ archivedSubjectIds: async () => new Set<string>() }));
 vi.mock('./piece-store', () => ({
   loadPiecePage: async (_l: unknown, _u: string, subjectId: string, pieceId: string) => ({
     subjectId,

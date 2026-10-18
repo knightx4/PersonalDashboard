@@ -27,27 +27,27 @@ describe('makeCustomSubject', () => {
   });
 
   it('writes no curriculum for a new subject with no units of its own, leaving it to the preparation', async () => {
-    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false });
+    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false, archived: false });
     const made = await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: null, units: '' });
     expect(made).toMatchObject({ ok: true, created: true, curriculum: { ok: true, units: [], written: false } });
     expect(ensureCurriculum).not.toHaveBeenCalled();
   });
 
   it('still saves the units the person typed for a new subject', async () => {
-    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false });
+    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false, archived: false });
     await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: null, units: 'Churn\nCAC' });
     expect(ensureCurriculum).toHaveBeenCalledWith(supabase, 'u', { id: 's1', name: 'SaaS metrics' }, null, ['Churn', 'CAC']);
   });
 
   it('does not place a new subject itself, since its preparation places it when it finishes', async () => {
     vi.mocked(placeTrackAfterResponse).mockReset();
-    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false });
+    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: true, placed: false, archived: false });
     await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: 'to price a plan', units: 'Churn' });
     expect(placeTrackAfterResponse).not.toHaveBeenCalled();
   });
 
   it('leaves a subject the person already had to the old path', async () => {
-    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: false, placed: true });
+    vi.mocked(findOrCreateSubject).mockResolvedValue({ id: 's1', created: false, placed: true, archived: false });
     await makeCustomSubject(supabase, 'u', { name: 'SaaS metrics', want: null, units: '' });
     expect(ensureCurriculum).toHaveBeenCalledTimes(1);
   });
