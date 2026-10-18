@@ -420,6 +420,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-suggestions': ['/goals/[goalId]'],
   'goals-metrics-props': ['/goals/[goalId]'],
   'goals-metrics-props-form': ['/goals/[goalId]'],
+  'goals-metrics-props-form-steps': ['/goals/[goalId]'],
   'goals-metrics-props-menu': ['/goals/[goalId]'],
   'goals-metrics-props-empty': ['/goals/[goalId]'],
   'goals-metrics-props-pending': ['/goals/[goalId]'],

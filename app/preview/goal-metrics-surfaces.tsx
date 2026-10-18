@@ -77,6 +77,30 @@ const NOTHING: MetricView = {
   counts: counted('week', '2026-10-12T09:00:00Z', []),
 };
 
+/** A metric on the goal's closed steps, before any is counted (plan #2397.3). */
+const STEPS_CLOSED: MetricView = {
+  id: 'm-steps',
+  name: 'Steps closed',
+  period: 'week',
+  target: 3,
+  source: 'steps',
+  list: null,
+  field: null,
+  counts: counted('week', '2026-10-12T09:00:00Z', []),
+};
+
+/** A metric on the files Dash writes under the goal, monthly with no aim. */
+const DASH_FILES: MetricView = {
+  id: 'm-files',
+  name: 'Drafts and notes from Dash',
+  period: 'month',
+  target: null,
+  source: 'files',
+  list: null,
+  field: null,
+  counts: counted('month', '2026-10-01T09:00:00Z', []),
+};
+
 export function GoalMetricsSurface() {
   return <GoalMetrics metrics={[APPLICATIONS, INTERVIEWS, RUNS]} />;
 }
@@ -86,9 +110,9 @@ export function GoalMetricsTooltipSurface() {
   return <GoalMetrics metrics={[APPLICATIONS]} held={8} />;
 }
 
-/** A metric with nothing counted yet. */
+/** Nothing counted yet: a list with no records, and a steps and a files metric. */
 export function GoalMetricsEmptySurface() {
-  return <GoalMetrics metrics={[NOTHING]} />;
+  return <GoalMetrics metrics={[NOTHING, STEPS_CLOSED, DASH_FILES]} />;
 }
 
 /** The read failed: the section's own message. */
