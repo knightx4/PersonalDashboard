@@ -49,6 +49,19 @@ const steps = [
   step('call', 'rates', { title: 'Call the card company', dueOn: '2026-10-03', position: 10 }),
   step('fees', 'rates', { title: 'Compare the transfer fees', position: 20 }),
   step('move', GOAL, { title: 'Move the balance', position: 20 }),
+  step('quotes', 'move', {
+    title: 'Find the 0% cards on offer',
+    kind: 'claude',
+    notifyOnDone: true,
+    position: 10,
+  }),
+  step('fee-list', 'move', { title: 'List the transfer fees', kind: 'claude', position: 20 }),
+  step('done-dash', 'move', {
+    title: 'Read the card terms',
+    kind: 'claude',
+    status: 'done',
+    position: 30,
+  }),
 ];
 
 const forest = buildForest([GOAL], steps);
@@ -117,6 +130,22 @@ describe('StepPage', () => {
     expect(html).not.toContain('type="date"');
     // The values still go with the form, so saving one fact keeps the others.
     expect(html).toContain('name="dueOn" value="2026-10-03"');
+  });
+
+  it('offers the phone notification on an open Dash step, as it was left (plan #2376.2)', () => {
+    const on = renderToStaticMarkup(<StepPage map={map} stepId="quotes" todoOn={false} />);
+    expect(text(on)).toContain('Notify my phone when Dash finishes this');
+    expect(on).toMatch(/role="switch"[^>]*checked=""/);
+    const off = renderToStaticMarkup(<StepPage map={map} stepId="fee-list" todoOn={false} />);
+    expect(text(off)).toContain('Notify my phone when Dash finishes this');
+    expect(off).not.toMatch(/role="switch"[^>]*checked=""/);
+  });
+
+  it('leaves the notification off your own steps and off closed ones', () => {
+    for (const id of ['rates', 'done-dash']) {
+      const html = renderToStaticMarkup(<StepPage map={map} stepId={id} todoOn={false} />);
+      expect(text(html)).not.toContain('Notify my phone');
+    }
   });
 
   it('draws nothing for a step the goal does not hold', () => {

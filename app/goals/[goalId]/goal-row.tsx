@@ -64,6 +64,7 @@ import {
   type ShapingActionState,
 } from './shaping-actions';
 import { DashDraft } from './dash-draft';
+import { NotifySwitch } from './notify-switch';
 import {
   PrepNote,
   PastPeriods,
@@ -865,6 +866,12 @@ export function GoalRow({
                 quiet
               />
             )}
+            {/* On an open Dash step's own page, a phone message when Dash
+                finishes it (plan #2376.2). */}
+            {page &&
+              step.kind === 'claude' &&
+              step.status !== 'done' &&
+              step.status !== 'dropped' && <NotifySwitch node={step} />}
             {isDecision &&
               step.status !== 'dropped' &&
               (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
