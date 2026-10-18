@@ -36,6 +36,26 @@ export const youActions: ModuleActions = {
       'Keeps a file the person has just uploaded under a course, as they chose its kind and week; Dash does not hold their files.',
     ),
     removeCourseFileAction: none('deletes'),
+    summariseCourseFileAction: none(
+      'spends',
+      'Has Dash read one course file and keep its summary and key points, paid for on each press, which the person decided to make only by pressing Summarise (plan #2401.3).',
+    ),
+    readSyllabusWeeksAction: none(
+      'spends',
+      "Has Dash read a course's syllabus and lay out its weeks, paid for on each press, which the person decided to make only by pressing (plan #2401.3).",
+    ),
+    collectCourseOverviewAction: none(
+      'spends',
+      "Has Dash read a course's file summaries and say what the course was about and which ideas recurred, paid for on each press, which the person decided to make only by pressing (plan #2401.3).",
+    ),
+    renameCourseWeekAction: none(
+      'theirs',
+      'Corrects the topic Dash read for a week; the person\'s correction is what a later read keeps, so it is theirs to make.',
+    ),
+    removeCourseWeekAction: none(
+      'theirs',
+      'Turns down a week Dash read from the syllabus, so a later read leaves it out; a verdict on what Dash laid out.',
+    ),
   },
   'app/you/places/actions.ts': {
     // A place is added through capture (plan #1950.7); the form only changes one.

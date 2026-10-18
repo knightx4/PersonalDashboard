@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_files', 'courses', 'details', 'insight_runs', 'insight_verdicts', 'insights', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_runs', 'insight_verdicts', 'insights', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -233,6 +233,175 @@ describe('course files', () => {
   it('takes the files with the course, and the course with its transcript', async () => {
     await asUser(userA, (tx) => tx`delete from transcripts where id = ${transcriptA}`);
     expect(await admin`select id from course_files where course_id = ${courseA}`).toHaveLength(0);
+  });
+});
+
+describe('course file summaries', () => {
+  // migrations-you/0009_course_file_summaries.sql (plan #2401.4): Dash's
+  // summary and key points for one course file, one row per file.
+  let fileA = '';
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'summary-record.pdf', ${`${userA}/t-summary-record.pdf`}, 'application/pdf', 1)
+      returning id`;
+    const [c] = await admin<{ id: string }[]>`
+      insert into courses (user_id, transcript_id, school, title, position)
+      values (${userA}, ${t.id}, 'State University', 'Microeconomics', 0)
+      returning id`;
+    const [f] = await admin<{ id: string }[]>`
+      insert into course_files (user_id, course_id, kind, title, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, ${c.id}, 'slides', 'Week 1', 'week-1.pdf', ${`${userA}/${c.id}/week-1.pdf`}, 'application/pdf', 1)
+      returning id`;
+    fileA = f.id;
+  });
+
+  const write = (user: string, owner: string, points: string[] = ['Scarcity forces choice.']) =>
+    asUser(
+      user,
+      (tx) => tx`
+        insert into course_file_summaries (file_id, user_id, summary, points, model)
+        values (${fileA}, ${owner}, 'What the week covers.', ${points}, 'claude-haiku')
+        on conflict (file_id) do update set summary = excluded.summary, points = excluded.points
+        returning file_id`,
+    );
+
+  it('keeps one summary per file, to its owner only, replaced by the next', async () => {
+    await write(userA, userA);
+    await write(userA, userA, ['Opportunity cost is the next best thing given up.']);
+    const own = await asUser(userA, (tx) => tx`select points from course_file_summaries`);
+    expect(own).toEqual([{ points: ['Opportunity cost is the next best thing given up.'] }]);
+    expect(await asUser(userB, (tx) => tx`select file_id from course_file_summaries`)).toHaveLength(0);
+  });
+
+  it("refuses a summary of another account's file", async () => {
+    await expect(write(userB, userB)).rejects.toThrow();
+    await expect(write(userB, userA)).rejects.toThrow();
+  });
+
+  it('refuses no points, more than five, and an empty summary', async () => {
+    await expect(write(userA, userA, [])).rejects.toThrow();
+    await expect(write(userA, userA, ['1', '2', '3', '4', '5', '6'])).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update course_file_summaries set summary = '  ' where file_id = ${fileA}`),
+    ).rejects.toThrow();
+  });
+
+  it('goes with its file', async () => {
+    await asUser(userA, (tx) => tx`delete from course_files where id = ${fileA}`);
+    expect(await admin`select file_id from course_file_summaries where file_id = ${fileA}`).toHaveLength(0);
+  });
+});
+
+describe('course weeks', () => {
+  // migrations-you/0010_course_weeks.sql (plan #2401.6): a course's weeks,
+  // read from its syllabus, one row per week.
+  let courseA = '';
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'weeks-record.pdf', ${`${userA}/t-weeks-record.pdf`}, 'application/pdf', 1)
+      returning id`;
+    const [c] = await admin<{ id: string }[]>`
+      insert into courses (user_id, transcript_id, school, title, position)
+      values (${userA}, ${t.id}, 'State University', 'Macroeconomics', 0)
+      returning id`;
+    courseA = c.id;
+  });
+
+  const write = (user: string, owner: string, week: number, title: string | null = 'Scarcity') =>
+    asUser(
+      user,
+      (tx) => tx`
+        insert into course_weeks (user_id, course_id, week, title)
+        values (${owner}, ${courseA}, ${week}, ${title})
+        on conflict (course_id, week) do update set title = excluded.title
+        returning id`,
+    );
+
+  it('keeps one row per week of a course, to its owner only', async () => {
+    await write(userA, userA, 1);
+    await write(userA, userA, 1, 'Supply and demand');
+    await write(userA, userA, 2, null);
+    const own = await asUser(userA, (tx) => tx`select week, title from course_weeks order by week`);
+    expect(own).toEqual([
+      { week: 1, title: 'Supply and demand' },
+      { week: 2, title: null },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from course_weeks`)).toHaveLength(0);
+  });
+
+  it("refuses a week on another account's course", async () => {
+    await expect(write(userB, userB, 3)).rejects.toThrow();
+    await expect(write(userB, userA, 3)).rejects.toThrow();
+  });
+
+  it('refuses a week past 60 and a blank title', async () => {
+    await expect(write(userA, userA, 61)).rejects.toThrow();
+    await expect(write(userA, userA, 4, '  ')).rejects.toThrow();
+  });
+
+  it('goes with its course', async () => {
+    await asUser(userA, (tx) => tx`delete from courses where id = ${courseA}`);
+    expect(await admin`select id from course_weeks where course_id = ${courseA}`).toHaveLength(0);
+  });
+});
+
+describe('course overviews', () => {
+  // migrations-you/0011_course_overviews.sql (plan #2401.7): what a course
+  // was about, pulled together from its file summaries, one row per course.
+  let courseA = '';
+  const files = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'];
+  const recurring = JSON.stringify([{ idea: 'Correlation is not cause.', file_ids: files }]);
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'overview-record.pdf', ${`${userA}/t-overview-record.pdf`}, 'application/pdf', 1)
+      returning id`;
+    const [c] = await admin<{ id: string }[]>`
+      insert into courses (user_id, transcript_id, school, title, position)
+      values (${userA}, ${t.id}, 'State University', 'Econometrics', 0)
+      returning id`;
+    courseA = c.id;
+  });
+
+  const write = (user: string, owner: string, fileIds: string[] = files, about = 'How to measure a cause.') =>
+    asUser(
+      user,
+      (tx) => tx`
+        insert into course_overviews (course_id, user_id, about, recurring, file_ids, model)
+        values (${courseA}, ${owner}, ${about}, ${recurring}::text::jsonb, ${fileIds}::uuid[], 'claude-haiku')
+        on conflict (course_id) do update set about = excluded.about
+        returning course_id`,
+    );
+
+  it('keeps one overview per course, to its owner only, replaced by the next', async () => {
+    await write(userA, userA);
+    await write(userA, userA, files, 'Regression and its limits.');
+    expect(await asUser(userA, (tx) => tx`select about from course_overviews`)).toEqual([
+      { about: 'Regression and its limits.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select course_id from course_overviews`)).toHaveLength(0);
+  });
+
+  it("refuses an overview of another account's course", async () => {
+    await expect(write(userB, userB)).rejects.toThrow();
+    await expect(write(userB, userA)).rejects.toThrow();
+  });
+
+  it('refuses one read from fewer than two files, and an empty about', async () => {
+    await expect(write(userA, userA, [files[0]])).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update course_overviews set about = '  ' where course_id = ${courseA}`),
+    ).rejects.toThrow();
+  });
+
+  it('goes with its course', async () => {
+    await asUser(userA, (tx) => tx`delete from courses where id = ${courseA}`);
+    expect(await admin`select course_id from course_overviews where course_id = ${courseA}`).toHaveLength(0);
   });
 });
 

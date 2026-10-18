@@ -19,6 +19,7 @@ import {
   type CourseFile,
   type CourseFileKind,
   type CourseFileMimeType,
+  type CourseWeek,
 } from '@/lib/you/transcripts';
 
 const PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
@@ -94,30 +95,61 @@ export function parseKind(value: unknown): CourseFileKind | null {
   return typeof value === 'string' && isCourseFileKind(value) ? value : null;
 }
 
-/** One heading of a course's file list and the files under it. */
-export type CourseFileGroup = { key: string; label: string; files: CourseFile[] };
+/**
+ * One heading of a course's file list and the files under it. A week laid
+ * out from the syllabus (plan #2401.6) carries its kept row as `slot`, with
+ * the topic the heading shows beside the week; a week with no slot is one
+ * only a file's week formed.
+ */
+export type CourseFileGroup = { key: string; label: string; files: CourseFile[]; slot?: CourseWeek };
 
-const byWeekThenPosition = (a: CourseFile, b: CourseFile) =>
-  (a.week ?? Number.MAX_SAFE_INTEGER) - (b.week ?? Number.MAX_SAFE_INTEGER) ||
+/** Lectures before readings within a week; the syllabus has its own heading. */
+const KIND_ORDER: Record<CourseFile['kind'], number> = { syllabus: 0, slides: 1, lecture_notes: 1, reading: 2 };
+
+const byKindThenPosition = (a: CourseFile, b: CourseFile) =>
+  KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
   a.position - b.position ||
   a.uploaded_at.localeCompare(b.uploaded_at);
 
 /**
- * A course's files as the list shows them, under their kind: the syllabus
- * first, then the lectures (slides and lecture notes together) in week
- * order, then the readings in week order. A file with no week comes after the
- * last week. The week is a fact on each row rather than a heading, so every
- * heading is a kind. Empty groups are left out.
+ * A course's files as the list shows them, week by week (plan #2401.5): the
+ * syllabus first, then a heading for each week, in week order, with its
+ * lectures (slides and lecture notes, in the order they were added) and then
+ * its readings. Files with no week come last under "No week", in the same
+ * order. The kind is a fact on each row, so every heading after the syllabus
+ * is a week.
+ *
+ * The weeks come from two places: every week laid out from the syllabus and
+ * not removed (plan #2401.6), which shows as a slot even with no file in it,
+ * and every week a file names. A removed week still heads the files that
+ * name it. Other empty groups are left out.
  */
-export function groupCourseFiles(files: CourseFile[]): CourseFileGroup[] {
-  const groups: CourseFileGroup[] = [
-    { key: 'syllabus', label: 'Syllabus', files: files.filter((f) => f.kind === 'syllabus') },
-    { key: 'lectures', label: 'Lectures', files: files.filter((f) => f.kind === 'slides' || f.kind === 'lecture_notes') },
-    { key: 'readings', label: 'Readings', files: files.filter((f) => f.kind === 'reading') },
-  ];
-  return groups
-    .filter((group) => group.files.length > 0)
-    .map((group) => ({ ...group, files: [...group.files].sort(byWeekThenPosition) }));
+export function groupCourseFiles(files: CourseFile[], slots: CourseWeek[] = []): CourseFileGroup[] {
+  const groups: CourseFileGroup[] = [];
+  const syllabus = files.filter((f) => f.kind === 'syllabus');
+  if (syllabus.length > 0) groups.push({ key: 'syllabus', label: 'Syllabus', files: [...syllabus].sort(byKindThenPosition) });
+  const rest = files.filter((f) => f.kind !== 'syllabus');
+  const shown = new Map(slots.filter((s) => !s.removed_at).map((s) => [s.week, s]));
+  const weeks = [
+    ...new Set([...shown.keys(), ...rest.map((f) => f.week).filter((w): w is number => w !== null)]),
+  ].sort((a, b) => a - b);
+  for (const week of weeks) {
+    const slot = shown.get(week);
+    groups.push({
+      key: `week-${week}`,
+      label: `Week ${week}`,
+      files: rest.filter((f) => f.week === week).sort(byKindThenPosition),
+      ...(slot ? { slot } : {}),
+    });
+  }
+  const loose = rest.filter((f) => f.week === null);
+  if (loose.length > 0) groups.push({ key: 'no-week', label: 'No week', files: loose.sort(byKindThenPosition) });
+  return groups;
+}
+
+/** What a week is called where it is picked, such as the add drawer's week list: "Week 3 · Elasticity". */
+export function weekName(slot: Pick<CourseWeek, 'week' | 'title'>): string {
+  return slot.title ? `Week ${slot.week} · ${slot.title}` : `Week ${slot.week}`;
 }
 
 /** How many files a course holds, as its row says it. */

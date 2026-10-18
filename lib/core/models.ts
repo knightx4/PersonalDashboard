@@ -236,6 +236,8 @@ export const MODELS = {
   vaultTranscript: HAIKU,
   /** lib/you/work-history-model.ts */
   youWorkHistory: HAIKU,
+  /** lib/you/course-file-model.ts; Summarise on a course file, which can run to a hundred pages */
+  youCourseFileSummary: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
 } as const;
