@@ -65,7 +65,7 @@ export async function draftTopicFromGoal(_prev: DraftState, formData: FormData):
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
-  // The draft is kept even if approving fails: its page still has Approve.
+  // The draft is kept even if approving fails: its page says it is held.
   await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) =>
     console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error),
   );

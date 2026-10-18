@@ -132,7 +132,7 @@ const draftTopicTool: DashPaidTool = {
         console.error('[dash draft_topic] subject lens', error instanceof Error ? error.message : error),
       );
     }
-    // The draft is kept even if approving fails: its page still has Approve.
+    // The draft is kept even if approving fails: its page says it is held.
     const approval = await approveDraftedTopic(learn, ctx.userId, result.id).catch((error: unknown) => {
       console.error('[dash draft_topic] approve', error instanceof Error ? error.message : error);
       return null;

@@ -156,7 +156,7 @@ export async function draftBriefTopics(briefId: string, aimId: string): Promise<
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Drafting the topic failed.' };
   }
-  // The draft is kept even if approving fails: its page still has Approve.
+  // The draft is kept even if approving fails: its page says it is held.
   const approval = await approveDraftedTopic(client, user.id, id).catch((caught: unknown) => {
     console.error('[learn brief] approve on draft', caught instanceof Error ? caught.message : caught);
     return null;
