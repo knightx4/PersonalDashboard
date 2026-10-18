@@ -7,6 +7,7 @@ import {
   explainQuestion,
   graderCells,
   linkReviewsFor,
+  type GraderCell,
   whatMoved,
   type GradeEvidence,
   type RawVerdict,
@@ -18,6 +19,19 @@ import { gradeCellAnswer, LEVEL_GRADE_MODEL, LEVEL_GRADE_SECOND_MODEL } from '@/
 import { loadGradeMap, territoryOf } from '@/lib/learn/levels/loader-grade';
 import { questionFormat, readCells } from '@/lib/learn/levels/model';
 import { predictedCell } from '@/lib/learn/predicted';
+import {
+  figureAnswerLabel,
+  figureForGrader,
+  figureQuestionView,
+  figureResponse,
+  gradeFigureQuestion,
+  poseFigureQuestion,
+  readStoredFigureQuestion,
+  type FigureQuestionView,
+  type StoredFigureQuestion,
+} from '@/lib/learn/figures/question';
+import { pageResolveContext } from '@/lib/learn/figures/resolve';
+import { writeFigureQuestion } from '@/lib/learn/levels/figure-question-call';
 
 /**
  * Asking an explain question about a cell and recording the answer
@@ -38,8 +52,13 @@ export type AskedCell = {
   topicName: string;
   level: number;
   question: string;
-  /** What the question is: an explanation, or a case to work (levels 4 to 6). */
-  format: 'explain' | 'case';
+  /**
+   * What the question is: an explanation, a case to work (levels 4 to 6), or
+   * a question on a figure, asked in an explanation's place (plan #2321.5).
+   */
+  format: 'explain' | 'case' | 'figure';
+  /** The figure question without its answer, when `format` is 'figure'. */
+  figure?: FigureQuestionView;
   /** The requirement line of a role you pursued that this topic serves, when one is near (plan #2184.2). */
   role?: RoleLine | null;
 };
@@ -60,6 +79,11 @@ export async function askCell(
   pieceId?: string,
   /** Finds the role requirement the topic serves: shown on the question and used to set a case. */
   findRole?: RoleLineFinder,
+  /**
+   * `figures: false` keeps to explanations, for a screen that cannot draw a
+   * figure question: the piece page's check, which has its own answer box.
+   */
+  options?: { figures?: boolean },
 ): Promise<AskCellResult> {
   const { data: cell, error } = await learn
     .from('topic_cells')
@@ -79,28 +103,52 @@ export async function askCell(
   const format = questionFormat(row.level);
   if (format === 'defend') return { ok: false, error: `Level ${row.level} is asked as a defence, which is not built yet.` };
 
+  // A figure question stands in for an explanation and for nothing else, so
+  // it is graded no higher than one (plan #2321.5).
+  const figuresAllowed = format === 'explain' && options?.figures !== false;
   const openQuery = learn
     .from('cell_questions')
-    .select('id, question')
+    .select('id, question, format, figure')
     .eq('user_id', userId)
     .eq('cell_id', cellId)
-    .eq('format', format)
+    .in('format', figuresAllowed ? [format, 'figure'] : [format])
     .is('answered_at', null);
   const { data: open } = await (pieceId ? openQuery.eq('piece_id', pieceId) : openQuery.is('piece_id', null))
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  const reuse = open as { id: string; question: string } | null;
+  const reuse = open as { id: string; question: string; format: string; figure: unknown } | null;
   const role = findRole ? await findRole(row.topic.name) : null;
-  const asked = (questionId: string, question: string): AskCellResult => ({
+  const asked = (questionId: string, question: string, figure?: FigureQuestionView | null): AskCellResult => ({
     ok: true,
-    asked: { questionId, cellId, topicName: row.topic.name, level: row.level, question, format, role },
+    asked: {
+      questionId,
+      cellId,
+      topicName: row.topic.name,
+      level: row.level,
+      question,
+      format: figure ? 'figure' : format,
+      ...(figure ? { figure } : {}),
+      role,
+    },
   });
-  if (reuse) return asked(reuse.id, reuse.question);
+  if (reuse) {
+    if (reuse.format !== 'figure') return asked(reuse.id, reuse.question);
+    // A figure question whose form the app no longer has is left open and a new one asked.
+    const stored = readStoredFigureQuestion(reuse.figure);
+    const view = stored ? figureQuestionView(stored) : null;
+    if (view) return asked(reuse.id, reuse.question, view);
+  }
 
   let text: string;
   let expected: string | null = null;
-  if (format === 'case') {
+  const figure =
+    figuresAllowed && writer && (await figureTurn(learn, userId, cellId))
+      ? await writeCellFigure(learn, userId, cellId, { topicName: row.topic.name, level: row.level, descriptor: row.descriptor ?? [] }, writer)
+      : null;
+  if (figure) {
+    text = figure.prompt;
+  } else if (format === 'case') {
     if (!writer) return { ok: false, error: 'Writing a case needs ANTHROPIC_API_KEY to be set.' };
     const { data: before } = await learn
       .from('cell_questions')
@@ -139,9 +187,10 @@ export async function askCell(
     .insert({
       user_id: userId,
       cell_id: cellId,
-      format,
+      format: figure ? 'figure' : format,
       question: text,
       expected,
+      figure,
       piece_id: pieceId ?? null,
       shown_at: new Date().toISOString(),
       predicted_status: believed?.status ?? null,
@@ -152,10 +201,72 @@ export async function askCell(
   if (insertError || !inserted) {
     return { ok: false, error: `Saving the question failed: ${insertError?.message ?? 'no row came back'}` };
   }
-  return asked((inserted as { id: string }).id, text);
+  return asked((inserted as { id: string }).id, text, figure ? figureQuestionView(figure) : null);
 }
 
-export type AnswerCellResult = { ok: true; moved: Moved } | { ok: false; error: string };
+/**
+ * Whether the next question on a cell is a figure question: when the last
+ * one answered on it was an explanation. So a cell is first explained, and
+ * then the two take turns, and a figure question never comes twice running.
+ */
+async function figureTurn(learn: LearnSupabaseClient, userId: string, cellId: string): Promise<boolean> {
+  const { data } = await learn
+    .from('cell_questions')
+    .select('format')
+    .eq('user_id', userId)
+    .eq('cell_id', cellId)
+    .not('answered_at', 'is', null)
+    .order('answered_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { format: string } | null)?.format === 'explain';
+}
+
+/**
+ * A figure question for a cell, written and posed, or null when the writer
+ * finds no form that fits, fails, or writes one the form cannot pose. A null
+ * asks the explanation instead, so a failure here costs the person nothing.
+ */
+async function writeCellFigure(
+  learn: LearnSupabaseClient,
+  userId: string,
+  cellId: string,
+  cell: { topicName: string; level: number; descriptor: readonly string[] },
+  writer: { anthropicApiKey: string; onSpend?: SpendSink },
+): Promise<StoredFigureQuestion | null> {
+  const { data: before } = await learn
+    .from('cell_questions')
+    .select('question')
+    .eq('user_id', userId)
+    .eq('cell_id', cellId)
+    .eq('format', 'figure')
+    .order('created_at', { ascending: false })
+    .limit(5);
+  const written = await writeFigureQuestion({
+    ...cell,
+    asked: ((before ?? []) as Array<{ question: string }>).map((b) => b.question),
+    anthropicApiKey: writer.anthropicApiKey,
+    onSpend: writer.onSpend,
+  });
+  if (!written.ok) {
+    console.error('[learn levels] figure question', written.detail);
+    return null;
+  }
+  if (!written.written) return null;
+  return poseFigureQuestion(written.written, pageResolveContext(learn));
+}
+
+export type AnswerCellResult =
+  | {
+      ok: true;
+      moved: Moved;
+      /** A figure question's answer in words, shown once it is graded (plan #2321.5). */
+      answer?: string;
+    }
+  | { ok: false; error: string };
+
+/** What `cell_questions.model` says of a figure question its form graded without a model. */
+export const FIGURE_EXACT_GRADER = 'exact';
 
 /**
  * Grade an answer to a cell question and write what it showed. Nothing is
@@ -166,12 +277,12 @@ export async function answerCell(
   userId: string,
   input: { questionId: string; response: string; anthropicApiKey: string; onSpend?: SpendSink },
 ): Promise<AnswerCellResult> {
-  const response = input.response.trim();
-  if (response === '') return { ok: false, error: 'Write an answer first.' };
+  const raw = input.response.trim();
+  if (raw === '') return { ok: false, error: 'Write an answer first.' };
 
   const { data: q, error: qError } = await learn
     .from('cell_questions')
-    .select('id, cell_id, question, expected, answered_at')
+    .select('id, cell_id, question, expected, format, figure, answered_at')
     .eq('user_id', userId)
     .eq('id', input.questionId)
     .maybeSingle();
@@ -181,10 +292,19 @@ export async function answerCell(
     cell_id: string;
     question: string;
     expected: string | null;
+    format: string;
+    figure: unknown;
     answered_at: string | null;
   } | null;
   if (!question) return { ok: false, error: 'That question is not one of yours.' };
   if (question.answered_at) return { ok: false, error: 'That question has been answered already.' };
+
+  // A figure question keeps what was picked by its label, so the quote under
+  // a met reads as the answer given (plan #2321.5).
+  const figure = question.format === 'figure' ? readStoredFigureQuestion(question.figure) : null;
+  if (question.format === 'figure' && !figure) return { ok: false, error: 'This question’s figure can no longer be read.' };
+  const response = figure ? figureResponse(figure, raw) : raw;
+  if (response === null) return { ok: false, error: 'Pick an answer first.' };
 
   let map;
   try {
@@ -193,30 +313,17 @@ export async function answerCell(
     return { ok: false, error: error instanceof Error ? error.message : 'Reading your topics failed.' };
   }
   const allCells = graderCells(map, question.cell_id);
-  // A case is graded on the asked cell alone (the spec's "Cases and defences").
-  const cells = allCells && question.expected ? allCells.slice(0, 1) : allCells;
+  // A case is graded on the asked cell alone (the spec's "Cases and defences"),
+  // and so is a figure question, which shows one thing about one level.
+  const cells = allCells && (question.expected || figure) ? allCells.slice(0, 1) : allCells;
   if (!cells) return { ok: false, error: 'That level is on a topic that is not approved.' };
 
-  const gradeInput = {
-    cells,
-    question: question.question,
-    expected: question.expected,
-    answer: response,
-    anthropicApiKey: input.anthropicApiKey,
-    onSpend: input.onSpend,
-  };
-  // Two graders read every answer; only the first writes evidence. A second
-  // that fails leaves its columns null and costs the person nothing.
-  const [grade, second] = await Promise.all([
-    gradeCellAnswer(gradeInput),
-    gradeCellAnswer({ ...gradeInput, model: LEVEL_GRADE_SECOND_MODEL }),
-  ]);
-  if (!grade.ok) {
-    console.error('[learn levels] grading', grade.detail);
-    return { ok: false, error: 'Dash could not grade this answer just now.' };
-  }
+  const graded = figure
+    ? await gradeFigure(figure, raw, response, cells, question.question, input)
+    : await gradeTwice(cells, question.question, question.expected, response, input);
+  if (!graded) return { ok: false, error: 'Dash could not grade this answer just now.' };
 
-  const { write } = applyGradeRules({ cells, answer: response, verdicts: grade.verdicts });
+  const { write } = applyGradeRules({ cells, answer: response, verdicts: graded.verdicts });
   const keyToCell = new Map(cells.map((c) => [c.key, c.cellId]));
   const now = new Date().toISOString();
 
@@ -226,10 +333,10 @@ export async function answerCell(
     .update({
       response,
       answered_at: now,
-      model: LEVEL_GRADE_MODEL,
-      grade: storedGrade(grade.verdicts, keyToCell),
-      grade_second: second.ok ? storedGrade(second.verdicts, keyToCell) : null,
-      model_second: second.ok ? LEVEL_GRADE_SECOND_MODEL : null,
+      model: graded.model,
+      grade: storedGrade(graded.verdicts, keyToCell),
+      grade_second: graded.second ? storedGrade(graded.second, keyToCell) : null,
+      model_second: graded.second ? LEVEL_GRADE_SECOND_MODEL : null,
     })
     .eq('user_id', userId)
     .eq('id', question.id)
@@ -296,7 +403,80 @@ export async function answerCell(
   return {
     ok: true,
     moved: whatMoved({ map, askedCellId: question.cell_id, before, after, written: write, reviews }),
+    ...(figure ? { answer: figureAnswerLabel(figure) } : {}),
   };
+}
+
+type Graded = { verdicts: RawVerdict[]; model: string; second: RawVerdict[] | null };
+type GradeKey = { anthropicApiKey: string; onSpend?: SpendSink };
+
+/**
+ * An explanation or a case: two graders read it and only the first writes
+ * evidence. A second that fails leaves its columns null and costs the person
+ * nothing. Null when the first fails.
+ */
+async function gradeTwice(
+  cells: GraderCell[],
+  question: string,
+  expected: string | null,
+  answer: string,
+  key: GradeKey,
+): Promise<Graded | null> {
+  const gradeInput = { cells, question, expected, answer, anthropicApiKey: key.anthropicApiKey, onSpend: key.onSpend };
+  const [grade, second] = await Promise.all([
+    gradeCellAnswer(gradeInput),
+    gradeCellAnswer({ ...gradeInput, model: LEVEL_GRADE_SECOND_MODEL }),
+  ]);
+  if (!grade.ok) {
+    console.error('[learn levels] grading', grade.detail);
+    return null;
+  }
+  return { verdicts: grade.verdicts, model: LEVEL_GRADE_MODEL, second: second.ok ? second.verdicts : null };
+}
+
+/**
+ * A figure question (plan #2321.5), on the asked cell alone: by its form's
+ * grader where the answer is exact, with the response itself as the quote,
+ * and otherwise by the model with the figure and its answer in the prompt.
+ * Either way the verdict goes through the same rules as an explanation's.
+ */
+async function gradeFigure(
+  figure: StoredFigureQuestion,
+  raw: string,
+  response: string,
+  cells: GraderCell[],
+  question: string,
+  key: GradeKey,
+): Promise<Graded | null> {
+  const asked = cells[0];
+  const exact = gradeFigureQuestion(figure, raw);
+  if (exact) {
+    return {
+      verdicts: [
+        {
+          cell: asked.key,
+          verdict: exact,
+          quote: exact === 'met' ? response : null,
+          reason: exact === 'met' ? 'The answer the figure holds.' : `The figure holds ${figureAnswerLabel(figure)}.`,
+        },
+      ],
+      model: FIGURE_EXACT_GRADER,
+      second: null,
+    };
+  }
+  const grade = await gradeCellAnswer({
+    cells,
+    question,
+    figure: figureForGrader(figure),
+    answer: response,
+    anthropicApiKey: key.anthropicApiKey,
+    onSpend: key.onSpend,
+  });
+  if (!grade.ok) {
+    console.error('[learn levels] grading a figure question', grade.detail);
+    return null;
+  }
+  return { verdicts: grade.verdicts, model: LEVEL_GRADE_MODEL, second: null };
 }
 
 /** A grader's verdicts as kept on the row: by cell id, with quote and reason. */

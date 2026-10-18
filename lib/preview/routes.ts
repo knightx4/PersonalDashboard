@@ -610,6 +610,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-maya': ['/vault/maya'],
   'vault-maya-thread': ['/vault/maya/[id]'],
   'vault-settings': ['/vault/settings'],
+  'learn-cell-answer-figure-fill': ['/learn/now'],
+  'learn-cell-answer-figure-fill-graded': ['/learn/now'],
+  'learn-cell-answer-figure-predict': ['/learn/now'],
+  'learn-cell-answer-figure-pick': ['/learn/now'],
 };
 
 /**
