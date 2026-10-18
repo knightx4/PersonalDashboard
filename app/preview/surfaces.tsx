@@ -458,10 +458,18 @@ import {
   InformationOneSurface,
 } from './goal-page-surfaces';
 import {
+  GoalListsCalendarDaySurface,
+  GoalListsCalendarEmptySurface,
+  GoalListsCalendarSurface,
   GoalListsEmptySurface,
   GoalListsErrorSurface,
+  GoalListsGallerySurface,
   GoalListsLinkedSurface,
   GoalListsLoadingSurface,
+  GoalListsMapEmptySurface,
+  GoalListsMapFailedSurface,
+  GoalListsMapPinSurface,
+  GoalListsMapSurface,
   GoalListsPanelSurface,
   GoalListsSurface,
   GoalListsTabSurface,
@@ -5011,6 +5019,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalListsLoadingSurface />,
+  },
+  {
+    /* The pantries open on Gallery (plan #2330.4): every picture in a grid with its name and price. */
+    id: 'goals-lists-panel-gallery',
+    label: 'Goal · a list as a gallery',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsGallerySurface />,
+  },
+  {
+    /* A list of events from the calendar (plan #2330.4): the month with two on one day, and what is coming under it. */
+    id: 'goals-lists-panel-calendar',
+    label: 'Goal · a list on a calendar',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarSurface />,
+  },
+  {
+    /* A day on the list’s calendar pressed: its popover names each row with its link. */
+    id: 'goals-lists-panel-calendar-day',
+    label: 'Goal · a list’s calendar, a day open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarDaySurface />,
+  },
+  {
+    /* The list’s calendar stepped to a month with nothing in it. */
+    id: 'goals-lists-panel-calendar-empty',
+    label: 'Goal · a list’s calendar, an empty month',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarEmptySurface />,
+  },
+  {
+    /* Shops on the map (plan #2330.4): numbered pins on OpenStreetMap, and one with an address alone listed under it. */
+    id: 'goals-lists-panel-map',
+    label: 'Goal · a list on a map',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapSurface />,
+  },
+  {
+    /* A pin on the list’s map pressed: its name, link and address over the map. */
+    id: 'goals-lists-panel-map-pin',
+    label: 'Goal · a list’s map, a pin open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapPinSurface />,
+  },
+  {
+    /* A list with a place field and no address yet: the map says how to add one. */
+    id: 'goals-lists-panel-map-empty',
+    label: 'Goal · a list’s map with no places',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapEmptySurface />,
+  },
+  {
+    /* The map’s tiles would not load, so the table stands in for it. */
+    id: 'goals-lists-panel-map-failed',
+    label: 'Goal · a list’s map that could not load',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapFailedSurface />,
   },
   {
     /* Three lists, so each has a tab after Steps; the pantries’ tab open. */

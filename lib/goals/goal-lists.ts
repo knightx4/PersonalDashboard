@@ -13,7 +13,7 @@
  * database. The reads are in lib/goals/goal-lists-store.ts.
  */
 
-import { liveFields, type CollectionField, type FieldValue } from '@/lib/goals/collections';
+import { isPlace, liveFields, type CollectionField, type FieldValue, type PlaceValue } from '@/lib/goals/collections';
 import type { CollectionRecord } from '@/lib/goals/collections-store';
 import { displayValue } from '@/lib/goals/information';
 import type { GoalList } from '@/lib/goals/lists-store';
@@ -28,7 +28,15 @@ export const LIST_TABS_FROM = 3;
 export const LIST_TAB_PREFIX = 'list-';
 
 /** One column of a list's table. */
-export type ListColumn = { key: string; label: string; num?: boolean };
+export type ListColumn = {
+  key: string;
+  label: string;
+  num?: boolean;
+  /** A price: Compare sets it on the card's foot line beside the link. */
+  money?: boolean;
+  /** An address, which needs no label before it. */
+  place?: boolean;
+};
 
 /** One row of a list, own or linked, in the words the table draws. */
 export type ListRowView = {
@@ -52,7 +60,14 @@ export type ListRowView = {
   picked: boolean;
   /** Comments on the row's own thread, where its table keeps one. */
   comments: number;
+  /** The day the row falls on, YYYY-MM-DD in the person's zone, for the calendar (plan #2330.4). */
+  day: string | null;
+  /** Where the row is, for the map. A pin needs `lat` and `lng`; an address alone is listed beside it. */
+  place: PlaceValue | null;
 };
+
+/** What a list's rows can hold, which decides the views it offers (lib/goals/list-views.ts). */
+export type ListHolds = { pictures: boolean; dates: boolean; places: boolean };
 
 export type ListView = {
   /** Unique on the goal and safe in an address. */
@@ -72,6 +87,10 @@ export type ListView = {
   standout: string | null;
   /** The field a typed name goes in, for an own list's add box. */
   nameField: string | null;
+  /** Pictures, dates and places: from an own list's field types, a linked list's kinds. */
+  holds: ListHolds;
+  /** The person's today, YYYY-MM-DD, that the calendar measures from; null when not given. */
+  today: string | null;
 };
 
 /** What the chip shows, without the rows. */
@@ -175,6 +194,22 @@ function firstOf(fields: CollectionField[], type: CollectionField['type'], data:
   return null;
 }
 
+/** The first live date field's value, as YYYY-MM-DD. */
+function firstDay(fields: CollectionField[], data: Record<string, FieldValue>): string | null {
+  const day = firstOf(fields, 'date', data);
+  return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+/** The first live place field's value, when it has an address. */
+function firstPlace(fields: CollectionField[], data: Record<string, FieldValue>): PlaceValue | null {
+  for (const field of liveFields(fields)) {
+    if (field.type !== 'place') continue;
+    const value = data[field.key];
+    if (isPlace(value) && value.address.trim() !== '') return value;
+  }
+  return null;
+}
+
 function ownRow(fields: CollectionField[], record: CollectionRecord, columns: CollectionField[]): ListRowView {
   const name = nameFieldOf(fields);
   const status = statusFieldOf(fields);
@@ -193,6 +228,8 @@ function ownRow(fields: CollectionField[], record: CollectionRecord, columns: Co
     ruledOut: RULED_OUT_WORDS.test(said.trim()),
     picked: PICKED_WORDS.test(said.trim()),
     comments: 0,
+    day: firstDay(fields, record.data),
+    place: firstPlace(fields, record.data),
   };
 }
 
@@ -210,10 +247,10 @@ const LINKED_COLUMNS: Record<ListedKind, ListColumn[]> = {
   reading: [{ key: 'status', label: 'Status' }],
   event: [
     { key: 'when', label: 'When' },
-    { key: 'where', label: 'Where' },
+    { key: 'where', label: 'Where', place: true },
   ],
   saved_item: [
-    { key: 'price', label: 'Price', num: true },
+    { key: 'price', label: 'Price', num: true, money: true },
     { key: 'status', label: 'Status' },
   ],
   contact: [
@@ -266,6 +303,8 @@ function linkedRow(row: LinkedRow, timeZone: string, comments: number): ListRowV
     ruledOut: false,
     picked: false,
     comments,
+    day: null as string | null,
+    place: null as PlaceValue | null,
   };
   if (row.gone) return { ...base, cells: {} };
   switch (row.kind) {
@@ -284,6 +323,9 @@ function linkedRow(row: LinkedRow, timeZone: string, comments: number): ListRowV
           when: day ? whenDate(day, { timeZone: 'UTC', weekday: 'short', year: 'auto' }) : null,
           where: row.location,
         },
+        day,
+        // An event's place is the words typed for it; nothing has given it a point yet.
+        place: row.location?.trim() ? { address: row.location.trim() } : null,
       };
     }
     case 'saved_item':
@@ -366,8 +408,11 @@ export function standoutOf(view: Pick<ListView, 'kind' | 'kinds' | 'rows'>, rows
   return null;
 }
 
+const hasType = (fields: CollectionField[], type: CollectionField['type']) =>
+  liveFields(fields).some((f) => f.type === type);
+
 /** One of a goal's own lists, as the page draws it. */
-export function ownListView(list: GoalList): Omit<ListView, 'key'> {
+export function ownListView(list: GoalList, today: string | null = null): Omit<ListView, 'key'> {
   const name = nameFieldOf(list.fields);
   const columns = ownColumns(list.fields, name);
   const all = list.rows.map((record) => ownRow(list.fields, record, columns));
@@ -376,10 +421,22 @@ export function ownListView(list: GoalList): Omit<ListView, 'key'> {
     kind: 'own' as const,
     name: list.name,
     kinds: [],
-    columns: columns.map((f) => ({ key: f.key, label: f.label, num: NUMERIC.has(f.type) })),
+    columns: columns.map((f) => ({
+      key: f.key,
+      label: f.label,
+      num: NUMERIC.has(f.type),
+      ...(f.type === 'money' ? { money: true } : {}),
+      ...(f.type === 'place' ? { place: true } : {}),
+    })),
     rows: all.filter((r) => !r.ruledOut),
     ruledOut: all.filter((r) => r.ruledOut),
     nameField: name?.key ?? null,
+    holds: {
+      pictures: hasType(list.fields, 'image'),
+      dates: hasType(list.fields, 'date'),
+      places: hasType(list.fields, 'place'),
+    },
+    today,
   };
   return { ...view, standout: standoutOf(view) };
 }
@@ -404,6 +461,12 @@ export function linkedListView(
     rows: all.filter((r) => !r.ruledOut),
     ruledOut: all.filter((r) => r.ruledOut),
     nameField: null,
+    holds: {
+      pictures: list.kinds.includes('saved_item'),
+      dates: list.kinds.includes('event'),
+      places: list.kinds.includes('event'),
+    },
+    today: options.today ?? null,
   };
   return { ...view, standout: standoutOf(view, list.rows, options.today, timeZone) };
 }
@@ -426,7 +489,7 @@ export function goalListViews(
     taken.add(key);
     return { ...view, key };
   };
-  return [...own.map((list) => keyed(ownListView(list))), ...linked.map((list) => keyed(linkedListView(list, options)))];
+  return [...own.map((list) => keyed(ownListView(list, options.today ?? null))), ...linked.map((list) => keyed(linkedListView(list, options)))];
 }
 
 /** What a list's chip shows: the count of rows in play, the line, and up to three pictures. */
