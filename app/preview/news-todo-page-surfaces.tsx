@@ -147,6 +147,7 @@ function task(over: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
     createdAt: '2026-10-01T09:00:00Z',
     position: null,
     parentId: null,
+    tags: [],
     ...over,
   };
 }
