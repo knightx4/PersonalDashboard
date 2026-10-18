@@ -2,8 +2,9 @@ import 'server-only';
 
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
-import { decryptAccessToken, vaultPortsFor } from '@/lib/vault/db/ports';
-import { VaultAuthError } from '@/lib/vault/providers';
+import { decryptAccessToken, noteDatingPorts, vaultPortsFor } from '@/lib/vault/db/ports';
+import { dateNotes } from '@/lib/vault/sync/dating';
+import { VaultAuthError, type VaultSource } from '@/lib/vault/providers';
 import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
 import { activeRun } from '@/lib/vault/sync/manual';
 import { indexNoteBlocks } from '@/lib/vault/notes/block-index';
@@ -170,6 +171,8 @@ export async function syncOneConnection(
 
     const result = await runVaultSync({ connection, ports });
 
+    const notesDated = await dateAfterSync(supabase, connection.id, ports.source);
+
     const a = result.attachments;
     if (a.copied || a.removed || a.pending || a.failed) {
       console.info(
@@ -188,6 +191,7 @@ export async function syncOneConnection(
         notes_written: result.notesWritten,
         notes_deleted: result.notesDeleted,
         notes_skipped: result.notesSkipped,
+        notes_dated: notesDated,
         finished_at: new Date().toISOString(),
       })
       .eq('id', runId);
@@ -218,6 +222,39 @@ export async function syncOneConnection(
     }
 
     throw err;
+  }
+}
+
+/**
+ * How long a sync may spend dating notes (plan #2413.2). A daily sync dates
+ * the handful it wrote in a second or two; the backfill, about two GitHub
+ * requests a note, takes a few runs at this length and resumes by itself.
+ */
+const DATING_AFTER_SYNC_MS = 45_000;
+
+/**
+ * Date the notes that are due, as far as the time allows. Never throws: a
+ * note left undated is still due, and the next sync dates it.
+ */
+async function dateAfterSync(
+  supabase: VaultSupabaseClient,
+  connectionId: string,
+  source: VaultSource,
+): Promise<number> {
+  try {
+    const result = await dateNotes({
+      ports: noteDatingPorts({ supabase, connectionId, source }),
+      deadline: Date.now() + DATING_AFTER_SYNC_MS,
+    });
+    if (!result.complete) {
+      console.info(
+        `vault: dated ${result.dated} notes, ${result.lookedUp} looked up on GitHub, ${result.failed} lookups failed; more to date next run`,
+      );
+    }
+    return result.dated;
+  } catch (err) {
+    console.error('[vault sync] note dating', err instanceof Error ? err.message : err);
+    return 0;
   }
 }
 
