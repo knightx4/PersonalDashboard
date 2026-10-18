@@ -3,6 +3,7 @@ import {
   COURSE_FILES_BUCKET,
   courseFileStoragePath,
   deleteCourse,
+  deleteCourseFile,
   deleteTranscript,
   isCourseFileMimeType,
   transcriptStoragePath,
@@ -180,6 +181,23 @@ describe('deleteCourse', () => {
     const store = fakeStore(seed());
     expect(await deleteCourse(store.client, 'u2', 'c1')).toBe(false);
     expect(store.tables.courses).toHaveLength(2);
+    expect(store.tables.course_files).toHaveLength(3);
+    expect(store.removed).toEqual([]);
+  });
+});
+
+describe('deleteCourseFile', () => {
+  it('removes the one row and its stored file, leaving the course and its other files', async () => {
+    const store = fakeStore(seed());
+    expect(await deleteCourseFile(store.client, 'u1', 'f2')).toBe(true);
+    expect(store.tables.courses).toHaveLength(2);
+    expect(store.tables.course_files.map((f) => f.id)).toEqual(['f1', 'f3']);
+    expect(store.removed).toEqual([{ bucket: COURSE_FILES_BUCKET, paths: ['u1/c1/f2-week-1.pptx'] }]);
+  });
+
+  it("touches nothing for another account's file", async () => {
+    const store = fakeStore(seed());
+    expect(await deleteCourseFile(store.client, 'u2', 'f2')).toBe(false);
     expect(store.tables.course_files).toHaveLength(3);
     expect(store.removed).toEqual([]);
   });
