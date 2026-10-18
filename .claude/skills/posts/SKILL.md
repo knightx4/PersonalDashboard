@@ -15,6 +15,21 @@ The table is described in `supabase/migrations/0146_social_posts.sql`, the
 types and the counter in `lib/dev/posts.ts`, and the check in
 `lib/dev/post-check.ts`.
 
+## A request for one post is saved by Dash
+
+When the person asks Dash, in the Ask box or under a draft, for a post about
+something that shipped, Dash reads what shipped, calls `post_pictures` for a
+picture of the screen and calls `suggest_post` with the angle, the posts and
+the picture (`lib/dash/post-writes.ts`). The app runs the same checks as
+`scripts/posts-check.ts` and keeps out the person's name, job-search
+companies and contacts' names, so that request needs no check file and no run
+of this skill, and it never becomes a hand-off to the backup routine. It saves
+no source steps or notes.
+
+This skill is for the batch: the Suggest posts button, which drafts three to
+five posts from what shipped since the last one, and a run opened for one
+draft's thread. For those the steps below hold, including the check file.
+
 ## How it is fired
 
 The Suggest posts button starts one run of the plan routine with job `posts`
