@@ -6,6 +6,7 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { insertMadeChange, type MadeDashChange } from '@/lib/talk/changes';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
+import { listPostPictures } from './post-pictures';
 import { POST_WRITE_TOOLS } from './post-writes';
 import type { DashWriteContext, DashWriteResult } from './registry';
 
@@ -48,6 +49,10 @@ function context(enabled: AskContext['enabledModules'] = ['dev']): DashWriteCont
 
 function rewrite(input: unknown, ctx = context()): Promise<DashWriteResult> {
   return POST_WRITE_TOOLS[0].apply(ctx, input);
+}
+
+function suggest(input: unknown, ctx = context()): Promise<DashWriteResult> {
+  return POST_WRITE_TOOLS.find((t) => t.name === 'suggest_post')!.apply(ctx, input);
 }
 
 function ok(result: DashWriteResult): Extract<DashWriteResult, { ok: true }> {
@@ -102,6 +107,9 @@ beforeEach(() => {
   });
   tables = {
     'core.dash_actions': [],
+    'public.profiles': [{ id: ME, display_name: 'Robin Quill' }],
+    'job_search.companies': [{ id: 'c1', user_id: ME, name: 'Brightwater' }],
+    'job_search.contacts': [{ id: 'p1', user_id: ME, full_name: 'Avery Stone' }],
     'public.social_posts': [
       row(POST),
       row(POSTED, { status: 'posted', posted_url: 'https://x.com/i/status/1', posted_at: '2026-10-14T09:00:00Z' }),
@@ -112,7 +120,7 @@ beforeEach(() => {
 });
 
 describe('rewrite_post', () => {
-  it('is the one post kind Ask keeps', () => {
+  it('lists the post kinds Ask keeps', () => {
     expect(POST_WRITE_TOOLS.map((t) => t.name)).toEqual([...POST_CHANGE_KINDS]);
   });
 
@@ -191,5 +199,93 @@ describe('rewrite_post', () => {
 
     expect(await undo()).toMatchObject({ ok: false });
     expect(post().body).toEqual(['Their own wording.']);
+  });
+});
+
+/**
+ * Dash saving a new post draft when asked (plan #2384.3): a draft that passes
+ * the posts run's checks goes in suggested with draft and body the same and
+ * no run, a picture must be one the gallery listing returns, a failing draft
+ * is refused with its reasons and nothing saved, and Undo deletes it while it
+ * is still suggested and unedited.
+ */
+describe('suggest_post', () => {
+  const ANGLE = 'Dash can save a post draft';
+  const POSTS = ['You can now ask Dash for a post about something that shipped, and the draft lands on the Posts tab with a picture.'];
+  const added = () => tables['public.social_posts'].filter((row) => row.angle === ANGLE);
+
+  it('saves a checked draft as suggested, with draft and body the same and no run', async () => {
+    const result = ok(await suggest({ angle: ANGLE, posts: POSTS }));
+
+    expect(added()).toHaveLength(1);
+    const row = added()[0];
+    expect(row).toMatchObject({ user_id: ME, status: 'suggested', draft: POSTS, body: POSTS, image_paths: [], run_id: null });
+    expect(result).toMatchObject({
+      kind: 'suggest_post',
+      subjectRef: `public.social_posts:${row.id}`,
+      op: 'insert',
+      before: null,
+      summary: expect.stringContaining(`Dash saved the post draft "${ANGLE}"`),
+      row: expect.objectContaining({ table: 'public.social_posts', ref: row.id, href: '/dev/posts' }),
+    });
+    expect(result.input).toMatchObject({ verb: 'Saved the post draft', paths: ['/dev/posts', '/home'] });
+  });
+
+  it('attaches a gallery picture the listing returns', async () => {
+    const pictures = await listPostPictures();
+    expect(pictures.length).toBeGreaterThan(0);
+    const result = ok(await suggest({ angle: ANGLE, posts: POSTS, picture: pictures[0].path }));
+    expect(added()[0].image_paths).toEqual([pictures[0].path]);
+    expect(result.summary).toMatch(/with a picture/);
+  });
+
+  it('refuses a picture the listing did not return, and saves nothing', async () => {
+    for (const picture of ['/posts/2026-01-01-not-there.png', 'https://example.com/a.png', '../secret.png']) {
+      expect(refused(await suggest({ angle: ANGLE, posts: POSTS, picture }))).toMatch(/not a gallery picture/);
+    }
+    expect(added()).toEqual([]);
+  });
+
+  it('refuses a draft that fails the post checks, with the reasons, and saves nothing', async () => {
+    const tooLong = refused(await suggest({ angle: ANGLE, posts: ['a'.repeat(281)] }));
+    expect(tooLong).toMatch(/the post is 281 characters; the limit is 280/);
+    expect(tooLong).toMatch(/Nothing was saved/);
+
+    expect(refused(await suggest({ angle: ANGLE, posts: ['Shipped a thing, see example.com'] }))).toMatch(/has a link or a domain/);
+    // The terms the posts run keeps out: the person's name, their companies and contacts.
+    expect(refused(await suggest({ angle: ANGLE, posts: ['Robin built this.'] }))).toMatch(/names "Robin"/);
+    expect(refused(await suggest({ angle: ANGLE, posts: ['Made for Brightwater.'] }))).toMatch(/names "Brightwater"/);
+    expect(refused(await suggest({ angle: 'Avery Stone asked for it', posts: POSTS }))).toMatch(/angle names "Avery Stone"/);
+    expect(refused(await suggest({ angle: ANGLE, posts: ['1', '2', '3', '4', '5', '6'] }))).toMatch(/at most 5 posts/);
+    expect(refused(await suggest({ angle: '', posts: POSTS }))).toMatch(/angle is missing/);
+
+    expect(added()).toEqual([]);
+    expect(tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('refuses when Dev is switched off', async () => {
+    expect(refused(await suggest({ angle: ANGLE, posts: POSTS }, context(['todo'])))).toMatch(/Dev workspace/);
+    expect(added()).toEqual([]);
+  });
+
+  it('is undone from Home, which removes the draft', async () => {
+    const { undo } = await keep(ok(await suggest({ angle: ANGLE, posts: POSTS })));
+    expect(added()).toHaveLength(1);
+
+    expect(await undo()).toMatchObject({ ok: true, change: { status: 'undone' } });
+    expect(added()).toEqual([]);
+  });
+
+  it('is not undone once the person has edited or planned the draft', async () => {
+    const edited = await keep(ok(await suggest({ angle: ANGLE, posts: POSTS })));
+    added()[0].body = ['Their own wording.'];
+    expect(await edited.undo()).toMatchObject({ ok: false });
+    expect(added()).toHaveLength(1);
+
+    tables['public.social_posts'] = tables['public.social_posts'].filter((row) => row.angle !== ANGLE);
+    const planned = await keep(ok(await suggest({ angle: ANGLE, posts: POSTS })));
+    added()[0].status = 'planned';
+    expect(await planned.undo()).toMatchObject({ ok: false });
+    expect(added()).toHaveLength(1);
   });
 });
