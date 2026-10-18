@@ -26,7 +26,7 @@ import type {
   Verdict,
 } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { markInsight, startInsightRun, type MarkResult } from './actions';
+import { markInsight, startFullReread, startInsightRun, type MarkResult } from './actions';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -39,16 +39,19 @@ import { markInsight, startInsightRun, type MarkResult } from './actions';
  * the card under Earlier with the mark, so what the person has said is not
  * true about them stays on record. Later passes a card without marking it.
  *
- * Look again starts a run (startInsightRun); while one is queued or running a
- * banner takes the button's place and the page looks again every minute.
+ * Look again starts a run (startInsightRun), one model call that writes in a
+ * few minutes; while one is queued or running a banner takes the button's
+ * place and the page looks again every minute. Under the deck, Full re-read
+ * starts the slow session on the person's Claude plan (startFullReread).
  */
 
 export type InsightsActions = {
   mark: (insightId: string, verdict: Verdict, note?: string | null) => Promise<MarkResult>;
   lookAgain: () => Promise<{ error: string | null }>;
+  fullReread: () => Promise<{ error: string | null }>;
 };
 
-const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun };
+const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun, fullReread: startFullReread };
 
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
@@ -87,10 +90,14 @@ const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
 };
 
 /**
- * A run reads for half an hour or so, with three readers beside it. No run
- * has been priced yet, so this is a guess and says so (law 16).
+ * Look again is one model call on the API; a run is refused before it starts
+ * if it is estimated over two dollars (lib/you/insights-write.ts). No run has
+ * been priced yet, so the figure is a guess and says so (law 16).
  */
-const LOOK_AGAIN_COST = 'About $2 to $5, uncertain';
+const LOOK_AGAIN_COST = 'Up to about $2, uncertain';
+
+/** A full re-read is a session on the person's Claude plan, with readers beside it, for half an hour or so. */
+const FULL_REREAD_COST = 'Uses your Claude plan for half an hour or so; about $2 to $5 at API prices, uncertain';
 
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
@@ -128,6 +135,7 @@ export function InsightsView({
   run,
   runWhen,
   available,
+  rereadAvailable = false,
   actions = REAL_ACTIONS,
   open = {},
 }: {
@@ -136,8 +144,10 @@ export function InsightsView({
   run: InsightRunState;
   /** When the newest run was asked for, already written in their zone. */
   runWhen: string | null;
-  /** Whether the deployment can start a run (both routine variables set). */
+  /** Whether the deployment can write a run (the API key is set). */
   available: boolean;
+  /** Whether the deployment can start a full re-read (both routine variables set). */
+  rereadAvailable?: boolean;
   actions?: InsightsActions;
   open?: InsightsOpen;
 }) {
@@ -188,6 +198,11 @@ export function InsightsView({
   const lookAgain = () =>
     startTransition(async () => {
       const result = await actions.lookAgain();
+      setRunError(result.error);
+    });
+  const fullReread = () =>
+    startTransition(async () => {
+      const result = await actions.fullReread();
       setRunError(result.error);
     });
 
@@ -312,8 +327,8 @@ export function InsightsView({
 
         {!available && (
           <p className="text-ui text-ink-muted">
-            Runs are not set up on this deployment yet. They use the goals routine, which needs
-            CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.
+            Runs are not set up on this deployment yet. They need ANTHROPIC_API_KEY in the
+            project’s environment variables.
           </p>
         )}
 
@@ -353,6 +368,19 @@ export function InsightsView({
               </Card>
             }
           />
+        )}
+
+        {rereadAvailable && !nothing && run.kind !== 'running' && (
+          <DashAction
+            type="button"
+            variant="link"
+            pending={starting}
+            onClick={fullReread}
+            costText={FULL_REREAD_COST}
+            what="Cost of a full re-read"
+          >
+            Full re-read
+          </DashAction>
         )}
 
         {earlier.length > 0 && (

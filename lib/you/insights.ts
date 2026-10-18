@@ -277,8 +277,8 @@ export const INSIGHT_KINDS = [
 ] as const;
 export type InsightKind = (typeof INSIGHT_KINDS)[number]['kind'];
 
-/** Why a run was started: the weekly tick, the Look again button, or a big change. */
-export type InsightRunReason = 'weekly' | 'look_again' | 'change';
+/** Why a routine run was started: the Full re-read link, or (before plan #2413.10) the weekly tick, Look again or a big change. */
+export type InsightRunReason = 'weekly' | 'look_again' | 'change' | 'full_reread';
 
 /**
  * The brief the goals routine is fired with for an insights run. Its first
@@ -299,7 +299,9 @@ export function insightsBrief(input: {
       ? `started by a change${change ? `: ${change.slice(0, 300)}` : ''}`
       : input.reason === 'look_again'
         ? 'started by Look again'
-        : 'weekly run';
+        : input.reason === 'full_reread'
+          ? 'started by Full re-read'
+          : 'weekly run';
   return [
     `Follow ${INSIGHTS_SKILL_PATH}`,
     `Insight run ${input.runId}`,
