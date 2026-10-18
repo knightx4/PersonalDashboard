@@ -228,6 +228,19 @@ const RUN_ID_CONTAINERS = ['run', 'routine_run', 'session', 'data', 'result'] as
  * beside the id, so a shape this misses is a question of reading the stored
  * row, not of firing another run to find out.
  */
+/**
+ * The page where a started run can be watched, from the body its fire
+ * returned (`claude_code_session_url`). Null when the body has none, or one
+ * that is not a claude.ai page, so the app never links somewhere it did not
+ * expect.
+ */
+export function runUrlFrom(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const value = (body as Record<string, unknown>).claude_code_session_url;
+  if (typeof value !== 'string') return null;
+  return /^https:\/\/claude\.ai\/[\w/-]+$/.test(value.trim()) ? value.trim() : null;
+}
+
 export function runIdFrom(body: unknown): string | null {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
   const record = body as Record<string, unknown>;

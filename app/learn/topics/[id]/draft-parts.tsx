@@ -6,26 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
 import { SectionLabel } from '@/components/ui/section-heading';
-import { Textarea } from '@/components/ui/field';
 import Link from '@/components/ui/link';
 import type { WantedTopic } from '@/lib/learn/levels/draft-payload';
 import { ladderLevel } from '@/lib/learn/levels/ladder';
 import type { TopicCellView, TopicLinkView, TopicMatch } from '@/lib/learn/levels/store';
 import {
-  approveTopicDraft,
   draftWantedTopic,
   mergeTopicDraft,
-  type ApproveState,
   type MergeState,
   type WantedState,
 } from './actions';
-import { CardNote, RowSource } from './draft-checks';
+import { RowSource } from './draft-checks';
 
 /**
- * The parts of a draft topic's page that write (plan #2138.2): the match
- * beside the draft, with merge or keep both; the levels, every one of them
- * editable, with the approve button under them; and a topic the draft's
- * links need, drafted on a press.
+ * The parts of a held draft's page (plan #2138.2): why it is held, the match
+ * beside it with merge or keep both, its levels to read, and a topic its
+ * links need, drafted on a press. Nothing here approves: Dash does that when
+ * the draft is written (plan #2356).
  */
 
 /** What a level needs from other topics, under its checks, each with where it came from. */
@@ -59,8 +56,7 @@ function MergeButton({ name }: { name: string }) {
 /**
  * A topic already on the map that this draft looks like, shown above the
  * levels so it is read before them. Merging drops the draft and opens the
- * topic you had; keeping both puts the card away and approval goes on as
- * usual. Which one is right is yours to say, never decided for you
+ * topic you had; keeping both puts the card away. Which one is right is yours to say, never decided for you
  * (LEARN-LEVELS-SPEC, "Drafting a topic").
  */
 export function DraftMatch({ topicId, match }: { topicId: string; match: TopicMatch }) {
@@ -101,123 +97,43 @@ export function DraftMatch({ topicId, match }: { topicId: string; match: TopicMa
   );
 }
 
-/** The form the header's approve button sends, by id. */
-const APPROVE_FORM = 'approve-topic';
-
 /**
- * Approve, in the header so it is in reach without scrolling past ten
- * levels. It sends the levels form below it by id. While a row names no
- * source and is not marked personal it is shut, and the checks under the
- * header say which rows (plan #2138.11).
+ * Why a draft is still a draft. Dash approves one as soon as it is written,
+ * so one that is held is a draft whose approval did not go through. The page
+ * says so, then names what it can see in the rows.
  */
-export function ApproveTopicButton({ uncited = 0 }: { uncited?: number }) {
+export function HeldNotice({ reasons }: { reasons: readonly string[] }) {
   return (
-    <Button
-      type="submit"
-      size="sm"
-      form={APPROVE_FORM}
-      disabled={uncited > 0}
-      title={uncited > 0 ? `${uncited} ${uncited === 1 ? 'row names' : 'rows name'} no source` : undefined}
-    >
-      Approve
-    </Button>
+    <Card padding="dense" className="space-y-1" aria-labelledby="held-heading">
+      <p id="held-heading" className="text-ui font-semibold text-ink">
+        Held: Dash could not approve this draft
+      </p>
+      <p className="text-ui text-ink">
+        Dash approves a draft as soon as it is written. Until this one is approved, nothing is asked about it.
+      </p>
+      <ul className="list-disc space-y-0.5 pl-5 text-small text-ink-muted">
+        {reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
-/**
- * One level's checks, read as text until pressed. Pressing turns that level
- * alone into a box to reword, one check a line; leaving the box shows the
- * new wording as text again. What the form sends is whatever is here.
- */
-function LevelChecks({
-  level,
-  checks,
-  problem,
-}: {
-  level: number;
-  checks: readonly string[];
-  problem?: string;
-}) {
-  const [text, setText] = useState(checks.join('\n'));
-  const [editing, setEditing] = useState(problem !== undefined);
-  const fieldId = `level-${level}`;
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
-
-  return (
-    <>
-      {editing ? (
-        /* ui-ok: the step asks for every level's checks to be rewordable on the approval screen (idea 646e303d); the box opens only on a press */
-        <Textarea
-          id={fieldId}
-          name={fieldId}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onBlur={() => setEditing(false)}
-          autoFocus
-          rows={Math.max(lines.length, 2)}
-          aria-label={`Checks for level ${level}, one a line`}
-          aria-invalid={problem ? true : undefined}
-          aria-describedby={problem ? `${fieldId}-error` : undefined}
-          className="mt-1.5 min-h-0"
-        />
-      ) : (
-        <>
-          <input type="hidden" name={fieldId} value={text} />
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label={`Reword level ${level}`}
-            className="press -mx-1.5 mt-1 block w-[calc(100%+0.75rem)] rounded-control px-1.5 py-1 text-left hover:bg-sunken"
-          >
-            <ul className="list-disc space-y-0.5 pl-5 text-ui text-ink">
-              {lines.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </button>
-        </>
-      )}
-      {problem && (
-        <p id={`${fieldId}-error`} role="alert" className="mt-1 text-small text-danger">
-          {problem}
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
- * Every level of the draft, its checks read as text and each level reworded
- * in place on a press. What the levels say when Approve is pressed is what is
- * kept; a level you reworded keeps the drafted wording beside yours.
- */
-export function ApproveDraft({
-  topicId,
+/** Every level of a held draft with its checks, read as text. */
+export function DraftLevels({
   cells,
   links,
 }: {
-  topicId: string;
   cells: readonly TopicCellView[];
   links: readonly TopicLinkView[];
 }) {
-  const [state, approve] = useActionState<ApproveState, FormData>(approveTopicDraft, {});
-
   return (
-    <form id={APPROVE_FORM} action={approve} aria-labelledby="levels-heading">
-      <input type="hidden" name="topicId" value={topicId} />
+    <section aria-labelledby="levels-heading">
       <h2 id="levels-heading" className="mb-2 px-1 text-ui font-semibold text-ink">
         The levels
       </h2>
-      {state.error && (
-        <p role="alert" className="mb-2 px-1 text-small text-danger">
-          {state.error}
-        </p>
-      )}
       <Card padding="none">
-        <CardNote>Press a level to reword it. Nothing is asked until you approve.</CardNote>
         <ol className="divide-y divide-border">
           {cells.map((cell) => {
             const rung = ladderLevel(cell.level);
@@ -228,7 +144,11 @@ export function ApproveDraft({
                   <SectionLabel as="span">{rung.band}</SectionLabel>
                   <span className="min-w-0 text-small text-ink-muted">You can {rung.can}</span>
                 </p>
-                <LevelChecks level={cell.level} checks={cell.checks} problem={state.levels?.[cell.level]} />
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ui text-ink">
+                  {cell.checks.map((check) => (
+                    <li key={check}>{check}</li>
+                  ))}
+                </ul>
                 <RowSource kind="cell" id={cell.id} citation={cell} />
                 <LevelNeeds links={links.filter((l) => l.fromLevel === cell.level)} />
               </li>
@@ -236,7 +156,7 @@ export function ApproveDraft({
           })}
         </ol>
       </Card>
-    </form>
+    </section>
   );
 }
 

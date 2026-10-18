@@ -119,7 +119,19 @@ export const jobsSources: ModuleSources = {
       title: 'summary',
       newest: 'requested_at',
       note: 'Written by Dash, not the person: read it for facts about the company, never as what they want.',
-      parent: parentBy('company_id', 'job_search.companies'),
+      // The research is read on its company's Perspective tab. The company
+      // page is keyed by slug, which this row does not hold, so it opens
+      // through the company's own ref (app/open/[ref]), carrying the tab.
+      page: {
+        title: 'summary',
+        href: (row) =>
+          row.company_id
+            ? `/open/${encodeURIComponent(`job_search.companies:${row.company_id}`)}?tab=perspective`
+            : null,
+        reads: ['company_id'],
+        section: COMPANIES,
+        parent: parentBy('company_id', 'job_search.companies'),
+      },
     },
     {
       table: 'job_search.contacts',

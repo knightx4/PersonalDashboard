@@ -284,6 +284,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-search-bar': ['/home'],
   'shell-go-to': ['/home'],
   'shell-capture': ['/home'],
+  'shell-account-menu': ['/home'],
   'shell-capture-aimed': ['/home'],
   'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
   'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
@@ -775,6 +776,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  'shell-account-menu': ['components/shell/account-menu.tsx'],
   // The status line while a run is going (plan #1964.2.3).
   'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
   'shell-status-run-new': ['components/shell/status-line.tsx'],
