@@ -77,6 +77,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/learn/home',
   '/learn/inbox',
   '/learn/know',
+  '/learn/know/archived',
   '/learn/know/personality',
   '/learn/know/space',
   '/learn/lens/[id]',
