@@ -36,7 +36,13 @@ describe('Dash merge_roles lists', () => {
 
   it('moves every table that points at a role, but for the ones it handles apart', async () => {
     // Applications are folded on their own; old thread notes refuse the merge.
-    const apart = ['job_search.applications.role_id', 'job_search.notes.role_id'];
+    // Origins are one row per role and field, and the role kept keeps its
+    // facts, so a merged role's origins go with it when it is deleted.
+    const apart = [
+      'job_search.applications.role_id',
+      'job_search.fact_origins.role_id',
+      'job_search.notes.role_id',
+    ];
     const listed = [...ROLE_CHILDREN.map((child) => `${child.table}.${child.column}`), ...apart].sort();
     expect(listed).toEqual(await childrenOf('job_search.roles'));
   });

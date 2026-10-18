@@ -6,6 +6,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
+import { recordHandEditOrigins } from '@/lib/jobs/fact-origins';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import {
@@ -36,6 +37,7 @@ export async function updateRole(
   const supabase = await createClient();
 
   const update: Record<string, unknown> = {};
+  let payFromPosting = false;
   if (patch.title !== undefined) update.title = patch.title.trim();
   if (patch.location !== undefined) update.location = patch.location;
   if (patch.workMode !== undefined) update.work_mode = patch.workMode || null;
@@ -69,9 +71,19 @@ export async function updateRole(
         update.comp_min_cents = comp.minCents;
         update.comp_max_cents = comp.maxCents;
         update.comp_source = 'posted';
+        payFromPosting = true;
       }
     }
   }
+
+  // What the facts were, so only the ones this save changes get an origin:
+  // the posting form sends the pay on every save.
+  const { data: before } = await supabase
+    .from('roles')
+    .select('location, work_mode, seniority, posting_status, comp_min_cents, comp_max_cents, comp_source')
+    .eq('id', roleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
 
   const { error } = await supabase
     .from('roles')
@@ -80,6 +92,7 @@ export async function updateRole(
     .eq('user_id', user.id);
 
   if (error) return { error: error.message };
+  if (before) await recordHandEditOrigins(supabase, user.id, roleId, before, update, { payFromPosting });
   revalidatePath(`/jobs/roles/${roleId}`);
   return { error: null };
 }

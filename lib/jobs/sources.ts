@@ -232,6 +232,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.discovery_runs', reason: 'When the weekly startup discovery ran for the person and how far it got.' },
     { table: 'job_search.watchlist_startups', reason: 'Startups the weekly discovery found on YC and Hacker News, with the board found for each; the person sees them only through their roles, and a saved role makes a companies row.' },
     { table: 'job_search.application_drafts', reason: "Dash's working draft of a whole application and the questions it asked back; what you keep lands in application_answers or the cover letter, which are sources." },
+    { table: 'job_search.fact_origins', reason: 'Where each fact about a role came from and how sure it is; the facts themselves are in roles and companies.' },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },
     { table: 'job_search.waiting_dismissals', reason: 'Dismissed waiting-on-reply nudges.' },
   ],
