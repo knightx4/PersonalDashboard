@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { Settings } from 'lucide-react';
 import { Popover, menuItemClass } from '@/components/ui/popover';
+import { PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { usePopover } from '@/lib/use-popover';
@@ -57,7 +59,7 @@ export function AccountMenu({
         // data-menu-panel: the top bar sizes every button in it as an icon, and
         // the theme's controls in here are buttons that are not icons.
         <Popover ref={panelRef} padding="menu" className="sm:w-72" aria-label="Account" data-menu-panel="">
-          <Link href="/account" onClick={close} className={menuItemClass()}>
+          <Link href="/account" onClick={close} className={cn(menuItemClass(), PRESS_AREA)}>
             <Settings strokeWidth={1.75} className="size-4 shrink-0 text-ink-muted" aria-hidden />
             Account settings
           </Link>
