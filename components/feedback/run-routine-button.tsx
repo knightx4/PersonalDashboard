@@ -206,6 +206,19 @@ export function RunRoutineButton({
           <span className="min-w-0">
             <span className="text-ink">Running for {elapsed(run.since, now)}</span> — working “
             {trim(run.note)}”.
+            {run.url && (
+              <>
+                {' '}
+                <a
+                  href={run.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn('press-area', linkVariants())}
+                >
+                  See it run
+                </a>
+              </>
+            )}
           </span>
         </p>
       )}

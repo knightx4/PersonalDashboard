@@ -14,6 +14,7 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { Field, FieldError, Textarea, Input } from '@/components/ui/field';
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { experienceAsk, experienceRange } from '@/lib/jobs/jd/experience';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -26,6 +27,7 @@ export function Posting({
   jdText,
   jdLookupNote,
   jdUrl,
+  location,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -92,6 +94,7 @@ export function Posting({
       <RoleDetailsCard
         roleId={roleId}
         jdUrl={jdUrl}
+        location={location}
         atsJobId={atsJobId}
         compMinCents={compMinCents}
         compMaxCents={compMaxCents}
@@ -245,6 +248,7 @@ export function Posting({
 function RoleDetailsCard({
   roleId,
   jdUrl,
+  location,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -253,6 +257,7 @@ function RoleDetailsCard({
 }: {
   roleId: string;
   jdUrl: string | null;
+  location: string | null;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
@@ -263,6 +268,7 @@ function RoleDetailsCard({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [jdUrlDraft, setJdUrlDraft] = useState(jdUrl ?? '');
+  const [locationDraft, setLocationDraft] = useState(location ?? '');
   const [atsJobIdDraft, setAtsJobIdDraft] = useState(atsJobId ?? '');
   const [compMinDraft, setCompMinDraft] = useState(
     compMinCents !== null ? String(Math.round(compMinCents / 100)) : '',
@@ -276,6 +282,7 @@ function RoleDetailsCard({
   const [looking, startLooking] = useTransition();
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
+  const experience = experienceAsk(jdText);
 
   // The nightly pass walks six companies a night. A role you are looking at now
   // should not wait behind two hundred you are not, and the answer arrives in
@@ -296,9 +303,11 @@ function RoleDetailsCard({
       setError('Compensation has to be a number.');
       return;
     }
+    const nextUrl = jdUrlDraft.trim() || null;
     startTransition(async () => {
       const result = await updateRole(roleId, {
-        jdUrl: jdUrlDraft.trim() || null,
+        jdUrl: nextUrl,
+        location: locationDraft.trim() || null,
         atsJobId: atsJobIdDraft.trim() || null,
         compMinCents: min,
         compMaxCents: max,
@@ -313,6 +322,9 @@ function RoleDetailsCard({
       }
       setEditing(false);
       router.refresh();
+      // A link added to a role with no description is the moment to read
+      // it, rather than leaving Look it up for you to press (note 1efa0fe4).
+      if (nextUrl && nextUrl !== jdUrl && !jdText) lookItUp();
     });
   };
 
@@ -350,6 +362,7 @@ function RoleDetailsCard({
               ) : null
             }
           />
+          <ValueRow label="Location" value={location} />
           <ValueRow label="ATS job id" value={atsJobId} />
           <ValueRow
             label="Compensation"
@@ -360,6 +373,25 @@ function RoleDetailsCard({
                   {compSource && (
                     <span className="ml-1.5 text-small text-ink-muted">from the {compSource}</span>
                   )}
+                </>
+              ) : null
+            }
+          />
+          {/* Read from the description, so it has no field of its own to
+              edit: the range, then the lines it came from (note a7495ede). */}
+          <ValueRow
+            label="Experience"
+            value={
+              experience ? (
+                <>
+                  {experienceRange(experience)}
+                  <ul className="mt-1 space-y-0.5">
+                    {experience.lines.map((line) => (
+                      <li key={line} className="text-small text-ink-muted">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
                 </>
               ) : null
             }
@@ -409,6 +441,9 @@ function RoleDetailsCard({
             onChange={(event) => setJdUrlDraft(event.target.value)}
             placeholder="https://…"
           />
+        </Field>
+        <Field id={`location-${roleId}`} label="Location">
+          <Input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} />
         </Field>
         <Field id={`ats-${roleId}`} label="ATS job id">
           <Input value={atsJobIdDraft} onChange={(event) => setAtsJobIdDraft(event.target.value)} />

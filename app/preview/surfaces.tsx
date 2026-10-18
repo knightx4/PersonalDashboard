@@ -345,6 +345,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
@@ -693,9 +694,11 @@ const rolePanels: PanelProps = {
   applicationId: 'app-1',
   status: 'in_process',
   jdText:
-    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
+    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.\n- 4-8 years of experience building research or trading systems\n- 2+ years in a systematic fund or a quantitative startup',
   jdLookupNote: null,
+  jdLookupAt: '2026-10-01T08:00:00Z',
   jdUrl: 'https://example.com/jobs/quant-dev',
+  location: 'London, hybrid three days a week',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,
@@ -6823,6 +6826,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+  {
+    /* The account icon's menu (note 6d32355f): the way to the settings, then
+     * the theme, changed without leaving the page. Drawn open, hung from its
+     * icon at the right of the strip. */
+    id: 'shell-account-menu',
+    label: 'Top bar · Account menu',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      // The top bar's rule for its icon buttons, so the picture shows the
+      // theme controls as they are drawn inside the bar.
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
+        <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
+      </div>
+    ),
   },
   {
     /* Capture aimed at a kind (plan #1950.1), what an Add button on a list
