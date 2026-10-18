@@ -159,5 +159,9 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+    // Counted from the sources themselves each night (plan #2413.7); Goals
+    // reads those rows directly.
+    { table: 'you.insight_signals', reason: 'Nightly counts worked out from other workspaces\' rows for the insights run.' },
+    { table: 'you.insight_tripwires', reason: 'What brings one of Dash\'s insights back, and when it last fired.' },
   ],
 };
