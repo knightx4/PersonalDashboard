@@ -1,6 +1,7 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import { FigureQuestionPreview } from './figure-question-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -223,6 +224,9 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnFigureSurface,
+  LearnExplorableSurface,
+  LearnMapSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -9273,6 +9277,117 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPieceHeldSurface />,
   },
   {
+    /* Each figure kind on a lesson, open on a phone (plan #2321.1). */
+    id: 'learn-figure-table',
+    label: 'Plan · A lesson with a table',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="table" />,
+  },
+  {
+    id: 'learn-figure-compare',
+    label: 'Plan · A lesson with a comparison',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="compare" />,
+  },
+  {
+    id: 'learn-figure-source-figure',
+    label: 'Plan · A lesson with a course figure',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="source_figure" />,
+  },
+  {
+    id: 'learn-figure-chart',
+    label: 'Plan · A lesson with a chart of a real series',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" />,
+  },
+  {
+    id: 'learn-figure-chart-missing',
+    label: 'Plan · A lesson whose chart’s series was not found',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" missing />,
+  },
+  {
+    /* An explorable model on a lesson on price formation (plan #2321.7). */
+    id: 'learn-figure-explorable',
+    label: 'Plan · A lesson with an explorable model',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface />,
+  },
+  {
+    /* Each model in lib/learn/figures/models/registry.ts, its sliders moved. */
+    id: 'learn-figure-explorable-supply-demand',
+    label: 'Plan · Supply and demand, supply moved',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="supply_demand" />,
+  },
+  {
+    id: 'learn-figure-flow',
+    label: 'Plan · A lesson with a flow',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="flow" />,
+  },
+  {
+    id: 'learn-figure-cycle',
+    label: 'Plan · A lesson with a cycle',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="cycle" />,
+  },
+  {
+    id: 'learn-figure-tree',
+    label: 'Plan · A lesson with a tree',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="tree" />,
+  },
+  {
+    id: 'learn-figure-two-by-two',
+    label: 'Plan · A lesson with a two-by-two',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="two_by_two" />,
+  },
+  {
+    id: 'learn-figure-timeline',
+    label: 'Plan · A lesson with a timeline',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="timeline" />,
+  },
+  {
+    /* A map on a lesson about the Big Dig, its places dated, so the year slider shows (plan #2321.6). */
+    id: 'learn-figure-map',
+    label: 'Plan · A lesson with a map of dated places',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface />,
+  },
+  {
+    /* The same kind with no years on its places: no slider, every marker in the accent. */
+    id: 'learn-figure-map-undated',
+    label: 'Plan · A lesson with a map of Shenzhen, no years',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface undated />,
+  },
+  {
+    /* A place pressed on the map, its note showing. */
+    id: 'learn-figure-map-pressed',
+    label: 'Plan · A map with a place pressed',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface pressed={2} />,
+  },
+  {
     id: 'learn-probe',
     label: 'Subject · Questions, before the first',
     module: 'learn',
@@ -9819,4 +9934,69 @@ export const SURFACES: readonly Surface[] = [
       ...(surface.deck ? { deck: surface.deck } : {}),
     })),
   ),
+  {
+    /* Figure questions in Practice Flow (plan #2321.5): a table's blank
+     * cell to fill, asked in an explanation's place. */
+    id: 'learn-cell-answer-figure-fill',
+    label: 'Practice Flow · Fill the cell',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" />,
+  },
+  {
+    /* The same, graded and missed, with the answer under the summary. */
+    id: 'learn-cell-answer-figure-fill-graded',
+    label: 'Practice Flow · Fill the cell, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" graded />,
+  },
+  {
+    /* A chart of a real series cut at a year, and which way it went next. */
+    id: 'learn-cell-answer-figure-predict',
+    label: 'Practice Flow · Which way next',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="predict" />,
+  },
+  {
+    /* The right figure among three, each drawn under its letter. */
+    id: 'learn-cell-answer-figure-pick',
+    label: 'Practice Flow · Pick the figure',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" />,
+  },
+  {
+    /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */
+    id: 'learn-figure-explorable-bid-rent',
+    label: 'Plan · Bid-rent, a rail line opened',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="bid_rent" />,
+  },
+  {
+    /* The agglomeration model on a lesson on why density pays, congestion eased (plan #2321.8). */
+    id: 'learn-figure-explorable-agglomeration',
+    label: 'Plan · Agglomeration, congestion eased',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="agglomeration" />,
+  },
+  {
+    /* Which way the city's edge moves when a rail line opens: bid-rent drawn still. */
+    id: 'learn-cell-answer-figure-move-bid-rent',
+    label: 'Practice Flow · Which way it moves, bid-rent',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-bid-rent" />,
+  },
+  {
+    /* Which way a city's best size moves when congestion eases: agglomeration drawn still. */
+    id: 'learn-cell-answer-figure-move-agglomeration',
+    label: 'Practice Flow · Which way it moves, agglomeration',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-agglomeration" />,
+  },
 ];

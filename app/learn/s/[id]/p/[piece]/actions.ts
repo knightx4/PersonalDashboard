@@ -150,7 +150,8 @@ async function askCellCheck(
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const spend = collectSpend();
-  const asked = await askCell(learn, userId, cellId, apiKey ? { anthropicApiKey: apiKey, onSpend: spend.sink } : undefined, pieceId, roleLineFinder(learn, userId));
+  // The check's own answer box takes words, so it asks no figure question (plan #2321.5).
+  const asked = await askCell(learn, userId, cellId, apiKey ? { anthropicApiKey: apiKey, onSpend: spend.sink } : undefined, pieceId, roleLineFinder(learn, userId), { figures: false });
   await recordLearnSpend(userId, 'write-cell-case', spend.reports);
   if (!asked.ok) return { error: asked.error };
   const check = await loadCellCheck(learn, userId, pieceId, asked.asked.questionId);
