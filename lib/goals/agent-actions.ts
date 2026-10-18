@@ -22,6 +22,7 @@ export const goalsActions: ModuleActions = {
     editStep: tool('change_goal_step'),
     setStepStatusAction: tool('close_goal_step', 'change_goal_step'),
     setStepOnTodoAction: tool('schedule_goal_step'),
+    setStepNotifyAction: none('setting', 'Whether the phone is told when Dash finishes a step is the person\'s own choice.'),
     countRhythmAction: tool('file_count'),
     moveStepAction: tool('change_goal_step'),
     archiveStepAction: tool('change_goal_step'),
