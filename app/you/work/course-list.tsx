@@ -35,7 +35,6 @@ export type FilesOpen = {
   adding?: boolean;
   chosen?: ChosenFile[];
   uploading?: boolean;
-  showRemove?: string;
   confirming?: string;
   summarising?: string;
   summariseErrors?: Record<string, string>;
@@ -247,7 +246,6 @@ function CourseRow({
             adding={addFiles > 0}
             chosen={filesOpen?.chosen}
             uploading={filesOpen?.uploading}
-            showRemove={filesOpen?.showRemove}
             confirming={filesOpen?.confirming}
             summarising={filesOpen?.summarising}
             summariseErrors={filesOpen?.summariseErrors}

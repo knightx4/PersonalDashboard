@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState, useId, useRef, useState } from 'react';
+import { useActionState, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, FileText } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { DashAction } from '@/components/ui/dash-action';
-import { Input, PressLabel, Select } from '@/components/ui/field';
+import { InlineInput, Input, PressLabel, Select } from '@/components/ui/field';
 import { Meter } from '@/components/ui/meter';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -100,7 +100,6 @@ export function CourseFiles({
   adding = false,
   chosen: initialChosen,
   uploading: initialUploading = false,
-  showRemove,
   confirming,
   summarising,
   summariseErrors,
@@ -128,8 +127,6 @@ export function CourseFiles({
   chosen?: ChosenFile[];
   /** The gallery's way to draw the drawer mid-upload. */
   uploading?: boolean;
-  /** The gallery's way to draw one row's remove as hover shows it. */
-  showRemove?: string;
   /** The gallery's way to draw one row's confirm armed. */
   confirming?: string;
   /** The gallery's way to draw one row mid-read. */
@@ -180,15 +177,12 @@ export function CourseFiles({
           ) : (
             <h4 className="text-small font-medium text-ink-muted">{group.label}</h4>
           )}
-          {group.files.length === 0 && (
-            <div className="py-1 text-small text-ink-muted">Nothing kept for this week yet.</div>
-          )}
+          {/* An empty week is its heading alone: the slot a file is attached to. */}
           <ul>
             {group.files.map((file) => (
               <FileRow
                 key={file.id}
                 file={file}
-                forceRemove={showRemove === file.id}
                 confirming={confirming === file.id}
                 summarising={summarising === file.id}
                 summariseError={summariseErrors?.[file.id]}
@@ -226,7 +220,6 @@ export function CourseFiles({
 
 function FileRow({
   file,
-  forceRemove,
   confirming,
   summarising,
   summariseError,
@@ -234,7 +227,6 @@ function FileRow({
   costOpen,
 }: {
   file: CourseFile;
-  forceRemove: boolean;
   confirming: boolean;
   summarising: boolean;
   summariseError?: string;
@@ -311,13 +303,12 @@ function FileRow({
         ) : (
           <div className="-my-1 sm:my-0 sm:min-w-36 sm:group-has-[p]:mr-23">{press('Summarise')}</div>
         )}
-        {/* Remove shows on hover and on focus; on a phone, with no hover, it is always there. */}
+        {/* Remove is always drawn, at every width, so each row ends on the
+          * course card's right edge rather than on an empty hover slot. */}
         <span
           className={cn(
             '-my-1 sm:my-0 sm:min-w-20 sm:text-right',
-            'sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100',
-            'has-[p]:my-1 has-[p]:w-full has-[p]:text-left sm:has-[p]:pl-5.5 sm:has-[p]:opacity-100',
-            forceRemove && 'sm:opacity-100',
+            'has-[p]:my-1 has-[p]:w-full has-[p]:text-left sm:has-[p]:pl-5.5',
           )}
         >
           <ConfirmStep
@@ -477,16 +468,18 @@ function WeekHeading({ group, slot, editing: initialEditing }: { group: CourseFi
         <h4 className="shrink-0 text-small font-medium text-ink-muted">
           <label htmlFor={`${id}-title`}>{group.label}</label>
         </h4>
-        {/* The PressLabel gives the field a 44px press area on a phone. */}
-        <div className="relative min-w-0 flex-1 basis-48">
+        {/* The topic is edited in place at the heading's own size (law 12),
+          * underlined rather than boxed, and only as wide as a topic needs.
+          * The PressLabel gives the field a 44px press area on a phone. */}
+        <div className="relative min-w-0 flex-1 basis-40 sm:max-w-sm">
           <PressLabel htmlFor={`${id}-title`} />
-          <Input
+          <InlineInput
             id={`${id}-title`}
             value={title}
             maxLength={200}
             placeholder="Topic"
             autoFocus={!initialEditing}
-            className="relative w-full"
+            className="relative rounded-none border-b-border sm:text-small"
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
@@ -520,7 +513,8 @@ function WeekHeading({ group, slot, editing: initialEditing }: { group: CourseFi
 
   return (
     <div className="group/week flex items-center gap-2">
-      <h4 className="min-w-0 text-small font-medium text-ink-muted">
+      {/* One line at every width: a long topic is cut at the end and shown whole in its title and editor. */}
+      <h4 className="min-w-0 truncate text-small font-medium text-ink-muted" title={slot.title ?? undefined}>
         {group.label}
         {slot.title && <span className="font-normal text-ink"> · {slot.title}</span>}
       </h4>
@@ -742,6 +736,7 @@ function ChosenRow({
   onLeaveOut: () => void;
 }) {
   const going = row.progress !== null && row.progress < 1;
+  const wide = useWide();
   return (
     <li className="py-2">
       <div className="flex items-center gap-2">
@@ -773,16 +768,21 @@ function ChosenRow({
                 .join(' · ')}
             </p>
           ) : (
-            <div className={cn('mt-1 flex items-center gap-2', slots.length > 0 && 'flex-wrap sm:flex-nowrap')}>
+            // The kind and the week share one line at every width, the kind narrow and the week taking the rest.
+            <div className="mt-1 flex items-center gap-2">
               {/* Each field has no visible label, so a PressLabel gives it a 44px press area on a phone. */}
-              <div className="relative min-w-0 flex-1 sm:w-48 sm:flex-none">
+              <div className={cn('relative min-w-0', slots.length > 0 ? 'shrink-0 sm:w-40' : 'flex-1 sm:w-48 sm:flex-none')}>
                 <PressLabel htmlFor={`${idBase}-kind`} />
                 <Select
                   id={`${idBase}-kind`}
                   aria-label={`What ${row.name} is`}
                   value={row.kind}
-                  // The guessed kind is quieter than the file it describes.
-                  className="relative w-full text-ink-muted"
+                  // The guessed kind is quieter than the file it describes. Beside the
+                  // week it is only as wide as the kind it shows, so the week's name reads.
+                  className={cn(
+                    'relative text-ink-muted',
+                    slots.length > 0 ? 'w-auto [field-sizing:content] sm:w-full' : 'w-full',
+                  )}
                   onChange={(e) => onChange({ kind: e.target.value as CourseFileKind })}
                 >
                   {COURSE_FILE_KINDS.map((kind) => (
@@ -793,8 +793,9 @@ function ChosenRow({
                 </Select>
               </div>
               {slots.length > 0 ? (
-                // With the syllabus's weeks laid out, the week is picked by name.
-                <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
+                // With the syllabus's weeks laid out, the week is picked by name, its
+                // topic cut to fit: a word or two beside the kind on a phone, more from laptop width.
+                <div className="relative min-w-0 flex-1">
                   <PressLabel htmlFor={`${idBase}-week`} />
                   <Select
                     id={`${idBase}-week`}
@@ -806,7 +807,7 @@ function ChosenRow({
                     <option value="">No week</option>
                     {weekChoices(slots, row.week).map((choice) => (
                       <option key={choice.week} value={String(choice.week)}>
-                        {weekName({ week: choice.week, title: shortTopic(choice.title) })}
+                        {weekName({ week: choice.week, title: shortTopic(choice.title, wide ? 32 : 12) })}
                       </option>
                     ))}
                   </Select>
@@ -845,6 +846,21 @@ function ChosenRow({
         </>
       )}
     </li>
+  );
+}
+
+const WIDE = '(min-width: 640px)';
+
+/** Whether the page is at least the sm width, for text a select cannot cut with CSS. */
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (change) => {
+      const query = window.matchMedia(WIDE);
+      query.addEventListener('change', change);
+      return () => query.removeEventListener('change', change);
+    },
+    () => window.matchMedia(WIDE).matches,
+    () => false,
   );
 }
 
