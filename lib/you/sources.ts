@@ -166,5 +166,9 @@ export const youSources: ModuleSources = {
         'Quotes copied out of their private notes in obsidian.notes, which Goals already reads whole; reading both would count the same words twice.',
     },
     { table: 'you.note_extract_reads', reason: 'Bookkeeping: which version of each note was read for its lines.' },
+    // Counted from the sources themselves each night (plan #2413.7); Goals
+    // reads those rows directly.
+    { table: 'you.insight_signals', reason: 'Nightly counts worked out from other workspaces\' rows for the insights run.' },
+    { table: 'you.insight_tripwires', reason: 'What brings one of Dash\'s insights back, and when it last fired.' },
   ],
 };

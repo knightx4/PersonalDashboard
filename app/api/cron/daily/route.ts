@@ -20,6 +20,7 @@ import { runPreparationsDaily } from '@/inngest/learn/prepare';
 import { runFigureNeedStepsDaily } from '@/inngest/learn/figure-need-steps';
 import { runFigureBackfillDaily } from '@/inngest/learn/figure-backfill';
 import { runXReadsForAll } from '@/inngest/x/read';
+import { runInsightSignals } from '@/inngest/you/insight-signals';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -89,6 +90,10 @@ export async function GET(request: NextRequest) {
     // No insights stage: each run is a full session on the person's plan,
     // and the change trigger fired near daily, so runs start only from Look
     // again until the cheaper design under plan #2413 replaces it.
+    // The numbers that design starts from are counted here instead, in SQL
+    // with no model call, after the goals stages have closed the morning's
+    // steps (plan #2413.7).
+    { name: 'insight-signals', run: () => runInsightSignals() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },
