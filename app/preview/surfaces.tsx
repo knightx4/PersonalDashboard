@@ -223,6 +223,7 @@ import {
   LearnPieceHeldSurface,
   LearnFigureSurface,
   LearnExplorableSurface,
+  LearnMapSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -9085,6 +9086,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'wide',
     render: () => <LearnExplorableSurface model="supply_demand" />,
+  },
+  {
+    /* A map on a lesson about the Big Dig, its places dated, so the year slider shows (plan #2321.6). */
+    id: 'learn-figure-map',
+    label: 'Plan · A lesson with a map of dated places',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface />,
+  },
+  {
+    /* The same kind with no years on its places: no slider, every marker in the accent. */
+    id: 'learn-figure-map-undated',
+    label: 'Plan · A lesson with a map of Shenzhen, no years',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface undated />,
+  },
+  {
+    /* A place pressed on the map, its note showing. */
+    id: 'learn-figure-map-pressed',
+    label: 'Plan · A map with a place pressed',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface pressed={2} />,
   },
   {
     id: 'learn-probe',

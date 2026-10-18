@@ -161,6 +161,7 @@ describe('the chart kind (plan #2321.3)', () => {
   it('resolves through the context and draws its source and years in the foot', async () => {
     const [resolved] = await resolveFigures([{ kind: 'chart', ...chartKind.example, resolved: undefined }], {
       series: async (ref) => series(ref.place ?? '', [70, 71, 72]),
+      places: async () => null,
     });
     expect(resolved.resolved).toMatchObject({ from: 2000, to: 2002 });
     const html = renderToStaticMarkup(<Figure figure={resolved} />);
@@ -172,6 +173,7 @@ describe('the chart kind (plan #2321.3)', () => {
   it('degrades to its caption when a series cannot be found, without dropping the figure', async () => {
     const [resolved] = await resolveFigures([block({ series: [{ source: 'fred', id: 'NOTASERIES' }] })], {
       series: async () => null,
+      places: async () => null,
     });
     expect(resolved.resolved).toBeNull();
     const html = renderToStaticMarkup(<Figure figure={resolved} />);

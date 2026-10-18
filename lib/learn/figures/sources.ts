@@ -45,7 +45,7 @@ export type Series = {
  */
 export type FetchedSeries = { found: true; series: Series } | { found: false };
 
-export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promise<Response>;
+export type FetchLike = (url: string, init?: { signal?: AbortSignal; headers?: Record<string, string> }) => Promise<Response>;
 
 export type DataSource = {
   id: DataSourceId;
