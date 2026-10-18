@@ -26,6 +26,7 @@ export function Posting({
   jdText,
   jdLookupNote,
   jdUrl,
+  location,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -92,6 +93,7 @@ export function Posting({
       <RoleDetailsCard
         roleId={roleId}
         jdUrl={jdUrl}
+        location={location}
         atsJobId={atsJobId}
         compMinCents={compMinCents}
         compMaxCents={compMaxCents}
@@ -245,6 +247,7 @@ export function Posting({
 function RoleDetailsCard({
   roleId,
   jdUrl,
+  location,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -253,6 +256,7 @@ function RoleDetailsCard({
 }: {
   roleId: string;
   jdUrl: string | null;
+  location: string | null;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
@@ -263,6 +267,7 @@ function RoleDetailsCard({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [jdUrlDraft, setJdUrlDraft] = useState(jdUrl ?? '');
+  const [locationDraft, setLocationDraft] = useState(location ?? '');
   const [atsJobIdDraft, setAtsJobIdDraft] = useState(atsJobId ?? '');
   const [compMinDraft, setCompMinDraft] = useState(
     compMinCents !== null ? String(Math.round(compMinCents / 100)) : '',
@@ -299,6 +304,7 @@ function RoleDetailsCard({
     startTransition(async () => {
       const result = await updateRole(roleId, {
         jdUrl: jdUrlDraft.trim() || null,
+        location: locationDraft.trim() || null,
         atsJobId: atsJobIdDraft.trim() || null,
         compMinCents: min,
         compMaxCents: max,
@@ -350,6 +356,7 @@ function RoleDetailsCard({
               ) : null
             }
           />
+          <ValueRow label="Location" value={location} />
           <ValueRow label="ATS job id" value={atsJobId} />
           <ValueRow
             label="Compensation"
@@ -409,6 +416,9 @@ function RoleDetailsCard({
             onChange={(event) => setJdUrlDraft(event.target.value)}
             placeholder="https://…"
           />
+        </Field>
+        <Field id={`location-${roleId}`} label="Location">
+          <Input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} />
         </Field>
         <Field id={`ats-${roleId}`} label="ATS job id">
           <Input value={atsJobIdDraft} onChange={(event) => setAtsJobIdDraft(event.target.value)} />

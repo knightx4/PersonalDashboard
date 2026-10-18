@@ -697,6 +697,7 @@ const rolePanels: PanelProps = {
     'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
   jdLookupNote: null,
   jdUrl: 'https://example.com/jobs/quant-dev',
+  location: 'London, hybrid three days a week',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,

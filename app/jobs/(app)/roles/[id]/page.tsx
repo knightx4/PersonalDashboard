@@ -582,6 +582,7 @@ export default async function RoleDetailPage({
           jdText={(role.jd_text as string) ?? ''}
           jdLookupNote={(role.jd_lookup_note as string) ?? null}
           jdUrl={(role.jd_url as string) ?? null}
+          location={(role.location as string | null) ?? null}
           atsJobId={(role.ats_job_id as string) ?? null}
           compMinCents={(role.comp_min_cents as number) ?? null}
           compMaxCents={(role.comp_max_cents as number) ?? null}

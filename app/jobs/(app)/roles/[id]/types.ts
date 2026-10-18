@@ -17,6 +17,7 @@ export interface PanelProps {
   /** What the last automated board lookup did, or could not do. */
   jdLookupNote: string | null;
   jdUrl: string | null;
+  location: string | null;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
