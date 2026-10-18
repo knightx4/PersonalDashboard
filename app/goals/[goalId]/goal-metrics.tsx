@@ -14,7 +14,7 @@ import {
   nothingCounted,
   targetLine,
 } from '@/lib/goals/metric-chart';
-import type { MetricPeriod, PeriodCount } from '@/lib/goals/metrics';
+import type { MetricPeriod, MetricSource, PeriodCount } from '@/lib/goals/metrics';
 import { formatNumber } from '@/lib/money';
 
 /** One metric as the Overview draws it: the store's counts and what it reads. */
@@ -24,6 +24,8 @@ export type MetricView = {
   period: MetricPeriod;
   target: number | null;
   counts: PeriodCount[];
+  /** What it counts (plan #2397.1); a view without one counts a list. */
+  source?: MetricSource;
   /** The list it counts, or null when that list is gone. */
   list: string | null;
   /** The label of the date field it counts by, or null. */
@@ -66,6 +68,8 @@ export function GoalMetrics({
 
 /** What an empty metric reads: "Counts Job applications by Applied on, each week." */
 function readsLine(metric: MetricView): string {
+  if (metric.source === 'steps') return `Counts the steps closed on this goal, each ${metric.period}.`;
+  if (metric.source === 'files') return `Counts the files Dash writes under this goal, each ${metric.period}.`;
   const list = metric.list ?? 'its list';
   const by = metric.field ? ` by ${metric.field}` : '';
   return `Counts ${list}${by}, each ${metric.period}.`;
