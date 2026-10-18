@@ -155,7 +155,7 @@ describe('StepPage', () => {
       ),
     );
     expect(activity).toContain('Wrote the call script.');
-    expect(activity).toContain('Add a comment');
+    expect(activity).toContain('Comment on this step');
     expect(activity).not.toContain('Call each lender.');
     expect(activity).not.toContain('Call the card company');
     expect(page('rates', 'activity')).toContain('Dash has not run on this step yet.');
@@ -168,6 +168,32 @@ describe('StepPage', () => {
         ),
       ),
     ).not.toContain('Wrote the call script.');
+  });
+
+  it('lists only the facts the step has, and its runs as the goal lists its own (plan #2373.3)', () => {
+    // Get the rates lowered has no due date and waits on nothing: neither is said as a dash.
+    const facts = text(renderToStaticMarkup(<StepPage map={map} stepId="rates" todoOn={false} />));
+    expect(facts).toContain('Progress');
+    expect(facts).not.toContain('—');
+    expect(facts).not.toContain('Waiting on');
+    // Call the card company has one, and says it.
+    expect(text(renderToStaticMarkup(<StepPage map={map} stepId="call" todoOn={false} />))).toContain(
+      'Due 3 Oct',
+    );
+
+    const history = {
+      runs: [
+        { id: 'r1', label: 'Sent a step', meta: 'Finished · took 4 min', failed: false, text: 'Wrote the call script.' },
+      ],
+      more: true,
+    };
+    const activity = renderToStaticMarkup(
+      <StepPage map={map} stepId="rates" todoOn={false} tab="activity" history={history} />,
+    );
+    expect(text(activity)).toContain('Sent a step · Finished · took 4 min');
+    expect(text(activity)).toContain('Wrote the call script.');
+    expect(activity).toContain('href="/goals/runs/r1"');
+    expect(text(activity)).toContain('All runs');
   });
 
   it('draws nothing for a step the goal does not hold', () => {

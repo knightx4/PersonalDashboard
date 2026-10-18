@@ -62,6 +62,7 @@ const steps: Step[] = [
     title: 'Get the rates lowered',
     detail: 'Call each lender and ask for a lower rate.',
     position: 20,
+    createdAt: '2026-09-02T09:00:00Z',
   }),
   step('script', 'rates', {
     title: 'Draft what to say on the call',
@@ -79,6 +80,7 @@ const steps: Step[] = [
     blockAsk: 'The account number from the last statement.',
     dueOn: '2026-10-03',
     position: 20,
+    createdAt: '2026-09-14T09:00:00Z',
   }),
   step('which', 'rates', {
     title: 'Which card goes first?',
@@ -305,10 +307,24 @@ export function GoalStepCommentsSurface() {
   return (
     <>
       <SetTab tab="activity" />
-      <StepPage map={map} stepId="call" todoOn={false} tab="activity" runs={CALL_RUN} />
+      <StepPage map={map} stepId="call" todoOn={false} tab="activity" runs={CALL_RUN} history={CALL_HISTORY} />
     </>
   );
 }
+
+/** Dash's runs on Call the card company, as its Activity tab lists them (plan #2373.3). */
+const CALL_HISTORY = {
+  runs: [
+    {
+      id: 'run-call',
+      label: 'Sent a step',
+      meta: 'Finished · Sun 20 Sept, 8:00 AM · took 12 min',
+      failed: false,
+      text: 'Drafted what to say on the call and filed it as a note under the goal.',
+    },
+  ],
+  more: true,
+};
 
 /** Dash's last run on Call the card company, for its Activity tab (plan #2373.2). */
 const CALL_RUN = {
