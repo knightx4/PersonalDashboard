@@ -299,7 +299,14 @@ import {
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
-import { educationGroups, educationCounts, educationExplains } from './education-fixtures';
+import {
+  educationChosen,
+  educationCounts,
+  educationExplains,
+  educationFiles,
+  educationGroups,
+  educationUploading,
+} from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -5784,6 +5791,107 @@ export const SURFACES: readonly Surface[] = [
           courses={9}
           explains={educationExplains}
           explaining="c3"
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened to its files (plan #2401.2): the syllabus, then the lectures week by week, then the readings, each with its size. */
+    id: 'you-work-files',
+    label: 'Work & school · A course\'s files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A file row with its Remove showing, as hover and focus show it, and
+     * another with its confirm armed in place before it deletes. */
+    id: 'you-work-files-remove',
+    label: 'Work & school · Removing a course file',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened with no files yet: what to add and the press that adds them. */
+    id: 'you-work-files-empty',
+    label: 'Work & school · A course with no files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer with four files chosen: two ready with their kind and week, one refused for its type and one for its size. */
+    id: 'you-work-files-add',
+    label: 'Work & school · Adding course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationChosen }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer mid-upload: one file going with its progress, one failed with its reason, one waiting its turn. */
+    id: 'you-work-files-uploading',
+    label: 'Work & school · Uploading course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
         />
       </>
     ),
