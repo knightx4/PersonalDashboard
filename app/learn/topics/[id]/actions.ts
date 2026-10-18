@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
-import { settleBriefTopic } from '@/lib/learn/briefs/topics-store';
+import { approveDraftedTopic, settleBriefTopic } from '@/lib/learn/briefs/topics-store';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -139,6 +139,18 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
     await settleWanted(supabase, user.id, { topicId: input.data.topicId, name: input.data.name, draftId: id });
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
+  }
+  // Approved as soon as it is kept when every row cites a source (plan
+  // #2356.2); the draft stays if approving fails, and its page still has Approve.
+  const approval = await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) => {
+    console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error);
+    return null;
+  });
+  if (approval?.brief) {
+    const { briefId } = approval.brief;
+    after(() => writeCardsForBrief(user.id, briefId).then(() => undefined));
+    revalidatePath(`/learn/b/${briefId}`);
+    revalidatePath('/learn/now');
   }
 
   revalidatePath('/learn/topics');

@@ -515,6 +515,39 @@ export async function approveDraft(
   return { rewritten };
 }
 
+/** A draft left as a draft because some of its rows cite no source. */
+export type KeptUncitedDraft = { id: string; uncited: number };
+
+/**
+ * Approve each of these topics that is still a draft and cites a source on
+ * every row, with its checks as drafted (plan #2356.2). Every drafting path
+ * calls this once its draft is kept, so no topic waits for the person to press
+ * Approve. A draft with an uncited row stays a draft and comes back in `kept`
+ * with how many rows cite nothing; a topic that is no longer a draft is passed
+ * over. Ids are read one at a time, in the order given.
+ */
+export async function approveCitedDrafts(
+  client: Client,
+  topicIds: readonly string[],
+): Promise<{ approved: string[]; kept: KeptUncitedDraft[] }> {
+  const approved: string[] = [];
+  const kept: KeptUncitedDraft[] = [];
+  for (const id of topicIds) {
+    const { data: topic, error } = await client.from('topics').select('status').eq('id', id).maybeSingle();
+    if (error) throw new Error(`Reading the draft failed: ${error.message}`);
+    if (!topic || topic.status !== 'draft') continue;
+    const uncited = await uncitedRows(client, id);
+    if (uncited > 0) {
+      kept.push({ id, uncited });
+      continue;
+    }
+    // The drafted checks stay as they are: an empty map rewrites nothing.
+    await approveDraft(client, id, new Map());
+    approved.push(id);
+  }
+  return { approved, kept };
+}
+
 /**
  * How many of a draft's rows cite nothing and are not marked personal: the
  * topic, its levels up to the ceiling, and the links from them. Approval

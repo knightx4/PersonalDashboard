@@ -7,13 +7,14 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { numbered, performancesFromText, sourcesFromText, type DraftSources } from '@/lib/learn/levels/draft-sources';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
+import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { roleRequirementSource } from '@/lib/learn/levels/role-sources';
 
 /**
  * Naming a goal on the topics page drafts its topic (docs/LEARN-LEVELS-SPEC.md,
- * "Drafting a topic"; plan #2138.2). The draft is kept as a draft, which
- * nothing asks about, and the press lands on its page to be read, reworded
- * and approved.
+ * "Drafting a topic"; plan #2138.2). A draft that cites a source on every row
+ * is approved as soon as it is kept (plan #2356.2), and the press lands on
+ * the topic's page. One with an uncited row stays a draft there.
  *
  * Since plan #2138.11 the box also takes what to draft from: the goal's
  * performances, pasted sources, and a phrase naming roles in job_search whose
@@ -64,6 +65,10 @@ export async function draftTopicFromGoal(_prev: DraftState, formData: FormData):
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
+  // The draft is kept even if approving fails: its page still has Approve.
+  await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) =>
+    console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error),
+  );
 
   revalidatePath('/learn/topics');
   redirect(`/learn/topics/${id}`);

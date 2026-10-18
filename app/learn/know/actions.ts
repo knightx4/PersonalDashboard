@@ -19,6 +19,7 @@ import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
+import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { classifyNote } from '@/lib/learn/vault/classify';
 import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -35,8 +36,10 @@ import {
  * way in: a chain of claims laid out, approved, and written to the subject.
  * The graph is now only read, so the goal goes to drafting a topic with its
  * ten levels (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"), the same press
- * as New topic on /learn/topics, and lands on the draft's page to be read and
- * approved. Nothing is asked about it until then.
+ * as New topic on /learn/topics, and lands on the topic's page. A draft that
+ * cites a source on every row is approved as soon as it is kept (plan
+ * #2356.2); one with an uncited row stays a draft, and nothing is asked about
+ * it until it is approved.
  */
 
 export type ProposeState = { error?: string };
@@ -72,6 +75,10 @@ export async function proposeGoal(_prev: ProposeState, formData: FormData): Prom
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
+  // The draft is kept even if approving fails: its page still has Approve.
+  await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) =>
+    console.error('[learn goal] approve on draft', error instanceof Error ? error.message : error),
+  );
 
   // Named on a subject's page, the topic joins that subject's lens, the one
   // lens its goals read too (plan #2138.7, #2302.3). The draft is kept even
