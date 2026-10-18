@@ -1,3 +1,4 @@
+import { escapeLike } from '@/lib/search/sources/map';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -91,6 +92,41 @@ export async function loadAttachedNoteText(
 export async function detachNote(learn: LearnSupabaseClient, essayId: string, attachmentId: string): Promise<void> {
   const { error } = await learn.from('essay_vault_notes').delete().eq('id', attachmentId).eq('essay_id', essayId);
   if (error) throw new Error(`Could not take the note off the essay: ${error.message}`);
+}
+
+/** The most notes a title search returns. */
+export const NOTE_SEARCH_LIMIT = 10;
+
+export type VaultNoteMatch = { id: string; path: string; title: string };
+
+/**
+ * The person's vault notes whose title contains `query`, newest first, up to
+ * NOTE_SEARCH_LIMIT. A deleted note is left out, and so is the essay's own
+ * note (learn.essays.note_id), since an essay is not merged into itself. An
+ * empty query returns nothing rather than the newest ten. The query is
+ * matched as text: a % or _ in it is a character, not a wildcard.
+ */
+export async function searchVaultNotes(
+  learn: LearnSupabaseClient,
+  vault: VaultSupabaseClient,
+  essayId: string,
+  query: string,
+): Promise<VaultNoteMatch[]> {
+  const needle = query.trim();
+  if (!needle) return [];
+  const own = await learn.from('essays').select('note_id').eq('id', essayId).maybeSingle();
+  if (own.error) throw new Error(`Could not read the essay: ${own.error.message}`);
+  const ownNoteId = (own.data as { note_id: string | null } | null)?.note_id ?? null;
+
+  let search = vault
+    .from('notes')
+    .select('id, path, title')
+    .ilike('title', `%${escapeLike(needle)}%`)
+    .is('deleted_at', null);
+  if (ownNoteId) search = search.neq('id', ownNoteId);
+  const { data, error } = await search.order('updated_at', { ascending: false }).limit(NOTE_SEARCH_LIMIT);
+  if (error) throw new Error(`Could not search the vault notes: ${error.message}`);
+  return ((data ?? []) as unknown as VaultNoteMatch[]).map((n) => ({ id: n.id, path: n.path, title: n.title }));
 }
 
 /** Where a vault note opens in the app. */
