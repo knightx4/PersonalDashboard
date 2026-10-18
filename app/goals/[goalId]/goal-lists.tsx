@@ -330,7 +330,7 @@ function ViewSwitch({
             className={cn(
               'press press-area h-full rounded-control px-2.5 text-small font-semibold transition-colors duration-quick',
               'focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on ? 'bg-raised text-accent shadow-sm' : 'text-ink-muted hover:text-ink',
+              on ? 'bg-raised text-accent' : 'text-ink-muted hover:text-ink',
             )}
           >
             {LIST_VIEW_LABELS[v]}

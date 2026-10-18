@@ -84,7 +84,7 @@ export function DraftConfirm({ recordId }: { recordId: string }) {
     {},
   );
   return (
-    <form action={confirm} className="relative z-10 inline-flex items-center gap-1.5">
+    <form action={confirm} className="relative z-over-link inline-flex items-center gap-1.5">
       <input type="hidden" name="recordId" value={recordId} />
       <Chip tone="caution" size="sm">
         Draft

@@ -147,11 +147,11 @@ export function ListMap({
         role="region"
         aria-label="Map of the places"
         // ui-ok: hand-rolled-box -- a map's frame, not a grouping
-        className="list-map relative z-0 h-72 overflow-hidden rounded-card border border-border bg-sunken sm:h-80"
+        className="list-map relative isolate h-72 overflow-hidden rounded-card border border-border bg-sunken sm:h-80"
       />
       {card && point && (
         <div
-          className="absolute z-10"
+          className="absolute z-over-link"
           style={
             below
               ? { left, top: point.y + PIN / 2 + 8 }
