@@ -4,21 +4,35 @@ import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { sortTags } from '@/lib/todo/tasks/tags';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
  * Reading the list. The deciding is next door in model.ts, on purpose.
  */
 
-const COLUMNS =
-  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id';
+/**
+ * A task's columns, with its tags embedded from todo.task_tags (plan #2340.1).
+ * Exported so every reader that builds a Task selects the same thing.
+ */
+export const TASK_COLUMNS =
+  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id, task_tags (tag)';
+
+const COLUMNS = TASK_COLUMNS;
 
 /** PostgREST caps a response; a personal list will not reach this, but say it. */
 const LIMIT = 500;
 
 type Row = Record<string, unknown>;
 
-function toTask(row: Row): Task {
+/** The tag names embedded on a task row, sorted. A row selected without them has none. */
+function tagsOf(row: Row): string[] {
+  const embedded = row.task_tags as { tag: string }[] | null | undefined;
+  return sortTags((embedded ?? []).map((entry) => entry.tag));
+}
+
+/** A task row selected with TASK_COLUMNS, as a Task. */
+export function toTask(row: Row): Task {
   return {
     id: row.id as string,
     title: row.title as string,
@@ -32,6 +46,7 @@ function toTask(row: Row): Task {
     createdAt: row.created_at as string,
     position: (row.position as number | null) ?? null,
     parentId: (row.parent_id as string | null) ?? null,
+    tags: tagsOf(row),
   };
 }
 
