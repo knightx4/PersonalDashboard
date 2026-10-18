@@ -457,6 +457,15 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import {
+  GoalListsEmptySurface,
+  GoalListsErrorSurface,
+  GoalListsLinkedSurface,
+  GoalListsLoadingSurface,
+  GoalListsPanelSurface,
+  GoalListsSurface,
+  GoalListsTabSurface,
+} from './goal-lists-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
@@ -4954,6 +4963,62 @@ export const SURFACES: readonly Surface[] = [
         seam={{ openRow: 'loan-student', editing: { recordId: 'loan-car', key: 'balance' } }}
       />
     ),
+  },
+  {
+    /* A goal’s lists as chips under the done-when (plan #2330.3): its own pantries to compare, one picked, and a linked list of readings from Learn. */
+    id: 'goals-lists',
+    label: 'Goal · its lists as chips',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsSurface />,
+  },
+  {
+    /* The pantry chip pressed: the list in a panel over the page, with a row a pasted link filled in waiting to be confirmed. */
+    id: 'goals-lists-panel',
+    label: 'Goal · a list open in its panel',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsPanelSurface />,
+  },
+  {
+    /* The readings chip pressed: each reading as Learn has it, two with comments, one gone, and the fold of the one put down, open. */
+    id: 'goals-lists-panel-linked',
+    label: 'Goal · a linked list open, ruled out showing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLinkedSurface />,
+  },
+  {
+    /* The add box after a pasted link was refused. */
+    id: 'goals-lists-panel-error',
+    label: 'Goal · a list, a link that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsErrorSurface />,
+  },
+  {
+    /* A list just started: the empty line and the add box. */
+    id: 'goals-lists-panel-empty',
+    label: 'Goal · a new list with nothing in it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsEmptySurface />,
+  },
+  {
+    /* A pasted link being read, waiting at the foot of the rows. */
+    id: 'goals-lists-panel-loading',
+    label: 'Goal · a list reading a pasted link',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLoadingSurface />,
+  },
+  {
+    /* Three lists, so each has a tab after Steps; the pantries’ tab open. */
+    id: 'goals-lists-tab',
+    label: 'Goal · a list on its own tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsTabSurface />,
   },
   {
     /* The design language, held to itself. It is the one surface where being
