@@ -79,6 +79,10 @@ export const supplyDemandModel: ExplorableModel = {
       ]),
     };
   },
+  measures: [
+    { id: 'price', label: 'the price', at: (values) => equilibrium(shifts(values)).price },
+    { id: 'quantity', label: 'the quantity bought and sold', at: (values) => equilibrium(shifts(values)).quantity },
+  ],
   Plot: SupplyDemandPlot,
   example: {
     caption: 'A frost cuts the coffee harvest: move supply and watch the price and the cups sold.',

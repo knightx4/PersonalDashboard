@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
+import { pickDiagramForm } from '../questions/pick-diagram';
 import { DiagramSvg, LINE, Lines, charsIn, label, wrap } from './diagram';
 
 /**
@@ -103,6 +104,23 @@ function TwoByTwoSvg({ spec }: { spec: TwoByTwoSpec }) {
   );
 }
 
+const TWO_BY_TWO_EXAMPLE: TwoByTwoSpec = {
+  x: { label: 'Can be fenced off', low: 'No', high: 'Yes' },
+  y: { label: 'Use crowds others out', low: 'No', high: 'Yes' },
+  cells: {
+    top_left: 'Common resources',
+    top_right: 'Private goods',
+    bottom_left: 'Public goods',
+    bottom_right: 'Club goods',
+  },
+  items: [
+    { label: 'Free street parking', x: 0.2, y: 0.82 },
+    { label: 'A flat to rent', x: 0.85, y: 0.88 },
+    { label: 'Street lighting', x: 0.15, y: 0.2 },
+    { label: 'A toll road', x: 0.82, y: 0.25 },
+  ],
+};
+
 export const twoByTwoKind: FigureKind<TwoByTwoSpec> = {
   id: 'two_by_two',
   label: 'Quadrant',
@@ -110,23 +128,23 @@ export const twoByTwoKind: FigureKind<TwoByTwoSpec> = {
   writerLine: `two_by_two: two qualities as axes from low to high, splitting a square into four named cells, with up to ${MAX_ITEMS} things placed on it, for a trade-off or a classification on two questions: rival and excludable goods, cost against benefit. spec is {"x": {"label": the quality across, "low": its low end, "high": its high end}, "y": {the same for the quality upwards}, "cells": {"top_left", "top_right", "bottom_left", "bottom_right": each cell's name in at most ${MAX_CELL_CHARS} characters}, "items": optional [{"label": at most ${MAX_ITEM_CHARS} characters, "x": 0 to 1 from low to high, "y": 0 to 1 from low to high}]}. Top is high y, right is high x.`,
   example: {
     caption: 'Four kinds of goods a city provides, by whether use can be limited and whether one person’s use crowds out another’s.',
-    spec: {
-      x: { label: 'Can be fenced off', low: 'No', high: 'Yes' },
-      y: { label: 'Use crowds others out', low: 'No', high: 'Yes' },
-      cells: {
-        top_left: 'Common resources',
-        top_right: 'Private goods',
-        bottom_left: 'Public goods',
-        bottom_right: 'Club goods',
-      },
-      items: [
-        { label: 'Free street parking', x: 0.2, y: 0.82 },
-        { label: 'A flat to rent', x: 0.85, y: 0.88 },
-        { label: 'Street lighting', x: 0.15, y: 0.2 },
-        { label: 'A toll road', x: 0.82, y: 0.25 },
-      ],
-    },
+    spec: TWO_BY_TWO_EXAMPLE,
   },
+  questions: [
+    pickDiagramForm(twoByTwoSpec, {
+      prompt: 'Which quadrant names the four kinds of goods correctly?',
+      wrong: [
+        {
+          ...TWO_BY_TWO_EXAMPLE,
+          cells: { ...TWO_BY_TWO_EXAMPLE.cells, top_left: 'Public goods', bottom_left: 'Common resources' },
+        },
+        {
+          ...TWO_BY_TWO_EXAMPLE,
+          cells: { ...TWO_BY_TWO_EXAMPLE.cells, top_right: 'Club goods', bottom_right: 'Private goods' },
+        },
+      ],
+    }),
+  ],
   Render: ({ spec }) => <TwoByTwoSvg spec={spec} />,
   data: 'none',
 };

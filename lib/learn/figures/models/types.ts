@@ -41,6 +41,20 @@ export type ModelParam = {
 /** One number read off the model, with what it was at the start. */
 export type ModelReadout = { label: string; value: string; was: string | null };
 
+/**
+ * One quantity the model works out, as a number, for a question that asks
+ * which way it goes when a slider moves (plan #2321.8). The answer is read
+ * from `at`, never from the writer.
+ */
+export type ModelMeasure = {
+  id: string;
+  /** What it is, as the object of "What happens to …?": "the price", "the city's edge". */
+  label: string;
+  at: (values: ModelValues) => number;
+  /** The choices in its own words, where "rises" and "falls" read wrongly: "It moves out". */
+  words?: { up: string; down: string; same: string };
+};
+
 /** What a model's Plot is given. */
 export type ModelPlotProps = {
   values: ModelValues;
@@ -69,6 +83,8 @@ export type ExplorableModel = {
    * nothing on the server, and a curve is not read out.
    */
   table: (values: ModelValues) => { head: string[]; rows: string[][] };
+  /** What a question can ask the direction of after a slider moves (plan #2321.8). */
+  measures: readonly ModelMeasure[];
   /** The drawing, on the client. */
   Plot: ComponentType<ModelPlotProps>;
   /**
@@ -90,7 +106,9 @@ export function modelSurface(model: Pick<ExplorableModel, 'id'>): string {
 
 /** Each parameter's starting value, with any the lesson named in place of the model's own. */
 export function startingValues(model: ExplorableModel, named: ModelValues = {}): ModelValues {
-  return Object.fromEntries(model.params.map((param) => [param.id, named[param.id] ?? param.start]));
+  return Object.fromEntries(
+    model.params.map((param) => [param.id, named[param.id] ?? param.start]),
+  );
 }
 
 /** Whether a value is in a parameter's range and on one of its steps. */

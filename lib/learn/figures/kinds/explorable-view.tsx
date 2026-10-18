@@ -40,7 +40,16 @@ export function ExplorableMoved({
  * Only the model's id and its starting values cross from the server: the
  * model itself, with its functions, is read from the registry here.
  */
-export function ExplorableView({ modelId, start }: { modelId: string; start: ModelValues }) {
+export function ExplorableView({
+  modelId,
+  start,
+  still = false,
+}: {
+  modelId: string;
+  start: ModelValues;
+  /** Drawn without sliders or caption, for a question asking what moving them would do. */
+  still?: boolean;
+}) {
   const moved = useContext(Moved)[modelId];
   const model = explorableModel(modelId);
   const from = model ? startingValues(model, start) : {};
@@ -65,43 +74,47 @@ export function ExplorableView({ modelId, start }: { modelId: string; start: Mod
       <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_8rem] sm:items-start sm:gap-6">
         <div>
           <Plot values={values} from={from} animate={touched && !reduced} />
-          <div className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
-            {model.params.map((param) => {
-              const value = values[param.id];
-              const words = param.say(value, from[param.id]);
-              const inputId = `${id}-${param.id}`;
-              return (
-                <div key={param.id}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <label htmlFor={inputId} className="text-small font-medium text-ink">
-                      {param.label}
-                    </label>
-                    <span className="text-small text-ink-muted">{words}</span>
-                  </div>
-                  <input
-                    id={inputId}
-                    type="range"
-                    min={param.min}
-                    max={param.max}
-                    step={param.step}
-                    value={value}
-                    aria-valuetext={words}
-                    onChange={(event) =>
-                      move({ ...values, [param.id]: Number(event.target.value) })
-                    }
-                    // ui-ok: the hit area is the 44px touch minimum, not a control height
-                    className="h-11 w-full cursor-pointer accent-accent"
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <Button variant="link" disabled={atStart} onClick={() => move(from)}>
-            Back to the start
-          </Button>
-          <p aria-live="polite" className="mt-3 text-body text-ink">
-            {model.describe(values, from)}
-          </p>
+          {!still && (
+            <>
+              <div className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                {model.params.map((param) => {
+                  const value = values[param.id];
+                  const words = param.say(value, from[param.id]);
+                  const inputId = `${id}-${param.id}`;
+                  return (
+                    <div key={param.id}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <label htmlFor={inputId} className="text-small font-medium text-ink">
+                          {param.label}
+                        </label>
+                        <span className="text-small text-ink-muted">{words}</span>
+                      </div>
+                      <input
+                        id={inputId}
+                        type="range"
+                        min={param.min}
+                        max={param.max}
+                        step={param.step}
+                        value={value}
+                        aria-valuetext={words}
+                        onChange={(event) =>
+                          move({ ...values, [param.id]: Number(event.target.value) })
+                        }
+                        // ui-ok: the hit area is the 44px touch minimum, not a control height
+                        className="h-11 w-full cursor-pointer accent-accent"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <Button variant="link" disabled={atStart} onClick={() => move(from)}>
+                Back to the start
+              </Button>
+              <p aria-live="polite" className="mt-3 text-body text-ink">
+                {model.describe(values, from)}
+              </p>
+            </>
+          )}
         </div>
         <div className="mt-4 sm:mt-8">
           <div className="flex gap-6 sm:flex-col sm:gap-4">
@@ -112,9 +125,11 @@ export function ExplorableView({ modelId, start }: { modelId: string; start: Mod
                 label={
                   <>
                     {readout.label}
-                    <span className="block">
-                      {readout.was ? `was ${readout.was}` : 'as it started'}
-                    </span>
+                    {!still && (
+                      <span className="block">
+                        {readout.was ? `was ${readout.was}` : 'as it started'}
+                      </span>
+                    )}
                   </>
                 }
               />
