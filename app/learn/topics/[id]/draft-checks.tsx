@@ -11,15 +11,14 @@ import type { RowCitation } from '@/lib/learn/levels/store';
 import { markRowsPersonal, type MarkState } from './actions';
 
 /**
- * The five checks shown above a draft's levels before Approve (plan
+ * The five checks shown above a held draft's levels (plan
  * #2138.11): coverage of the sources given, structure, how far the two
  * drafts agree, which rows name a source, and a short checklist a
  * practitioner would read the top levels against.
  *
  * Coverage, structure, overlap and the checklist were worked out when the
  * topic was drafted and are kept on it; provenance is read from the rows, so
- * a row marked personal counts at once. A row naming no source is the one
- * thing that holds Approve back.
+ * a row marked personal counts at once.
  *
  * Marking is one hidden form, `MARK_FORM`, that each row's button sends by
  * id, since the rows sit inside the levels form and a form cannot hold
@@ -149,7 +148,7 @@ export function DraftChecks({ drafting, provenance }: { drafting: DraftingRecord
       finding={
         uncited === 0
           ? `Every row names a source${provenance.personal > 0 ? ` or is marked personal (${provenance.personal})` : ''}.`
-          : `${provenance.cited} of ${provenance.total} rows name a source. ${uncited === 1 ? 'One does not' : `${uncited} do not`}, and Approve waits until each is marked personal.`
+          : `${provenance.cited} of ${provenance.total} rows name a source. ${uncited === 1 ? 'One does not' : `${uncited} do not`}, and Dash marks each personal when it approves the draft.`
       }
     >
       {uncited > 0 && (
@@ -184,7 +183,7 @@ export function DraftChecks({ drafting, provenance }: { drafting: DraftingRecord
     <section aria-labelledby="checks-heading">
       <ChecksHeading />
       <Card padding="none">
-        <CardNote>Read these before the levels. Only a row with no source holds Approve back.</CardNote>
+        <CardNote>Read these before the levels.</CardNote>
         <ul className="divide-y divide-border">
           <CheckRow
             name="Coverage"
