@@ -169,12 +169,29 @@ export function titleHead(title: string): string {
   return trimmed.slice(0, trimmed.length - titleTail(title).length);
 }
 
-/** What a `heading` row hands its page's frame: see `frame` on `TreeRow`. */
+/**
+ * What a `heading` row hands its page's frame: see `frame` on `TreeRow`. The
+ * header's three parts, then the rest of the row split by tab (plan #2373.2),
+ * each part list items for a `<ul>` of the frame's own.
+ */
 export type TreeRowFrameParts = {
   status: ReactNode;
   title: ReactNode;
   menu: ReactNode;
-  rows: ReactNode;
+  /** The notices and the panel: the detail, done-when, facts, files and what it waits on. */
+  overview: ReactNode;
+  /** The open sub-steps as rows at the first level of their list, then `after`. */
+  substeps: ReactNode;
+  /** The row's `activity` items: the Activity tab's runs. */
+  activity: ReactNode;
+  /** The row's comment thread, for the Activity tab. */
+  thread: ReactNode;
+  /**
+   * The menu's Add a sub-step was pressed. The frame draws the composer, and
+   * calls `stopAdding` when it closes.
+   */
+  adding: boolean;
+  stopAdding: () => void;
 };
 
 /** Everything under a row sits in from the tree by the same amount the title does. */
@@ -218,8 +235,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
   after,
   heading = false,
   frame,
+  activity,
   titleHref,
 }: {
+  /**
+   * List items for a frame's Activity tab, such as the row's latest run line
+   * (plan #2373.2). Drawn only in a frame; a row in a tree puts its run line
+   * in `notices`.
+   */
+  activity?: ReactNode;
   /**
    * The page's frame around a `heading` row (a goal step's own page, plan
    * #2373.1). The row hands it the status you press, the title (or its
@@ -866,7 +890,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
     </>
   );
 
-  const rest = (
+  const thread = (
+    <Thread
+      subject={threadRef(comments.target, node.id)}
+      turns={node.thread}
+      titles={titles}
+      placeholder={threadPlaceholder}
+    />
+  );
+
+  const overview = (
     <>
       {notices}
 
@@ -967,12 +1000,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     />
                   )}
 
-                  <Thread
-                    subject={threadRef(comments.target, node.id)}
-                    turns={node.thread}
-                    titles={titles}
-                    placeholder={threadPlaceholder}
-                  />
+                  {/* In a page's frame the thread is on the Activity tab (plan #2373.2). */}
+                  {!glyphOnly && thread}
 
                   {meta}
 
@@ -1007,6 +1036,38 @@ export function TreeRow<E extends TreeCatalogEntry>({
           </li>
         )
       )}
+    </>
+  );
+
+  // On a page with a frame, the title row's parts go to the page's header
+  // and the rest to its tabs (plans #2373.1 and #2373.2). The sub-steps head
+  // the Sub-steps tab's list, so they sit at its first level and always
+  // show, and the frame draws the composer.
+  if (heading && frame) {
+    return frame({
+      status: healthMenu,
+      title: row.editing && titleEditor ? titleEditor : headingTitle,
+      menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
+      overview,
+      substeps: (
+        <>
+          {substeps.map((child) => (
+            <Fragment key={child.id}>{renderChild(child, [])}</Fragment>
+          ))}
+          {after}
+        </>
+      ),
+      activity,
+      thread,
+      adding: row.addingChild,
+      stopAdding: () => row.setAddingChild(false),
+    });
+  }
+
+  return (
+    <>
+      {titleRow}
+      {overview}
 
       {hasChildren &&
         showChildren &&
@@ -1023,23 +1084,6 @@ export function TreeRow<E extends TreeCatalogEntry>({
           {addChild}
         </li>
       )}
-    </>
-  );
-
-  // On a page with a frame, the title row's parts go to the page's header.
-  if (heading && frame) {
-    return frame({
-      status: healthMenu,
-      title: row.editing && titleEditor ? titleEditor : headingTitle,
-      menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
-      rows: rest,
-    });
-  }
-
-  return (
-    <>
-      {titleRow}
-      {rest}
     </>
   );
 }

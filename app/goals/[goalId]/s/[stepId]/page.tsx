@@ -8,6 +8,8 @@ import { isOwner } from '@/lib/dev/owner';
 import type { LinkedFile } from '@/lib/files/files';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
+import { STEP_TABS, type StepTab } from '@/lib/goals/goal-page';
+import { tabFrom } from '@/lib/tabs';
 import { loadFilesOf } from '@/lib/goals/files-store';
 import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
@@ -58,10 +60,14 @@ function stepRunLines(runs: Record<string, GoalRun>) {
  */
 export default async function StepOwnPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ goalId: string; stepId: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const { goalId, stepId } = await params;
+  // The open tab is in the address, so a reload or a pasted link opens it (plan #2373.2).
+  const tab = tabFrom((await searchParams).tab, STEP_TABS) as StepTab;
   if (!UUID.test(goalId) || !UUID.test(stepId)) notFound();
 
   const user = await requireUser();
@@ -106,6 +112,7 @@ export default async function StepOwnPage({
           arrivals={arrivals}
           canRun={owner}
           timeZone={account.timezone}
+          tab={tab}
         />
       </YourInitialProvider>
     </StepCloseRing>

@@ -14,3 +14,15 @@ export function GoalStepMenuSurface() {
     </OpenMenu>
   );
 }
+
+/**
+ * A step's Overview with its done-when being written (plan #2373.2): the
+ * editor that opens in place when the done-when is pressed.
+ */
+export function GoalStepEditingSurface() {
+  return (
+    <OpenMenu trigger={'button[title^="Edit when"]'}>
+      <GoalStepSurface />
+    </OpenMenu>
+  );
+}

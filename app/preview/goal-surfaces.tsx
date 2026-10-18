@@ -1,5 +1,6 @@
 import { StepPage } from '@/app/goals/[goalId]/step-page';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
+import { SetTab } from './set-tab';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -296,11 +297,61 @@ export function GoalSubStepSurface() {
 }
 
 /**
- * A step's page with its comment showing on the Activity tab's label (plan
- * #2373.1): Call the card company, which has one comment in its thread.
+ * A step's page open on Activity, its comment counted on the tab's label
+ * (plans #2373.1 and #2373.2): Call the card company, with Dash's last run
+ * and the one comment in its thread.
  */
 export function GoalStepCommentsSurface() {
-  return <StepPage map={map} stepId="call" todoOn={false} />;
+  return (
+    <>
+      <SetTab tab="activity" />
+      <StepPage map={map} stepId="call" todoOn={false} tab="activity" runs={CALL_RUN} />
+    </>
+  );
+}
+
+/** Dash's last run on Call the card company, for its Activity tab (plan #2373.2). */
+const CALL_RUN = {
+  call: {
+    runId: 'run-call',
+    running: null,
+    error: null,
+    summary: 'Drafted what to say on the call and filed it as a note under the goal.',
+  },
+};
+
+/**
+ * A step's Sub-steps tab (plan #2373.2): Get the rates lowered's open
+ * sub-steps on the goal page's columns, the finished ones folded at the
+ * foot, then Add a sub-step.
+ */
+export function GoalStepSubstepsSurface() {
+  return (
+    <>
+      <SetTab tab="substeps" />
+      <StepPage map={map} stepId="rates" todoOn={false} tab="substeps" />
+    </>
+  );
+}
+
+/** A step with no sub-steps on its Sub-steps tab: the empty state that adds the first. */
+export function GoalStepSubstepsEmptySurface() {
+  return (
+    <>
+      <SetTab tab="substeps" />
+      <StepPage map={map} stepId="list" todoOn={false} tab="substeps" />
+    </>
+  );
+}
+
+/** A step's Activity tab with no run and no comment yet: List every balance. */
+export function GoalStepActivityEmptySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <StepPage map={map} stepId="list" todoOn={false} tab="activity" />
+    </>
+  );
 }
 
 /**
@@ -309,6 +360,20 @@ export function GoalStepCommentsSurface() {
  */
 export function GoalStepEmptySurface() {
   return <StepPage map={map} stepId="list" todoOn={false} />;
+}
+
+/**
+ * A step Dash proposed, on its own page (plan #2373.2): Overview carries
+ * Accept and Decline at the foot of its card.
+ */
+export function GoalStepProposedSurface() {
+  return (
+    <StepPage
+      map={goalMapWith({ rates: { status: 'proposed' } })}
+      stepId="rates"
+      todoOn={false}
+    />
+  );
 }
 
 /**

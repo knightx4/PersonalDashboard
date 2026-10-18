@@ -87,8 +87,8 @@ describe('StepPage', () => {
     expect(text(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]!)).toBe('Get the rates lowered');
     expect(html).toContain(`href="/goals/${GOAL}"`);
     expect(text(html)).toContain('Call each lender.');
-    expect(text(html)).toContain('Call the card company');
-    expect(text(html)).toContain('Compare the transfer fees');
+    // The sub-steps are on their own tab (plan #2373.2), not under the panel.
+    expect(text(html)).not.toContain('Compare the transfer fees');
     // The page links to itself twice: the path's last part, and the Overview
     // tab, which is the plain address (plan #2373.1). The row does not.
     expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(3);
@@ -120,6 +120,54 @@ describe('StepPage', () => {
     expect(html).not.toContain('type="date"');
     // The values still go with the form, so saving one fact keeps the others.
     expect(html).toContain('name="dueOn" value="2026-10-03"');
+  });
+
+  it('puts every part of the panel on one tab (plan #2373.2)', () => {
+    const page = (stepId: string, tab: 'overview' | 'substeps' | 'activity') =>
+      text(renderToStaticMarkup(<StepPage map={map} stepId={stepId} todoOn={false} tab={tab} />));
+    const runs = {
+      rates: { runId: 'r1', running: null, error: null, summary: 'Wrote the call script.' },
+    };
+
+    // Overview: the detail, and neither the sub-steps, the thread nor the run.
+    const overview = page('rates', 'overview');
+    expect(overview).toContain('Call each lender.');
+    expect(overview).not.toContain('Call the card company');
+    expect(overview).not.toContain('Add a comment');
+
+    // Sub-steps: the open sub-steps under the goal page's columns, then the composer.
+    const substeps = page('rates', 'substeps');
+    expect(substeps).toContain('Call the card company');
+    expect(substeps).toContain('Compare the transfer fees');
+    expect(substeps).toContain('Add a sub-step');
+    expect(substeps).not.toContain('Call each lender.');
+    expect(substeps).not.toContain('Add a comment');
+
+    // A step with none says so, and offers to add the first.
+    const none = page('call', 'substeps');
+    expect(none).toContain('No sub-steps yet');
+    expect(none).toContain('Add a sub-step');
+
+    // Activity: the run and the thread, and not the panel.
+    const activity = text(
+      renderToStaticMarkup(
+        <StepPage map={map} stepId="rates" todoOn={false} tab="activity" runs={runs} />,
+      ),
+    );
+    expect(activity).toContain('Wrote the call script.');
+    expect(activity).toContain('Add a comment');
+    expect(activity).not.toContain('Call each lender.');
+    expect(activity).not.toContain('Call the card company');
+    expect(page('rates', 'activity')).toContain('Dash has not run on this step yet.');
+
+    // The run line is on Activity alone.
+    expect(
+      text(
+        renderToStaticMarkup(
+          <StepPage map={map} stepId="rates" todoOn={false} tab="overview" runs={runs} />,
+        ),
+      ),
+    ).not.toContain('Wrote the call script.');
   });
 
   it('draws nothing for a step the goal does not hold', () => {
