@@ -17,14 +17,13 @@ import type { TopicDetail, TopicMatch } from '@/lib/learn/levels/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { draftProvenance } from '@/lib/learn/levels/provenance';
 import { CardNote, DraftChecks, MarkPersonalForm, RowSource } from './draft-checks';
-import { ApproveDraft, ApproveTopicButton, DraftMatch, WantedRow } from './draft-parts';
+import { DraftLevels, DraftMatch, HeldNotice, WantedRow } from './draft-parts';
 import { LadderView, type LadderOpen } from './ladder-view';
 
 /**
- * One topic (plan #2138.2). A draft is the approval screen: what it covers,
- * any topic you already have that it looks like, then every level with its
- * checks open to rewording, then the approve button. An approved topic shows
- * the same levels to read.
+ * One topic (plan #2138.2). A draft is a held topic (plan #2356): why it is
+ * held, what it covers, any topic you already have that it looks like, the
+ * checks, then every level to read. An approved topic shows the ladder.
  *
  * An approved topic shows the ladder (#2138.3): where you stand on each level
  * and why, from the model's reading of the evidence, with each level's
@@ -72,9 +71,7 @@ export function TopicView({
   return (
     <DetailPage
       header={<PageHeader subject={path} title={topic.name} actions={
-            draft ? (
-              <ApproveTopicButton uncited={provenance?.uncited.length} />
-            ) : practise ? (
+            practise && !draft ? (
               <Link href={practise} className={buttonVariants({ size: 'sm' })}>
                 Practice
               </Link>
@@ -123,6 +120,8 @@ export function TopicView({
         </Card>
       }
     >
+      {draft && provenance && <HeldNotice reasons={heldReasons(provenance.uncited.length)} />}
+
       {draft && match && <DraftMatch topicId={topic.id} match={match} />}
 
       {draft && provenance && (
@@ -133,7 +132,7 @@ export function TopicView({
       )}
 
       {draft ? (
-        <ApproveDraft topicId={topic.id} cells={topic.cells} links={topic.links} />
+        <DraftLevels cells={topic.cells} links={topic.links} />
       ) : (
         standing && <LadderView topicId={topic.id} standing={standing} practise={practise} open={open} timezone={timezone} now={now} />
       )}
@@ -175,4 +174,19 @@ export function TopicView({
       </Card>
     </DetailPage>
   );
+}
+
+/**
+ * Why a draft is held. The error from the failed approval is not recorded, so
+ * the page says that, then what it can see in the rows.
+ */
+function heldReasons(uncited: number): string[] {
+  const reasons = ['The approval stopped with an error, and the error was not kept.'];
+  if (uncited > 0) {
+    reasons.push(
+      `${uncited} ${uncited === 1 ? 'row names' : 'rows name'} no source, so Dash did not get as far as marking ${uncited === 1 ? 'it' : 'them'} personal.`,
+    );
+  }
+  reasons.push('Dash tries approving it again the next time it prepares topics.');
+  return reasons;
 }

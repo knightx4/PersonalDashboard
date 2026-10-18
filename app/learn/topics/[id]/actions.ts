@@ -4,77 +4,25 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
-import { approveDraftedTopic, settleBriefTopic } from '@/lib/learn/briefs/topics-store';
+import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { checksFromText } from '@/lib/learn/levels/draft-payload';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { MAX_LEVEL } from '@/lib/learn/levels/model';
 import { readDrafting } from '@/lib/learn/levels/draft-sources';
-import { approveDraft, markPersonal, mergeDraftInto, settleWanted, type CitedRowKind } from '@/lib/learn/levels/store';
+import { markPersonal, mergeDraftInto, settleWanted, type CitedRowKind } from '@/lib/learn/levels/store';
 import { rewriteCell } from '@/lib/learn/levels/store-page';
 import { carryLensTargets } from '@/lib/learn/levels/lens-store';
 
 /**
- * What a draft topic's page does (plan #2138.2): approve it with the checks
- * as the person left them, merge it into the topic it duplicates, or draft a
- * topic its links need.
- *
- * Approval saves what was on the screen. A level whose checks were reworded
- * keeps the drafted wording beside them (`descriptor_original`), so nothing
- * lands on the map in the model's words alone without the person having read
- * them there.
+ * What a draft topic's page does (plan #2138.2): merge it into the topic it
+ * duplicates, mark its rows personal, or draft a topic its links need. Dash
+ * approves a draft as soon as it is written (plan #2356), so there is no
+ * action here that approves one.
  */
 
-export type ApproveState = {
-  error?: string;
-  /** Per level, what is wrong with the checks typed there. */
-  levels?: Record<number, string>;
-};
-
 const Id = z.string().uuid();
-
-// latency: pending
-export async function approveTopicDraft(_prev: ApproveState, formData: FormData): Promise<ApproveState> {
-  const user = await requireUser();
-  const id = Id.safeParse(formData.get('topicId'));
-  if (!id.success) return { error: 'Could not work out which draft this was.' };
-
-  const checks = new Map<number, string[]>();
-  const levels: Record<number, string> = {};
-  for (let level = 1; level <= MAX_LEVEL; level += 1) {
-    const text = formData.get(`level-${level}`);
-    if (typeof text !== 'string') continue;
-    const read = checksFromText(text);
-    if (read.ok) checks.set(level, read.checks);
-    else levels[level] = `Level ${level} ${read.detail}.`;
-  }
-  if (Object.keys(levels).length > 0) {
-    return { error: 'Some levels need fixing before this can be approved.', levels };
-  }
-
-  const supabase = await createLearnClient();
-  let fromBrief: { briefId: string; aimId: string } | null = null;
-  try {
-    await approveDraft(supabase, id.data, checks);
-    // A topic drafted from a research brief joins its goal's lens, and the
-    // brief's cards are written for that goal after the response (plan #2184.1).
-    fromBrief = await settleBriefTopic(supabase, user.id, id.data);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Approving the topic failed.' };
-  }
-  if (fromBrief) {
-    const { briefId } = fromBrief;
-    after(() => writeCardsForBrief(user.id, briefId).then(() => undefined));
-    revalidatePath(`/learn/b/${briefId}`);
-    revalidatePath('/learn/now');
-  }
-
-  revalidatePath('/learn/topics');
-  revalidatePath(`/learn/topics/${id.data}`);
-  return {};
-}
 
 export type MergeState = { error?: string };
 
@@ -141,7 +89,7 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
   // Approved as soon as it is kept (plan #2356.2), uncited rows marked
-  // personal; the draft stays if approving fails, and its page still has Approve.
+  // personal; the draft stays if approving fails, and its page says it is held.
   const approval = await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) => {
     console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error);
     return null;
