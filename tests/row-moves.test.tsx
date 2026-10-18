@@ -124,6 +124,7 @@ const task: Task = {
   createdAt: '2026-10-01T00:00:00Z',
   position: null,
   parentId: null,
+  tags: [],
 };
 
 describe('moves on Jobs, Todo and Shopping rows', () => {

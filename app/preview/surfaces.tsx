@@ -619,6 +619,7 @@ const roleTasks: Task[] = [
     createdAt: '2026-09-15T16:00:00.000Z',
     position: null,
     parentId: null,
+    tags: [],
   },
 ];
 
@@ -5341,6 +5342,7 @@ export const SURFACES: readonly Surface[] = [
             createdAt: '2026-09-02T08:00:00.000Z',
             position: null,
             parentId: null,
+            tags: [],
           },
         ]}
       />

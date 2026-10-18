@@ -40,6 +40,7 @@ function task(title: string, dueOn: string | null = null): AgendaEntry {
     createdAt: '2026-09-01T00:00:00Z',
     position: null,
     parentId: null,
+    tags: [],
   };
   return { kind: 'task', key: title, task: t, children: [], openChildren: 0, totalChildren: 0 };
 }

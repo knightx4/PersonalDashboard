@@ -319,7 +319,7 @@ async function writeTodo(deps: ChangeDeps, change: Extract<DashChange, { kind: '
   const input = change.input;
   const { id, error } = await deps.createTask(
     deps.userId,
-    { title: input.title, body: input.body, dueOn: input.dueOn, dueTime: input.dueTime, pinned: input.pinned },
+    { title: input.title, body: input.body, dueOn: input.dueOn, dueTime: input.dueTime, pinned: input.pinned, tags: input.tags ?? [] },
     deps.timezone,
   );
   if (error || !id) throw new Error(error ?? 'The todo was not written.');

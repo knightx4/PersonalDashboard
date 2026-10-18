@@ -194,6 +194,70 @@ describe('todo.tasks nesting', () => {
   });
 });
 
+describe('todo.task_tags (plan #2340.1)', () => {
+  let tagged = '';
+
+  beforeAll(async () => {
+    const [task] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'Buy bin bags') returning id`;
+    tagged = task.id;
+  });
+
+  it('tags a task its owner owns, and shows the tags only to them', async () => {
+    await asUser(userA, (tx) => tx`insert into task_tags (task_id, tag)
+                                   values (${tagged}, 'home'), (${tagged}, 'errands')`);
+
+    const mine = await asUser(userA, (tx) =>
+      tx<{ tag: string }[]>`select tag from task_tags where task_id = ${tagged} order by tag`);
+    expect(mine.map((r) => r.tag)).toEqual(['errands', 'home']);
+
+    const theirs = await asUser(userB, (tx) =>
+      tx<{ tag: string }[]>`select tag from task_tags where task_id = ${tagged}`);
+    expect(theirs).toEqual([]);
+  });
+
+  it('refuses a tag on somebody else\'s task', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into task_tags (task_id, tag) values (${tagged}, 'mine')`),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('refuses the same tag twice on one task', async () => {
+    await expect(
+      admin`insert into task_tags (task_id, tag) values (${tagged}, 'home')`,
+    ).rejects.toThrow(/duplicate key/);
+  });
+
+  it('refuses a blank tag, a tag not lowercased and trimmed, and one over 40 characters', async () => {
+    for (const tag of ['', '   ', 'Home', ' home', 'x'.repeat(41)]) {
+      await expect(
+        admin`insert into task_tags (task_id, tag) values (${tagged}, ${tag})`,
+      ).rejects.toThrow(/task_tags_tag_ck/);
+    }
+    await admin`insert into task_tags (task_id, tag) values (${tagged}, ${'x'.repeat(40)})`;
+  });
+
+  it('keeps the tags when the task is edited, finished and reopened', async () => {
+    await asUser(userA, async (tx) => {
+      await tx`update tasks set title = 'Buy bin bags and foil' where id = ${tagged}`;
+      await tx`update tasks set status = 'done' where id = ${tagged}`;
+      await tx`update tasks set status = 'open' where id = ${tagged}`;
+    });
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from task_tags where task_id = ${tagged}`;
+    expect(Number(row.n)).toBe(3);
+  });
+
+  it('takes the tags with it when the task is deleted', async () => {
+    await asUser(userA, (tx) => tx`delete from tasks where id = ${tagged}`);
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from task_tags where task_id = ${tagged}`;
+    expect(Number(row.n)).toBe(0);
+  });
+});
+
 describe('todo.task_links', () => {
   it('links a task to a role its owner owns', async () => {
     await asUser(userA, async (tx) => {

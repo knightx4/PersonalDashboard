@@ -322,7 +322,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'todos',
     description:
-      'The person\'s todos finished between two dates, and the ones still open and past their due date today. Each links to the task on the todo list. Defaults to the last seven days.',
+      'The person\'s todos finished between two dates, and the ones still open and past their due date today, each with its tags. Each links to the task on the todo list. Defaults to the last seven days. tags_in_use lists every tag they have on a todo.',
     input_schema: {
       type: 'object',
       properties: {
