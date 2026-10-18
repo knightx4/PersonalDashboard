@@ -6,6 +6,7 @@ import {
   goalListViews,
   listForTab,
   listTabId,
+  pickPlan,
   slugOf,
   tabsWithLists,
 } from './goal-lists';
@@ -167,5 +168,49 @@ describe('list tabs', () => {
     expect(slugOf('Groups to try!')).toBe('groups-to-try');
     expect(slugOf('Café & bars')).toBe('cafe-bars');
     expect(slugOf('—')).toBe('list');
+  });
+});
+
+describe('picking a row rules out the rest (plan #2330.5)', () => {
+  const rows = [
+    { id: 'a', data: { name: 'HOMCOM', status: 'Shortlist' } },
+    { id: 'b', data: { name: 'IKEA', status: null } },
+    { id: 'c', data: { name: 'Wayfair', status: 'Ruled out' } },
+  ];
+
+  it("uses the list's own picked and ruled-out options", () => {
+    const fields = [
+      { key: 'name', label: 'Name', type: 'text' as const },
+      { key: 'status', label: 'Status', type: 'choice' as const, options: ['Shortlist', 'Picked', 'Ruled out'] },
+    ];
+    expect(pickPlan(fields, rows, 'a')).toEqual({
+      fields,
+      fieldsChanged: false,
+      statusKey: 'status',
+      picked: 'Picked',
+      ruledOut: 'Ruled out',
+      others: ['b'],
+    });
+  });
+
+  it('adds the options a status field lacks', () => {
+    const fields = [{ key: 'decision', label: 'Decision', type: 'choice' as const, options: ['Maybe', 'Chosen'] }];
+    const plan = pickPlan(fields, rows, 'b');
+    expect(plan.picked).toBe('Chosen');
+    expect(plan.ruledOut).toBe('Ruled out');
+    expect(plan.fieldsChanged).toBe(true);
+    expect(plan.fields[0].options).toEqual(['Maybe', 'Chosen', 'Ruled out']);
+    expect(plan.others).toEqual(['a', 'c']);
+  });
+
+  it('gives a list with no status field one', () => {
+    const fields = [
+      { key: 'name', label: 'Name', type: 'text' as const },
+      { key: 'status', label: 'Where it is', type: 'text' as const },
+    ];
+    const plan = pickPlan(fields, rows, 'a');
+    expect(plan.fields[2]).toEqual({ key: 'status_2', label: 'Status', type: 'choice', options: ['Picked', 'Ruled out'] });
+    expect(plan.statusKey).toBe('status_2');
+    expect(plan.others).toEqual(['b', 'c']);
   });
 });

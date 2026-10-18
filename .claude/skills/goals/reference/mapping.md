@@ -279,6 +279,10 @@ insert into goals.links (user_id, item_id, kind, target_id, list_name)
 values ('<user>', '<goal id>', 'saved_item', '<saved_items.id>', null);
 ```
 
+Link the product a step is about to the step itself, not only to the goal
+(`item_id` the step's id; in Ask Dash, `change_goal_link` with `step_ref`):
+buying it in Shopping then closes the step (plan #2330.5).
+
 `list_name` null puts the link in the kind's own list; give a name to split
 one kind into two lists ("Shortlist", "Ruled out"). Link only rows that
 plainly belong, as "Writing what you found" says, and never link a row to make

@@ -1406,6 +1406,81 @@ describe("a goal's own lists (plan #2330.2)", () => {
   });
 });
 
+describe('a list counts towards its goal and closes a step (plan #2330.5)', () => {
+  it("counts the rows of a list holding one option of a choice field", async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title) values (${userA}, 'goal', ${areaA}, 'Meet people') returning id`);
+    const fields = [
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'status', label: 'Status', type: 'choice', options: ['Going', 'Went'] },
+    ];
+    const [list] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, goal_id, name, fields)
+      values (${userA}, ${goal.id}, 'Events', ${JSON.stringify(fields)}::text::jsonb) returning id`);
+    for (const [name, status] of [['Parkrun', 'Went'], ['Book club', 'Going'], ['Quiz', 'Went']]) {
+      await asUser(userA, (tx) => tx`
+        insert into records (user_id, collection_id, data)
+        values (${userA}, ${list.id}, ${JSON.stringify({ name, status })}::text::jsonb)`);
+    }
+
+    // Only an option the field offers, and only on a count.
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${list.id}, number_from_field = 'status',
+          number_from_how = 'count', number_from_value = 'Skipped' where id = ${goal.id}`),
+    ).rejects.toThrow(/offers no option Skipped/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${list.id}, number_from_how = 'count',
+          number_from_value = 'Went' where id = ${goal.id}`),
+    ).rejects.toThrow(/items_number_from_value_ck/);
+
+    await asUser(userA, (tx) => tx`
+      update items set number_from_collection_id = ${list.id}, number_from_field = 'status',
+        number_from_how = 'count', number_from_value = 'Went' where id = ${goal.id}`);
+    const read = async () =>
+      (await admin<{ value: string; note: string }[]>`
+        select value::text, note from readings where item_id = ${goal.id} order by created_at desc limit 1`)[0];
+    expect(await read()).toEqual({ value: '2', note: 'From Events: count where status is Went' });
+
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"status": "Went"}'::jsonb
+      where collection_id = ${list.id} and data ->> 'name' = 'Book club'`);
+    expect((await read()).value).toBe('3');
+  });
+
+  it('closes a step of yours when the saved product it links is bought, saying what was seen', async () => {
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url, title)
+      values (${userA}, 'https://shop.example/homcom', 'HOMCOM 72 inch pantry') returning id`;
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Get a pantry') returning id`);
+    const [waiting] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Fit the pantry') returning id`);
+    await asUser(userA, (tx) => tx`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${waiting.id}, 'mine', 'Find a drill')`);
+    await asUser(userA, async (tx) => {
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${step.id}, 'saved_item', ${saved.id})`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${waiting.id}, 'saved_item', ${saved.id})`;
+    });
+
+    await asUser(userA, (tx) => tx`update public.saved_items set status = 'purchased' where id = ${saved.id}`);
+
+    const steps = await admin<{ id: string; status: string; evidence: string | null; evidence_source: string | null }[]>`
+      select id, status, evidence, evidence_source from items where id in (${step.id}, ${waiting.id})`;
+    expect(steps.find((s) => s.id === step.id)).toMatchObject({
+      status: 'done',
+      evidence: 'You bought HOMCOM 72 inch pantry in Shopping.',
+      evidence_source: 'shopping',
+    });
+    // A step with something open beneath it stays open.
+    expect(steps.find((s) => s.id === waiting.id)).toMatchObject({ status: 'open', evidence: null });
+  });
+});
+
 describe('comments on goals and steps (plan #957)', () => {
   // Since plan #1470 a goal's thread is kept in core.conversations under the
   // item's ref, and goals.comments only holds the old rows, read-only.

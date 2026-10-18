@@ -91,8 +91,70 @@ export function nameFieldOf(fields: CollectionField[]): CollectionField | null {
 }
 
 /** The choice field that says where a row stands, if the list has one. */
-function statusFieldOf(fields: CollectionField[]): CollectionField | null {
+export function statusFieldOf(fields: CollectionField[]): CollectionField | null {
   return liveFields(fields).find((f) => f.type === 'choice' && (STATUS_WORDS.test(f.key) || STATUS_WORDS.test(f.label))) ?? null;
+}
+
+/** True when a status value says the row was picked: "Picked", "Chosen", "Bought". */
+export function isPickedWord(value: unknown): boolean {
+  return typeof value === 'string' && PICKED_WORDS.test(value.trim());
+}
+
+/** True when a status value says the row was set aside: "Ruled out", "Dropped". */
+export function isRuledOutWord(value: unknown): boolean {
+  return typeof value === 'string' && RULED_OUT_WORDS.test(value.trim());
+}
+
+/**
+ * What picking one row of an own list writes (plan #2330.5): the row's status
+ * set to the list's picked option, and every other live row not already ruled
+ * out set to its ruled-out option. A list with no status field gains one
+ * ("Status": Picked, Ruled out), and a status field lacking either option
+ * gains it, so `fields` is what the list should hold afterwards and
+ * `fieldsChanged` says whether that differs.
+ */
+export type PickPlan = {
+  fields: CollectionField[];
+  fieldsChanged: boolean;
+  statusKey: string;
+  picked: string;
+  ruledOut: string;
+  /** The other rows to mark ruled out, in the list's order. */
+  others: string[];
+};
+
+export function pickPlan(
+  fields: CollectionField[],
+  rows: readonly Pick<CollectionRecord, 'id' | 'data'>[],
+  rowId: string,
+): PickPlan {
+  let next = fields.map((f) => ({ ...f }));
+  let status = statusFieldOf(next);
+  let changed = false;
+  if (!status) {
+    const taken = new Set(next.map((f) => f.key));
+    let key = 'status';
+    for (let n = 2; taken.has(key); n++) key = `status_${n}`;
+    status = { key, label: 'Status', type: 'choice', options: ['Picked', 'Ruled out'] };
+    next = [...next, status];
+    changed = true;
+  }
+  const options = status.options ?? [];
+  let picked = options.find((o) => isPickedWord(o));
+  let ruledOut = options.find((o) => isRuledOutWord(o));
+  if (!picked || !ruledOut) {
+    picked ??= 'Picked';
+    ruledOut ??= 'Ruled out';
+    const added = [picked, ruledOut].filter((o) => !options.includes(o));
+    const key = status.key;
+    next = next.map((f) => (f.key === key ? { ...f, options: [...options, ...added] } : f));
+    changed = changed || added.length > 0;
+  }
+  const statusKey = status.key;
+  const others = rows
+    .filter((r) => r.id !== rowId && !isRuledOutWord(r.data[statusKey]))
+    .map((r) => r.id);
+  return { fields: next, fieldsChanged: changed, statusKey, picked, ruledOut, others };
 }
 
 /** The columns an own list shows: every live field but its name, its picture and its link, at most five. */

@@ -310,6 +310,12 @@ export type NumberFrom = {
   /** Null only for a count of every record. */
   field: string | null;
   how: NumberFromHow;
+  /**
+   * For a count over a choice field: the option a record must hold to be
+   * counted, such as "Went" (goals.items.number_from_value, plan #2330.5).
+   * Null or absent counts every record with a value.
+   */
+  value?: string | null;
 };
 
 /** A collection serving the goal, as far as working out its number needs. */
@@ -327,7 +333,8 @@ export type NumberFromChoice = {
 const NUMBER_TYPES: ReadonlySet<FieldType> = new Set(['number', 'money', 'percent']);
 
 export function numberFromValue(from: NumberFrom): string {
-  return `${from.how}|${from.collectionId}|${from.field ?? ''}`;
+  const base = `${from.how}|${from.collectionId}|${from.field ?? ''}`;
+  return from.value ? `${base}|${from.value}` : base;
 }
 
 function unitFor(field: CollectionField): string {
@@ -339,7 +346,9 @@ function unitFor(field: CollectionField): string {
 /**
  * Every way the goal's number could be worked out from the collections
  * serving it: for each number, money or percent field, its total and its
- * latest value, and for each collection the count of its records.
+ * latest value, for each collection the count of its records, and for each
+ * option of a choice field the count of records holding it ("Number of
+ * Events with status Went", plan #2330.5).
  */
 export function numberFromChoices(sources: NumberSource[]): NumberFromChoice[] {
   const choices: NumberFromChoice[] = [];
@@ -357,13 +366,21 @@ export function numberFromChoices(sources: NumberSource[]): NumberFromChoice[] {
         });
       }
     }
+    const unit = source.name.toLowerCase().slice(0, UNIT_MAX);
     const count = { collectionId: source.id, field: null, how: 'count' as const };
-    choices.push({
-      value: numberFromValue(count),
-      label: `Number of ${source.name}`,
-      from: count,
-      unit: source.name.toLowerCase().slice(0, UNIT_MAX),
-    });
+    choices.push({ value: numberFromValue(count), label: `Number of ${source.name}`, from: count, unit });
+    for (const field of source.fields) {
+      if (field.removed || field.type !== 'choice') continue;
+      for (const option of field.options ?? []) {
+        const from = { collectionId: source.id, field: field.key, how: 'count' as const, value: option };
+        choices.push({
+          value: numberFromValue(from),
+          label: `Number of ${source.name} with ${field.label.toLowerCase()} ${option}`,
+          from,
+          unit,
+        });
+      }
+    }
   }
   return choices;
 }

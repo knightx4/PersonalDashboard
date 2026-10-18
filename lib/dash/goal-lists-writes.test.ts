@@ -190,6 +190,32 @@ describe('change_goal_list', () => {
     expect(await refused(data, { change: 'archive_row', goal_ref: GOAL, row: 'ikea' })).toMatch(/No row matches "ikea"/);
   });
 
+  it('picks a row and rules out the rest, giving the list a status field when it has none (plan #2330.5)', async () => {
+    const data = tables();
+    for (const name of ['HOMCOM', 'IKEA Bror', 'Wayfair']) await made(data, { change: 'add_row', goal_ref: GOAL, values: { name } });
+    const result = await made(data, { change: 'pick_row', goal_ref: GOAL, row: 'homcom' });
+    const list = data['goals.collections']!.find((c) => c.id === LIST)!;
+    expect((list.fields as { key: string; options?: string[] }[]).at(-1)).toMatchObject({ key: 'status', options: ['Picked', 'Ruled out'] });
+    expect(data['goals.records']!.map((r) => (r.data as Record<string, unknown>).status)).toEqual(['Picked', 'Ruled out', 'Ruled out']);
+    expect(result.summary).toBe('Dash marked "HOMCOM" as picked on the list "Pantries" and ruled out the other 2.');
+  });
+
+  it('rules out the rest when edit_row sets a status to picked', async () => {
+    const data = tables();
+    await made(data, {
+      change: 'add_fields',
+      goal_ref: GOAL,
+      fields: [{ key: 'status', label: 'Status', type: 'choice', options: ['Maybe', 'Picked', 'Dropped'] }],
+    });
+    await made(data, { change: 'add_row', goal_ref: GOAL, values: { name: 'HOMCOM', status: 'Maybe' } });
+    await made(data, { change: 'add_row', goal_ref: GOAL, values: { name: 'IKEA Bror', status: 'Maybe' } });
+    const result = await made(data, { change: 'edit_row', goal_ref: GOAL, row: 'ikea', values: { status: 'Picked' } });
+    expect(data['goals.records']!.map((r) => (r.data as Record<string, unknown>).status)).toEqual(['Dropped', 'Picked']);
+    expect(result.summary).toMatch(/and ruled out the other one\.$/);
+    const again = await made(data, { change: 'edit_row', goal_ref: GOAL, row: 'ikea', values: { status: 'Picked' } });
+    expect(again.summary).not.toMatch(/ruled out/);
+  });
+
   it('renames a list, adds fields to it and archives it', async () => {
     const data = tables();
     await made(data, {

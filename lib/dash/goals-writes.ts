@@ -1066,7 +1066,8 @@ async function changeGoalNumber(env: GoalsWriteEnv, args: Args): Promise<GoalsMa
   const same =
     (before.number_from_collection_id ?? null) === (from?.collectionId ?? null) &&
     (before.number_from_field ?? null) === (from?.field ?? null) &&
-    (before.number_from_how ?? null) === (from?.how ?? null);
+    (before.number_from_how ?? null) === (from?.how ?? null) &&
+    (before.number_from_value ?? null) === (from?.value ?? null);
   if (same) throw new GoalsRefused(choice ? `That goal's number is the ${choice.label.toLowerCase()} already.` : "That goal's number is typed in already.");
   if (!(await setNumberFrom(await env.write({}), id, from, choice?.unit ?? null))) {
     throw new GoalsRefused('That goal has just changed.');
@@ -1138,6 +1139,18 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
   const goal = await ownGoal(env, text(args, 'goal_ref'));
   const goalId = goal.id as string;
   const title = named(goal.title, 'the goal');
+  // A step of the goal's can hold the row instead, so buying a product
+  // linked to "Get a pantry" closes that step (plan #2330.5).
+  const stepRef = text(args, 'step_ref');
+  const step = stepRef ? await ownStep(env, stepRef, 'step_ref') : null;
+  if (step) {
+    if (step.archived_at != null) throw new GoalsRefused('That step is archived. Restore it first.');
+    if ((await goalAbove(env, step)).id !== goalId) throw new GoalsRefused('That step is not under that goal.');
+  }
+  const itemId = step ? (step.id as string) : goalId;
+  const holder = step ? `the step "${named(step.title, 'the step')}"` : `the goal "${title}"`;
+  const holderShort = step ? named(step.title, 'the step') : title;
+  const holderNoun = step ? 'That step' : 'That goal';
   const target = await findListedRow(env, kind, text(args, 'target'));
   const noun = LISTED[kind].noun;
   const what = `the ${noun} "${target.name}"`;
@@ -1147,7 +1160,7 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
       .from('links')
       .select('*')
       .eq('user_id', env.userId)
-      .eq('item_id', goalId)
+      .eq('item_id', itemId)
       .eq('kind', kind)
       .eq('target_id', target.id)
       .maybeSingle();
@@ -1165,10 +1178,10 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
     const was = live ? listNameOf({ kind, listName: (before.list_name as string | null) ?? null }) : null;
     const into = listNameOf({ kind, listName: asked === undefined ? ((before?.list_name as string | null) ?? null) : asked });
     if (live && (asked === undefined || was?.toLowerCase() === into.toLowerCase())) {
-      throw new GoalsRefused(`That goal lists ${what} in "${was}" already.`);
+      throw new GoalsRefused(`${holderNoun} lists ${what} in "${was}" already.`);
     }
-    const linked = await linkTarget(await env.write({}), env.userId, goalId, kind, target.id, asked);
-    if (!linked) throw new GoalsRefused(`That goal could not list ${what}.`);
+    const linked = await linkTarget(await env.write({}), env.userId, itemId, kind, target.id, asked);
+    if (!linked) throw new GoalsRefused(`${holderNoun} could not list ${what}.`);
     const after = await readLink();
     if (!after) throw new Error('The link was written but could not be read back.');
     const moved = live;
@@ -1177,7 +1190,7 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
       input: {
         verb: moved ? 'Moved' : 'Listed',
         what: target.name,
-        rest: ` in "${into}" on ${title}`,
+        rest: ` in "${into}" on ${holderShort}`,
         href: goalHref(goalId),
         where: 'Open the goal',
         paths: [...GOAL_PATHS, goalHref(goalId)],
@@ -1188,13 +1201,13 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
       after,
       undo: null,
       summary: moved
-        ? `Dash moved ${what} to the list "${into}" on the goal "${title}".`
-        : `Dash listed ${what} in "${into}" on the goal "${title}".`,
+        ? `Dash moved ${what} to the list "${into}" on ${holder}.`
+        : `Dash listed ${what} in "${into}" on ${holder}.`,
       row: { table: ITEM, ref: goalId, title, href: goalHref(goalId) },
     };
   }
 
-  if (!live) throw new GoalsRefused(`That goal does not list ${what}.`);
+  if (!live) throw new GoalsRefused(`${holderNoun} does not list ${what}.`);
   if (!(await unlinkTarget(await env.write({}), before.id as string))) throw new GoalsRefused('That link has already gone.');
   const after = await readLink();
   if (!after) throw new Error('The link was written but could not be read back.');
@@ -1204,7 +1217,7 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
     input: {
       verb: 'Took',
       what: target.name,
-      rest: ` off "${from}" on ${title}`,
+      rest: ` off "${from}" on ${holderShort}`,
       href: goalHref(goalId),
       where: 'Open the goal',
       paths: [...GOAL_PATHS, goalHref(goalId)],
@@ -1214,7 +1227,7 @@ async function changeGoalRow(env: GoalsWriteEnv, args: Args, change: 'link_row' 
     before,
     after,
     undo: null,
-    summary: `Dash took ${what} off the list "${from}" on the goal "${title}".`,
+    summary: `Dash took ${what} off the list "${from}" on ${holder}.`,
     row: { table: ITEM, ref: goalId, title, href: goalHref(goalId) },
   };
 }
@@ -1754,7 +1767,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_number',
     description:
-      "Change how one of the person's goals is measured, when they ask: set the unit and the target it aims for (change measure, with unit and target; an empty unit stops measuring it by a number), or work its number out from a collection serving it, or go back to readings typed in (number_from, with from naming the choice, such as \"Total balance of Loans\"; empty for typed readings). Name the goal by the goals.items ref a lookup returned. A wrong from is refused with the choices the goal has.",
+      "Change how one of the person's goals is measured, when they ask: set the unit and the target it aims for (change measure, with unit and target; an empty unit stops measuring it by a number), or work its number out from a collection serving it, or go back to readings typed in (number_from, with from naming the choice, such as \"Total balance of Loans\", or \"Number of Events with status Went\" to count only the rows of a list holding one option; empty for typed readings). Name the goal by the goals.items ref a lookup returned. A wrong from is refused with the choices the goal has.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1772,7 +1785,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_link',
     description:
-      "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Or list one of their readings, calendar events, saved products or contacts on the goal, or take it off (link_row or unlink_row, with kind and target, and list for the list's name, such as \"Pantries to compare\"; a row already listed moves to the list named). Name the goal by the goals.items ref a lookup returned, the Learn goal by its name as they have it, and the row by its ref or its name. The goal points at the row rather than copying it, and nothing in Learn, Todo, Shopping or the job search is changed.",
+      "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Or list one of their readings, calendar events, saved products or contacts on the goal, or take it off (link_row or unlink_row, with kind and target, and list for the list's name, such as \"Pantries to compare\"; a row already listed moves to the list named). Give step_ref to list the row on one of the goal's steps instead: a saved product listed on a step closes that step when it is bought. Name the goal by the goals.items ref a lookup returned, the Learn goal by its name as they have it, and the row by its ref or its name. The goal points at the row rather than copying it, and nothing in Learn, Todo, Shopping or the job search is changed.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1785,6 +1798,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
           description: 'For link_row and unlink_row: a reading (learn.readings), event (todo.events), saved_item (saved_items) or contact (job_search.contacts).',
         },
         target: { type: 'string', description: 'For link_row and unlink_row: the row, by the ref a lookup returned or its name.' },
+        step_ref: {
+          type: 'string',
+          description: "For link_row and unlink_row: a step under the goal, by its goals.items ref, to list the row on that step rather than on the goal. A saved product listed on a step closes the step when it is bought.",
+        },
         list: {
           type: 'string',
           description: `For link_row: the list on the goal it goes in. Leave out for the kind's own list (${LISTED_KINDS.map((k) => `"${DEFAULT_LIST_NAMES[k]}"`).join(', ')}), or to keep the list it is in.`,

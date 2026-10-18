@@ -4,10 +4,12 @@ import { fieldsError, type CollectionField, type RecordValues } from '@/lib/goal
 import {
   addRecord,
   reviseFields,
+  updateRecord,
   type CollectionRecord,
   type WriteResult,
 } from '@/lib/goals/collections-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { isPickedWord, pickPlan, statusFieldOf } from '@/lib/goals/goal-lists';
 import {
   DEFAULT_LIST_FIELDS,
   LISTS_PER_GOAL_MAX,
@@ -277,4 +279,73 @@ export async function addListRowFromLink(
   );
   if (!added.ok) return added;
   return { ok: true, value: { recordId: added.value, missing, addedFields } };
+}
+
+/** What picking a row did: the rows it ruled out, by id, and whether the list gained a status field or option. */
+export type Picked = { ruledOut: string[]; fieldsChanged: boolean };
+
+/** The live rows of one list, in order. */
+async function listRows(client: GoalsSupabaseClient, userId: string, listId: string): Promise<CollectionRecord[]> {
+  const { data, error } = await client
+    .from('records')
+    .select(RECORD_COLUMNS)
+    .eq('user_id', userId)
+    .eq('collection_id', listId)
+    .is('archived_at', null)
+    .order('position')
+    .order('created_at');
+  if (error) throw new Error(`Could not read the list's rows: ${error.message}`);
+  return ((data ?? []) as RecordRow[]).map(toRow);
+}
+
+/**
+ * Pick one row of a list (plan #2330.5): its status becomes the list's picked
+ * option and every other live row's becomes the ruled-out option, so the
+ * panel folds them under "Ruled out". The rules, and the status field a list
+ * gains when it has none, are pickPlan's in lib/goals/goal-lists.ts.
+ */
+export async function pickListRow(
+  client: GoalsSupabaseClient,
+  userId: string,
+  listId: string,
+  recordId: string,
+): Promise<WriteResult<Picked>> {
+  const list = await loadGoalList(client, userId, listId);
+  if (!list) return { ok: false, field: null, error: 'That list is gone.' };
+  const rows = await listRows(client, userId, listId);
+  if (!rows.some((r) => r.id === recordId)) return { ok: false, field: null, error: 'That row is gone.' };
+
+  const plan = pickPlan(list.fields, rows, recordId);
+  if (plan.fieldsChanged) {
+    const revised = await reviseFields(client, listId, plan.fields);
+    if (!revised.ok) return revised;
+  }
+  const done = await updateRecord(client, recordId, { [plan.statusKey]: plan.picked });
+  if (!done.ok) return done;
+  for (const id of plan.others) {
+    const out = await updateRecord(client, id, { [plan.statusKey]: plan.ruledOut });
+    if (!out.ok) return out;
+  }
+  return { ok: true, value: { ruledOut: plan.others, fieldsChanged: plan.fieldsChanged } };
+}
+
+/**
+ * After a row's values changed: when its status moved to a picked option,
+ * rule out the rest, as pickListRow does. Nothing happens otherwise, and the
+ * result is then an empty list.
+ */
+export async function ruleOutAfterEdit(
+  client: GoalsSupabaseClient,
+  userId: string,
+  listId: string,
+  before: Pick<CollectionRecord, 'id' | 'data'>,
+  after: Pick<CollectionRecord, 'id' | 'data'>,
+): Promise<WriteResult<Picked>> {
+  const list = await loadGoalList(client, userId, listId);
+  if (!list) return { ok: true, value: { ruledOut: [], fieldsChanged: false } };
+  const status = statusFieldOf(list.fields);
+  if (!status || !isPickedWord(after.data[status.key]) || isPickedWord(before.data[status.key])) {
+    return { ok: true, value: { ruledOut: [], fieldsChanged: false } };
+  }
+  return pickListRow(client, userId, listId, after.id);
 }

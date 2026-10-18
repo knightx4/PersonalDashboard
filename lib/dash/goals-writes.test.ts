@@ -504,6 +504,27 @@ describe('the Goals writes', () => {
         expect(row(data, 'public.saved_items', PANTRY)).toEqual({ id: PANTRY, user_id: ME, title: 'HOMCOM 72 inch pantry' });
       });
 
+      it('lists a saved product on a step of the goal, so buying it closes the step (plan #2330.5)', async () => {
+        const data = listTables();
+        const listed = await made('change_goal_link', data, {
+          change: 'link_row',
+          goal_ref: GOAL,
+          step_ref: STEP,
+          kind: 'saved_item',
+          target: PANTRY,
+        });
+        expect(listed.after).toMatchObject({ item_id: STEP, kind: 'saved_item', target_id: PANTRY });
+        expect(listed.summary).toBe('Dash listed the saved product "HOMCOM 72 inch pantry" in "Products" on the step "Buy shoes".');
+        expect(
+          await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL_2, step_ref: STEP, kind: 'saved_item', target: PANTRY }),
+        ).toBe('That step is not under that goal.');
+        expect(
+          await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, step_ref: STEP, kind: 'saved_item', target: PANTRY }),
+        ).toBe('That step lists the saved product "HOMCOM 72 inch pantry" in "Products" already.');
+        const off = await made('change_goal_link', data, { change: 'unlink_row', goal_ref: GOAL, step_ref: STEP, kind: 'saved_item', target: PANTRY });
+        expect(off.summary).toBe('Dash took the saved product "HOMCOM 72 inch pantry" off the list "Products" on the step "Buy shoes".');
+      });
+
       it("refuses another account's row, a name that matches two, and a ref of another table", async () => {
         const data = listTables();
         expect(await refused('change_goal_link', data, { change: 'link_row', goal_ref: GOAL, kind: 'reading', target: THEIR_READING })).toBe(

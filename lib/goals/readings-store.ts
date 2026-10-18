@@ -129,7 +129,7 @@ export async function loadNumberFrom(
 ): Promise<NumberFrom | null> {
   const { data, error } = await client
     .from('items')
-    .select('number_from_collection_id, number_from_field, number_from_how')
+    .select('number_from_collection_id, number_from_field, number_from_how, number_from_value')
     .eq('id', goalId)
     .maybeSingle();
   if (error) throw new Error(`Could not read where the number comes from: ${error.message}`);
@@ -137,12 +137,14 @@ export async function loadNumberFrom(
     number_from_collection_id: string | null;
     number_from_field: string | null;
     number_from_how: NumberFromHow | null;
+    number_from_value: string | null;
   } | null;
   if (!row?.number_from_collection_id || !row.number_from_how) return null;
   return {
     collectionId: row.number_from_collection_id,
     field: row.number_from_field,
     how: row.number_from_how,
+    value: row.number_from_value,
   };
 }
 
@@ -174,6 +176,7 @@ export async function setNumberFrom(
       number_from_collection_id: from?.collectionId ?? null,
       number_from_field: from?.field ?? null,
       number_from_how: from?.how ?? null,
+      number_from_value: from?.value ?? null,
       ...(from && !(goal as { unit: string | null }).unit && unit ? { unit } : {}),
     })
     .eq('id', goalId);

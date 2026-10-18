@@ -9,7 +9,9 @@ import {
   addListRowFromLink,
   archiveGoalList,
   createGoalList,
+  pickListRow,
   renameGoalList,
+  ruleOutAfterEdit,
 } from '@/lib/goals/lists-store';
 import { scrapeProductUrl } from '@/lib/saved/scrape-product';
 import { GoalsRefused } from './goals-refused';
@@ -28,7 +30,10 @@ import type { GoalsMade, GoalsWrite, GoalsWriteEnv } from './goals-writes';
  *   add_row       a row from values they gave
  *   add_link      a row from a pasted product link: the page's name, picture
  *                 and price, as a draft for them to confirm
- *   edit_row      some of a row's values changed
+ *   edit_row      some of a row's values changed; setting its status to
+ *                 a picked option rules out the rest, as pick_row does
+ *   pick_row      the row they chose: it is marked picked and every other
+ *                 row ruled out (plan #2330.5)
  *   confirm_row   a draft kept as a row
  *   archive_row   a row put away, and restore_row to bring it back
  *
@@ -45,6 +50,7 @@ const CHANGES = [
   'add_row',
   'add_link',
   'edit_row',
+  'pick_row',
   'confirm_row',
   'archive_row',
   'restore_row',
@@ -157,6 +163,12 @@ async function findRow(env: GoalsWriteEnv, list: Row, wanted: string, archived: 
       ? `More than one row matches "${wanted}": ${list10}. Say which.`
       : `No ${archived ? 'archived ' : ''}row matches "${wanted}". The rows are ${list10}.`,
   );
+}
+
+/** The rows ruled out, said: "the other one", "the other 3", or empty for none. */
+export function ruledOutWords(n: number): string {
+  if (n === 0) return '';
+  return n === 1 ? 'the other one' : `the other ${n}`;
 }
 
 /** Values keyed by field key, from values the model keyed by key or by label. */
@@ -323,15 +335,32 @@ async function changeGoalList(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'edit_row': {
       const before = await findRow(env, list, text(args, 'row'), false);
       const values = keyedValues(fields, args);
-      const result = await updateRecord(await env.write({}), before.id as string, values);
+      const client = await env.write({});
+      const result = await updateRecord(client, before.id as string, values);
       if (!result.ok) throw new GoalsRefused(result.error);
+      const ruled = await ruleOutAfterEdit(client, env.userId, listId, { id: before.id as string, data: (before.data ?? {}) as never }, result.value);
+      if (!ruled.ok) throw new GoalsRefused(ruled.error);
       const after = await ownRow(env, 'records', before.id as string);
       const said = describeRow(fields, before.data);
+      const others = ruledOutWords(ruled.value.ruledOut.length);
       return made(RECORDS, before.id as string, 'update', before, after, {
         verb: 'Changed',
         what: said,
-        rest: ` on ${listName}`,
-        summary: `Dash changed the row "${said}" on the list "${listName}".`,
+        rest: ` on ${listName}${others ? `, and ruled out ${others}` : ''}`,
+        summary: `Dash changed the row "${said}" on the list "${listName}"${others ? ` and ruled out ${others}` : ''}.`,
+      });
+    }
+    case 'pick_row': {
+      const before = await findRow(env, list, text(args, 'row'), false);
+      const result = await pickListRow(await env.write({}), env.userId, listId, before.id as string);
+      if (!result.ok) throw new GoalsRefused(result.error);
+      const said = describeRow(fields, before.data);
+      const others = ruledOutWords(result.value.ruledOut.length);
+      return made(RECORDS, before.id as string, 'update', before, await ownRow(env, 'records', before.id as string), {
+        verb: 'Picked',
+        what: said,
+        rest: ` on ${listName}${others ? `, and ruled out ${others}` : ''}`,
+        summary: `Dash marked "${said}" as picked on the list "${listName}"${others ? ` and ruled out ${others}` : ''}.`,
       });
     }
     case 'confirm_row': {
@@ -370,7 +399,7 @@ async function changeGoalList(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
 export const CHANGE_GOAL_LIST: GoalsWrite = {
   name: 'change_goal_list',
   description:
-    "Change the lists one of the person's goals keeps of its own, for things with no other home in the app such as pantries to compare or volunteer groups to try, when they ask: start a list (change add_list, with name and optionally fields), rename it (rename_list, with name), add fields to it (add_fields), archive it (archive_list), add a row from values they give (add_row, with values keyed by field key or label), add a row from a product link they paste, which reads the page's name, picture and price and adds it as a draft for them to confirm (add_link, with link), change a row's values (edit_row, with row and values), keep a draft as a row (confirm_row), or archive a row or bring one back (archive_row, restore_row). Name the goal by the goals.items ref a lookup returned, the list by its name, and a row by words from it. Readings, events, saved products and contacts the app already holds are linked with change_goal_link, not copied into a list.",
+    "Change the lists one of the person's goals keeps of its own, for things with no other home in the app such as pantries to compare or volunteer groups to try, when they ask: start a list (change add_list, with name and optionally fields), rename it (rename_list, with name), add fields to it (add_fields), archive it (archive_list), add a row from values they give (add_row, with values keyed by field key or label), add a row from a product link they paste, which reads the page's name, picture and price and adds it as a draft for them to confirm (add_link, with link), change a row's values (edit_row, with row and values), mark the row they chose as picked, which rules out every other row (pick_row, with row; setting a status to Picked with edit_row does the same), keep a draft as a row (confirm_row), or archive a row or bring one back (archive_row, restore_row). Name the goal by the goals.items ref a lookup returned, the list by its name, and a row by words from it. Readings, events, saved products and contacts the app already holds are linked with change_goal_link, not copied into a list.",
   input_schema: {
     type: 'object',
     properties: {
@@ -395,7 +424,7 @@ export const CHANGE_GOAL_LIST: GoalsWrite = {
       },
       values: { type: 'object', description: 'For add_row and edit_row: the values, keyed by field key or label.' },
       link: { type: 'string', description: 'For add_link: the product page address they pasted.' },
-      row: { type: 'string', description: 'For edit_row, confirm_row, archive_row and restore_row: words from the row, or its goals.records ref.' },
+      row: { type: 'string', description: 'For edit_row, pick_row, confirm_row, archive_row and restore_row: words from the row, or its goals.records ref.' },
     },
     required: ['change', 'goal_ref'],
     additionalProperties: false,

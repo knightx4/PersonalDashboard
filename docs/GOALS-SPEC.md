@@ -265,8 +265,9 @@ Claude also closes one of your steps when it sees the step happened (plan
 day has passed, a ticked Todo task, or an email from the other party
 confirming the exact thing. The morning run looks for this while reviewing
 each goal. The close sets `evidence`, one line naming what was seen and when,
-and `evidence_source` (`jobs`, `gmail`, `calendar` or `todo`) in the same
-write. It reads "Closed X: <what Dash saw>" on the run's page and the Goals
+and `evidence_source` (`jobs`, `gmail`, `calendar`, `todo`, or `shopping` for
+a linked saved product bought, which the database closes by itself, plan
+#2330.5) in the same write. It reads "Closed X: <what Dash saw>" on the run's page and the Goals
 home, and its Undo reopens the step and clears the note. The database refuses
 Claude closing one of your steps without evidence, or with a sub-step still
 open beneath it (`migrations-goals/0050`), and Claude never closes a rhythm.
@@ -1196,6 +1197,21 @@ writes a table or a migration.
   product or contact found by search. A goal with three lists or more also
   gives each list a tab after Steps (`?tab=list-<name>`). The rules are in
   `lib/goals/goal-lists.ts`.
+- **A list counts towards its goal and closes a step** (plan #2330.5). The
+  goal's number can count the rows of a list holding one option of a choice
+  field, such as the events whose status is Went
+  (`items.number_from_value`, with `number_from_how` = `count`); the reading
+  it writes says "From Events: count where status is Went". Picking a row of
+  an own list marks every other live row ruled out (`pickListRow` in
+  `lib/goals/lists-store.ts`): the list's status field takes its picked and
+  ruled-out options, and a list without them gains them, or gains a Status
+  field of Picked and Ruled out. Dash picks with `change_goal_list`
+  (`pick_row`), and an `edit_row` that sets a status to Picked does the same.
+  A step of yours that links a saved product closes when the product is
+  bought, marked purchased in Shopping or matched to an order line, with
+  "You bought <the product> in Shopping." as its evidence and `shopping` as
+  its source (`migrations-goals/0082`). A step with a sub-step still open
+  stays open.
 
 - **Worked-out answers.** A step exists to answer something, such as when
   the loan payments start or what they come to a month, and the fields are
