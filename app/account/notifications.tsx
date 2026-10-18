@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
+import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/field';
 import {
   readFinishNotice,
@@ -68,9 +69,9 @@ export function FinishNoticeRow({
   onChange?: (on: boolean) => void;
 }) {
   return (
-    <label className="row-pad flex items-start gap-3 border-t border-border">
+    <label className="row-pad flex items-start gap-3">
       <Switch
-        checked={enabled ?? true}
+        checked={enabled ?? false}
         disabled={busy || enabled === null}
         onChange={(event) => onChange?.(event.target.checked)}
         className="mt-0.5"
@@ -80,8 +81,9 @@ export function FinishNoticeRow({
           {busy ? 'Saving…' : 'Tell me when Dash has finished'}
         </span>
         <span className="block text-small leading-snug text-ink-muted">
-          One notification when Dash has no run going and has finished something, with the count of
-          your Dev inbox. Applies to every device you have turned notifications on for.
+          {enabled === null
+            ? 'Loading…'
+            : 'One notification when Dash has no run going and has finished something, with the count of your Dev inbox. Applies to every device you have turned notifications on for.'}
         </span>
       </span>
     </label>
@@ -173,11 +175,13 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
     setFinishEnabled(on);
     try {
       const saved = await saveFinishNotice(on);
-      if (!saved.ok) throw new Error(saved.error);
+      if (!saved.ok) throw new Error('save failed');
       setFinishEnabled(saved.enabled);
-    } catch (err) {
+    } catch {
       setFinishEnabled(before);
-      setError(err instanceof Error ? err.message : 'Could not save that. Try again.');
+      setError(
+        `Could not turn ${on ? 'on' : 'off'} “Tell me when Dash has finished”. It is still ${on ? 'off' : 'on'}. Try again.`,
+      );
     } finally {
       setFinishBusy(false);
     }
@@ -187,8 +191,8 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
     // Dash points at this tab when a watch would reach no phone (lib/watch/start.ts);
     // the id is where links written before Account had tabs still point.
     <section>
-      <h3 className="text-ui font-semibold text-ink">Morning brief</h3>
-      <div className="mt-4 border-y border-border">
+      <h3 className="text-ui font-semibold text-ink">Notifications</h3>
+      <Card className="mt-4 divide-y divide-border">
         {!publicKey ? (
           <p className="row-pad text-small text-ink-muted">
             Notifications are not set up on this server yet: the VAPID keys are missing from its
@@ -229,7 +233,7 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
             onChange={(on) => void toggleFinish(on)}
           />
         )}
-      </div>
+      </Card>
 
       {error && (
         <div className="mt-3">
