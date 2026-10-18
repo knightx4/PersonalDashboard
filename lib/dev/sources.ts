@@ -114,6 +114,7 @@ export const devSources: ModuleSources = {
     'public.dev_comments',
     'public.dev_comment_reads',
     'public.dev_digests',
+    'public.dash_finish_notifications',
     'public.feedback_items',
     'public.module_visions',
     'public.raised_items',
