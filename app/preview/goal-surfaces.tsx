@@ -1,6 +1,7 @@
 import { StepPage } from '@/app/goals/[goalId]/step-page';
 import { NotifySwitch } from '@/app/goals/[goalId]/notify-switch';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
+import { SetTab } from './set-tab';
 import { Card } from '@/components/ui/card';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
@@ -63,6 +64,7 @@ const steps: Step[] = [
     title: 'Get the rates lowered',
     detail: 'Call each lender and ask for a lower rate.',
     position: 20,
+    createdAt: '2026-09-02T09:00:00Z',
   }),
   step('script', 'rates', {
     title: 'Draft what to say on the call',
@@ -80,6 +82,7 @@ const steps: Step[] = [
     blockAsk: 'The account number from the last statement.',
     dueOn: '2026-10-03',
     position: 20,
+    createdAt: '2026-09-14T09:00:00Z',
   }),
   step('which', 'rates', {
     title: 'Which card goes first?',
@@ -295,6 +298,100 @@ export function GoalStepSurface() {
 /** A sub-step on its own page: Call the card company, under Get the rates lowered. */
 export function GoalSubStepSurface() {
   return <StepPage map={map} stepId="call" todoOn={false} />;
+}
+
+/**
+ * A step's page open on Activity, its comment counted on the tab's label
+ * (plans #2373.1 and #2373.2): Call the card company, with Dash's last run
+ * and the one comment in its thread.
+ */
+export function GoalStepCommentsSurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <StepPage map={map} stepId="call" todoOn={false} tab="activity" runs={CALL_RUN} history={CALL_HISTORY} />
+    </>
+  );
+}
+
+/** Dash's runs on Call the card company, as its Activity tab lists them (plan #2373.3). */
+const CALL_HISTORY = {
+  runs: [
+    {
+      id: 'run-call',
+      label: 'Sent a step',
+      meta: 'Finished · Sun 20 Sept, 8:00 AM · took 12 min',
+      failed: false,
+      text: 'Drafted what to say on the call and filed it as a note under the goal.',
+    },
+  ],
+  more: true,
+};
+
+/** Dash's last run on Call the card company, for its Activity tab (plan #2373.2). */
+const CALL_RUN = {
+  call: {
+    runId: 'run-call',
+    running: null,
+    error: null,
+    summary: 'Drafted what to say on the call and filed it as a note under the goal.',
+  },
+};
+
+/**
+ * A step's Sub-steps tab (plan #2373.2): Get the rates lowered's open
+ * sub-steps on the goal page's columns, the finished ones folded at the
+ * foot, then Add a sub-step.
+ */
+export function GoalStepSubstepsSurface() {
+  return (
+    <>
+      <SetTab tab="substeps" />
+      <StepPage map={map} stepId="rates" todoOn={false} tab="substeps" />
+    </>
+  );
+}
+
+/** A step with no sub-steps on its Sub-steps tab: the empty state that adds the first. */
+export function GoalStepSubstepsEmptySurface() {
+  return (
+    <>
+      <SetTab tab="substeps" />
+      <StepPage map={map} stepId="list" todoOn={false} tab="substeps" />
+    </>
+  );
+}
+
+/** A step's Activity tab with no run and no comment yet: List every balance. */
+export function GoalStepActivityEmptySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <StepPage map={map} stepId="list" todoOn={false} tab="activity" />
+    </>
+  );
+}
+
+/**
+ * A step that lacks most facts (plan #2373.1): List every balance, done, with
+ * no date, no sub-steps and nothing it waits on, so its properties say a dash.
+ */
+export function GoalStepEmptySurface() {
+  return <StepPage map={map} stepId="list" todoOn={false} />;
+}
+
+/**
+ * A step Dash proposed, on its own page (plan #2373.2): Overview carries
+ * Accept and Decline at the foot of its card.
+ */
+export function GoalStepProposedSurface() {
+  return (
+    <StepPage
+      map={goalMapWith({ rates: { status: 'proposed' } })}
+      stepId="rates"
+      todoOn={false}
+    />
+  );
 }
 
 /**

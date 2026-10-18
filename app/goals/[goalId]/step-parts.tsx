@@ -290,14 +290,28 @@ export function useDeclineProposal(node: { id: string; title: string }) {
  * Approve and Decline beside a proposal's Needs line (plan #960), the same
  * two moves its menu offers.
  */
-export function ProposalButtons({ node }: { node: StepNode }) {
+export function ProposalButtons({
+  node,
+  heading = false,
+}: {
+  node: StepNode;
+  /**
+   * On the title's line of the step's own page (plan #2373.2): no gap above,
+   * and on a phone Approve alone, since the status beside the title offers
+   * Decline too and two buttons there would squeeze the title.
+   */
+  heading?: boolean;
+}) {
   const [state, settle, settling] = useActionState(settleProposalAction, answerInitial);
   const [declining, startDecline] = useTransition();
   const decline = useDeclineProposal(node);
   const beneath = countProposed(node.children);
   const with_ = beneath > 0 ? `, with ${beneath} beneath` : '';
   return (
-    <form action={settle} className="mt-1.5 flex flex-wrap items-center gap-2">
+    <form
+      action={settle}
+      className={cn('flex flex-wrap items-center gap-2', heading ? 'flex-nowrap' : 'mt-1.5')}
+    >
       <input type="hidden" name="id" value={node.id} />
       <Button type="submit" size="sm" name="approve" value="1" pending={settling} disabled={declining}>
         Approve{with_}
@@ -309,6 +323,7 @@ export function ProposalButtons({ node }: { node: StepNode }) {
         disabled={settling}
         pending={declining}
         onClick={() => startDecline(decline)}
+        className={heading ? 'max-sm:hidden' : undefined}
       >
         <StatusGlyph glyph={LIFECYCLE_GLYPH.declined} />
         {LIFECYCLE_VERB.declined}
@@ -433,7 +448,7 @@ export function StepText({ node, field }: { node: StepNode; field: 'detail' | 'a
       value={(detail ? node.detail : node.acceptance) ?? ''}
       label={detail ? `What ${node.title} involves` : `When ${node.title} is done`}
       empty={detail ? 'Say what it involves' : 'Say when it is done'}
-      placeholder={detail ? 'What it involves' : 'Done when…'}
+      placeholder={detail ? 'What it involves' : 'What has to be true, such as every lender has answered'}
       onSave={(next) => saveStep(node.id, { [field]: next })}
     />
   );
