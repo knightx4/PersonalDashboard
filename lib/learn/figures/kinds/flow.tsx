@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
+import { pickDiagramForm } from '../questions/pick-diagram';
 import {
   Arrow,
   type Box,
@@ -221,6 +222,47 @@ export const flowKind: FigureKind<FlowSpec> = {
       ],
     },
   },
+  questions: [
+    pickDiagramForm(flowSpec, {
+      prompt: 'Which flow shows how a new rail line raises the price of land near its stations?',
+      wrong: [
+        {
+          steps: [
+            { id: 'line', label: 'A rail line opens' },
+            { id: 'bids', label: 'Households bid more for land nearby' },
+            { id: 'commute', label: 'Commutes from nearby get shorter' },
+            { id: 'owners', label: 'Landowners gain' },
+            { id: 'renters', label: 'Renters there pay more' },
+            { id: 'dense', label: 'Builders put up taller buildings' },
+          ],
+          links: [
+            { from: 'line', to: 'bids' },
+            { from: 'bids', to: 'commute' },
+            { from: 'commute', to: 'owners' },
+            { from: 'commute', to: 'renters' },
+            { from: 'commute', to: 'dense' },
+          ],
+        },
+        {
+          steps: [
+            { id: 'line', label: 'A rail line opens' },
+            { id: 'commute', label: 'Commutes from nearby get shorter' },
+            { id: 'dense', label: 'Builders put up taller buildings' },
+            { id: 'bids', label: 'Households bid more for land nearby' },
+            { id: 'owners', label: 'Landowners gain' },
+            { id: 'renters', label: 'Renters there pay more' },
+          ],
+          links: [
+            { from: 'line', to: 'commute' },
+            { from: 'commute', to: 'dense' },
+            { from: 'dense', to: 'bids' },
+            { from: 'bids', to: 'owners' },
+            { from: 'bids', to: 'renters' },
+          ],
+        },
+      ],
+    }),
+  ],
   Render: ({ spec }) => {
     const columns = flowColumns(spec) ?? [spec.steps.map((step) => step.id)];
     return (

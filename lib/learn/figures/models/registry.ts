@@ -1,5 +1,7 @@
 import type { ExplorableModel } from './types';
 import { supplyDemandModel } from './supply-demand';
+import { bidRentModel } from './bid-rent';
+import { agglomerationModel } from './agglomeration';
 
 /**
  * Every explorable model a lesson can name (plan #2321.7), listed by field
@@ -9,6 +11,8 @@ import { supplyDemandModel } from './supply-demand';
 
 export const EXPLORABLE_MODELS: readonly ExplorableModel[] = [
   supplyDemandModel,
+  bidRentModel,
+  agglomerationModel,
 ];
 
 export function explorableModel(id: string): ExplorableModel | null {
@@ -27,9 +31,15 @@ export function explorableWriterList(): string {
     .map((field) => {
       const models = EXPLORABLE_MODELS.filter((model) => model.field === field).map((model) => {
         const params = model.params
-          .map((param) => `"${param.id}" from ${param.min} to ${param.max} in steps of ${param.step}, starting at ${param.start}`)
+          .map(
+            (param) =>
+              `"${param.id}" from ${param.min} to ${param.max} in steps of ${param.step}, starting at ${param.start}`,
+          )
           .join('; ');
-        return `"${model.id}", ${model.teaches} Parameters: ${params}.`;
+        const measures = model.measures
+          .map((measure) => `"${measure.id}" (${measure.label})`)
+          .join(', ');
+        return `"${model.id}", ${model.teaches} Parameters: ${params}. Measures: ${measures}.`;
       });
       return `${field}: ${models.join(' ')}`;
     })

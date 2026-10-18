@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
+import { pickDiagramForm } from '../questions/pick-diagram';
 import {
   type Box,
   DiagramSvg,
@@ -179,6 +180,29 @@ export const treeKind: FigureKind<TreeSpec> = {
       ],
     },
   },
+  questions: [
+    pickDiagramForm(treeSpec, {
+      prompt: 'Which tree shows how land is used in a city with one centre?',
+      wrong: [
+        {
+          root: 'Land in a one-centre city',
+          children: [
+            { label: 'Central business district', children: [{ label: 'Offices' }, { label: 'Flats near the centre' }] },
+            { label: 'Residential ring', children: [{ label: 'Shops' }, { label: 'Houses further out' }] },
+            { label: 'Farmland at the edge', children: [{ label: 'Crops and grazing' }] },
+          ],
+        },
+        {
+          root: 'Land in a one-centre city',
+          children: [
+            { label: 'Central business district', children: [{ label: 'Offices' }, { label: 'Shops' }] },
+            { label: 'Residential ring', children: [{ label: 'Flats near the centre' }, { label: 'Crops and grazing' }] },
+            { label: 'Farmland at the edge', children: [{ label: 'Houses further out' }] },
+          ],
+        },
+      ],
+    }),
+  ],
   Render: ({ spec }) => (
     <PhoneAndWide
       phone={<TreeSvg spec={spec} width={PHONE_WIDTH} />}

@@ -3,6 +3,7 @@ import type { FigureKind } from '../types';
 import { explorableModel, explorableModelIds, explorableWriterList } from '../models/registry';
 import { onScale, type ModelValues } from '../models/types';
 import { ExplorableView } from './explorable-view';
+import { predictMoveForm } from '../questions/predict-move';
 
 /**
  * An explorable model (plan #2321.7): a mechanism drawn with sliders the
@@ -18,6 +19,8 @@ const explorableSpec = z
   .object({
     model: z.enum(explorableModelIds()),
     start: z.record(z.string(), z.number()).default({}),
+    /** Drawn without its sliders, as a question asking what moving them would do shows it (plan #2321.8). */
+    still: z.boolean().optional(),
   })
   .superRefine((spec, context) => {
     const model = explorableModel(spec.model);
@@ -34,7 +37,7 @@ const explorableSpec = z
     }
   });
 
-export type ExplorableSpec = { model: string; start: ModelValues };
+export type ExplorableSpec = { model: string; start: ModelValues; still?: boolean };
 
 export const explorableKind: FigureKind<ExplorableSpec> = {
   id: 'explorable',
@@ -45,6 +48,7 @@ export const explorableKind: FigureKind<ExplorableSpec> = {
     caption: 'How a market finds its price: move either curve and read where buyers and sellers now meet.',
     spec: { model: 'supply_demand', start: {} },
   },
-  Render: ({ spec }) => <ExplorableView modelId={spec.model} start={spec.start} />,
+  Render: ({ spec }) => <ExplorableView modelId={spec.model} start={spec.start} still={spec.still ?? false} />,
+  questions: [predictMoveForm<ExplorableSpec>()],
   data: 'none',
 };

@@ -9720,4 +9720,36 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => <FigureQuestionPreview form="pick" />,
   },
+  {
+    /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */
+    id: 'learn-figure-explorable-bid-rent',
+    label: 'Plan · Bid-rent, a rail line opened',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="bid_rent" />,
+  },
+  {
+    /* The agglomeration model on a lesson on why density pays, congestion eased (plan #2321.8). */
+    id: 'learn-figure-explorable-agglomeration',
+    label: 'Plan · Agglomeration, congestion eased',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="agglomeration" />,
+  },
+  {
+    /* Which way the city's edge moves when a rail line opens: bid-rent drawn still. */
+    id: 'learn-cell-answer-figure-move-bid-rent',
+    label: 'Practice Flow · Which way it moves, bid-rent',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-bid-rent" />,
+  },
+  {
+    /* Which way a city's best size moves when congestion eases: agglomeration drawn still. */
+    id: 'learn-cell-answer-figure-move-agglomeration',
+    label: 'Practice Flow · Which way it moves, agglomeration',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-agglomeration" />,
+  },
 ];

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
+import { pickDiagramForm } from '../questions/pick-diagram';
 import { type Box, DiagramSvg, Head, Lines, Node, box, charsIn, label, wrap } from './diagram';
 
 /**
@@ -103,6 +104,33 @@ export const cycleKind: FigureKind<CycleSpec> = {
       centre: 'Agglomeration',
     },
   },
+  questions: [
+    pickDiagramForm(cycleSpec, {
+      prompt: 'Which cycle shows why firms keep clustering in a city that already has many of them?',
+      wrong: [
+        {
+          stages: [
+            'Firms cluster in the city',
+            'Workers and firms match better',
+            'A pool of skilled workers forms',
+            'Wages and output per worker rise',
+            'More firms and workers move in',
+          ],
+          centre: 'Agglomeration',
+        },
+        {
+          stages: [
+            'Firms cluster in the city',
+            'More firms and workers move in',
+            'Wages and output per worker rise',
+            'Workers and firms match better',
+            'A pool of skilled workers forms',
+          ],
+          centre: 'Agglomeration',
+        },
+      ],
+    }),
+  ],
   Render: ({ spec }) => <CycleSvg spec={spec} />,
   data: 'none',
 };

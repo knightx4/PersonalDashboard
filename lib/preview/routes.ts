@@ -624,6 +624,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-cell-answer-figure-fill-graded': ['/learn/now'],
   'learn-cell-answer-figure-predict': ['/learn/now'],
   'learn-cell-answer-figure-pick': ['/learn/now'],
+  'learn-figure-explorable-bid-rent': ['/learn/s/[id]/p/[piece]'],
+  'learn-figure-explorable-agglomeration': ['/learn/s/[id]/p/[piece]'],
+  'learn-cell-answer-figure-move-bid-rent': ['/learn/now'],
+  'learn-cell-answer-figure-move-agglomeration': ['/learn/now'],
 };
 
 /**

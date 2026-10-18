@@ -5,6 +5,7 @@ import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { HAIKU } from '@/lib/core/models';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { chartKind } from '@/lib/learn/figures/kinds/chart';
+import { explorableKind } from '@/lib/learn/figures/kinds/explorable';
 import { tableKind } from '@/lib/learn/figures/kinds/table';
 import { figureQuestionView, type FigureQuestionView, type StoredFigureQuestion } from '@/lib/learn/figures/question';
 import { pickDiagramForm } from '@/lib/learn/figures/questions/pick-diagram';
@@ -59,9 +60,30 @@ const pickView: FigureQuestionView = {
   })),
 };
 
+/* Which way a model's number moves (plan #2321.8): each urban model drawn still, with a change described. */
+const move = explorableKind.questions![0];
+const bidRentView = posedView(
+  { kind: 'explorable', form: move.id, caption: 'Rent against distance from the centre of a city with one centre.', spec: null },
+  move.pose({
+    spec: { model: 'bid_rent', start: {} },
+    resolved: undefined,
+    ask: { move: { rail: 15 }, measure: 'edge', change: 'A new rail line opens, running 15 km out from the centre.' },
+  })!,
+);
+const agglomerationView = posedView(
+  { kind: 'explorable', form: move.id, caption: 'Output per worker against the size of a city.', spec: null },
+  move.pose({
+    spec: { model: 'agglomeration', start: {} },
+    resolved: undefined,
+    ask: { move: { congestion: 3 }, measure: 'best_size', change: 'The city builds a metro, and each million more people now costs each worker less in crowding and commuting.' },
+  })!,
+);
+
 const base = { topicName: 'Price elasticity of demand', format: 'figure' as const };
 
-const ASKED: Record<'fill' | 'predict' | 'pick', AskedCellView> = {
+type Form = 'fill' | 'predict' | 'pick' | 'move-bid-rent' | 'move-agglomeration';
+
+const ASKED: Record<Form, AskedCellView> = {
   fill: { ...base, questionId: '00000000-0000-4000-8000-000000023215', level: 2, question: fillView.prompt, figure: fillView },
   predict: {
     questionId: '00000000-0000-4000-8000-000000023216',
@@ -72,6 +94,22 @@ const ASKED: Record<'fill' | 'predict' | 'pick', AskedCellView> = {
     figure: predictView,
   },
   pick: { ...base, questionId: '00000000-0000-4000-8000-000000023217', level: 2, question: pickView.prompt, figure: pickView },
+  'move-bid-rent': {
+    questionId: '00000000-0000-4000-8000-000000023218',
+    topicName: 'The shape of the city',
+    level: 3,
+    format: 'figure',
+    question: bidRentView.prompt,
+    figure: bidRentView,
+  },
+  'move-agglomeration': {
+    questionId: '00000000-0000-4000-8000-000000023219',
+    topicName: 'Why density pays',
+    level: 3,
+    format: 'figure',
+    question: agglomerationView.prompt,
+    figure: agglomerationView,
+  },
 };
 
 const missed: Moved = {
@@ -90,7 +128,7 @@ const missed: Moved = {
   doubted: [],
 };
 
-export function FigureQuestionPreview({ form, graded = false }: { form: 'fill' | 'predict' | 'pick'; graded?: boolean }) {
+export function FigureQuestionPreview({ form, graded = false }: { form: Form; graded?: boolean }) {
   const state: CellAnswerState = graded ? { moved: missed, error: null, response: '£360', answer: '£324' } : { moved: null, error: null };
   return (
     <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>

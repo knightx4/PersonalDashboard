@@ -981,6 +981,61 @@ export function LearnFigureSurface({
   );
 }
 
+type ExplorableLesson = {
+  conceptId: string;
+  name: string;
+  claim: string;
+  lesson: { takeaway: string; context: string; summary: string; example: string; question: string; answer: string };
+};
+
+const PRICE_FORMATION_LESSON: ExplorableLesson = {
+  conceptId: supplyDemand.id,
+  name: 'How a market price forms',
+  claim: supplyDemand.claim,
+  lesson: {
+    takeaway: 'A price settles where what buyers want to buy meets what sellers want to sell, and moves when either side changes.',
+    context: 'Every market price, from coffee beans to rents, is set this way when there are many buyers and sellers.',
+    summary:
+      'Demand falls as the price rises; supply rises with it. Where they cross, nobody is left wanting to buy or sell at that price. Shift either curve and the crossing moves, and the price with it.',
+    example: 'Frost in Brazil in 2021 cut the coffee harvest, and the world price of arabica roughly doubled within a year.',
+    question: 'A new study says coffee is good for you. Which curve moves, which way, and what happens to the price?',
+    answer: 'Demand moves right: buyers want more at every price. The crossing moves up and right, so the price rises and more coffee is sold.',
+  },
+};
+
+/** The lessons on cities the urban models are drawn on (plan #2321.8), by model id. */
+const EXPLORABLE_LESSONS: Record<string, ExplorableLesson> = {
+  bid_rent: {
+    conceptId: 'c0000000-0000-4000-8000-000000002318',
+    name: 'The shape of the city',
+    claim: 'Land near a city’s centre goes to whoever will pay most to be close, so rent falls with distance and the land changes use where one bidder’s rent overtakes another’s.',
+    lesson: {
+      takeaway: 'Rent falls with distance from the centre because every km further out costs more commuting, and land goes to whichever use bids most for it.',
+      context: 'It explains why city centres are offices and towers, suburbs are houses with gardens, and the edge is fields.',
+      summary:
+        'Firms pay most to be central, so they take the middle. Households pay less for land the longer the commute, so homes come next. Where homes bid less than a farmer would, the city ends. Cheaper commuting or higher incomes push that edge out.',
+      example:
+        'When the Elizabeth line opened in 2022, house prices near its new stations in east London and Berkshire rose faster than in the streets around them.',
+      question: 'Petrol prices double. What happens to rents near the centre and to the city’s edge?',
+      answer: 'Commuting gets dearer, so households bid more for land near the centre and less far out: central rents rise and the edge moves in.',
+    },
+  },
+  agglomeration: {
+    conceptId: 'c0000000-0000-4000-8000-000000002319',
+    name: 'Why density pays',
+    claim: 'Workers in bigger cities produce more each, because size lets firms share suppliers, match workers to jobs and learn from each other, until congestion costs more than size adds.',
+    lesson: {
+      takeaway: 'Big cities pay higher wages because crowding people together makes each of them more productive, up to the point where congestion eats the gain.',
+      context: 'It is why firms pay London rents and why the most productive industries cluster in a few places.',
+      summary:
+        'Sharing: a big city supports specialist suppliers and transport no small town could. Matching: more workers and firms means a better fit for each. Learning: ideas spread faster between people who meet. Each newcomer adds a little less than the last, while congestion keeps growing, so output per worker peaks at a size.',
+      example: 'Doubling a city’s size raises output per worker by somewhere between 3 and 8 per cent, by most estimates.',
+      question: 'A city builds a metro that halves journey times. What happens to the size at which it stops gaining from growth?',
+      answer: 'Congestion costs less for every million people, so the gains of size win for longer and the best size grows.',
+    },
+  },
+};
+
 /**
  * A lesson on how a market price forms, carrying an explorable model
  * (plan #2321.7). With no model named it draws the explorable kind's own
@@ -993,23 +1048,17 @@ export function LearnExplorableSurface({ model: id }: { model?: string }) {
     ? { kind: explorableKind.id, caption: model.example.caption, spec: { model: model.id, start: model.example.start } }
     : { kind: explorableKind.id, ...explorableKind.example };
   const idea = piecePage.ideas[0];
+  const text = (model && EXPLORABLE_LESSONS[model.id]) ?? PRICE_FORMATION_LESSON;
   const card = (
     <LessonCard
       idea={{
         ...idea,
-        conceptId: supplyDemand.id,
-        name: 'How a market price forms',
-        claim: supplyDemand.claim,
+        conceptId: text.conceptId,
+        name: text.name,
+        claim: text.claim,
         lesson: idea.lesson && {
           ...idea.lesson,
-          takeaway: 'A price settles where what buyers want to buy meets what sellers want to sell, and moves when either side changes.',
-          context: 'Every market price, from coffee beans to rents, is set this way when there are many buyers and sellers.',
-          summary:
-            'Demand falls as the price rises; supply rises with it. Where they cross, nobody is left wanting to buy or sell at that price. Shift either curve and the crossing moves, and the price with it.',
-          example:
-            'Frost in Brazil in 2021 cut the coffee harvest, and the world price of arabica roughly doubled within a year.',
-          question: 'A new study says coffee is good for you. Which curve moves, which way, and what happens to the price?',
-          answer: 'Demand moves right: buyers want more at every price. The crossing moves up and right, so the price rises and more coffee is sold.',
+          ...text.lesson,
           figures: [figure],
         },
       }}

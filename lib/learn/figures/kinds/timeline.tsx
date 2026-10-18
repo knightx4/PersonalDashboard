@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
+import { pickDiagramForm } from '../questions/pick-diagram';
 import { DiagramSvg, LINE, Lines, PHONE_WIDTH, PhoneAndWide, WIDE_WIDTH, LARGE_WIDTH, charsIn, label, wrap } from './diagram';
 
 /**
@@ -111,6 +112,31 @@ export const timelineKind: FigureKind<TimelineSpec> = {
       ],
     },
   },
+  questions: [
+    pickDiagramForm(timelineSpec, {
+      prompt: 'Which timeline puts the steps of America’s move to the suburbs in the right order?',
+      wrong: [
+        {
+          events: [
+            { date: '1908', label: 'The Model T puts a car within reach of many' },
+            { date: '1934', label: 'Federal insurance makes mortgages cheaper' },
+            { date: '1947', label: 'The Interstate highways are funded' },
+            { date: '1956', label: 'Building starts on Levittown, New York' },
+            { date: '1970', label: 'More Americans live in suburbs than cities' },
+          ],
+        },
+        {
+          events: [
+            { date: '1908', label: 'Federal insurance makes mortgages cheaper' },
+            { date: '1934', label: 'The Model T puts a car within reach of many' },
+            { date: '1947', label: 'Building starts on Levittown, New York' },
+            { date: '1956', label: 'The Interstate highways are funded' },
+            { date: '1970', label: 'More Americans live in suburbs than cities' },
+          ],
+        },
+      ],
+    }),
+  ],
   Render: ({ spec }) => <PhoneAndWide phone={<PhoneTimeline spec={spec} />} wide={<WideTimeline spec={spec} width={WIDE_WIDTH} />} large={<WideTimeline spec={spec} width={LARGE_WIDTH} />} />,
   data: 'none',
 };
