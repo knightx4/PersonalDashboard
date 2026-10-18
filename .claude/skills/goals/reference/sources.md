@@ -517,6 +517,14 @@ Every course on their academic transcripts: the school, code, title, term, credi
 - Opens at `/you/work#course-<id>`
 - transcript_id points at you.transcripts. year is the year of the term where the transcript gives one. grade is null for a course with no grade, such as transfer credit.
 
+### `you.course_files` (You)
+
+The files they kept from a course: its syllabus, lecture slides, lecture notes and readings, each marked with its week.
+
+- Search: `title`, `file_name`, `kind`
+- Name a row by `title`; link it by `id`
+- course_id points at you.courses. kind is syllabus, slides, lecture_notes or reading. week is the week of the course, or null for a file that spans it. The file is in the private you-course-files bucket at storage_path; a course holds at most 20.
+
 ### `you.transcripts` (You)
 
 The academic transcripts they have uploaded, one per school record, with the original file kept.
