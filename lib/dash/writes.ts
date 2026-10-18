@@ -104,6 +104,8 @@ import { POST_WRITE_TOOLS } from './post-writes';
  *                    (lib/dash/interview-writes.ts, plan #2044.1).
  *   rewrite_post     the text of a post draft on the Posts tab in Dev
  *                    rewritten (lib/dash/post-writes.ts, plan #2202.1).
+ *   suggest_post     a new post draft saved to the Posts tab, with an
+ *                    optional gallery picture (plan #2384.3).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
