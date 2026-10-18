@@ -21,7 +21,18 @@ import {
 import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/you/transcript-model';
 import { readTranscript, type DraftCourse } from '@/lib/you/transcript-read';
 import {
+  courseFileContentType,
+  courseFileTitle,
+  ownsCourseFilePath,
+  parseKind,
+  parseWeek,
+} from '@/lib/you/course-files';
+import {
+  COURSE_FILES_BUCKET,
+  COURSE_FILES_MAX,
+  COURSE_FILE_MAX_BYTES,
   deleteCourse,
+  deleteCourseFile,
   deleteTranscript,
   TRANSCRIPTS_BUCKET,
   type TranscriptStore,
@@ -306,4 +317,108 @@ export async function answerCourseExplainAction(
   if (!result.ok) return { error: result.error, response: parsed.data.response };
   revalidatePath(EDUCATION_HREF);
   return { results: result.results };
+}
+
+// ---------------------------------------------------------------------------
+// Files kept under a course (plan #2401.2)
+// ---------------------------------------------------------------------------
+
+export type AddCourseFileInput = {
+  courseId: string;
+  /** Where the browser put the file: courseFileStoragePath's answer. */
+  path: string;
+  fileName: string;
+  sizeBytes: number;
+  kind: string;
+  week: string;
+};
+
+export type AddCourseFileResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Keep the row for a file the browser has just put in the course's folder of
+ * the you-course-files bucket, as the transcript upload does. When the row
+ * cannot be written the stored file is removed, so nothing is left in the
+ * bucket that the page cannot show or delete.
+ */
+// latency: pending
+export async function addCourseFileAction(input: AddCourseFileInput): Promise<AddCourseFileResult> {
+  const user = await requireUser();
+  const courseId = id.safeParse(input.courseId);
+  const fileName = String(input.fileName ?? '').trim().slice(0, 255);
+  const path = String(input.path ?? '');
+  const mimeType = courseFileContentType(path);
+  const sizeBytes = Number(input.sizeBytes);
+  if (
+    !courseId.success ||
+    !ownsCourseFilePath(user.id, courseId.data, path) ||
+    !fileName ||
+    !mimeType ||
+    !Number.isInteger(sizeBytes) ||
+    sizeBytes < 0 ||
+    sizeBytes > COURSE_FILE_MAX_BYTES
+  ) {
+    return { ok: false, error: 'That upload could not be found. Add the file again.' };
+  }
+
+  const you = await createYouClient();
+  // A path a saved row already holds is that row's file, and is left alone.
+  const discard = async () => {
+    const { data } = await you.from('course_files').select('id').eq('storage_path', path).limit(1);
+    if (data && data.length > 0) return;
+    await you.storage.from(COURSE_FILES_BUCKET).remove([path]);
+  };
+
+  const kind = parseKind(input.kind);
+  const week = parseWeek(input.week);
+  if (!kind || !week.ok) {
+    await discard();
+    return { ok: false, error: !kind ? 'Say what kind of file this is.' : 'A week is a number from 0 to 60.' };
+  }
+
+  const { count } = await you
+    .from('course_files')
+    .select('id', { count: 'exact', head: true })
+    .eq('course_id', courseId.data)
+    .eq('user_id', user.id);
+
+  const { error } = await you.from('course_files').insert({
+    user_id: user.id,
+    course_id: courseId.data,
+    kind,
+    title: courseFileTitle(fileName),
+    week: week.week,
+    position: count ?? 0,
+    file_name: fileName,
+    storage_path: path,
+    mime_type: mimeType,
+    size_bytes: sizeBytes,
+  });
+  if (error) {
+    await discard();
+    if (error.message.includes('at most')) {
+      return { ok: false, error: `A course holds at most ${COURSE_FILES_MAX} files.` };
+    }
+    if (error.code === '23503') return { ok: false, error: 'That course could not be found.' };
+    return { ok: false, error: 'The file was not saved. Try again.' };
+  }
+
+  revalidatePath(EDUCATION_HREF);
+  return { ok: true };
+}
+
+/** Remove one file kept under a course, and its stored original. */
+// latency: pending
+export async function removeCourseFileAction(form: FormData): Promise<RemoveResult> {
+  const user = await requireUser();
+  const fileId = id.safeParse(form.get('id'));
+  if (!fileId.success) return { ok: false, error: 'That file could not be found.' };
+  const you = await createYouClient();
+  try {
+    await deleteCourseFile(you as unknown as TranscriptStore, user.id, fileId.data);
+  } catch {
+    return { ok: false, error: 'The file was not removed. Try again.' };
+  }
+  revalidatePath(EDUCATION_HREF);
+  return { ok: true };
 }

@@ -262,3 +262,20 @@ export async function deleteCourse(client: TranscriptStore, userId: string, cour
   await removeFiles(client, COURSE_FILES_BUCKET, filePaths, "the course's files");
   return true;
 }
+
+/**
+ * Delete one file kept under a course: the row, then the stored file, in the
+ * same order as deleteTranscript. Returns false when there was no such file
+ * of this account's (plan #2401.2).
+ */
+export async function deleteCourseFile(client: TranscriptStore, userId: string, fileId: string): Promise<boolean> {
+  const paths = await column(
+    client.from('course_files').delete().eq('id', fileId).eq('user_id', userId).select('storage_path'),
+    'storage_path',
+    'Deleting the file',
+  );
+  if (paths.length === 0) return false;
+
+  await removeFiles(client, COURSE_FILES_BUCKET, paths, 'the stored file');
+  return true;
+}

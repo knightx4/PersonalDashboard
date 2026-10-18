@@ -15,7 +15,8 @@ import {
   transcriptFileHref,
   type SchoolGroup,
 } from '@/lib/you/education';
-import type { Course, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, Transcript } from '@/lib/you/transcripts';
+import { courseFilesCount } from '@/lib/you/course-files';
 import {
   removeCourseAction,
   removeTranscriptAction,
@@ -25,6 +26,17 @@ import {
 import { whenDate } from '@/lib/core/when';
 import type { CourseExplain } from '@/lib/learn/evidence/course-explain';
 import { CourseExplainForm, CourseExplainLine } from './course-explain';
+import { CourseFiles, type ChosenFile } from './course-files';
+
+/** The gallery's way to draw one course with its files open, and which hidden part showing. */
+export type FilesOpen = {
+  courseId: string;
+  adding?: boolean;
+  chosen?: ChosenFile[];
+  uploading?: boolean;
+  showRemove?: string;
+  confirming?: string;
+};
 
 /**
  * One school's courses, term by term with the newest first, and the
@@ -36,6 +48,8 @@ export function SchoolCourses({
   courseCounts,
   explains = {},
   explaining,
+  files = {},
+  filesOpen,
 }: {
   group: SchoolGroup;
   /** How many courses each transcript holds, across every school. */
@@ -44,6 +58,9 @@ export function SchoolCourses({
   explains?: Record<string, CourseExplain>;
   /** The gallery's way to draw one course with its prompt open. */
   explaining?: string;
+  /** The files kept under each course, by course id (plan #2401.2). */
+  files?: Record<string, CourseFile[]>;
+  filesOpen?: FilesOpen;
 }) {
   const courses = group.terms.flatMap((term) => term.courses);
   const credits = courses.reduce((sum, course) => sum + (course.credits ?? 0), 0);
@@ -71,6 +88,8 @@ export function SchoolCourses({
                 course={course}
                 explain={explains[course.id]}
                 explaining={explaining === course.id}
+                files={files[course.id] ?? []}
+                filesOpen={filesOpen?.courseId === course.id ? filesOpen : undefined}
               />
             ))}
           </ul>
@@ -101,13 +120,21 @@ function CourseRow({
   course,
   explain,
   explaining = false,
+  files,
+  filesOpen,
 }: {
   course: Course;
   explain?: CourseExplain;
   explaining?: boolean;
+  files: CourseFile[];
+  filesOpen?: FilesOpen;
 }) {
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(explaining);
+  const [showFiles, setShowFiles] = useState(filesOpen !== undefined);
+  // Counts presses of the menu's Add files, so each one opens the drawer afresh.
+  const [addFiles, setAddFiles] = useState(filesOpen?.adding ? 1 : 0);
+  const filesId = `${courseAnchor(course.id)}-files`;
   if (editing) return <CourseEdit course={course} onClose={() => setEditing(false)} />;
 
   const credits = creditsLabel(course.credits);
@@ -116,10 +143,20 @@ function CourseRow({
     <li id={courseAnchor(course.id)} className="scroll-mt-bar py-2 target:bg-accent-tint">
       <div className="flex items-center gap-3">
         <span className="min-w-0 flex-1">
-          <span className="block text-body text-ink">
+          {/* The course opens to its files (plan #2401.2). */}
+          <button
+            type="button"
+            aria-expanded={showFiles}
+            aria-controls={filesId}
+            onClick={() => setShowFiles((shown) => !shown)}
+            className="block text-left text-body text-ink hover:text-accent"
+          >
             {course.code && <span className="mr-2 tabular-nums text-ink-muted">{course.code}</span>}
             {course.title}
-          </span>
+          </button>
+          {files.length > 0 && !showFiles && (
+            <span className="block text-small text-ink-muted">{courseFilesCount(files.length)}</span>
+          )}
           {explain && !prompt && (
             <CourseExplainLine explain={explain} onOpen={() => setOpen(true)} />
           )}
@@ -135,6 +172,14 @@ function CourseRow({
         <ActionMenu
           label={`Actions for ${course.title}`}
           items={[
+            {
+              id: 'files',
+              label: 'Add files',
+              onSelect: () => {
+                setShowFiles(true);
+                setAddFiles((n) => n + 1);
+              },
+            },
             { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
             {
               id: 'remove',
@@ -153,6 +198,21 @@ function CourseRow({
           question={prompt.question}
           onClose={() => setOpen(false)}
         />
+      )}
+      {showFiles && (
+        <div id={filesId}>
+          <CourseFiles
+            key={addFiles}
+            courseId={course.id}
+            courseTitle={course.title}
+            files={files}
+            adding={addFiles > 0}
+            chosen={filesOpen?.chosen}
+            uploading={filesOpen?.uploading}
+            showRemove={filesOpen?.showRemove}
+            confirming={filesOpen?.confirming}
+          />
+        </div>
       )}
     </li>
   );
