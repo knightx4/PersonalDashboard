@@ -257,6 +257,10 @@ export const SPEND_OPERATIONS = {
     // "Lay out the weeks" (plan #2401.6). One Haiku call reading the whole
     // syllabus.
     'read-syllabus-weeks',
+    // What a course was about and the ideas that recurred, pulled together
+    // from its file summaries on a press (plan #2401.7). One Haiku call
+    // reading the stored summaries and key points, not the files.
+    'collect-course-overview',
   ],
 } as const;
 

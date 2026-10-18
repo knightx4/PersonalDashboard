@@ -27,6 +27,9 @@ export const COURSE_FILE_OPERATION: YouOperation = 'summarise-course-file';
 /** The spend ledger's name for laying out a syllabus's weeks (plan #2401.6). */
 export const SYLLABUS_WEEKS_OPERATION: YouOperation = 'read-syllabus-weeks';
 
+/** The spend ledger's name for pulling a course together from its summaries (plan #2401.7). */
+export const COURSE_OVERVIEW_OPERATION: YouOperation = 'collect-course-overview';
+
 export type CourseFileModelOptions = {
   apiKey: string;
   /** Overridable for tests. */

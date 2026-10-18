@@ -41,6 +41,8 @@ import {
   type ReadSyllabusWeeksState,
   type SummariseCourseFileState,
 } from './actions';
+import { CourseOverviewBlock } from './course-overview';
+import type { CourseNote, CourseOverview } from '@/lib/you/course-overview';
 
 /**
  * The files kept under one course (plan #2401.2), each opening its
@@ -64,6 +66,11 @@ import {
  * empty one saying nothing is kept for it yet, and the add drawer offers the
  * weeks by name. A week's Edit changes its topic or removes it, and reading
  * the syllabus again leaves weeks changed that way as they were left.
+ *
+ * Above the files, a block says what the course was about and what came
+ * back across its files once Dash has pulled it together from two or more
+ * summaries, with the person's own notes that name the course under it
+ * (plan #2401.7, course-overview.tsx).
  */
 
 /** One chosen file in the add drawer, and where its upload has got to. */
@@ -88,6 +95,8 @@ export function CourseFiles({
   courseTitle,
   files,
   weeks = [],
+  overview = null,
+  notes = [],
   adding = false,
   chosen: initialChosen,
   uploading: initialUploading = false,
@@ -100,12 +109,19 @@ export function CourseFiles({
   editingWeek,
   weeksError,
   readingWeeks = false,
+  collecting = false,
+  overviewError,
+  overviewCostOpen = false,
 }: {
   courseId: string;
   courseTitle: string;
   files: CourseFile[];
   /** The weeks laid out from the syllabus, removed ones included (plan #2401.6). */
   weeks?: CourseWeek[];
+  /** What the course was about, as Dash pulled it together (plan #2401.7). */
+  overview?: CourseOverview | null;
+  /** The person's own notes that name the course. */
+  notes?: CourseNote[];
   /** Open with the add drawer showing. */
   adding?: boolean;
   /** The gallery's way to draw the drawer with files chosen. */
@@ -130,11 +146,16 @@ export function CourseFiles({
   weeksError?: string;
   /** The gallery's way to draw the syllabus mid-read for its weeks. */
   readingWeeks?: boolean;
+  /** The gallery's way to draw the course block mid-read. */
+  collecting?: boolean;
+  /** The gallery's way to draw a failed read for the course block. */
+  overviewError?: string;
+  /** The gallery's way to draw the course block's cost hint open. */
+  overviewCostOpen?: boolean;
 }) {
   const [open, setOpen] = useState(adding);
   const groups = groupCourseFiles(files, weeks);
   const slots = weeks.filter((week) => !week.removed_at);
-  const noneRead = files.length > 0 && files.every((file) => !file.summary);
 
   return (
     <div className="mt-2 border-l-2 border-border pl-3 sm:ml-1">
@@ -143,11 +164,15 @@ export function CourseFiles({
           No files yet. Add the syllabus, slides, lecture notes and readings you kept from this course.
         </p>
       )}
-      {noneRead && (
-        <p className="pb-1 text-small text-ink-muted">
-          Dash has not read any of these yet. Summarise a file and its summary and key points stay under it.
-        </p>
-      )}
+      <CourseOverviewBlock
+        courseId={courseId}
+        files={files}
+        overview={overview}
+        notes={notes}
+        collecting={collecting}
+        error={overviewError}
+        costOpen={overviewCostOpen}
+      />
       {groups.map((group) => (
         <section key={group.key} className="mt-2 first:mt-0" aria-label={group.label}>
           {group.slot ? (

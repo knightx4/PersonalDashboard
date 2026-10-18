@@ -25,8 +25,17 @@ import {
   askCourseFileModel,
   COURSE_FILE_MODEL,
   COURSE_FILE_OPERATION,
+  COURSE_OVERVIEW_OPERATION,
   SYLLABUS_WEEKS_OPERATION,
 } from '@/lib/you/course-file-model';
+import {
+  OVERVIEW_INSTRUCTION,
+  OVERVIEW_MIN_READ,
+  overviewNeed,
+  overviewTool,
+  readCourseOverview,
+  type OverviewRead,
+} from '@/lib/you/course-overview';
 import {
   mergeSyllabusWeeks,
   parseWeekTitle,
@@ -668,4 +677,89 @@ export async function removeCourseWeekAction(form: FormData): Promise<CourseWeek
   if (!data?.length) return { ok: false, error: 'That week could not be found.' };
   revalidatePath(EDUCATION_HREF);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// What a course was about, pulled together from its summaries (plan #2401.7)
+// ---------------------------------------------------------------------------
+
+export type CollectCourseOverviewState = { error?: string; collected?: boolean };
+
+/**
+ * Have Dash read the summaries and key points of a course's read files and
+ * keep what the course was about and the ideas that came back in more than
+ * one file, in you.course_overviews. It needs two read files, runs only on a
+ * press, as decision #2401.3 chose, and is paid for each time. The files are
+ * not read again. A second press replaces the overview; a read that fails
+ * keeps the earlier one and says why.
+ */
+// latency: pending
+export async function collectCourseOverviewAction(
+  _prev: CollectCourseOverviewState,
+  form: FormData,
+): Promise<CollectCourseOverviewState> {
+  const user = await requireUser();
+  const courseId = id.safeParse(form.get('courseId'));
+  if (!courseId.success) return { error: 'That course could not be found.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot read the course.' };
+
+  const you = await createYouClient();
+  const [{ data: course }, { data: fileRows }] = await Promise.all([
+    you.from('courses').select('id, title').eq('id', courseId.data).eq('user_id', user.id).maybeSingle(),
+    you
+      .from('course_files')
+      .select('id, kind, title, week, position, summary:course_file_summaries(summary, points, model, read_at)')
+      .eq('course_id', courseId.data)
+      .eq('user_id', user.id)
+      .order('position'),
+  ]);
+  const courseRow = course as { id: string; title: string } | null;
+  if (!courseRow) return { error: 'That course could not be found.' };
+  const files = ((fileRows ?? []) as Array<CourseFile & { summary: unknown }>).map((file) => ({
+    ...file,
+    summary: (Array.isArray(file.summary) ? file.summary[0] : file.summary) ?? null,
+  })) as CourseFile[];
+  if (overviewNeed(files) > 0) {
+    return { error: `Summarise at least ${OVERVIEW_MIN_READ} of the course's files first.` };
+  }
+
+  const spend = collectSpend();
+  let read: OverviewRead;
+  try {
+    read = await readCourseOverview({ courseTitle: courseRow.title, files }, (source, system) =>
+      askCourseFileModel({ apiKey, onSpend: spend.sink }, source, system, {
+        tool: overviewTool(),
+        instruction: OVERVIEW_INSTRUCTION,
+      }),
+    );
+  } catch {
+    read = { ok: false, error: 'The summaries could not be read. Try again.' };
+  }
+  await recordSpendReports(
+    await createCoreClient(),
+    user.id,
+    { module: 'you', operation: COURSE_OVERVIEW_OPERATION },
+    spend.reports,
+  );
+
+  if (!read.ok) return { error: read.error };
+
+  const { error } = await you.from('course_overviews').upsert(
+    {
+      course_id: courseRow.id,
+      user_id: user.id,
+      about: read.about,
+      recurring: read.recurring,
+      file_ids: read.fileIds,
+      model: COURSE_FILE_MODEL,
+      read_at: new Date().toISOString(),
+    },
+    { onConflict: 'course_id' },
+  );
+  if (error) return { error: 'What Dash wrote was not saved. Try again.' };
+
+  revalidatePath(EDUCATION_HREF);
+  return { collected: true };
 }

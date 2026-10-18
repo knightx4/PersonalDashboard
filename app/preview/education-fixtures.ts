@@ -4,6 +4,7 @@ import { groupCourses } from '@/lib/you/education';
 import type { ChosenFile } from '@/app/you/work/course-files';
 import type { Course, CourseFile, CourseFileKind, CourseWeek, Transcript } from '@/lib/you/transcripts';
 import { HAIKU } from '@/lib/core/models';
+import type { CourseNote, CourseOverview } from '@/lib/you/course-overview';
 
 /** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
 
@@ -245,6 +246,48 @@ export const educationWeeks: Record<string, CourseWeek[]> = {
     slot(5, 'Midterm', { removed_at: '2026-10-18T11:00:00Z' }),
     slot(6, null),
     slot(7, 'Market structures: perfect competition, monopoly, oligopoly and monopolistic competition'),
+  ],
+};
+
+/**
+ * What ECON 101 was about, as Dash pulled it together from its two read
+ * files (plan #2401.7): a paragraph and three ideas that came back, the last
+ * the longest.
+ */
+export const educationOverviews: Record<string, CourseOverview> = {
+  c3: {
+    about:
+      'An introduction to how people and markets decide what to make and who gets it when there is not enough of everything. It starts from scarcity and the cost of each choice, then builds the supply and demand model and uses it to explain how prices form and why they move.',
+    recurring: [
+      { idea: 'Every choice has a cost: the best alternative given up.', file_ids: ['f2', 'f6'] },
+      { idea: 'People respond to incentives, so a change in a price changes what they do.', file_ids: ['f2', 'f6'] },
+      {
+        idea: 'A market price is set by no one in particular; it settles where what buyers want meets what sellers offer, and moves when anything behind either side changes.',
+        file_ids: ['f2', 'f6'],
+      },
+    ],
+    file_ids: ['f2', 'f6'],
+    model: HAIKU,
+    read_at: '2026-10-18T11:30:00Z',
+  },
+};
+
+/** The person's own vault notes that name ECON 101, the second with a long title. */
+export const educationNotes: Record<string, CourseNote[]> = {
+  c3: [
+    {
+      id: 'n1',
+      path: 'School/ECON 101 - Principles of Economics.md',
+      title: 'ECON 101 - Principles of Economics',
+      excerpt: 'Took ECON 101 with Professor Dittmar in winter 2018. The supply and demand week finally made the housing market make sense to me…',
+    },
+    {
+      id: 'n2',
+      path: 'Journal/2018-02-14 Why I keep thinking about opportunity cost when choosing what to read next.md',
+      title: 'Why I keep thinking about opportunity cost when choosing what to read next',
+      excerpt: '…the idea from ECON 101 that the real cost is the next best thing you give up has stuck with me longer than anything else from that year…',
+    },
+    { id: 'n3', path: 'School/Winter 2018 courses.md', title: 'Winter 2018 courses', excerpt: '…ECON101, STATS 250, ENGLISH 125…' },
   ],
 };
 

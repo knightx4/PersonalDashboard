@@ -44,6 +44,10 @@ export const youActions: ModuleActions = {
       'spends',
       "Has Dash read a course's syllabus and lay out its weeks, paid for on each press, which the person decided to make only by pressing (plan #2401.3).",
     ),
+    collectCourseOverviewAction: none(
+      'spends',
+      "Has Dash read a course's file summaries and say what the course was about and which ideas recurred, paid for on each press, which the person decided to make only by pressing (plan #2401.3).",
+    ),
     renameCourseWeekAction: none(
       'theirs',
       'Corrects the topic Dash read for a week; the person\'s correction is what a later read keeps, so it is theirs to make.',

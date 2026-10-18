@@ -145,6 +145,11 @@ export const youSources: ModuleSources = {
   ],
   notSources: [
     {
+      table: 'you.course_overviews',
+      reason:
+        "Dash's account of what a course was about and which ideas recurred, made on a press from the file summaries; what the person kept is the files in you.course_files.",
+    },
+    {
       table: 'you.course_file_summaries',
       reason:
         "Dash's summary and key points of a course file, made on a press of Summarise; what the person kept is the file in you.course_files.",

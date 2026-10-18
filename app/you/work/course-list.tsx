@@ -16,6 +16,7 @@ import {
   type SchoolGroup,
 } from '@/lib/you/education';
 import type { Course, CourseFile, CourseWeek, Transcript } from '@/lib/you/transcripts';
+import type { CourseNote, CourseOverview } from '@/lib/you/course-overview';
 import { courseFilesCount } from '@/lib/you/course-files';
 import {
   removeCourseAction,
@@ -46,6 +47,12 @@ export type FilesOpen = {
   weeksError?: string;
   /** The syllabus mid-read for its weeks. */
   readingWeeks?: boolean;
+  /** The course block mid-read (plan #2401.7). */
+  collecting?: boolean;
+  /** A failed read for the course block. */
+  overviewError?: string;
+  /** The course block's cost hint open, as hover shows it. */
+  overviewCostOpen?: boolean;
 };
 
 /**
@@ -60,6 +67,8 @@ export function SchoolCourses({
   explaining,
   files = {},
   weeks = {},
+  overviews = {},
+  notes = {},
   filesOpen,
 }: {
   group: SchoolGroup;
@@ -73,6 +82,10 @@ export function SchoolCourses({
   files?: Record<string, CourseFile[]>;
   /** The weeks laid out from each course's syllabus, by course id (plan #2401.6). */
   weeks?: Record<string, CourseWeek[]>;
+  /** What each course was about, by course id (plan #2401.7). */
+  overviews?: Record<string, CourseOverview>;
+  /** The person's own notes naming each course, by course id (plan #2401.7). */
+  notes?: Record<string, CourseNote[]>;
   filesOpen?: FilesOpen;
 }) {
   const courses = group.terms.flatMap((term) => term.courses);
@@ -103,6 +116,8 @@ export function SchoolCourses({
                 explaining={explaining === course.id}
                 files={files[course.id] ?? []}
                 weeks={weeks[course.id] ?? []}
+                overview={overviews[course.id] ?? null}
+                notes={notes[course.id] ?? []}
                 filesOpen={filesOpen?.courseId === course.id ? filesOpen : undefined}
               />
             ))}
@@ -136,6 +151,8 @@ function CourseRow({
   explaining = false,
   files,
   weeks,
+  overview,
+  notes,
   filesOpen,
 }: {
   course: Course;
@@ -143,6 +160,8 @@ function CourseRow({
   explaining?: boolean;
   files: CourseFile[];
   weeks: CourseWeek[];
+  overview: CourseOverview | null;
+  notes: CourseNote[];
   filesOpen?: FilesOpen;
 }) {
   const [editing, setEditing] = useState(false);
@@ -223,6 +242,8 @@ function CourseRow({
             courseTitle={course.title}
             files={files}
             weeks={weeks}
+            overview={overview}
+            notes={notes}
             adding={addFiles > 0}
             chosen={filesOpen?.chosen}
             uploading={filesOpen?.uploading}
@@ -235,6 +256,9 @@ function CourseRow({
             editingWeek={filesOpen?.editingWeek}
             weeksError={filesOpen?.weeksError}
             readingWeeks={filesOpen?.readingWeeks}
+            collecting={filesOpen?.collecting}
+            overviewError={filesOpen?.overviewError}
+            overviewCostOpen={filesOpen?.overviewCostOpen}
           />
         </div>
       )}

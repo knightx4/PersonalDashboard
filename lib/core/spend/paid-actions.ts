@@ -189,6 +189,8 @@ export const PAID_ACTIONS = {
   'app/you/work/actions.ts#summariseCourseFileAction': ['summarise-course-file'],
   // Lay out the weeks from a course's syllabus (plan #2401.6)
   'app/you/work/actions.ts#readSyllabusWeeksAction': ['read-syllabus-weeks'],
+  // Pull together what a course was about from its file summaries (plan #2401.7)
+  'app/you/work/actions.ts#collectCourseOverviewAction': ['collect-course-overview'],
   'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it

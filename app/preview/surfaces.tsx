@@ -315,6 +315,8 @@ import {
   educationCounts,
   educationExplains,
   educationFiles,
+  educationNotes,
+  educationOverviews,
   educationWeeks,
   educationGroups,
   educationUploading,
@@ -3274,13 +3276,25 @@ const guessedWeeks: CostEstimate = {
   models: [HAIKU],
 };
 
+const guessedOverview: CostEstimate = {
+  lowMicros: 8_000,
+  medianMicros: 14_000,
+  highMicros: 25_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU],
+};
+
 /**
- * What Summarise on a course file (plan #2401.4) and laying out a syllabus's
- * weeks (plan #2401.6) cost, for the files surfaces.
+ * What Summarise on a course file (plan #2401.4), laying out a syllabus's
+ * weeks (plan #2401.6) and pulling a course together (plan #2401.7) cost,
+ * for the files surfaces.
  */
 const summariseCosts = {
   'app/you/work/actions.ts#summariseCourseFileAction': guessedSummary,
   'app/you/work/actions.ts#readSyllabusWeeksAction': guessedWeeks,
+  'app/you/work/actions.ts#collectCourseOverviewAction': guessedOverview,
 } as const;
 
 const perReading: CostEstimate = {
@@ -6364,6 +6378,119 @@ export const SURFACES: readonly Surface[] = [
             chosen: educationChosenWeeks,
             weeksError: 'Dash found no weeks in it. It lists the topics with no schedule.',
           }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The block at the head of a course (plan #2401.7): what it was about
+     * and the ideas that came back, in Dash's words, how many files that
+     * was read from with the press to do it again, and the person's own
+     * notes naming the course. */
+    id: 'you-work-files-overview',
+    label: 'Work & school · What a course was about',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          overviews={educationOverviews}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* Two files read and nothing pulled together yet: the press with its
+     * cost hint open, as hover opens it, above the person's notes. */
+    id: 'you-work-files-overview-ready',
+    label: 'Work & school · Pulling a course together',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', overviewCostOpen: true }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* One file read: the block says how many more are needed. */
+    id: 'you-work-files-overview-empty',
+    label: 'Work & school · A course with one file read',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={{ c3: educationFiles.c3.map((file) => (file.id === 'f6' ? { ...file, summary: null } : file)) }}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The course mid-read, with Dash at work on the press. */
+    id: 'you-work-files-overview-pending',
+    label: 'Work & school · A course being pulled together',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', collecting: true }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A second read that failed: the overview stays as it was and the
+     * reason shows in the block. */
+    id: 'you-work-files-overview-error',
+    label: 'Work & school · A course that could not be pulled together again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          overviews={educationOverviews}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', overviewError: 'Reading is rate-limited right now. Try again in a minute.' }}
         />
       </PaidCostsProvider>
     ),

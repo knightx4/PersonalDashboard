@@ -12,6 +12,8 @@ import { JobsSection } from './jobs-section';
 import { sectionSubject } from '@/lib/core/section-path';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadCourseExplains } from '@/lib/learn/evidence/course-explain-store';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadCourseNotes, loadCourseOverviews } from '@/lib/you/course-overview-store';
 
 export const metadata = { title: 'Work & school' };
 
@@ -28,7 +30,7 @@ export default async function Page() {
   const you = await createYouClient();
   const user = await requireUser();
   const jobsClient = await createJobsClient();
-  const [transcripts, courses, courseFiles, courseWeeks, jobs, resume] = await Promise.all([
+  const [transcripts, courses, courseFiles, courseWeeks, overviews, jobs, resume] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -75,6 +77,8 @@ export default async function Page() {
         if (error) throw new Error(`Loading course weeks failed: ${error.message}`);
         return (data ?? []) as CourseWeek[];
       }),
+    // What each course was about, as Dash pulled it together (plan #2401.7).
+    loadCourseOverviews(you, user.id),
     you
       .from('work_history')
       .select('*')
@@ -114,6 +118,16 @@ export default async function Page() {
   const weeksByCourse: Record<string, CourseWeek[]> = {};
   for (const week of courseWeeks) (weeksByCourse[week.course_id] ??= []).push(week);
 
+  // The person's own notes naming each course that has files kept (plan
+  // #2401.7). A failed search leaves the block without them rather than the tab blank.
+  const notes = await loadCourseNotes(
+    await createVaultClient(),
+    courses.filter((course) => filesByCourse[course.id]?.length),
+  ).catch((error: unknown) => {
+    console.error('[you work] course notes', error instanceof Error ? error.message : error);
+    return {};
+  });
+
   const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
 
   return (
@@ -132,6 +146,8 @@ export default async function Page() {
         explains={explains}
         files={filesByCourse}
         weeks={weeksByCourse}
+        overviews={overviews}
+        notes={notes}
       />
     </PageColumn>
   );
