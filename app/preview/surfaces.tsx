@@ -345,6 +345,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
@@ -6823,6 +6824,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+  {
+    /* The account icon's menu (note 6d32355f): the way to the settings, then
+     * the theme, changed without leaving the page. Drawn open, hung from its
+     * icon at the right of the strip. */
+    id: 'shell-account-menu',
+    label: 'Top bar · Account menu',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <div className="flex min-h-[44rem] justify-end">
+        <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
+      </div>
+    ),
   },
   {
     /* Capture aimed at a kind (plan #1950.1), what an Add button on a list

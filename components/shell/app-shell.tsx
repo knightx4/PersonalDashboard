@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/cn';
 import { NoteButton } from '@/components/shell/feedback-button';
 import { ThemeRepair } from '@/components/shell/theme-picker';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
@@ -851,16 +852,11 @@ export function AppShell({
                   {/* No bell (plan #1937.7): what is on you is Home's Inbox,
                   counted on Home's first screen, and each workspace's own. */}
                   <NoteButton />
-
-                  <Tooltip label={`Your account, ${displayName ?? email}`} align="end" className="shrink-0">
-                    <Link
-                      href="/account"
-                      className="press press-area flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent max-lg:size-10 max-lg:text-body"
-                    >
-                      {initial}
-                      <span className="sr-only">Account</span>
-                    </Link>
-                  </Tooltip>
+                </div>
+                {/* Outside the row above: its rule sizes every button inside
+                it, and the menu's theme controls are buttons too. */}
+                <div className="shrink-0 sm:ml-0.5 lg:ml-1">
+                  <AccountMenu initial={initial} label={`Your account, ${displayName ?? email}`} theme={theme} />
                 </div>
               </div>
             </header>
