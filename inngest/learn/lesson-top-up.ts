@@ -5,6 +5,7 @@ import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LessonPick } from '@/lib/learn/lessons/choose';
 import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
+import { loadOfferableFigures } from '@/lib/learn/catalogue/figures';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
 import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
@@ -17,6 +18,9 @@ import { UNIT_CHECK_MODEL, writeUnitCheck } from '@/lib/learn/lessons/write-unit
 import { lessonWhy, type LessonOutcome, type LessonTopUpPorts } from '@/lib/learn/lessons/top-up';
 import { WRITE_LESSON_MODEL, writeLesson } from '@/lib/learn/lessons/write-lesson';
 import type { LearnOperation } from '@/lib/learn/spend';
+import { resolveFigures, writerResolveContext } from '@/lib/learn/figures/resolve';
+import { recordFigureNeeds } from '@/lib/learn/figures/needs';
+import { embedOne } from '@/lib/learn/embed/embed';
 
 /**
  * The real ports for writing Learn now lessons (plan #978), used by the
@@ -26,6 +30,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 
 const WRITE_OPERATION: LearnOperation = 'write-lesson';
 const EMBED_OPERATION: LearnOperation = 'embed-lesson-claim';
+const NEED_OPERATION: LearnOperation = 'embed-figure-need';
 const CHECK_OPERATION: LearnOperation = 'write-unit-check';
 
 /** Postgres's unique violation: another run stored a lesson for this concept first. */
@@ -103,6 +108,7 @@ export async function writeLessonCard(
   const found: LessonSource | null = await findLessonSource(learn, pick.concept.claim, {
     onSpend: (report) => embedSpend.push(report),
   });
+  const sourceFigures = found ? await loadOfferableFigures(learn, found.itemId) : [];
   const result = await writeLesson({
     lesson: {
       concept: { name: pick.concept.name, claim: pick.concept.claim, mastery: pick.concept.mastery },
@@ -110,6 +116,7 @@ export async function writeLessonCard(
       unit: unit ? { title: unit.title, outcome: unit.outcome } : null,
       prerequisites,
       source: found,
+      sourceFigures,
     },
     anthropicApiKey: apiKey,
     onSpend: (report) => writeSpend.push(report),
@@ -117,6 +124,13 @@ export async function writeLessonCard(
   await record();
   // Nothing is stored, so the concept is chosen again on a later run.
   if (result.outcome === 'failed') return { outcome: 'failed', detail: result.detail };
+
+  // A chart's series are fetched now and kept in the shared cache, so the
+  // page reads them from there (plan #2321.3). One that cannot be found is
+  // remembered as missing and the lesson keeps the figure as its caption.
+  if (result.outcome === 'ready' && result.figures.length > 0) {
+    await resolveFigures(result.figures, writerResolveContext(learn));
+  }
 
   // The source the lesson named is the one it was given; its item comes from there.
   const cited = result.source && found?.segmentId === result.source.segmentId ? found : null;
@@ -144,16 +158,38 @@ export async function writeLessonCard(
           example: result.card.example,
           check_question: result.card.question,
           check_answer: result.card.answer,
+          figures: result.figures,
           why: lessonWhy(pick.subjectName, prerequisites),
         }
       : { status: 'dropped', drop_reason: result.reason }),
   };
-  const { error } = await learn.from('feed_cards').insert(row);
+  const { data: saved, error } = await learn.from('feed_cards').insert(row).select('id').single();
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return { outcome: 'already', detail: 'Written by another run first.' };
     return { outcome: 'failed', detail: `Saving the lesson failed: ${error.message}` };
   }
-  return result.outcome === 'ready' ? { outcome: 'ready' } : { outcome: 'dropped', detail: result.reason };
+  if (result.outcome !== 'ready') return { outcome: 'dropped', detail: result.reason };
+
+  // A figure the lesson asked for and the app cannot draw is kept, grouped
+  // with the other lessons asking for the same thing (plan #2321.9). The
+  // lesson is saved whatever this comes to.
+  const cardId = (saved as { id: string } | null)?.id;
+  if (cardId && result.figures.some((figure) => figure.kind === 'wanted')) {
+    const needSpend: SpendReport[] = [];
+    const needs = await recordFigureNeeds(
+      learn,
+      { userId, subjectId: pick.subjectId, cardId, figures: result.figures },
+      async (text) => {
+        const embedded = await embedOne(text, { inputType: 'document', onSpend: (report) => needSpend.push(report) });
+        return embedded.ok ? { vector: embedded.vector, model: embedded.model } : null;
+      },
+    );
+    for (const report of needSpend) {
+      await recordSpend(core, userId, { module: 'learn', operation: NEED_OPERATION, model: report.model, usage: report.usage });
+    }
+    if (needs.detail) console.warn(`[learn] ${needs.detail}`);
+  }
+  return { outcome: 'ready' };
 }
 
 export function createLessonPorts(context: {

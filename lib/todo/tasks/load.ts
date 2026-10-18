@@ -4,21 +4,36 @@ import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { sortTags } from '@/lib/todo/tasks/tags';
+import type { TagFilter } from '@/lib/todo/tasks/tag-filter';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
  * Reading the list. The deciding is next door in model.ts, on purpose.
  */
 
-const COLUMNS =
-  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id';
+/**
+ * A task's columns, with its tags embedded from todo.task_tags (plan #2340.1).
+ * Exported so every reader that builds a Task selects the same thing.
+ */
+export const TASK_COLUMNS =
+  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id, task_tags (tag)';
+
+const COLUMNS = TASK_COLUMNS;
 
 /** PostgREST caps a response; a personal list will not reach this, but say it. */
 const LIMIT = 500;
 
 type Row = Record<string, unknown>;
 
-function toTask(row: Row): Task {
+/** The tag names embedded on a task row, sorted. A row selected without them has none. */
+function tagsOf(row: Row): string[] {
+  const embedded = row.task_tags as { tag: string }[] | null | undefined;
+  return sortTags((embedded ?? []).map((entry) => entry.tag));
+}
+
+/** A task row selected with TASK_COLUMNS, as a Task. */
+export function toTask(row: Row): Task {
   return {
     id: row.id as string,
     title: row.title as string,
@@ -32,6 +47,7 @@ function toTask(row: Row): Task {
     createdAt: row.created_at as string,
     position: (row.position as number | null) ?? null,
     parentId: (row.parent_id as string | null) ?? null,
+    tags: tagsOf(row),
   };
 }
 
@@ -91,6 +107,8 @@ export async function loadDoneSinceMidnight(
 export interface AllTasksFilter {
   status?: TaskStatus | 'all';
   search?: string;
+  /** One tag, or the tasks with none (plan #2340.3). */
+  tag?: TagFilter;
 }
 
 /**
@@ -102,7 +120,23 @@ export interface AllTasksFilter {
 export async function loadAllTasks(userId: string, filter: AllTasksFilter = {}): Promise<Task[]> {
   const supabase = await createTodoClient();
 
-  let query = supabase.from('tasks').select(COLUMNS).eq('user_id', userId);
+  // The tag filter is a second embed of the same table under its own name,
+  // so the one in COLUMNS still brings every tag the row carries: filtering
+  // that embed itself would leave only the matching tag on each row. Inner
+  // keeps the rows that have the tag; a null test on a plain embed keeps the
+  // rows that have none.
+  const tag = filter.tag ?? null;
+  const columns =
+    tag?.kind === 'tag'
+      ? `${COLUMNS}, tag_match:task_tags!inner (tag)`
+      : tag?.kind === 'untagged'
+        ? `${COLUMNS}, tag_any:task_tags (tag)`
+        : COLUMNS;
+
+  let query = supabase.from('tasks').select(columns).eq('user_id', userId);
+
+  if (tag?.kind === 'tag') query = query.eq('tag_match.tag', tag.tag);
+  if (tag?.kind === 'untagged') query = query.is('tag_any', null);
 
   if (filter.status && filter.status !== 'all') query = query.eq('status', filter.status);
 
@@ -116,7 +150,7 @@ export async function loadAllTasks(userId: string, filter: AllTasksFilter = {}):
   assertSchemaExposed(error, TODO_SCHEMA);
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map(toTask);
+  return ((data ?? []) as unknown as Row[]).map(toTask);
 }
 
 /**
@@ -170,6 +204,33 @@ export async function loadTask(userId: string, id: string): Promise<Task | null>
   if (error) throw new Error(error.message);
 
   return data ? toTask(data) : null;
+}
+
+/**
+ * Every tag the person has put on a task, the most used first, then by name
+ * (plan #2340.2). What the tag picker offers after Now and Eventually.
+ *
+ * Scoped through the task, since a tag row has no user_id of its own.
+ */
+export async function loadUsedTags(userId: string, client?: TodoSupabaseClient): Promise<string[]> {
+  const supabase = client ?? (await createTodoClient());
+
+  const { data, error } = await supabase
+    .from('task_tags')
+    .select('tag, tasks!inner(user_id)')
+    .eq('tasks.user_id', userId)
+    .limit(LIMIT * 4);
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { tag: string }[]) {
+    counts.set(row.tag, (counts.get(row.tag) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .map(([tag]) => tag);
 }
 
 /** How many are open and not deferred — for the nav badge and the home slice. */

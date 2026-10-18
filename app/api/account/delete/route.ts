@@ -10,7 +10,7 @@ import { DOCUMENT_BUCKET } from '@/lib/goals/extract';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
-import { TRANSCRIPTS_BUCKET } from '@/lib/you/transcripts';
+import { COURSE_FILES_BUCKET, TRANSCRIPTS_BUCKET } from '@/lib/you/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
@@ -148,6 +148,14 @@ export async function POST(request: NextRequest) {
   //    of their own with one folder per account.
   try {
     await removeAttachmentFolder(admin, user.id, TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the files kept under each course (plan #2401.1), one folder per
+  //    account with one per course inside it.
+  try {
+    await removeAttachmentFolder(admin, user.id, COURSE_FILES_BUCKET);
   } catch {
     // As above.
   }

@@ -45,6 +45,7 @@ import {
   unitsComeAtStep,
   withAddedSources,
 } from '@/lib/learn/prepare/view';
+import { loadSubjectFigureNeeds, type UnbuiltFigure } from '@/lib/learn/figures/needs-load';
 import { loadAddedSources } from '@/lib/learn/prepare/add-source-run';
 import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import { countStates } from '@/lib/learn/graph/model';
@@ -177,7 +178,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added] =
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added, unbuilt] =
     await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
@@ -206,6 +207,9 @@ export default async function SubjectPage({
     // What the person added with Add a source (plan #2307.4). Ones that
     // cannot be read leave the Sources section with the run's documents.
     loadAddedSources(supabase, user.id, id).catch((): SourceDocument[] => []),
+    // Figures its lessons asked for that cannot be drawn (plan #2321.12).
+    // Ones that cannot be read leave the list out of Sources.
+    loadSubjectFigureNeeds(supabase, user.id, id).catch((): UnbuiltFigure[] => []),
   ]);
   const lensId = lensRead?.id ?? null;
   const held = lensRead?.held ?? null;
@@ -363,7 +367,7 @@ export default async function SubjectPage({
       )}
 
       {sourceList && (
-        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} />
+        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} unbuilt={unbuilt} />
       )}
       {/* One press feeds the bank the preparation reads (plan #2307.4). */}
       <AddSource subjectId={id} />

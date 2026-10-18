@@ -89,8 +89,30 @@ describe('reading the lesson report', () => {
         question: stored.question,
         answer: stored.answer,
       },
+      figures: [],
       source: { verdict: 'supports', note: reported.source_note },
     });
+  });
+
+  it('keeps one figure of a known kind whose spec parses, and drops the rest (plan #2321.1)', () => {
+    const table = {
+      kind: 'table',
+      caption: 'Chip lines by age and how full they run.',
+      spec: { columns: ['Line', 'Use'], rows: [['28nm', '98%'], ['5nm', '90%']] },
+    };
+    const report = readLessonReport({ ...reported, figures: [table, { ...table, caption: 'A second one.' }] }, true);
+    expect(report).toMatchObject({ verdict: 'ready', figures: [table] });
+  });
+
+  it('serves the lesson without a figure whose kind is unknown or whose spec does not parse', () => {
+    for (const figures of [
+      [{ kind: 'pie', caption: 'Shares.', spec: {} }],
+      [{ kind: 'table', caption: 'Ragged.', spec: { columns: ['A', 'B'], rows: [['1']] } }],
+      [{ kind: 'compare', caption: 'One thing.', spec: { things: ['A'], rows: [] } }],
+      'a table',
+    ]) {
+      expect(readLessonReport({ ...reported, figures }, true)).toMatchObject({ verdict: 'ready', figures: [] });
+    }
   });
 
   it('drops a lesson the source contradicts, with the model sentence', () => {
@@ -234,6 +256,7 @@ describe('writing a lesson', () => {
     expect(result).toEqual({
       outcome: 'ready',
       card: stored,
+      figures: [],
       source: { segmentId: 'seg-1', itemTitle: 'CHIPS and Science Act', heading: 'Manufacturing' },
     });
     expect(spent).toEqual(['claude-sonnet-5-5']);

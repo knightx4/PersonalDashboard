@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import type { ModuleId } from '@/lib/modules';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
 import { jobBoardLookup } from './job-board';
@@ -28,6 +28,7 @@ import { tableInfoLookup } from './table-info';
 import { QUERY_OPS, QUERY_ROWS_MAX, queryRowsLookup } from './query';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
+import { postPicturesLookup } from '@/lib/dash/post-pictures';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
@@ -69,6 +70,7 @@ export const ASK_TOOL_NAMES = [
   'read_spec',
   'read_dev_row',
   'find_dev_text',
+  'post_pictures',
   'search_mail',
   'read_mail',
   'read_job_board',
@@ -322,7 +324,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'todos',
     description:
-      'The person\'s todos finished between two dates, and the ones still open and past their due date today. Each links to the task on the todo list. Defaults to the last seven days.',
+      'The person\'s todos finished between two dates, and the ones still open and past their due date today, each with its tags. Each links to the task on the todo list. Defaults to the last seven days. tags_in_use lists every tag they have on a todo.',
     input_schema: {
       type: 'object',
       properties: {
@@ -494,6 +496,22 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'post_pictures',
+    description:
+      'List the pictures you may attach to an X post draft on the Posts tab: the gallery screenshots kept in public/posts/, each with its path, the day it was taken, the gallery surface and workspace it shows, and a short label such as "Vault: note". Pick one whose workspace and label fit what the post is about and pass its path; these are the only images a draft can take from you, so never invent a file name. Pass workspace to keep only the pictures of one workspace. Only for the owner of the app, with the Dev workspace on.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        workspace: {
+          type: 'string',
+          enum: [...MODULE_IDS],
+          description: 'Only the pictures that show this workspace. Leave out to list them all.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'search_mail',
     description:
       'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
@@ -576,6 +594,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   read_spec: { run: readSpecLookup, module: null },
   read_dev_row: { run: readDevRowLookup, module: null },
   find_dev_text: { run: findDevTextLookup, module: null },
+  post_pictures: { run: postPicturesLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
@@ -607,7 +626,7 @@ async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Pr
 export function lookupInScope(name: string, scope: ModuleId): boolean {
   if (!isAskToolName(name)) return true;
   if (name === 'search_mail' || name === 'read_mail') return false;
-  if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text') return scope === 'dev';
+  if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text' || name === 'post_pictures') return scope === 'dev';
   const { module } = LOOKUPS[name];
   return module === null || module === scope;
 }

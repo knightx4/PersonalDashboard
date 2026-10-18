@@ -46,6 +46,7 @@ const ideas: PieceIdea[] = [
         'A team starts the year with customers paying £100,000. Upgrades add £18,000, cancellations take away £9,000 and downgrades £2,000, so the same customers pay £107,000: 107%.',
       question: 'A business loses a fifth of its customers’ revenue to churn but grows the rest by 30%. Is its retention above or below 100%?',
       answer: 'Above: 0.8 × 1.3 is 1.04, so 104%.',
+      figures: [],
     },
   },
   {
@@ -61,6 +62,7 @@ const ideas: PieceIdea[] = [
       example: 'The team above keeps £89,000 of its £100,000 before upgrades: gross retention of 89%.',
       question: null,
       answer: null,
+      figures: [],
     },
   },
   {
@@ -76,6 +78,7 @@ const ideas: PieceIdea[] = [
       example: null,
       question: null,
       answer: null,
+      figures: [],
     },
   },
 ];

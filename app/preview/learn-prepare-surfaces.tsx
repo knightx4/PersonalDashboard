@@ -8,6 +8,7 @@ import { CurriculumComing } from '@/app/learn/s/[id]/curriculum';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import type { SubjectReading } from '@/lib/learn/chat/subject-load';
+import type { UnbuiltFigure } from '@/lib/learn/figures/needs-load';
 import type { FinishDetail } from '@/lib/learn/prepare/finish-step';
 import type { PreparationRow, PreparationStepRow } from '@/lib/learn/prepare/run';
 import { PREPARATION_STEPS, type PreparationStepKey } from '@/lib/learn/prepare/steps';
@@ -383,6 +384,51 @@ export function LearnSubjectPrepareSourcesFoldedSurface() {
         readings={READINGS}
       />
     </div>
+  );
+}
+
+// Figures its lessons asked for (plan #2321.12) -----------------------------
+
+const UNBUILT: UnbuiltFigure[] = [
+  {
+    key: '00000000-0000-4000-8000-00000000f301',
+    need: 'data_source',
+    shows: 'Monthly recurring revenue of a public software company across its last twelve quarters, from its filings',
+    why: 'The lesson compares two companies and the app holds no filings.',
+    asked: 4,
+  },
+  {
+    key: '00000000-0000-4000-8000-00000000f302',
+    need: 'model',
+    shows: 'How a change in monthly churn moves the lifetime value of a customer, with the churn rate adjustable',
+    why: 'The lesson asks the reader to try rates.',
+    asked: 1,
+  },
+];
+
+/** The Sources section listing the figures the subject's lessons wanted and did not get. */
+export function LearnSubjectSourcesUnbuiltSurface() {
+  return (
+    <SourcesSection
+      live={false}
+      subjectId={SUBJECT_ID}
+      sources={finishedSources(FINISH_DETAIL)}
+      readings={READINGS}
+      unbuilt={UNBUILT}
+    />
+  );
+}
+
+/** Nothing outstanding: the section draws as it did before the list existed. */
+export function LearnSubjectSourcesUnbuiltNoneSurface() {
+  return (
+    <SourcesSection
+      live={false}
+      subjectId={SUBJECT_ID}
+      sources={finishedSources(FINISH_DETAIL)}
+      readings={READINGS}
+      unbuilt={[]}
+    />
   );
 }
 

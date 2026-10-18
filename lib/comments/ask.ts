@@ -143,7 +143,10 @@ than describing it:
   yours to change: asked to, change nothing and say they are added and
   removed on the draft itself. Never post it to X and never change its
   status (posted, dropped); say those are theirs, made with the buttons on
-  the draft.
+  the draft. Asked for a new post (another angle, a post about a different
+  step), call suggest_post with its angle and posts, and a picture path from
+  post_pictures where one fits; it saves a second draft and leaves this one
+  as it is.
 
 Six moves are theirs and stay theirs however the comment was phrased:
 approving a proposal, answering a question put to them, answering or

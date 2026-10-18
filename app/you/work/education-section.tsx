@@ -2,7 +2,8 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import type { CourseExplain } from '@/lib/learn/evidence/course-explain';
 import type { SchoolGroup } from '@/lib/you/education';
 import { AddTranscript } from './add-transcript';
-import { SchoolCourses } from './course-list';
+import { SchoolCourses, type FilesOpen } from './course-list';
+import type { CourseFile } from '@/lib/you/transcripts';
 
 /**
  * Education on You's Work & school tab (plan #1991.3, moved from the Vault):
@@ -19,6 +20,8 @@ export function EducationSection({
   courses,
   explains,
   explaining,
+  files,
+  filesOpen,
 }: {
   groups: SchoolGroup[];
   courseCounts: Record<string, number>;
@@ -28,6 +31,10 @@ export function EducationSection({
   explains?: Record<string, CourseExplain>;
   /** The gallery's way to draw one course with its prompt open. */
   explaining?: string;
+  /** The files kept under each course, by course id (plan #2401.2). */
+  files?: Record<string, CourseFile[]>;
+  /** The gallery's way to draw one course with its files open. */
+  filesOpen?: FilesOpen;
 }) {
   return (
     <section aria-labelledby="education">
@@ -49,6 +56,8 @@ export function EducationSection({
           courseCounts={courseCounts}
           explains={explains}
           explaining={explaining}
+          files={files}
+          filesOpen={filesOpen}
         />
       ))}
     </section>

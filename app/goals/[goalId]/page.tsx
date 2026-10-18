@@ -1,5 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { DetailCard } from '@/components/patterns/tabbed-detail';
 import { cn } from '@/lib/cn';
 import { notFound } from 'next/navigation';
 import { tabFrom } from '@/lib/tabs';
@@ -9,7 +10,9 @@ import { loadYourInitial } from '@/lib/core/account/your-initial';
 import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
+import { LISTED_KINDS, noLinks, weekInstants, type GoalLinks, type ListedKind } from '@/lib/goals/links';
+import { listForTab, tabsWithLists, type ListView } from '@/lib/goals/goal-lists';
+import { loadGoalListViews } from '@/lib/goals/goal-lists-store';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
 import { loadCollection, loadCollectionsForGoal } from '@/lib/goals/collections-store';
 import { namedLists, type MetricList } from '@/lib/goals/metric-chart';
@@ -84,6 +87,7 @@ import { GoalHelp } from './goal-help';
 import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
+import { GoalListChips, ListBody } from './goal-lists';
 import { MetricsProperty } from './metrics-property';
 import { metricLists } from '@/lib/goals/metric-form';
 import type { Metric } from '@/lib/goals/metrics';
@@ -96,6 +100,14 @@ import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
 
 export const metadata = { title: 'Goal' };
+
+/** The workspace each kind of linked row is kept in, which has to be on for it to be read. */
+const LISTED_MODULE: Record<ListedKind, 'learn' | 'todo' | 'shopping' | 'jobs'> = {
+  reading: 'learn',
+  event: 'todo',
+  saved_item: 'shopping',
+  contact: 'jobs',
+};
 export const dynamic = 'force-dynamic';
 
 /**
@@ -321,7 +333,7 @@ export default async function GoalMapPage({
   searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const { goalId } = await params;
-  const tab = tabFrom((await searchParams).tab, GOAL_TABS);
+  const tabParam = (await searchParams).tab;
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -332,6 +344,9 @@ export default async function GoalMapPage({
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
+  // The kinds a goal's linked lists are read for: those of the workspaces
+  // switched on (plan #2330.1).
+  const listedKinds = LISTED_KINDS.filter((kind) => moduleEnabled(account, LISTED_MODULE[kind]));
   const [
     map,
     readings,
@@ -345,6 +360,7 @@ export default async function GoalMapPage({
     flags,
     context,
     learnGoal,
+    goalLists,
   ] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
@@ -368,8 +384,20 @@ export default async function GoalMapPage({
     // leaves the section out rather than the page.
     loadContext(client, goalId).catch((): ContextItem[] => []),
     loadGoalLearn(learn, user.id, goalId),
+    // The goal's lists, its own and linked (plan #2330.3). A failed read
+    // leaves the chips out rather than the page.
+    createClient()
+      .then((db) =>
+        loadGoalListViews({ goals: client, db }, user.id, goalId, listedKinds, {
+          today,
+          timeZone: account.timezone,
+        }),
+      )
+      .catch((): ListView[] => []),
   ]);
   if (!map) notFound();
+  const tab = tabFrom(tabParam, tabsWithLists(GOAL_TABS, goalLists));
+  const listTab = listForTab(tab, goalLists);
   // The latest run on each step sent, prepared or asked about from its row
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
@@ -535,7 +563,14 @@ export default async function GoalMapPage({
       : null;
   const overview = (
     <div className="space-y-6">
-      <GoalDoneWhen goal={map.goal} />
+      <GoalDoneWhen goal={map.goal}>
+        <GoalListChips
+          goalId={map.goal.id}
+          goalTitle={map.goal.title}
+          lists={goalLists}
+          canAdd={map.goal.status === 'open'}
+        />
+      </GoalDoneWhen>
       <div className="space-y-4">
         <GoalStatusCard
           line={line}
@@ -589,6 +624,7 @@ export default async function GoalMapPage({
         number={numberEmpty ? number : null}
         help={!errand && helpEmpty ? help : null}
         links={linksEmpty && canLink ? linked : null}
+        list={goalLists.length === 0 && map.goal.status === 'open' ? { goalId: map.goal.id } : null}
       />
     </div>
   );
@@ -603,8 +639,13 @@ export default async function GoalMapPage({
       timeZone={account.timezone}
       pace={pace}
       metrics={metricsPart}
+      lists={goalLists}
     >
-      {tab === 'steps' ? (
+      {listTab ? (
+        <DetailCard>
+          <ListBody goalId={map.goal.id} list={listTab} />
+        </DetailCard>
+      ) : tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
           {/* Your initial, for the Assignee column (plan #2069.2). */}
           <YourInitialProvider initial={await loadYourInitial(user)}>

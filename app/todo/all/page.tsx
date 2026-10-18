@@ -1,7 +1,8 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
+import { loadAllTasks, loadParentTitles, loadUsedTags } from '@/lib/todo/tasks/load';
+import { parseTagFilter } from '@/lib/todo/tasks/tag-filter';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { loadTaskFiles } from '@/lib/todo/tasks/files';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
@@ -24,7 +25,13 @@ export const metadata = { title: 'All tasks' };
 export default async function AllTasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; focus?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    focus?: string;
+    tag?: string | string[];
+    untagged?: string | string[];
+  }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -36,15 +43,20 @@ export default async function AllTasksPage({
   // A task is the one thing in the app with no page of its own, so the command
   // palette sends you here with the row named. Absent, nothing changes.
   const focus = params.focus?.trim() ?? '';
+  // One tag, or the untagged (plan #2340.3), inside the tab and the search.
+  const tag = parseTagFilter(params);
 
-  const [settings, tasks, working] = await Promise.all([
+  const [settings, tasks, working, used] = await Promise.all([
     loadAccountSettings(user.id),
     loadAllTasks(user.id, {
       status: status === 'all' ? 'all' : (status as TaskStatus),
       search,
+      tag,
     }),
     // What an Ask Dash hand-off is working on (plan #1568).
     workingRefsForPage(user.id),
+    // The chips the filter offers. A failed read leaves Now and Eventually.
+    loadUsedTags(user.id).catch(() => [] as string[]),
   ]);
 
   // What each task is about, in one pass for the page. The naive shape resolves
@@ -79,6 +91,8 @@ export default async function AllTasksPage({
     <AllTasksView
       status={status}
       search={search}
+      tag={tag}
+      usedTags={used}
       focus={focus}
       tasks={tasks}
       timezone={settings.timezone}

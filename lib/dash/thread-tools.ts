@@ -27,7 +27,8 @@ export const DEV_THREAD_TABLES = {
   takeaway: 'public.inspiration_takeaways',
   change: 'public.spec_changes',
   // An X post draft on the Posts tab (plan #2202.2), rewritten with
-  // rewrite_post (lib/dash/post-writes.ts), which is offered on every thread.
+  // rewrite_post (lib/dash/post-writes.ts), which is offered on every thread,
+  // as suggest_post is for a new draft (plan #2384.3).
   post: 'public.social_posts',
 } as const;
 

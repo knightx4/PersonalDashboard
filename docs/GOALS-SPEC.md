@@ -265,8 +265,9 @@ Claude also closes one of your steps when it sees the step happened (plan
 day has passed, a ticked Todo task, or an email from the other party
 confirming the exact thing. The morning run looks for this while reviewing
 each goal. The close sets `evidence`, one line naming what was seen and when,
-and `evidence_source` (`jobs`, `gmail`, `calendar` or `todo`) in the same
-write. It reads "Closed X: <what Dash saw>" on the run's page and the Goals
+and `evidence_source` (`jobs`, `gmail`, `calendar`, `todo`, or `shopping` for
+a linked saved product bought, which the database closes by itself, plan
+#2330.5) in the same write. It reads "Closed X: <what Dash saw>" on the run's page and the Goals
 home, and its Undo reopens the step and clears the note. The database refuses
 Claude closing one of your steps without evidence, or with a sub-step still
 open beneath it (`migrations-goals/0050`), and Claude never closes a rhythm.
@@ -1128,8 +1129,10 @@ collection: loans   (one row per loan)
 
 Field types are a fixed list the app knows how to draw and check: text, long
 text, number, money, percent, date, day of month, yes/no, choice from a list,
-and link. Claude picks fields from that list and never writes a table or a
-migration.
+link, picture (`image`, the address of a picture), place (an address on one
+line, with a latitude and longitude or neither) and a row elsewhere in the app
+(`ref`, `schema.table:id`). Claude picks fields from that list and never
+writes a table or a migration.
 
 - **Collections** (`goals.collections`) hold each definition: a name, the
   fields, whether it is one record or a list, a version number, and the goals
@@ -1171,6 +1174,44 @@ migration.
 - **Changing a definition** raises its version. Existing records keep their
   values; a new field shows empty; a removed field is hidden but its values
   stay in the record.
+- **A goal's own lists** (plan #2330.2). A goal can keep any number of lists
+  of things that have no other home in the app, such as pantries to compare
+  or volunteer groups to try. Each is a collection with `goal_id` set and a
+  `position` among the goal's lists, and it serves that goal, so the goal's
+  number can be counted from it. Its name is unique among the goal's lists.
+  Pasting a product link reads the page (`lib/saved/scrape-product.ts`) and
+  adds a draft row with its name, picture, price and link, adding any of
+  those fields the list lacks; the person confirms it as they confirm any
+  draft. Dash starts, renames and archives lists and adds, changes, confirms
+  and archives their rows with `change_goal_list`. Readings, events, saved
+  products and contacts are linked rather than copied (`goals.links`).
+- **Lists on the goal page** (plan #2330.3). Every list, own or linked,
+  shows as one chip on the done-when's card: a picture or a list mark, the
+  name, the count of rows in play and the one thing that stands out (rows to
+  confirm first, then what was picked, read or bought, then the next event).
+  Pressing a chip opens the list in a panel over the page with its rows, an
+  Add button and a fold for rows ruled out (dismissed in Shopping, put down
+  in Learn, or marked ruled out in a status field). A typed name adds an own
+  row; a pasted link adds a draft from the page, and the line under the box
+  names what the page did not give. A linked list adds a reading, saved
+  product or contact found by search. A goal with three lists or more also
+  gives each list a tab after Steps (`?tab=list-<name>`). The rules are in
+  `lib/goals/goal-lists.ts`.
+- **A list counts towards its goal and closes a step** (plan #2330.5). The
+  goal's number can count the rows of a list holding one option of a choice
+  field, such as the events whose status is Went
+  (`items.number_from_value`, with `number_from_how` = `count`); the reading
+  it writes says "From Events: count where status is Went". Picking a row of
+  an own list marks every other live row ruled out (`pickListRow` in
+  `lib/goals/lists-store.ts`): the list's status field takes its picked and
+  ruled-out options, and a list without them gains them, or gains a Status
+  field of Picked and Ruled out. Dash picks with `change_goal_list`
+  (`pick_row`), and an `edit_row` that sets a status to Picked does the same.
+  A step of yours that links a saved product closes when the product is
+  bought, marked purchased in Shopping or matched to an order line, with
+  "You bought <the product> in Shopping." as its evidence and `shopping` as
+  its source (`migrations-goals/0082`). A step with a sub-step still open
+  stays open.
 
 - **Worked-out answers.** A step exists to answer something, such as when
   the loan payments start or what they come to a month, and the fields are
@@ -1376,7 +1417,13 @@ A sketch for the migration, not the migration itself.
   #1029).
 - `goals.item_goals`: extra goals a step counts towards, beyond its own
   parent.
-- `goals.links`: a goal or step to a Learn aim, a job application, a role.
+- `goals.links`: a goal or step to a Learn aim, a job application, a role,
+  or a row it lists from another workspace: a reading (`learn.readings`), an
+  event (`todo.events`), a saved product (`saved_items`) or a contact
+  (`job_search.contacts`). The goal points at the row and reads it live, so
+  finishing a reading in Learn shows on the goal (plan #2330.1).
+  `list_name` groups the links of one goal into lists; null is the kind's
+  own list (Reading, Events, Products, People).
 - `goals.history`: one row per change to any goals table, written by
   trigger: table, row id, action, old and new values, actor (`me`, `claude`,
   `capture`), capture id where there is one, and time. An Undo on a run's

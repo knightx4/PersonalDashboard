@@ -23,6 +23,7 @@ const ANSWER_1 = '99999999-9999-4999-8999-999999999991';
 const ANSWER_2 = '99999999-9999-4999-8999-999999999992';
 const QUESTION = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const LINK = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const EMAIL = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const env = (tables: FakeTables): JobsWriteEnv => {
   const db = fakeSchemaDb(tables);
@@ -107,6 +108,40 @@ describe('the Jobs writes', () => {
     });
     expect(change.after).toMatchObject({ jd_source: 'manual', comp_source: 'posted' });
     expect(change.after.jd_hash).toEqual(expect.any(String));
+  });
+
+  it('records where the facts it sets came from (plan #2343.2)', async () => {
+    const t = tables();
+    await made('change_role', t, { role_ref: ROLE, location: 'London', pay_min: 150000, pay_max: 180000, pay_source: 'recruiter' });
+    const origin = (field: string) => (t['job_search.fact_origins'] ?? []).find((row) => row.role_id === ROLE && row.field === field);
+    expect(origin('location')).toMatchObject({ user_id: ME, origin: 'dash', certainty: 'guess' });
+    expect(origin('comp')).toMatchObject({ origin: 'dash', certainty: 'secondhand' });
+
+    t['job_search.inbox_messages'] = [{ id: EMAIL, user_id: ME, subject: 'Hello' }];
+    await made('change_role', t, { role_ref: ROLE, work_mode: 'hybrid', fact_source: 'email', email_ref: EMAIL });
+    expect(origin('work_mode')).toMatchObject({ origin: 'dash', certainty: 'secondhand', message_id: EMAIL });
+
+    await made('change_role', t, { role_ref: ROLE, seniority: 'Staff', fact_source: 'person' });
+    expect(origin('seniority')).toMatchObject({ origin: 'you', certainty: 'firsthand' });
+
+    await made('change_role', t, { role_ref: ROLE, location: '' });
+    expect(origin('location')).toBeUndefined();
+  });
+
+  it('will not let a guess replace a fact from the posting', async () => {
+    const t = tables();
+    t['job_search.roles'][0].location = 'London';
+    t['job_search.fact_origins'] = [{ id: 'o1', user_id: ME, role_id: ROLE, field: 'location', origin: 'posting', certainty: 'firsthand' }];
+    expect(await refused('change_role', t, { role_ref: ROLE, location: 'Paris' })).toMatch(/location on file came from the posting \(firsthand\)/);
+    expect(t['job_search.roles'][0].location).toBe('London');
+
+    await made('change_role', t, { role_ref: ROLE, location: 'Paris', fact_source: 'posting' });
+    expect(t['job_search.fact_origins'][0]).toMatchObject({ origin: 'dash', certainty: 'firsthand' });
+  });
+
+  it('refuses fact_source email without the email', async () => {
+    expect(await refused('change_role', tables(), { role_ref: ROLE, location: 'Paris', fact_source: 'email' })).toMatch(/needs email_ref/);
+    expect(await refused('change_role', tables(), { role_ref: ROLE, location: 'Paris', email_ref: EMAIL })).toMatch(/goes with fact_source/);
   });
 
   it('refuses a band whose top is under its bottom, an empty title and a call with nothing in it', async () => {

@@ -20,6 +20,7 @@
 
 import {
   liveFields,
+  isPlace,
   parseFieldValue,
   type CollectionField,
   type FieldValue,
@@ -226,6 +227,7 @@ export function shownValue(field: CollectionField, raw: unknown): string {
   const value = parsed.value as FieldValue;
   if (value === null) return '';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (isPlace(value)) return value.address;
   return String(value);
 }
 

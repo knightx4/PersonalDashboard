@@ -105,10 +105,26 @@ describe('executeProposal', () => {
     const result = await executeProposal('propose_todo', { title: ' Call the dentist ', due_on: '2026-10-02' }, ctx);
     expect(result.ok).toBe(true);
     expect(kept).toEqual([
-      { kind: 'add_todo', input: { title: 'Call the dentist', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false } },
+      { kind: 'add_todo', input: { title: 'Call the dentist', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false, tags: [] } },
     ]);
     expect(writes).toEqual([]);
     if (result.ok) expect(result.note).toContain('Proposed: Add the todo "Call the dentist", due 2026-10-02.');
+  });
+
+  it('tags a todo now when it is due today, eventually when it has no date, with any tag sent (plan #2340.4)', async () => {
+    const { ctx, kept } = context();
+    await executeProposal('propose_todo', { title: 'Call the bank', due_on: '2026-09-27' }, ctx);
+    await executeProposal('propose_todo', { title: 'Learn the banjo' }, ctx);
+    await executeProposal('propose_todo', { title: 'Renew the passport', due_on: '2027-03-01', tags: ['Admin'] }, ctx);
+    await executeProposal('propose_todo', { title: 'Buy milk', tags: ['now', 'errands'] }, ctx);
+    expect(kept.map((change) => (change.input as { tags: string[] }).tags)).toEqual([
+      ['now'],
+      ['eventually'],
+      ['admin', 'eventually'],
+      ['errands', 'now'],
+    ]);
+    const result = await executeProposal('propose_todo', { title: 'x', tags: ['home', 'Home'] }, ctx);
+    expect(result).toEqual({ ok: false, error: 'That tag is on the list twice.' });
   });
 
   it('refuses a todo the add bar would refuse', async () => {

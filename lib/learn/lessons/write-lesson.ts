@@ -7,6 +7,10 @@ import type { IdeaCard } from '@/lib/learn/feed/write-card';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LessonSource } from './closest-source';
 import { MODELS } from '@/lib/core/models';
+import { MAX_FIGURES_PER_LESSON, figureKindIds, figureWriterLines, readWrittenFigures } from '@/lib/learn/figures/registry';
+import type { FigureBlock } from '@/lib/learn/figures/types';
+import type { OfferedFigure } from '@/lib/learn/catalogue/figures';
+import { resolveSourceFigures } from '@/lib/learn/figures/kinds/source-figure';
 
 /**
  * Writing the lesson for one concept in a track (LEARN-LESSONS-SPEC, "A
@@ -73,6 +77,8 @@ export type LessonToWrite = {
   prerequisites?: string[];
   /** The closest catalogue section, from `findLessonSource`, or null. */
   source: LessonSource | null;
+  /** Stored figures of the source's course that may be shown (plan #2321.4); the only ones a source_figure may name. */
+  sourceFigures?: OfferedFigure[];
 };
 
 /** The source a lesson used, as the row stores it. */
@@ -89,6 +95,8 @@ export type LessonReport =
   | {
       verdict: 'ready';
       card: Omit<IdeaCard, 'name'>;
+      /** The figures that parsed, at most one (plan #2321.1). */
+      figures: FigureBlock[];
       /** Null when no source was given. */
       source: { verdict: SourceVerdict; note: string } | null;
     }
@@ -109,7 +117,7 @@ export type LessonReport =
  * named and the reason is the model's sentence on the contradiction.
  */
 export type LessonResult =
-  | { outcome: 'ready'; card: IdeaCard; source: LessonSourceUsed | null }
+  | { outcome: 'ready'; card: IdeaCard; figures: FigureBlock[]; source: LessonSourceUsed | null }
   | { outcome: 'dropped'; reason: string; contradicted: boolean; source: LessonSourceUsed | null }
   | { outcome: 'failed'; detail: string };
 
@@ -132,6 +140,9 @@ evidence: One or two sentences with concrete support: a number, a named case, a 
 why: Two or three sentences on why the claim holds: the mechanism or reasoning.
 
 example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. Only what is well established; name the case and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
+
+figures: At most one figure, and only when the idea compares things, orders them, quantifies a change or locates something, so that a grid says it faster than sentences can, or when it is a process, a loop, a hierarchy, a trade-off or a sequence in time, so that a diagram does. Choose the kind by the idea's shape before its numbers: an idea about an era or a period, what happened when and in what order, is a timeline even when it has numbers, a chain of causes or steps is a flow, a loop is a cycle, a whole and its parts is a tree, and a trade-off on two qualities is a two_by_two; a table or a comparison is for figures and things side by side. A diagram takes only its labels and links: the app lays it out. When the idea needs a figure and none of the kinds below can draw it, because the app has no such figure, data source, model or map layer, give a wanted figure saying what it needs rather than forcing a kind that does not fit or leaving it out. Most ideas need none, and then figures is an empty list. A figure lays out facts the evidence or the example already uses, or ones as well established; never a figure you are unsure of. caption is one sentence saying what the figure shows. The kinds, and the spec each takes:
+${figureWriterLines()}
 
 question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. When checks are given, ask for one of them. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
 
@@ -178,6 +189,8 @@ const payloadSchema = z.object({
   example: text.optional(),
   question: text.optional(),
   answer: text.optional(),
+  /** Read kind by kind in `readWrittenFigures`; anything else is no figures. */
+  figures: z.unknown().optional(),
 });
 
 /** Collapse whitespace; empty for nothing. */
@@ -201,7 +214,7 @@ function badPart(label: string, value: string, cap: number): string | null {
  * model did not vouch for. A contradiction drops the lesson before its parts
  * are read, since it is not served whatever they say.
  */
-export function readLessonReport(input: unknown, hasSource: boolean): LessonReport {
+export function readLessonReport(input: unknown, hasSource: boolean, offered: readonly OfferedFigure[] = []): LessonReport {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) {
     const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
@@ -261,6 +274,7 @@ export function readLessonReport(input: unknown, hasSource: boolean): LessonRepo
       question: asked ? question : null,
       answer: asked ? answer : null,
     },
+    figures: readWrittenFigures(resolveSourceFigures(data.figures, offered)),
     source: sourceVerdict ? { verdict: sourceVerdict, note } : null,
   };
 }
@@ -299,6 +313,12 @@ export function lessonPrompt(lesson: LessonToWrite): string {
           '<source>',
           cut ? text.slice(0, MAX_SOURCE_CHARS) : text,
           '</source>',
+          ...((lesson.sourceFigures ?? []).length > 0
+            ? [
+                'Figures from the course (name one with a source_figure only if it shows what the lesson says):',
+                ...(lesson.sourceFigures ?? []).map((figure) => `- ${figure.id}: ${clean(figure.altText)}`),
+              ]
+            : []),
         ]
           .filter(Boolean)
           .join('\n')
@@ -364,6 +384,20 @@ export async function writeLesson(input: {
               example: part('The idea applied to one specific case or a worked number.'),
               question: part('One question that makes them use the idea.'),
               answer: part('The answer, with why, in two or three sentences.'),
+              figures: {
+                type: 'array',
+                maxItems: MAX_FIGURES_PER_LESSON,
+                description: 'A figure only where the idea compares, orders, quantifies or locates, or is a process, loop, hierarchy, trade-off or sequence in time. Empty for none.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string', enum: figureKindIds() },
+                    caption: { type: 'string', description: 'One sentence saying what the figure shows.' },
+                    spec: { type: 'object', description: 'The shape the kind takes, as the instructions give it.' },
+                  },
+                  required: ['kind', 'caption', 'spec'],
+                },
+              },
             },
             required: [
               'can_teach',
@@ -401,7 +435,7 @@ export async function writeLesson(input: {
   // every concept after it, back for good (note 727c77a2).
   if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
 
-  const report = readLessonReport(block.input, source !== null);
+  const report = readLessonReport(block.input, source !== null, prepared.sourceFigures ?? []);
   if (report.verdict === 'failed') return { outcome: 'failed', detail: report.reason };
   if (report.verdict === 'dropped') {
     return {
@@ -414,6 +448,7 @@ export async function writeLesson(input: {
   return {
     outcome: 'ready',
     card: { name, ...report.card },
+    figures: report.figures,
     source: source && report.source?.verdict === 'supports' ? sourceUsed(source) : null,
   };
 }

@@ -474,6 +474,77 @@ describe('goals links', () => {
     const seen = await asUser(userB, (tx) => tx`select id from links where user_id = ${userA}`);
     expect(seen).toHaveLength(0);
   });
+
+  it('lists readings, events, saved products and contacts of your own, under a list name (plan #2330.1)', async () => {
+    const [track] = await admin<{ id: string }[]>`
+      insert into learn.tracks (user_id, title) values (${userA}, 'Cities') returning id`;
+    const [reading] = await admin<{ id: string }[]>`
+      insert into learn.readings (user_id, track_id, locator_basis, title)
+      values (${userA}, ${track.id}, 'typed in', 'The Power Broker') returning id`;
+    const [event] = await admin<{ id: string }[]>`
+      insert into todo.events (user_id, title, starts_on, ends_on)
+      values (${userA}, 'Parkrun meetup', '2026-11-01', '2026-11-01') returning id`;
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url, title)
+      values (${userA}, 'https://shop.example/pantry', 'Pantry') returning id`;
+    const [contact] = await admin<{ id: string }[]>`
+      insert into job_search.contacts (user_id, full_name) values (${userA}, 'Ana Ruiz') returning id`;
+
+    const kinds = await asUser(userA, async (tx) => {
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'reading', ${reading.id})`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'event', ${event.id})`;
+      await tx`
+        insert into links (user_id, item_id, kind, target_id, list_name)
+        values (${userA}, ${goalA}, 'saved_item', ${saved.id}, 'Pantries to compare')`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, 'contact', ${contact.id})`;
+      return tx<{ kind: string; list_name: string | null }[]>`
+        select kind, list_name from links
+        where item_id = ${goalA} and kind in ('reading', 'event', 'saved_item', 'contact') order by kind`;
+    });
+    expect(kinds).toEqual([
+      { kind: 'contact', list_name: null },
+      { kind: 'event', list_name: null },
+      { kind: 'reading', list_name: null },
+      { kind: 'saved_item', list_name: 'Pantries to compare' },
+    ]);
+
+    // A blank list name is not a name.
+    await expect(
+      admin`update links set list_name = '  ' where kind = 'reading' and item_id = ${goalA}`,
+    ).rejects.toThrow(/links_list_name_ck/);
+  });
+
+  it("refuses to list another account's reading, event, saved product or contact", async () => {
+    const [track] = await admin<{ id: string }[]>`
+      insert into learn.tracks (user_id, title) values (${userB}, 'Theirs') returning id`;
+    const [reading] = await admin<{ id: string }[]>`
+      insert into learn.readings (user_id, track_id, locator_basis, title)
+      values (${userB}, ${track.id}, 'typed in', 'Their book') returning id`;
+    const [event] = await admin<{ id: string }[]>`
+      insert into todo.events (user_id, title, starts_on, ends_on)
+      values (${userB}, 'Their party', '2026-11-01', '2026-11-01') returning id`;
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url) values (${userB}, 'https://shop.example/theirs') returning id`;
+    const [contact] = await admin<{ id: string }[]>`
+      insert into job_search.contacts (user_id, full_name) values (${userB}, 'Their friend') returning id`;
+
+    const cases: [string, string][] = [
+      ['reading', reading.id],
+      ['event', event.id],
+      ['saved_item', saved.id],
+      ['contact', contact.id],
+    ];
+    for (const [kind, id] of cases) {
+      // Even with the service role, which sees every row.
+      await expect(
+        admin`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, ${kind}, ${id})`,
+      ).rejects.toThrow(new RegExp(`no ${kind}`));
+      await expect(
+        asUser(userA, (tx) => tx`
+          insert into links (user_id, item_id, kind, target_id) values (${userA}, ${goalA}, ${kind}, gen_random_uuid())`),
+      ).rejects.toThrow(new RegExp(`no ${kind}`));
+    }
+  });
 });
 
 describe('goals and the account', () => {
@@ -1257,6 +1328,156 @@ describe('collections and records (plan #953)', () => {
         insert into collection_goals (user_id, collection_id, goal_id)
         values (${userB}, ${collection}, ${goalA})`),
     ).rejects.toThrow();
+  });
+});
+
+describe("a goal's own lists (plan #2330.2)", () => {
+  const fields = [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'picture', label: 'Picture', type: 'image' },
+    { key: 'store', label: 'Store', type: 'place' },
+    { key: 'reading', label: 'Reading', type: 'ref' },
+  ];
+  let list = '';
+
+  beforeAll(async () => {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, goal_id, name, fields)
+      values (${userA}, ${goalA}, 'Candidates', ${JSON.stringify(fields)}::text::jsonb) returning id`);
+    list = row.id;
+  });
+
+  async function addRow(data: Record<string, unknown>): Promise<string> {
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into records (user_id, collection_id, data)
+      values (${userA}, ${list}, ${JSON.stringify(data)}::text::jsonb) returning id`);
+    return row.id;
+  }
+
+  it('serves the goal it belongs to, so its number can be counted from it', async () => {
+    const served = await admin<{ goal_id: string; archived_at: string | null }[]>`
+      select goal_id, archived_at from collection_goals where collection_id = ${list}`;
+    expect(served).toEqual([{ goal_id: goalA, archived_at: null }]);
+  });
+
+  it('belongs to a goal, never to a step', async () => {
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Measure the wall') returning id`);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields)
+        values (${userA}, ${step.id}, 'On a step', '[]'::jsonb)`),
+    ).rejects.toThrow(/a list belongs to a goal/);
+  });
+
+  it('keeps a picture, a place and a row in the app in their stored forms', async () => {
+    const id = await addRow({
+      name: 'HOMCOM 72',
+      picture: 'https://cdn.example.com/homcom.jpg',
+      store: { address: '1 Retail Park, Leeds', lat: 53.8, lng: -1.55 },
+      reading: 'learn.readings:3f1c0b8e-1111-4222-8333-444455556666',
+    });
+    expect(id).toBeTruthy();
+    await addRow({ store: { address: 'Typed in, not looked up' } });
+    await expect(addRow({ picture: 'not a picture' })).rejects.toThrow(/Picture must be a web address/);
+    await expect(addRow({ store: { address: '1 High St', lat: 53.8 } })).rejects.toThrow(/Store needs both coordinates/);
+    await expect(addRow({ store: '1 High St' })).rejects.toThrow(/Store must be an address/);
+    await expect(addRow({ store: { address: '1 High St', zip: 'LS1' } })).rejects.toThrow(/Store must be an address/);
+    await expect(addRow({ reading: 'a reading' })).rejects.toThrow(/Reading must point at a row in the app/);
+  });
+
+  it('lets two goals each keep a list of the same name, and one goal only one', async () => {
+    const [other] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title) values (${userA}, 'goal', ${areaA}, 'Find a desk') returning id`);
+    await asUser(userA, (tx) => tx`
+      insert into collections (user_id, goal_id, name, fields) values (${userA}, ${other.id}, 'Candidates', '[]'::jsonb)`);
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields) values (${userA}, ${goalA}, 'candidates ', '[]'::jsonb)`),
+    ).rejects.toThrow(/collections_goal_name_key/);
+  });
+
+  it("keeps a list to its account's goals", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into collections (user_id, goal_id, name, fields) values (${userB}, ${goalA}, 'Theirs', '[]'::jsonb)`),
+    ).rejects.toThrow();
+  });
+});
+
+describe('a list counts towards its goal and closes a step (plan #2330.5)', () => {
+  it("counts the rows of a list holding one option of a choice field", async () => {
+    const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, area_id, title) values (${userA}, 'goal', ${areaA}, 'Meet people') returning id`);
+    const fields = [
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'status', label: 'Status', type: 'choice', options: ['Going', 'Went'] },
+    ];
+    const [list] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into collections (user_id, goal_id, name, fields)
+      values (${userA}, ${goal.id}, 'Events', ${JSON.stringify(fields)}::text::jsonb) returning id`);
+    for (const [name, status] of [['Parkrun', 'Went'], ['Book club', 'Going'], ['Quiz', 'Went']]) {
+      await asUser(userA, (tx) => tx`
+        insert into records (user_id, collection_id, data)
+        values (${userA}, ${list.id}, ${JSON.stringify({ name, status })}::text::jsonb)`);
+    }
+
+    // Only an option the field offers, and only on a count.
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${list.id}, number_from_field = 'status',
+          number_from_how = 'count', number_from_value = 'Skipped' where id = ${goal.id}`),
+    ).rejects.toThrow(/offers no option Skipped/);
+    await expect(
+      asUser(userA, (tx) => tx`
+        update items set number_from_collection_id = ${list.id}, number_from_how = 'count',
+          number_from_value = 'Went' where id = ${goal.id}`),
+    ).rejects.toThrow(/items_number_from_value_ck/);
+
+    await asUser(userA, (tx) => tx`
+      update items set number_from_collection_id = ${list.id}, number_from_field = 'status',
+        number_from_how = 'count', number_from_value = 'Went' where id = ${goal.id}`);
+    const read = async () =>
+      (await admin<{ value: string; note: string }[]>`
+        select value::text, note from readings where item_id = ${goal.id} order by created_at desc limit 1`)[0];
+    expect(await read()).toEqual({ value: '2', note: 'From Events: count where status is Went' });
+
+    await asUser(userA, (tx) => tx`
+      update records set data = data || '{"status": "Went"}'::jsonb
+      where collection_id = ${list.id} and data ->> 'name' = 'Book club'`);
+    expect((await read()).value).toBe('3');
+  });
+
+  it('closes a step of yours when the saved product it links is bought, saying what was seen', async () => {
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url, title)
+      values (${userA}, 'https://shop.example/homcom', 'HOMCOM 72 inch pantry') returning id`;
+    const [step] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Get a pantry') returning id`);
+    const [waiting] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'mine', 'Fit the pantry') returning id`);
+    await asUser(userA, (tx) => tx`
+      insert into items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${waiting.id}, 'mine', 'Find a drill')`);
+    await asUser(userA, async (tx) => {
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${step.id}, 'saved_item', ${saved.id})`;
+      await tx`insert into links (user_id, item_id, kind, target_id) values (${userA}, ${waiting.id}, 'saved_item', ${saved.id})`;
+    });
+
+    await asUser(userA, (tx) => tx`update public.saved_items set status = 'purchased' where id = ${saved.id}`);
+
+    const steps = await admin<{ id: string; status: string; evidence: string | null; evidence_source: string | null }[]>`
+      select id, status, evidence, evidence_source from items where id in (${step.id}, ${waiting.id})`;
+    expect(steps.find((s) => s.id === step.id)).toMatchObject({
+      status: 'done',
+      evidence: 'You bought HOMCOM 72 inch pantry in Shopping.',
+      evidence_source: 'shopping',
+    });
+    // A step with something open beneath it stays open.
+    expect(steps.find((s) => s.id === waiting.id)).toMatchObject({ status: 'open', evidence: null });
   });
 });
 

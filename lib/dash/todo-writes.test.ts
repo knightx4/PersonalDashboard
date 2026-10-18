@@ -51,11 +51,39 @@ describe('the Todo writes', () => {
     expect(change.subjectRef).toBe(`todo.tasks:${TASK}`);
     expect(change.before).toMatchObject({ body: null, pinned: false });
     expect(change.after).toMatchObject({ body: 'Ask about the crown.', pinned: true });
-    expect(change.summary).toBe('Dash changed the todo "Book the dentist": its notes written and pinned.');
+    // It had no tags and no date, so it is tagged eventually as it is changed (plan #2340.4).
+    expect(change.summary).toBe('Dash changed the todo "Book the dentist": its notes written, pinned and tagged eventually.');
+    expect(change.undo).toEqual({ tags_added: ['eventually'] });
+  });
+
+  it('tags an untagged todo by its date with the tags sent, and only tags when that is all it is asked (plan #2340.4)', async () => {
+    const tables: FakeTables = { 'todo.tasks': [task({ due_on: '2000-01-01' })], 'todo.task_tags': [] };
+    const change = await made('edit_todo', tables, { todo_ref: TASK, tags: ['Health'] });
+    expect(change.summary).toBe('Dash changed the todo "Book the dentist": tagged health and now.');
+    expect(change.after).toEqual(change.before);
+    expect(change.undo).toEqual({ tags_added: ['health', 'now'] });
+    expect(change.row.detail).toMatchObject({ tags: 'health, now' });
+    expect(tables['todo.task_tags'].map((row) => [row.task_id, row.tag])).toEqual([
+      [TASK, 'health'],
+      [TASK, 'now'],
+    ]);
+  });
+
+  it('leaves a todo the person tagged as they tagged it', async () => {
+    const tables: FakeTables = { 'todo.tasks': [task()], 'todo.task_tags': [{ task_id: TASK, tag: 'car' }] };
+    expect(await runTodoWrite(write('edit_todo'), env(tables), { todo_ref: TASK, tags: ['now'] })).toEqual({
+      ok: false,
+      error: 'That todo is tagged car already, and Dash leaves tags they set alone. Leave tags out, and tell them they can change its tags on its row.',
+    });
+    const pinned = await made('edit_todo', tables, { todo_ref: TASK, pinned: true });
+    expect(pinned.summary).toBe('Dash changed the todo "Book the dentist": pinned.');
+    expect(pinned.undo).toBeNull();
+    expect(tables['todo.task_tags']).toEqual([{ task_id: TASK, tag: 'car' }]);
   });
 
   it('puts a todo off to a day, drops one and reopens one', async () => {
-    const tables = { 'todo.tasks': [task()] };
+    // Tagged already, so none of these tags it.
+    const tables: FakeTables = { 'todo.tasks': [task()], 'todo.task_tags': [{ task_id: TASK, tag: 'health' }] };
     const later = await made('edit_todo', tables, { todo_ref: TASK, later: '2099-01-15' });
     expect(typeof later.after.snoozed_until).toBe('string');
     expect(later.summary).toBe('Dash changed the todo "Book the dentist": put off until Thu 15 Jan 2099.');
@@ -74,7 +102,7 @@ describe('the Todo writes', () => {
     tables['todo.tasks'][0].user_id = ME;
     expect(await runTodoWrite(write('edit_todo'), env(tables), { todo_ref: TASK })).toEqual({
       ok: false,
-      error: 'Say what to change: notes, pinned, later or state.',
+      error: 'Say what to change: notes, pinned, later, state or tags.',
     });
     expect(await runTodoWrite(write('edit_todo'), env(tables), { todo_ref: TASK, state: 'open' })).toEqual({
       ok: false,
