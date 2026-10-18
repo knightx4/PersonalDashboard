@@ -22,7 +22,9 @@ export type RolesSortKey =
   | 'applied'
   | 'excitement'
   | 'fit'
-  | 'chance';
+  | 'chance'
+  | 'ready'
+  | 'questions';
 
 /** The role title is the only cell that says which row this is, so it stays. */
 export const ROLE_PROPERTIES = [
@@ -34,6 +36,8 @@ export const ROLE_PROPERTIES = [
   { id: 'excitement', label: 'Excitement' },
   { id: 'fit', label: FIT_SCORE_LABEL },
   { id: 'chance', label: CHANCE_LABEL },
+  { id: 'ready', label: 'Ready' },
+  { id: 'questions', label: 'Questions' },
   { id: 'comp', label: 'Comp' },
 ] as const;
 
@@ -78,6 +82,17 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         id: 'chance',
         label: CHANCE_LABEL,
         compare: (a, b) => noteRank(b.scoreNote, 'chance') - noteRank(a.scoreNote, 'chance'),
+      },
+      // The two marks set on the role page, the ones marked first.
+      {
+        id: 'ready',
+        label: 'Ready',
+        compare: (a, b) => Number(b.readyToApply) - Number(a.readyToApply),
+      },
+      {
+        id: 'questions',
+        label: 'Questions',
+        compare: (a, b) => Number(b.allQuestionsAdded) - Number(a.allQuestionsAdded),
       },
     ],
     groups: [

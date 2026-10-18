@@ -38,7 +38,7 @@ const spec = rolesDisplay();
 const arranged = (params: Record<string, string>) => parseListDisplay(spec, params);
 
 describe('the roles table', () => {
-  it('keeps the sort ids the column headers link to, with fit and chance after them', () => {
+  it('keeps the sort ids the column headers link to, with fit, chance, ready and questions after them', () => {
     expect(spec.sorts.map((sort) => sort.id)).toEqual([
       'title',
       'company',
@@ -48,6 +48,8 @@ describe('the roles table', () => {
       'excitement',
       'fit',
       'chance',
+      'ready',
+      'questions',
     ]);
   });
 

@@ -27,8 +27,26 @@ function filtersFor(params: PipelineParams, scored = false) {
 describe('pipelineColumnFilters', () => {
   it('offers a filter on the columns that have one, and none on the rest', () => {
     const filters = filtersFor({ view: 'table' });
-    expect(Object.keys(filters).sort()).toEqual(['applied', 'company', 'excitement', 'status']);
+    expect(Object.keys(filters).sort()).toEqual(['applied', 'company', 'excitement', 'questions', 'ready', 'status']);
     expect(Object.keys(filtersFor({ view: 'table' }, true))).toContain('fit');
+  });
+
+  it('narrows by ready to apply and by all questions added, with the counts in scope', () => {
+    const marked = { ...row('lead', 'Stripe'), readyToApply: true, allQuestionsAdded: true } as PipelineRow;
+    const params: PipelineParams = { view: 'table', ready: 'yes' };
+    const state = parsePipeline(params);
+    const all = [...rows, marked];
+    const { scoped, filtered } = filterPipeline(all, state);
+    const { ready, questions } = pipelineColumnFilters(params, state, scoped, all, false);
+
+    expect(filtered).toEqual([marked]);
+    expect(ready.active).toBe(true);
+    expect(ready.choices.map((c) => c.label)).toEqual(['Ready or not', 'Ready to apply · 1', 'Not ready · 3']);
+    expect(questions.active).toBe(false);
+    expect(questions.choices[1]).toMatchObject({
+      label: 'All questions added · 1',
+      href: '/jobs/pipeline?view=table&ready=yes&questions=yes',
+    });
   });
 
   it('lists the companies in scope, most applications first, with links that keep the table', () => {

@@ -702,7 +702,7 @@ Every source passes one gate (`lib/jobs/suggest/admit.ts`, `fit-gate.ts`): a rol
 
 **Pipeline board.** Kanban by status, cards showing company, title, days since last activity, next action, excitement. Drag to change status, which writes a manual override event. A stage with no cards is a narrow lane, so the others fit a laptop's width.
 
-**Pipeline table.** The same data as a sortable table, because a board is bad above about forty items and you will pass forty items. Columns are configurable, sorted by last activity by default.
+**Pipeline table.** The same data as a sortable table, because a board is bad above about forty items and you will pass forty items. Columns are configurable, sorted by last activity by default. Ready and Questions columns show the two marks set on a role page (ready to apply, all questions added), and each header's menu narrows the table to the roles marked or not, as the chips above it do.
 
 **Role detail.** JD, requirement map, application status and timeline, answers, cover letter, interviews, notes, attachments, linked emails. The page you actually live in.
 
