@@ -1,7 +1,8 @@
 import type { TranscriptDraft } from '@/app/you/work/actions';
 import { courseExplainPrompt, type CourseExplain } from '@/lib/learn/evidence/course-explain';
 import { groupCourses } from '@/lib/you/education';
-import type { Course, Transcript } from '@/lib/you/transcripts';
+import type { ChosenFile } from '@/app/you/work/course-files';
+import type { Course, CourseFile, CourseFileKind, Transcript } from '@/lib/you/transcripts';
 
 /** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
 
@@ -110,3 +111,83 @@ export const educationExplains: Record<string, CourseExplain> = {
   },
   c7: offer('c7', ['Microeconomics', 'Game theory', 'General equilibrium theory']),
 };
+
+function kept(
+  id: string,
+  kind: CourseFileKind,
+  week: number | null,
+  title: string,
+  fileName: string,
+  size: number,
+  position: number,
+): CourseFile {
+  const pptx = fileName.endsWith('.pptx');
+  return {
+    id,
+    user_id: USER,
+    course_id: 'c3',
+    kind,
+    title,
+    week,
+    position,
+    file_name: fileName,
+    storage_path: `${USER}/c3/${id}-${fileName}`,
+    mime_type: pptx ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'application/pdf',
+    size_bytes: size,
+    uploaded_at: '2026-10-18T09:00:00Z',
+    updated_at: '2026-10-18T09:00:00Z',
+  };
+}
+
+/**
+ * The files kept under ECON 101 (plan #2401.2): a syllabus, two weeks of
+ * slides and notes, a deck with no week, a reading with a long title and one
+ * with a week. Every other course holds none, and STATS 250 shows the empty
+ * state when opened.
+ */
+export const educationFiles: Record<string, CourseFile[]> = {
+  c3: [
+    kept('f1', 'syllabus', null, 'ECON 101 Winter 2018 syllabus', 'ECON101_W18_syllabus.pdf', 214_331, 0),
+    kept('f2', 'slides', 1, 'Lecture 01 Scarcity and choice', 'Lecture_01_Scarcity_and_choice.pptx', 6_402_118, 1),
+    kept('f3', 'lecture_notes', 1, 'Week 1 notes', 'Week_1_notes.pdf', 88_204, 2),
+    kept('f4', 'slides', 2, 'Lecture 02 Supply and demand', 'Lecture_02_Supply_and_demand.pptx', 9_870_552, 3),
+    kept('f5', 'slides', null, 'Review session before the midterm', 'Review_session.pptx', 3_118_004, 4),
+    kept(
+      'f6',
+      'reading',
+      2,
+      'Mankiw, Principles of Microeconomics, chapter 4: The market forces of supply and demand',
+      'Mankiw_ch4.pdf',
+      2_480_916,
+      5,
+    ),
+    kept('f7', 'reading', null, 'Hayek, The use of knowledge in society', 'Hayek_1945.pdf', 1_204_448, 6),
+  ],
+};
+
+function chosen(key: number, name: string, size: number, kind: CourseFileKind, week: string, extra: Partial<ChosenFile> = {}): ChosenFile {
+  return { key, name, size, kind, week, problem: null, refused: false, progress: null, ...extra };
+}
+
+/** The add drawer with files chosen: two ready, one refused for its type, one for its size. */
+export const educationChosen: ChosenFile[] = [
+  chosen(0, 'Lecture_03_Elasticity.pptx', 7_204_118, 'slides', '3'),
+  chosen(1, 'Week 3 notes.pdf', 120_331, 'lecture_notes', '3'),
+  chosen(2, 'Lecture_04_recording.mp4', 412_000_000, 'slides', '4', {
+    refused: true,
+    problem: 'Not a file the course can keep. Use a PDF, PowerPoint, Word document, photo or text file.',
+  }),
+  chosen(3, 'Problem set scans, all weeks.pdf', 38_201_554, 'reading', '', {
+    refused: true,
+    problem: 'Over 20 MB (36.4 MB).',
+  }),
+];
+
+/** The same drawer mid-upload: one going, one failed with its reason, one waiting its turn. */
+export const educationUploading: ChosenFile[] = [
+  chosen(0, 'Lecture_03_Elasticity.pptx', 7_204_118, 'slides', '3', { progress: 0.62 }),
+  chosen(1, 'Week 3 notes.pdf', 120_331, 'lecture_notes', '3', {
+    problem: 'The connection dropped. Try again.',
+  }),
+  chosen(4, 'Krugman, The age of diminished expectations, chapter 2.pdf', 3_402_118, 'reading', '3'),
+];

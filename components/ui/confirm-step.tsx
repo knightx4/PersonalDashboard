@@ -33,6 +33,7 @@ export function ConfirmStep({
   align = 'end',
   className,
   disabled,
+  defaultArmed = false,
 }: {
   /** The button before it is armed: "Delete forever". */
   children: React.ReactNode;
@@ -50,8 +51,10 @@ export function ConfirmStep({
   align?: 'start' | 'end';
   className?: string;
   disabled?: boolean;
+  /** Start armed: the gallery's way to draw the confirm showing. */
+  defaultArmed?: boolean;
 }) {
-  const [armed, setArmed] = useState(false);
+  const [armed, setArmed] = useState(defaultArmed);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 

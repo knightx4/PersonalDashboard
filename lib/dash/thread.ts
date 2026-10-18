@@ -67,13 +67,13 @@ Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_age
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
-change_goal_link, change_goal_form and change_goals_inbox, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+change_goal_link, change_goal_form, change_goals_inbox and change_goal_list, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
 add_discovered_company, add_role_from_email, change_interview, change_interviewer and
 change_interview_round, and in Dev rewrite_post for the text of an X post
-draft. This
+draft and suggest_post to save a new one. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

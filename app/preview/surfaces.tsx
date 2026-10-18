@@ -1,6 +1,7 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import { FigureQuestionPreview } from './figure-question-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -28,9 +29,9 @@ import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
 import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
-import { Property } from '@/components/shell/detail-layout';
-import { DetailFacts } from '@/components/patterns/list-detail';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
+import { HeaderFacts, RoleFacts } from '@/app/jobs/(app)/roles/[id]/role-facts';
+import { roleFactOrigins, type FactField, type FactOriginRecord, type RoleFactOrigins } from '@/lib/jobs/fact-origins';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
@@ -80,6 +81,8 @@ import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurfa
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
+import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
+import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -221,6 +224,9 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnFigureSurface,
+  LearnExplorableSurface,
+  LearnMapSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -293,7 +299,14 @@ import {
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
-import { educationGroups, educationCounts, educationExplains } from './education-fixtures';
+import {
+  educationChosen,
+  educationCounts,
+  educationExplains,
+  educationFiles,
+  educationGroups,
+  educationUploading,
+} from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -457,6 +470,23 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import {
+  GoalListsCalendarDaySurface,
+  GoalListsCalendarEmptySurface,
+  GoalListsCalendarSurface,
+  GoalListsEmptySurface,
+  GoalListsErrorSurface,
+  GoalListsGallerySurface,
+  GoalListsLinkedSurface,
+  GoalListsLoadingSurface,
+  GoalListsMapEmptySurface,
+  GoalListsMapFailedSurface,
+  GoalListsMapPinSurface,
+  GoalListsMapSurface,
+  GoalListsPanelSurface,
+  GoalListsSurface,
+  GoalListsTabSurface,
+} from './goal-lists-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
@@ -495,6 +525,7 @@ import { RunLinesSurface } from './run-lines-surfaces';
 import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
+  FinishNoticeSurface,
   DevBugsSurface,
   DevChangelogSurface,
   DevChangelogScreensSurface,
@@ -519,6 +550,7 @@ import {
   NewsSettingsSurface,
   NewsStorySurface,
   TodoAllSurface,
+  TodoAllTaggedSurface,
   TodoSettingsSurface,
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
@@ -619,6 +651,7 @@ const roleTasks: Task[] = [
     createdAt: '2026-09-15T16:00:00.000Z',
     position: null,
     parentId: null,
+    tags: [],
   },
 ];
 
@@ -1470,6 +1503,33 @@ const contact: ContactRow = {
 };
 
 /** People to name as a referrer: one with the longest name, one with no company. */
+/** Fact origins for the role page's gallery entries (plan #2343.3). */
+function factOriginFixtures(
+  given: Partial<Record<FactField, Pick<FactOriginRecord, 'origin' | 'certainty'> & { messageId?: string }>>,
+): RoleFactOrigins {
+  const out = roleFactOrigins([]);
+  for (const [field, record] of Object.entries(given) as Array<[FactField, NonNullable<(typeof given)[FactField]>]>) {
+    out[field] = {
+      field,
+      origin: record.origin,
+      certainty: record.certainty,
+      messageId: record.messageId ?? null,
+      sourceUrl: null,
+      recordedAt: '2026-08-01T12:00:00.000Z',
+    };
+  }
+  return out;
+}
+
+/** The facts surface's origins: one of each look the step draws. */
+const roleFactsOrigins = factOriginFixtures({
+  comp: { origin: 'recruiter_email', certainty: 'secondhand', messageId: 'msg-1' },
+  location: { origin: 'posting', certainty: 'firsthand' },
+  work_mode: { origin: 'you', certainty: 'firsthand' },
+  seniority: { origin: 'dash', certainty: 'guess' },
+  posting_status: { origin: 'unknown', certainty: null },
+});
+
 const referrerFixtures: ReferrerOption[] = [
   { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The Halloran-Achterberg group' },
   { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
@@ -4023,25 +4083,77 @@ export const SURFACES: readonly Surface[] = [
               </div>
             }
           />
-          <DetailFacts>
-            <Property label="Applied" value="31 Jul 2026" />
-            <Property label="Confirmed" value="31 Jul 2026" />
-            <Property label="First human reply" value="6 Aug 2026" />
-            <Property
-              label="Channel"
-              value={
-                <ChannelPicker
-                  applicationId="app-1"
-                  source="referral"
-                  referralContactId="contact-2"
-                  contacts={referrerFixtures}
-                />
-              }
-            />
-            <Property label="Comp band" value="$180k–$220k" />
-            <Property label="Outcome" value="—" />
-          </DetailFacts>
+          <RoleFacts
+            roleId="role-1"
+            applied="31 Jul 2026"
+            confirmed="31 Jul 2026"
+            firstHumanReply="6 Aug 2026"
+            channel={
+              <ChannelPicker
+                applicationId="app-1"
+                source="referral"
+                referralContactId="contact-2"
+                contacts={referrerFixtures}
+              />
+            }
+            compBand="$180k–$220k"
+            location="New York"
+            workMode="Hybrid"
+            seniority="Senior"
+            postingStatus="open"
+            companyStage={null}
+            ats="greenhouse"
+            outcome="—"
+            origins={factOriginFixtures({ comp: { origin: 'posting', certainty: 'firsthand' } })}
+          />
         <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
+      </div>
+    ),
+  },
+  {
+    /* The role page's header and facts with an origin under each of the role's
+     * own (plan #2343.3): pay from a recruiter's email with the message
+     * linked, the location from the posting, the work mode typed by you, the
+     * seniority Dash guessed, a posting status saved before origins were kept
+     * (no label) and a company stage nobody has filled in. */
+    id: 'jobs-role-facts',
+    label: 'Role · Facts and where they came from',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <div className="space-y-4">
+        <PageHeader
+          title="Staff Machine Learning Engineer, Ranking and Recommendations Infrastructure"
+          description={
+            <>
+              The Halloran-Achterberg group
+              <HeaderFacts
+                facts={[
+                  ['location', 'San Francisco, New York or remote in the US'],
+                  ['work_mode', 'Hybrid'],
+                  ['seniority', 'Staff'],
+                ]}
+                origins={roleFactsOrigins}
+              />
+            </>
+          }
+        />
+        <RoleFacts
+          roleId="role-1"
+          applied="31 Jul 2026"
+          confirmed="—"
+          firstHumanReply="—"
+          channel="Careers page"
+          compBand="$240k–$310k"
+          location="San Francisco, New York or remote in the US"
+          workMode="Hybrid"
+          seniority="Staff"
+          postingStatus="open"
+          companyStage={null}
+          ats="ashby"
+          outcome="—"
+          origins={roleFactsOrigins}
+        />
       </div>
     ),
   },
@@ -4956,6 +5068,126 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A goal’s lists as chips under the done-when (plan #2330.3): its own pantries to compare, one picked, and a linked list of readings from Learn. */
+    id: 'goals-lists',
+    label: 'Goal · its lists as chips',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsSurface />,
+  },
+  {
+    /* The pantry chip pressed: the list in a panel over the page, with a row a pasted link filled in waiting to be confirmed. */
+    id: 'goals-lists-panel',
+    label: 'Goal · a list open in its panel',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsPanelSurface />,
+  },
+  {
+    /* The readings chip pressed: each reading as Learn has it, two with comments, one gone, and the fold of the one put down, open. */
+    id: 'goals-lists-panel-linked',
+    label: 'Goal · a linked list open, ruled out showing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLinkedSurface />,
+  },
+  {
+    /* The add box after a pasted link was refused. */
+    id: 'goals-lists-panel-error',
+    label: 'Goal · a list, a link that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsErrorSurface />,
+  },
+  {
+    /* A list just started: the empty line and the add box. */
+    id: 'goals-lists-panel-empty',
+    label: 'Goal · a new list with nothing in it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsEmptySurface />,
+  },
+  {
+    /* A pasted link being read, waiting at the foot of the rows. */
+    id: 'goals-lists-panel-loading',
+    label: 'Goal · a list reading a pasted link',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLoadingSurface />,
+  },
+  {
+    /* The pantries open on Gallery (plan #2330.4): every picture in a grid with its name and price. */
+    id: 'goals-lists-panel-gallery',
+    label: 'Goal · a list as a gallery',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsGallerySurface />,
+  },
+  {
+    /* A list of events from the calendar (plan #2330.4): the month with two on one day, and what is coming under it. */
+    id: 'goals-lists-panel-calendar',
+    label: 'Goal · a list on a calendar',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarSurface />,
+  },
+  {
+    /* A day on the list’s calendar pressed: its popover names each row with its link. */
+    id: 'goals-lists-panel-calendar-day',
+    label: 'Goal · a list’s calendar, a day open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarDaySurface />,
+  },
+  {
+    /* The list’s calendar stepped to a month with nothing in it. */
+    id: 'goals-lists-panel-calendar-empty',
+    label: 'Goal · a list’s calendar, an empty month',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarEmptySurface />,
+  },
+  {
+    /* Shops on the map (plan #2330.4): numbered pins on OpenStreetMap, and one with an address alone listed under it. */
+    id: 'goals-lists-panel-map',
+    label: 'Goal · a list on a map',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapSurface />,
+  },
+  {
+    /* A pin on the list’s map pressed: its name, link and address over the map. */
+    id: 'goals-lists-panel-map-pin',
+    label: 'Goal · a list’s map, a pin open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapPinSurface />,
+  },
+  {
+    /* A list with a place field and no address yet: the map says how to add one. */
+    id: 'goals-lists-panel-map-empty',
+    label: 'Goal · a list’s map with no places',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapEmptySurface />,
+  },
+  {
+    /* The map’s tiles would not load, so the table stands in for it. */
+    id: 'goals-lists-panel-map-failed',
+    label: 'Goal · a list’s map that could not load',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapFailedSurface />,
+  },
+  {
+    /* Three lists, so each has a tab after Steps; the pantries’ tab open. */
+    id: 'goals-lists-tab',
+    label: 'Goal · a list on its own tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsTabSurface />,
+  },
+  {
     /* The design language, held to itself. It is the one surface where being
      * wrong is self-refuting, and it is the surface most likely to drift,
      * because it is written in prose and prose does not fail a type check. */
@@ -5341,6 +5573,7 @@ export const SURFACES: readonly Surface[] = [
             createdAt: '2026-09-02T08:00:00.000Z',
             position: null,
             parentId: null,
+            tags: [],
           },
         ]}
       />
@@ -5696,6 +5929,107 @@ export const SURFACES: readonly Surface[] = [
           courses={9}
           explains={educationExplains}
           explaining="c3"
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened to its files (plan #2401.2): the syllabus, then the lectures week by week, then the readings, each with its size. */
+    id: 'you-work-files',
+    label: 'Work & school · A course\'s files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A file row with its Remove showing, as hover and focus show it, and
+     * another with its confirm armed in place before it deletes. */
+    id: 'you-work-files-remove',
+    label: 'Work & school · Removing a course file',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened with no files yet: what to add and the press that adds them. */
+    id: 'you-work-files-empty',
+    label: 'Work & school · A course with no files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer with four files chosen: two ready with their kind and week, one refused for its type and one for its size. */
+    id: 'you-work-files-add',
+    label: 'Work & school · Adding course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationChosen }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer mid-upload: one file going with its progress, one failed with its reason, one waiting its turn. */
+    id: 'you-work-files-uploading',
+    label: 'Work & school · Uploading course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
         />
       </>
     ),
@@ -8195,6 +8529,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TaskFilesSurface />,
   },
 
+  /* Tags on todo rows (plan #2340.2): the chips, the picker open under a
+   * row, and the pointer's controls held (remove on a chip, the plus chip). */
+  {
+    id: 'todo-task-tags',
+    label: 'Todo · Tags on a task',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsSurface />,
+  },
+  {
+    id: 'todo-task-tags-picker',
+    label: 'Todo · Tags on a task, the picker open',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsPickerSurface />,
+  },
+  {
+    id: 'todo-task-tags-hover',
+    label: 'Todo · Tags on a task, pointed at',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsHoverSurface />,
+  },
+
+  /* The agenda narrowed by a tag (plan #2340.3): Now chosen, and a tag
+   * nothing carries with the way back to everything. */
+  {
+    id: 'todo-agenda-tagged',
+    label: 'Todo · The agenda filtered by a tag',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-more',
+    label: 'Todo · The tag filter, More open on a phone',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedMoreSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-empty',
+    label: 'Todo · The agenda filtered by a tag nothing carries',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedEmptySurface />,
+  },
+
   /* The end of Quick read (plan #1557): played by passing the last story,
    * and as a page that loads already caught up. */
   {
@@ -8385,6 +8767,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AccountSurface tab="notifications" />,
+  },
+  {
+    /* The switch for Dash's finished-work notification, under the morning brief (plan #2389.4). */
+    id: 'account-notifications-finish',
+    label: 'Account · Tell me when Dash has finished',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface />,
+  },
+  {
+    /* The same switch before its row is read: disabled (plan #2389.4). */
+    id: 'account-notifications-finish-loading',
+    label: 'Account · Tell me when Dash has finished, loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface loading />,
+  },
+  {
+    /* A save that failed: the message, and the switch back where it was (plan #2389.4). */
+    id: 'account-notifications-finish-error',
+    label: 'Account · Tell me when Dash has finished, save failed',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface enabled error="Could not turn off “Tell me when Dash has finished”. It is still on. Try again." />,
   },
   {
     /* The workspaces and the one list of settings links, with Timeline and Model spend (plan #1743). */
@@ -9033,6 +9439,117 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPieceHeldSurface />,
   },
   {
+    /* Each figure kind on a lesson, open on a phone (plan #2321.1). */
+    id: 'learn-figure-table',
+    label: 'Plan · A lesson with a table',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="table" />,
+  },
+  {
+    id: 'learn-figure-compare',
+    label: 'Plan · A lesson with a comparison',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="compare" />,
+  },
+  {
+    id: 'learn-figure-source-figure',
+    label: 'Plan · A lesson with a course figure',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="source_figure" />,
+  },
+  {
+    id: 'learn-figure-chart',
+    label: 'Plan · A lesson with a chart of a real series',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" />,
+  },
+  {
+    id: 'learn-figure-chart-missing',
+    label: 'Plan · A lesson whose chart’s series was not found',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" missing />,
+  },
+  {
+    /* An explorable model on a lesson on price formation (plan #2321.7). */
+    id: 'learn-figure-explorable',
+    label: 'Plan · A lesson with an explorable model',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface />,
+  },
+  {
+    /* Each model in lib/learn/figures/models/registry.ts, its sliders moved. */
+    id: 'learn-figure-explorable-supply-demand',
+    label: 'Plan · Supply and demand, supply moved',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="supply_demand" />,
+  },
+  {
+    id: 'learn-figure-flow',
+    label: 'Plan · A lesson with a flow',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="flow" />,
+  },
+  {
+    id: 'learn-figure-cycle',
+    label: 'Plan · A lesson with a cycle',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="cycle" />,
+  },
+  {
+    id: 'learn-figure-tree',
+    label: 'Plan · A lesson with a tree',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="tree" />,
+  },
+  {
+    id: 'learn-figure-two-by-two',
+    label: 'Plan · A lesson with a two-by-two',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="two_by_two" />,
+  },
+  {
+    id: 'learn-figure-timeline',
+    label: 'Plan · A lesson with a timeline',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="timeline" />,
+  },
+  {
+    /* A map on a lesson about the Big Dig, its places dated, so the year slider shows (plan #2321.6). */
+    id: 'learn-figure-map',
+    label: 'Plan · A lesson with a map of dated places',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface />,
+  },
+  {
+    /* The same kind with no years on its places: no slider, every marker in the accent. */
+    id: 'learn-figure-map-undated',
+    label: 'Plan · A lesson with a map of Shenzhen, no years',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface undated />,
+  },
+  {
+    /* A place pressed on the map, its note showing. */
+    id: 'learn-figure-map-pressed',
+    label: 'Plan · A map with a place pressed',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface pressed={2} />,
+  },
+  {
     id: 'learn-probe',
     label: 'Subject · Questions, before the first',
     module: 'learn',
@@ -9422,6 +9939,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TodoAllSurface />,
   },
   {
+    id: 'todo-all-tagged',
+    label: 'Todo · All tasks, filtered by a tag',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoAllTaggedSurface />,
+  },
+  {
     id: 'todo-settings',
     label: 'Todo · Settings',
     module: 'todo',
@@ -9572,4 +10096,69 @@ export const SURFACES: readonly Surface[] = [
       ...(surface.deck ? { deck: surface.deck } : {}),
     })),
   ),
+  {
+    /* Figure questions in Practice Flow (plan #2321.5): a table's blank
+     * cell to fill, asked in an explanation's place. */
+    id: 'learn-cell-answer-figure-fill',
+    label: 'Practice Flow · Fill the cell',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" />,
+  },
+  {
+    /* The same, graded and missed, with the answer under the summary. */
+    id: 'learn-cell-answer-figure-fill-graded',
+    label: 'Practice Flow · Fill the cell, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" graded />,
+  },
+  {
+    /* A chart of a real series cut at a year, and which way it went next. */
+    id: 'learn-cell-answer-figure-predict',
+    label: 'Practice Flow · Which way next',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="predict" />,
+  },
+  {
+    /* The right figure among three, each drawn under its letter. */
+    id: 'learn-cell-answer-figure-pick',
+    label: 'Practice Flow · Pick the figure',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" />,
+  },
+  {
+    /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */
+    id: 'learn-figure-explorable-bid-rent',
+    label: 'Plan · Bid-rent, a rail line opened',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="bid_rent" />,
+  },
+  {
+    /* The agglomeration model on a lesson on why density pays, congestion eased (plan #2321.8). */
+    id: 'learn-figure-explorable-agglomeration',
+    label: 'Plan · Agglomeration, congestion eased',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="agglomeration" />,
+  },
+  {
+    /* Which way the city's edge moves when a rail line opens: bid-rent drawn still. */
+    id: 'learn-cell-answer-figure-move-bid-rent',
+    label: 'Practice Flow · Which way it moves, bid-rent',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-bid-rent" />,
+  },
+  {
+    /* Which way a city's best size moves when congestion eases: agglomeration drawn still. */
+    id: 'learn-cell-answer-figure-move-agglomeration',
+    label: 'Practice Flow · Which way it moves, agglomeration',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-agglomeration" />,
+  },
 ];

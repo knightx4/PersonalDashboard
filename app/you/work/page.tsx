@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { groupCourses } from '@/lib/you/education';
-import type { Course, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, Transcript } from '@/lib/you/transcripts';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { resumeHash } from '@/lib/you/resume-hash';
 import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
@@ -28,7 +28,7 @@ export default async function Page() {
   const you = await createYouClient();
   const user = await requireUser();
   const jobsClient = await createJobsClient();
-  const [transcripts, courses, jobs, resume] = await Promise.all([
+  const [transcripts, courses, courseFiles, jobs, resume] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -48,6 +48,16 @@ export default async function Page() {
           ...course,
           credits: course.credits === null ? null : Number(course.credits),
         }));
+      }),
+    // The files kept under each course (plan #2401.2).
+    you
+      .from('course_files')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('position')
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Loading course files failed: ${error.message}`);
+        return ((data ?? []) as CourseFile[]).map((file) => ({ ...file, size_bytes: Number(file.size_bytes) }));
       }),
     you
       .from('work_history')
@@ -82,6 +92,9 @@ export default async function Page() {
   const courseCounts: Record<string, number> = {};
   for (const course of courses) courseCounts[course.transcript_id] = (courseCounts[course.transcript_id] ?? 0) + 1;
 
+  const filesByCourse: Record<string, CourseFile[]> = {};
+  for (const file of courseFiles) (filesByCourse[file.course_id] ??= []).push(file);
+
   const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
 
   return (
@@ -98,6 +111,7 @@ export default async function Page() {
         transcripts={transcripts.length}
         courses={courses.length}
         explains={explains}
+        files={filesByCourse}
       />
     </PageColumn>
   );

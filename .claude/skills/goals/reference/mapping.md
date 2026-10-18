@@ -20,6 +20,119 @@ plan, which always goes in `proposed` ("Steps that act outside the plan"). Befor
 there and build around it: keep the person's steps, fill in what is missing,
 and reuse a step that already says what you were about to write.
 
+### Blind spots
+
+Before you write the stages, look for what the person has not thought of: the
+cost nobody mentioned, the document a later stage needs, the person who has
+to agree. A map built only from what the goal says leaves those for the
+person to find halfway through. The pass ends in a file called **Blind
+spots** under the goal, and what it finds goes into the map like anything
+else you learned.
+
+**When it runs.** Once per goal, the first time the goal is mapped. Run the
+query under "The file" below before anything else: if it finds a Blind spots
+file, the goal has been through the pass, so skip steps 1 to 5 and map as
+usual. The pass does not run on a later Ask Dash press, on the overnight map
+of a goal that already has stages, on a re-shape, on an area plan, or on an
+errand ("An errand"). A comment from the person on the Blind spots file is
+the request for a fresh pass: on that run, do the pass again and revise the
+file in place.
+
+1. **Read first, so you list only gaps.** The goal's title, `detail` and
+   `acceptance`, the steps already under it and the questions already
+   answered, its area, its `goals.context`, and the other modules as
+   "Pulling in from the other modules" says. Something the person already
+   has in hand (a step that covers it, a note that answers it, a document
+   already filed) is not a blind spot; leave it off.
+2. **Check four kinds.** Think about each for this goal in particular, not
+   goals in general:
+   - **Costs**: money, fees, deposits, subscriptions, and time the plan
+     will take that the person has not allowed for.
+   - **Prerequisites**: what has to be true or in hand before a stage can
+     start: a document, an account, a qualification, a booking window,
+     another goal finished first.
+   - **People involved**: who else has to agree, act, be told or be asked
+     (a partner, a landlord, a manager, a referee, a doctor).
+   - **Common stall points**: where goals of this kind usually stop moving:
+     a waiting list, a quote nobody chases, the second month of a habit, a
+     form that needs something from a third party.
+3. **Keep six at most**, across the four kinds, ordered by how much each
+   changes the plan. One that gates a stage or could sink the goal comes
+   before one that adds a step; one that only adds a line to a step's detail
+   comes last. Fewer is fine, and a kind can have none.
+4. **Sort each into "put in the map" or "ask".** The default is the map: a
+   step (usually a `claude` step to find it out, or the person's step to
+   get it), a dependency, a clause in a stage's `acceptance`, a field on an
+   information step's collection, or a line in a step's `detail`. Where
+   building it in means choosing something, choose it and write the
+   `Decided:` line on the step it shapes. Sort an item to "ask" only when it
+   passes the test in "Decide first, ask last"; one that fails is decided.
+   A fact only the person holds goes on an information step, not a
+   question. The pass does not raise the number of questions: a goal still
+   rarely gets more than one per run, so a blind spot that would be a second
+   question is decided, or written as a provisional step on the question
+   that is already there.
+5. **Write the map**, stages and all, with each "put in the map" item on
+   the step it shapes. Then write the file, so it can name those steps.
+
+**The file.** Write it on every pass, whether or not anything was asked, so
+the person can see what was checked. Follow [files.md](files.md), with the
+answer first: how many blind spots, the one that matters most, and what you
+asked, if anything ("Three blind spots. The biggest is the landlord's
+written consent, which I put in as the first step of Get the paperwork. I
+asked nothing."). Then one row per blind spot in a table: the blind spot,
+its kind, what you did with it (the step it went into, by title, or the
+question you asked), and why it matters in a clause. After the table, one
+line naming the kinds you checked and found nothing in, so an empty kind
+reads as checked rather than skipped.
+
+File it by hand, not with `goals.file_result`. That function keeps one file
+per item, found by its `origin`, and the goal's own slot belongs to writing
+that bears on the goal as a whole (a breakdown, a set of options); filing
+Blind spots there would overwrite that file, or be overwritten by it. So the
+Blind spots file has no `origin` (an origin has to name a real row, which a
+suffix on the goal's ref does not) and is linked from the goal alone. Send it
+as one statement, through `scripts/sql.ts --file` with `--set
+goals.actor=claude --set goals.run_id=<the run id>`:
+
+```sql
+with f as (
+  insert into core.files (user_id, title, summary, body, made_by)
+  values ('<user>', 'Blind spots',
+          'Three blind spots. The biggest is the landlord''s written consent, now the first step of Get the paperwork. I asked nothing.',
+          $f$<the markdown>$f$, 'claude')
+  returning id
+)
+insert into goals.links (user_id, item_id, kind, target_id)
+select '<user>', '<goal id>', 'file', id from f
+returning target_id;
+```
+
+Look for one before you do anything else in the pass, and again before you
+write: a live file of Dash's titled Blind spots, linked from the goal. Never
+write a second one for a goal.
+
+```sql
+select f.id, f.body, f.updated_at
+from goals.links l
+join core.files f on f.id = l.target_id and f.user_id = l.user_id
+where l.user_id = '<user>' and l.item_id = '<goal id>' and l.kind = 'file'
+  and l.archived_at is null and f.archived_at is null
+  and f.made_by = 'claude' and f.title = 'Blind spots';
+```
+
+When there is one, read its thread (`core.thread_turns`, ref
+`core.files:<id>`) and revise it with an update of `body`, `summary` and
+`change_note`, as "Files" in `working-steps.md` says for a file on the same
+question, rather than writing a second. List the blind spots in the run
+summary too, with what you did with each.
+
+The query finds the file by its title and maker, so a file the person has
+renamed is not found, and the goal reads as not yet through the pass. That is
+accepted: the pass then runs once more and writes a new file. If you see a
+renamed file of Dash's under the goal whose body is a blind-spot table, treat
+it as the goal's file and revise it instead.
+
 ### Stages and sub-steps
 
 1. **Stages at the top level.** (Older runs, and the Send a phase job, call
@@ -144,6 +257,9 @@ for a health goal.
    | `yes_no` | `true` or `false` | on autopay or not |
    | `choice` | one of `options`, exactly | federal or private |
    | `link` | an http or https address | the servicer's login page |
+   | `image` | an http or https address of a picture | a product photo |
+   | `place` | `{"address": "…", "lat": 53.8, "lng": -1.55}`, coordinates both or neither | a store, a venue |
+   | `ref` | a row in the app as `schema.table:id` | a reading in Learn |
 
    `key` is lower case letters, digits and `_`, at most 40 characters, and
    never changes. `tracked` goes only on `number`, `money` or `percent`, and
@@ -245,6 +361,107 @@ returning id;
      takes them (`["Edfinancial", "edfinancial.com"]`). The morning run
      searches Gmail for new ones from these ("Reading new statements from
      Gmail"). Leave it `[]` for a document that is not emailed.
+
+### Lists the goal needs
+
+A goal often comes down to a pile of things to compare, visit, read or meet.
+When you map one, decide which lists it needs and set them up, so the person
+opens the goal and finds the places to start (plan #2330.6). There are no
+goal types: nothing on the goal says "purchase" or "explore". You read what
+the goal is about and pick the lists, and the person can add, rename or
+archive any of them afterwards.
+
+**Link before you write.** Four kinds of thing already live in their own
+workspace, so a list of them links to the rows there (`goals.links`) and never
+copies them. Finishing a reading in Learn then shows on the goal too.
+
+| Kind | The rows | The kind's own list | Look in |
+|---|---|---|---|
+| `reading` | readings on a Learn track | Reading | `learn.readings` (`title`, `status`) |
+| `event` | calendar events | Events | `todo.events` (`title`, `location`, `starts_at`) |
+| `saved_item` | products saved in Shopping | Products | `public.saved_items` (`title`, `url`, `status`) |
+| `contact` | people in the job search | People | `job_search.contacts` (`title`, `status`) |
+
+Search the owner's rows for ones that fit the goal (titles, notes, the
+context kept for the goal) and link the real ones:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.links (user_id, item_id, kind, target_id, list_name)
+values ('<user>', '<goal id>', 'saved_item', '<saved_items.id>', null);
+```
+
+Link the product a step is about to the step itself, not only to the goal
+(`item_id` the step's id; in Ask Dash, `change_goal_link` with `step_ref`):
+buying it in Shopping then closes the step (plan #2330.5).
+
+`list_name` null puts the link in the kind's own list; give a name to split
+one kind into two lists ("Shortlist", "Ruled out"). Link only rows that
+plainly belong, as "Writing what you found" says, and never link a row to make
+a list look full. In Ask Dash's tools this is `change_goal_link` with
+`{change: 'link_row', goal_ref, kind, target, list}`. When nothing fits yet,
+add no empty link list: the person links rows from the goal later, and a
+reading, event or product they add afterwards can be linked then.
+
+**Write a list of the goal's own for what has no other home.** A candidates
+list, places to visit, groups to try, documents to collect. It is a
+collection with `goal_id` set; a trigger makes it serve the goal, so do not
+write `collection_goals` yourself. Fields come from the types above, and the
+first field is the one that names the row. Mark the numbers the goal is
+measured by `tracked`.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.collections (user_id, goal_id, name, shape, fields, position)
+values ('<user>', '<goal id>', 'Candidates', 'list', '[
+  {"key": "name", "label": "Name", "type": "text", "id": true},
+  {"key": "picture", "label": "Picture", "type": "image"},
+  {"key": "size", "label": "Size", "type": "text"},
+  {"key": "price", "label": "Price", "type": "money"},
+  {"key": "link", "label": "Link", "type": "link"}
+]'::jsonb, 0)
+returning id;
+```
+
+- `position` counts from 0 in the order the person should meet the lists.
+- Name the list for what it holds on this goal ("Candidates", "Places to
+  visit"). A list's name is unique among the goal's live lists once
+  migration 0081 is live; until the workflow on main has applied it, a name
+  is unique across the account, so a clash means pick a more specific name
+  ("Sofa candidates"), not reuse the other goal's list.
+- A row you write in a list is a **draft**: `goals.actor = 'claude'`,
+  `draft = true` and a `source` that is not `typed`, as "Filing a document you
+  were given" in `records.md` says. The person confirms it. Write rows only
+  for facts you found (a product page, an event listing); an empty list is
+  a good start and a guessed row is not.
+- A pasted product link becomes a draft row for the person through
+  `add_link`; you read the page the same way and fill name, picture, price
+  and link from it.
+- From Ask Dash's chat the same moves are `change_goal_list` (add_list,
+  add_fields, add_row, add_link, and the rest).
+
+**Which lists fit.** These are starting points. Use the ones the goal needs,
+add others the goal calls for, and leave out any it does not.
+
+| The goal is about | Start with |
+|---|---|
+| Buying something (a sofa, a laptop, a bike) | A **Candidates** list: name, picture (`image`), size, price (`money`, tracked), link (`link`), where to see it (`place`), plus `choice` fields for what the person said matters. Link `saved_item` rows the person already saved for it. |
+| Exploring a place or an interest (a neighbourhood, a hobby, a city) | A **Places** list with a `place` field, a `date` for the last visit and a `number` visit count (tracked); a **Groups** list (name, link, when they meet) if there are clubs to try. Link `event` rows on the calendar. |
+| Something social (meeting people, joining a community) | Link `event` rows for the events to attend, and `contact` rows for people met when the job search holds them. A **People met** list of the goal's own (name, where met, `date`, notes) for people who are in no other workspace. |
+| Learning something | Link `reading` rows from the aim's track. A **Courses** or **Resources** list (title, `link`, cost) for what is not in Learn. |
+| Paperwork (a visa, a move, taxes) | A **Documents** list: name, who issues it, `choice` status (To get, Requested, Have), due `date`, `link`, and a `ref` field for the file or email that holds it. |
+| Money or a number (debt, savings) | No list of the goal's own. It needs an information step and its form (above). |
+
+**Counting.** Say a list counts towards the goal only where that already
+works: a goal's number can be counted from a collection serving it
+(`change_goal_number`, "Number of Places"), and a goal-owned list serves its
+goal automatically. Do not set a number from a list unless the goal is
+measured by how many there are; do not promise a count where none is wired.
+
+Say in the run's summary which lists you added, which rows you linked and
+which you looked for and did not find.
 
 ### Weekly help
 
@@ -349,6 +566,8 @@ down to fit:
   with `acts` if Dash would do it, as "Steps that act outside the plan" says.
 - **No weekly help.** Leave `proposed_help_kinds` empty; an errand is over
   before a weekly run would help it.
+- **Skip the blind-spot pass.** An errand is a one-off job with a date and at
+  most one question, so write no Blind spots file for it.
 - Leave the goal's note as for any run. The errand closes as any goal does:
   propose `met` in the morning review once its done-when holds.
 

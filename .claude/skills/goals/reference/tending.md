@@ -162,7 +162,10 @@ where id = '<step id>' and user_id = '<user>' and kind = 'mine';
 `evidence` is one line, up to 500 characters, that the person reads on the
 Goals home after "Closed <the step>:". Name the thing you saw and its date,
 and where it is: "The Nelnet email of 20 September says autopay is on for
-both loans." `evidence_source` is `jobs`, `gmail`, `calendar` or `todo`. The
+both loans." `evidence_source` is `jobs`, `gmail`, `calendar` or `todo`.
+`shopping` is the database's own: a step of the person's that links a saved
+product closes by itself when the product is bought (plan #2330.5), so a
+step like "Get a pantry" needs no search once its product is linked to it. The
 database refuses a close of one of the person's steps without both, and one
 with an open sub-step beneath it (`migrations-goals/0050`); close the
 sub-steps from their own evidence first, and the phase follows by itself.

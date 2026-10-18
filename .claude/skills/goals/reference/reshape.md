@@ -12,6 +12,10 @@ When questions under the goal have a `resolution`:
   older provisional step still `proposed` under an approved goal goes to
   `open` once settled.
 - Write any new steps the answer made clear, in the phase they belong to.
+- Add a list the answer made clear the goal needs (a candidates list once the
+  person has said what they are buying), and link rows it now makes relevant,
+  as "Lists the goal needs" in `mapping.md` says. Keep the lists that are
+  there; the person may have added their own.
 - Ask a new question only if an answer opened one. Never re-ask one the person
   answered, or one they put aside.
 - A provisional step of the person's kind (`mine` or `rhythm`) is not yours

@@ -3,17 +3,11 @@ import { createClient, getUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { NoPermission } from '@/components/shell/no-permission';
 import type { NavSection } from '@/components/shell/app-shell';
-import { loadOpenRaises, type OpenRaise } from '@/lib/raised/open-raises';
 import { loadDevBrief } from '@/lib/shell/brief';
 import { shellFor } from '@/lib/shell/shell-for';
 import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
-import { buildPlanTree } from '@/lib/plan/tree';
-import { waitingOnYou } from '@/lib/plan/waiting';
-import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
-import { planRowRef, raiseRef, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
-import { countPlanRunQuestions } from '@/lib/plan/run-answer';
-import { countProposedSpecChanges } from '@/lib/specs/changes';
+import { countDevInbox } from '@/lib/dev/inbox-count';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -55,29 +49,19 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   }
 
   // Started here, beside the shell's own reads, and awaited by the Inbox tab.
-  const inboxReads = Promise.all([
-    // The open raises, which the shell read for the bell until plan #1937.7.
-    loadOpenRaises(user.id),
-    loadPlanForRequest(user.id),
-    // Changes to specs waiting on a yes, which Home lists under To approve
-    // (plan #1506).
-    countProposedSpecChanges(supabase, user.id),
-    // Runs held on a question they asked partway, which the Inbox lists
-    // under Need your answer (plan #1824).
-    countPlanRunQuestions(supabase, user.id),
-    // Rows put aside until a later day leave the count too (plan #1843).
-    loadSnoozeState(supabase, user.id),
-  ]);
+  // The count is lib/dev/inbox-count.ts, which the notification that Dash has
+  // finished its work reads too (plan #2389.2).
+  const inbox = countDevInbox(supabase, user.id, { plan: loadPlanForRequest(user.id) });
   // A failure still fails the layout when the tab awaits it, as it did when
   // these were read in one round with the shell's; this only keeps it from
   // being reported as unhandled in the meantime.
-  inboxReads.catch(() => {});
+  inbox.catch(() => {});
 
   return shellFor({
     module: 'dev',
     user,
-    sections: async ({ owner }) => devSections(owner, ...(await inboxReads)),
-    brief: async () => loadDevBrief(devWaiting(...(await inboxReads))),
+    sections: async ({ owner }) => devSections(owner, await inbox),
+    brief: async () => loadDevBrief(await inbox),
     // The routines that work the repository, moved off Home (plan #1937.10).
     settingsHref: '/dev/settings',
     settingsLabel: 'Dev settings',
@@ -85,44 +69,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   });
 }
 
-function devWaiting(
-  raised: OpenRaise[],
-  plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
-  specChanges: number,
-  runQuestions: number,
-  snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
-): number {
-  /**
-   * The badge is everything waiting on you, which is more than the raises.
-   *
-   * It used to be `raised.length`, so a step blocked on a credential added
-   * nothing to it: #499 sat blocked for a day behind a tab reading zero. The
-   * plan's half is derived the same way the Dash page derives the section it
-   * lands in -- `waitingOnYou` over the same tree -- rather than counted again
-   * here, because a badge that disagrees with the page it links to is worse
-   * than no badge.
-   */
-  const waiting = withoutSnoozed(
-    waitingOnYou(buildPlanTree(plan)),
-    (row) => planRowRef(row.id),
-    snoozes,
-  );
-  const raisedAwake = withoutSnoozed(raised, (raise) => raiseRef(raise.id), snoozes);
-  return raisedAwake.length + waiting.length + specChanges + runQuestions;
-}
-
-function devSections(
-  owner: boolean,
-  raised: OpenRaise[],
-  plan: Awaited<ReturnType<typeof loadPlanForRequest>>,
-  specChanges: number,
-  runQuestions: number,
-  snoozes: Awaited<ReturnType<typeof loadSnoozeState>>,
-): NavSection[] {
+function devSections(owner: boolean, waiting: number): NavSection[] {
   // The tabs and their order are in lib/shell/tabs.ts (plan #2208.2), where the
   // command panel reads them too. The Inbox's badge is everything waiting on
   // you, the length of the list it opens.
-  return withBadges(tabsFor('dev', owner), {
-    '/dev/inbox': devWaiting(raised, plan, specChanges, runQuestions, snoozes),
-  });
+  return withBadges(tabsFor('dev', owner), { '/dev/inbox': waiting });
 }

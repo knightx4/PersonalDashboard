@@ -49,7 +49,7 @@ function SlotDash({ slot, newest }: { slot: RunnerSlot; newest: RunActivity | nu
           activity={working ? pose.activity : undefined}
           moment={working ? (moment ?? undefined) : undefined}
           runner={RUNNERS[slot.slot]}
-          size="icon"
+          size="sm"
           decorative
           still={!working}
         />
@@ -79,7 +79,8 @@ export function RunnerDashes({ owner }: { owner: boolean }) {
       role="group"
       aria-label="The runner's sessions"
       data-runner-dashes=""
-      className="pointer-events-auto flex shrink-0 items-center gap-0.5"
+      // 24px Dashes, pulled into the line's padding so the line keeps its height.
+      className="pointer-events-auto -my-1 flex shrink-0 items-center gap-1"
     >
       {slots.map((slot) => (
         <SlotDash

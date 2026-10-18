@@ -68,6 +68,7 @@ const TOOL_LABELS: Record<string, string> = {
   courses: 'Read courses',
   read_dev_row: 'Read a Dev row',
   find_dev_text: 'Searched Dev text',
+  post_pictures: 'Listed post pictures',
 };
 
 export function toolLabel(tool: string): string {

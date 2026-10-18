@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['courses', 'details', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_files', 'courses', 'details','personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -138,5 +138,100 @@ describe('personal details', () => {
 
   it('refuses a detail past its length', async () => {
     await expect(admin`update details set phone = ${'5'.repeat(201)} where user_id = ${userA}`).rejects.toThrow();
+  });
+});
+
+describe('course files', () => {
+  // migrations-you/0008_course_files.sql (plan #2401.1): the syllabus,
+  // slides, lecture notes and readings kept under a course.
+  const pdf = 'application/pdf';
+  let courseA = '';
+  let transcriptA = '';
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'record.pdf', ${`${userA}/t-record.pdf`}, ${pdf}, 1)
+      returning id`;
+    transcriptA = t.id;
+    const [c] = await admin<{ id: string }[]>`
+      insert into courses (user_id, transcript_id, school, title, position)
+      values (${userA}, ${transcriptA}, 'State University', 'Intro to Economics', 0)
+      returning id`;
+    courseA = c.id;
+  });
+
+  const insertFile = (
+    user: string,
+    owner: string,
+    course: string,
+    name: string,
+    extra: Record<string, string | number> = {},
+  ) => {
+    const row = {
+      user_id: owner,
+      course_id: course,
+      kind: 'reading',
+      title: name,
+      file_name: name,
+      storage_path: `${owner}/${course}/${name}`,
+      mime_type: pdf,
+      size_bytes: 1,
+      ...extra,
+    };
+    return asUser(user, (tx) => tx`insert into course_files ${tx(row)} returning id`);
+  };
+
+  it('keeps a file under its course, to its owner only', async () => {
+    await insertFile(userA, userA, courseA, 'syllabus.pdf', { kind: 'syllabus' });
+    await insertFile(userA, userA, courseA, 'week-1.pptx', {
+      kind: 'slides',
+      week: 1,
+      mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+    const own = await asUser(userA, (tx) => tx`select kind, week from course_files order by kind`);
+    expect(own).toEqual([
+      { kind: 'slides', week: 1 },
+      { kind: 'syllabus', week: null },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from course_files`)).toHaveLength(0);
+  });
+
+  it("refuses a file on another account's course, or in another account's folder", async () => {
+    await expect(insertFile(userB, userB, courseA, 'planted.pdf')).rejects.toThrow();
+    await expect(insertFile(userB, userA, courseA, 'planted.pdf')).rejects.toThrow();
+    await expect(
+      insertFile(userA, userA, courseA, 'elsewhere.pdf', { storage_path: `${userA}/other-course/elsewhere.pdf` }),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`delete from course_files`);
+    expect(await admin`select id from course_files where user_id = ${userA}`).toHaveLength(2);
+  });
+
+  it('refuses an unknown kind, an unkept type and a file over 20 MB', async () => {
+    await expect(insertFile(userA, userA, courseA, 'a.pdf', { kind: 'homework' })).rejects.toThrow();
+    await expect(insertFile(userA, userA, courseA, 'a.svg', { mime_type: 'image/svg+xml' })).rejects.toThrow();
+    await expect(insertFile(userA, userA, courseA, 'a.pdf', { size_bytes: 20971521 })).rejects.toThrow();
+  });
+
+  it('refuses a 21st file on one course', async () => {
+    for (let i = 2; i < 20; i++) await insertFile(userA, userA, courseA, `reading-${i}.pdf`);
+    expect(await admin`select id from course_files where course_id = ${courseA}`).toHaveLength(20);
+    await expect(insertFile(userA, userA, courseA, 'reading-20.pdf')).rejects.toThrow(/at most 20/);
+  });
+
+  it('keeps each account to its own folder of the you-course-files bucket', async () => {
+    const own = (user: string, name: string) =>
+      asUser(user, (tx) => tx<{ ok: boolean }[]>`select you.course_file_is_own(${name}) as ok`)
+        .then(([row]) => row.ok);
+
+    expect(await own(userA, `${userA}/${courseA}/f-a.pdf`)).toBe(true);
+    expect(await own(userB, `${userA}/${courseA}/f-a.pdf`)).toBe(false);
+    expect(await own(userA, `${userA}/f-a.pdf`)).toBe(false);
+    expect(await own(userA, `${userA}/${courseA}/`)).toBe(false);
+  });
+
+  it('takes the files with the course, and the course with its transcript', async () => {
+    await asUser(userA, (tx) => tx`delete from transcripts where id = ${transcriptA}`);
+    expect(await admin`select id from course_files where course_id = ${courseA}`).toHaveLength(0);
   });
 });

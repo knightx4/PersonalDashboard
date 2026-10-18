@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tagList } from '@/lib/todo/tasks/tags';
 
 /**
  * What a task is written from, parsed through Zod. Kept apart from write.ts,
@@ -29,6 +30,12 @@ export const taskInput = z.object({
   dueOn: optionalDate,
   dueTime: optionalTime,
   pinned: z.boolean().default(false),
+  /**
+   * Tags written with the task when it is created (plan #2340.1). Editing a
+   * task leaves its tags alone: they change through addTaskTag and
+   * removeTaskTag in write.ts.
+   */
+  tags: tagList.default([]),
 });
 
 export type TaskInput = z.infer<typeof taskInput>;

@@ -88,9 +88,15 @@ export const goalsActions: ModuleActions = {
     archiveRecordAction: tool('change_goal_form'),
     saveQuestionsAction: tool('change_goal_form'),
   },
+  'app/goals/[goalId]/list-actions.ts': {
+    addGoalListAction: tool('change_goal_list'),
+    addListRowAction: tool('change_goal_list'),
+    confirmListRowAction: tool('change_goal_list'),
+  },
   'app/goals/[goalId]/link-actions.ts': {
     linkAimAction: tool('change_goal_link'),
     linkJobSearchAction: tool('change_goal_link'),
+    linkRowAction: tool('change_goal_link'),
     unlinkAction: tool('change_goal_link'),
   },
   'app/goals/[goalId]/reading-actions.ts': {

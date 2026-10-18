@@ -71,6 +71,20 @@ export const HAND_OFF_TOOL: Anthropic.Tool = {
   },
 };
 
+/**
+ * A request for an X post draft is saved by Dash itself with suggest_post
+ * (plan #2384.4), so it is never kept as a hand-off.
+ */
+const POST_REQUEST = /\b(x|twitter|social)\s+posts?\b|\b(draft|write|suggest)\s+(me\s+)?(a|an|some|another)\s+posts?\b|\bposts?\s+about\b|\btweet/i;
+
+export function isPostRequest(request: string): boolean {
+  return POST_REQUEST.test(request);
+}
+
+/** Said to the model when it tries to hand on a request for a post. */
+export const POST_NOT_HANDED_ON =
+  'A post is not handed on. Call post_pictures for a picture of the screen, then call suggest_post with the angle, the posts and the picture where one fits.';
+
 /** The longest subject ref kept (dash_handoffs_subject_ref_ck). */
 const MAX_SUBJECT_REF = 200;
 
@@ -91,6 +105,7 @@ export function handoffRequest(
   if (request.length > MAX_HANDOFF_REQUEST) {
     return { ok: false, error: `request is ${request.length} characters; the most is ${MAX_HANDOFF_REQUEST}.` };
   }
+  if (isPostRequest(request)) return { ok: false, error: POST_NOT_HANDED_ON };
   return { ok: true, request, subjectRef: subjectRefOf(args.about, seen) };
 }
 

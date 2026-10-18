@@ -2,6 +2,7 @@ import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabb
 import { toRef } from '@/lib/core/refs';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
+import { tabsWithLists, type ListView } from '@/lib/goals/goal-lists';
 import type { GoalPace } from '@/lib/goals/pace';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { goalGlyph, type GoalProgress } from '@/lib/goals/status';
@@ -28,6 +29,7 @@ export function GoalDetail({
   timeZone,
   pace = null,
   metrics = null,
+  lists = [],
   children,
 }: {
   goal: Goal;
@@ -44,13 +46,21 @@ export function GoalDetail({
    * they add to the phone's fold; null where there is nothing to count.
    */
   metrics?: { node: React.ReactNode; count: number } | null;
+  /**
+   * The goal's lists (plan #2330.3). Three or more give each its own tab
+   * after Steps; fewer leave the tabs as they are.
+   */
+  lists?: readonly ListView[];
   /** The open tab's content. */
   children: React.ReactNode;
 }) {
   const closed = goal.status === 'done';
   const hexagon = goalGlyph(goal.status, progress);
   const open = progress.live - progress.done;
-  const tabs = GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t));
+  const tabs = tabsWithLists(
+    GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t)),
+    lists,
+  );
   return (
     <TabbedDetail
       subject={{
@@ -112,12 +122,20 @@ export function GoalDetail({
  * the tabbed detail pattern no longer allows, and it is the Overview's to say
  * what the goal is for. Editable where it stands, as it was in the header.
  */
-export function GoalDoneWhen({ goal }: { goal: Pick<Goal, 'id' | 'acceptance'> }) {
+export function GoalDoneWhen({
+  goal,
+  children,
+}: {
+  goal: Pick<Goal, 'id' | 'acceptance'>;
+  /** What sits under the sentence on the same card: the goal's list chips (plan #2330.3). */
+  children?: React.ReactNode;
+}) {
   return (
     <DetailCard>
       <DetailPart label="Done when">
         <GoalHeadingField goalId={goal.id} field="acceptance" value={goal.acceptance} />
       </DetailPart>
+      {children}
     </DetailCard>
   );
 }
