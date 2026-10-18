@@ -267,7 +267,7 @@ not in this file, find it here and read it:
 | Section | File |
 |---|---|
 | Pulling in from the other modules (Where to look, How to search, Search by meaning from a row you found, What is already on the goal, Writing what you found, Using it, Something the catalogue does not list) | `reference/pulling-in.md` |
-| Mapping a goal (Stages and sub-steps, Information steps, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
+| Mapping a goal (Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
 | Filing a document you were given, Pre-filling from Gmail, Answers on an information step | `reference/records.md` |
 | Decide first, ask last; Questions; Provisional steps | `reference/deciding.md` |
 | Planning an area (Reading the area, What to propose, Afterwards) | `reference/area.md` |
