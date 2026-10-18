@@ -6836,7 +6836,9 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'narrow',
     render: () => (
-      <div className="flex min-h-[44rem] justify-end">
+      // The top bar's rule for its icon buttons, so the picture shows the
+      // theme controls as they are drawn inside the bar.
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
         <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
       </div>
     ),

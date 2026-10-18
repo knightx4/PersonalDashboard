@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { Settings } from 'lucide-react';
 import { Popover, menuItemClass } from '@/components/ui/popover';
-import { SectionLabel } from '@/components/ui/section-heading';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { usePopover } from '@/lib/use-popover';
@@ -55,13 +54,16 @@ export function AccountMenu({
       </Tooltip>
 
       {open && (
-        <Popover ref={panelRef} padding="menu" className="sm:w-72" aria-label="Account">
+        // data-menu-panel: the top bar sizes every button in it as an icon, and
+        // the theme's controls in here are buttons that are not icons.
+        <Popover ref={panelRef} padding="menu" className="sm:w-72" aria-label="Account" data-menu-panel="">
           <Link href="/account" onClick={close} className={menuItemClass()}>
             <Settings strokeWidth={1.75} className="size-4 shrink-0 text-ink-muted" aria-hidden />
             Account settings
           </Link>
+          {/* The picker opens on its own labels, Light or dark first, so it
+              needs no heading of its own here. */}
           <div className="mt-1 border-t border-border px-2.5 pb-2 pt-3">
-            <SectionLabel className="pb-2">Theme</SectionLabel>
             <ThemePicker value={theme} />
           </div>
         </Popover>

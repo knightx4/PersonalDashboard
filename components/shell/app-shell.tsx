@@ -753,7 +753,7 @@ export function AppShell({
               {/* Below lg the bar is 5rem tall and its icons were the desk's
               16px in 32px buttons, too small to hit or read on a phone (note
               55df4819): there they are 20px in 40px buttons, the dock's size. */}
-              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button]:size-10 max-lg:[&_button_svg]:size-5">
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5 max-lg:[&_button:not([data-menu-panel]_button)]:size-10 max-lg:[&_button:not([data-menu-panel]_button)_svg]:size-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
                   <IconButton
                     label="Open navigation"
@@ -840,8 +840,10 @@ export function AppShell({
                 their theme, their feedback, their account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
                 {/* From lg up its buttons are 36px with 18px icons rather than
-                the desk's 32 and 16, so they are easier to hit (note 5c94a19a). */}
-                <div className="flex shrink-0 items-center sm:gap-0.5 lg:gap-1 lg:[&_button]:size-9 lg:[&_button_svg]:size-[18px]">
+                the desk's 32 and 16, so they are easier to hit (note 5c94a19a).
+                Buttons inside a menu panel hung from the row (the account
+                menu's theme controls) are not icons, and are left out. */}
+                <div className="flex shrink-0 items-center sm:gap-0.5 lg:gap-1 lg:[&_button:not([data-menu-panel]_button)]:size-9 lg:[&_button:not([data-menu-panel]_button)_svg]:size-[18px]">
                   {/* No search or switcher here below lg: the dock's centre
                   button is both (note 5f3ef44f). From lg up the field is in
                   the bar a few inches to the left. */}
@@ -852,10 +854,7 @@ export function AppShell({
                   {/* No bell (plan #1937.7): what is on you is Home's Inbox,
                   counted on Home's first screen, and each workspace's own. */}
                   <NoteButton />
-                </div>
-                {/* Outside the row above: its rule sizes every button inside
-                it, and the menu's theme controls are buttons too. */}
-                <div className="shrink-0 sm:ml-0.5 lg:ml-1">
+
                   <AccountMenu initial={initial} label={`Your account, ${displayName ?? email}`} theme={theme} />
                 </div>
               </div>
