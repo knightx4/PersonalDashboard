@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { parseStepFields } from '@/lib/goals/steps';
 import { taskInput } from '@/lib/todo/tasks/input';
+import { dashTags } from '@/lib/todo/tasks/dash-tags';
 import type { ModuleId } from '@/lib/modules';
 import type { DashChange, NewDashChange } from '@/lib/talk/changes';
 import { MAX_REPORT_TIMES, MAX_WATCH_DAYS, NO_PUSH_LINE, parseWatchRequest, watchPlan } from '@/lib/watch/start';
@@ -202,9 +203,12 @@ async function checkTodo(ctx: CheckContext, args: Record<string, unknown>): Prom
   const parsed = taskInput.safeParse({ title: text(args, 'title'), body: '', dueOn, dueTime: '', pinned: false });
   if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
   if (parsed.data.dueOn && Number.isNaN(Date.parse(parsed.data.dueOn))) throw new Refused('due_on is not a date.');
+  // Every todo Dash adds arrives tagged (plan #2340.4): now or eventually by its date, and any it sent.
+  const tagged = dashTags(args.tags, parsed.data.dueOn, ctx.today);
+  if (!tagged.ok) throw new Refused(tagged.error);
   return {
     kind: 'add_todo',
-    input: { title: parsed.data.title, body: null, dueOn: parsed.data.dueOn, dueTime: null, pinned: false },
+    input: { title: parsed.data.title, body: null, dueOn: parsed.data.dueOn, dueTime: null, pinned: false, tags: tagged.tags },
   };
 }
 
@@ -362,11 +366,17 @@ const CHECKS: Record<ProposalToolName, (ctx: CheckContext, args: Record<string, 
   propose_delete: checkDelete,
 };
 
+/** ", tagged now and errands", or nothing for a todo with no tags. */
+export function taggedWords(tags: readonly string[] | undefined): string {
+  if (!tags || tags.length === 0) return '';
+  return `, tagged ${tags.length === 1 ? tags[0] : `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`}`;
+}
+
 /** How a kept proposal reads back to the model. */
 function described(change: NewDashChange): string {
   switch (change.kind) {
     case 'add_todo':
-      return `Add the todo "${change.input.title}"${change.input.dueOn ? `, due ${change.input.dueOn}` : ''}.`;
+      return `Add the todo "${change.input.title}"${change.input.dueOn ? `, due ${change.input.dueOn}` : ''}${taggedWords(change.input.tags)}.`;
     case 'add_goal_step':
       return `Add the step "${change.input.title}" under the goal "${change.input.goalTitle}".`;
     case 'mark_returned':

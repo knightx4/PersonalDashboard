@@ -23,6 +23,7 @@ const TASK: Task = {
   createdAt: '2026-09-02T08:00:00.000Z',
   position: null,
   parentId: null,
+  tags: [],
 };
 
 function render(tasks: Task[]) {

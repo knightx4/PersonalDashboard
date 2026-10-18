@@ -97,6 +97,8 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  * without another read.
  *
  * add_todo       createTask(userId, input, timezone) takes it as a TaskInput.
+ *                `tags` are the ones Dash wrote with it (plan #2340.4);
+ *                absent on records kept before then.
  * add_goal_step  insertStep(client, userId, parentId, { title, kind }).
  * mark_returned  markItemReturned's form field `id`.
  * start_watch    the core.watches row to insert (plan #1296): `below` and
@@ -168,7 +170,7 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  `undo.rows`, which Undo inserts again.
  */
 export type DashChangeInput = {
-  add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
+  add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false; tags?: string[] };
   add_goal_step: { parentId: string; goalTitle: string; title: string; kind: 'mine' };
   mark_returned: { id: string; itemTitle: string };
   start_watch: {

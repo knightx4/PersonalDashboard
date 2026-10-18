@@ -10,7 +10,8 @@ import {
   type LinkTarget,
   type TaskLink,
 } from '@/lib/todo/links/model';
-import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
+import type { Task } from '@/lib/todo/tasks/model';
+import { TASK_COLUMNS, toTask } from '@/lib/todo/tasks/load';
 
 /**
  * "What is outstanding on this role" -- the read the inline sections make.
@@ -21,29 +22,9 @@ import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
  * name; it does not need this module to tell it.
  */
 
-const TASK_COLUMNS =
-  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id';
-
 type Row = Record<string, unknown>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function toTask(row: Row): Task {
-  return {
-    id: row.id as string,
-    title: row.title as string,
-    body: (row.body as string | null) ?? null,
-    status: row.status as TaskStatus,
-    dueOn: (row.due_on as string | null) ?? null,
-    dueAt: (row.due_at as string | null) ?? null,
-    pinned: Boolean(row.pinned),
-    snoozedUntil: (row.snoozed_until as string | null) ?? null,
-    completedAt: (row.completed_at as string | null) ?? null,
-    createdAt: row.created_at as string,
-    position: (row.position as number | null) ?? null,
-    parentId: (row.parent_id as string | null) ?? null,
-  };
-}
 
 /**
  * Tasks attached to one thing.

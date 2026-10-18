@@ -38,7 +38,9 @@ import {
   renameTaskAction,
   reopenTask,
   rescheduleTaskAction,
+  tagTask,
   unpointTask,
+  untagTask,
 } from '@/app/todo/actions';
 import { openCount, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
 import { laterUntil } from '@/lib/core/snooze-days';
@@ -62,6 +64,8 @@ import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
 import { TaskFiles, TaskFilesCount, type TaskFile } from '@/components/attachments/task-files';
 import { Tooltip } from '@/components/ui/tooltip';
+import { sortTags, tagName } from '@/lib/todo/tasks/tags';
+import { TagChips, TagPicker } from './task-tags';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -143,6 +147,7 @@ export function TaskRow({
   files = [],
   filesOpen = false,
   archive = false,
+  tagPreview,
 }: {
   task: Task;
   timezone: string;
@@ -196,6 +201,12 @@ export function TaskRow({
    * on the title's left edge.
    */
   archive?: boolean;
+  /**
+   * The tags' hidden parts, for the gallery's shots (plan #2340.2): the
+   * picker open, the tags it offers as used, and the hover's controls drawn
+   * at rest.
+   */
+  tagPreview?: { open?: boolean; used?: readonly string[]; revealed?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
   const [showFiles, setShowFiles] = useState(filesOpen);
@@ -211,6 +222,8 @@ export function TaskRow({
   const [pickingLater, setPickingLater] = useState(false);
   /** Hand to Dash (plan #1263), which opens in place of the row like the editor. */
   const [handing, setHanding] = useState(false);
+  /** The tag picker, under the row (plan #2340.2). */
+  const [tagging, setTagging] = useState(tagPreview?.open ?? false);
   const [pending, start] = useTransition();
   const [grabbed, setGrabbed] = useState(false);
   /** Which edge of this row the dragged task would land on, while it is over. */
@@ -349,6 +362,30 @@ export function TaskRow({
     });
   }
 
+  /**
+   * Put a tag on, or take one off. Drawn before the write lands, like the
+   * pin; a refused write puts the chips back and says why in the toast.
+   */
+  function addTag(tag: string) {
+    const parsed = tagName.safeParse(tag);
+    if (!parsed.success) {
+      toast({ text: parsed.error.issues[0].message });
+      return;
+    }
+    if (task.tags.includes(parsed.data)) return;
+    run({
+      patch: { tags: sortTags([...task.tags, parsed.data]) },
+      write: () => tagTask(task.id, parsed.data),
+    });
+  }
+
+  function removeTag(tag: string) {
+    run({
+      patch: { tags: task.tags.filter((name) => name !== tag) },
+      write: () => untagTask(task.id, tag),
+    });
+  }
+
   function move(direction: 'up' | 'down') {
     act(() => moveTask(task.id, direction, [...siblings]));
   }
@@ -389,6 +426,7 @@ export function TaskRow({
       ? [{ id: 'drop', label: LIFECYCLE_VERB.dropped, lifecycle: 'dropped' as const, onSelect: drop }]
       : []),
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
+    { id: 'tag', label: 'Add a tag', onSelect: () => setTagging(true) },
     ...(archive ? [{ id: 'edit', label: 'Edit everything', onSelect: () => setEditing(true) }] : []),
     { id: 'comment', label: 'Comment', onSelect: () => setCommenting(true) },
     {
@@ -610,6 +648,18 @@ export function TaskRow({
             )}
 
             {dropped && <span className={cn('text-small text-ink-muted', inset)}>dropped</span>}
+
+            {/* Its tags (plan #2340.2), last on the line: a way of sorting
+                the task rather than part of reading it. */}
+            <TagChips
+              tags={task.tags}
+              editable={!done && !dropped}
+              open={tagging}
+              onToggle={() => setTagging(!tagging)}
+              onRemove={removeTag}
+              revealed={tagPreview?.revealed}
+              className="self-center"
+            />
           </div>
 
           {task.body && (
@@ -782,6 +832,20 @@ export function TaskRow({
       {pickingLater && (
         <div className="pb-2 pl-9 pr-3">
           <LaterDayField label={task.title} onChoose={later} onCancel={() => setPickingLater(false)} />
+        </div>
+      )}
+
+      {/* The tag picker, at the indent of the items, when the plus chip,
+          or the phone menu opened it. */}
+      {tagging && !done && !dropped && (
+        <div className="pb-2 pl-9 pr-3">
+          <TagPicker
+            tags={task.tags}
+            used={tagPreview?.used}
+            onAdd={addTag}
+            onRemove={removeTag}
+            onClose={() => setTagging(false)}
+          />
         </div>
       )}
 
