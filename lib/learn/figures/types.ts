@@ -73,12 +73,71 @@ export type FigureKind<Spec = unknown, Resolved = unknown> = {
    */
   resolve?: (spec: Spec, context: FigureResolveContext) => Promise<Resolved | null>;
   /**
-   * How a question is asked on the figure, for the kinds that can carry one
-   * (plan #2321.5 gives this its shape and grading). Absent on a kind no
+   * The questions a kind can be asked through (plan #2321.5): fill a table's
+   * cell, say which way a chart goes, pick the right diagram. Each form is
+   * written by the figure question writer, posed from the figure, and
+   * graded by its own grader where the answer is exact. Absent on a kind no
    * question is asked of.
    */
-  question?: { writerLine: string };
+  questions?: readonly FigureQuestionForm<Spec, Resolved>[];
   data: FigureData;
+};
+
+/**
+ * A figure question as a form poses it (plan #2321.5): the figure as shown
+ * (a table with a cell blanked, a chart cut before the years asked about),
+ * the question, the answers to pick from or none for a short typed answer,
+ * and the answer, which stays on the server and is never sent to the page.
+ */
+export type PosedFigure<Spec = unknown, Resolved = unknown> = {
+  spec: Spec;
+  resolved?: Resolved;
+  prompt: string;
+  /** Each carries a `spec` of the same kind when the choices are figures. */
+  choices?: Array<{ value: string; label: string; spec?: Spec }>;
+  /** A choice's value, or the text the blank held. */
+  answer: string;
+};
+
+/** One answer a figure question offers on the page; a pick's carry the figure each one is. */
+export type FigureChoice = { value: string; label: string; figure?: FigureBlock };
+
+/** What a form's grader says: met, not met, or null when only the model can tell. */
+export type FigureQuestionVerdict = 'met' | 'not_met' | null;
+
+/**
+ * One way of asking a question on a figure (plan #2321.5). A kind lists its
+ * forms in `questions`; the question writer is told each form's line, writes
+ * the figure and the form's `ask`, and the form turns them into the question.
+ */
+export type FigureQuestionForm<Spec = unknown, Resolved = unknown, Ask = unknown> = {
+  /** Stored with the question; never renamed once used. */
+  id: string;
+  /** What the question is called above it, such as "Fill the cell". */
+  label: string;
+  /** For the question writer: when the form fits, and the exact shape of `ask`. Starts with the id. */
+  writerLine: string;
+  /** Parses what the writer wrote for the form. */
+  schema: z.ZodType<Ask>;
+  /**
+   * The question, from the figure and the writer's ask, or null when they
+   * cannot make a fair one (a blank on an empty cell, a chart whose move is
+   * too small to call). A null asks an explanation instead.
+   */
+  // A method, so a form with its own Ask sits in a kind's list of forms.
+  pose(input: { spec: Spec; resolved: Resolved; ask: Ask }): PosedFigure<Spec, Resolved> | null;
+  /**
+   * Grades a response against the posed answer. A form with choices always
+   * says met or not met; a typed answer that is not plainly right or wrong
+   * is null, and the model grades it with the figure in its prompt.
+   */
+  grade(answer: string, response: string): FigureQuestionVerdict;
+  /**
+   * An ask that poses a question on the kind's own example, drawn in the
+   * gallery and checked by the registry test. A form built for any kind (the
+   * pick of a diagram) may leave it to the kind that lists it.
+   */
+  example?: Ask;
 };
 
 /** The gallery surface every kind is drawn on. A surface id takes no underscore, so `two_by_two` is drawn on `learn-figure-two-by-two`. */

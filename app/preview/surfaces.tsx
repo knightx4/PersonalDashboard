@@ -1,6 +1,7 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import { FigureQuestionPreview } from './figure-question-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -9661,4 +9662,37 @@ export const SURFACES: readonly Surface[] = [
       ...(surface.deck ? { deck: surface.deck } : {}),
     })),
   ),
+  {
+    /* Figure questions in Practice Flow (plan #2321.5): a table's blank
+     * cell to fill, asked in an explanation's place. */
+    id: 'learn-cell-answer-figure-fill',
+    label: 'Practice Flow · Fill the cell',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" />,
+  },
+  {
+    /* The same, graded and missed, with the answer under the summary. */
+    id: 'learn-cell-answer-figure-fill-graded',
+    label: 'Practice Flow · Fill the cell, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" graded />,
+  },
+  {
+    /* A chart of a real series cut at a year, and which way it went next. */
+    id: 'learn-cell-answer-figure-predict',
+    label: 'Practice Flow · Which way next',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="predict" />,
+  },
+  {
+    /* The right figure among three, each drawn under its letter. */
+    id: 'learn-cell-answer-figure-pick',
+    label: 'Practice Flow · Pick the figure',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" />,
+  },
 ];

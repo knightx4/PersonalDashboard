@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FigureKind } from '../types';
 import { DATA_SOURCES, DATA_SOURCE_IDS, dataSource } from '../sources';
 import { ChartPlot } from './chart-plot';
+import { predictDirectionForm } from '../questions/predict-direction';
 import { chartData, chartSummary, plotGroups, plotRows, sourceNames, yearRange, compactNumber, type ChartData } from './chart-data';
 
 /**
@@ -80,6 +81,7 @@ export const chartKind: FigureKind<ChartSpec, ChartData> = {
     return chartData(series as NonNullable<(typeof series)[number]>[], { from: spec.from ?? undefined, to: spec.to ?? undefined });
   },
   Render: ({ spec, resolved }) => <ChartFigure style={spec.style} data={resolved} />,
+  questions: [predictDirectionForm<ChartSpec>()],
   data: 'series',
 };
 

@@ -14,10 +14,13 @@ import type { FigureBlock } from '@/lib/learn/figures/types';
 export function Figure({
   figure,
   defaultOpen = false,
+  unfolded = false,
 }: {
   figure: FigureBlock;
   /** Opens the phone's fold, for the gallery's drawing of the figure open. */
   defaultOpen?: boolean;
+  /** Never folds, on any width: a question on the figure (plan #2321.5) cannot be answered from its caption. */
+  unfolded?: boolean;
 }) {
   const drawn = parseFigure(figure);
   if (!drawn) {
@@ -38,6 +41,14 @@ export function Figure({
   }
   const { Render } = drawn.kind;
   const body = <Render spec={drawn.spec} resolved={figure.resolved} />;
+  if (unfolded) {
+    return (
+      <figure className="mt-4">
+        <figcaption className="text-small font-semibold text-ink-muted">{figure.caption}</figcaption>
+        <div className="mt-1.5">{body}</div>
+      </figure>
+    );
+  }
   return (
     <figure className="mt-4">
       <div className="max-sm:hidden">
@@ -55,6 +66,20 @@ export function Figure({
       </Disclosure>
     </figure>
   );
+}
+
+/**
+ * A figure drawn alone, with no caption and no fold: one option of a pick
+ * question (plan #2321.5), whose label stands in for the caption. A block
+ * that cannot be drawn says so in a line.
+ */
+export function FigureBody({ figure }: { figure: FigureBlock }) {
+  const drawn = parseFigure(figure);
+  if (!drawn || (drawn.kind.resolve && figure.resolved == null)) {
+    return <p className="text-small text-ink-muted">This figure cannot be drawn.</p>;
+  }
+  const { Render } = drawn.kind;
+  return <Render spec={drawn.spec} resolved={figure.resolved} />;
 }
 
 /** A lesson's figures, in order, after its example. */

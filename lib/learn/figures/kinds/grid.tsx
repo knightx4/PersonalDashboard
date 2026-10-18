@@ -1,5 +1,6 @@
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
+import { BLANK_CELL } from '../questions/fill-cell';
 
 /**
  * The grid the table and compare kinds both draw (plan #2321.1): a header
@@ -14,10 +15,13 @@ const SHORT_VALUE_CHARS = 16;
 
 const NUMBER_LIKE =/^[-+(]?[$£€]?[\d.,]+%?[)]?[kmb]?$/i;
 
-/** Whether every non-empty cell of each column reads as a number. */
+/** Whether every non-empty cell of each column reads as a number. A question's blank (plan #2321.5) is neither. */
 export function numericColumns(rows: readonly (readonly string[])[], width: number): boolean[] {
   return Array.from({ length: width }, (_, index) =>
-    rows.every((row) => (row[index] ?? '') === '' || NUMBER_LIKE.test((row[index] ?? '').replace(/\s/g, ''))),
+    rows.every((row) => {
+      const cell = row[index] ?? '';
+      return cell === '' || cell === BLANK_CELL || NUMBER_LIKE.test(cell.replace(/\s/g, ''));
+    }),
   );
 }
 

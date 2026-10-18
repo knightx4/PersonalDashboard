@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { FigureKind } from '../types';
 import { FigureGrid } from './grid';
+import { fillCellForm } from '../questions/fill-cell';
 
 /** A table: named columns and rows of cells, for an idea that quantifies or orders (plan #2321.1). */
 
@@ -38,5 +39,6 @@ export const tableKind: FigureKind<TableSpec> = {
     },
   },
   Render: ({ spec }) => <FigureGrid head={spec.columns} rows={spec.rows} />,
+  questions: [fillCellForm<TableSpec>()],
   data: 'none',
 };
