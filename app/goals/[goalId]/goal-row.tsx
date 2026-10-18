@@ -118,6 +118,8 @@ const GOAL_COMMENTS = { target: 'goal' as const };
 const NO_FILES: LinkedFile[] = [];
 /** The step page's panel inset (plan #2373.1), the same as TreeRow gives a heading row's panel. */
 const PAGE_INSET = { paddingLeft: '0.75rem' };
+/** A line on a card of its own, which pads it already. */
+const NO_INSET = {};
 
 export type GoalRowContext = {
   goalId: string;
@@ -284,6 +286,11 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
       </ul>
     </section>
   );
+}
+
+/** Whether a run has a line to say: one going, one that failed, or one that summed itself up. */
+function runSays(run: StepRunView | undefined): run is StepRunView {
+  return Boolean(run && (run.running || run.error || run.summary));
 }
 
 /**
@@ -779,7 +786,28 @@ export function GoalRow({
         // Finished rows sit under a Finished fold that says so.
         dimClosed={false}
         heading={page}
-        frame={page ? frame : undefined}
+        // On the step's own page a proposal's Approve sits on the title's
+        // line before the menu, on the first screen at every width (plan
+        // #2373.2).
+        frame={
+          page && frame
+            ? (parts) =>
+                frame({
+                  ...parts,
+                  menu: proposed ? (
+                    <>
+                      <ProposalButtons node={step} heading />
+                      {parts.menu}
+                    </>
+                  ) : (
+                    parts.menu
+                  ),
+                })
+            : undefined
+        }
+        // On the Activity tab the run line sits on a card of its own, so it
+        // takes the card's inset rather than the panel's.
+        activity={framed && runSays(run) && <StepRunLine run={run} inset={NO_INSET} />}
         statusMenu={statusMenu}
         menu={menu}
         actions={GOAL_TREE_ACTIONS}
@@ -855,8 +883,9 @@ export function GoalRow({
                 {!askState.error && <span className="text-ink-muted">{askState.message}</span>}
               </li>
             )}
-            {/* The step's own latest run, read with the page (plan #1044). */}
-            {run && <StepRunLine run={run} inset={inset} />}
+            {/* The step's own latest run, read with the page (plan #1044). On
+                the step's own page it is on the Activity tab (plan #2373.2). */}
+            {run && !framed && <StepRunLine run={run} inset={inset} />}
             {draft && <DashDraft {...draft} inset={inset} />}
             {stepOpen && (
               <ProgressLine
@@ -962,7 +991,7 @@ export function GoalRow({
         }
         panelActions={
           <>
-            {proposed && <ProposalButtons node={step} />}
+            {proposed && !framed && <ProposalButtons node={step} />}
             {/* Ask Dash, with room to say what you want: the words go into the
               run's brief as a comment's would. Left empty, the step says it.
               The first press opens the box; the second sends. */}
@@ -1017,7 +1046,12 @@ export function GoalRow({
         }
         after={
           finished.length > 0 && (
-            <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
+            // On the step's own page the fold heads no deeper level: it sits
+            // at the foot of the Sub-steps card, as Finished does on a goal's.
+            <li
+              style={framed ? PAGE_INSET : rowInset([...trail, false])}
+              className={framed ? 'py-1.5 pr-3' : 'pb-1.5 pr-3'}
+            >
               <FinishedFold count={finished.length}>
                 {() => (
                   // Out to the row's own right edge, so the finished rows'
