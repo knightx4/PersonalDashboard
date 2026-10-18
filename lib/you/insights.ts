@@ -69,7 +69,8 @@ export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
   'insight_verdicts(verdict, note, decided_at)';
 
-export const RUN_COLUMNS = 'id, status, summary, error, run_url, requested_at, started_at, finished_at';
+export const RUN_COLUMNS =
+  'id, status, summary, error, run_url, requested_at, started_at, finished_at';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 const textOrNull = (value: unknown): string | null =>
@@ -106,7 +107,11 @@ export function layersOf(value: unknown): InsightLayer[] {
   // A stable sort, so two layers at one depth keep the order they were written in.
   return layers
     .map((layer, index) => ({ layer, index }))
-    .sort((a, b) => INSIGHT_DEPTHS.indexOf(a.layer.depth) - INSIGHT_DEPTHS.indexOf(b.layer.depth) || a.index - b.index)
+    .sort(
+      (a, b) =>
+        INSIGHT_DEPTHS.indexOf(a.layer.depth) - INSIGHT_DEPTHS.indexOf(b.layer.depth) ||
+        a.index - b.index,
+    )
     .map(({ layer }) => layer);
 }
 
@@ -121,7 +126,10 @@ export function receiptsOf(value: unknown): InsightReceipt[] {
     const rawId = row.row_id;
     const rowId = typeof rawId === 'number' ? String(rawId) : textOrNull(rawId);
     const rawQuote = row.quote ?? row.number;
-    const quote = typeof rawQuote === 'number' && Number.isFinite(rawQuote) ? String(rawQuote) : textOrNull(rawQuote);
+    const quote =
+      typeof rawQuote === 'number' && Number.isFinite(rawQuote)
+        ? String(rawQuote)
+        : textOrNull(rawQuote);
     return [{ source, rowId, quote, link: safeLink(row.link) }];
   });
 }
@@ -196,7 +204,10 @@ export async function listInsights(
 }
 
 /** Their newest run, or null before the first. */
-export async function latestInsightRun(client: YouSupabaseClient, userId: string): Promise<InsightRun | null> {
+export async function latestInsightRun(
+  client: YouSupabaseClient,
+  userId: string,
+): Promise<InsightRun | null> {
   const { data, error } = await client
     .from('insight_runs')
     .select(RUN_COLUMNS)
@@ -221,11 +232,18 @@ export async function saveVerdict(
 ): Promise<InsightVerdict> {
   if (!oneOf(VERDICTS, verdict)) throw new Error(`Unknown verdict: ${String(verdict)}`);
   const cleaned = textOrNull(note);
-  if (cleaned && cleaned.length > 2000) throw new Error('A note on an insight holds at most 2,000 characters.');
+  if (cleaned && cleaned.length > 2000)
+    throw new Error('A note on an insight holds at most 2,000 characters.');
   const { data, error } = await client
     .from('insight_verdicts')
     .upsert(
-      { user_id: userId, insight_id: insightId, verdict, note: cleaned, decided_at: new Date().toISOString() },
+      {
+        user_id: userId,
+        insight_id: insightId,
+        verdict,
+        note: cleaned,
+        decided_at: new Date().toISOString(),
+      },
       { onConflict: 'insight_id' },
     )
     .select('verdict, note, decided_at')
@@ -233,4 +251,59 @@ export async function saveVerdict(
   const saved = verdictOf(data);
   if (error || !saved) throw new Error(`Saving your mark failed: ${error?.message ?? 'no row'}`);
   return saved;
+}
+
+// ---------------------------------------------------------------------------
+// The run's brief and the method's words (plan #2413.4).
+// ---------------------------------------------------------------------------
+
+/** The skill a run follows: the reading, the layers and the filter. */
+export const INSIGHTS_SKILL_PATH = '.claude/skills/insights/SKILL.md';
+
+/**
+ * The words a run writes into you.insights.kind, one per place the strongest
+ * insights came from (the skill's step 4). A card that fits none is a
+ * pattern.
+ */
+export const INSIGHT_KINDS = [
+  { kind: 'named_concept', label: 'A concept you named' },
+  { kind: 'testable_claim', label: 'A claim the records test' },
+  { kind: 'recurring_phrase', label: 'A phrase that comes back' },
+  { kind: 'tension', label: 'Two positions that pull apart' },
+  { kind: 'unmet_want', label: 'A want that recurs' },
+  { kind: 'shared_structure', label: 'One structure, many interests' },
+  { kind: 'precursor', label: 'What comes before' },
+  { kind: 'pattern', label: 'A pattern' },
+] as const;
+export type InsightKind = (typeof INSIGHT_KINDS)[number]['kind'];
+
+/** Why a run was started: the weekly tick, the Look again button, or a big change. */
+export type InsightRunReason = 'weekly' | 'look_again' | 'change';
+
+/**
+ * The brief the goals routine is fired with for an insights run. Its first
+ * line hands the session to the insights skill (the goals skill, "Jobs that
+ * follow another skill"); the skill reads the run row, the earlier insights
+ * and the verdicts by the ids here, so nothing else has to fit in it. A run
+ * started by a change names the change in one line.
+ */
+export function insightsBrief(input: {
+  runId: string;
+  userId: string;
+  reason: InsightRunReason;
+  change?: string | null;
+}): string {
+  const change = input.change?.replace(/\s+/g, ' ').trim();
+  const why =
+    input.reason === 'change'
+      ? `started by a change${change ? `: ${change.slice(0, 300)}` : ''}`
+      : input.reason === 'look_again'
+        ? 'started by Look again'
+        : 'weekly run';
+  return [
+    `Follow ${INSIGHTS_SKILL_PATH}`,
+    `Insight run ${input.runId}`,
+    `user_id ${input.userId}`,
+    why,
+  ].join('\n');
 }
