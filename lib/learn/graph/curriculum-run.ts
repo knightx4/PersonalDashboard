@@ -95,11 +95,20 @@ export async function makeCustomSubject(
   if (!own.ok) return { ok: false, detail: own.detail };
   const { name, want } = input;
 
-  let subject: { id: string; created: boolean; placed: boolean };
+  let subject: { id: string; created: boolean; placed: boolean; archived: boolean };
   try {
     subject = await findOrCreateSubject(supabase, userId, name);
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : 'Could not make that subject.' };
+  }
+  // An archived subject keeps its name, so a new one cannot take it (plan
+  // #2355.3). Say so and link to it, where Restore brings it back.
+  if (subject.archived) {
+    return {
+      ok: false,
+      detail: `You archived a subject called ${name}. Restore it to pick it up again.`,
+      existing: { id: subject.id, name },
+    };
   }
 
   if (subject.created) {

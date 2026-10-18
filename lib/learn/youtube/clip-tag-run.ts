@@ -2,6 +2,7 @@ import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadSubjects } from '@/lib/learn/graph/load';
 import { TAG_BATCH, tagClipBatch, type ClipToTag, type SubjectToTag } from './clip-tags';
@@ -71,6 +72,14 @@ export function tagRows(userId: string, subjects: Map<string, string[]>): { user
   return [...subjects].flatMap(([clipId, ids]) => ids.map((subjectId) => ({ user_id: userId, clip_id: clipId, subject_id: subjectId })));
 }
 
+/** The person's subjects to tag clips with; an archived one is left out (plan #2355.4). */
+async function liveSubjects(learn: LearnSupabaseClient, userId: string): Promise<SubjectToTag[]> {
+  const [subjects, archived] = await Promise.all([loadSubjects(learn, userId), archivedSubjectIds(learn, userId)]);
+  return subjects
+    .filter((subject) => !archived.has(subject.id))
+    .map((subject) => ({ id: subject.id, name: subject.name, note: subject.note }));
+}
+
 /** Tag the unchecked clips, until the batches or the time run out. */
 export async function tagUntaggedClips(
   learn: LearnSupabaseClient,
@@ -101,7 +110,7 @@ export async function tagUntaggedClips(
   people: for (const [userId, rows] of byPerson) {
     const subjects = options.subjectsFor
       ? await options.subjectsFor(userId)
-      : (await loadSubjects(learn, userId)).map((subject) => ({ id: subject.id, name: subject.name, note: subject.note }));
+      : await liveSubjects(learn, userId);
     if (subjects.length === 0) continue;
     for (let at = 0; at < rows.length; at += TAG_BATCH) {
       if (sent >= maxBatches) break people;

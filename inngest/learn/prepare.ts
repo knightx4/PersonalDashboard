@@ -29,18 +29,22 @@ export async function pumpPreparation(input: {
   origin: string;
   /** A branch run's key (plan #2276.7); null is the subject's own run. */
   branch?: string | null;
-}): Promise<PreparationResult | { outcome: 'missing' }> {
+}): Promise<PreparationResult | { outcome: 'missing' } | { outcome: 'archived' }> {
   const branch = input.branch ?? null;
   const learn = createLearnServiceSupabase();
   // The subject names its account; everything after this is scoped to it.
   const { data, error } = await learn
     .from('subjects')
-    .select('user_id, survey')
+    .select('user_id, survey, archived_at')
     .eq('id', input.subjectId)
     .maybeSingle();
   if (error) throw new Error(`Reading the subject failed: ${error.message}`);
-  const subject = data as { user_id: string; survey: boolean } | null;
+  const subject = data as { user_id: string; survey: boolean; archived_at: string | null } | null;
   if (!subject || subject.survey) return { outcome: 'missing' };
+  // An archived subject is not worked (plan #2355.4). A slice already running
+  // when it was archived finishes; the next slice, which this would start,
+  // does not. The run keeps its place, so restoring the subject resumes it.
+  if (subject.archived_at) return { outcome: 'archived' };
 
   const userId = subject.user_id;
   // A subject made before the trigger in 0167 has no run until it is asked for one.

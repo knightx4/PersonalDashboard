@@ -38,11 +38,16 @@ function hasAll(text: string, wanted: readonly string[]): boolean {
 
 type SubjectRow = { id: string; name: string };
 
-/** The person's subjects whose name holds every word given. */
+/** The person's subjects whose name holds every word given. An archived one is left out (plan #2355.3). */
 async function subjectsNamed(learn: SchemaClient, userId: string, phrase: string): Promise<SubjectRow[]> {
   const wanted = words(phrase);
   if (wanted.length === 0) return [];
-  const { data, error } = await learn.from('subjects').select('id, name').eq('user_id', userId).limit(2000);
+  const { data, error } = await learn
+    .from('subjects')
+    .select('id, name')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .limit(2000);
   if (error) throw new Error(`subjects: ${error.message}`);
   return ((data ?? []) as SubjectRow[]).filter((row) => hasAll(row.name, wanted));
 }

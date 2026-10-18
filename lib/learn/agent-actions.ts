@@ -243,6 +243,8 @@ export const learnActions: ModuleActions = {
     ),
     addSubjectSource: none('spends', CATALOGUE),
     findSubjectChannels: none('spends', OWNER_ONLY),
+    archiveSubject: none('setting', 'Whether a subject stays in front of the person is theirs to choose; archiving is undone by restoring.'),
+    restoreSubject: none('setting', 'Putting an archived subject back in front of the person is theirs to choose.'),
     deleteSubject: none('deletes'),
     writeTrackCurriculum: tool('write_subject_curriculum'),
     moveUnitInPlan: none('setting', "The order of a learning goal's units is how the person arranges their own plan."),

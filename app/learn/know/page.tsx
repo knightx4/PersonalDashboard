@@ -1,7 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
-import { Layers, Network, Plus } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { buttonVariants } from '@/components/ui/button';
+import { Network } from 'lucide-react';
+import { SubjectsHeader } from './subjects-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
@@ -42,7 +41,6 @@ import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { PageColumn } from '@/components/shell/page-width';
-import { sectionSubject } from '@/lib/core/section-path';
 import { FieldLevels, SubjectLenses, type SubjectLensRow } from './lens-lists';
 import { loadKnowLenses } from './lens-load';
 
@@ -227,28 +225,7 @@ export default async function KnowPage({
 
   return (
     <PageColumn>
-      <PageHeader
-        subject={sectionSubject('/learn/know', 'Subjects')}
-        title="Subjects"
-        description="One graph per subject, and it grows every time you use it."
-        actions={
-          <>
-            {/* The topics map (plan #2138.4), which the claims graph is
-                moving onto. A link here rather than a tab of its own, so
-                Learn's nav does not grow. */}
-            <Link href="/learn/topics" className={buttonVariants({ variant: 'secondary' })}>
-              <Layers className="size-4" strokeWidth={1.75} aria-hidden />
-              Topics
-            </Link>
-            {!making && (
-              <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
-                <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-                Make a subject
-              </Link>
-            )}
-          </>
-        }
-      />
+      <SubjectsHeader making={making} />
 
       <LearnGoalsLine href={goalsHref} offerLevel3={!hasLevel3} />
 

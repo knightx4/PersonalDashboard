@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LessonPick } from '@/lib/learn/lessons/choose';
 import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
@@ -280,7 +281,11 @@ export function createLessonPorts(context: {
         .eq('user_id', userId);
       if (error) throw new Error(error.message);
     },
-    floorsDue: (userId, limit) => loadFloorsDue(learn, userId, limit),
+    // A lesson of an archived subject gets no floor written under it (plan #2355.4).
+    floorsDue: async (userId, limit) => {
+      const [due, archived] = await Promise.all([loadFloorsDue(learn, userId, limit), archivedSubjectIds(learn, userId)]);
+      return due.filter((floor) => !archived.has(floor.subjectId));
+    },
     addFloor: (userId, due) => addLessonFloor(learn, core, userId, due, apiKey),
     writeCheck,
     write,
