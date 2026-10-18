@@ -4,6 +4,11 @@ import { tableKind } from './kinds/table';
 import { sourceFigureKind } from './kinds/source-figure';
 import { chartKind } from './kinds/chart';
 import { explorableKind } from './kinds/explorable';
+import { flowKind } from './kinds/flow';
+import { cycleKind } from './kinds/cycle';
+import { treeKind } from './kinds/tree';
+import { twoByTwoKind } from './kinds/two-by-two';
+import { timelineKind } from './kinds/timeline';
 
 /**
  * Every figure kind a lesson can carry (plan #2321.1), and the reads that go
@@ -11,7 +16,7 @@ import { explorableKind } from './kinds/explorable';
  * read this list, so a kind added here reaches all three.
  */
 
-export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind, chartKind, sourceFigureKind, explorableKind] as unknown as readonly FigureKind[];
+export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind, flowKind, cycleKind, treeKind, twoByTwoKind, timelineKind, chartKind, sourceFigureKind, explorableKind] as unknown as readonly FigureKind[];
 
 /** At most this many figures on one lesson: a lesson teaches one idea, and an idea gets one figure. */
 export const MAX_FIGURES_PER_LESSON = 1;

@@ -141,7 +141,7 @@ why: Two or three sentences on why the claim holds: the mechanism or reasoning.
 
 example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. Only what is well established; name the case and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
 
-figures: At most one figure, and only when the idea compares things, orders them, quantifies a change or locates something, so that a grid says it faster than sentences can. Most ideas need none, and then figures is an empty list. A figure lays out facts the evidence or the example already uses, or ones as well established; never a figure you are unsure of. caption is one sentence saying what the figure shows. The kinds, and the spec each takes:
+figures: At most one figure, and only when the idea compares things, orders them, quantifies a change or locates something, so that a grid says it faster than sentences can, or when it is a process, a loop, a hierarchy, a trade-off or a sequence in time, so that a diagram does. Choose the kind by the idea's shape before its numbers: an idea about an era or a period, what happened when and in what order, is a timeline even when it has numbers, a chain of causes or steps is a flow, a loop is a cycle, a whole and its parts is a tree, and a trade-off on two qualities is a two_by_two; a table or a comparison is for figures and things side by side. A diagram takes only its labels and links: the app lays it out. Most ideas need none, and then figures is an empty list. A figure lays out facts the evidence or the example already uses, or ones as well established; never a figure you are unsure of. caption is one sentence saying what the figure shows. The kinds, and the spec each takes:
 ${figureWriterLines()}
 
 question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. When checks are given, ask for one of them. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
@@ -387,7 +387,7 @@ export async function writeLesson(input: {
               figures: {
                 type: 'array',
                 maxItems: MAX_FIGURES_PER_LESSON,
-                description: 'A figure only where the idea compares, orders, quantifies or locates. Empty for none.',
+                description: 'A figure only where the idea compares, orders, quantifies or locates, or is a process, loop, hierarchy, trade-off or sequence in time. Empty for none.',
                 items: {
                   type: 'object',
                   properties: {

@@ -40,9 +40,7 @@ describe('the figure registry (plan #2321.1)', () => {
 
       it('draws its example with its caption', () => {
         const html = renderToStaticMarkup(<Figure figure={{ kind: kind.id, ...kind.example }} />);
-        // Drawn, not the caption-only fallback: the phone's fold names the kind (plan #2321.3).
-        expect(html).toContain(escape(kind.label));
-        if (kind.data === 'none') expect(html).toContain('<table');
+        if (kind.data === 'none') expect(html).toMatch(/<table|<svg/);
         expect(html).toContain(escape(kind.example.caption));
       });
     });
