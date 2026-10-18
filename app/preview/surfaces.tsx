@@ -13,7 +13,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
-import { YouTabEmpty } from '@/app/you/you-tabs';
+import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -8059,11 +8059,94 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Insights (plan #2413.5): one insight at a time on the deck, claim,
+     * layers and folded evidence, with Right, Not quite and Wrong in the
+     * forward row and two marked cards under Earlier. */
     id: 'you-insights',
+    label: 'You · Insights, three waiting',
+    module: 'you',
+    width: 'page',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] [data-insight-claim]',
+      direction: 'left',
+      shows: 'The insight follows the finger left, then the next one comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-evidence',
+    label: 'You · Insights, evidence open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ evidence: true }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-why',
+    label: 'You · Insights, Not quite pressed with its line of why',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ why: 'not_quite' }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-earlier',
+    label: 'You · Insights, Earlier open with your marks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ earlier: true }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-running',
+    label: 'You · Insights, a run going in place of Look again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-failed',
+    label: 'You · Insights, the last run failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-empty',
     label: 'You · Insights, before Dash has noticed anything',
     module: 'you',
     width: 'page',
-    render: () => <YouTabEmpty tab="insights" />,
+    render: () => <YouInsightsPreview empty />,
+  },
+  {
+    id: 'you-insights-loading',
+    label: 'You · Insights, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouInsightsLoadingPreview />,
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
