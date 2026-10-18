@@ -38,11 +38,9 @@ audit the specs runs the same skill by hand.
 
 ## Working without the CLI
 
-There is no script. Use the **`Supabase`** connector (`mcp__Supabase__*`,
-loaded through ToolSearch), project ref `asjztutnqxbecruvyrbj`, and filter
-every query by the account's `user_id`. Keep each write short and plain, as
-`.claude/skills/plan/reference/offline.md` says: the connector holds some
-statements for a confirmation, and in a routine nobody is there to give it.
+Use `npx tsx scripts/sql.ts` (CLAUDE.md), not the Supabase connector: the
+connector holds some statements for a confirmation, and in a routine nobody is
+there to give it. Filter every query by the account's `user_id`.
 
 Before starting:
 

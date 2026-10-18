@@ -47,6 +47,8 @@ export interface Task {
    * database refuses the third level, not just the reader.
    */
   parentId: string | null;
+  /** Its tags, lowercase and sorted by name; empty when it has none (plan #2340.1). */
+  tags: string[];
 }
 
 /**

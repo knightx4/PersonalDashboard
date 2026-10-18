@@ -40,10 +40,8 @@ and nothing else.
 
 ## Working without the CLI
 
-Use the **`Supabase`** connector (`mcp__Supabase__*`, loaded through
-ToolSearch), project ref `asjztutnqxbecruvyrbj`, and filter every query by the
-account's `user_id`. Keep each write short and plain, as
-`.claude/skills/plan/reference/offline.md` says.
+Use `npx tsx scripts/sql.ts` (CLAUDE.md), not the Supabase connector, and
+filter every query by the account's `user_id`.
 
 First find this run's row, which every draft carries in `run_id`:
 

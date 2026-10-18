@@ -242,8 +242,8 @@ What the recorder can reach depends on the session:
   the shots to `ui-shots/<user id>/<step>/<surface>/r<round>/<shot>.png`,
   which only the account can read, and writes the row.
 - With only `DATABASE_URL`, it writes the row with no shots.
-- With neither, as on the web, it prints the insert. Run that through the
-  connector's `execute_sql` as it is printed. The critic's text is in base64
+- With neither, as on the web, it prints the insert. Send that through
+  `npx tsx scripts/sql.ts --file` as it is printed. The critic's text is in base64
   inside it, so no apostrophe reaches the connector. The row is written with
   no shots, and the shots stay in `.preview-shots/checks/` for the report.
   Storage uploads do not go through SQL, so the connector cannot put them in

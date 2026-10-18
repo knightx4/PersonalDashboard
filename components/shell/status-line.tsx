@@ -25,6 +25,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { DashMark } from '@/components/ui/dash-mark';
 import { useGoingRunLine, type GoingRunLine } from '@/components/runs/use-going-run-line';
 import { runPose } from '@/lib/core/run-pose';
+import { RunnerDashes } from '@/components/shell/runner-dashes';
 
 /**
  * The status line.
@@ -48,6 +49,10 @@ import { runPose } from '@/lib/core/run-pose';
  * page. It is read from a stored row, never from GitHub; see
  * `lib/shell/main-check.ts`.
  *
+ * Just before the dot, for the owner, are the runner's four Dashes, the same
+ * four as the runner card on /dev/plan: working while their slot works and
+ * asleep while it does not (components/shell/runner-dashes.tsx).
+ *
  * The workspace's one-line summary reads at the left of this line from lg up,
  * where the middle of the top bar used to carry it. It is the one thing here
  * about your data rather than about the system, so it stays on its own side of
@@ -59,6 +64,7 @@ export function StatusLine({
   brief = null,
   main = null,
   going: fixture,
+  owner = false,
 }: {
   lines: ActivityLine[];
   /** The one thing this workspace would say if it could say only one thing. */
@@ -69,6 +75,8 @@ export function StatusLine({
    * the newest run still going itself (plan #1964.2.3).
    */
   going?: GoingRunLine | null;
+  /** The owner, who has the runner: their line carries its four Dashes. */
+  owner?: boolean;
 }) {
   const [settled, setSettled] = useState(false);
   const going = useGoingRunLine(fixture);
@@ -84,7 +92,7 @@ export function StatusLine({
   // matters on a quiet day -- main goes red on the nights nothing else is
   // happening -- and the summary is the third, on a workspace where nothing has
   // happened yet at all. With none of the three there is still nothing to draw.
-  if (lines.length === 0 && !main && !brief && !going) return null;
+  if (lines.length === 0 && !main && !brief && !going && !owner) return null;
 
   return (
     <div className="pointer-events-none sticky bottom-0 z-status hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
@@ -114,6 +122,7 @@ export function StatusLine({
         <span className="min-w-0 flex-1 truncate">
           {lines.map((line) => line.text).join('  ·  ')}
         </span>
+        <RunnerDashes owner={owner} />
         <MainDotMark check={main} />
         <Timestamp />
       </div>

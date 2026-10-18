@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
@@ -16,6 +17,13 @@ import type { PanelProps } from './types';
 
 export function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) => void }) {
   const { messages, timezone, applicationId, companyName, matchCandidates, onAddInterview } = props;
+  // The message a fact's origin label links to (plan #2343.3): scrolled to
+  // and ringed, as an interview arriving from This week is.
+  const focusMessageId = useSearchParams().get('message');
+  useEffect(() => {
+    if (!focusMessageId) return;
+    document.getElementById(`mail-${focusMessageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusMessageId]);
 
   return (
     <div className="space-y-4">
@@ -44,7 +52,11 @@ export function LinkedMail(props: PanelProps & { onAddInterview: (seed: Intervie
             </THead>
             <TBody>
               {messages.map((message) => (
-                <TR key={message.id}>
+                <TR
+                  key={message.id}
+                  id={`mail-${message.id}`}
+                  className={cn(message.id === focusMessageId && 'ring-2 ring-inset ring-accent')}
+                >
                   <TD muted label="Received" className="tabular whitespace-nowrap">
                     {formatDate(message.receivedAt, timezone)}
                   </TD>

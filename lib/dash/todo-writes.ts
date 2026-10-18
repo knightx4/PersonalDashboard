@@ -12,6 +12,9 @@ import { clientsOver } from '@/lib/todo/agenda/clients';
 import { sourceById } from '@/lib/todo/agenda/registry';
 import { isSourceId, SOURCE_IDS, type AgendaSource, type SourceContext, type SourceId } from '@/lib/todo/agenda/sources';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { dashTags } from '@/lib/todo/tasks/dash-tags';
+import { dayIn } from '@/lib/todo/time';
+import { TAGS_ADDED } from '@/lib/core/dash-actions';
 import { LATER_REFUSED, LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -61,6 +64,8 @@ export type TodoMade = {
   after: Record<string, unknown>;
   summary: string;
   row: AskRow;
+  /** What undoing needs beyond the row: the tags Dash put on it (TAGS_ADDED). */
+  undo?: Record<string, unknown> | null;
 };
 
 export type TodoWrite = {
@@ -185,9 +190,41 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     patch.status = state;
     said.push(state === 'open' ? 'reopened' : 'dropped');
   }
-  if (said.length === 0) throw new TodoRefused('Say what to change: notes, pinned, later or state.');
+  const asked = sent(args, 'tags');
+  if (said.length === 0 && !asked) throw new TodoRefused('Say what to change: notes, pinned, later, state or tags.');
 
-  const after = await updated(env, 'tasks', id, patch, 'todo');
+  // Tags go on a todo that has none (plan #2340.4): one the person tagged is
+  // left as they tagged it. An open todo Dash edits is tagged by its date even
+  // when no tags were sent; an item on a todo's list is not tagged unasked.
+  const existing = await tagsOf(env, id);
+  if (asked && existing.length > 0) {
+    throw new TodoRefused(
+      `That todo is tagged ${existing.join(', ')} already, and Dash leaves tags they set alone. Leave tags out, and tell them they can change its tags on its row.`,
+    );
+  }
+  const status = (patch.status ?? before.status) as string;
+  const tagging = existing.length === 0 && (asked || (status === 'open' && !before.parent_id));
+  let tags: string[] = [];
+  if (tagging) {
+    const due = typeof before.due_on === 'string' ? before.due_on : typeof before.due_at === 'string' ? dayIn(before.due_at, env.timezone) : null;
+    const tagged = dashTags(args.tags, due, todayIn(env.timezone));
+    if (!tagged.ok) throw new TodoRefused(tagged.error);
+    tags = tagged.tags;
+  }
+  if (tags.length > 0) said.push(`tagged ${listed(tags)}`);
+  if (said.length === 0) throw new TodoRefused('Say what to change: notes, pinned, later, state or tags.');
+
+  // The tags first, so a failure there changes nothing; they come off again when the row's change fails.
+  if (tags.length > 0) await addTags(env, id, tags);
+  let after = before;
+  if (Object.keys(patch).length > 0) {
+    try {
+      after = await updated(env, 'tasks', id, patch, 'todo');
+    } catch (error) {
+      if (tags.length > 0) await env.todo.from('task_tags').delete().eq('task_id', id).in('tag', tags);
+      throw error;
+    }
+  }
   const href = todoHref(id);
   return {
     kind: 'edit_todo',
@@ -197,8 +234,21 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     before,
     after,
     summary: `Dash changed the todo "${title}": ${listed(said)}.`,
-    row: { table: 'todo.tasks', ref: id, title, href, detail: { status: String(after.status) } },
+    row: { table: 'todo.tasks', ref: id, title, href, detail: { status: String(after.status), ...(tags.length > 0 ? { tags: tags.join(', ') } : {}) } },
+    undo: tags.length > 0 ? { [TAGS_ADDED]: tags } : null,
   };
+}
+
+/** The tags on one of the person's todos; the task was read under their id first. */
+async function tagsOf(env: TodoWriteEnv, taskId: string): Promise<string[]> {
+  const { data, error } = await env.todo.from('task_tags').select('tag').eq('task_id', taskId);
+  if (error) throw new Error(`Reading the todo's tags failed: ${error.message}`);
+  return ((data ?? []) as { tag: string }[]).map((row) => row.tag);
+}
+
+async function addTags(env: TodoWriteEnv, taskId: string, tags: string[]): Promise<void> {
+  const { error } = await env.todo.from('task_tags').insert(tags.map((tag) => ({ task_id: taskId, tag })));
+  if (error) throw new Error(`Tagging the todo failed: ${error.message}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -607,7 +657,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   {
     name: 'edit_todo',
     description:
-      "Change one of the person's todos in ways change_todo does not, when they ask: write or clear its notes, pin or unpin it, put it off to a day (later: tomorrow, weekend, next_week, next_month or a day) or bring it back (later: back), drop it (state: dropped), or reopen one that is done or dropped (state: open). Send only what they asked to change. Renaming it, moving it to another day and ticking it off are not done with this tool.",
+      "Change one of the person's todos in ways change_todo does not, when they ask: write or clear its notes, pin or unpin it, put it off to a day (later: tomorrow, weekend, next_week, next_month or a day) or bring it back (later: back), drop it (state: dropped), or reopen one that is done or dropped (state: open). Send only what they asked to change. Renaming it, moving it to another day and ticking it off are not done with this tool. An open todo with no tags is tagged as it is changed: now when it is due today or before, eventually when it has no date or one more than two weeks off. Send tags only for more: now for one they said they need today, and any tag they already use (the todos lookup lists them in tags_in_use) that clearly fits; never make up new ones. A todo that has tags already keeps them: do not send tags for it.",
     input_schema: {
       type: 'object',
       properties: {
@@ -616,6 +666,11 @@ export const TODO_WRITES: readonly TodoWrite[] = [
         pinned: { type: 'boolean' },
         later: { type: 'string', description: `Puts it out of sight until a day: ${LATER_UNTIL_HELP}. back brings it back now.` },
         state: { type: 'string', enum: [...TODO_STATES], description: 'open reopens it; dropped drops it.' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for a todo that has none, beyond the one its date gives: lowercase, from the ones they already use.',
+        },
       },
       required: ['todo_ref'],
       additionalProperties: false,
@@ -737,6 +792,6 @@ export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = TODO_
     const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.timezone ?? 'UTC', db: ctx.db };
     const made = await runTodoWrite(write, env, input);
     if ('ok' in made) return made;
-    return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: null };
+    return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: made.undo ?? null };
   },
 }));

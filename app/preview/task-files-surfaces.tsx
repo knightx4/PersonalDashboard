@@ -38,6 +38,7 @@ function task(id: string, title: string, extra: Partial<Task> = {}): Task {
     createdAt: '2026-10-09T08:00:00.000Z',
     position: null,
     parentId: null,
+    tags: [],
     ...extra,
   };
 }

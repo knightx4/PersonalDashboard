@@ -19,6 +19,31 @@ import {
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { FetchedPosting } from '@/lib/jobs/ats/types';
+import { changedRoleFacts, factWrites, recordRoleFactOrigins } from '@/lib/jobs/fact-origins';
+
+/**
+ * Every fact the posting reader writes came from the posting, read firsthand
+ * (plan #2343.2). Recording it is after the value is saved, and a failure is
+ * logged rather than undoing a description that did save.
+ */
+async function recordFromPosting(
+  supabase: AppSupabaseClient,
+  role: RoleForLookup,
+  update: Record<string, unknown>,
+  sourceUrl: string | null,
+  now: Date,
+): Promise<void> {
+  const writes = factWrites(changedRoleFacts(role as unknown as Record<string, unknown>, update), () => ({
+    origin: 'posting',
+    certainty: 'firsthand',
+    sourceUrl,
+  }));
+  try {
+    await recordRoleFactOrigins(supabase, role.user_id, role.id, writes, { now });
+  } catch (error) {
+    console.error('jd lookup: recording where the facts came from failed', error);
+  }
+}
 
 /**
  * Reading a role's job description off the employer's own board.
@@ -202,15 +227,13 @@ export async function applyBoardToRole(
     // A live board that does not carry this posting is the board saying the
     // posting is gone.
     if (role.posting_status === 'unknown') {
-      await supabase
-        .from('roles')
-        .update({
-          posting_status: 'closed',
-          jd_lookup_at: now.toISOString(),
-          jd_lookup_note: `Not on the ${vendor} board any more, so the posting has closed and its description is no longer published.`,
-        })
-        .eq('id', role.id)
-        .eq('user_id', role.user_id);
+      const closed = {
+        posting_status: 'closed',
+        jd_lookup_at: now.toISOString(),
+        jd_lookup_note: `Not on the ${vendor} board any more, so the posting has closed and its description is no longer published.`,
+      };
+      const { error } = await supabase.from('roles').update(closed).eq('id', role.id).eq('user_id', role.user_id);
+      if (!error) await recordFromPosting(supabase, role, closed, role.jd_url, now);
       return { kind: 'closed', vendor };
     }
 
@@ -281,6 +304,7 @@ async function writePosting(
     .eq('user_id', role.user_id);
 
   if (!error) {
+    await recordFromPosting(supabase, role, update, posting.url ?? role.jd_url, now);
     return { kind: 'filled', vendor: posting.vendor, title: posting.title, note: provenanceNote };
   }
 

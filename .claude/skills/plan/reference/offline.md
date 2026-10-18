@@ -3,13 +3,15 @@
 A cloud session runs `scripts/plan.ts` over HTTPS when
 `SUPABASE_SERVICE_ROLE_KEY` is set, and that is the way to work. This file is
 for when it cannot: neither key nor `DATABASE_URL` is set, or `plan.ts` fails
-to reach the database. Then fall back to the **`Supabase`** connector against
-`plan_items` and `plan_dependencies` (both in `public`; project ref
-`asjztutnqxbecruvyrbj`), and do not spend the session diagnosing it. The
+to reach the database. Then send the SQL below through
+`npx tsx scripts/sql.ts` (CLAUDE.md) against `plan_items` and
+`plan_dependencies` (both in `public`), and do not spend the session
+diagnosing it. Only when that cannot run either, use the **`Supabase`**
+connector (project ref `asjztutnqxbecruvyrbj`), with the care below. The
 brief a routine was fired with is the plan as it stood; trust it, and re-read
 the row before closing it.
 
-**Keep each write short and plain.** The connector holds some statements for
+**On the connector, keep each write short and plain.** It holds some statements for
 a confirmation, and in a routine nobody is there to give it, so the call sits
 for 60 seconds and times out without running. Which ones it holds depends on
 the text: on 1 October 2026 every close whose note mentioned "dropped",
@@ -21,8 +23,9 @@ plainer words went straight through. So:
   person, not how the schema changed. The commit already holds that.
 - Avoid `drop` in a migration applied through the connector where another
   form will do.
-- After a timeout, select the row to see whether the write landed before
-  sending it again. A timeout means it did not run, not that it ran slowly.
+- After a timeout, do not send it again: it did not run, and each retry is
+  another notification on the person's phone. Select the row to confirm,
+  then send it through `scripts/sql.ts` or leave the step as it stands.
 
 The reading rules are in `lib/plan/tree.ts` and are what the page uses; when
 working by hand, apply the same ones:

@@ -17,6 +17,8 @@ import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { tagFilterLabel, tagFilterQuery, type TagFilter } from '@/lib/todo/tasks/tag-filter';
+import { TagFilterEmpty, TagFilterRow } from '@/components/todo/tag-filter';
 
 export const FILTERS = [
   { id: 'open', label: 'Open' },
@@ -36,6 +38,8 @@ export type Filter = (typeof FILTERS)[number]['id'];
 export function AllTasksView({
   status,
   search,
+  tag = null,
+  usedTags = [],
   focus,
   tasks,
   timezone,
@@ -48,6 +52,10 @@ export function AllTasksView({
 }: {
   status: Filter;
   search: string;
+  /** The tag filter (plan #2340.3): one tag, the untagged, or none. */
+  tag?: TagFilter;
+  /** The person's tags, most used first, for the filter's chips. */
+  usedTags?: readonly string[];
   focus: string;
   tasks: Task[];
   timezone: string;
@@ -71,12 +79,16 @@ export function AllTasksView({
 
   // Directly above the list it narrows, like every other list in the app. The
   // status filter rides along in the URL, so searching stays inside the tab
-  // you are on.
+  // you are on, and so does the tag.
+  const searchQuery: Record<string, string> = search ? { q: search } : {};
   const tools = (
     <div className="flex flex-col gap-3">
       <nav className="flex flex-wrap items-center gap-1" aria-label="Filter by status">
         {FILTERS.map((filter) => {
-          const href = { pathname: '/todo/all', query: { status: filter.id, ...(search ? { q: search } : {}) } };
+          const href = {
+            pathname: '/todo/all',
+            query: { status: filter.id, ...searchQuery, ...tagFilterQuery(tag) },
+          };
           return (
             <Link
               key={filter.id}
@@ -89,6 +101,7 @@ export function AllTasksView({
           );
         })}
       </nav>
+      <TagFilterRow pathname="/todo/all" used={usedTags} filter={tag} keep={{ status, ...searchQuery }} />
       <SearchField placeholder="Search titles" />
     </div>
   );
@@ -97,19 +110,28 @@ export function AllTasksView({
     // Finishing the last open task draws the day's sigil in (plan #1340).
     // Keyed by the view, so opening a tab that is already empty is not a
     // clear.
-    <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
+    <QueueCleared
+      key={`${status}:${search ?? ''}:${JSON.stringify(tag)}`}
+      cleared={status === 'open' && !search && !tag && tasks.length === 0}
+    >
       {tasks.length === 0 ? (
         <PageColumn>
           {header}
           {tools}
           {search ? (
             <SearchEmpty query={search} className="mt-6" />
+          ) : tag ? (
+            <TagFilterEmpty
+              filter={tag}
+              clearHref={`/todo/all?status=${status}`}
+              className="mt-6"
+            />
           ) : (
             <AllTasksEmpty status={status} seed={seed} />
           )}
         </PageColumn>
       ) : (
-        <ListPage header={header} tools={tools} foot={countLine(tasks.length, status, search)}>
+        <ListPage header={header} tools={tools} foot={countLine(tasks.length, status, search, tag)}>
           {tasks.map((task) => (
             <li
               key={task.id}
@@ -153,9 +175,10 @@ export function AllTasksView({
  * The count under the list (plan #1776), in the tab's own word: "6 open",
  * "12 done", "40 tasks" on Everything, and what a search found.
  */
-export function countLine(count: number, status: Filter, search: string): string {
+export function countLine(count: number, status: Filter, search: string, tag: TagFilter = null): string {
   const word = status === 'all' ? (count === 1 ? 'task' : 'tasks') : status;
-  return search ? `${count} ${word} matching “${search}”` : `${count} ${word}`;
+  const tagged = tag ? (tag.kind === 'tag' ? ` tagged ${tagFilterLabel(tag)}` : ' with no tag') : '';
+  return search ? `${count} ${word}${tagged} matching “${search}”` : `${count} ${word}${tagged}`;
 }
 
 /**
