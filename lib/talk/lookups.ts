@@ -206,6 +206,8 @@ export function lookupLabel(name: string, input: unknown): string {
       const q = quoted(field(input, 'query'));
       return q ? `Searching the Dev pages for ${q}` : 'Searching the Dev pages';
     }
+    case 'post_pictures':
+      return 'Looking at the post pictures';
     case 'search_mail': {
       const from = quoted(field(input, 'from'));
       const words = quoted(field(input, 'words'));

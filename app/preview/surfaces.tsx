@@ -1,6 +1,7 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import { FigureQuestionPreview } from './figure-question-surface';
 import {
   GoalMetricsEmptySurface,
   GoalMetricsErrorSurface,
@@ -225,6 +226,9 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnFigureSurface,
+  LearnExplorableSurface,
+  LearnMapSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -297,7 +301,14 @@ import {
   LearnBriefNewSourcesSurface,
   LearnNowBriefsSurface,
 } from './brief-surfaces';
-import { educationGroups, educationCounts, educationExplains } from './education-fixtures';
+import {
+  educationChosen,
+  educationCounts,
+  educationExplains,
+  educationFiles,
+  educationGroups,
+  educationUploading,
+} from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -461,6 +472,23 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import {
+  GoalListsCalendarDaySurface,
+  GoalListsCalendarEmptySurface,
+  GoalListsCalendarSurface,
+  GoalListsEmptySurface,
+  GoalListsErrorSurface,
+  GoalListsGallerySurface,
+  GoalListsLinkedSurface,
+  GoalListsLoadingSurface,
+  GoalListsMapEmptySurface,
+  GoalListsMapFailedSurface,
+  GoalListsMapPinSurface,
+  GoalListsMapSurface,
+  GoalListsPanelSurface,
+  GoalListsSurface,
+  GoalListsTabSurface,
+} from './goal-lists-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
@@ -4269,7 +4297,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Companies · Table',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompaniesPage companies={companyRows} params={{}} />,
+    render: () => <CompaniesPage companies={companyRows} params={{ view: 'table' }} />,
   },
   {
     /* A text column's menu open: its sort, then the field that narrows by a
@@ -4279,7 +4307,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <CompaniesPage companies={companyRows} params={{ priority: 'interested' }} openColumn="name" />
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'interested' }} openColumn="name" />
     ),
   },
   {
@@ -4290,7 +4318,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <CompaniesPage companies={companyRows} params={{ priority: 'passed', activity: 'active' }} />
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'passed', activity: 'active' }} />
     ),
   },
   {
@@ -5178,6 +5206,126 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A goal’s lists as chips under the done-when (plan #2330.3): its own pantries to compare, one picked, and a linked list of readings from Learn. */
+    id: 'goals-lists',
+    label: 'Goal · its lists as chips',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsSurface />,
+  },
+  {
+    /* The pantry chip pressed: the list in a panel over the page, with a row a pasted link filled in waiting to be confirmed. */
+    id: 'goals-lists-panel',
+    label: 'Goal · a list open in its panel',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsPanelSurface />,
+  },
+  {
+    /* The readings chip pressed: each reading as Learn has it, two with comments, one gone, and the fold of the one put down, open. */
+    id: 'goals-lists-panel-linked',
+    label: 'Goal · a linked list open, ruled out showing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLinkedSurface />,
+  },
+  {
+    /* The add box after a pasted link was refused. */
+    id: 'goals-lists-panel-error',
+    label: 'Goal · a list, a link that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsErrorSurface />,
+  },
+  {
+    /* A list just started: the empty line and the add box. */
+    id: 'goals-lists-panel-empty',
+    label: 'Goal · a new list with nothing in it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsEmptySurface />,
+  },
+  {
+    /* A pasted link being read, waiting at the foot of the rows. */
+    id: 'goals-lists-panel-loading',
+    label: 'Goal · a list reading a pasted link',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLoadingSurface />,
+  },
+  {
+    /* The pantries open on Gallery (plan #2330.4): every picture in a grid with its name and price. */
+    id: 'goals-lists-panel-gallery',
+    label: 'Goal · a list as a gallery',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsGallerySurface />,
+  },
+  {
+    /* A list of events from the calendar (plan #2330.4): the month with two on one day, and what is coming under it. */
+    id: 'goals-lists-panel-calendar',
+    label: 'Goal · a list on a calendar',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarSurface />,
+  },
+  {
+    /* A day on the list’s calendar pressed: its popover names each row with its link. */
+    id: 'goals-lists-panel-calendar-day',
+    label: 'Goal · a list’s calendar, a day open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarDaySurface />,
+  },
+  {
+    /* The list’s calendar stepped to a month with nothing in it. */
+    id: 'goals-lists-panel-calendar-empty',
+    label: 'Goal · a list’s calendar, an empty month',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarEmptySurface />,
+  },
+  {
+    /* Shops on the map (plan #2330.4): numbered pins on OpenStreetMap, and one with an address alone listed under it. */
+    id: 'goals-lists-panel-map',
+    label: 'Goal · a list on a map',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapSurface />,
+  },
+  {
+    /* A pin on the list’s map pressed: its name, link and address over the map. */
+    id: 'goals-lists-panel-map-pin',
+    label: 'Goal · a list’s map, a pin open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapPinSurface />,
+  },
+  {
+    /* A list with a place field and no address yet: the map says how to add one. */
+    id: 'goals-lists-panel-map-empty',
+    label: 'Goal · a list’s map with no places',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapEmptySurface />,
+  },
+  {
+    /* The map’s tiles would not load, so the table stands in for it. */
+    id: 'goals-lists-panel-map-failed',
+    label: 'Goal · a list’s map that could not load',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapFailedSurface />,
+  },
+  {
+    /* Three lists, so each has a tab after Steps; the pantries’ tab open. */
+    id: 'goals-lists-tab',
+    label: 'Goal · a list on its own tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsTabSurface />,
+  },
+  {
     /* The design language, held to itself. It is the one surface where being
      * wrong is self-refuting, and it is the surface most likely to drift,
      * because it is written in prose and prose does not fail a type check. */
@@ -5919,6 +6067,107 @@ export const SURFACES: readonly Surface[] = [
           courses={9}
           explains={educationExplains}
           explaining="c3"
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened to its files (plan #2401.2): the syllabus, then the lectures week by week, then the readings, each with its size. */
+    id: 'you-work-files',
+    label: 'Work & school · A course\'s files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A file row with its Remove showing, as hover and focus show it, and
+     * another with its confirm armed in place before it deletes. */
+    id: 'you-work-files-remove',
+    label: 'Work & school · Removing a course file',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* A course opened with no files yet: what to add and the press that adds them. */
+    id: 'you-work-files-empty',
+    label: 'Work & school · A course with no files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c4' }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer with four files chosen: two ready with their kind and week, one refused for its type and one for its size. */
+    id: 'you-work-files-add',
+    label: 'Work & school · Adding course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationChosen }}
+        />
+      </>
+    ),
+  },
+  {
+    /* The add drawer mid-upload: one file going with its progress, one failed with its reason, one waiting its turn. */
+    id: 'you-work-files-uploading',
+    label: 'Work & school · Uploading course files',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
         />
       </>
     ),
@@ -9304,6 +9553,117 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPieceHeldSurface />,
   },
   {
+    /* Each figure kind on a lesson, open on a phone (plan #2321.1). */
+    id: 'learn-figure-table',
+    label: 'Plan · A lesson with a table',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="table" />,
+  },
+  {
+    id: 'learn-figure-compare',
+    label: 'Plan · A lesson with a comparison',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="compare" />,
+  },
+  {
+    id: 'learn-figure-source-figure',
+    label: 'Plan · A lesson with a course figure',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="source_figure" />,
+  },
+  {
+    id: 'learn-figure-chart',
+    label: 'Plan · A lesson with a chart of a real series',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" />,
+  },
+  {
+    id: 'learn-figure-chart-missing',
+    label: 'Plan · A lesson whose chart’s series was not found',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" missing />,
+  },
+  {
+    /* An explorable model on a lesson on price formation (plan #2321.7). */
+    id: 'learn-figure-explorable',
+    label: 'Plan · A lesson with an explorable model',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface />,
+  },
+  {
+    /* Each model in lib/learn/figures/models/registry.ts, its sliders moved. */
+    id: 'learn-figure-explorable-supply-demand',
+    label: 'Plan · Supply and demand, supply moved',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="supply_demand" />,
+  },
+  {
+    id: 'learn-figure-flow',
+    label: 'Plan · A lesson with a flow',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="flow" />,
+  },
+  {
+    id: 'learn-figure-cycle',
+    label: 'Plan · A lesson with a cycle',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="cycle" />,
+  },
+  {
+    id: 'learn-figure-tree',
+    label: 'Plan · A lesson with a tree',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="tree" />,
+  },
+  {
+    id: 'learn-figure-two-by-two',
+    label: 'Plan · A lesson with a two-by-two',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="two_by_two" />,
+  },
+  {
+    id: 'learn-figure-timeline',
+    label: 'Plan · A lesson with a timeline',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="timeline" />,
+  },
+  {
+    /* A map on a lesson about the Big Dig, its places dated, so the year slider shows (plan #2321.6). */
+    id: 'learn-figure-map',
+    label: 'Plan · A lesson with a map of dated places',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface />,
+  },
+  {
+    /* The same kind with no years on its places: no slider, every marker in the accent. */
+    id: 'learn-figure-map-undated',
+    label: 'Plan · A lesson with a map of Shenzhen, no years',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface undated />,
+  },
+  {
+    /* A place pressed on the map, its note showing. */
+    id: 'learn-figure-map-pressed',
+    label: 'Plan · A map with a place pressed',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnMapSurface pressed={2} />,
+  },
+  {
     id: 'learn-probe',
     label: 'Subject · Questions, before the first',
     module: 'learn',
@@ -9850,4 +10210,69 @@ export const SURFACES: readonly Surface[] = [
       ...(surface.deck ? { deck: surface.deck } : {}),
     })),
   ),
+  {
+    /* Figure questions in Practice Flow (plan #2321.5): a table's blank
+     * cell to fill, asked in an explanation's place. */
+    id: 'learn-cell-answer-figure-fill',
+    label: 'Practice Flow · Fill the cell',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" />,
+  },
+  {
+    /* The same, graded and missed, with the answer under the summary. */
+    id: 'learn-cell-answer-figure-fill-graded',
+    label: 'Practice Flow · Fill the cell, graded',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="fill" graded />,
+  },
+  {
+    /* A chart of a real series cut at a year, and which way it went next. */
+    id: 'learn-cell-answer-figure-predict',
+    label: 'Practice Flow · Which way next',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="predict" />,
+  },
+  {
+    /* The right figure among three, each drawn under its letter. */
+    id: 'learn-cell-answer-figure-pick',
+    label: 'Practice Flow · Pick the figure',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" />,
+  },
+  {
+    /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */
+    id: 'learn-figure-explorable-bid-rent',
+    label: 'Plan · Bid-rent, a rail line opened',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="bid_rent" />,
+  },
+  {
+    /* The agglomeration model on a lesson on why density pays, congestion eased (plan #2321.8). */
+    id: 'learn-figure-explorable-agglomeration',
+    label: 'Plan · Agglomeration, congestion eased',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="agglomeration" />,
+  },
+  {
+    /* Which way the city's edge moves when a rail line opens: bid-rent drawn still. */
+    id: 'learn-cell-answer-figure-move-bid-rent',
+    label: 'Practice Flow · Which way it moves, bid-rent',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-bid-rent" />,
+  },
+  {
+    /* Which way a city's best size moves when congestion eases: agglomeration drawn still. */
+    id: 'learn-cell-answer-figure-move-agglomeration',
+    label: 'Practice Flow · Which way it moves, agglomeration',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="move-agglomeration" />,
+  },
 ];

@@ -38,5 +38,5 @@ export async function answerCellQuestion(prev: CellAnswerState, formData: FormDa
   await recordLearnSpend(user.id, 'grade-cell-answer', spend.reports);
 
   if (!result.ok) return { ...prev, error: result.error, response: parsed.data.response };
-  return { moved: result.moved, error: null, response: parsed.data.response };
+  return { moved: result.moved, error: null, response: parsed.data.response, ...(result.answer ? { answer: result.answer } : {}) };
 }

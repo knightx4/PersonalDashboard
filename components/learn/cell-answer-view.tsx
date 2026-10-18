@@ -13,6 +13,8 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
 import type { Moved, ReachedCell, ReachedHow } from '@/lib/learn/levels/grade';
+import type { FigureQuestionView } from '@/lib/learn/figures/question';
+import { FigureAnswer } from './figure-answer';
 
 /**
  * An explain question about one level of a topic, and the answer screen
@@ -37,8 +39,14 @@ export type AskedCellView = {
   topicName: string;
   level: number;
   question: string;
-  /** A case (levels 4 to 6) is worked and typed; an explanation is written out. Absent means explain. */
-  format?: 'explain' | 'case';
+  /**
+   * A case (levels 4 to 6) is worked and typed; an explanation is written
+   * out; a figure question is answered on its figure (plan #2321.5). Absent
+   * means explain.
+   */
+  format?: 'explain' | 'case' | 'figure';
+  /** The figure question, without its answer, when `format` is 'figure'. */
+  figure?: FigureQuestionView;
   /** Why Practice Flow chose this level, opened on tap (plan #2138.6). */
   why?: string;
   /** Where the question sits in a placement, such as "Question 3 of up to 8" (plan #2292.2). */
@@ -50,6 +58,8 @@ export type CellAnswerState = {
   error: string | null;
   /** What was sent, kept so an error leaves the answer in the box. */
   response?: string;
+  /** A figure question's answer in words, shown once it is graded. */
+  answer?: string;
 };
 
 /**
@@ -263,7 +273,8 @@ export function CellAnswerView({
     <>
       <p className="text-small text-ink-muted">
         {asked.step && <>{asked.step} · </>}
-        {asked.topicName} · Level {asked.level} · {asked.format === 'case' ? 'Work this case' : 'Explain in your own words'}
+        {asked.topicName} · Level {asked.level} ·{' '}
+        {asked.figure ? asked.figure.label : asked.format === 'case' ? 'Work this case' : 'Explain in your own words'}
       </p>
       {/* The heaviest text on the card: the question is what the screen is for. */}
       <p className="mt-1 text-title leading-snug text-ink">{asked.question}</p>
@@ -284,13 +295,24 @@ export function CellAnswerView({
   if (state.moved) {
     const moved = state.moved;
     const firstShown = moved.reached.findIndex((r) => r.how === 'shown' && r.quote);
+    // A pick posts its choice's value; it is said by its label.
+    const given = asked.figure?.choices?.find((choice) => choice.value === state.response)?.label ?? state.response;
     return (
       <div data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
         <Card padding="standard">
           {head}
           <p className="mt-4 text-ui font-semibold text-ink">{movedSummary(moved, asked)}</p>
+          {state.answer && (
+            <p className="mt-1 text-ui text-ink">
+              The answer: {state.answer}
+              {given && given !== state.answer && <span className="text-ink-muted"> · you said {given}</span>}
+            </p>
+          )}
+          {asked.figure && <FigureAnswer questionId={asked.questionId} question={asked.figure} answered />}
         </Card>
-        {(moved.reached.length > 0 || moved.doubted.length > 0) && (
+        {/* A figure question reaches the asked level alone, and the line above
+          * already says how; the list shows only when it adds to that. */}
+        {(asked.figure ? moved.reached.length > 1 || moved.doubted.length > 0 : moved.reached.length > 0 || moved.doubted.length > 0) && (
           <Card padding="none" className="mt-3 overflow-hidden">
             <ul className="divide-y divide-border">
               {moved.reached.map((cell, i) => (
@@ -321,6 +343,16 @@ export function CellAnswerView({
       <input type="hidden" name="questionId" value={asked.questionId} />
       <Card padding="standard">
         {head}
+        {asked.figure ? (
+          <FigureAnswer
+            questionId={asked.questionId}
+            question={asked.figure}
+            pending={pending}
+            defaultValue={state.response}
+            describedBy={state.error ? `answer-error-${asked.questionId}` : undefined}
+          />
+        ) : (
+        <>
         <label htmlFor={`answer-${asked.questionId}`} className="sr-only">
           Your answer
         </label>
@@ -341,6 +373,8 @@ export function CellAnswerView({
           aria-describedby={state.error ? `answer-error-${asked.questionId}` : undefined}
           required
         />
+        </>
+        )}
         {state.error && !pending && (
           <p id={`answer-error-${asked.questionId}`} role="alert" className="mt-2 text-ui text-danger">
             {state.error} Your answer is still here to send again.

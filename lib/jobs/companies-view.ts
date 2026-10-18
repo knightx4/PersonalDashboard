@@ -26,7 +26,9 @@ export const COMPANIES_PATH = '/jobs/companies';
 
 /**
  * The views the page has: the table, and the focused view of one company at
- * a time (plan #2341.4). The table is the default until the view switch.
+ * a time (plan #2341.4). The page opens on the focused view unless the address
+ * names the table or carries a column or rail filter (plan #2341.5), the way
+ * Pipeline does.
  */
 export const COMPANY_VIEWS = ['table', 'focus'] as const;
 export type CompaniesViewName = (typeof COMPANY_VIEWS)[number];
@@ -106,8 +108,8 @@ function someOrNone(value: string | undefined): 'some' | 'none' | null {
 }
 
 export function parseCompanies(params: CompaniesParams): CompaniesState {
-  return {
-    view: parseView(params.view, COMPANY_VIEWS, 'table'),
+  const state: CompaniesState = {
+    view: 'focus',
     priority: COMPANY_PRIORITIES.find((p) => p === params.priority) ?? null,
     activeOnly: params.active === '1',
     terms: searchTerms(params.q),
@@ -119,6 +121,11 @@ export function parseCompanies(params: CompaniesParams): CompaniesState {
     company: params.company?.trim() || null,
     page: parsePage(params.page),
   };
+  // An address that names a view gets it. One that names none opens on the
+  // focused view, or on the table when a filter is set: a filtered list is
+  // something to scan, and a saved view of either mode carries its own `view`.
+  state.view = parseView(params.view, COMPANY_VIEWS, hasColumnFilters(state) ? 'table' : 'focus');
+  return state;
 }
 
 /**
@@ -176,15 +183,29 @@ export function filterCompanies<T extends CompanyRow>(
 
 const COMPANIES_ADDRESS: PageAddress<CompaniesParams> = {
   path: COMPANIES_PATH,
-  defaults: { view: 'table' },
+  // Focus is the default, but only while nothing is filtered: with a filter in
+  // the address a bare `view` means the table, so companiesHref keeps
+  // `view=focus` there instead of leaving it to this list.
+  defaults: { view: 'focus' },
 };
 
-/** The link that changes `changes` and keeps everything else, back to the first page. */
+/**
+ * The link that changes `changes` and keeps everything else, back to the first
+ * page. `view=focus` is left out only when no filter is set, since the address
+ * would otherwise open on the table.
+ */
 export function companiesHref(
   params: CompaniesParams,
   changes: AddressChanges<CompaniesParams>,
 ): string {
-  return addressHref(COMPANIES_ADDRESS, params, changes);
+  const href = addressHref({ ...COMPANIES_ADDRESS, defaults: {} }, params, changes);
+  const [path, query = ''] = href.split('?');
+  const next = Object.fromEntries(new URLSearchParams(query)) as CompaniesParams;
+  if (next.view === 'focus' && !hasColumnFilters(parseCompanies({ ...next, view: undefined }))) {
+    delete next.view;
+  }
+  const rest = new URLSearchParams(next as Record<string, string>).toString();
+  return rest ? `${path}?${rest}` : path;
 }
 
 /**
@@ -192,8 +213,8 @@ export function companiesHref(
  * previous and next step through the rows the table showed. The table's page
  * is dropped: the focused view steps through every page.
  */
-export function focusHref(params: CompaniesParams, slug: string): string {
-  return companiesHref(params, { view: 'focus', company: slug });
+export function focusHref(params: CompaniesParams, slug?: string | null): string {
+  return companiesHref(params, { view: 'focus', company: slug ?? undefined });
 }
 
 /** The table with the same filters, leaving the focused company behind. */
@@ -212,7 +233,10 @@ export function focusIndex(rows: readonly Pick<CompanyRow, 'slug'>[], slug: stri
 
 /** The same table with every filter off, the search included; the arrangement stays. */
 export function clearFiltersHref(params: CompaniesParams): string {
+  // Clearing the filters of the table stays on the table.
+  const view = parseCompanies(params).view;
   return companiesHref(params, {
+    view,
     priority: undefined,
     active: undefined,
     q: undefined,

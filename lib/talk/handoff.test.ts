@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { handoffBrief, handoffRequest, MAX_HANDOFF_REQUEST } from './handoff';
+import { handoffBrief, handoffRequest, MAX_HANDOFF_REQUEST, POST_NOT_HANDED_ON } from './handoff';
 
 describe('handoffRequest', () => {
+  it('refuses a request for a post, which Dash saves with suggest_post', () => {
+    for (const request of ['Draft a post about the vault map', 'Write an X post about Learn', 'suggest some posts about the plan']) {
+      expect(handoffRequest({ request })).toEqual({ ok: false, error: POST_NOT_HANDED_ON });
+    }
+    expect(handoffRequest({ request: 'Add a goal to publish a song' }).ok).toBe(true);
+  });
+
   it('takes the request, trimmed', () => {
     expect(handoffRequest({ request: '  Create a goal  ' })).toEqual({
       ok: true,

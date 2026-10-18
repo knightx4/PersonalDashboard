@@ -3,7 +3,8 @@ import { isUuid } from '@/lib/ask/db';
 import type { PostChangeInput, PostChangeKind } from '@/lib/ask/post-changes';
 import { toRef } from '@/lib/core/refs';
 import { checkDraft } from '@/lib/dev/post-check';
-import { cleanThread, MAX_THREAD_POSTS, X_POST_LIMIT } from '@/lib/dev/posts';
+import { cleanThread, MAX_ANGLE, MAX_THREAD_POSTS, X_POST_LIMIT } from '@/lib/dev/posts';
+import { listPostPictures } from './post-pictures';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -11,8 +12,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *
  *   rewrite_post  the text of an X post draft on the Posts tab replaced with
  *                 a new thread: shorter, reworded, split or joined.
+ *   suggest_post  a new draft saved to the Posts tab, with an optional
+ *                 gallery picture (plan #2384.3, feature #2384).
  *
- * Only `body` changes. `draft` keeps what Dash first wrote, as the tab's own
+ * A rewrite changes only `body`. `draft` keeps what Dash first wrote, as the tab's own
  * edit leaves it (app/dev/posts/actions.ts, editPostBody), so the gap between
  * the two still shows how the person edits.
  *
@@ -30,6 +33,16 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * One row is updated, so the one undo rule in lib/core/dash-actions.ts puts
  * the text back from the values kept, and refuses once the text has changed
  * again since.
+ *
+ * A suggested draft is held to the checks the posts run's drafts pass
+ * (scripts/posts-check.ts): checkDraft on the angle and the posts, with the
+ * same terms kept out (.claude/skills/posts/SKILL.md, step 4: the person's
+ * name, the companies and contacts in their job search). Its picture must be
+ * one listPostPictures returns, by its site path. The row goes in as
+ * `suggested` with `draft` and `body` the same text and `run_id` null, since
+ * no posts run drafted it. Dash still never sends a post. Undo deletes the
+ * row by the same rule, which refuses once the row has moved since: edited,
+ * planned, dropped or posted.
  */
 
 /** A refusal Dash reads and says in words. */
@@ -168,6 +181,119 @@ async function rewritePost(ctx: DashWriteContext, args: Args): Promise<DashWrite
   };
 }
 
+/** The terms a post must not name, as the posts run gathers them for scripts/posts-check.ts. */
+async function avoidTerms(ctx: DashWriteContext): Promise<string[]> {
+  const [pub, jobs] = await Promise.all([ctx.db('public'), ctx.db('job_search')]);
+  const [profile, companies, contacts] = await Promise.all([
+    pub.from('profiles').select('display_name').eq('id', ctx.userId).maybeSingle(),
+    jobs.from('companies').select('name').eq('user_id', ctx.userId),
+    jobs.from('contacts').select('full_name').eq('user_id', ctx.userId),
+  ]);
+  for (const read of [profile, companies, contacts]) {
+    if (read.error) throw new Error(`Reading the terms to keep out failed: ${read.error.message}`);
+  }
+  const terms = new Set<string>();
+  const name = (profile.data as Row | null)?.display_name;
+  if (typeof name === 'string') for (const word of name.split(/\s+/)) terms.add(word);
+  for (const row of (companies.data ?? []) as Row[]) if (typeof row.name === 'string') terms.add(row.name);
+  for (const row of (contacts.data ?? []) as Row[]) if (typeof row.full_name === 'string') terms.add(row.full_name);
+  return [...terms].map((t) => t.trim()).filter((t) => t.length >= 2);
+}
+
+async function suggestPost(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  if (!ctx.enabledModules.includes('dev')) {
+    throw new Refused('The Dev workspace is switched off, so nothing can be saved there.');
+  }
+
+  const angle = typeof args.angle === 'string' ? args.angle.replace(/\s+/g, ' ').trim() : '';
+  if (!angle) throw new Refused('angle is missing: the one idea the post is about, in a short line.');
+  if (angle.length > MAX_ANGLE) throw new Refused(`The angle is at most ${MAX_ANGLE} characters.`);
+
+  if (!Array.isArray(args.posts) || args.posts.some((post) => typeof post !== 'string')) {
+    throw new Refused('posts must be the text, as a list of strings: one for each post in the thread.');
+  }
+  const posts = cleanThread(args.posts as string[]);
+  if (!posts) {
+    throw new Refused(
+      (args.posts as string[]).length > MAX_THREAD_POSTS
+        ? `A thread is at most ${MAX_THREAD_POSTS} posts.`
+        : 'The text is empty. A draft needs at least one post.',
+    );
+  }
+
+  let picture: string | null = null;
+  if (args.picture !== undefined && args.picture !== null && args.picture !== '') {
+    const wanted = typeof args.picture === 'string' ? args.picture.trim() : '';
+    const found = (await listPostPictures()).find((p) => p.path === wanted);
+    if (!found) {
+      throw new Refused(
+        `${wanted || 'That'} is not a gallery picture. Use a path the post_pictures lookup returned, or leave picture out. Nothing was saved.`,
+      );
+    }
+    picture = found.path;
+  }
+
+  const checked = checkDraft({ angle, posts }, await avoidTerms(ctx));
+  if (!checked.ok) {
+    throw new Refused(
+      `The draft breaks the rules for a post (docs/X-POSTS.md): ${checked.problems.join('; ')}. ` +
+        `Nothing was saved. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes or private details; write it again within those.`,
+    );
+  }
+
+  const db = await ctx.db('public');
+  const { data, error } = await db
+    .from('social_posts')
+    .insert({
+      user_id: ctx.userId,
+      platform: 'x',
+      angle,
+      status: 'suggested',
+      draft: posts,
+      body: posts,
+      image_paths: picture ? [picture] : [],
+      run_id: null,
+    })
+    .select('*');
+  if (error) throw new Error(`Saving the post draft failed: ${error.message}`);
+  const after = (Array.isArray(data) ? data[0] : data) as Row | undefined;
+  if (!after || typeof after.id !== 'string') throw new Error('Saving the post draft returned no row.');
+  const ref = after.id;
+
+  const what = named(angle);
+  const rest = `: ${shape(checked.lengths)}${picture ? ', with a picture' : ''}`;
+  const input: PostChangeInput = {
+    verb: 'Saved the post draft',
+    what,
+    rest,
+    href: POSTS_HREF,
+    where: 'Open Posts',
+    paths: POST_PATHS,
+  };
+  return {
+    ok: true,
+    kind: 'suggest_post' satisfies PostChangeKind,
+    input: input as unknown as Record<string, unknown>,
+    subjectRef: toRef(TABLE, ref),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash saved the post draft "${what}"${rest}.`,
+    row: {
+      table: TABLE,
+      ref,
+      title: what,
+      href: POSTS_HREF,
+      detail: {
+        posts: posts.join('\n\n'),
+        lengths: checked.lengths.join(', '),
+        ...(picture ? { picture } : {}),
+        ...(checked.warnings.length > 0 ? { warnings: checked.warnings.join('; ') } : {}),
+      },
+    },
+  };
+}
+
 /** Runs a write, turning a refusal or a failure into the sentence the model reads. Never throws. */
 function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
   return async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
@@ -217,5 +343,29 @@ export const POST_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     rewritePost,
+  ),
+  tool(
+    'suggest_post',
+    `Save a new X post draft to the Posts tab in Dev, when they ask you for a post about something that shipped ("write a post about the new plan page"). Read what shipped first (the plan steps and changelog), and write about what the app does, never what they keep in it. Send angle as the one idea the post is about, in a short line, and posts as the text, one string per post in the thread, at most ${MAX_THREAD_POSTS}. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture the post_pictures lookup returned, of the screen the post is about, where one fits; leave it out otherwise. The draft waits on the Posts tab for them: you never post it.`,
+    {
+      type: 'object',
+      properties: {
+        angle: { type: 'string', description: 'The one idea the post is about, in a short line. Shown on the tab, never posted.' },
+        posts: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 1,
+          maxItems: MAX_THREAD_POSTS,
+          description: 'The text: one string per post in the thread, in order.',
+        },
+        picture: {
+          type: 'string',
+          description: 'Optional: the path of a gallery picture the post_pictures lookup returned, such as /posts/2026-10-18-dev-plan-tree.png.',
+        },
+      },
+      required: ['angle', 'posts'],
+      additionalProperties: false,
+    },
+    suggestPost,
   ),
 ];

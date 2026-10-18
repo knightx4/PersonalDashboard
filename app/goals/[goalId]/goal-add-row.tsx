@@ -5,8 +5,9 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { GoalHelp } from './goal-help';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
+import { NewListForm } from './goal-lists';
 
-type Section = 'number' | 'help' | 'links';
+type Section = 'number' | 'help' | 'links' | 'list';
 
 /**
  * The goal's empty sections as one row of add lines above its steps (ui
@@ -20,10 +21,13 @@ export function GoalAddRow({
   number,
   help,
   links,
+  list = null,
 }: {
   number: ComponentProps<typeof GoalNumber> | null;
   help: ComponentProps<typeof GoalHelp> | null;
   links: ComponentProps<typeof GoalLinksSection> | null;
+  /** A goal with no lists yet, which can start one (plan #2330.3). */
+  list?: { goalId: string } | null;
 }) {
   const [open, setOpen] = useState<Section | null>(null);
   const close = () => setOpen(null);
@@ -33,7 +37,8 @@ export function GoalAddRow({
   if (open === 'number' && number) return <GoalNumber {...number} startEditing onClose={close} />;
   if (open === 'help' && help) return <GoalHelp {...help} startEditing onClose={close} />;
   if (open === 'links' && links) return <GoalLinksSection {...links} startAdding onClose={close} />;
-  if (!number && !help && !links) return null;
+  if (open === 'list' && list) return <NewListForm goalId={list.goalId} onClose={close} />;
+  if (!number && !help && !links && !list) return null;
   const aims = (links?.aimChoices?.length ?? 0) > 0;
 
   return (
@@ -46,6 +51,7 @@ export function GoalAddRow({
           onClick={() => setOpen('links')}
         />
       )}
+      {list && <AddTrigger label="Start a list" onClick={() => setOpen('list')} />}
     </div>
   );
 }

@@ -87,6 +87,8 @@ export function gradePrompt(input: {
   question: string;
   answer: string;
   expected?: string | null;
+  /** A figure question's figure and answer, written out (plan #2321.5); graded on the asked cell alone. */
+  figure?: string | null;
 }): string {
   const lines: string[] = ['The cells:', ''];
   for (const cell of input.cells) {
@@ -113,6 +115,16 @@ export function gradePrompt(input: {
       '',
     );
   }
+  if (input.figure) {
+    lines.push(
+      'The question is asked on a figure, and only C1 is graded. The figure and the answer, which the person has not seen:',
+      input.figure,
+      '',
+      'Grade C1 met when their answer gives the same thing as the answer, in any wording or notation; quote it.',
+      'A different answer is not_met.',
+      '',
+    );
+  }
   lines.push('Their answer:', input.answer, '', `Call ${TOOL}.`);
   return lines.join('\n');
 }
@@ -124,6 +136,8 @@ export async function gradeCellAnswer(input: {
   answer: string;
   /** The answer a case expects; set for a case, which is graded on the asked cell alone. */
   expected?: string | null;
+  /** A figure question's figure and answer, written out; graded on the asked cell alone. */
+  figure?: string | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

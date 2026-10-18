@@ -31,6 +31,28 @@ export const youSources: ModuleSources = {
         'grade is null for a course with no grade, such as transfer credit.',
     },
     {
+      table: 'you.course_files',
+      module: 'You',
+      holds: 'The files they kept from a course: its syllabus, lecture slides, lecture notes and readings, each marked with its week.',
+      weight: 'record',
+      search: ['title', 'file_name', 'kind'],
+      title: 'title',
+      facts: ['week'],
+      newest: 'uploaded_at',
+      // A file opens on its course's line, which its ref alone cannot name.
+      page: {
+        title: 'title',
+        reads: ['course_id'],
+        href: (row) => (row.course_id ? courseHref(String(row.course_id)) : null),
+        section: WORK,
+        parent: parentBy('course_id', 'you.courses'),
+      },
+      note:
+        'course_id points at you.courses. kind is syllabus, slides, lecture_notes or reading. ' +
+        'week is the week of the course, or null for a file that spans it. ' +
+        'The file is in the private you-course-files bucket at storage_path; a course holds at most 20.',
+    },
+    {
       table: 'you.transcripts',
       module: 'You',
       holds: 'The academic transcripts they have uploaded, one per school record, with the original file kept.',

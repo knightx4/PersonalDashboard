@@ -4,7 +4,8 @@
  * A collection is a definition, such as loans with a name, servicer, balance,
  * rate, minimum and due day, and a record is one filled-in set of its values
  * (docs/GOALS-SPEC.md, "Information steps and collections"). Claude picks
- * fields from the ten types below and never writes a table.
+ * fields from the thirteen types below and never writes a table. A goal's own
+ * list (plan #2330.2) is a collection too, and uses the same types.
  *
  * This file holds the field types and the one validator every record write
  * goes through: checkRecord turns what was typed, pasted or found into the
@@ -30,6 +31,9 @@ export const FIELD_TYPES = [
   'yes_no',
   'choice',
   'link',
+  'image',
+  'place',
+  'ref',
 ] as const;
 
 export type FieldType = (typeof FIELD_TYPES)[number];
@@ -46,6 +50,9 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   yes_no: 'Yes/no',
   choice: 'Choice',
   link: 'Link',
+  image: 'Picture',
+  place: 'Place',
+  ref: 'Row in the app',
 };
 
 /** The types whose changes can be kept as a series of readings. */
@@ -81,8 +88,15 @@ export type CollectionDefinition = {
   fields: CollectionField[];
 };
 
+/**
+ * A place field's value (plan #2330.2): the address as one line, with both
+ * coordinates or neither. The map view needs the coordinates; an address
+ * typed in has none until something looks them up.
+ */
+export type PlaceValue = { address: string; lat?: number; lng?: number };
+
 /** A value in the form it is stored in records.data. */
-export type FieldValue = string | number | boolean | null;
+export type FieldValue = string | number | boolean | PlaceValue | null;
 export type RecordValues = Record<string, FieldValue>;
 
 /**
@@ -103,6 +117,23 @@ export const LINK_MAX = 2000;
 export const PERCENT_ABS_MAX = 1000;
 export const NUMBER_ABS_MAX = 1e12;
 export const COLLECTION_NAME_MAX = 200;
+export const ADDRESS_MAX = 500;
+
+/** A ref as lib/core/refs.ts reads it, `schema.table:id`, as 0080 checks it. */
+export const REF_PATTERN = /^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*:[A-Za-z0-9_-]{1,100}$/;
+
+/** Whether a value is a place, as stored. */
+export function isPlace(value: unknown): value is PlaceValue {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof (value as PlaceValue).address === 'string';
+}
+
+/** Two stored values are the same: equal, or two places with the same address and coordinates. */
+export function sameValue(a: FieldValue | undefined, b: unknown): boolean {
+  if (isPlace(a) && isPlace(b)) {
+    return a.address === b.address && (a.lat ?? null) === (b.lat ?? null) && (a.lng ?? null) === (b.lng ?? null);
+  }
+  return (a ?? null) === (b ?? null);
+}
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -281,13 +312,51 @@ export function parseFieldValue(field: CollectionField, raw: unknown): Parsed<Fi
       if (match === undefined) return fail('one of its options');
       return { ok: true, value: match };
     }
-    case 'link': {
+    case 'link':
+    case 'image': {
       if (text === null || !/^https?:\/\/\S+$/.test(text) || text.length > LINK_MAX) {
         return fail('a web address starting http:// or https://');
       }
       return { ok: true, value: text };
     }
+    case 'place':
+      return parsePlace(field, raw);
+    case 'ref': {
+      if (text === null || !REF_PATTERN.test(text)) return fail('a row in the app, as schema.table:id');
+      return { ok: true, value: text };
+    }
   }
+}
+
+function finite(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : NaN;
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/**
+ * A place, from an address typed as text or from `{address, lat, lng}` as a
+ * routine or the map sends it. Coordinates come in pairs: both or neither.
+ */
+function parsePlace(field: CollectionField, raw: unknown): Parsed<FieldValue> {
+  const object = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  const address = (typeof raw === 'string' ? raw : typeof object?.address === 'string' ? object.address : '').trim();
+  if (!address || /[\r\n]/.test(address) || address.length > ADDRESS_MAX) {
+    return { ok: false, error: `${field.label} must be an address of one line, up to ${ADDRESS_MAX} characters.` };
+  }
+  if (object && Object.keys(object).some((key) => !['address', 'lat', 'lng'].includes(key))) {
+    return { ok: false, error: `${field.label} holds an address, a latitude and a longitude, and nothing else.` };
+  }
+  const lat = finite(object?.lat);
+  const lng = finite(object?.lng);
+  if (lat === null && lng === null) return { ok: true, value: { address } };
+  if (lat === null || lng === null || Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return {
+      ok: false,
+      error: `${field.label} needs both coordinates, a latitude from -90 to 90 and a longitude from -180 to 180.`,
+    };
+  }
+  return { ok: true, value: { address, lat, lng } };
 }
 
 export type RecordCheck =
@@ -313,10 +382,10 @@ export function checkRecord(
   for (const [key, raw] of Object.entries(values)) {
     const field = fields.find((f) => f.key === key);
     if (!field || field.removed) {
-      if (isEmpty(raw) || (previous && previous[key] === raw)) continue;
+      if (isEmpty(raw) || (previous && sameValue(previous[key], raw))) continue;
       return { ok: false, field: key, error: `There is no field ${key} to fill in.` };
     }
-    if (previous && key in previous && previous[key] === raw) continue;
+    if (previous && key in previous && sameValue(previous[key], raw)) continue;
     const parsed = parseFieldValue(field, raw);
     if (!parsed.ok) return { ok: false, field: key, error: parsed.error };
     data[key] = parsed.value;

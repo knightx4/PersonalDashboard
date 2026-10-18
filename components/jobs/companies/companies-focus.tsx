@@ -19,7 +19,6 @@ import {
   filterNames,
   focusHref,
   focusIndex,
-  tableHref,
   type CompaniesParams,
   type CompaniesState,
   type CompanyRow,
@@ -50,9 +49,6 @@ export function CompaniesFocus({
         <p className="text-body font-medium text-ink">No companies match these filters</p>
         <p className="mt-1 text-small text-ink-muted">{filterNames(state).join(' · ')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Link href={tableHref(params)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            Back to the table
-          </Link>
           <Link href={clearFiltersHref(params)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
             Clear filters
           </Link>

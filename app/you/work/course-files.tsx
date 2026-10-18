@@ -1,0 +1,461 @@
+'use client';
+
+import { useId, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FileText } from 'lucide-react';
+import { AddTrigger } from '@/components/ui/add-trigger';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { Input, PressLabel, Select } from '@/components/ui/field';
+import { Meter } from '@/components/ui/meter';
+import { useToast } from '@/components/ui/toast';
+import { cn } from '@/lib/cn';
+import {
+  COURSE_FILE_ACCEPT,
+  COURSE_FILE_HINT,
+  courseFileContentType,
+  courseFileHref,
+  courseFileSize,
+  groupCourseFiles,
+  parseWeek,
+  refuseCourseFiles,
+} from '@/lib/you/course-files';
+import { uploadCourseFile } from '@/lib/you/course-file-upload';
+import {
+  COURSE_FILE_KINDS,
+  COURSE_FILE_KIND_LABELS,
+  type CourseFile,
+  type CourseFileKind,
+} from '@/lib/you/transcripts';
+import { addCourseFileAction, removeCourseFileAction } from './actions';
+
+/**
+ * The files kept under one course (plan #2401.2): the syllabus, then the
+ * slides and lecture notes week by week, then the readings, each opening its
+ * original through a one-minute signed link. "Add files" opens a drawer under
+ * the list where several files are chosen at once, each given its kind and
+ * week, and uploaded one after another with its own progress. A file the
+ * bucket would refuse says why on its row before anything is sent, and a
+ * failed upload keeps its row with the reason.
+ */
+
+/** One chosen file in the add drawer, and where its upload has got to. */
+export type ChosenFile = {
+  key: number;
+  name: string;
+  size: number;
+  /** Absent in the gallery, which draws rows without real files. */
+  file?: File;
+  kind: CourseFileKind;
+  week: string;
+  /** Why it will not be or was not kept; null while it can still go. */
+  problem: string | null;
+  /** True for a refusal found before upload: the row cannot be sent at all. */
+  refused: boolean;
+  /** 0 to 1 while uploading; null before it starts. */
+  progress: number | null;
+};
+
+export function CourseFiles({
+  courseId,
+  courseTitle,
+  files,
+  adding = false,
+  chosen: initialChosen,
+  uploading: initialUploading = false,
+  showRemove,
+  confirming,
+}: {
+  courseId: string;
+  courseTitle: string;
+  files: CourseFile[];
+  /** Open with the add drawer showing. */
+  adding?: boolean;
+  /** The gallery's way to draw the drawer with files chosen. */
+  chosen?: ChosenFile[];
+  /** The gallery's way to draw the drawer mid-upload. */
+  uploading?: boolean;
+  /** The gallery's way to draw one row's remove as hover shows it. */
+  showRemove?: string;
+  /** The gallery's way to draw one row's confirm armed. */
+  confirming?: string;
+}) {
+  const [open, setOpen] = useState(adding);
+  const groups = groupCourseFiles(files);
+
+  return (
+    <div className="mt-2 border-l-2 border-border pl-3 sm:ml-1">
+      {groups.length === 0 && !open && (
+        <p className="py-1 text-ui text-ink-muted">
+          No files yet. Add the syllabus, slides, lecture notes and readings you kept from this course.
+        </p>
+      )}
+      {groups.map((group) => (
+        <section key={group.key} className="mt-2 first:mt-0" aria-label={group.label}>
+          <h4 className="text-small font-medium text-ink-muted">{group.label}</h4>
+          <ul>
+            {group.files.map((file) => (
+              <FileRow
+                key={file.id}
+                file={file}
+                forceRemove={showRemove === file.id}
+                confirming={confirming === file.id}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {open ? (
+        <AddFiles
+          courseId={courseId}
+          courseTitle={courseTitle}
+          held={files.length}
+          initial={initialChosen}
+          initialUploading={initialUploading}
+          onClose={() => setOpen(false)}
+        />
+      ) : (
+        <AddTrigger label="Add files" onClick={() => setOpen(true)} className="mt-1" />
+      )}
+    </div>
+  );
+}
+
+function FileRow({
+  file,
+  forceRemove,
+  confirming,
+}: {
+  file: CourseFile;
+  forceRemove: boolean;
+  confirming: boolean;
+}) {
+  const kind = file.kind === 'slides' || file.kind === 'lecture_notes' ? COURSE_FILE_KIND_LABELS[file.kind] : null;
+  const meta = [file.week !== null ? `Week ${file.week}` : null, kind, courseFileSize(file.size_bytes)]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <li className="group flex flex-wrap items-center gap-x-3 py-1.5 sm:py-0.5">
+      <a
+        href={courseFileHref(file.id)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="press-area inline-flex w-full min-w-0 items-start gap-1.5 text-body text-ink hover:text-accent sm:min-h-8 sm:w-auto sm:flex-1 sm:items-center"
+      >
+        <FileText className="mt-1 size-4 shrink-0 text-ink-muted sm:mt-0" strokeWidth={1.75} aria-hidden />
+        <span className="line-clamp-2 sm:truncate">{file.title}</span>
+      </a>
+      {/* On a phone the title takes the whole line and the facts and Remove sit tight under it. */}
+      {/* While the confirm is armed it drops to a line of its own, so the
+        * facts keep the column the rows around them end on (5.75rem is the
+        * Remove slot and its gap). */}
+      <span className="mr-auto pl-5.5 text-small tabular-nums text-ink-muted sm:mr-0 sm:pl-0 sm:group-has-[p]:mr-23">
+        {meta}
+      </span>
+      {/* Remove shows on hover and on focus; on a phone, with no hover, it is always there. */}
+      <span
+        className={cn(
+          '-my-1 sm:my-0 sm:min-w-20 sm:text-right',
+          'sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100',
+          'has-[p]:my-1 has-[p]:w-full has-[p]:pl-5.5 has-[p]:text-left sm:has-[p]:opacity-100',
+          forceRemove && 'sm:opacity-100',
+        )}
+      >
+        <ConfirmStep
+          align="start"
+          prompt={`Removes ${file.file_name} from the course. This cannot be undone.`}
+          confirmLabel="Yes, remove"
+          pendingLabel="Removing…"
+          action={removeCourseFileAction}
+          fields={{ id: file.id }}
+          defaultArmed={confirming}
+        >
+          Remove
+        </ConfirmStep>
+      </span>
+    </li>
+  );
+}
+
+/** A kind to start a chosen file on, guessed from its name. */
+function guessKind(name: string): CourseFileKind {
+  const lower = name.toLowerCase();
+  if (/syllab|course outline|course guide/.test(lower)) return 'syllabus';
+  if (/\.pptx$/.test(lower) || /slide|lecture/.test(lower)) return 'slides';
+  if (/notes?\b/.test(lower)) return 'lecture_notes';
+  return 'reading';
+}
+
+/** A week to start a chosen file on, read from a name like "Week 3" or "Lecture_04". */
+function guessWeek(name: string): string {
+  const match = /(?:week|wk|lecture|lec)[\s_-]*0*(\d{1,2})/i.exec(name);
+  return match && Number(match[1]) <= 60 ? String(Number(match[1])) : '';
+}
+
+function AddFiles({
+  courseId,
+  courseTitle,
+  held,
+  initial,
+  initialUploading,
+  onClose,
+}: {
+  courseId: string;
+  courseTitle: string;
+  held: number;
+  initial?: ChosenFile[];
+  initialUploading: boolean;
+  onClose: () => void;
+}) {
+  const id = useId();
+  const router = useRouter();
+  const toast = useToast();
+  const next = useRef(initial?.length ?? 0);
+  const [rows, setRows] = useState<ChosenFile[]>(initial ?? []);
+  const [uploading, setUploading] = useState(initialUploading);
+  const [added, setAdded] = useState(0);
+
+  const patch = (key: number, change: Partial<ChosenFile>) =>
+    setRows((list) => list.map((row) => (row.key === key ? { ...row, ...change } : row)));
+
+  const choose = (list: FileList | null) => {
+    const picked = Array.from(list ?? []);
+    if (picked.length === 0) return;
+    setRows((current) => {
+      const all = [
+        ...current,
+        ...picked.map((file) => ({
+          key: next.current++,
+          name: file.name,
+          size: file.size,
+          file,
+          kind: guessKind(file.name),
+          week: guessWeek(file.name),
+          problem: null,
+          refused: false,
+          progress: null,
+        })),
+      ];
+      // Refusals are worked out across the whole list, so the twentieth place goes to the first chosen.
+      const reasons = refuseCourseFiles(all, held + added);
+      return all.map((row, index) => ({
+        ...row,
+        refused: reasons[index] !== null,
+        problem: reasons[index] ?? (row.refused ? null : row.problem),
+      }));
+    });
+  };
+
+  const sendable = rows.filter((row) => !row.refused && row.progress !== 1);
+
+  const upload = async () => {
+    setUploading(true);
+    let kept = 0;
+    for (const row of sendable) {
+      const week = parseWeek(row.week);
+      if (!week.ok) {
+        patch(row.key, { problem: 'A week is a number from 0 to 60.' });
+        continue;
+      }
+      const contentType = courseFileContentType(row.name);
+      if (!row.file || !contentType) {
+        patch(row.key, { problem: 'Not a file the course can keep.', refused: true });
+        continue;
+      }
+      patch(row.key, { problem: null, progress: 0 });
+      const sent = await uploadCourseFile(courseId, row.file, contentType, (fraction) =>
+        patch(row.key, { progress: Math.min(fraction, 0.99) }),
+      );
+      if ('error' in sent) {
+        patch(row.key, { problem: sent.error, progress: null });
+        continue;
+      }
+      // The action removes the stored file itself when the row cannot be written.
+      const saved = await addCourseFileAction({
+        courseId,
+        path: sent.path,
+        fileName: row.name,
+        sizeBytes: row.size,
+        kind: row.kind,
+        week: row.week,
+      }).catch(() => ({ ok: false as const, error: 'The file was not saved. Try again.' }));
+      if (!saved.ok) {
+        patch(row.key, { problem: saved.error, progress: null });
+        continue;
+      }
+      kept += 1;
+      patch(row.key, { progress: 1 });
+    }
+    setUploading(false);
+    setAdded((n) => n + kept);
+    if (kept > 0) {
+      toast({ text: `Added ${kept} ${kept === 1 ? 'file' : 'files'} to ${courseTitle}.` });
+      router.refresh();
+    }
+    // Keep only the rows still to deal with; close once nothing is left.
+    setRows((list) => {
+      const left = list.filter((row) => row.progress !== 1);
+      if (left.length === 0 && kept > 0) onClose();
+      return left;
+    });
+  };
+
+  const count = sendable.length;
+
+  return (
+    <div className="mt-2 space-y-3 rounded-card bg-sunken p-3">
+      <div>
+        {/* The browser's own file control says "No file chosen" beside a list
+          * of chosen files, so the input is hidden and its label is the button. */}
+        <label
+          className={cn(
+            buttonVariants({ variant: 'secondary', size: 'sm' }),
+            'cursor-pointer focus-within:outline-2 focus-within:outline-offset-2',
+            uploading && 'pointer-events-none opacity-50',
+          )}
+        >
+          <input
+            id={`${id}-files`}
+            type="file"
+            multiple
+            accept={COURSE_FILE_ACCEPT}
+            disabled={uploading}
+            aria-describedby={`${id}-hint`}
+            className="sr-only"
+            onChange={(e) => {
+              choose(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          {rows.length > 0 ? 'Add more files' : 'Choose files'}
+        </label>
+        <p id={`${id}-hint`} className="mt-1 text-small text-ink-muted">
+          {COURSE_FILE_HINT}
+        </p>
+      </div>
+
+      {rows.length > 0 && (
+        <ul className="divide-y divide-border">
+          {rows.map((row) => (
+            <ChosenRow
+              key={row.key}
+              row={row}
+              idBase={`${id}-${row.key}`}
+              locked={uploading}
+              onChange={(change) => patch(row.key, change)}
+              onLeaveOut={() => setRows((list) => list.filter((r) => r.key !== row.key))}
+            />
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" pending={uploading} disabled={count === 0} onClick={upload}>
+          {uploading ? 'Uploading…' : count === 1 ? 'Upload 1 file' : count === 0 ? 'Upload' : `Upload ${count} files`}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={uploading}>
+          {rows.length > 0 ? 'Cancel' : 'Close'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ChosenRow({
+  row,
+  idBase,
+  locked,
+  onChange,
+  onLeaveOut,
+}: {
+  row: ChosenFile;
+  idBase: string;
+  locked: boolean;
+  onChange: (change: Partial<ChosenFile>) => void;
+  onLeaveOut: () => void;
+}) {
+  const going = row.progress !== null && row.progress < 1;
+  return (
+    <li className="py-2">
+      <div className="flex items-center gap-2">
+        {/* A refused file's name wraps, so the extension the refusal is about shows. */}
+        <span
+          className={cn(
+            'min-w-0 flex-1 text-body font-medium text-ink',
+            row.refused ? 'line-clamp-2 break-words' : 'truncate',
+          )}
+        >
+          {row.name}
+        </span>
+        <span className="shrink-0 text-small tabular-nums text-ink-muted">{courseFileSize(row.size)}</span>
+        {!locked && (
+          <Button type="button" size="xs" variant="ghost" onClick={onLeaveOut}>
+            Leave out
+          </Button>
+        )}
+      </div>
+      {row.refused ? (
+        <p className="mt-0.5 text-small text-danger">Not added: {row.problem}</p>
+      ) : (
+        <>
+          {locked ? (
+            // While the files go up, the kind and week are facts, not a form.
+            <p className="mt-0.5 text-small text-ink-muted">
+              {[COURSE_FILE_KIND_LABELS[row.kind], parseWeek(row.week).ok && row.week.trim() ? `Week ${row.week.trim()}` : null]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          ) : (
+            <div className="mt-1 flex items-center gap-2">
+              {/* Each field has no visible label, so a PressLabel gives it a 44px press area on a phone. */}
+              <div className="relative min-w-0 flex-1 sm:w-48 sm:flex-none">
+                <PressLabel htmlFor={`${idBase}-kind`} />
+                <Select
+                  id={`${idBase}-kind`}
+                  aria-label={`What ${row.name} is`}
+                  value={row.kind}
+                  // The guessed kind is quieter than the file it describes.
+                  className="relative w-full text-ink-muted"
+                  onChange={(e) => onChange({ kind: e.target.value as CourseFileKind })}
+                >
+                  {COURSE_FILE_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {COURSE_FILE_KIND_LABELS[kind]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="relative w-20">
+                <PressLabel htmlFor={`${idBase}-week`} />
+                <Input
+                  id={`${idBase}-week`}
+                  aria-label={`Week of ${row.name}`}
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={row.week}
+                  placeholder="Week"
+                  className="relative w-full text-ink-muted"
+                  onChange={(e) => onChange({ week: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          {going && (
+            <Meter
+              value={row.progress ?? 0}
+              max={1}
+              moves
+              track="canvas"
+              label={`${row.name}: ${Math.round((row.progress ?? 0) * 100)}% uploaded`}
+              className="mt-2"
+            />
+          )}
+          {row.problem && <p className="mt-1 text-small text-danger">Not added: {row.problem}</p>}
+          {locked && !row.problem && row.progress === null && (
+            <p className="mt-1 text-small text-ink-muted">Waiting its turn</p>
+          )}
+        </>
+      )}
+    </li>
+  );
+}
