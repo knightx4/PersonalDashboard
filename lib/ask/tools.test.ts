@@ -31,6 +31,8 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
   private head = false;
   /** PostgREST embeds, `alias:table!key(column)`: the rows of `table` whose `key` is this row's id. */
   private embeds: { alias: string; table: string; key: string; filters: Filter[] }[] = [];
+  /** PostgREST's `table!inner(column)` on a child: the parent row its `<table less s>_id` names, which must pass the filters. */
+  private parents: { table: string; key: string; filters: Filter[] }[] = [];
 
   constructor(
     private readonly rows: Row[],
@@ -43,6 +45,9 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
     this.head = options?.head === true;
     for (const [, alias, table, key] of (columns ?? '').matchAll(/(linked_\d+):(\w+)!(\w+)\(\w+\)/g)) {
       this.embeds.push({ alias, table, key, filters: [] });
+    }
+    for (const [, table] of (columns ?? '').matchAll(/(\w+)!inner\(\w+\)/g)) {
+      this.parents.push({ table, key: `${table.replace(/s$/, '')}_id`, filters: [] });
     }
     return this;
   }
@@ -85,8 +90,10 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
   eq(column: string, value: unknown) {
     const [alias, inner] = column.split('.');
     const embed = inner ? this.embeds.find((e) => e.alias === alias) : undefined;
-    if (inner && !embed) throw new Error(`fake eq: no embed ${alias}`);
-    if (embed) embed.filters.push((row) => row[inner] === value);
+    const parent = inner ? this.parents.find((p) => p.table === alias) : undefined;
+    if (inner && !embed && !parent) throw new Error(`fake eq: no embed ${alias}`);
+    if (parent) parent.filters.push((row) => row[inner] === value);
+    else if (embed) embed.filters.push((row) => row[inner] === value);
     else this.filters.push((row) => row[column] === value);
     return this;
   }
@@ -147,7 +154,13 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null; count: number
       }
       return out;
     });
-    let out = embedded.filter((row) => this.filters.every((f) => f(row)));
+    let out = embedded.filter(
+      (row) =>
+        this.filters.every((f) => f(row)) &&
+        this.parents.every((p) =>
+          (this.tables[`${this.schema}.${p.table}`] ?? []).some((parent) => parent.id === row[p.key] && p.filters.every((f) => f(parent))),
+        ),
+    );
     for (const { column, ascending } of [...this.sorts].reverse()) {
       out = [...out].sort((a, b) => {
         const x = String(a[column] ?? '');
@@ -644,16 +657,29 @@ describe('todos', () => {
       task('t5', THEM, 'done', { completed_at: '2026-09-26T18:00:00Z' }),
       task('t6', THEM, 'open', { due_on: '2026-09-01' }),
     ],
+    // Tags (plan #2340.4): the asker's, and one on someone else's todo that never shows.
+    'todo.task_tags': [
+      { task_id: 't3', tag: 'now' },
+      { task_id: 't3', tag: 'errands' },
+      { task_id: 't4', tag: 'home' },
+      { task_id: 't6', tag: 'secret' },
+    ],
   };
 
   it('lists what was done this week and what is overdue today, the asker’s only', async () => {
     const result = await executeAskTool('todos', {}, context(tables));
     const rows = expectLinkedRows(result);
     if (!result.ok) return;
-    expect(result.totals).toEqual({ from: '2026-09-21', to: TODAY, done: 1, overdue_today: 1 });
-    expect(rows.map((r) => [r.ref, r.detail?.list])).toEqual([
-      ['t1', 'done'],
-      ['t3', 'overdue'],
+    expect(result.totals).toEqual({
+      from: '2026-09-21',
+      to: TODAY,
+      done: 1,
+      overdue_today: 1,
+      tags_in_use: ['errands', 'home', 'now'],
+    });
+    expect(rows.map((r) => [r.ref, r.detail?.list, r.detail?.tags])).toEqual([
+      ['t1', 'done', null],
+      ['t3', 'overdue', 'errands, now'],
     ]);
     expect(rows[0].href).toBe('/todo/all?status=all&focus=t1');
   });

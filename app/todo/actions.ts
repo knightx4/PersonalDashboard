@@ -11,9 +11,10 @@ import { loadErrandAreas, saveErrandAndStart } from '@/lib/goals/errand-store';
 import { isLinkTarget } from '@/lib/todo/links/model';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { clearTaskAbout, linkTask, setTaskAbout } from '@/lib/todo/links/write';
-import { loadTask } from '@/lib/todo/tasks/load';
+import { loadTask, loadUsedTags } from '@/lib/todo/tasks/load';
 import { resolveRelativeDay, todayIn } from '@/lib/todo/tasks/model';
 import {
+  addTaskTag,
   completeTaskWithItems,
   createItem,
   createTask,
@@ -21,6 +22,7 @@ import {
   itemInput,
   renameTask,
   reopenTaskWithItems,
+  removeTaskTag,
   reorderTasks,
   rescheduleTask,
   setTaskBody,
@@ -308,6 +310,33 @@ export async function dropTask(id: string): Promise<{ error: string | null }> {
 
   revalidateTodo();
   return { error: null };
+}
+
+// latency: optimistic -- the chip appears before the write returns
+export async function tagTask(id: string, tag: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const { error } = await addTaskTag(user.id, id, tag);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
+}
+
+// latency: optimistic -- the chip goes before the write returns
+export async function untagTask(id: string, tag: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const { error } = await removeTaskTag(user.id, id, tag);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
+}
+
+/** The tags the picker offers after Now and Eventually, read when it opens (plan #2340.2). */
+// latency: pending
+export async function usedTaskTags(): Promise<string[]> {
+  const user = await requireUser();
+  return loadUsedTags(user.id);
 }
 
 // latency: optimistic -- the pin appears before the write returns

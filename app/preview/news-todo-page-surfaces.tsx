@@ -147,6 +147,7 @@ function task(over: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
     createdAt: '2026-10-01T09:00:00Z',
     position: null,
     parentId: null,
+    tags: [],
     ...over,
   };
 }
@@ -184,6 +185,42 @@ export function TodoAllSurface() {
       files={new Map()}
       anchors={anchors}
       parents={parents}
+      seed="preview:2026-10-07:todo-all"
+      usedTags={usedTags}
+    />
+  );
+}
+
+/** The tags the fixtures carry, most used first. */
+const usedTags = ['now', 'home', 'eventually', 'travel'];
+
+const tagged: Task[] = [
+  task({ id: 'g1', title: 'Book the dentist', dueOn: '2026-10-07', tags: ['now'] }),
+  task({
+    id: 'g2',
+    title: 'Send Dana the paper on columnar storage she asked about at the end of the second interview',
+    dueOn: '2026-10-09',
+    tags: ['now', 'travel'],
+  }),
+  task({ id: 'g3', title: 'Renew the house insurance', pinned: true, tags: ['home', 'now'] }),
+];
+
+/** All tasks narrowed to one tag (plan #2340.3), inside the Open tab. */
+export function TodoAllTaggedSurface() {
+  return (
+    <AllTasksView
+      status="open"
+      search=""
+      tag={{ kind: 'tag', tag: 'now' }}
+      usedTags={usedTags}
+      focus=""
+      tasks={tagged}
+      timezone={ZONE}
+      working={[]}
+      threads={new Map()}
+      files={new Map()}
+      anchors={anchors}
+      parents={new Map()}
       seed="preview:2026-10-07:todo-all"
     />
   );

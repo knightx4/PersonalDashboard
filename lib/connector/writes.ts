@@ -424,17 +424,20 @@ const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => (
     const vault = write.name === 'attach_vault_note' && ctx.db && vaultOn ? await ctx.db('obsidian') : undefined;
     const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn, research, vault }, input);
     if ('ok' in made) throw new AskInputError(made.error);
-    await recordLearn(ctx, made);
+    await recordMade(ctx, made);
     return { ok: true, rows: [made.row], note: made.summary };
   },
 }));
 
 /**
- * Record a Learn change as Dash's. One whose Undo needs more than the row
- * (research_topic's, which archives) keeps that in `undo`, which
- * core.record_dash_action does not take, so it is written from here.
+ * Record a Learn or Todo change as Dash's. One whose Undo needs more than the
+ * row (research_topic's, which archives; a todo Dash tagged) keeps that in
+ * `undo`, which core.record_dash_action does not take, so it is written from here.
  */
-async function recordLearn(ctx: ConnectorWriteContext, made: LearnMade): Promise<void> {
+async function recordMade(
+  ctx: ConnectorWriteContext,
+  made: Pick<LearnMade, 'subjectRef' | 'op' | 'summary' | 'before' | 'undo'> & { kind: string },
+): Promise<void> {
   if (!made.undo || !ctx.db) {
     await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
     return;
@@ -472,7 +475,8 @@ const TODO_TOOLS: readonly ConnectorWriteTool[] = TODO_WRITES.map((write) => ({
     const env = { userId: ctx.userId, todo: await ctx.db('todo'), timezone: ctx.account.timezone ?? 'UTC', db: ctx.db };
     const made = await runTodoWrite(write, env, input);
     if ('ok' in made) throw new AskInputError(made.error);
-    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    // A todo Dash tagged keeps the tags in `undo`, which the generic rule takes off (plan #2340.4).
+    await recordMade(ctx, made);
     return { ok: true, rows: [made.row], note: made.summary };
   },
 }));
