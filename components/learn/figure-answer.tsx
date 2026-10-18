@@ -78,8 +78,7 @@ export function FigureAnswer({
             readOnly={pending}
             autoComplete="off"
             placeholder="What goes in the blank"
-            // A press target on a phone is 44px at the least.
-            className={cn('mt-4 h-11 text-body', pending && 'text-ink-muted')}
+            className={cn('mt-4 h-11 text-body', pending && 'text-ink-muted')} /* ui-ok: 44px is the phone floor for a press target */
             aria-describedby={describedBy}
             required
           />
