@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/auth/server';
 
 /** An open raise, as Dev's Inbox badge counts it. */
@@ -16,9 +17,15 @@ export type OpenRaise = { id: string };
  *
  * No limit, because the badge's number is the length of this list.
  */
-export async function loadOpenRaises(userId: string): Promise<OpenRaise[]> {
+export async function loadOpenRaises(
+  userId: string,
+  // A service-role client, for the job that counts the inbox without a session
+  // (plan #2389.2). Left out, the request's own client reads.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client?: SupabaseClient<any, any>,
+): Promise<OpenRaise[]> {
   try {
-    const supabase = await createClient();
+    const supabase = client ?? (await createClient());
     const { data } = await supabase
       .from('raised_items')
       .select('id')
