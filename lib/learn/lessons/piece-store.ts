@@ -8,6 +8,7 @@ import { pieceCheckCell, type PieceCellView } from './piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from './piece-cells-store';
 import { readStoredFigures } from '@/lib/learn/figures/registry';
 import type { FigureBlock } from '@/lib/learn/figures/types';
+import { needsResolving, pageResolveContext, resolveFigures } from '@/lib/learn/figures/resolve';
 
 /**
  * The reads and writes behind a piece's page (plan #1141). Shared by the page
@@ -180,6 +181,26 @@ export async function loadLessons(
   return found;
 }
 
+/**
+ * The lessons with their figures' data fetched (plan #2321.3): a chart's
+ * series through the shared cache. Only the reads the page draws from call
+ * this; the writers and the practice task read the lessons without it.
+ */
+export async function resolveLessonFigures(
+  learn: LearnSupabaseClient,
+  lessons: Map<string, Pick<PieceIdea, 'lesson' | 'dropped'>>,
+): Promise<Map<string, Pick<PieceIdea, 'lesson' | 'dropped'>>> {
+  const waiting = [...lessons.values()].filter((found) => found.lesson && needsResolving(found.lesson.figures));
+  if (waiting.length === 0) return lessons;
+  const context = pageResolveContext(learn);
+  await Promise.all(
+    waiting.map(async (found) => {
+      if (found.lesson) found.lesson = { ...found.lesson, figures: await resolveFigures(found.lesson.figures, context) };
+    }),
+  );
+  return lessons;
+}
+
 /** One idea with its lesson, for the page after a lesson is written. */
 export async function loadPieceIdea(
   learn: LearnSupabaseClient,
@@ -188,7 +209,7 @@ export async function loadPieceIdea(
 ): Promise<PieceIdea | null> {
   const [ideas, lessons] = await Promise.all([
     loadIdeas(learn, userId, [conceptId]),
-    loadLessons(learn, userId, [conceptId]),
+    loadLessons(learn, userId, [conceptId]).then((found) => resolveLessonFigures(learn, found)),
   ]);
   const idea = ideas[0];
   if (!idea) return null;
@@ -239,7 +260,7 @@ export async function loadPiecePage(
       .eq('user_id', userId)
       .order('ordinal'),
     loadIdeas(learn, userId, piece.concept_ids),
-    loadLessons(learn, userId, piece.concept_ids),
+    loadLessons(learn, userId, piece.concept_ids).then((found) => resolveLessonFigures(learn, found)),
     loadLatestCheck(learn, userId, piece.id),
     loadPieceCellsAndLadder(learn, userId, piece.cell_ids),
   ]);

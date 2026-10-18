@@ -1,6 +1,7 @@
 import type { FigureBlock, FigureKind } from './types';
 import { compareKind } from './kinds/compare';
 import { tableKind } from './kinds/table';
+import { chartKind } from './kinds/chart';
 
 /**
  * Every figure kind a lesson can carry (plan #2321.1), and the reads that go
@@ -8,7 +9,7 @@ import { tableKind } from './kinds/table';
  * read this list, so a kind added here reaches all three.
  */
 
-export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind] as unknown as readonly FigureKind[];
+export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind, chartKind] as unknown as readonly FigureKind[];
 
 /** At most this many figures on one lesson: a lesson teaches one idea, and an idea gets one figure. */
 export const MAX_FIGURES_PER_LESSON = 1;

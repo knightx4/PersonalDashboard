@@ -8,7 +8,8 @@ import type { FigureBlock } from '@/lib/learn/figures/types';
  * The caption heads the figure. On a phone the figure folds to its caption,
  * so a lesson read on the way somewhere is not a wall of grid; the press
  * opens it. A block whose kind the app does not know, or whose spec no longer
- * parses, shows its caption alone.
+ * parses, shows its caption alone; one whose data could not be fetched
+ * shows its caption and says so.
  */
 export function Figure({
   figure,
@@ -26,8 +27,17 @@ export function Figure({
       </figure>
     );
   }
+  // A kind whose content is fetched and came back with nothing (plan #2321.3).
+  if (drawn.kind.resolve && figure.resolved == null) {
+    return (
+      <figure className="mt-4">
+        <figcaption className="text-small font-semibold text-ink-muted">{figure.caption}</figcaption>
+        <p className="mt-0.5 text-small text-ink-muted">The data for this figure was not found.</p>
+      </figure>
+    );
+  }
   const { Render } = drawn.kind;
-  const body = <Render spec={drawn.spec} />;
+  const body = <Render spec={drawn.spec} resolved={figure.resolved} />;
   return (
     <figure className="mt-4">
       <div className="max-sm:hidden">
