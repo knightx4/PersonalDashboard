@@ -9056,6 +9056,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="source_figure" />,
   },
   {
+    id: 'learn-figure-chart',
+    label: 'Plan · A lesson with a chart of a real series',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" />,
+  },
+  {
+    id: 'learn-figure-chart-missing',
+    label: 'Plan · A lesson whose chart’s series was not found',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="chart" missing />,
+  },
+  {
     id: 'learn-probe',
     label: 'Subject · Questions, before the first',
     module: 'learn',

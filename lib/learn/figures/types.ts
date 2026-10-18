@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { z } from 'zod';
+import type { SeriesLoader } from './series-store';
 
 /**
  * The figure contract (plan #2321.1).
@@ -38,12 +39,19 @@ export type FigureBlock = {
   caption: string;
   /** The kind's own shape, read with its schema when the figure is drawn. */
   spec: unknown;
+  /**
+   * What the kind's `resolve` fetched for the figure, filled in on the server
+   * when the lesson is loaded and never stored (plan #2321.3). Absent on a
+   * kind with nothing to fetch; null when the fetch found nothing, which
+   * draws the caption with a line saying so.
+   */
+  resolved?: unknown;
 };
 
-/** What a kind's Render is given: the spec its schema parsed. */
-export type FigureRenderProps<Spec> = { spec: Spec };
+/** What a kind's Render is given: the spec its schema parsed, and what its resolve fetched. */
+export type FigureRenderProps<Spec, Resolved = unknown> = { spec: Spec; resolved: Resolved };
 
-export type FigureKind<Spec = unknown> = {
+export type FigureKind<Spec = unknown, Resolved = unknown> = {
   /** Stored in `FigureBlock.kind` and offered to the writer; never renamed once used. */
   id: string;
   /** What the kind is called on the page and in the gallery. */
@@ -56,8 +64,14 @@ export type FigureKind<Spec = unknown> = {
    */
   writerLine: string;
   /** A spec the schema parses, drawn on the kind's gallery surface and checked by the test. */
-  example: { caption: string; spec: Spec };
-  Render: ComponentType<FigureRenderProps<Spec>>;
+  example: { caption: string; spec: Spec; resolved?: Resolved };
+  Render: ComponentType<FigureRenderProps<Spec, Resolved>>;
+  /**
+   * Fetches what a `series` or `source` kind draws, on the server, between
+   * the stored block and Render (`./resolve.ts`). Null when it cannot be
+   * found. A kind with nothing to fetch leaves it out.
+   */
+  resolve?: (spec: Spec, context: FigureResolveContext) => Promise<Resolved | null>;
   /**
    * How a question is asked on the figure, for the kinds that can carry one
    * (plan #2321.5 gives this its shape and grading). Absent on a kind no
@@ -71,3 +85,13 @@ export type FigureKind<Spec = unknown> = {
 export function figureSurface(kind: Pick<FigureKind, 'id'>): string {
   return `learn-figure-${kind.id}`;
 }
+
+/**
+ * What a kind's resolve can reach (plan #2321.3). Each data kind adds the
+ * reader it needs here, and `./resolve.ts` builds the context for the page
+ * and for the lesson writer.
+ */
+export type FigureResolveContext = {
+  /** A registered data source's series, through the shared cache (`./series-store.ts`). */
+  series: SeriesLoader;
+};

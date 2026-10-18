@@ -954,13 +954,21 @@ export function LearnPieceHeldSurface() {
  * kind in lib/learn/figures/registry.ts has one of these, named
  * learn-figure-<id>, and draws its own example.
  */
-export function LearnFigureSurface({ kind: id }: { kind: string }) {
+export function LearnFigureSurface({
+  kind: id,
+  missing = false,
+}: {
+  kind: string;
+  /** Draws a fetched kind whose data could not be found (plan #2321.3). */
+  missing?: boolean;
+}) {
   const kind = figureKind(id);
   if (!kind) return null;
   const idea = piecePage.ideas[0];
+  const figure = { kind: kind.id, ...kind.example, ...(missing ? { resolved: null } : {}) };
   return (
     <LessonCard
-      idea={{ ...idea, lesson: idea.lesson && { ...idea.lesson, figures: [{ kind: kind.id, ...kind.example }] } }}
+      idea={{ ...idea, lesson: idea.lesson && { ...idea.lesson, figures: [figure] } }}
       number={1}
       writing={null}
       figuresOpen
