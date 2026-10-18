@@ -135,6 +135,7 @@ export function ActionMenu({
   panelClassName,
   onOpenChange,
   defaultOpen = false,
+  header,
 }: {
   label?: string;
   items: ActionMenuItem[];
@@ -157,6 +158,11 @@ export function ActionMenu({
   onOpenChange?: (open: boolean) => void;
   /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
   defaultOpen?: boolean;
+  /**
+   * Drawn above the items, inside the panel: a field that narrows a table
+   * column by a typed value (plan #2341.3). Clicks in it keep the menu open.
+   */
+  header?: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [pending, startTransition] = useTransition();
@@ -273,6 +279,7 @@ export function ActionMenu({
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
             className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1', panelClassName)}
           >
+            {header}
             {items.map((item) => {
               if (armed === item.id) {
                 return (

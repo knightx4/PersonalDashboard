@@ -127,6 +127,8 @@ import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
+import { CompaniesPage } from '@/components/jobs/companies/companies-page';
+import type { CompanyRow } from '@/lib/jobs/companies-view';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
@@ -281,6 +283,8 @@ import {
   LearnSubjectPrepareFinishedSurface,
   LearnSubjectPrepareSourcesEmptySurface,
   LearnSubjectPrepareSourcesFoldedSurface,
+  LearnSubjectSourcesUnbuiltSurface,
+  LearnSubjectSourcesUnbuiltNoneSurface,
   LearnSubjectPrepareStartingSurface,
   LearnSubjectPrepareStartSurface,
   LearnSubjectPrepareStartPendingSurface,
@@ -859,6 +863,77 @@ const pipelineRow = (
   coverage: { covered: 0, total: 0, gaps: 0, rate: null },
   ...row,
 });
+
+/* The Companies table (plan #2341.3): ten companies, one with a name as long
+ * as real ones get, several without a domain or a role. */
+function companyFixture(
+  slug: string,
+  name: string,
+  priority: string,
+  status: string,
+  domains: string[],
+  roles: number,
+  hq: string | null = null,
+): CompanyRow {
+  return {
+    id: `co-${slug}`,
+    name,
+    slug,
+    priority,
+    status,
+    industry: null,
+    hq_location: hq,
+    domains,
+    website: null,
+    careers_url: null,
+    logo_url: null,
+    ats_type: 'unknown',
+    ats_board_token: null,
+    perspective_updated_at: null,
+    roles: Array.from({ length: roles }, (_, i) => ({
+      id: `${slug}-r${i}`,
+      applications: [{ status: status === 'active' ? 'in_process' : status === 'closed_out' ? 'rejected' : 'lead' }],
+    })),
+  };
+}
+
+const companyRows: CompanyRow[] = [
+  companyFixture('ledgerline', 'Ledgerline', 'target', 'active', ['ledgerline.io'], 2, 'London'),
+  companyFixture('halcyon', 'Halcyon Health', 'target', 'no_activity', ['halcyonhealth.com'], 1, 'Boston'),
+  {
+    // The focused view's company (plan #2341.4): every fact filled and four
+    // of the six questions answered, one at the length real answers get.
+    ...companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+    industry: 'Data infrastructure',
+    website: 'https://northwind.ai',
+    careers_url: 'https://jobs.ashbyhq.com/northwind',
+    perspective_updated_at: '2026-10-02T09:00:00.000Z',
+    ...({
+      perspective_business:
+        'Sells a warehouse-native analytics layer to mid-market finance teams, priced per seat with a usage tier on top. Most revenue is annual contracts.',
+      perspective_why_now:
+        'Raised a Series B in August and is hiring its first FP&A lead; the CFO said on a podcast that forecasting is still a spreadsheet.',
+      perspective_problem:
+        'Moving from founder-led pricing to a model that survives usage growth, and building the first real board pack.',
+      perspective_next_move: 'Ask Priya for an introduction to the CFO before the role is posted.',
+    } as Record<string, string>),
+  } as CompanyRow,
+  companyFixture('fabrikam', 'Fabrikam', 'interested', 'closed_out', ['fabrikam.com'], 1, 'Seattle'),
+  companyFixture(
+    'international-consolidated',
+    'International Consolidated Logistics and Freight Holdings',
+    'backup',
+    'no_activity',
+    [],
+    0,
+    'Rotterdam',
+  ),
+  companyFixture('globex', 'Globex', 'backup', 'closed_out', ['globex.example'], 2),
+  companyFixture('initech', 'Initech', 'interested', 'no_activity', [], 0, 'Austin'),
+  companyFixture('contoso', 'Contoso', 'passed', 'closed_out', ['contoso.com'], 1, 'Redmond'),
+  companyFixture('tailspin', 'Tailspin Toys', 'interested', 'no_activity', ['tailspin.toys'], 0),
+  companyFixture('wingtip', 'Wingtip', 'backup', 'active', ['wingtip.dev'], 1, 'Berlin'),
+];
 
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
@@ -4221,6 +4296,72 @@ export const SURFACES: readonly Surface[] = [
         rows={pipelineRows}
         params={{ view: 'table', company: pipelineRows[0].companySlug }}
         openColumn="company"
+      />
+    ),
+  },
+  {
+    /* The Companies table (plan #2341.3): every column a menu of filters
+     * from its header, paged at 50, all of it in the address. */
+    id: 'jobs-companies-table',
+    label: 'Companies · Table',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompaniesPage companies={companyRows} params={{ view: 'table' }} />,
+  },
+  {
+    /* A text column's menu open: its sort, then the field that narrows by a
+     * typed value. Priority is filtered, so its header carries the mark. */
+    id: 'jobs-companies-table-column-menu',
+    label: 'Companies · Table · Column filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'interested' }} openColumn="name" />
+    ),
+  },
+  {
+    /* Filtered to nothing: the headers stay so a filter can be loosened, and
+     * the box under them clears every one. */
+    id: 'jobs-companies-table-empty',
+    label: 'Companies · Table · No rows match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'passed', activity: 'active' }} />
+    ),
+  },
+  {
+    /* The focused view (plan #2341.4): one company in full, opened from its
+     * table row, with previous and next through the filtered, sorted list. */
+    id: 'jobs-companies-focus',
+    label: 'Companies · Focus',
+    module: 'jobs',
+    width: 'wide',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'northwind' }} />
+    ),
+  },
+  {
+    /* At the end of the list: Next goes grey, Previous still steps back. */
+    id: 'jobs-companies-focus-end',
+    label: 'Companies · Focus · Last company',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'wingtip' }} />
+    ),
+  },
+  {
+    /* Filtered to nothing: back to the table, or clear the filters. */
+    id: 'jobs-companies-focus-empty',
+    label: 'Companies · Focus · No companies match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage
+        companies={companyRows}
+        params={{ view: 'focus', priority: 'passed', activity: 'active' }}
       />
     ),
   },
@@ -9474,6 +9615,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="chart" />,
   },
   {
+    /* A lesson that asked for a figure the app cannot draw yet (plan #2321.9). */
+    id: 'learn-figure-wanted',
+    label: 'Plan · A lesson whose figure is not built yet',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="wanted" />,
+  },
+  {
     id: 'learn-figure-chart-missing',
     label: 'Plan · A lesson whose chart’s series was not found',
     module: 'learn',
@@ -9910,6 +10059,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Figures the subject's lessons asked for and the app cannot draw (plan #2321.12). */
+    id: 'learn-subject-sources-unbuilt',
+    label: 'Subject · Sources listing the figures its lessons asked for',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltSurface />,
+  },
+  {
+    id: 'learn-subject-sources-unbuilt-none',
+    label: 'Subject · Sources with no figures outstanding',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltNoneSurface />,
   },
   {
     /* Add a source (plan #2307.4): the press closed under Sources, with a
