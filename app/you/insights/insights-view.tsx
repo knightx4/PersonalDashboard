@@ -17,6 +17,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { formatDateInline } from '@/lib/jobs/applications/load';
+import { firedLine, firedSinceMark, type FiredTripwire } from '@/lib/you/insight-fired';
 import type {
   Insight,
   InsightConfidence,
@@ -39,6 +41,11 @@ import { markInsight, startInsightRun, type MarkResult } from './actions';
  * the card under Earlier with the mark, so what the person has said is not
  * true about them stays on record. Later passes a card without marking it.
  *
+ * A card whose tripwire fired since the person last marked it (plan #2413.11)
+ * comes back to the front of the deck with a dated line under the claim naming
+ * what happened and the evidence the nightly check recorded, folded. Marking
+ * it again clears the line until the tripwire fires again.
+ *
  * Look again starts a run (startInsightRun); while one is queued or running a
  * banner takes the button's place and the page looks again every minute.
  */
@@ -55,6 +62,8 @@ export type InsightsOpen = {
   evidence?: boolean;
   why?: Exclude<Verdict, 'right'>;
   earlier?: boolean;
+  /** The evidence under a card brought back by a tripwire. */
+  fired?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -128,6 +137,7 @@ export function InsightsView({
   run,
   runWhen,
   available,
+  timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
 }: {
@@ -138,12 +148,14 @@ export function InsightsView({
   runWhen: string | null;
   /** Whether the deployment can start a run (both routine variables set). */
   available: boolean;
+  /** Their timezone, for the date on a card brought back. */
+  timezone?: string;
   actions?: InsightsActions;
   open?: InsightsOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, InsightVerdict>>(new Map());
   const [choosing, setChoosing] = useState<{ id: string; verdict: Exclude<Verdict, 'right'> } | null>(() => {
-    const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict);
+    const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict && !insight.fired.length);
     return open.why && first ? { id: first.id, verdict: open.why } : null;
   });
   const [note, setNote] = useState('');
@@ -155,11 +167,25 @@ export function InsightsView({
   useRefreshWhileRunning(running);
 
   const verdictOf = (insight: Insight) => marks.get(insight.id) ?? insight.verdict;
-  const waiting = insights.filter((insight) => insight.status === 'shown' && !verdictOf(insight));
+  const broughtBack = (insight: Insight): FiredTripwire | null =>
+    insight.status === 'shown' ? firedSinceMark(insight.fired, verdictOf(insight)?.decidedAt) : null;
+  const isWaiting = (insight: Insight) =>
+    insight.status === 'shown' && (!verdictOf(insight) || broughtBack(insight) !== null);
+  // Cards brought back by a tripwire come first, the newest fire first; the
+  // rest keep their order.
+  const waiting = insights
+    .filter(isWaiting)
+    .map((insight, index) => ({ insight, index, fired: broughtBack(insight) }))
+    .sort((a, b) => {
+      if (a.fired && b.fired) return Date.parse(b.fired.firedAt) - Date.parse(a.fired.firedAt);
+      if (a.fired || b.fired) return a.fired ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map(({ insight }) => insight);
   const earlier = insights
     .flatMap((insight) => {
       const verdict = verdictOf(insight);
-      return verdict ? [{ insight, verdict }] : [];
+      return verdict && !isWaiting(insight) ? [{ insight, verdict }] : [];
     })
     .sort((a, b) => b.verdict.decidedAt.localeCompare(a.verdict.decidedAt));
 
@@ -213,7 +239,10 @@ export function InsightsView({
       body: (
         <InsightCard
           insight={insight}
+          fired={broughtBack(insight)}
+          timezone={timezone}
           evidenceOpen={open.evidence}
+          firedOpen={open.fired}
           why={
             choice ? (
               <WhyLine
@@ -376,11 +405,17 @@ export function InsightsView({
 /** One insight: the claim, the layers under it, and the evidence folded beneath. */
 function InsightCard({
   insight,
+  fired,
+  timezone,
   evidenceOpen,
+  firedOpen,
   why,
 }: {
   insight: Insight;
+  fired: FiredTripwire | null;
+  timezone: string;
   evidenceOpen?: boolean;
+  firedOpen?: boolean;
   why: React.ReactNode;
 }) {
   return (
@@ -396,6 +431,8 @@ function InsightCard({
         </p>
         <h2 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{insight.claim}</h2>
       </div>
+
+      {fired && <BroughtBack fired={fired} timezone={timezone} defaultOpen={firedOpen} />}
 
       {insight.layers.length > 0 && (
         <ol className="space-y-3">
@@ -426,6 +463,40 @@ function InsightCard({
 
       {why}
     </Card>
+  );
+}
+
+/**
+ * The dated line under the claim of a card a tripwire brought back: what
+ * happened, when the check saw it, and what it recorded, folded.
+ */
+function BroughtBack({
+  fired,
+  timezone,
+  defaultOpen,
+}: {
+  fired: FiredTripwire;
+  timezone: string;
+  defaultOpen?: boolean;
+}) {
+  const date = (iso: string) => (iso ? formatDateInline(iso, timezone) : '');
+  const line = firedLine(fired, date);
+  return (
+    <div className="space-y-1" data-insight-fired>
+      <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">{line.headline}</p>
+      <p className="text-small text-ink-muted">Back on {date(fired.firedAt)} because of this</p>
+      {line.details.length > 0 && (
+        <Disclosure title="What was seen" meta={String(line.details.length)} defaultOpen={defaultOpen}>
+          <ul className="space-y-1.5">
+            {line.details.map((detail, index) => (
+              <li key={index} className="text-ui text-ink-muted [overflow-wrap:anywhere]">
+                {detail}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
+    </div>
   );
 }
 
