@@ -154,12 +154,12 @@ export function MapView({ data }: { data: MapData }) {
               aria-controls={`${id}-note`}
               onClick={() => setPressed(pressed === index ? null : index)}
               className={`absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-accent ${
-                current(place) || pressed === index ? 'z-10' : ''
+                current(place) || pressed === index ? 'z-over-link' : ''
               } ${open && open !== place ? 'opacity-30' : ''}`}
               style={{ left: across(frame.at[index].x), top: down(frame.at[index].y) }}
             >
               <span
-                className={`rounded-full shadow-[0_0_0_2px_var(--c-surface)] ${pressed === index ? 'scale-125' : ''} transition-transform motion-reduce:transition-none`}
+                className={`rounded-full ring-2 ring-surface ${pressed === index ? 'scale-125' : ''} transition-transform motion-reduce:transition-none`}
               >
                 {badge(place, index)}
               </span>
@@ -210,7 +210,7 @@ export function MapView({ data }: { data: MapData }) {
 
       <ol className="mt-3 space-y-2">
         {data.places.map((place, index) => (
-          <li key={index} className={`flex items-start gap-2.5 ${open && open !== place ? 'opacity-50' : ''}`}>
+          <li key={index} className="flex items-start gap-2.5">
             {badge(place, index)}
             <p className={`text-small ${later(place) ? 'text-ink-muted' : 'text-ink'}`}>
               <span className="font-medium">{place.name}</span>

@@ -137,25 +137,29 @@ export function ExplorableView({
           </div>
         </div>
       </div>
-      <table className="sr-only">
-        <caption>{model.label}, as the sliders now stand</caption>
-        <thead>
-          <tr>
-            {table.head.map((cell) => (
-              <th key={cell}>{cell}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.map((row, index) => (
-            <tr key={index}>
-              {row.map((cell, at) => (
-                <td key={at}>{cell}</td>
+      {/* The wrapper is what hides it: overflow does not clip a table box, so
+          an sr-only table this wide still widens the page on a phone. */}
+      <div className="sr-only">
+        <table>
+          <caption>{model.label}, as the sliders now stand</caption>
+          <thead>
+            <tr>
+              {table.head.map((cell) => (
+                <th key={cell}>{cell}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {table.rows.map((row, index) => (
+              <tr key={index}>
+                {row.map((cell, at) => (
+                  <td key={at}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
