@@ -1,12 +1,9 @@
+import type { ReactNode } from 'react';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { formatDay } from '@/lib/goals/dates';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import { stepMove, STEP_MOVE_WORD } from '@/lib/goals/status';
-import { STEP_KIND_LABELS } from '@/lib/goals/steps';
 import { dayIn } from '@/lib/todo/time';
-
-/** What a fact the step lacks says (plan #2373.1). */
-const NONE = '—';
 
 /**
  * The one line under a step's title on its own page (plan #2373.1), as a
@@ -71,70 +68,88 @@ function hasSubsteps(node: Pick<GoalRowNode, 'children'>): boolean {
   return subRows(node).length > 0;
 }
 
-/** When it is due, or a dash. */
-function dueWords(node: Pick<GoalRowNode, 'step'>): string {
-  return node.step.dueOn ? formatDay(node.step.dueOn) : NONE;
+/** One fact about the step, as the frame draws it. */
+type Fact = { label: string; value: string; hint?: string; wide?: boolean };
+
+/**
+ * Every fact the step has, in the order they are read: status, then
+ * progress, the dates and whose move it is. A fact the step lacks is left out
+ * rather than said as a dash, and none repeats what the Overview already
+ * shows: whose step it is is the picker there, and what it needs is its
+ * Needs line (plan #2373.3). The dates are changed in the Overview; these
+ * only say them.
+ */
+function stepFacts(node: Pick<GoalRowNode, 'health' | 'step' | 'children'>): Fact[] {
+  const { step } = node;
+  const split = splitWords(node);
+  const progress = progressWords(node);
+  const facts: (Fact | false | null)[] = [
+    { label: 'Status', hint: node.health.title, value: node.health.word },
+    progress !== null && { label: 'Progress', value: progress },
+    step.dueOn ? { label: 'Due', value: formatDay(step.dueOn) } : null,
+    step.waitsUntil ? { label: 'Starts', value: formatDay(step.waitsUntil) } : null,
+    split !== null && {
+      // "Open", not "Open sub-steps", so the label fits its third of the phone's row.
+      label: hasSubsteps(node) ? 'Open' : 'Whose move',
+      value: split,
+      wide: true,
+      hint: hasSubsteps(node)
+        ? 'Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date.'
+        : undefined,
+    },
+  ];
+  return facts.filter((fact): fact is Fact => Boolean(fact));
 }
 
 /**
- * The step's facts read first: its status, what kind of step it is, and how
- * far through its sub-steps it is, or when it is due on a step with none
- * beneath. One row on a phone, with the rest under All details; the head of
- * the column from laptop width.
+ * The facts read first: one row on a phone, the head of the column from
+ * laptop width. In that row no fact is wide, so the three stay on one line.
  */
-export function StepGlance({
-  node,
-}: {
-  node: Pick<GoalRowNode, 'health' | 'step' | 'children'>;
-}) {
+const GLANCE = 3;
+
+function FactList({ facts }: { facts: readonly Fact[] }) {
   return (
     <>
-      <Property label="Status" hint={node.health.title} value={node.health.word} />
-      <Property label="Kind" value={STEP_KIND_LABELS[node.step.kind]} />
-      {hasSubsteps(node) ? (
-        <Property label="Progress" value={progressWords(node) ?? NONE} />
-      ) : (
-        <Property label="Due" value={dueWords(node)} />
-      )}
+      {facts.map((fact) => (
+        <Property key={fact.label} label={fact.label} value={fact.value} hint={fact.hint} wide={fact.wide} />
+      ))}
     </>
   );
 }
 
-/** How many facts `StepProperties` draws, said on the closed fold on a phone. */
-export function stepDetailCount(node: Pick<GoalRowNode, 'step' | 'children'>): number {
-  return (hasSubsteps(node) ? 3 : 2) + (node.step.waitsUntil ? 1 : 0);
-}
-
 /**
- * The rest of the step's facts in the properties column (plan #2373.1): when
- * it is due (unless the glance says it) and when it can start, what it waits on, and whose move it is.
- * A fact the step lacks says a dash, so the column keeps its shape from one
- * step to the next. The dates are changed in the step's panel; these only
- * say them.
+ * The step's facts for the frame (plan #2373.1): the first three as the
+ * glance, read first, and the rest folded under All details on a phone, with
+ * how many there are. A step with no more than three facts has no fold:
+ * they are the one row on a phone, laid out as the glance is.
  */
-export function StepProperties({
-  node,
-}: {
-  node: Pick<GoalRowNode, 'step' | 'need' | 'children'>;
-}) {
-  const { step } = node;
-  const split = splitWords(node);
-  return (
-    <PropertyList>
-      {/* Due is read first on a step with no sub-steps (StepGlance). */}
-      {hasSubsteps(node) && <Property label="Due" value={dueWords(node)} />}
-      {step.waitsUntil && <Property label="Starts" value={formatDay(step.waitsUntil)} />}
-      <Property
-        label={hasSubsteps(node) ? 'Open sub-steps' : 'Whose move'}
-        wide
-        hint={
-          hasSubsteps(node)
-            ? 'Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date.'
-            : undefined
-        }
-        value={split ?? NONE}
-      />
-      <Property label="Waiting on" wide hint={node.need ?? undefined} value={node.need ?? NONE} />
-    </PropertyList>
-  );
+export function stepFactParts(node: Pick<GoalRowNode, 'health' | 'step' | 'children'>): {
+  glance?: ReactNode;
+  detailCount?: number;
+  properties: ReactNode;
+} {
+  const facts = stepFacts(node);
+  const rest = facts.slice(GLANCE);
+  if (rest.length === 0) {
+    return {
+      properties: (
+        // The glance's own grid (PropertiesFold), so the facts stay one row on a phone.
+        <dl className="grid grid-cols-3 gap-x-4 gap-y-3 lg:grid-cols-1 lg:gap-y-2.5">
+          <FactList facts={facts.map((fact) => ({ ...fact, wide: false }))} />
+        </dl>
+      ),
+    };
+  }
+  return {
+    glance: <FactList facts={facts.slice(0, GLANCE).map((fact) => ({ ...fact, wide: false }))} />,
+    // A fold over one fact joins the row on a phone (PropertiesFold); the
+    // step keeps its row to three and folds the fourth, so the tabs stay high
+    // (plan #2373.3). With no count the fold still says All details.
+    detailCount: rest.length > 1 ? rest.length : undefined,
+    properties: (
+      <PropertyList>
+        <FactList facts={rest} />
+      </PropertyList>
+    ),
+  };
 }

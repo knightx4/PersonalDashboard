@@ -8,6 +8,8 @@ import type { TreeRowFrameParts } from '@/components/plan-tree/tree-row';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { LinkedFile } from '@/lib/files/files';
+import type { GoalRunRow } from '@/lib/goals/runs';
+import { isClosed, isDismissed } from '@/lib/plan/load';
 import { stepCrumbs } from '@/lib/goals/crumbs';
 import { STEP_TABS, type StepTab } from '@/lib/goals/goal-page';
 import { tabSearch } from '@/lib/tabs';
@@ -17,14 +19,9 @@ import type { StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow } from './goal-row';
 import type { InformationSeam } from './information-step';
+import { RunHistory } from './goal-shaping';
 import { StepComposer } from './step-parts';
-import {
-  openSubsteps,
-  StepGlance,
-  StepProperties,
-  stepDetailCount,
-  stepLine,
-} from './step-properties';
+import { openSubsteps, stepFactParts, stepLine } from './step-properties';
 import { GoalColumnHeader, useGoalRows } from './step-tree';
 
 /** The row for a step anywhere in the tree, with the rows beside it. */
@@ -72,6 +69,7 @@ export function StepPage({
   informationSeam,
   timeZone = 'UTC',
   tab = 'overview',
+  history,
 }: {
   map: GoalMap;
   stepId: string;
@@ -87,6 +85,11 @@ export function StepPage({
   informationSeam?: InformationSeam;
   /** The account's zone, for the day the step was added. */
   timeZone?: string;
+  /**
+   * The step's latest runs for its Activity tab, as the goal's are listed on
+   * its own (plan #2373.3), and whether older ones are on the Runs page.
+   */
+  history?: { runs: GoalRunRow[]; more: boolean };
 }) {
   const { own, context } = useGoalRows(map, {
     todoOn,
@@ -109,6 +112,11 @@ export function StepPage({
   // The open sub-steps the tab lists as rows: the step's own, not every
   // level beneath, as the properties count them (plan #2373.2).
   const open = openSubsteps(row);
+  const facts = stepFactParts(row);
+  // Counted as the questions' own label counts them, which the page's heading replaces.
+  const unanswered = row.children.filter(
+    (child) => child.kind === 'decision' && !isClosed(child.status) && !isDismissed(child),
+  ).length;
   const tabs = STEP_TABS.map((tab) =>
     tab.id === 'substeps'
       ? { ...tab, count: open }
@@ -134,9 +142,9 @@ export function StepPage({
           title={title}
           description={<span className="text-small">{stepLine(row, timeZone)}</span>}
           actions={menu}
-          glance={<StepGlance node={row} />}
-          detailCount={stepDetailCount(row)}
-          properties={<StepProperties node={row} />}
+          glance={facts.glance}
+          detailCount={facts.detailCount}
+          properties={facts.properties}
           tabs={tabs}
           label="Step"
           className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
@@ -145,6 +153,10 @@ export function StepPage({
             tab={tab}
             parts={parts}
             stepId={row.id}
+            unanswered={unanswered}
+            hasQuestions={row.children.some((child) => child.kind === 'decision')}
+            hasEdges={row.dependsOn.length + row.waitingOn.length + row.blocks.length > 0}
+            history={history}
             hasSubsteps={row.children.some((child) => child.kind !== 'decision')}
           />
         </TabbedDetail>
@@ -169,11 +181,22 @@ function OpenTab({
   parts,
   stepId,
   hasSubsteps,
+  unanswered,
+  hasQuestions,
+  hasEdges,
+  history,
 }: {
   tab: StepTab;
   parts: Omit<TreeRowFrameParts, 'status' | 'title' | 'menu'>;
   stepId: string;
   hasSubsteps: boolean;
+  /** How many of the step's questions wait on an answer, said beside their heading. */
+  unanswered: number;
+  /** Whether the step has questions, which then get a part of their own. */
+  hasQuestions: boolean;
+  /** Whether the step waits on a step or one waits on it, which then get a part of their own. */
+  hasEdges: boolean;
+  history?: { runs: GoalRunRow[]; more: boolean };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -187,9 +210,15 @@ function OpenTab({
   if (tab === 'activity') {
     return (
       <div className="space-y-6">
+        {/* The step's runs as the goal's Activity tab lists its own: each
+            run's name, how it ended, when and how long it took, then what it
+            did (plan #2373.3). The gallery, with no history, draws the
+            latest run's line from the row. */}
         <section aria-label="Runs">
           <Card padding="dense">
-            {parts.activity ? (
+            {history && history.runs.length > 0 ? (
+              <RunHistory runs={history.runs} more={history.more} />
+            ) : parts.activity ? (
               <ul>{parts.activity}</ul>
             ) : (
               <p className="text-small text-ink-muted">Dash has not run on this step yet.</p>
@@ -241,9 +270,65 @@ function OpenTab({
     );
   }
 
+  // The panel on its card, then the questions and what the step waits on,
+  // each under a heading on the page and on a card of its own, as the goal's
+  // Overview lays out its parts (plan #2373.3). With none of either, only
+  // the line that adds the first is left, and it closes the panel's card
+  // instead, so closing the step does not take whole parts off the page.
   return (
-    <Card padding="none">
-      <ul className="pt-2">{parts.overview}</ul>
-    </Card>
+    <div className="space-y-6">
+      <Card padding="none">
+        <ul className="pt-2">{parts.overview}</ul>
+        {(!hasQuestions || !hasEdges) && (
+          <div className="space-y-2 px-3 pb-3 empty:hidden">
+            {!hasQuestions && parts.questions}
+            {!hasEdges && parts.dependencies}
+          </div>
+        )}
+      </Card>
+      {hasQuestions && (
+        <OverviewPart
+          id="step-questions"
+          title="Questions"
+          count={unanswered > 0 ? <span className="text-caution">{unanswered} unanswered</span> : null}
+        >
+          {parts.questions}
+        </OverviewPart>
+      )}
+      {hasEdges && parts.dependencies && (
+        <OverviewPart id="step-dependencies" title="Dependencies">
+          {parts.dependencies}
+        </OverviewPart>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One part of a step's Overview under its own heading, as Waiting on you is on
+ * a goal's: the heading on the page with its count, the part on a card. Hidden
+ * whole when the part draws nothing.
+ */
+function OverviewPart({
+  id,
+  title,
+  count,
+  children,
+}: {
+  id: string;
+  title: string;
+  count?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="space-y-2 has-[[data-part]:empty]:hidden">
+      <h2 id={id} className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink">
+        {title}
+        {count && <span className="tabular text-small font-normal text-ink-muted">{count}</span>}
+      </h2>
+      <Card padding="dense">
+        <div data-part>{children}</div>
+      </Card>
+    </section>
   );
 }

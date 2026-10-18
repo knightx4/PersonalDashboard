@@ -178,8 +178,12 @@ export type TreeRowFrameParts = {
   status: ReactNode;
   title: ReactNode;
   menu: ReactNode;
-  /** The notices and the panel: the detail, done-when, facts, files and what it waits on. */
+  /** The notices and the panel: the detail, done-when, facts and files. */
   overview: ReactNode;
+  /** The row's questions without their label, for a part of the page with its own heading. */
+  questions: ReactNode;
+  /** What the row waits on and what waits on it, and the picker; null where the row has none. */
+  dependencies: ReactNode;
   /** The open sub-steps as rows at the first level of their list, then `after`. */
   substeps: ReactNode;
   /** The row's `activity` items: the Activity tab's runs. */
@@ -896,6 +900,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
       turns={node.thread}
       titles={titles}
       placeholder={threadPlaceholder}
+      // On a step's own page the thread is on its Activity tab, offered as
+      // the goal's is on its own (plan #2373.3).
+      label={glyphOnly ? 'Comment on this step' : undefined}
+    />
+  );
+
+  const questionsPart = (bare: boolean) => (
+    <Questions node={node} titles={titles} actions={actions} comments={comments} bare={bare} />
+  );
+  const waits = dependencies && (
+    <Dependencies
+      node={node}
+      catalog={dependencies.catalog}
+      groupOf={dependencies.groupOf}
+      actions={actions}
+      closed={closed}
     />
   );
 
@@ -988,17 +1008,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
                   {body}
 
-                  <Questions node={node} titles={titles} actions={actions} comments={comments} />
-
-                  {dependencies && (
-                    <Dependencies
-                      node={node}
-                      catalog={dependencies.catalog}
-                      groupOf={dependencies.groupOf}
-                      actions={actions}
-                      closed={closed}
-                    />
-                  )}
+                  {/* In a page's frame the questions and what it waits on are
+                      parts of their own, each under a heading on its own card
+                      (plan #2373.3). */}
+                  {!glyphOnly && questionsPart(false)}
+                  {!glyphOnly && waits}
 
                   {/* In a page's frame the thread is on the Activity tab (plan #2373.2). */}
                   {!glyphOnly && thread}
@@ -1049,6 +1063,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
       title: row.editing && titleEditor ? titleEditor : headingTitle,
       menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
       overview,
+      questions: questionsPart(true),
+      dependencies: waits || null,
       substeps: (
         <>
           {substeps.map((child) => (

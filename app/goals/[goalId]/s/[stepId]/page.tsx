@@ -13,6 +13,8 @@ import { tabFrom } from '@/lib/tabs';
 import { loadFilesOf } from '@/lib/goals/files-store';
 import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
+import { goalRunRows, type RunListing } from '@/lib/goals/runs';
+import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { stepRunViews, type GoalRun } from '@/lib/goals/shaping';
 import { loadStepRuns } from '@/lib/goals/shaping-store';
 import type { StepNode } from '@/lib/goals/steps';
@@ -47,6 +49,11 @@ function allSteps(nodes: readonly StepNode[]): StepNode[] {
 /** Each sent step's run line. Outside the component because it reads the clock. */
 function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
+}
+
+/** The step's latest runs for its Activity tab (plan #2373.3). Outside the component because it reads the clock. */
+function runHistory(history: { runs: RunListing[]; more: boolean }, timeZone: string) {
+  return { runs: goalRunRows(history.runs, Date.now(), timeZone), more: history.more };
 }
 
 /**
@@ -87,11 +94,12 @@ export default async function StepOwnPage({
   const done = steps.filter((node) => node.status === 'done').map((node) => node.id);
   const core = await createCoreClient();
   // A failed read leaves its part out rather than the page, as on the goal page.
-  const [runs, filesOf, entries, arrivals] = await Promise.all([
+  const [runs, filesOf, entries, arrivals, history] = await Promise.all([
     loadStepRuns(client, ids).catch((): Record<string, GoalRun> => ({})),
     loadFilesOf(client, core, ids).catch((): Record<string, LinkedFile[]> => ({})),
     loadProgressEntries(client, ids).catch((): ProgressEntry[] => []),
     loadDashArrivals(client, done).catch((): string[] => []),
+    loadGoalRuns(client, step.id).catch(() => ({ runs: [] as RunListing[], more: false })),
   ]);
 
   // Closing the step here grows the goal's close ring out of its glyph
@@ -113,6 +121,7 @@ export default async function StepOwnPage({
           canRun={owner}
           timeZone={account.timezone}
           tab={tab}
+          history={runHistory(history, account.timezone)}
         />
       </YourInitialProvider>
     </StepCloseRing>
