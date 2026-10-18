@@ -95,7 +95,7 @@ const LOOK_AGAIN_COST = 'About $2 to $5, uncertain';
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
   'relative -ml-px rounded-none first:ml-0 first:rounded-l-control last:rounded-r-control ' +
-  'focus-visible:z-10 aria-pressed:z-10 max-sm:px-2';
+  'focus-visible:z-over-link aria-pressed:z-over-link max-sm:px-2';
 
 /** How often a page with a run going looks again, and for how long. */
 const POLL_MS = 60_000;

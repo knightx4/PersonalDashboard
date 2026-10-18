@@ -47,6 +47,16 @@ export const youActions: ModuleActions = {
     ),
     worldMap: none('page'),
   },
+  'app/you/insights/actions.ts': {
+    markInsight: none(
+      'theirs',
+      "Right, not quite or wrong is the person's verdict on what Dash wrote about them; Dash does not mark its own insights.",
+    ),
+    startInsightRun: none(
+      'spends',
+      'Look again starts a long Dash session on the account, which spends money the person chooses to spend.',
+    ),
+  },
   'app/you/details/actions.ts': {
     saveDetailsForm: none(
       'own',
