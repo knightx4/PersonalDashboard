@@ -5,6 +5,7 @@ import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { LessonPick } from '@/lib/learn/lessons/choose';
 import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
+import { loadOfferableFigures } from '@/lib/learn/catalogue/figures';
 import { findLessonSource, type LessonSource } from '@/lib/learn/lessons/closest-source';
 import { addLessonFloor, loadFloorsDue } from '@/lib/learn/lessons/add-floor';
 import { addNextUnit } from '@/lib/learn/lessons/add-unit';
@@ -103,6 +104,7 @@ export async function writeLessonCard(
   const found: LessonSource | null = await findLessonSource(learn, pick.concept.claim, {
     onSpend: (report) => embedSpend.push(report),
   });
+  const sourceFigures = found ? await loadOfferableFigures(learn, found.itemId) : [];
   const result = await writeLesson({
     lesson: {
       concept: { name: pick.concept.name, claim: pick.concept.claim, mastery: pick.concept.mastery },
@@ -110,6 +112,7 @@ export async function writeLessonCard(
       unit: unit ? { title: unit.title, outcome: unit.outcome } : null,
       prerequisites,
       source: found,
+      sourceFigures,
     },
     anthropicApiKey: apiKey,
     onSpend: (report) => writeSpend.push(report),
