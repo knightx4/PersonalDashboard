@@ -498,4 +498,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-syllabus-weeks': run(HAIKU, 12_000, 700),
   // Up to twenty files' summaries and points in, a paragraph and eight ideas out (plan #2401.7).
   'collect-course-overview': run(HAIKU, 6_000, 900),
+  // The digest, note extracts, signals, earlier insights and five or six
+  // notes in; thinking at high effort, then three to five cards and a new
+  // digest out (plan #2413.9).
+  'write-insights': run(OPUS, 60_000, 25_000),
 };

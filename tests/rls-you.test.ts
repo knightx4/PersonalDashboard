@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -512,5 +512,65 @@ describe('insights', () => {
     expect(kept).toEqual({ run_id: null, superseded_by: next.id });
     await admin`delete from insights where id = ${insightA}`;
     expect(await admin`select id from insight_verdicts where insight_id = ${insightA}`).toHaveLength(0);
+  });
+});
+
+describe('insight digest and saving one call', () => {
+  // migrations-you/0014_insight_digest.sql (plan #2413.9): the account Dash
+  // keeps for its next call, and the save that writes a call's cards together.
+  const card = (claim: string, extra: Record<string, unknown> = {}) => ({
+    kind: 'pattern',
+    claim,
+    layers: [
+      { depth: 'saw', text: 'a' },
+      { depth: 'deeper', text: 'b' },
+      { depth: 'further', text: 'c' },
+    ],
+    receipts: [
+      { source: 'Me/Notes to Self.md', row_id: null, quote: 'q', link: '/vault/n/Me/Notes%20to%20Self.md' },
+      { source: 'you.insight_signals', row_id: null, quote: '3', link: null },
+    ],
+    confidence: 'medium',
+    live_ref: null,
+    ...extra,
+  });
+
+  it('saves the cards, their tripwires, the replacement and the digest, and marks the run ready', async () => {
+    const [old] = await admin<{ id: string }[]>`
+      insert into insights (user_id, kind, claim, confidence) values (${userA}, 'pattern', 'Old card', 'hunch') returning id`;
+    // The insights tests above leave a run open, and one is allowed at a time.
+    await admin`update insight_runs set status = 'failed' where user_id = ${userA} and status in ('queued', 'running')`;
+    const [run] = await admin<{ id: string }[]>`insert into insight_runs (user_id, status) values (${userA}, 'running') returning id`;
+    const insights = [
+      card('First', { tripwire: { kind: 'want_recurring', params: { words: ['write'], min_mentions: 2 } } }),
+      card('Second', { supersedes: old.id }),
+    ];
+    const [{ ids }] = await admin<{ ids: string[] }[]>`
+      select you.save_insight_run(${userA}, ${run.id}, ${admin.json(insights)}, 'Digest text', 'Summary.') as ids`;
+    expect(ids).toHaveLength(2);
+    const [saved] = await admin`select status, summary from insight_runs where id = ${run.id}`;
+    expect(saved).toEqual({ status: 'ready', summary: 'Summary.' });
+    expect(await admin`select kind from insight_tripwires where insight_id = ${ids[0]}`).toEqual([{ kind: 'want_recurring' }]);
+    const [replaced] = await admin`select status, superseded_by from insights where id = ${old.id}`;
+    expect(replaced).toEqual({ status: 'superseded', superseded_by: ids[1] });
+    const [digest] = await admin`select body, run_id from insight_digest where user_id = ${userA}`;
+    expect(digest).toEqual({ body: 'Digest text', run_id: run.id });
+
+    // A run already finished is refused, and nothing of it lands.
+    await expect(
+      admin`select you.save_insight_run(${userA}, ${run.id}, ${admin.json([card('Third')])}, 'New', 'S')`,
+    ).rejects.toThrow(/already ready/);
+    expect(await admin`select id from insights where claim = 'Third'`).toHaveLength(0);
+  });
+
+  it('keeps the digest to its owner, and lets only the service role write it', async () => {
+    expect(await asUser(userA, (tx) => tx`select body from insight_digest`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select body from insight_digest`)).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`insert into insight_digest (user_id, body) values (${userB}, 'x')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`select you.save_insight_run(${userA}, gen_random_uuid(), '[]'::jsonb, 'x', 'y')`),
+    ).rejects.toThrow();
   });
 });
