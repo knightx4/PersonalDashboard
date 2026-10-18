@@ -6256,7 +6256,7 @@ export const SURFACES: readonly Surface[] = [
           transcripts={2}
           courses={9}
           files={educationFiles}
-          filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
+          filesOpen={{ courseId: 'c3', confirming: 'f4' }}
         />
       </PaidCostsProvider>
     ),
@@ -6505,7 +6505,7 @@ export const SURFACES: readonly Surface[] = [
           weeks={educationWeeks}
           overviews={educationOverviews}
           notes={educationNotes}
-          filesOpen={{ courseId: 'c3' }}
+          filesOpen={{ courseId: 'c3', summaryOpen: 'f6' }}
         />
       </PaidCostsProvider>
     ),
