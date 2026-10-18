@@ -272,6 +272,12 @@ function pageRowLine(page: PageContext): string {
 export const LOOK_FIRST =
   'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, query_rows filters and counts one, including by whether rows of another table are linked to each (table_info names its columns and links), search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
 
+/**
+ * Said to the model when it ended its turn with no answer and no text, before
+ * the last call, which allows no tool.
+ */
+const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them now, in words, from what you have found.';
+
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
 
@@ -1017,20 +1023,33 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       // question failed after five rounds of lookups ("stopped: tool_use").
       // Refuse those lookups and ask once more with no tool allowed, so what
       // was already looked up still becomes an answer.
-      if (uses.length > 0) {
+      //
+      // Or it ended its turn with nothing to show: no answer call and no
+      // text. Sonnet 5.5 returns prose longer than a sentence or two as a
+      // progress note in a thinking block, which comes back empty, and it
+      // cannot be made to call the answer tool. That is how thread replies
+      // failed from mid-October ("reported nothing (stopped: end_turn)").
+      // With no tool allowed, what it writes comes back as text.
+      const empty = uses.length === 0 && !text && stopped !== 'max_tokens' && stopped !== 'refusal';
+      if (uses.length > 0 || empty) {
         const at = lookups;
-        messages.push(
-          { role: 'assistant', content: response.content },
-          {
-            role: 'user',
-            content: uses.map((use, i) => {
-              const result = keptResult({ ok: false, error: LIMIT_REACHED });
-              toolCalls.push({ name: use.name, input: use.input, result });
-              hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
-              return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
-            }),
-          },
-        );
+        if (empty) {
+          if (response.content.length > 0) messages.push({ role: 'assistant', content: response.content });
+          messages.push({ role: 'user', content: WRITE_IT_OUT });
+        } else {
+          messages.push(
+            { role: 'assistant', content: response.content },
+            {
+              role: 'user',
+              content: uses.map((use, i) => {
+                const result = keptResult({ ok: false, error: LIMIT_REACHED });
+                toolCalls.push({ name: use.name, input: use.input, result });
+                hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
+                return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
+              }),
+            },
+          );
+        }
         let prose: Anthropic.Message;
         try {
           prose = await callModel(
@@ -1054,8 +1073,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         input.onSpend?.({ model, usage: usageFrom(prose.usage) });
         const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
         if (said && prose.stop_reason !== 'max_tokens') {
-          const stop: DashStop = limit ?? 'lookups';
-          const note = `\n\n${limitNote(stop)}`;
+          const stop: DashStop = limit ?? (empty ? 'answered' : 'lookups');
+          const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
           return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
         }
         return fail(whyNoReport(prose), stoppedInWords(prose));
