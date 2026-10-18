@@ -64,7 +64,7 @@ export function Notice({ title, children }: { title: string; children: React.Rea
 export function Refused({ name, address }: { name?: string; address?: string }) {
   return (
     <Notice title="This app cannot connect">
-      Only Claude can connect to your dashboard, and this request would send your access to{' '}
+      Only Claude and apps on your own computer can connect to your dashboard, and this request would send your access to{' '}
       {address ? (
         <span className="[overflow-wrap:anywhere] text-ink">{address}</span>
       ) : (
