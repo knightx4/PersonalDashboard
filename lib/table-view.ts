@@ -104,8 +104,14 @@ export function withoutPage<P extends AddressParams>(params: P): P {
 /** One entry in a column header's menu, as a link. */
 export type ColumnFilterChoice = { id: string; label: string; href: string; current: boolean };
 
+/**
+ * A text column's typed filter: the param a field in its menu sets as you
+ * type, and what the field says before anything is in it (plan #2341.3).
+ */
+export type ColumnTyped = { param: string; placeholder: string };
+
 /** A column's choices, and whether one of them other than "any" is set. */
-export type ColumnFilter = { active: boolean; choices: ColumnFilterChoice[] };
+export type ColumnFilter = { active: boolean; choices: ColumnFilterChoice[]; typed?: ColumnTyped };
 
 /** A choice before its link is built: what it changes in the address. */
 export type ColumnOption<P extends AddressParams> = {
@@ -120,6 +126,8 @@ export type FilterColumn<P extends AddressParams> = {
   id: string;
   active: boolean;
   options: readonly ColumnOption<P>[];
+  /** A field above the choices that narrows by a typed value, for a text column. */
+  typed?: ColumnTyped;
 };
 
 /**
@@ -137,6 +145,7 @@ export function columnFilters<P extends AddressParams>(
     filters[column.id] = {
       active: column.active,
       choices: column.options.map(({ id, label, changes, current }) => ({ id, label, href: href(changes), current })),
+      ...(column.typed ? { typed: column.typed } : {}),
     };
   }
   return filters;
