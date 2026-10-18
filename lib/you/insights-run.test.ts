@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InsightRun } from '@/lib/you/insights';
-import { INSIGHT_RUN_STALE_AFTER_MS, insightRunBrief, insightRunState, STALE_RUN_ERROR } from '@/lib/you/insights-run';
+import { INSIGHT_RUN_STALE_AFTER_MS, insightRunState, STALE_RUN_ERROR } from '@/lib/you/insights-run';
 
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 
@@ -37,15 +37,5 @@ describe('insightRunState', () => {
 
   it('reads ready as ready', () => {
     expect(insightRunState(run('ready'), NOW).kind).toBe('ready');
-  });
-});
-
-describe('insightRunBrief', () => {
-  it('names the run and the person', () => {
-    const brief = insightRunBrief({ runId: 'run-1', userId: 'user-1' });
-    expect(brief).toContain('Insight run run-1');
-    expect(brief).toContain('user_id user-1');
-    expect(brief.split('\n')[0]).toBe('Follow .claude/skills/insights/SKILL.md');
-    expect(brief).toContain('PLACEHOLDER');
   });
 });
