@@ -221,6 +221,7 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnFigureSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -9031,6 +9032,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceHeldSurface />,
+  },
+  {
+    /* Each figure kind on a lesson, open on a phone (plan #2321.1). */
+    id: 'learn-figure-table',
+    label: 'Plan · A lesson with a table',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="table" />,
+  },
+  {
+    id: 'learn-figure-compare',
+    label: 'Plan · A lesson with a comparison',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="compare" />,
   },
   {
     id: 'learn-probe',

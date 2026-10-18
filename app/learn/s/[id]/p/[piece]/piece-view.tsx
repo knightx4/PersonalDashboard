@@ -26,6 +26,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Disclosure } from '@/components/ui/disclosure';
+import { Figures } from '@/components/learn/figure';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -125,12 +126,15 @@ export function LessonCard({
   number,
   writing,
   folded = false,
+  figuresOpen = false,
 }: {
   idea: PieceIdea;
   number: number;
   writing: Writing | null;
   /** Shows the takeaway alone, with the rest behind Open the lesson (plan #2292.5). */
   folded?: boolean;
+  /** Opens the figures' phone fold, for the gallery's drawing of a figure kind (plan #2321.1). */
+  figuresOpen?: boolean;
 }) {
   const { lesson } = idea;
   return (
@@ -146,10 +150,10 @@ export function LessonCard({
           </section>
           {folded ? (
             <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
-              <LessonBody lesson={lesson} />
+              <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
             </Disclosure>
           ) : (
-            <LessonBody lesson={lesson} />
+            <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
           )}
         </>
       ) : (
@@ -170,8 +174,8 @@ export function LessonCard({
   );
 }
 
-/** A written lesson below its takeaway: the context, the hook, the example and Try this. */
-function LessonBody({ lesson }: { lesson: NonNullable<PieceIdea['lesson']> }) {
+/** A written lesson below its takeaway: the context, the hook, the example, its figures and Try this. */
+function LessonBody({ lesson, figuresOpen }: { lesson: NonNullable<PieceIdea['lesson']>; figuresOpen: boolean }) {
   return (
     <>
           {lesson.context && <p className="mt-3 text-body text-ink">{lesson.context}</p>}
@@ -183,6 +187,7 @@ function LessonBody({ lesson }: { lesson: NonNullable<PieceIdea['lesson']> }) {
               <p className="mt-1 text-body text-ink">{lesson.example}</p>
             </section>
           )}
+          <Figures figures={lesson.figures} defaultOpen={figuresOpen} />
           {lesson.question && lesson.answer && (
             <section className="mt-4">
               <h3 className="text-small font-semibold text-ink-muted">Try this</h3>
