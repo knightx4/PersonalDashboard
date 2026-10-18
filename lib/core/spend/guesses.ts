@@ -167,6 +167,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One passage of a note with its Folder > Note > Heading place in front.
   'embed-note-blocks': background(unit(VOYAGE_LITE, 400, 0)),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
+  // A note's folder, title, tags and first 1,500 characters, and a voice and
+  // one sentence back.
+  'tag-note-voice': background(unit(HAIKU, 900, 60)),
   // A note, its eight nearest notes cut to 1,500 characters, and up to
   // sixteen positions with quotes, plus up to two searches read back. The
   // material is cached, so the rounds after the first read it at a tenth.

@@ -154,5 +154,10 @@ export const youSources: ModuleSources = {
       reason:
         "Dash's summary and key points of a course file, made on a press of Summarise; what the person kept is the file in you.course_files.",
     },
+    // Dash's writing about the person (plan #2413.1). Goals reading them would
+    // cite Dash to itself as though it were something the person said.
+    { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
+    { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
+    { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
   ],
 };

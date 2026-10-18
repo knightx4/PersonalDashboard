@@ -55,6 +55,7 @@ export function Deck({
   onForward,
   onPrevious,
   alreadyPassed = [],
+  countOnPhone = true,
   done,
   className,
 }: {
@@ -73,6 +74,12 @@ export function Deck({
   onPrevious?: (key: string) => void;
   /** Keys of items to start with as already passed; the gallery draws Previous with it. */
   alreadyPassed?: readonly string[];
+  /**
+   * False leaves the "1 of 3" count to screen readers on a phone, for items
+   * whose actions need its room to share one line with the forward press
+   * (Right, Not quite and Wrong on the Insights tab). From sm it shows.
+   */
+  countOnPhone?: boolean;
   /** What shows once every item has been passed. */
   done: ReactNode;
   className?: string;
@@ -128,7 +135,7 @@ export function Deck({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {current.actions}
         </div>
-        <span className="tabular shrink-0 text-small text-ink-muted">
+        <span className={cn('tabular shrink-0 text-small text-ink-muted', !countOnPhone && 'max-sm:sr-only')}>
           {behind.length + 1} of {items.length}
         </span>
         {previousKey && (

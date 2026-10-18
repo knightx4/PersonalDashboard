@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_runs', 'insight_verdicts', 'insights', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -402,5 +402,115 @@ describe('course overviews', () => {
   it('goes with its course', async () => {
     await asUser(userA, (tx) => tx`delete from courses where id = ${courseA}`);
     expect(await admin`select course_id from course_overviews where course_id = ${courseA}`).toHaveLength(0);
+  });
+});
+
+describe('insights', () => {
+  // migrations-you/0010_insights.sql (plan #2413.1): what Dash wrote about
+  // the person, the evidence for it, their mark on it and the runs.
+  const layers = admin.json([
+    { depth: 'saw', text: 'You have lived in four cities.' },
+    { depth: 'deeper', text: 'Each move followed a job going flat.' },
+  ]);
+  const receipts = admin.json([{ source: 'you.places', row_id: 'p1', quote: '2021', link: '/you/places/p1' }]);
+  let runA = '';
+  let insightA = '';
+
+  it('keeps a run, its insight and the verdict on it, to their owner only', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into insight_runs (user_id) values (${userA}) returning id, status`,
+    );
+    runA = run.id;
+    expect(run.status).toBe('queued');
+    const [insight] = await asUser(
+      userA,
+      (tx) => tx`insert into insights (user_id, run_id, kind, claim, layers, receipts, confidence)
+                 values (${userA}, ${runA}, 'pattern', 'You move when a job stops teaching you.',
+                         ${layers}, ${receipts}, 'medium')
+                 returning id, status`,
+    );
+    insightA = insight.id;
+    expect(insight.status).toBe('shown');
+    await asUser(
+      userA,
+      (tx) => tx`insert into insight_verdicts (user_id, insight_id, verdict, note)
+                 values (${userA}, ${insightA}, 'not_quite', 'Close')`,
+    );
+    const own = await asUser(
+      userA,
+      (tx) => tx`select i.claim, jsonb_array_length(i.layers) as n, v.verdict
+                 from insights i join insight_verdicts v on v.insight_id = i.id`,
+    );
+    expect(own).toEqual([{ claim: 'You move when a job stops teaching you.', n: 2, verdict: 'not_quite' }]);
+    expect(await asUser(userB, (tx) => tx`select id from insights`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from insight_verdicts`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from insight_runs`)).toHaveLength(0);
+  });
+
+  it("does not let a user write, mark or change another account's insight", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into insights (user_id, kind, claim, confidence)
+                   values (${userA}, 'pattern', 'Planted', 'high')`,
+      ),
+    ).rejects.toThrow();
+    // Their own row, pointing at someone else's insight or run.
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into insight_verdicts (user_id, insight_id, verdict) values (${userB}, ${insightA}, 'wrong')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into insights (user_id, run_id, kind, claim, confidence)
+                   values (${userB}, ${runA}, 'pattern', 'Borrowed run', 'high')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update insights set claim = 'Changed'`);
+    await asUser(userB, (tx) => tx`delete from insight_verdicts`);
+    const left = await admin`select i.claim, v.verdict from insights i join insight_verdicts v on v.insight_id = i.id
+                             where i.user_id = ${userA}`;
+    expect(left).toEqual([{ claim: 'You move when a job stops teaching you.', verdict: 'not_quite' }]);
+  });
+
+  it('keeps one verdict per insight and one open run per person', async () => {
+    await expect(
+      admin`insert into insight_verdicts (user_id, insight_id, verdict) values (${userA}, ${insightA}, 'right')`,
+    ).rejects.toThrow();
+    await expect(admin`insert into insight_runs (user_id) values (${userA})`).rejects.toThrow();
+    await admin`update insight_runs set status = 'ready', finished_at = now() where id = ${runA}`;
+    await admin`insert into insight_runs (user_id) values (${userA})`;
+  });
+
+  it('refuses an insight of the wrong shape', async () => {
+    const bad = [
+      () => admin`insert into insights (user_id, kind, claim, confidence) values (${userA}, 'pattern', 'x', 'certain')`,
+      () => admin`insert into insights (user_id, kind, claim, confidence) values (${userA}, 'Pattern!', 'x', 'high')`,
+      () => admin`insert into insights (user_id, kind, claim, confidence) values (${userA}, 'pattern', ' ', 'high')`,
+      () => admin`insert into insights (user_id, kind, claim, confidence, layers)
+                  values (${userA}, 'pattern', 'x', 'high', '{}'::jsonb)`,
+      () => admin`insert into insights (user_id, kind, claim, confidence, status)
+                  values (${userA}, 'pattern', 'x', 'high', 'hidden')`,
+      () => admin`insert into insights (user_id, kind, claim, confidence, superseded_by)
+                  values (${userA}, 'pattern', 'x', 'high', ${insightA})`,
+      () => admin`insert into insight_verdicts (user_id, insight_id, verdict) values (${userA}, ${insightA}, 'maybe')`,
+    ];
+    for (const statement of bad) await expect(statement()).rejects.toThrow();
+  });
+
+  it('points a superseded insight at its replacement, and takes the verdict with the insight', async () => {
+    const [next] = await admin<{ id: string }[]>`
+      insert into insights (user_id, kind, claim, confidence)
+      values (${userA}, 'pattern', 'You move when you stop learning.', 'high') returning id`;
+    await admin`update insights set status = 'superseded', superseded_by = ${next.id} where id = ${insightA}`;
+    await admin`delete from insight_runs where id = ${runA}`;
+    const [kept] = await admin`select run_id, superseded_by from insights where id = ${insightA}`;
+    expect(kept).toEqual({ run_id: null, superseded_by: next.id });
+    await admin`delete from insights where id = ${insightA}`;
+    expect(await admin`select id from insight_verdicts where insight_id = ${insightA}`).toHaveLength(0);
   });
 });

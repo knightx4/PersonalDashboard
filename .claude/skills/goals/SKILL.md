@@ -32,6 +32,13 @@ company research skill, for one, writes `job_search.company_research`), so
 write no `goals.runs` row and none of this skill's rules apply, beyond scoping
 every read and write to the `user_id` in the brief.
 
+The skills fired this way so far:
+
+- `company-research`: research on one company, into `job_search.company_research`.
+- `insights`: three to five deep insights about the person for the Insights
+  tab of You, into `you.insights` under the `you.insight_runs` row the brief
+  names (`insightsBrief` in `lib/you/insights.ts`).
+
 ## How you read and write
 
 Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through scripts/sql.ts"), not the Supabase connector, whose confirmations never reach
