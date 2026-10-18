@@ -67,7 +67,7 @@ function OriginLabel({ roleId, record }: { roleId: string; record: FactOriginRec
     return record.messageId ? (
       <Link
         href={originMessageHref(roleId, record.messageId)}
-        className={cn(linkVariants({ tone: 'quiet' }), 'text-caution hover:text-caution')}
+        className={cn(linkVariants({ tone: 'quiet' }), '-my-2.5 inline-flex min-h-11 items-center text-caution hover:text-caution')}
         title="Secondhand: open the message it came from"
       >
         {label}

@@ -264,6 +264,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.company_research = research.id;
 
+  // Where a role's pay came from (job_search 0063).
+  const [factOrigin] = await admin<{ id: string }[]>`
+    insert into fact_origins (user_id, role_id, field, origin, certainty)
+    values (${userId}, ${role.id}, 'comp', 'posting', 'firsthand')
+    returning id`;
+  ids.fact_origins = factOrigin.id;
+
   return ids;
 }
 
