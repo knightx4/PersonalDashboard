@@ -150,8 +150,9 @@ function summarised(summary: string, points: string[]): CourseFile['summary'] {
 /**
  * The files kept under ECON 101 (plan #2401.2): a syllabus, two weeks of
  * slides and notes, a deck with no week, a reading with a long title and one
- * with a week. The first week's slides have been summarised (plan #2401.4). Every other course holds none, and STATS 250 shows the empty
- * state when opened.
+ * with a week. The first week's slides and the long reading have been
+ * summarised (plan #2401.4). Every other course holds none, and STATS 250
+ * shows the empty state when opened.
  */
 export const educationFiles: Record<string, CourseFile[]> = {
   c3: [
@@ -184,6 +185,16 @@ export const educationFiles: Record<string, CourseFile[]> = {
       'Mankiw_ch4.pdf',
       2_480_916,
       5,
+      summarised(
+        'A market brings buyers and sellers of one good together, and in a competitive market no single one of them sets the price. Demand falls as the price rises and supply rises with it, and the price settles where the quantity buyers want meets the quantity sellers offer. A shift in either curve, from tastes, incomes, input costs or the number of sellers, moves that price and quantity to a new equilibrium.',
+        [
+          'The law of demand: other things equal, the quantity demanded falls when the price rises.',
+          'The law of supply: other things equal, the quantity supplied rises when the price rises.',
+          'Market demand and supply are the sums of every buyer and seller at each price.',
+          'At equilibrium the quantity demanded equals the quantity supplied; a surplus or a shortage pushes the price back toward it.',
+          'A change in the price moves along a curve, while a change in anything else shifts the whole curve.',
+        ],
+      ),
     ),
     kept('f7', 'reading', null, 'Hayek, The use of knowledge in society', 'Hayek_1945.pdf', 1_204_448, 6),
   ],

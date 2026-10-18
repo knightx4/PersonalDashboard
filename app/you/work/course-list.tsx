@@ -38,6 +38,8 @@ export type FilesOpen = {
   confirming?: string;
   summarising?: string;
   summariseErrors?: Record<string, string>;
+  summaryOpen?: string;
+  costOpen?: string;
 };
 
 /**
@@ -215,6 +217,8 @@ function CourseRow({
             confirming={filesOpen?.confirming}
             summarising={filesOpen?.summarising}
             summariseErrors={filesOpen?.summariseErrors}
+            summaryOpen={filesOpen?.summaryOpen}
+            costOpen={filesOpen?.costOpen}
           />
         </div>
       )}

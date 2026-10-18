@@ -3262,6 +3262,9 @@ const guessedSummary: CostEstimate = {
   models: [HAIKU],
 };
 
+/** What Summarise on a course file costs, for the files surfaces (plan #2401.4). */
+const summariseCosts = { 'app/you/work/actions.ts#summariseCourseFileAction': guessedSummary } as const;
+
 const perReading: CostEstimate = {
   lowMicros: 12_000,
   medianMicros: 18_000,
@@ -6081,13 +6084,16 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* A course opened to its files (plan #2401.2): the syllabus, then the lectures week by week, then the readings, each with its size. */
+    /* A course opened to its files (plan #2401.2): the syllabus, then each
+     * week with its lectures before its readings, then the files with no
+     * week. A summarised file shows two lines of its summary under it (plan
+     * #2401.5); the others offer Summarise. */
     id: 'you-work-files',
     label: 'Work & school · A course\'s files',
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6097,7 +6103,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3' }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6108,7 +6114,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6118,7 +6124,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6129,7 +6135,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6145,7 +6151,70 @@ export const SURFACES: readonly Surface[] = [
             },
           }}
         />
-      </>
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A file's summary opened in place (plan #2401.5): the whole summary,
+     * its key points and Summarise again with its cost. */
+    id: 'you-work-files-summary',
+    label: 'Work & school · A course file\'s summary opened',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', summaryOpen: 'f6' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A course whose files Dash has not read yet: the line saying so above
+     * the weeks, and Summarise on every row (plan #2401.5). */
+    id: 'you-work-files-unread',
+    label: 'Work & school · A course with no file read',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={{ c3: educationFiles.c3.map((file) => ({ ...file, summary: null })) }}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* Summarise's cost hint open, as hover and focus open it (plan #2401.5),
+     * beside an unread file's press. */
+    id: 'you-work-files-cost',
+    label: 'Work & school · What summarising a file costs',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', costOpen: 'f3' }}
+        />
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6175,7 +6244,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6185,7 +6254,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', adding: true, chosen: educationChosen }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6195,7 +6264,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6205,7 +6274,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {

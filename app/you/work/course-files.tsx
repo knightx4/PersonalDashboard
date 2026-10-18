@@ -2,7 +2,7 @@
 
 import { useActionState, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText } from 'lucide-react';
+import { ChevronDown, FileText } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -36,8 +36,7 @@ import {
 } from './actions';
 
 /**
- * The files kept under one course (plan #2401.2): the syllabus, then the
- * slides and lecture notes week by week, then the readings, each opening its
+ * The files kept under one course (plan #2401.2), each opening its
  * original through a one-minute signed link. "Add files" opens a drawer under
  * the list where several files are chosen at once, each given its kind and
  * week, and uploaded one after another with its own progress. A file the
@@ -46,7 +45,11 @@ import {
  *
  * Each file has Summarise (plan #2401.4): Dash reads it once, on the press
  * and at the cost its hint shows, and keeps a summary and up to five key
- * points. A summarised file offers Summarise again; a read that fails keeps nothing and says why under the row.
+ * points. A read that fails keeps nothing and says why under the row.
+ *
+ * The files run week by week (plan #2401.5), lectures before readings, and a
+ * summarised file shows its summary under it, two lines until opened in
+ * place, then the key points and Summarise again.
  */
 
 /** One chosen file in the add drawer, and where its upload has got to. */
@@ -77,6 +80,8 @@ export function CourseFiles({
   confirming,
   summarising,
   summariseErrors,
+  summaryOpen,
+  costOpen,
 }: {
   courseId: string;
   courseTitle: string;
@@ -95,15 +100,25 @@ export function CourseFiles({
   summarising?: string;
   /** The gallery's way to draw a failed read, by file id. */
   summariseErrors?: Record<string, string>;
+  /** The gallery's way to draw one file's summary opened. */
+  summaryOpen?: string;
+  /** The gallery's way to draw one file's cost hint open, as hover shows it. */
+  costOpen?: string;
 }) {
   const [open, setOpen] = useState(adding);
   const groups = groupCourseFiles(files);
+  const noneRead = files.length > 0 && files.every((file) => !file.summary);
 
   return (
     <div className="mt-2 border-l-2 border-border pl-3 sm:ml-1">
       {groups.length === 0 && !open && (
         <p className="py-1 text-ui text-ink-muted">
           No files yet. Add the syllabus, slides, lecture notes and readings you kept from this course.
+        </p>
+      )}
+      {noneRead && (
+        <p className="pb-1 text-small text-ink-muted">
+          Dash has not read any of these yet. Summarise a file and its summary and key points stay under it.
         </p>
       )}
       {groups.map((group) => (
@@ -118,6 +133,8 @@ export function CourseFiles({
                 confirming={confirming === file.id}
                 summarising={summarising === file.id}
                 summariseError={summariseErrors?.[file.id]}
+                summaryOpen={summaryOpen === file.id}
+                costOpen={costOpen === file.id}
               />
             ))}
           </ul>
@@ -145,12 +162,16 @@ function FileRow({
   confirming,
   summarising,
   summariseError,
+  summaryOpen,
+  costOpen,
 }: {
   file: CourseFile;
   forceRemove: boolean;
   confirming: boolean;
   summarising: boolean;
   summariseError?: string;
+  summaryOpen: boolean;
+  costOpen: boolean;
 }) {
   const toast = useToast();
   const [state, summarise, reading] = useActionState<SummariseCourseFileState, FormData>(
@@ -164,17 +185,27 @@ function FileRow({
     summariseError ? { error: summariseError } : {},
   );
   const pending = reading || summarising;
-  const kind = file.kind === 'slides' || file.kind === 'lecture_notes' ? COURSE_FILE_KIND_LABELS[file.kind] : null;
-  const meta = [
-    file.week !== null ? `Week ${file.week}` : null,
-    kind,
-    courseFileSize(file.size_bytes),
-  ]
+  const read = file.summary ?? null;
+  // The heading is the week, so the row says what the file is; the syllabus heading says it already.
+  const meta = [file.kind === 'syllabus' ? null : COURSE_FILE_KIND_LABELS[file.kind], courseFileSize(file.size_bytes)]
     .filter(Boolean)
     .join(' · ');
-  const phoneMeta = [file.week !== null ? `Week ${file.week}` : null, courseFileSize(file.size_bytes)]
-    .filter(Boolean)
-    .join(' · ');
+  const press = (label: string) => (
+    <form action={summarise}>
+      <input type="hidden" name="id" value={file.id} />
+      <DashAction
+        type="submit"
+        size="xs"
+        variant="ghost"
+        pending={pending}
+        paid="app/you/work/actions.ts#summariseCourseFileAction"
+        what={`Cost of summarising ${file.title}`}
+        hintOpen={costOpen}
+      >
+        {pending ? 'Summarising…' : label}
+      </DashAction>
+    </form>
+  );
   return (
     <li className="group flex flex-wrap items-center gap-x-3 py-1.5 sm:py-0.5">
       <a
@@ -187,62 +218,80 @@ function FileRow({
         <span className="line-clamp-2 sm:truncate">{file.title}</span>
       </a>
       {/* On a phone a file is two lines: the title across the whole row,
-        * then the facts with Summarise and Remove at their end. The kind is
-        * left to the heading there, for the room. From laptop width the
-        * wrapper steps aside and the facts, Summarise and Remove are columns
-        * every row ends on. While the confirm is armed it drops to a line of
-        * its own under the facts, so Summarise keeps its column (5.75rem is
-        * the Remove slot and its gap). */}
+        * then the facts with Summarise and Remove at their end. From laptop
+        * width the wrapper steps aside and the facts, Summarise and Remove
+        * are columns every row ends on; a summarised file leaves the
+        * Summarise column empty, since its press lives with the summary.
+        * While the confirm is armed it drops to a line of its own under the
+        * facts, so the column keeps its place (5.75rem is the Remove slot
+        * and its gap). */}
       <div className="flex w-full flex-wrap items-center gap-x-2 pl-5.5 sm:contents">
         <span className="mr-auto text-small tabular-nums text-ink-muted sm:mr-0">
-          <span className="sm:hidden">{phoneMeta}</span>
+          {/* On a phone the kind alone, with "Notes" for lecture notes, keeps the
+            * facts, Summarise with its cost and Remove on one line. */}
+          <span className="sm:hidden">
+            {file.kind === 'syllabus'
+              ? courseFileSize(file.size_bytes)
+              : file.kind === 'lecture_notes'
+                ? 'Notes'
+                : COURSE_FILE_KIND_LABELS[file.kind]}
+          </span>
           <span className="hidden sm:inline">{meta}</span>
         </span>
-        <form action={summarise} className="-my-1 sm:my-0 sm:min-w-36 sm:group-has-[p]:mr-23">
-          <input type="hidden" name="id" value={file.id} />
-          <DashAction
-            type="submit"
-            size="xs"
-            variant="ghost"
-            pending={pending}
-            paid="app/you/work/actions.ts#summariseCourseFileAction"
-            what={`Cost of summarising ${file.title}`}
-          >
-            {pending ? (
-              'Summarising…'
-            ) : file.summary ? (
-              // The shorter word on a phone keeps the facts, the press and Remove on one line.
-              <>
-                <span className="sm:hidden">Re-summarise</span>
-                <span className="hidden sm:inline">Summarise again</span>
-              </>
-            ) : (
-              'Summarise'
-            )}
-          </DashAction>
-        </form>
-      {/* Remove shows on hover and on focus; on a phone, with no hover, it is always there. */}
-      <span
-        className={cn(
-          '-my-1 sm:my-0 sm:min-w-20 sm:text-right',
-          'sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100',
-          'has-[p]:my-1 has-[p]:w-full has-[p]:text-left sm:has-[p]:pl-5.5 sm:has-[p]:opacity-100',
-          forceRemove && 'sm:opacity-100',
+        {read ? (
+          <span aria-hidden className="hidden sm:block sm:min-w-36 sm:group-has-[p]:mr-23" />
+        ) : (
+          <div className="-my-1 sm:my-0 sm:min-w-36 sm:group-has-[p]:mr-23">{press('Summarise')}</div>
         )}
-      >
-        <ConfirmStep
-          align="start"
-          prompt={`Removes ${file.file_name} from the course. This cannot be undone.`}
-          confirmLabel="Yes, remove"
-          pendingLabel="Removing…"
-          action={removeCourseFileAction}
-          fields={{ id: file.id }}
-          defaultArmed={confirming}
+        {/* Remove shows on hover and on focus; on a phone, with no hover, it is always there. */}
+        <span
+          className={cn(
+            '-my-1 sm:my-0 sm:min-w-20 sm:text-right',
+            'sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100',
+            'has-[p]:my-1 has-[p]:w-full has-[p]:text-left sm:has-[p]:pl-5.5 sm:has-[p]:opacity-100',
+            forceRemove && 'sm:opacity-100',
+          )}
         >
-          Remove
-        </ConfirmStep>
-      </span>
+          <ConfirmStep
+            align="start"
+            prompt={`Removes ${file.file_name} from the course. This cannot be undone.`}
+            confirmLabel="Yes, remove"
+            pendingLabel="Removing…"
+            action={removeCourseFileAction}
+            fields={{ id: file.id }}
+            defaultArmed={confirming}
+          >
+            Remove
+          </ConfirmStep>
+        </span>
       </div>
+      {/* Dash's summary under the file (plan #2401.5): two lines until it is
+        * opened, then the whole of it, the key points and the press to read
+        * the file again. No p in here: the row's group-has-[p] rule is how
+        * the armed Remove confirm finds its own. */}
+      {read && (
+        // Dash's words sit on the recessed ground (voice-dash), apart from the file rows.
+        <div className="w-full pl-5.5 sm:mb-1 sm:mt-0.5">
+          {/* ui-ok: hand-rolled-fold -- the closed line is the summary's own first two lines, which then open in place; Disclosure's title row would show them twice */}
+          <details open={summaryOpen} className="group/summary voice-dash max-w-prose px-2.5 py-1.5">
+            <summary className="flex cursor-pointer list-none items-start gap-1 rounded-control text-ui focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
+              <span className="line-clamp-2 flex-1 group-open/summary:line-clamp-none">{read.summary}</span>
+              <ChevronDown
+                className="mt-0.5 size-4 shrink-0 text-ink-muted transition-transform group-open/summary:rotate-180"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </summary>
+            <span className="mt-2 block text-small font-medium text-ink-muted">Key points</span>
+            <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-ui marker:text-ink-muted">
+              {read.points.map((point, index) => (
+                <li key={index}>{point}</li>
+              ))}
+            </ul>
+            <div className="-ml-2 mt-1">{press('Summarise again')}</div>
+          </details>
+        </div>
+      )}
       {/* A div, not a p: the facts and Remove make room for the confirm's own p. */}
       {state.error && !pending && (
         <div role="alert" className="w-full pl-5.5 text-small text-danger">

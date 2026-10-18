@@ -97,27 +97,38 @@ export function parseKind(value: unknown): CourseFileKind | null {
 /** One heading of a course's file list and the files under it. */
 export type CourseFileGroup = { key: string; label: string; files: CourseFile[] };
 
-const byWeekThenPosition = (a: CourseFile, b: CourseFile) =>
-  (a.week ?? Number.MAX_SAFE_INTEGER) - (b.week ?? Number.MAX_SAFE_INTEGER) ||
+/** Lectures before readings within a week; the syllabus has its own heading. */
+const KIND_ORDER: Record<CourseFile['kind'], number> = { syllabus: 0, slides: 1, lecture_notes: 1, reading: 2 };
+
+const byKindThenPosition = (a: CourseFile, b: CourseFile) =>
+  KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
   a.position - b.position ||
   a.uploaded_at.localeCompare(b.uploaded_at);
 
 /**
- * A course's files as the list shows them, under their kind: the syllabus
- * first, then the lectures (slides and lecture notes together) in week
- * order, then the readings in week order. A file with no week comes after the
- * last week. The week is a fact on each row rather than a heading, so every
- * heading is a kind. Empty groups are left out.
+ * A course's files as the list shows them, week by week (plan #2401.5): the
+ * syllabus first, then a heading for each week that holds a file, in week
+ * order, with its lectures (slides and lecture notes, in the order they were
+ * added) and then its readings. Files with no week come last under "No
+ * week", in the same order. The kind is a fact on each row, so every heading
+ * after the syllabus is a week. Empty groups are left out.
  */
 export function groupCourseFiles(files: CourseFile[]): CourseFileGroup[] {
-  const groups: CourseFileGroup[] = [
-    { key: 'syllabus', label: 'Syllabus', files: files.filter((f) => f.kind === 'syllabus') },
-    { key: 'lectures', label: 'Lectures', files: files.filter((f) => f.kind === 'slides' || f.kind === 'lecture_notes') },
-    { key: 'readings', label: 'Readings', files: files.filter((f) => f.kind === 'reading') },
-  ];
-  return groups
-    .filter((group) => group.files.length > 0)
-    .map((group) => ({ ...group, files: [...group.files].sort(byWeekThenPosition) }));
+  const groups: CourseFileGroup[] = [];
+  const syllabus = files.filter((f) => f.kind === 'syllabus');
+  if (syllabus.length > 0) groups.push({ key: 'syllabus', label: 'Syllabus', files: [...syllabus].sort(byKindThenPosition) });
+  const rest = files.filter((f) => f.kind !== 'syllabus');
+  const weeks = [...new Set(rest.map((f) => f.week).filter((w): w is number => w !== null))].sort((a, b) => a - b);
+  for (const week of weeks) {
+    groups.push({
+      key: `week-${week}`,
+      label: `Week ${week}`,
+      files: rest.filter((f) => f.week === week).sort(byKindThenPosition),
+    });
+  }
+  const loose = rest.filter((f) => f.week === null);
+  if (loose.length > 0) groups.push({ key: 'no-week', label: 'No week', files: loose.sort(byKindThenPosition) });
+  return groups;
 }
 
 /** How many files a course holds, as its row says it. */

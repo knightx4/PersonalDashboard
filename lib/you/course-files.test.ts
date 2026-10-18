@@ -88,7 +88,7 @@ describe('courseFileTitle', () => {
 });
 
 describe('groupCourseFiles', () => {
-  it('puts the syllabus first, then lectures in week order, then readings', () => {
+  it('puts the syllabus first, then each week with its lectures before its readings, then the files with no week', () => {
     const groups = groupCourseFiles([
       file('r2', 'reading', 3),
       file('n2', 'lecture_notes', 2),
@@ -100,8 +100,10 @@ describe('groupCourseFiles', () => {
     ]);
     expect(groups.map((g) => [g.label, g.files.map((f) => f.id)])).toEqual([
       ['Syllabus', ['syl']],
-      ['Lectures', ['s1', 'n2', 's2', 'loose']],
-      ['Readings', ['r1', 'r2']],
+      ['Week 1', ['s1', 'r1']],
+      ['Week 2', ['n2', 's2']],
+      ['Week 3', ['r2']],
+      ['No week', ['loose']],
     ]);
   });
 
