@@ -1184,6 +1184,18 @@ writes a table or a migration.
   draft. Dash starts, renames and archives lists and adds, changes, confirms
   and archives their rows with `change_goal_list`. Readings, events, saved
   products and contacts are linked rather than copied (`goals.links`).
+- **Lists on the goal page** (plan #2330.3). Every list, own or linked,
+  shows as one chip on the done-when's card: a picture or a list mark, the
+  name, the count of rows in play and the one thing that stands out (rows to
+  confirm first, then what was picked, read or bought, then the next event).
+  Pressing a chip opens the list in a panel over the page with its rows, an
+  Add button and a fold for rows ruled out (dismissed in Shopping, put down
+  in Learn, or marked ruled out in a status field). A typed name adds an own
+  row; a pasted link adds a draft from the page, and the line under the box
+  names what the page did not give. A linked list adds a reading, saved
+  product or contact found by search. A goal with three lists or more also
+  gives each list a tab after Steps (`?tab=list-<name>`). The rules are in
+  `lib/goals/goal-lists.ts`.
 
 - **Worked-out answers.** A step exists to answer something, such as when
   the loan payments start or what they come to a month, and the fields are
