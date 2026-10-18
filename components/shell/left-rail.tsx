@@ -30,9 +30,15 @@ export function LeftRail({
   children,
   className,
   fill = false,
+  active = 0,
 }: {
   children: React.ReactNode;
   className?: string;
+  /**
+   * How many filters are on, for the phone's Filters button, which says so
+   * when any is: a narrowed list should look narrowed (plan #2341.3).
+   */
+  active?: number;
   /**
    * The parent already bounds the height -- a page whose results scroll in
    * their own region rather than with the document. The rail then fills that
@@ -63,11 +69,11 @@ export function LeftRail({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mb-3 xl:hidden')}
+        className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mb-3 xl:hidden', active > 0 && 'text-accent')}
         aria-expanded={open}
       >
         <SlidersHorizontal className="size-4" strokeWidth={1.75} aria-hidden />
-        Filters
+        {active > 0 ? <span className="tabular">Filters · {active}</span> : 'Filters'}
       </button>
 
       {/* Rendered only when open, so it costs nothing at rest. */}
