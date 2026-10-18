@@ -7,6 +7,14 @@ import {
 } from '@/lib/jobs/pipeline';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { parseScoreMinimum, passesMinimum, type ScoreMinimum } from '@/lib/jobs/suggest/score-notes';
+import {
+  TABLE_PAGE_SIZE,
+  addressHref,
+  pageOf,
+  parsePage,
+  withoutPage,
+  type PageAddress,
+} from '@/lib/table-view';
 
 /**
  * What the Pipeline page shows, read from its address (plan #1590).
@@ -57,7 +65,11 @@ export type PipelineStageKey = PipelineStage['key'];
 export const SENT_MAX_DAYS = 90;
 
 /** How many rows the table draws at once. */
-export const PIPELINE_PAGE_SIZE = 50;
+export const PIPELINE_PAGE_SIZE = TABLE_PAGE_SIZE;
+
+// Paging and the table's links are the shared table module's; Pipeline's
+// callers keep importing them from here.
+export { pageOf, withoutPage };
 
 /** The search params the page reads. Sort, group and hide are the table's. */
 export type PipelineParams = {
@@ -124,7 +136,6 @@ export function parsePipeline(params: PipelineParams): PipelineState {
   const view: PipelineViewName =
     params.view === 'table' || scope !== 'live' ? 'table' : params.view === 'board' ? 'board' : 'focus';
   const excitement = Number(params.excitement);
-  const page = Number(params.page);
   const sent = Number(params.sent);
   return {
     stage: PIPELINE_STAGES.find((stage) => stage.key === params.stage) ?? null,
@@ -139,7 +150,7 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     excitement: (EXCITEMENT_MINIMUMS as readonly number[]).includes(excitement) ? excitement : null,
     minimum: parseScoreMinimum(params),
     terms: searchTerms(params.q),
-    page: Number.isInteger(page) && page > 1 ? page : 1,
+    page: parsePage(params.page),
   };
 }
 
@@ -197,71 +208,26 @@ export function sentWithin(
   return Number.isFinite(at) && at >= now.getTime() - days * DAY_MS && at <= now.getTime();
 }
 
-/** The page of `rows` to draw, with where it starts and how many pages there are. */
-export function pageOf<T>(
-  rows: readonly T[],
-  page: number,
-  size = PIPELINE_PAGE_SIZE,
-): { rows: T[]; page: number; pages: number; first: number; last: number } {
-  const pages = Math.max(1, Math.ceil(rows.length / size));
-  const current = Math.min(Math.max(1, page), pages);
-  const start = (current - 1) * size;
-  const slice = rows.slice(start, start + size);
-  return {
-    rows: slice,
-    page: current,
-    pages,
-    first: slice.length ? start + 1 : 0,
-    last: start + slice.length,
-  };
-}
-
-/** The params as plain strings, the way a link carries them. */
-function flatten(params: PipelineParams): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(params)) {
-    if (Array.isArray(value)) {
-      if (value.length) out[key] = value.join(',');
-    } else if (value) {
-      out[key] = value;
-    }
-  }
-  return out;
-}
+const PIPELINE_ADDRESS: PageAddress<PipelineParams> = {
+  path: PIPELINE_PATH,
+  // The defaults stay out of the address, so the bare page is the bare link.
+  defaults: { view: 'focus', status: 'live' },
+};
 
 /**
- * The link that changes `changes` and keeps everything else. A filter or a
- * view change goes back to the first page, since page 4 of a different list
- * is nobody's place in it; only a change of page keeps the page.
+ * The link that changes `changes` and keeps everything else, going back to
+ * the first page unless the page is what changes (lib/table-view.ts).
  */
 export function pipelineHref(
   params: PipelineParams,
   changes: Partial<Record<keyof PipelineParams, string | undefined>>,
 ): string {
-  const next = flatten(params);
-  if (!('page' in changes)) delete next.page;
-  for (const [key, value] of Object.entries(changes)) {
-    if (value) next[key] = value;
-    else delete next[key];
-  }
-  // The defaults stay out of the address, so the bare page is the bare link.
-  if (next.view === 'focus') delete next.view;
-  if (next.status === 'live') delete next.status;
-  if (next.page === '1') delete next.page;
-  const query = new URLSearchParams(next).toString();
-  return query ? `${PIPELINE_PATH}?${query}` : PIPELINE_PATH;
+  return addressHref(PIPELINE_ADDRESS, params, changes);
 }
 
 /** Where an old /jobs/roles link lands: the table, with what it asked for. */
 export function rolesRedirect(params: PipelineParams): string {
   return pipelineHref(params, { view: 'table' });
-}
-
-/** The params without the page, for the links that rearrange the table. */
-export function withoutPage(params: PipelineParams): PipelineParams {
-  const rest = { ...params };
-  delete rest.page;
-  return rest;
 }
 
 /** The header's line: how many are shown, out of how many, of which kind. */

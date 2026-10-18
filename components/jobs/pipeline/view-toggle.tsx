@@ -1,6 +1,5 @@
-import Link from '@/components/ui/link';
 import { Columns3, ListChecks, Table2 } from 'lucide-react';
-import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
+import { ViewSwitch } from '@/components/shell/view-switch';
 import { pipelineHref, type PipelineParams, type PipelineViewName } from '@/lib/jobs/pipeline-view';
 
 const VIEWS = [
@@ -27,24 +26,18 @@ export function PipelineViewToggle({
   params: PipelineParams;
 }) {
   return (
-    <span role="group" aria-label="Pipeline view" className={segmentedFrame}>
-      {VIEWS.map(({ value, label, Icon }) => (
-        <Link
-          key={value}
-          href={pipelineHref(
-            params,
-            value === 'table'
-              ? { view: 'table' }
-              : { view: value === 'focus' ? undefined : value, status: undefined },
-          )}
-          scroll={false}
-          aria-current={view === value ? 'true' : undefined}
-          className={segmentClass(view === value)}
-        >
-          <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {label}
-        </Link>
-      ))}
-    </span>
+    <ViewSwitch
+      label="Pipeline view"
+      current={view}
+      views={VIEWS.map((option) => ({
+        ...option,
+        href: pipelineHref(
+          params,
+          option.value === 'table'
+            ? { view: 'table' }
+            : { view: option.value === 'focus' ? undefined : option.value, status: undefined },
+        ),
+      }))}
+    />
   );
 }

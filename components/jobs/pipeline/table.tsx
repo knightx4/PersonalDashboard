@@ -1,12 +1,12 @@
 import { RowLink } from '@/components/shell/back-link';
-import { ActionMenu } from '@/components/ui/action-menu';
+import { ColumnHeading } from '@/components/shell/column-heading';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatCompBand, formatDate, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
-import type { ColumnFilter } from '@/lib/jobs/pipeline-columns';
+import type { ColumnFilter } from '@/lib/table-view';
 import type { DisplayChoice } from '@/lib/list-display';
 import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -70,36 +70,7 @@ export function RolesTable({
             .filter((entry) => showing(entry.id))
             .map((entry) => (
               <TH key={entry.id} className={cn(cell, entry.id === 'applied' && narrowHidden)}>
-                {filters[entry.id] ? (
-                  <ActionMenu
-                    label={`Sort or filter by ${entry.label.toLowerCase()}`}
-                    align="start"
-                    defaultOpen={openFilter === entry.id}
-                    // The header row is not drawn on a phone, so neither is its menu.
-                    panelClassName="max-md:hidden"
-                    // The heading alone, at the width the sort link had: a
-                    // chevron on five headings pushed Comp off the card.
-                    trigger={entry.label}
-                    triggerClassName={cn(
-                      'h-auto w-auto justify-start p-0 text-left text-micro font-semibold uppercase tracking-wider',
-                      entry.chosen || filters[entry.id].active ? 'text-accent' : 'text-ink-muted hover:text-ink',
-                    )}
-                    items={[
-                      { id: 'sort', label: `Sort by ${entry.label.toLowerCase()}`, href: entry.href, current: entry.chosen },
-                      ...filters[entry.id].choices,
-                    ]}
-                  />
-                ) : (
-                  <Link
-                    href={entry.href}
-                    className={cn(
-                      'transition-colors duration-quick',
-                      entry.chosen ? 'text-accent' : 'hover:text-ink',
-                    )}
-                  >
-                    {entry.label}
-                  </Link>
-                )}
+                <ColumnHeading sort={entry} filter={filters[entry.id]} open={openFilter === entry.id} />
               </TH>
             ))}
           {/* Comp is a column without a sort, so it is not in the list above
