@@ -1,6 +1,9 @@
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { tableKind } from '@/lib/learn/figures/kinds/table';
 import { figureKind } from '@/lib/learn/figures/registry';
+import { explorableKind } from '@/lib/learn/figures/kinds/explorable';
+import { ExplorableMoved } from '@/lib/learn/figures/kinds/explorable-view';
+import { explorableModel } from '@/lib/learn/figures/models/registry';
 import { LessonCard } from '@/app/learn/s/[id]/p/[piece]/piece-view';
 import { MODELS } from '@/lib/core/models';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
@@ -974,6 +977,46 @@ export function LearnFigureSurface({
       figuresOpen
     />
   );
+}
+
+/**
+ * A lesson on how a market price forms, carrying an explorable model
+ * (plan #2321.7). With no model named it draws the explorable kind's own
+ * example at its start; naming a model draws that model's example with its
+ * sliders already moved, so the live caption and the starting curves show.
+ */
+export function LearnExplorableSurface({ model: id }: { model?: string }) {
+  const model = id ? explorableModel(id) : null;
+  const figure = model
+    ? { kind: explorableKind.id, caption: model.example.caption, spec: { model: model.id, start: model.example.start } }
+    : { kind: explorableKind.id, ...explorableKind.example };
+  const idea = piecePage.ideas[0];
+  const card = (
+    <LessonCard
+      idea={{
+        ...idea,
+        conceptId: supplyDemand.id,
+        name: 'How a market price forms',
+        claim: supplyDemand.claim,
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          takeaway: 'A price settles where what buyers want to buy meets what sellers want to sell, and moves when either side changes.',
+          context: 'Every market price, from coffee beans to rents, is set this way when there are many buyers and sellers.',
+          summary:
+            'Demand falls as the price rises; supply rises with it. Where they cross, nobody is left wanting to buy or sell at that price. Shift either curve and the crossing moves, and the price with it.',
+          example:
+            'Frost in Brazil in 2021 cut the coffee harvest, and the world price of arabica roughly doubled within a year.',
+          question: 'A new study says coffee is good for you. Which curve moves, which way, and what happens to the price?',
+          answer: 'Demand moves right: buyers want more at every price. The crossing moves up and right, so the price rises and more coffee is sold.',
+          figures: [figure],
+        },
+      }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
+  );
+  return model ? <ExplorableMoved moved={{ [model.id]: model.example.moved }}>{card}</ExplorableMoved> : card;
 }
 
 // ---- Questions on a subject ---------------------------------------------------------

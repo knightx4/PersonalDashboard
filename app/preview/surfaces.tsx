@@ -222,6 +222,7 @@ import {
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
   LearnFigureSurface,
+  LearnExplorableSurface,
   LearnProbeSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
@@ -9068,6 +9069,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'wide',
     render: () => <LearnFigureSurface kind="chart" missing />,
+  },
+  {
+    /* An explorable model on a lesson on price formation (plan #2321.7). */
+    id: 'learn-figure-explorable',
+    label: 'Plan · A lesson with an explorable model',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface />,
+  },
+  {
+    /* Each model in lib/learn/figures/models/registry.ts, its sliders moved. */
+    id: 'learn-figure-explorable-supply-demand',
+    label: 'Plan · Supply and demand, supply moved',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnExplorableSurface model="supply_demand" />,
   },
   {
     id: 'learn-probe',
