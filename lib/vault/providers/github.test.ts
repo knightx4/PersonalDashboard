@@ -430,3 +430,33 @@ describe('canWrite', () => {
     await expect(source.canWrite()).rejects.toBeInstanceOf(VaultSourceError);
   });
 });
+
+describe('firstCommitAt', () => {
+  it('reads the last page of the path history, with the subpath in front', async () => {
+    const calls = stubFetch((url) =>
+      url.endsWith('page=1')
+        ? {
+            body: [{ commit: { author: { date: '2026-09-01T10:00:00Z' } } }],
+            headers: {
+              link: '<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?per_page=1&page=7>; rel="last"',
+            },
+          }
+        : { body: [{ commit: { author: { date: '2023-05-17T22:28:50Z' } } }] },
+    );
+    const source = new GithubVaultSource({ ...config, subpath: 'me@example.com' });
+
+    await expect(source.firstCommitAt('Me/Journal.md')).resolves.toBe('2023-05-17T22:28:50Z');
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain('path=me%40example.com%2FMe%2FJournal.md');
+    expect(calls[0]).toContain('sha=main');
+    expect(calls[1]).toContain('page=7');
+  });
+
+  it('takes the only commit when there is no last link, and null when there is none', async () => {
+    stubFetch(() => ({ body: [{ commit: { author: { date: '2025-01-09T08:00:00Z' } } }] }));
+    await expect(new GithubVaultSource(config).firstCommitAt('One.md')).resolves.toBe('2025-01-09T08:00:00Z');
+
+    stubFetch(() => ({ body: [] }));
+    await expect(new GithubVaultSource(config).firstCommitAt('None.md')).resolves.toBeNull();
+  });
+});
