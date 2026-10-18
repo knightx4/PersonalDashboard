@@ -20,6 +20,119 @@ plan, which always goes in `proposed` ("Steps that act outside the plan"). Befor
 there and build around it: keep the person's steps, fill in what is missing,
 and reuse a step that already says what you were about to write.
 
+### Blind spots
+
+Before you write the stages, look for what the person has not thought of: the
+cost nobody mentioned, the document a later stage needs, the person who has
+to agree. A map built only from what the goal says leaves those for the
+person to find halfway through. The pass ends in a file called **Blind
+spots** under the goal, and what it finds goes into the map like anything
+else you learned.
+
+**When it runs.** Once per goal, the first time the goal is mapped. Run the
+query under "The file" below before anything else: if it finds a Blind spots
+file, the goal has been through the pass, so skip steps 1 to 5 and map as
+usual. The pass does not run on a later Ask Dash press, on the overnight map
+of a goal that already has stages, on a re-shape, on an area plan, or on an
+errand ("An errand"). A comment from the person on the Blind spots file is
+the request for a fresh pass: on that run, do the pass again and revise the
+file in place.
+
+1. **Read first, so you list only gaps.** The goal's title, `detail` and
+   `acceptance`, the steps already under it and the questions already
+   answered, its area, its `goals.context`, and the other modules as
+   "Pulling in from the other modules" says. Something the person already
+   has in hand (a step that covers it, a note that answers it, a document
+   already filed) is not a blind spot; leave it off.
+2. **Check four kinds.** Think about each for this goal in particular, not
+   goals in general:
+   - **Costs**: money, fees, deposits, subscriptions, and time the plan
+     will take that the person has not allowed for.
+   - **Prerequisites**: what has to be true or in hand before a stage can
+     start: a document, an account, a qualification, a booking window,
+     another goal finished first.
+   - **People involved**: who else has to agree, act, be told or be asked
+     (a partner, a landlord, a manager, a referee, a doctor).
+   - **Common stall points**: where goals of this kind usually stop moving:
+     a waiting list, a quote nobody chases, the second month of a habit, a
+     form that needs something from a third party.
+3. **Keep six at most**, across the four kinds, ordered by how much each
+   changes the plan. One that gates a stage or could sink the goal comes
+   before one that adds a step; one that only adds a line to a step's detail
+   comes last. Fewer is fine, and a kind can have none.
+4. **Sort each into "put in the map" or "ask".** The default is the map: a
+   step (usually a `claude` step to find it out, or the person's step to
+   get it), a dependency, a clause in a stage's `acceptance`, a field on an
+   information step's collection, or a line in a step's `detail`. Where
+   building it in means choosing something, choose it and write the
+   `Decided:` line on the step it shapes. Sort an item to "ask" only when it
+   passes the test in "Decide first, ask last"; one that fails is decided.
+   A fact only the person holds goes on an information step, not a
+   question. The pass does not raise the number of questions: a goal still
+   rarely gets more than one per run, so a blind spot that would be a second
+   question is decided, or written as a provisional step on the question
+   that is already there.
+5. **Write the map**, stages and all, with each "put in the map" item on
+   the step it shapes. Then write the file, so it can name those steps.
+
+**The file.** Write it on every pass, whether or not anything was asked, so
+the person can see what was checked. Follow [files.md](files.md), with the
+answer first: how many blind spots, the one that matters most, and what you
+asked, if anything ("Three blind spots. The biggest is the landlord's
+written consent, which I put in as the first step of Get the paperwork. I
+asked nothing."). Then one row per blind spot in a table: the blind spot,
+its kind, what you did with it (the step it went into, by title, or the
+question you asked), and why it matters in a clause. After the table, one
+line naming the kinds you checked and found nothing in, so an empty kind
+reads as checked rather than skipped.
+
+File it by hand, not with `goals.file_result`. That function keeps one file
+per item, found by its `origin`, and the goal's own slot belongs to writing
+that bears on the goal as a whole (a breakdown, a set of options); filing
+Blind spots there would overwrite that file, or be overwritten by it. So the
+Blind spots file has no `origin` (an origin has to name a real row, which a
+suffix on the goal's ref does not) and is linked from the goal alone. Send it
+as one statement, through `scripts/sql.ts --file` with `--set
+goals.actor=claude --set goals.run_id=<the run id>`:
+
+```sql
+with f as (
+  insert into core.files (user_id, title, summary, body, made_by)
+  values ('<user>', 'Blind spots',
+          'Three blind spots. The biggest is the landlord''s written consent, now the first step of Get the paperwork. I asked nothing.',
+          $f$<the markdown>$f$, 'claude')
+  returning id
+)
+insert into goals.links (user_id, item_id, kind, target_id)
+select '<user>', '<goal id>', 'file', id from f
+returning target_id;
+```
+
+Look for one before you do anything else in the pass, and again before you
+write: a live file of Dash's titled Blind spots, linked from the goal. Never
+write a second one for a goal.
+
+```sql
+select f.id, f.body, f.updated_at
+from goals.links l
+join core.files f on f.id = l.target_id and f.user_id = l.user_id
+where l.user_id = '<user>' and l.item_id = '<goal id>' and l.kind = 'file'
+  and l.archived_at is null and f.archived_at is null
+  and f.made_by = 'claude' and f.title = 'Blind spots';
+```
+
+When there is one, read its thread (`core.thread_turns`, ref
+`core.files:<id>`) and revise it with an update of `body`, `summary` and
+`change_note`, as "Files" in `working-steps.md` says for a file on the same
+question, rather than writing a second. List the blind spots in the run
+summary too, with what you did with each.
+
+The query finds the file by its title and maker, so a file the person has
+renamed is not found, and the goal reads as not yet through the pass. That is
+accepted: the pass then runs once more and writes a new file. If you see a
+renamed file of Dash's under the goal whose body is a blind-spot table, treat
+it as the goal's file and revise it instead.
+
 ### Stages and sub-steps
 
 1. **Stages at the top level.** (Older runs, and the Send a phase job, call
@@ -453,6 +566,8 @@ down to fit:
   with `acts` if Dash would do it, as "Steps that act outside the plan" says.
 - **No weekly help.** Leave `proposed_help_kinds` empty; an errand is over
   before a weekly run would help it.
+- **Skip the blind-spot pass.** An errand is a one-off job with a date and at
+  most one question, so write no Blind spots file for it.
 - Leave the goal's note as for any run. The errand closes as any goal does:
   propose `met` in the morning review once its done-when holds.
 

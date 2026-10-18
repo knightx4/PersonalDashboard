@@ -250,7 +250,7 @@ for it before your first write:
 
 | Job | Read |
 |---|---|
-| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`. An errand also needs `working-steps.md`. |
+| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`. An errand also needs `working-steps.md`. |
 | `goal` with a comment in the brief | `requests.md` ("Replying to a comment"), then whatever the comment asks for: `working-steps.md` for work you do, `records.md` for facts to file |
 | `area` | `pulling-in.md`, `area.md`, `deciding.md` |
 | `reshape` | `reshape.md`, `deciding.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps", and "Moving a step that has sat for a week" for a drop on the person's answer), `step-states.md` |
@@ -266,7 +266,7 @@ not in this file, find it here and read it:
 | Section | File |
 |---|---|
 | Pulling in from the other modules (Where to look, How to search, Search by meaning from a row you found, What is already on the goal, Writing what you found, Using it, Something the catalogue does not list) | `reference/pulling-in.md` |
-| Mapping a goal (Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
+| Mapping a goal (Blind spots, Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
 | Filing a document you were given, Pre-filling from Gmail, Answers on an information step | `reference/records.md` |
 | Decide first, ask last; Questions; Provisional steps | `reference/deciding.md` |
 | Planning an area (Reading the area, What to propose, Afterwards) | `reference/area.md` |
