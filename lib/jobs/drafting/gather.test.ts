@@ -164,6 +164,48 @@ describe('gather', () => {
     expect(renderQuestions(m.questions)).toContain('limit: 150 words');
   });
 
+  it('reads their Perspective answers and the newest finished research run on the company', async () => {
+    const tables = fixture();
+    Object.assign(tables['job_search.companies'][0], {
+      perspective_business: 'Payments rails for marketplaces.',
+      perspective_why_me: 'I built the model that got us to break-even.',
+      perspective_next_move: 'Email the CFO.',
+    });
+    tables['job_search.company_research'] = [
+      { id: 'cr-old', user_id: ME, company_id: COMPANY, status: 'ready', summary: 'Older run.', sections: [], finished_at: '2026-09-01T00:00:00Z' },
+      {
+        id: 'cr-new',
+        user_id: ME,
+        company_id: COMPANY,
+        status: 'ready',
+        summary: 'Profitable since spring.',
+        sections: [{ key: 'money', title: 'How it makes money', body: 'Take rate on volume.' }],
+        finished_at: '2026-10-01T00:00:00Z',
+      },
+      { id: 'cr-going', user_id: ME, company_id: COMPANY, status: 'researching', summary: 'Half done.', sections: [], finished_at: null },
+      { id: 'cr-theirs', user_id: THEM, company_id: COMPANY, status: 'ready', summary: 'Not mine.', sections: [], finished_at: '2026-10-10T00:00:00Z' },
+    ];
+    const result = await gather(deps(tables), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+
+    // The next move is a to-do, not material for an answer.
+    expect(result.material.role.perspective).toBe(
+      'What they do: Payments rails for marketplaces.\n\nWhy you: I built the model that got us to break-even.',
+    );
+    expect(result.material.role.researchWriteUp).toBe('Profitable since spring.\n\nHow it makes money\nTake rate on volume.');
+    const text = renderMaterial(result.material);
+    expect(text).toContain('## Their own view of the company, in their words');
+    expect(text).toContain('## Research prepared on the company');
+    expect(text).not.toContain('Email the CFO');
+  });
+
+  it('leaves the Perspective and the write-up out when there are none', async () => {
+    const result = await gather(deps(fixture()), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.material.role).toMatchObject({ perspective: null, researchWriteUp: null });
+    expect(renderMaterial(result.material)).not.toContain('Research prepared on the company');
+  });
+
   it('skips vault passages quietly when no embedding key is set, and with no core client', async () => {
     const noKey: QuestionEmbedder = async () => ({ ok: false, reason: 'no-key', detail: 'EMBEDDING_API_KEY is not set' });
     const withoutKey = await gather(deps(fixture(), { core: memory([]), embed: noKey }), { userId: ME, applicationId: APP });
@@ -191,6 +233,10 @@ describe('gather', () => {
     tables['job_search.roles'][0].jd_text = long(10_000, 'posting');
     tables['job_search.roles'][0].requirements = Array.from({ length: 200 }, (_, i) => ({ kind: 'must_have', text: long(20, `req${i}`) }));
     tables['job_search.companies'][0].research = long(5_000, 'research');
+    tables['job_search.companies'][0].perspective_why_me = long(2_000, 'why');
+    tables['job_search.company_research'] = [
+      { id: 'cr', user_id: ME, company_id: COMPANY, status: 'ready', summary: long(2_000, 'summary'), sections: [{ title: 'More', body: long(5_000, 'section') }], finished_at: '2026-10-01' },
+    ];
     tables['job_search.evidence_items'] = Array.from({ length: 120 }, (_, i) => ({
       id: `ev${i}`, user_id: ME, title: `Story ${i}`, body: long(1_000), context: long(100), metrics: long(100), skills: ['a', 'b'], strength: i % 5, used_count: 0,
     }));
@@ -223,6 +269,8 @@ describe('gather', () => {
     expect(m.role.posting!.length).toBeLessThanOrEqual(BUDGETS.posting);
     expect(m.resume!.text.length).toBeLessThanOrEqual(BUDGETS.resume);
     expect(m.role.research!.length).toBeLessThanOrEqual(BUDGETS.companyResearch);
+    expect(m.role.perspective!.length).toBeLessThanOrEqual(BUDGETS.perspective);
+    expect(m.role.researchWriteUp!.length).toBeLessThanOrEqual(BUDGETS.researchWriteUp);
     expect(m.vault.passages.length).toBeGreaterThan(0);
     expect(m.vault.passages.length).toBeLessThan(20);
   });

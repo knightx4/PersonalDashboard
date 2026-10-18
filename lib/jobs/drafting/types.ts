@@ -28,6 +28,10 @@ export type GatheredRole = {
   requirements: GatheredRequirement[];
   /** companies.research, cut to its budget. */
   research: string | null;
+  /** Their answers on the company's Perspective tab, as "label: answer" paragraphs, cut to budget. */
+  perspective: string | null;
+  /** The newest finished job_search.company_research write-up: summary and sections, cut to budget. */
+  researchWriteUp: string | null;
   /** job_search.notes on the company, the role or this application, pinned first. */
   notes: string[];
 };

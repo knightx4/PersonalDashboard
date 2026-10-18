@@ -96,6 +96,8 @@ export function renderMaterial(material: GatheredMaterial): string {
       'What they have found out about the company',
       lines([role.research, ...role.notes.map((note) => `- ${note}`)]) || null,
     ),
+    section('Their own view of the company, in their words', role.perspective),
+    section('Research prepared on the company', role.researchWriteUp),
     section(
       'Their evidence bank',
       material.evidence.items.length > 0

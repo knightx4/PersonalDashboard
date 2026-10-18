@@ -4,7 +4,9 @@
  * The single-question drafter (lib/jobs/evidence/draft.ts) is sent a few bank
  * items matched to one question. Drafting a whole application, or a cover
  * letter, wants all of the person's material at once: the role and what they
- * found out about the company, the whole bank, the résumé, what they have
+ * found out about the company (their own research, their answers on its
+ * Perspective tab and the newest research Dash prepared on it), the whole
+ * bank, the résumé, what they have
  * approved or sent before, what they have been thinking, their notes on the
  * company, how they write, and every question with its limit. gather() reads
  * all of it on the client it is handed, so RLS decides whose rows come back,
@@ -21,6 +23,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SpendSink } from '@/lib/core/spend/pricing';
+import { PERSPECTIVE_COLUMNS, perspectiveOf, perspectiveText, type PerspectiveKey } from '@/lib/jobs/companies/perspective';
+import { researchFromRow, researchText } from '@/lib/jobs/companies/research';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
@@ -73,6 +77,12 @@ export type GatherDeps = {
 };
 
 export type GatherInput = { userId: string; applicationId: string };
+
+/**
+ * The Perspective answers a draft draws on. The unknowns and the next move are
+ * questions to ask and a to-do, not material for an answer.
+ */
+export const PERSPECTIVE_FOR_DRAFTS: readonly PerspectiveKey[] = ['business', 'whyNow', 'problem', 'whyMe'];
 
 /** The vault, by default: the Obsidian notes. */
 export const VAULT_SOURCES = ['obsidian.notes'] as const;
@@ -323,10 +333,26 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
     .filter(Boolean)
     .join(',');
 
-  const [company, answers, bank, resumes, past, defaults, thoughts, notes, profile] = await Promise.all([
+  const [company, writeUps, answers, bank, resumes, past, defaults, thoughts, notes, profile] = await Promise.all([
     companyId
-      ? jobs.from('companies').select('id, name, industry, research').eq('id', companyId).eq('user_id', userId).maybeSingle()
+      ? jobs
+          .from('companies')
+          .select(`id, name, industry, research, ${PERSPECTIVE_COLUMNS}`)
+          .eq('id', companyId)
+          .eq('user_id', userId)
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    // The newest finished research run on the company, if one has finished.
+    companyId
+      ? jobs
+          .from('company_research')
+          .select('summary, sections, finished_at')
+          .eq('company_id', companyId)
+          .eq('user_id', userId)
+          .eq('status', 'ready')
+          .order('finished_at', { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: [], error: null }),
     jobs
       .from('application_answers')
       .select('id, question_id, answer, status, word_limit, created_at')
@@ -367,7 +393,7 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
     jobs.from('profiles').select('writing_style_notes, banned_constructions').eq('id', userId).maybeSingle(),
   ]);
 
-  for (const read of [company, answers, bank, resumes, past, defaults, thoughts, notes, profile]) {
+  for (const read of [company, writeUps, answers, bank, resumes, past, defaults, thoughts, notes, profile]) {
     if (read.error) return { ok: false, error: read.error.message };
   }
 
@@ -435,6 +461,7 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
   const fittedNotes = fitToBudget(noteBodies, (note) => note.length + 3, BUDGETS.notes).kept;
 
   const companyRow = company.data as Row | null;
+  const writeUp = ((writeUps.data ?? []) as Row[])[0];
   const companyName = str(companyRow?.name);
   const title = (role.title as string) ?? '';
 
@@ -462,6 +489,10 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
           (role.requirements as Requirement[] | null) ?? null,
         ),
         research: cutOptional(companyRow?.research as string | null, BUDGETS.companyResearch),
+        perspective: companyRow
+          ? cutOptional(perspectiveText(perspectiveOf(companyRow), PERSPECTIVE_FOR_DRAFTS), BUDGETS.perspective)
+          : null,
+        researchWriteUp: writeUp ? cutOptional(researchText(researchFromRow(writeUp)), BUDGETS.researchWriteUp) : null,
         notes: fittedNotes,
       },
       evidence: evidenceFrom((bank.data ?? []) as Row[]),

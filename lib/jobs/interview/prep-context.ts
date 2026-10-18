@@ -38,6 +38,9 @@ export const MAX_JD_EXCERPT_CHARS = 2_000;
 
 /** One person's research on one company, and one round's write-up. */
 export const MAX_RESEARCH_CHARS = 4_000;
+/** Their answers on the company's Perspective tab, and the research Dash prepared on it. */
+export const MAX_PERSPECTIVE_CHARS = 2_000;
+export const MAX_WRITE_UP_CHARS = 4_000;
 export const MAX_NOTES_CHARS = 2_000;
 
 /* -------------------------------------------------------------------------- */
@@ -95,6 +98,10 @@ export interface PrepCompanyRow {
   stage: string | null;
   headcountBand: string | null;
   research: string | null;
+  /** Their Perspective answers as "label: answer" paragraphs (perspectiveText). */
+  perspective?: string | null;
+  /** The newest finished company_research write-up (researchText). */
+  researchWriteUp?: string | null;
   priority: string | null;
 }
 
@@ -411,7 +418,19 @@ export function buildPrepContext(input: PrepInput): PrepContext {
     ? cap(jdText, requirements.length > 0 ? MAX_JD_EXCERPT_CHARS : MAX_JD_CHARS)
     : null;
 
-  const research = trim(input.company.research);
+  // What they wrote, their own view from the Perspective tab, then what the
+  // research run found, each capped so one long part cannot crowd the others.
+  const ownResearch = trim(input.company.research);
+  const perspective = trim(input.company.perspective);
+  const writeUp = trim(input.company.researchWriteUp);
+  const research =
+    [
+      ownResearch && cap(ownResearch, MAX_RESEARCH_CHARS).text,
+      perspective && `Your own view of the company:\n${cap(perspective, MAX_PERSPECTIVE_CHARS).text}`,
+      writeUp && `Research prepared on the company:\n${cap(writeUp, MAX_WRITE_UP_CHARS).text}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n') || null;
   const roundNotes = trim(input.round?.notes);
   const priorRounds = collectPriorRounds(
     input.priorRounds,
@@ -452,7 +471,7 @@ export function buildPrepContext(input: PrepInput): PrepContext {
       industry: trim(input.company.industry),
       stage: trim(input.company.stage),
       headcountBand: trim(input.company.headcountBand),
-      research: research ? cap(research, MAX_RESEARCH_CHARS).text : null,
+      research,
       priority: trim(input.company.priority),
     },
     interviewers,

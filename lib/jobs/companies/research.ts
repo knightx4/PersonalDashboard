@@ -138,6 +138,17 @@ export function researchFromRow(row: Record<string, unknown>): CompanyResearch {
   };
 }
 
+/**
+ * A finished write-up as plain text for a prompt: the summary, then each
+ * section under its title. The sources and the suggested Perspective answers
+ * are left out; the person's own answers are read from the company row.
+ */
+export function researchText(research: Pick<CompanyResearch, 'summary' | 'sections'>): string {
+  return [research.summary.trim(), ...research.sections.map((section) => `${section.title}\n${section.body}`)]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 /** The sources grouped by kind, in the tab's order, leaving out empty kinds. */
 export function sourcesByKind(
   sources: readonly ResearchSource[],
