@@ -25,6 +25,9 @@ import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
+import { FinishNoticeRow } from '@/app/account/notifications';
+import { Banner } from '@/components/ui/banner';
+import { Switch } from '@/components/ui/field';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
   isOutstanding,
@@ -1242,5 +1245,47 @@ export function DevRunnerCrewSurface() {
       />
       <OvernightControl run={null} canSend night={null} push={null} ready={2} />
     </>,
+  );
+}
+
+// ---- The "Tell me when Dash has finished" switch (plan #2389.4) -----------
+
+/**
+ * The notifications section as it reads on a device that has notifications
+ * on: the morning-brief switch above and the finish switch beneath it. The
+ * browser's own state is what draws the real section, so the gallery draws
+ * the same two rows with fixtures: `loading` is the finish switch before the
+ * row is read, `error` is a save that failed, with the switch back where it was.
+ */
+export function FinishNoticeSurface({
+  enabled = true,
+  loading,
+  error,
+}: {
+  enabled?: boolean;
+  loading?: boolean;
+  error?: string;
+}) {
+  return (
+    <section className="max-w-2xl">
+      <h3 className="text-ui font-semibold text-ink">Morning brief</h3>
+      <div className="mt-4 border-y border-border">
+        <label className="row-pad flex items-start gap-3">
+          <Switch checked readOnly className="mt-0.5" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-ui font-medium text-ink">Send me the morning brief</span>
+            <span className="block text-small leading-snug text-ink-muted">
+              On this device only. Turn it on from each phone or computer you want it on.
+            </span>
+          </span>
+        </label>
+        <FinishNoticeRow enabled={loading ? null : enabled} busy={false} />
+      </div>
+      {error && (
+        <div className="mt-3">
+          <Banner tone="bad">{error}</Banner>
+        </div>
+      )}
+    </section>
   );
 }
