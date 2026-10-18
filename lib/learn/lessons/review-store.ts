@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import {
@@ -117,17 +118,21 @@ export async function loadDueReviews(
   const dueList = (dueRows ?? []) as { concept_id: string; review_due_on: string }[];
   if (dueList.length === 0) return [];
 
-  const [labels, passed] = await Promise.all([
+  const [labels, passed, archived] = await Promise.all([
     loadConceptLabels(
       learn,
       userId,
       dueList.map((row) => row.concept_id),
     ),
     loadPassedPieces(learn, userId),
+    archivedSubjectIds(learn, userId),
   ]);
+  // An archived subject's reviews wait until it is restored (plan #2355.3),
+  // except on its own page, which names it.
   const due = dueList.flatMap((row) => {
     const label = labels.get(row.concept_id);
-    return label ? [{ conceptId: row.concept_id, dueOn: row.review_due_on, subjectId: label.subjectId }] : [];
+    if (!label || (archived.has(label.subjectId) && label.subjectId !== options.subjectId)) return [];
+    return [{ conceptId: row.concept_id, dueOn: row.review_due_on, subjectId: label.subjectId }];
   });
   const picked = pickDue(due, passed.map(toPassed), {
     limit: options.limit,

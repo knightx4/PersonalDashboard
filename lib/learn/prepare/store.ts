@@ -216,6 +216,16 @@ export async function preparedSubjectIds(learn: LearnSupabaseClient, userId: str
   return new Set(((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id));
 }
 
+/**
+ * `preparedSubjectIds` without the archived ones: the prepared subjects Now
+ * counts (plan #2355.3). The unfiltered set stays for a subject's own page,
+ * which opens by link when archived.
+ */
+export async function preparedActiveSubjectIds(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const [prepared, archived] = await Promise.all([preparedSubjectIds(learn, userId), archivedSubjectIds(learn, userId)]);
+  return new Set([...prepared].filter((id) => !archived.has(id)));
+}
+
 /** A subject whose own preparation has not finished, with its run, for Now's rail (plan #2313.1). */
 export type PreparingSubject = { subjectId: string; name: string; run: PreparationRow; steps: PreparationStepRow[] };
 

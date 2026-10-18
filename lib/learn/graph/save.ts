@@ -76,10 +76,10 @@ export async function findOrCreateSubject(
   userId: string,
   name: string,
   options: { note?: string | null } = {},
-): Promise<{ id: string; created: boolean; placed: boolean }> {
+): Promise<{ id: string; created: boolean; placed: boolean; archived: boolean }> {
   const { data, error } = await supabase
     .from('subjects')
-    .select('id, name, placed_at, survey')
+    .select('id, name, placed_at, survey, archived_at')
     // Named, because the service role (the Learn now top-up) is not narrowed
     // by RLS and would otherwise find another person's track of the same name.
     .eq('user_id', userId)
@@ -89,7 +89,7 @@ export async function findOrCreateSubject(
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Looking up the subject', error);
   if (data) {
-    const found = data as { id: string; placed_at?: string | null; survey?: boolean };
+    const found = data as { id: string; placed_at?: string | null; survey?: boolean; archived_at?: string | null };
     // A hidden subject holding survey questions about this theme (plan #838)
     // becomes the track, so the ideas already tested there are its start.
     if (found.survey) {
@@ -101,7 +101,9 @@ export async function findOrCreateSubject(
       // Now a subject, it is prepared like a new one (plan #2276.1).
       prepareSubjectAfterResponse(found.id);
     }
-    return { id: found.id, created: false, placed: Boolean(found.placed_at) };
+    // An archived subject keeps its name (plan #2355), so this returns it
+    // still archived; a caller that makes a subject says so (plan #2355.3).
+    return { id: found.id, created: false, placed: Boolean(found.placed_at), archived: Boolean(found.archived_at) };
   }
 
   const { data: created, error: createError } = await supabase
@@ -117,7 +119,7 @@ export async function findOrCreateSubject(
   const id = (created as { id: string }).id;
   // The insert opened its preparation run (0167); start it once the response has gone.
   prepareSubjectAfterResponse(id);
-  return { id, created: true, placed: false };
+  return { id, created: true, placed: false, archived: false };
 }
 
 /**

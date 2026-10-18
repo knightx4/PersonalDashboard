@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { preparedSubjectIds } from '@/lib/learn/prepare/store';
@@ -45,9 +46,15 @@ export type PlanSubject = { subjectId: string; aimId: string | null };
  * preparation's first_lesson step and its later ones by the top-up from here.
  */
 export async function planSubjects(learn: LearnSupabaseClient, userId: string): Promise<PlanSubject[]> {
-  const [aims, prepared] = await Promise.all([goalsWithTracks(learn, userId), preparedSubjectIds(learn, userId)]);
+  const [aims, prepared, archived] = await Promise.all([
+    goalsWithTracks(learn, userId),
+    preparedSubjectIds(learn, userId),
+    archivedSubjectIds(learn, userId),
+  ]);
   const out: PlanSubject[] = [];
-  const seen = new Set<string>();
+  // An archived subject has no plan on Now or Goals and none laid out until
+  // it is restored (plan #2355.3); its own page reads its plan by id.
+  const seen = new Set<string>(archived);
   for (const aim of aims) {
     if (seen.has(aim.subject_id)) continue;
     seen.add(aim.subject_id);

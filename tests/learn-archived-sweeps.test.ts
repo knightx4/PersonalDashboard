@@ -5,7 +5,9 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 /**
  * An archived subject gets no background work (plan #2355.4): the hourly
  * sweeps and the preparation never choose it, and restoring it makes it
- * eligible again on the next run.
+ * eligible again on the next run. Nor is it among what you choose from
+ * (plan #2355.3): the loaders behind Now, the Subjects list and Practice
+ * leave it out, and a restore puts it back.
  */
 
 type Row = Record<string, unknown>;
@@ -30,6 +32,8 @@ function memoryLearn(tables: Record<string, Row[]>): LearnSupabaseClient {
         return builder;
       },
       in: (column: string, values: unknown[]) => (filters.push((row) => values.includes(row[column])), builder),
+      ilike: (column: string, value: string) =>
+        (filters.push((row) => String(row[column]).toLowerCase() === value.toLowerCase()), builder),
       lt: (column: string, value: number) => (filters.push((row) => (row[column] as number) < value), builder),
       // Only the lease filter uses it here, and no row in these tests holds a lease.
       or: () => builder,
@@ -125,5 +129,60 @@ describe('the channels waiting to be judged', () => {
     expect([...(await archivedAmong(learn, ['live', 'shelved', 'shelved']))]).toEqual(['shelved']);
     restore('shelved');
     expect([...(await archivedAmong(learn, ['live', 'shelved']))]).toEqual([]);
+  });
+});
+
+describe('the loaders you choose what to learn from', () => {
+  beforeEach(() => {
+    tables.subject_preparations = [
+      { subject_id: 'live', user_id: USER, branch_key: null, status: 'done', failures: 0 },
+      { subject_id: 'shelved', user_id: USER, branch_key: null, status: 'done', failures: 0 },
+    ];
+    tables.aims = [
+      { id: 'aim-1', name: 'Speak Welsh', user_id: USER, subject_id: 'shelved', archived_at: null, list_source: null },
+    ];
+  });
+
+  it('leaves an archived subject off the Subjects list, and a restore puts it back', async () => {
+    const { loadSubjects } = await import('@/lib/learn/graph/load');
+    const learn = memoryLearn(tables);
+    expect((await loadSubjects(learn, USER)).map((row) => row.id)).toEqual(['live']);
+    restore('shelved');
+    expect((await loadSubjects(learn, USER)).map((row) => row.id)).toEqual(['live', 'shelved']);
+  });
+
+  it('opens an archived subject by its link', async () => {
+    const { loadSubject } = await import('@/lib/learn/graph/load');
+    expect((await loadSubject(memoryLearn(tables), 'shelved'))?.id).toBe('shelved');
+  });
+
+  it('gives an archived subject no plan on Now, even when a goal points at it', async () => {
+    const { planSubjects } = await import('@/lib/learn/lessons/plan-store');
+    const learn = memoryLearn(tables);
+    expect((await planSubjects(learn, USER)).map((one) => one.subjectId)).toEqual(['live']);
+    restore('shelved');
+    expect((await planSubjects(learn, USER)).map((one) => one.subjectId)).toEqual(['shelved', 'live']);
+  });
+
+  it('leaves an archived subject out of what Practice asks about and what Now counts as prepared', async () => {
+    const { practiceSubjectIds } = await import('@/lib/learn/levels/practice-store');
+    const { preparedActiveSubjectIds } = await import('@/lib/learn/prepare/store');
+    const learn = memoryLearn(tables);
+    expect([...(await practiceSubjectIds(learn, USER))]).toEqual(['live']);
+    expect([...(await preparedActiveSubjectIds(learn, USER))]).toEqual(['live']);
+    restore('shelved');
+    expect([...(await practiceSubjectIds(learn, USER))].sort()).toEqual(['live', 'shelved']);
+    expect([...(await preparedActiveSubjectIds(learn, USER))].sort()).toEqual(['live', 'shelved']);
+  });
+
+  it('says a subject of that name is archived rather than making one or reopening it quietly', async () => {
+    const { makeCustomSubject } = await import('@/lib/learn/graph/curriculum-run');
+    const made = await makeCustomSubject(memoryLearn(tables), USER, { name: 'welsh', want: null, units: '' });
+    expect(made).toEqual({
+      ok: false,
+      detail: 'You archived a subject called welsh. Restore it to pick it up again.',
+      existing: { id: 'shelved', name: 'welsh' },
+    });
+    expect(tables.subjects.find((row) => row.id === 'shelved')?.archived_at).toBe(ARCHIVED_AT);
   });
 });
