@@ -19,8 +19,8 @@ import { findStoredUnits, liveStoredUnitPorts } from '@/lib/learn/levels/stored-
 import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { CURRICULUM_MODEL, writeCurriculum } from '@/lib/learn/graph/curriculum';
-import { approveDraft, uncitedRows } from '@/lib/learn/levels/store';
-import { draftTopicsStep, writeUnitsStep, type KeptDraft, type SubjectUnit } from './draft-steps';
+import { approveDrafts } from '@/lib/learn/levels/store';
+import { draftTopicsStep, writeUnitsStep, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishPreparationStep } from './finish-step';
 import { addedSourceItems, addedSourceWeeks } from './add-source-run';
@@ -322,24 +322,17 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
       const asks = topics.map((t) => t.ask);
       const { data, error } = await learn
         .from('topics')
-        .select('id, asked, name, status')
+        .select('id, status')
         .eq('user_id', userId)
         .in('asked', asks);
       if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
-      const rows = (data ?? []) as { id: string; asked: string; name: string; status: string }[];
-      let approved = rows.filter((r) => r.status === 'approved').length;
-      const kept: KeptDraft[] = [];
-      for (const row of rows.filter((r) => r.status === 'draft')) {
-        const uncited = await uncitedRows(learn, row.id);
-        if (uncited > 0) {
-          kept.push({ ask: row.asked, name: row.name, reason: `${uncited} ${uncited === 1 ? 'row cites' : 'rows cite'} no source` });
-          continue;
-        }
-        // The drafted checks stay as they are: an empty map rewrites nothing.
-        await approveDraft(learn, row.id, new Map());
-        approved += 1;
-      }
-      return { approved, kept };
+      const rows = (data ?? []) as { id: string; status: string }[];
+      // Every draft is approved, its uncited rows marked personal (plan #2356.6), so none is kept.
+      const settled = await approveDrafts(
+        learn,
+        rows.filter((r) => r.status === 'draft').map((r) => r.id),
+      );
+      return { approved: rows.filter((r) => r.status === 'approved').length + settled.length, kept: [] };
     },
   });
 

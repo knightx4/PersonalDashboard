@@ -111,15 +111,16 @@ export type MetricList = { id: string; name: string; fields: readonly { key: str
 
 /**
  * The list and date field each metric reads, named from the lists given: the
- * list's name and the field's label, or null for one not found.
+ * list's name and the field's label, or null for one not found and for a
+ * metric that counts steps or files.
  */
-export function namedLists<M extends { collectionId: string; dateField: string }>(
+export function namedLists<M extends { collectionId: string | null; dateField: string | null }>(
   metrics: readonly M[],
   lists: readonly MetricList[],
 ): (M & { list: string | null; field: string | null })[] {
   const byId = new Map(lists.map((list) => [list.id, list]));
   return metrics.map((metric) => {
-    const list = byId.get(metric.collectionId);
+    const list = metric.collectionId ? byId.get(metric.collectionId) : undefined;
     const field = list?.fields.find((f) => f.key === metric.dateField);
     return { ...metric, list: list?.name ?? null, field: field?.label ?? null };
   });

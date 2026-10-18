@@ -16,7 +16,10 @@ export interface PanelProps {
   jdText: string;
   /** What the last automated board lookup did, or could not do. */
   jdLookupNote: string | null;
+  /** When the board was last asked for this role's description; null if never. */
+  jdLookupAt: string | null;
   jdUrl: string | null;
+  location: string | null;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;

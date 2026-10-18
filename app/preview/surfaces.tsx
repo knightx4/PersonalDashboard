@@ -335,12 +335,21 @@ import {
 } from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
-import { SubjectPresses, subjectDescription } from '@/app/learn/s/[id]/header';
+import {
+  LearnArchivedEmptyPreview,
+  LearnArchivedErrorPreview,
+  LearnArchivedLoadingPreview,
+  LearnArchivedPreview,
+  LearnSubjectArchivedPreview,
+  LearnSubjectHeaderPreview,
+  LearnSubjectsHeaderPreview,
+} from './learn-archive-surfaces';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
@@ -397,6 +406,8 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashStepNotifyErrorSurface,
+  GoalDashStepSurface,
   GoalOpenedSurface,
   GoalStepSurface,
   GoalSubStepSurface,
@@ -438,6 +449,7 @@ import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
   GoalMetricPropsEmptySurface,
   GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormStepsSurface,
   GoalMetricPropsFormSurface,
   GoalMetricPropsMenuSurface,
   GoalMetricPropsPendingSurface,
@@ -687,9 +699,11 @@ const rolePanels: PanelProps = {
   applicationId: 'app-1',
   status: 'in_process',
   jdText:
-    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
+    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.\n- 4-8 years of experience building research or trading systems\n- 2+ years in a systematic fund or a quantitative startup',
   jdLookupNote: null,
+  jdLookupAt: '2026-10-01T08:00:00Z',
   jdUrl: 'https://example.com/jobs/quant-dev',
+  location: 'London, hybrid three days a week',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,
@@ -1612,7 +1626,7 @@ const roleFactsOrigins = factOriginFixtures({
   location: { origin: 'posting', certainty: 'firsthand' },
   work_mode: { origin: 'you', certainty: 'firsthand' },
   seniority: { origin: 'dash', certainty: 'guess' },
-  posting_status: { origin: 'unknown', certainty: null },
+  posting_status: { origin: 'posting', certainty: 'firsthand' },
 });
 
 const referrerFixtures: ReferrerOption[] = [
@@ -4230,8 +4244,8 @@ export const SURFACES: readonly Surface[] = [
     /* The role page's header and facts with an origin under each of the role's
      * own (plan #2343.3): pay from a recruiter's email with the message
      * linked, the location from the posting, the work mode typed by you, the
-     * seniority Dash guessed, a posting status saved before origins were kept
-     * (no label) and a company stage nobody has filled in. */
+     * seniority Dash guessed, the posting status from the posting and a company
+     * stage nobody has filled in (no label). */
     id: 'jobs-role-facts',
     label: 'Role · Facts and where they came from',
     module: 'jobs',
@@ -4960,6 +4974,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* A step Dash is doing on its own page (plan #2376.2): the switch for a
+     * phone message when Dash finishes it, turned on. */
+    id: 'goals-step-dash',
+    label: 'Goal · a Dash step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepSurface />,
+  },
+  {
+    /* That switch after a save that failed: off again, the reason beneath. */
+    id: 'goals-step-dash-notify-error',
+    label: 'Goal · the notify switch, save failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepNotifyErrorSurface />,
   },
   {
     /* Closing a step on its own page (plan #1623): the goal's close ring
@@ -6983,21 +7014,59 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The top of a prepared subject's page with no claims behind it (plan
-     * #2307.1): lens progress as tested and inferred, and both presses. */
+     * #2307.1): lens progress as tested and inferred, and both presses, with
+     * Archive beside Delete subject (plan #2355.2). */
     id: 'learn-subject-header',
     label: 'Subject · Header of a prepared subject',
     module: 'learn',
     width: 'page',
-    render: () => (
-      <PageHeader
-        title="Urban economics and the economics of housing supply"
-        description={subjectDescription(
-          { tested: 12, inferred: 9, declared: 0, total: 46 },
-          { unknown: 0, shaky: 0, recognised: 0, known: 0, sharp: 0, misconception: 0, total: 0 },
-        )}
-        actions={<SubjectPresses id="s1" lensId="l1" owner />}
-      />
-    ),
+    render: () => <LearnSubjectHeaderPreview />,
+  },
+  {
+    /* An archived subject's page opens on a banner with Restore, and its
+     * header loses the Archive press (plan #2355.2). */
+    id: 'learn-subject-archived',
+    label: 'Subject · Archived, with Restore',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSubjectArchivedPreview />,
+  },
+  {
+    /* The Subjects list's header, with the Archived link (plan #2355.2). */
+    id: 'learn-subjects-header',
+    label: 'Subjects · Header, with Topics and Archived',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSubjectsHeaderPreview />,
+  },
+  {
+    /* Archived subjects, newest first, each with Restore (plan #2355.2). */
+    id: 'learn-archived',
+    label: 'Archived subjects · The list',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedPreview />,
+  },
+  {
+    id: 'learn-archived-empty',
+    label: 'Archived subjects · Nothing archived',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedEmptyPreview />,
+  },
+  {
+    id: 'learn-archived-loading',
+    label: 'Archived subjects · Loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedLoadingPreview />,
+  },
+  {
+    id: 'learn-archived-error',
+    label: 'Archived subjects · A restore that failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedErrorPreview />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything
@@ -7072,6 +7141,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+  {
+    /* The account icon's menu (note 6d32355f): the way to the settings, then
+     * the theme, changed without leaving the page. Drawn open, hung from its
+     * icon at the right of the strip. */
+    id: 'shell-account-menu',
+    label: 'Top bar · Account menu',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      // The top bar's rule for its icon buttons, so the picture shows the
+      // theme controls as they are drawn inside the bar.
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
+        <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
+      </div>
+    ),
   },
   {
     /* Capture aimed at a kind (plan #1950.1), what an Add button on a list
@@ -8161,6 +8246,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsFormSurface />,
   },
   {
+    /* Adding one where no list has a date: on Steps closed, no date asked (plan #2397.3). */
+    id: 'goals-metrics-props-form-steps',
+    label: 'Goal · Metrics, adding one on steps',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormStepsSurface />,
+  },
+  {
     /* A metric's row pointed at, its Change and Remove menu showing. */
     id: 'goals-metrics-props-menu',
     label: 'Goal · Metrics, a row’s menu',
@@ -8169,9 +8262,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsMenuSurface />,
   },
   {
-    /* No list on the goal has a date to count by. */
+    /* No metric yet on a goal with no list: what can be counted. */
     id: 'goals-metrics-props-empty',
-    label: 'Goal · Metrics, nothing to count',
+    label: 'Goal · Metrics, none yet',
     module: 'goals',
     width: 'narrow',
     render: () => <GoalMetricPropsEmptySurface />,
@@ -8185,7 +8278,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsPendingSurface />,
   },
   {
-    /* A change refused, its message beside the field. */
+    /* A change to a steps metric refused, its message beside the aim. */
     id: 'goals-metrics-props-error',
     label: 'Goal · Metrics, a change refused',
     module: 'goals',

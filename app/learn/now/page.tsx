@@ -12,7 +12,7 @@ import { loadDueReviews } from '@/lib/learn/lessons/review-store';
 import { readWaiting, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
 import { firstParam, wantsPractice } from '@/lib/learn/flow/href';
 import { loadSubject } from '@/lib/learn/graph/load';
-import { loadPreparingSubjects, preparedSubjectIds, type PreparingSubject } from '@/lib/learn/prepare/store';
+import { loadPreparingSubjects, preparedActiveSubjectIds, type PreparingSubject } from '@/lib/learn/prepare/store';
 import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
 import { loadWorkspaceInbox } from '@/lib/inbox/workspace-inbox';
 import { PracticeFlow } from '../flow/practice';
@@ -204,7 +204,7 @@ export default async function NowPage({
     createCoreClient()
       .then((core) => loadTodaysPiece(supabase, user.id, pinnedPiece.success ? pinnedPiece.data : null, core))
       .catch(orElse<TodaysPiece | null>('today’s piece', null)),
-    preparedSubjectIds(supabase, user.id).catch(orElse('prepared subjects', new Set<string>())),
+    preparedActiveSubjectIds(supabase, user.id).catch(orElse('prepared subjects', new Set<string>())),
     loadPreparingSubjects(supabase, user.id).catch(orElse<PreparingSubject[]>('preparing subjects', [])),
   ]);
   const queued = readings ?? [];

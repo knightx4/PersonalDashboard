@@ -1,13 +1,21 @@
 import 'server-only';
 
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { loadListingsById } from '@/lib/files/store';
 import { loadRecords, type WriteResult } from '@/lib/goals/collections-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  closedStepDays,
   countByPeriod,
+  countDaysByPeriod,
+  dashFileDays,
   metricInputError,
+  type CountedFile,
+  type CountedStep,
   type Metric,
   type MetricInput,
   type MetricPeriod,
+  type MetricSource,
   type PeriodCount,
 } from '@/lib/goals/metrics';
 
@@ -26,19 +34,21 @@ type MetricRow = {
   id: string;
   goal_id: string;
   name: string;
-  collection_id: string;
-  date_field: string;
+  source: MetricSource;
+  collection_id: string | null;
+  date_field: string | null;
   period: MetricPeriod;
   target: number | null;
   position: number;
 };
 
-const METRIC_COLUMNS = 'id, goal_id, name, collection_id, date_field, period, target, position';
+const METRIC_COLUMNS = 'id, goal_id, name, source, collection_id, date_field, period, target, position';
 
 const toMetric = (row: MetricRow): Metric => ({
   id: row.id,
   goalId: row.goal_id,
   name: row.name,
+  source: row.source,
   collectionId: row.collection_id,
   dateField: row.date_field,
   period: row.period,
@@ -46,10 +56,12 @@ const toMetric = (row: MetricRow): Metric => ({
   position: row.position,
 });
 
+/** Only a list metric keeps a list and a date; the table's check holds it so. */
 const toRow = (input: MetricInput) => ({
   name: input.name.trim(),
-  collection_id: input.collectionId,
-  date_field: input.dateField,
+  source: input.source,
+  collection_id: input.source === 'list' ? input.collectionId : null,
+  date_field: input.source === 'list' ? input.dateField : null,
   period: input.period,
   target: input.target,
 });
@@ -144,31 +156,124 @@ export async function archiveMetric(client: GoalsSupabaseClient, metricId: strin
 
 export type MetricCounts = Metric & { counts: PeriodCount[] };
 
+type StepRow = {
+  id: string;
+  parent_id: string | null;
+  level: string;
+  status: string;
+  closed_at: string | null;
+};
+
+/** A live step under the goal, at any depth, with what a steps metric reads. */
+type GoalStep = CountedStep & { id: string };
+
 /**
- * Each live metric on a goal with its counts, worked out from the live
- * records of its list. `goal.createdAt` is where the periods start unless a
- * record is earlier; the zone is the account's (loadAccountSettings).
+ * Every live step under a goal, at any depth (plan #2397.2). All live items
+ * are read at once, as loadGoalMap does, and walked down from the goal, so a
+ * step under an archived step is out of view with it. A step linked in from
+ * another goal (goals.item_goals) is that goal's and is not counted here.
+ */
+async function loadGoalSteps(client: GoalsSupabaseClient, goalId: string): Promise<GoalStep[]> {
+  const { data, error } = await client
+    .from('items')
+    .select('id, parent_id, level, status, closed_at')
+    .is('archived_at', null);
+  if (error) throw new Error(`Could not read the goal's steps: ${error.message}`);
+  const children = new Map<string, StepRow[]>();
+  for (const row of (data ?? []) as StepRow[]) {
+    if (row.level !== 'step' || !row.parent_id) continue;
+    const list = children.get(row.parent_id) ?? [];
+    list.push(row);
+    children.set(row.parent_id, list);
+  }
+  const steps: GoalStep[] = [];
+  const seen = new Set<string>([goalId]);
+  let frontier = [goalId];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const row of children.get(id) ?? []) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        steps.push({ id: row.id, status: row.status, closedAt: row.closed_at });
+        next.push(row.id);
+      }
+    }
+    frontier = next;
+  }
+  return steps;
+}
+
+type FileLinkRow = { target_id: string };
+
+/**
+ * The live files linked to the goal or to any of the given steps under it
+ * (goals.links, kind 'file'), each once. The file is in core and PostgREST
+ * cannot join across schemas, so it is read with the core client.
+ */
+async function loadGoalFiles(
+  client: GoalsSupabaseClient,
+  core: CoreSupabaseClient,
+  itemIds: string[],
+): Promise<CountedFile[]> {
+  const { data, error } = await client
+    .from('links')
+    .select('target_id')
+    .eq('kind', 'file')
+    .in('item_id', [...new Set(itemIds)])
+    .is('archived_at', null);
+  if (error) throw new Error(`Could not read the goal's files: ${error.message}`);
+  const files = await loadListingsById(
+    core,
+    ((data ?? []) as FileLinkRow[]).map((row) => row.target_id),
+  );
+  return [...files.values()].map((file) => ({ id: file.id, madeBy: file.madeBy, createdAt: file.createdAt }));
+}
+
+/**
+ * Each live metric on a goal with its counts: a list metric from the live
+ * records of its list, a steps metric from the steps closed as done under the
+ * goal, and a files metric from the files Dash wrote under it (plan #2397.2).
+ * `goal.createdAt` is where the periods start unless something counted is
+ * earlier; the zone is the account's (loadAccountSettings). The steps and
+ * files are read only when a metric counts them.
  */
 export async function loadMetricCounts(
   client: GoalsSupabaseClient,
   goal: { id: string; createdAt: string | null },
   timeZone: string,
-  now: Date = new Date(),
+  { core, now = new Date() }: { core: CoreSupabaseClient; now?: Date },
 ): Promise<MetricCounts[]> {
   const metrics = await loadMetrics(client, goal.id);
   const lists = new Map<string, Awaited<ReturnType<typeof loadRecords>>>();
-  for (const id of new Set(metrics.map((m) => m.collectionId))) {
-    lists.set(id, await loadRecords(client, id));
+  for (const metric of metrics) {
+    if (metric.source !== 'list' || !metric.collectionId || lists.has(metric.collectionId)) continue;
+    lists.set(metric.collectionId, await loadRecords(client, metric.collectionId));
   }
-  return metrics.map((metric) => ({
-    ...metric,
-    counts: countByPeriod({
-      records: lists.get(metric.collectionId) ?? [],
-      dateField: metric.dateField,
-      period: metric.period,
-      goalStartedAt: goal.createdAt,
-      now,
-      timeZone,
-    }),
-  }));
+  // A files metric reads the steps too, for the files linked to them.
+  const wantsTree = metrics.some((m) => m.source === 'steps' || m.source === 'files');
+  const steps = wantsTree ?await loadGoalSteps(client, goal.id) : [];
+  const files = metrics.some((m) => m.source === 'files')
+    ? await loadGoalFiles(client, core, [goal.id, ...steps.map((step) => step.id)])
+    : [];
+
+  const daysOf = (metric: Metric): string[] | null => {
+    if (metric.source === 'steps') return closedStepDays(steps, timeZone);
+    if (metric.source === 'files') return dashFileDays(files, timeZone);
+    return null;
+  };
+  return metrics.map((metric) => {
+    const days = daysOf(metric);
+    const common = { period: metric.period, goalStartedAt: goal.createdAt, now, timeZone };
+    if (days) return { ...metric, counts: countDaysByPeriod({ days, ...common }) };
+    if (!metric.collectionId || !metric.dateField) return { ...metric, counts: [] };
+    return {
+      ...metric,
+      counts: countByPeriod({
+        records: lists.get(metric.collectionId) ?? [],
+        dateField: metric.dateField,
+        ...common,
+      }),
+    };
+  });
 }

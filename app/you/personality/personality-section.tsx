@@ -2,7 +2,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { buttonVariants, PRESS_AREA } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
-import { cardVariants } from '@/components/ui/card';
+import { CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import {
@@ -21,7 +21,6 @@ import {
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
 import { Note } from '@/components/ui/note';
-import { SectionHeading } from '@/components/ui/section-heading';
 
 /**
  * Your personality results on You's Personality tab (plan #1634, moved from
@@ -114,7 +113,11 @@ export function testSlots(typed: readonly TypedResult[]): Slot[] {
   return slots;
 }
 
-/** One test's section: its name, where to take or add it, and what is kept from it. */
+/**
+ * One test's section: its name, where to take or add it, and what is kept
+ * from it. Each folds by its heading, kept in this browser per test (note
+ * aff71d76), so a long page of tests can be shut down to the ones in use.
+ */
 function TestSection({
   title,
   meta,
@@ -127,10 +130,15 @@ function TestSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(cardVariants({ padding: 'standard' }), 'space-y-3')}>
-      <SectionHeading title={title} count={meta} action={action} />
-      {children}
-    </section>
+    <CardSection
+      title={title}
+      meta={meta}
+      action={action}
+      padding="standard"
+      fold={`you.personality.${title}`}
+    >
+      <div className="space-y-3">{children}</div>
+    </CardSection>
   );
 }
 

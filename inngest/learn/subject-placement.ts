@@ -92,6 +92,8 @@ export async function pendingSubjects(learn: LearnSupabaseClient): Promise<Subje
       .is('placed_at', null)
       .eq('placement_moved_by_hand', false)
       .eq('survey', false)
+      // An archived subject gets no background work (plan #2355.4).
+      .is('archived_at', null)
       .lt('placement_attempts', MAX_PLACEMENT_ATTEMPTS)
       .order('id')
       .range(from, from + PAGE - 1);

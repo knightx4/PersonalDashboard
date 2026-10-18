@@ -5,7 +5,7 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
-import { notesRoutine } from '@/lib/feedback/routine';
+import { notesRoutine, runUrlFrom } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
   NOTES_WORK_KINDS,
@@ -525,6 +525,8 @@ export type RoutineRun = {
   since: string;
   /** Long enough that a run is likelier to have died than to still be going. */
   stale: boolean;
+  /** Where the newest notes run can be watched, or null when none was recorded. */
+  url: string | null;
 };
 
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
@@ -545,11 +547,25 @@ export async function routineRun(): Promise<RoutineRun | null> {
   const row = data?.[0];
   if (!row) return null;
 
+  // The session behind it, from the newest notes run fired from the button
+  // inside the same window. A run started by the schedule has no row here,
+  // and gets no link.
+  const { data: runs } = await supabase
+    .from('plan_runs')
+    .select('response')
+    .eq('user_id', user.id)
+    .eq('job', 'notes')
+    .eq('status', 'started')
+    .gte('created_at', new Date(Date.now() - STALE_AFTER_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1);
+
   const since = row.updated_at as string;
   return {
     note: row.body as string,
     since,
     stale: Date.now() - new Date(since).getTime() > STALE_AFTER_MS,
+    url: runUrlFrom(runs?.[0]?.response),
   };
 }
 

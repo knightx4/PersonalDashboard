@@ -414,12 +414,13 @@ export default async function GoalMapPage({
     client,
     { id: map.goal.id, createdAt: map.goal.createdAt ?? null },
     account.timezone,
+    { core },
   )
     .then(async (counted): Promise<MetricView[]> => {
       const known = new Set(sources.map((list) => list.id));
       const others = await Promise.all(
         [...new Set(counted.map((m) => m.collectionId))]
-          .filter((id) => !known.has(id))
+          .filter((id): id is string => id !== null && !known.has(id))
           .map((id) => loadCollection(client, id)),
       );
       const lists: MetricList[] = [...sources, ...others.filter((list) => list !== null)];
@@ -554,8 +555,10 @@ export default async function GoalMapPage({
   const metrics = await metricsRead;
   const metricRows = await metricRowsRead;
   const lists = metricLists(sources);
+  // Every goal has steps and files to count (plan #2397.3), so the metrics
+  // show whether or not it holds a list.
   const metricsPart =
-    metricRows && (metricRows.length > 0 || lists.length > 0)
+    metricRows
       ? {
           node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
           count: Math.max(1, metricRows.length),

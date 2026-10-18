@@ -2908,4 +2908,31 @@ describe('metrics on a goal (plan #2084.1)', () => {
       await expect(bad).rejects.toThrow(/metrics_/);
     }
   });
+
+  it('counts a list, closed steps or Dash files, with a list only for a list (plan #2397.1)', async () => {
+    const [kept] = await asUser(userA, (tx) => tx<{ source: string }[]>`
+      insert into metrics (user_id, goal_id, name, collection_id, date_field)
+      values (${userA}, ${goalA}, 'Still a list', ${list}, 'applied') returning source`);
+    expect(kept.source).toBe('list');
+
+    for (const source of ['steps', 'files']) {
+      const [metric] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+        insert into metrics (user_id, goal_id, name, source, period)
+        values (${userA}, ${goalA}, ${source}, ${source}, 'month') returning id`);
+      const [back] = await asUser(userA, (tx) => tx`
+        select source, collection_id, date_field from metrics where id = ${metric.id}`);
+      expect(back).toEqual({ source, collection_id: null, date_field: null });
+    }
+
+    for (const bad of [
+      admin`insert into metrics (user_id, goal_id, name, source, collection_id, date_field)
+            values (${userA}, ${goalA}, 'Steps with a list', 'steps', ${list}, 'applied')`,
+      admin`insert into metrics (user_id, goal_id, name, source)
+            values (${userA}, ${goalA}, 'A list with none', 'list')`,
+      admin`insert into metrics (user_id, goal_id, name, source)
+            values (${userA}, ${goalA}, 'Notes', 'notes')`,
+    ]) {
+      await expect(bad).rejects.toThrow(/metrics_source/);
+    }
+  });
 });

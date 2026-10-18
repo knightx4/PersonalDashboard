@@ -76,6 +76,12 @@ select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'close_st
   $s$Dash closed "Send the form", since the council's reply came on 2 October.$s$);
 ```
 
+When the step you close is a Dash step, its text opens with one plain
+sentence of what Dash did or found, such as "Found three Saturday volunteer
+sessions in Brooklyn, and the earliest is on 4 November." The notification
+shows that sentence with the step's title (`reference/working-steps.md`,
+step 3).
+
 The arguments are the account, the row as `schema.table:id`, the op
 (`insert`, `update` or `delete`), what was done in snake_case (`add_step`,
 `close_step`, `move_step`, `file_record`, `answer_question`, `write_file`),
