@@ -46,8 +46,6 @@ import { markInsight, startFullReread, startInsightRun, type MarkResult } from '
  * what happened and the evidence the nightly check recorded, folded. Marking
  * it again clears the line until the tripwire fires again.
  *
- * Look again starts a run (startInsightRun); while one is queued or running a
- * banner takes the button's place and the page looks again every minute.
  * Look again starts a run (startInsightRun), one model call that writes in a
  * few minutes; while one is queued or running a banner takes the button's
  * place and the page looks again every minute. Under the deck, Full re-read

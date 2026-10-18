@@ -30,6 +30,7 @@ const earlier = (over: Partial<Insight> = {}): Insight => ({
   supersededBy: null,
   createdAt: '2026-10-01T00:00:00Z',
   verdict: { verdict: 'not_quite', note: 'Too neat', decidedAt: '2026-10-02T00:00:00Z' },
+  fired: [],
   ...over,
 });
 
