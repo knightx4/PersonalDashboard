@@ -1,5 +1,5 @@
-import { Building2, Table as TableIcon } from 'lucide-react';
-import { Tooltip } from '@/components/ui/tooltip';
+import { Building2, ListChecks, Table2 } from 'lucide-react';
+import { ViewSwitch } from '@/components/shell/view-switch';
 import { AddCompany } from '@/app/jobs/(app)/companies/add-company';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -98,8 +98,10 @@ export function CompaniesPage({
 
   const state = parseCompanies(params);
   const filtered = filterCompanies(companies, state);
+  // Every link keeps the mode the person is in, so a filter set from the
+  // focused view stays focused.
   const href = (changes: Partial<Record<keyof CompaniesParams, string | undefined>>) =>
-    companiesHref(params, changes);
+    companiesHref(params, { view: state.view, ...changes });
 
   // Two rows for one employer split its roles and mail between them, so the
   // pairs are named here with the merge one click away on either page.
@@ -146,20 +148,15 @@ export function CompaniesPage({
         title="Companies"
         actions={
           <>
-            {/* An icon, so the header keeps to one line on a phone. The view
-                switch takes its place (plan #2341.5). */}
-            {focus && (
-              <Tooltip label="Back to the table" align="end">
-                <Link
-                  href={tableHref(params)}
-                  aria-label="Back to the table"
-                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                >
-                  <TableIcon className="size-4" strokeWidth={1.75} aria-hidden />
-                </Link>
-              </Tooltip>
-            )}
-            <DisplayMenu menu={menu} />
+            <ViewSwitch
+              label="Companies view"
+              current={state.view}
+              views={[
+                { value: 'focus', label: 'Focused', Icon: ListChecks, href: focusHref(params, state.company) },
+                { value: 'table', label: 'Table', Icon: Table2, href: tableHref(params) },
+              ]}
+            />
+            <DisplayMenu menu={menu} className="max-sm:hidden" />
             <AddCompany />
           </>
         }
@@ -303,8 +300,14 @@ export function CompaniesPage({
           {/* Directly above the table it narrows, like every other list in the
               app. Every filter, the sort and the page are on the URL and the
               field carries them, so searching a narrowed table stays narrowed. */}
-          <div className="mb-4">
-            <SearchField placeholder="Search name, location or domain" />
+          <div className="mb-4 flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <SearchField placeholder="Search companies" />
+            </div>
+            {/* On a phone the header has no room for it beside the switch and
+                the add button, so it sits beside the search, worded, since its
+                icon is the one the Filters button above it carries. */}
+            <DisplayMenu menu={menu} className="sm:hidden" />
           </div>
 
           {searchedOut ? (

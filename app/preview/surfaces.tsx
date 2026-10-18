@@ -4297,7 +4297,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Companies · Table',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompaniesPage companies={companyRows} params={{}} />,
+    render: () => <CompaniesPage companies={companyRows} params={{ view: 'table' }} />,
   },
   {
     /* A text column's menu open: its sort, then the field that narrows by a
@@ -4307,7 +4307,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <CompaniesPage companies={companyRows} params={{ priority: 'interested' }} openColumn="name" />
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'interested' }} openColumn="name" />
     ),
   },
   {
@@ -4318,7 +4318,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <CompaniesPage companies={companyRows} params={{ priority: 'passed', activity: 'active' }} />
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'passed', activity: 'active' }} />
     ),
   },
   {
