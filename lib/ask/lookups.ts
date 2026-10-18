@@ -645,6 +645,8 @@ type TaskRow = {
   completed_at: string | null;
 };
 
+const TASK_COLUMNS = 'id, title, status, due_on, completed_at';
+
 const taskHref = (id: string) => `/todo/all?status=all&focus=${id}`;
 
 export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
@@ -653,10 +655,10 @@ export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToo
   if (from > to) throw new AskInputError('from is after to.');
 
   const client = await ctx.db('todo');
-  const [done, overdue] = await Promise.all([
+  const [done, overdue, tagged] = await Promise.all([
     client
       .from('tasks')
-      .select('id, title, status, due_on, completed_at')
+      .select(TASK_COLUMNS)
       .eq('user_id', ctx.userId)
       .eq('status', 'done')
       .gte('completed_at', from)
@@ -664,14 +666,26 @@ export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToo
       .order('completed_at', { ascending: false }),
     client
       .from('tasks')
-      .select('id, title, status, due_on, completed_at')
+      .select(TASK_COLUMNS)
       .eq('user_id', ctx.userId)
       .eq('status', 'open')
       .lt('due_on', ctx.today)
       .order('due_on', { ascending: true }),
+    // Every tag they use, so Dash tags a todo with theirs rather than new ones.
+    client.from('task_tags').select('task_id, tag, tasks!inner(user_id)').eq('tasks.user_id', ctx.userId),
   ]);
   if (done.error) throw new Error(`tasks: ${done.error.message}`);
   if (overdue.error) throw new Error(`tasks: ${overdue.error.message}`);
+  if (tagged.error) throw new Error(`task_tags: ${tagged.error.message}`);
+  const tagRows = (tagged.data ?? []) as { task_id: string; tag: string }[];
+  const tagsInUse = [...new Set(tagRows.map((row) => row.tag))].sort((a, b) => a.localeCompare(b));
+  /** A row's tags, by name and comma-separated, or null for none (plan #2340.4). */
+  const taskTags = (task: TaskRow): string | null =>
+    tagRows
+      .filter((row) => row.task_id === task.id)
+      .map((row) => row.tag)
+      .sort((a, b) => a.localeCompare(b))
+      .join(', ') || null;
   const doneRows = (done.data ?? []) as TaskRow[];
   const overdueRows = (overdue.data ?? []) as TaskRow[];
 
@@ -681,21 +695,21 @@ export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToo
       ref: t.id,
       title: t.title,
       href: taskHref(t.id),
-      detail: { list: 'done', done_on: t.completed_at?.slice(0, 10) ?? null, was_due: t.due_on },
+      detail: { list: 'done', done_on: t.completed_at?.slice(0, 10) ?? null, was_due: t.due_on, tags: taskTags(t) },
     })),
     ...overdueRows.slice(0, MAX_ROWS).map((t) => ({
       table: 'todo.tasks',
       ref: t.id,
       title: t.title,
       href: taskHref(t.id),
-      detail: { list: 'overdue', due_on: t.due_on },
+      detail: { list: 'overdue', due_on: t.due_on, tags: taskTags(t) },
     })),
   ];
 
   return {
     ok: true,
     rows,
-    totals: { from, to, done: doneRows.length, overdue_today: overdueRows.length },
+    totals: { from, to, done: doneRows.length, overdue_today: overdueRows.length, tags_in_use: tagsInUse },
     note:
       `Done means finished between ${from} and ${to}; overdue means still open and due before ${ctx.today}. ` +
       `Done: ${matchedNote(doneRows.length, Math.min(doneRows.length, MAX_ROWS))}. Overdue: ${matchedNote(overdueRows.length, Math.min(overdueRows.length, MAX_ROWS))}.`,

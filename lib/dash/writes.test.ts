@@ -41,7 +41,7 @@ function context(enabled: AskContext['enabledModules'] = ['todo', 'goals', 'jobs
     goals: async () => client('goals') as unknown as GoalsSupabaseClient,
     createTask: async (userId, input) => {
       const id = '00000000-0000-4000-8000-000000000b09';
-      tables['todo.tasks'].push({ id, user_id: userId, title: input.title, status: 'open', due_on: input.dueOn, parent_id: null });
+      tables['todo.tasks'].push({ id, user_id: userId, title: input.title, status: 'open', due_on: input.dueOn, parent_id: null, tags: input.tags });
       return { id, error: null };
     },
   };
@@ -465,6 +465,20 @@ describe('add_todo', () => {
       row: { table: 'todo.tasks', title: 'Call the bank' },
     });
     expect(tables['todo.tasks'].some((t) => t.title === 'Call the bank')).toBe(true);
+  });
+
+  it('arrives tagged now when due today and eventually with no date (plan #2340.4)', async () => {
+    // "Remind me to call the bank today": the context's today is 2026-10-03.
+    const today = ok(await apply('add_todo', { title: 'Call the bank', due_on: '2026-10-03' }));
+    expect(today.input).toMatchObject({ tags: ['now'] });
+    expect(today.summary).toBe('Dash added the todo "Call the bank", due 2026-10-03, tagged now.');
+    const someday = ok(await apply('add_todo', { title: 'Learn the banjo', tags: ['music'] }));
+    expect(someday.input).toMatchObject({ tags: ['eventually', 'music'] });
+    expect(someday.summary).toBe('Dash added the todo "Learn the banjo", tagged eventually and music.');
+    expect(tables['todo.tasks'].map((t) => [t.title, t.tags]).slice(-2)).toEqual([
+      ['Call the bank', ['now']],
+      ['Learn the banjo', ['eventually', 'music']],
+    ]);
   });
 });
 
