@@ -12,6 +12,7 @@ import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
 import { indexNoteBlocks, type BlockIndexResult } from '@/lib/vault/notes/block-index';
 import { embedVaultNotes, type NoteEmbedResult } from '@/lib/vault/notes/embed';
 import { noteVoicePorts, tagNoteVoices, type VoiceSummary } from '@/lib/vault/notes/voice';
+import { extractNoteLines, noteExtractPorts, type ExtractSummary } from '@/lib/you/note-extracts';
 import { linkPositions, type LinkPassResult } from '@/lib/vault/map/link-positions';
 import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
 import { proposePositionMerges, type PositionMergeResult } from '@/lib/vault/map/merge-positions';
@@ -87,6 +88,14 @@ export const THEME_APPLY_UNTIL_MS = 180_000;
 export const NOTE_VOICE_UNTIL_MS = 60_000;
 
 /**
+ * When pulling lines out of private notes stops starting new calls (plan
+ * #2413.8). Straight after the voice tagging, which it waits on: in the usual
+ * tick a few notes or none have changed. The first pass over about 520
+ * private notes takes fifteen to twenty ticks.
+ */
+export const NOTE_EXTRACT_UNTIL_MS = 90_000;
+
+/**
  * When the position merge pass stops starting new calls. One call over twenty
  * pairs takes ten to twenty seconds, so this leaves room for the call in
  * flight and for applying what the pass proposed.
@@ -133,6 +142,8 @@ export type MapSweepTickSummary = {
   noteBlocks: Pick<BlockIndexResult, 'notes' | 'embedded' | 'stopped'> | null;
   /** Notes given a voice by rule or by Haiku (plan #2413.3). Null when it threw. */
   noteVoices: VoiceSummary | null;
+  /** Private notes read for their lines (plan #2413.8). Null when it threw. */
+  noteExtracts: ExtractSummary | null;
   /**
    * Theme merge proposals written after embedding (plan #811). Null when the
    * pass did not run: no ANTHROPIC_API_KEY, embedding still catching up, or
@@ -174,6 +185,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     notesEmbedded: null,
     noteBlocks: null,
     noteVoices: null,
+    noteExtracts: null,
     themeMerges: null,
     positionMerges: null,
     applied: { theme: null, position: null },
@@ -223,6 +235,22 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     });
   } catch (err) {
     console.error('[map sweep] note voices', err instanceof Error ? err.message : err);
+  }
+
+  // Their own words from every private note that changed (plan #2413.8):
+  // one Haiku call per note version, only for notes tagged private above.
+  try {
+    summary.noteExtracts = await extractNoteLines({
+      ports: noteExtractPorts({
+        supabase,
+        core: createCoreServiceSupabase(),
+        userId: null,
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+      }),
+      deadline: startedAt + NOTE_EXTRACT_UNTIL_MS,
+    });
+  } catch (err) {
+    console.error('[map sweep] note extracts', err instanceof Error ? err.message : err);
   }
 
   // Every account's rows with no vector, whether a sweep ran or not. Without

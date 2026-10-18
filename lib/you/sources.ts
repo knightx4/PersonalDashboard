@@ -159,5 +159,12 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+    // Lines from their private notes for the insights run (plan #2413.8).
+    {
+      table: 'you.note_extracts',
+      reason:
+        'Quotes copied out of their private notes in obsidian.notes, which Goals already reads whole; reading both would count the same words twice.',
+    },
+    { table: 'you.note_extract_reads', reason: 'Bookkeeping: which version of each note was read for its lines.' },
   ],
 };

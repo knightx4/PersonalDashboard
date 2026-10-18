@@ -232,6 +232,8 @@ export const MODELS = {
   vaultConnections: HAIKU,
   /** lib/vault/notes/voice.ts: whose words each note is (plan #2413.3) */
   vaultNoteVoice: HAIKU,
+  /** lib/you/note-extracts.ts: their own words from private notes (plan #2413.8) */
+  youNoteExtracts: HAIKU,
   /** lib/you/transcript-model.ts */
   vaultTranscript: HAIKU,
   /** lib/you/work-history-model.ts */
