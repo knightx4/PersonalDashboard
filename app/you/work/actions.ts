@@ -21,6 +21,7 @@ import {
 import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/you/transcript-model';
 import { readTranscript, type DraftCourse } from '@/lib/you/transcript-read';
 import {
+  deleteCourse,
   deleteTranscript,
   TRANSCRIPTS_BUCKET,
   type TranscriptStore,
@@ -220,20 +221,23 @@ export async function updateCourseAction(_prev: CourseEditState, form: FormData)
 
 export type RemoveResult = { ok: boolean; error?: string };
 
-/** Remove one course from a transcript. */
+/** Remove one course from a transcript, with the files kept under it. */
 // latency: pending
 export async function removeCourseAction(form: FormData): Promise<RemoveResult> {
   const user = await requireUser();
   const courseId = id.safeParse(form.get('id'));
   if (!courseId.success) return { ok: false, error: 'That course could not be found.' };
   const you = await createYouClient();
-  const { error } = await you.from('courses').delete().eq('id', courseId.data).eq('user_id', user.id);
-  if (error) return { ok: false, error: 'The course was not removed. Try again.' };
+  try {
+    await deleteCourse(you as unknown as TranscriptStore, user.id, courseId.data);
+  } catch {
+    return { ok: false, error: 'The course was not removed. Try again.' };
+  }
   revalidatePath(EDUCATION_HREF);
   return { ok: true };
 }
 
-/** Delete a transcript, its courses and its original file. */
+/** Delete a transcript, its courses, its original file and the files kept under its courses. */
 // latency: pending
 export async function removeTranscriptAction(form: FormData): Promise<RemoveResult> {
   const user = await requireUser();
