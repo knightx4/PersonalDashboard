@@ -470,6 +470,23 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import {
+  GoalListsCalendarDaySurface,
+  GoalListsCalendarEmptySurface,
+  GoalListsCalendarSurface,
+  GoalListsEmptySurface,
+  GoalListsErrorSurface,
+  GoalListsGallerySurface,
+  GoalListsLinkedSurface,
+  GoalListsLoadingSurface,
+  GoalListsMapEmptySurface,
+  GoalListsMapFailedSurface,
+  GoalListsMapPinSurface,
+  GoalListsMapSurface,
+  GoalListsPanelSurface,
+  GoalListsSurface,
+  GoalListsTabSurface,
+} from './goal-lists-surfaces';
 import { InboxPageSurface } from './inbox-page-surface';
 import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
@@ -5048,6 +5065,126 @@ export const SURFACES: readonly Surface[] = [
         seam={{ openRow: 'loan-student', editing: { recordId: 'loan-car', key: 'balance' } }}
       />
     ),
+  },
+  {
+    /* A goal’s lists as chips under the done-when (plan #2330.3): its own pantries to compare, one picked, and a linked list of readings from Learn. */
+    id: 'goals-lists',
+    label: 'Goal · its lists as chips',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsSurface />,
+  },
+  {
+    /* The pantry chip pressed: the list in a panel over the page, with a row a pasted link filled in waiting to be confirmed. */
+    id: 'goals-lists-panel',
+    label: 'Goal · a list open in its panel',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsPanelSurface />,
+  },
+  {
+    /* The readings chip pressed: each reading as Learn has it, two with comments, one gone, and the fold of the one put down, open. */
+    id: 'goals-lists-panel-linked',
+    label: 'Goal · a linked list open, ruled out showing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLinkedSurface />,
+  },
+  {
+    /* The add box after a pasted link was refused. */
+    id: 'goals-lists-panel-error',
+    label: 'Goal · a list, a link that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsErrorSurface />,
+  },
+  {
+    /* A list just started: the empty line and the add box. */
+    id: 'goals-lists-panel-empty',
+    label: 'Goal · a new list with nothing in it',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsEmptySurface />,
+  },
+  {
+    /* A pasted link being read, waiting at the foot of the rows. */
+    id: 'goals-lists-panel-loading',
+    label: 'Goal · a list reading a pasted link',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsLoadingSurface />,
+  },
+  {
+    /* The pantries open on Gallery (plan #2330.4): every picture in a grid with its name and price. */
+    id: 'goals-lists-panel-gallery',
+    label: 'Goal · a list as a gallery',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsGallerySurface />,
+  },
+  {
+    /* A list of events from the calendar (plan #2330.4): the month with two on one day, and what is coming under it. */
+    id: 'goals-lists-panel-calendar',
+    label: 'Goal · a list on a calendar',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarSurface />,
+  },
+  {
+    /* A day on the list’s calendar pressed: its popover names each row with its link. */
+    id: 'goals-lists-panel-calendar-day',
+    label: 'Goal · a list’s calendar, a day open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarDaySurface />,
+  },
+  {
+    /* The list’s calendar stepped to a month with nothing in it. */
+    id: 'goals-lists-panel-calendar-empty',
+    label: 'Goal · a list’s calendar, an empty month',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsCalendarEmptySurface />,
+  },
+  {
+    /* Shops on the map (plan #2330.4): numbered pins on OpenStreetMap, and one with an address alone listed under it. */
+    id: 'goals-lists-panel-map',
+    label: 'Goal · a list on a map',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapSurface />,
+  },
+  {
+    /* A pin on the list’s map pressed: its name, link and address over the map. */
+    id: 'goals-lists-panel-map-pin',
+    label: 'Goal · a list’s map, a pin open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapPinSurface />,
+  },
+  {
+    /* A list with a place field and no address yet: the map says how to add one. */
+    id: 'goals-lists-panel-map-empty',
+    label: 'Goal · a list’s map with no places',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapEmptySurface />,
+  },
+  {
+    /* The map’s tiles would not load, so the table stands in for it. */
+    id: 'goals-lists-panel-map-failed',
+    label: 'Goal · a list’s map that could not load',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsMapFailedSurface />,
+  },
+  {
+    /* Three lists, so each has a tab after Steps; the pantries’ tab open. */
+    id: 'goals-lists-tab',
+    label: 'Goal · a list on its own tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalListsTabSurface />,
   },
   {
     /* The design language, held to itself. It is the one surface where being

@@ -144,6 +144,9 @@ for a health goal.
    | `yes_no` | `true` or `false` | on autopay or not |
    | `choice` | one of `options`, exactly | federal or private |
    | `link` | an http or https address | the servicer's login page |
+   | `image` | an http or https address of a picture | a product photo |
+   | `place` | `{"address": "…", "lat": 53.8, "lng": -1.55}`, coordinates both or neither | a store, a venue |
+   | `ref` | a row in the app as `schema.table:id` | a reading in Learn |
 
    `key` is lower case letters, digits and `_`, at most 40 characters, and
    never changes. `tracked` goes only on `number`, `money` or `percent`, and
@@ -245,6 +248,107 @@ returning id;
      takes them (`["Edfinancial", "edfinancial.com"]`). The morning run
      searches Gmail for new ones from these ("Reading new statements from
      Gmail"). Leave it `[]` for a document that is not emailed.
+
+### Lists the goal needs
+
+A goal often comes down to a pile of things to compare, visit, read or meet.
+When you map one, decide which lists it needs and set them up, so the person
+opens the goal and finds the places to start (plan #2330.6). There are no
+goal types: nothing on the goal says "purchase" or "explore". You read what
+the goal is about and pick the lists, and the person can add, rename or
+archive any of them afterwards.
+
+**Link before you write.** Four kinds of thing already live in their own
+workspace, so a list of them links to the rows there (`goals.links`) and never
+copies them. Finishing a reading in Learn then shows on the goal too.
+
+| Kind | The rows | The kind's own list | Look in |
+|---|---|---|---|
+| `reading` | readings on a Learn track | Reading | `learn.readings` (`title`, `status`) |
+| `event` | calendar events | Events | `todo.events` (`title`, `location`, `starts_at`) |
+| `saved_item` | products saved in Shopping | Products | `public.saved_items` (`title`, `url`, `status`) |
+| `contact` | people in the job search | People | `job_search.contacts` (`title`, `status`) |
+
+Search the owner's rows for ones that fit the goal (titles, notes, the
+context kept for the goal) and link the real ones:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.links (user_id, item_id, kind, target_id, list_name)
+values ('<user>', '<goal id>', 'saved_item', '<saved_items.id>', null);
+```
+
+Link the product a step is about to the step itself, not only to the goal
+(`item_id` the step's id; in Ask Dash, `change_goal_link` with `step_ref`):
+buying it in Shopping then closes the step (plan #2330.5).
+
+`list_name` null puts the link in the kind's own list; give a name to split
+one kind into two lists ("Shortlist", "Ruled out"). Link only rows that
+plainly belong, as "Writing what you found" says, and never link a row to make
+a list look full. In Ask Dash's tools this is `change_goal_link` with
+`{change: 'link_row', goal_ref, kind, target, list}`. When nothing fits yet,
+add no empty link list: the person links rows from the goal later, and a
+reading, event or product they add afterwards can be linked then.
+
+**Write a list of the goal's own for what has no other home.** A candidates
+list, places to visit, groups to try, documents to collect. It is a
+collection with `goal_id` set; a trigger makes it serve the goal, so do not
+write `collection_goals` yourself. Fields come from the types above, and the
+first field is the one that names the row. Mark the numbers the goal is
+measured by `tracked`.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.collections (user_id, goal_id, name, shape, fields, position)
+values ('<user>', '<goal id>', 'Candidates', 'list', '[
+  {"key": "name", "label": "Name", "type": "text", "id": true},
+  {"key": "picture", "label": "Picture", "type": "image"},
+  {"key": "size", "label": "Size", "type": "text"},
+  {"key": "price", "label": "Price", "type": "money"},
+  {"key": "link", "label": "Link", "type": "link"}
+]'::jsonb, 0)
+returning id;
+```
+
+- `position` counts from 0 in the order the person should meet the lists.
+- Name the list for what it holds on this goal ("Candidates", "Places to
+  visit"). A list's name is unique among the goal's live lists once
+  migration 0081 is live; until the workflow on main has applied it, a name
+  is unique across the account, so a clash means pick a more specific name
+  ("Sofa candidates"), not reuse the other goal's list.
+- A row you write in a list is a **draft**: `goals.actor = 'claude'`,
+  `draft = true` and a `source` that is not `typed`, as "Filing a document you
+  were given" in `records.md` says. The person confirms it. Write rows only
+  for facts you found (a product page, an event listing); an empty list is
+  a good start and a guessed row is not.
+- A pasted product link becomes a draft row for the person through
+  `add_link`; you read the page the same way and fill name, picture, price
+  and link from it.
+- From Ask Dash's chat the same moves are `change_goal_list` (add_list,
+  add_fields, add_row, add_link, and the rest).
+
+**Which lists fit.** These are starting points. Use the ones the goal needs,
+add others the goal calls for, and leave out any it does not.
+
+| The goal is about | Start with |
+|---|---|
+| Buying something (a sofa, a laptop, a bike) | A **Candidates** list: name, picture (`image`), size, price (`money`, tracked), link (`link`), where to see it (`place`), plus `choice` fields for what the person said matters. Link `saved_item` rows the person already saved for it. |
+| Exploring a place or an interest (a neighbourhood, a hobby, a city) | A **Places** list with a `place` field, a `date` for the last visit and a `number` visit count (tracked); a **Groups** list (name, link, when they meet) if there are clubs to try. Link `event` rows on the calendar. |
+| Something social (meeting people, joining a community) | Link `event` rows for the events to attend, and `contact` rows for people met when the job search holds them. A **People met** list of the goal's own (name, where met, `date`, notes) for people who are in no other workspace. |
+| Learning something | Link `reading` rows from the aim's track. A **Courses** or **Resources** list (title, `link`, cost) for what is not in Learn. |
+| Paperwork (a visa, a move, taxes) | A **Documents** list: name, who issues it, `choice` status (To get, Requested, Have), due `date`, `link`, and a `ref` field for the file or email that holds it. |
+| Money or a number (debt, savings) | No list of the goal's own. It needs an information step and its form (above). |
+
+**Counting.** Say a list counts towards the goal only where that already
+works: a goal's number can be counted from a collection serving it
+(`change_goal_number`, "Number of Places"), and a goal-owned list serves its
+goal automatically. Do not set a number from a list unless the goal is
+measured by how many there are; do not promise a count where none is wired.
+
+Say in the run's summary which lists you added, which rows you linked and
+which you looked for and did not find.
 
 ### Weekly help
 
