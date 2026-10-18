@@ -342,8 +342,10 @@ describe('search and switching on a phone', () => {
 
   it('draws the top icons at the dock size below lg (note 55df4819)', () => {
     const top = header(shell('todo'));
-    expect(top).toContain('max-lg:[&amp;_button]:size-10');
-    expect(top).toContain('max-lg:[&amp;_button_svg]:size-5');
+    // Buttons in a menu panel hung from the bar (the account menu's theme
+    // controls) are left out of the rule.
+    expect(top).toContain('max-lg:[&amp;_button:not([data-menu-panel]_button)]:size-10');
+    expect(top).toContain('max-lg:[&amp;_button:not([data-menu-panel]_button)_svg]:size-5');
   });
 });
 

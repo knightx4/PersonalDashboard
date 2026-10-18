@@ -6,6 +6,7 @@ import {
   planRoutine,
   resolveRoutineId,
   runIdFrom,
+  runUrlFrom,
 } from '@/lib/feedback/routine';
 
 describe('fireFeatureRoutine', () => {
@@ -219,5 +220,24 @@ describe('which routine each button fires', () => {
     vi.stubEnv('CLAUDE_API_KEY', '');
     expect(notesRoutine().token).toBe('oat_notes');
     expect(planRoutine().token).toBeNull();
+  });
+});
+
+describe('runUrlFrom', () => {
+  it('reads the session page a fire returned', () => {
+    expect(
+      runUrlFrom({
+        type: 'routine_fire',
+        claude_code_session_id: 'cse_01PUBQ',
+        claude_code_session_url: 'https://claude.ai/code/cse_01PUBQ',
+      }),
+    ).toBe('https://claude.ai/code/cse_01PUBQ');
+  });
+
+  it('is null without one, or for a page that is not on claude.ai', () => {
+    expect(runUrlFrom(null)).toBeNull();
+    expect(runUrlFrom({ claude_code_session_id: 'cse_1' })).toBeNull();
+    expect(runUrlFrom({ claude_code_session_url: 'https://example.com/x' })).toBeNull();
+    expect(runUrlFrom({ claude_code_session_url: 'javascript:alert(1)' })).toBeNull();
   });
 });
