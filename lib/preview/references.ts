@@ -70,6 +70,30 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The same mockup, for its Context pane: Sources and Changes as two tabs with counts, each source numbered to match the marks in the answer, and a change waiting for approval shown as what it adds.',
     from: '2215.9',
   },
+  // The "Step attachments" mockups the person chose option A and D from on
+  // 17 October 2026 for a goal's lists (plan #2330). Drawn at laptop width
+  // only; the boards have no phone layout.
+  'goals-lists': {
+    pictures: ['docs/references/goals-lists/chip-laptop.png', 'docs/references/goals-lists/two-chips-laptop.png'],
+    link: 'https://claude.ai/artifact/KtUUbM5HzUsBKaokYiNqLN',
+    source: 'docs/references/goals-lists/chip.html',
+    why: 'Each list is one chip on the goal, in the row of facts under the done-when: a picture or a mark, the list name, then the count and the one thing that stands out ("2 · HOMCOM 72 inch leading"), so a goal with several lists stays one row tall.',
+    from: '2330.3',
+  },
+  'goals-lists-panel': {
+    pictures: ['docs/references/goals-lists/panel-laptop.png'],
+    link: 'https://claude.ai/artifact/KtUUbM5HzUsBKaokYiNqLN',
+    source: 'docs/references/goals-lists/panel.html',
+    why: 'The chip opens the list in a panel over the right of the page with the goal dimmed behind it: "On <goal>" above the list name, the view switch and a close button on one line, the add box for a pasted link, the rows, and the ruled-out count at the foot. The Compare cards are #2330.4\'s; here the table is the view.',
+    from: '2330.3',
+  },
+  'goals-lists-tab': {
+    pictures: ['docs/references/goals-lists/tab-laptop.png'],
+    link: 'https://claude.ai/artifact/KtUUbM5HzUsBKaokYiNqLN',
+    source: 'docs/references/goals-lists/tab.html',
+    why: 'A list as its own tab beside Steps, carrying its count: the add action on the toolbar line, then a table with a thumbnail column, the name in heavier type, the list\'s own columns with numbers lined up, a status in colour, and "Ruled out" folded at the foot.',
+    from: '2330.3',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */

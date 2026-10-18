@@ -1,12 +1,13 @@
 /**
- * Links from a goal to what Learn and the job search own (docs/GOALS-SPEC.md,
- * "Where things live"; plan #931).
+ * Links from a goal to what other workspaces own (docs/GOALS-SPEC.md,
+ * "Where things live"; plan #931, plan #2330.1).
  *
  * A link is a row of goals.links naming a Learn aim, the job search as a
- * whole, one role or one application. The goal page reads each target's
- * progress from its own module when it loads, so nothing is logged twice and
- * nothing is copied: the counts here are always Learn's and the job search's
- * own, read live.
+ * whole, one role or one application, or a row a goal lists: a reading, a
+ * calendar event, a saved product or a contact. The goal page reads each
+ * target from its own workspace when it loads, so nothing is logged twice and
+ * nothing is copied: finishing a reading in Learn shows on the goal because
+ * the goal reads the reading itself.
  *
  * Pure, so the week and the wording are tested without a database. The reads
  * and writes are in lib/goals/links-store.ts.
@@ -14,12 +15,48 @@
 import { periodOf } from '@/lib/goals/rhythms';
 import { wallClockToInstant } from '@/lib/todo/time';
 
-export type LinkKind = 'aim' | 'job_search' | 'role' | 'application';
+/**
+ * The kinds of row a goal's list can point at (plan #2330.1). Each is a row
+ * another workspace keeps: a reading on a Learn track, a Todo calendar event,
+ * a product saved for later in Shopping, a contact in the job search.
+ */
+export const LISTED_KINDS = ['reading', 'event', 'saved_item', 'contact'] as const;
 
-export const LINK_KINDS: readonly LinkKind[] = ['aim', 'job_search', 'role', 'application'];
+export type ListedKind = (typeof LISTED_KINDS)[number];
+
+export function isListedKind(value: unknown): value is ListedKind {
+  return typeof value === 'string' && (LISTED_KINDS as readonly string[]).includes(value);
+}
+
+export type LinkKind = 'aim' | 'job_search' | 'role' | 'application' | ListedKind;
+
+export const LINK_KINDS: readonly LinkKind[] = ['aim', 'job_search', 'role', 'application', ...LISTED_KINDS];
 
 export function isLinkKind(value: unknown): value is LinkKind {
   return typeof value === 'string' && (LINK_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * The list a link lands in when it is made without a name. Links of one goal
+ * with the same list name are one list, so a goal's readings are one list
+ * called "Reading" until someone names a second.
+ */
+export const DEFAULT_LIST_NAMES: Record<ListedKind, string> = {
+  reading: 'Reading',
+  event: 'Events',
+  saved_item: 'Products',
+  contact: 'People',
+};
+
+/** The most a list name holds, as goals.links_list_name_ck allows. */
+export const LIST_NAME_MAX = 80;
+
+/** A list name as typed, trimmed; null when blank, which means the kind's own list. */
+export function parseListName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (name === '') return null;
+  return name.slice(0, LIST_NAME_MAX).trim();
 }
 
 export type Link = {
@@ -28,16 +65,126 @@ export type Link = {
   kind: LinkKind;
   /** Null for the job search, which is the whole of it. */
   targetId: string | null;
+  /** The list it belongs to; null is the kind's own (DEFAULT_LIST_NAMES). */
+  listName: string | null;
 };
 
-export const LINK_COLUMNS = 'id, item_id, kind, target_id';
+export const LINK_COLUMNS = 'id, item_id, kind, target_id, list_name';
 
-export type LinkRow = { id: string; item_id: string; kind: string; target_id: string | null };
+export type LinkRow = { id: string; item_id: string; kind: string; target_id: string | null; list_name?: string | null };
 
 /** A row as read, or null for a kind this code does not know. */
 export function toLink(row: LinkRow): Link | null {
   if (!isLinkKind(row.kind)) return null;
-  return { id: row.id, itemId: row.item_id, kind: row.kind, targetId: row.target_id };
+  return { id: row.id, itemId: row.item_id, kind: row.kind, targetId: row.target_id, listName: row.list_name ?? null };
+}
+
+/** The name of the list a link shows in. */
+export function listNameOf(link: Pick<Link, 'kind' | 'listName'>): string {
+  if (link.listName) return link.listName;
+  return isListedKind(link.kind) ? DEFAULT_LIST_NAMES[link.kind] : link.kind;
+}
+
+type LinkedBase = {
+  linkId: string;
+  targetId: string;
+  listName: string;
+  /** True when the row has been removed from its workspace since it was linked. */
+  gone: boolean;
+  /** Where the row opens in its own workspace; null once it has gone. */
+  href: string | null;
+};
+
+/** A reading on a Learn track, as Learn has it now. */
+export type LinkedReading = LinkedBase & {
+  kind: 'reading';
+  title: string | null;
+  /** learn.readings.status, as Learn writes it. */
+  status: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+/** A Todo calendar event. Exactly one of the two pairs is set, as todo.events enforces. */
+export type LinkedEvent = LinkedBase & {
+  kind: 'event';
+  title: string | null;
+  location: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+};
+
+/** A product saved for later in Shopping. */
+export type LinkedSavedItem = LinkedBase & {
+  kind: 'saved_item';
+  title: string | null;
+  /** The shop's page for it. */
+  url: string | null;
+  imageUrl: string | null;
+  priceCents: number | null;
+  currency: string | null;
+  /** public.saved_items.status, as Shopping writes it. */
+  status: string | null;
+  /** Matched to an order line in Shopping (saved_items.purchased_order_item_id). */
+  bought: boolean;
+};
+
+/** A contact in the job search. */
+export type LinkedContact = LinkedBase & {
+  kind: 'contact';
+  name: string | null;
+  /** Their job title. */
+  role: string | null;
+  company: string | null;
+  email: string | null;
+  linkedinUrl: string | null;
+};
+
+/** One row a goal lists, read live from the workspace that keeps it. */
+export type LinkedRow = LinkedReading | LinkedEvent | LinkedSavedItem | LinkedContact;
+
+/** A list on a goal: every link of one item that shares a list name. */
+export type LinkedList = {
+  name: string;
+  /** The kinds its rows are, in the order they first appear. */
+  kinds: ListedKind[];
+  rows: LinkedRow[];
+};
+
+/**
+ * Rows into their lists, each list placed where its first row is and each
+ * row in the order it was linked. Names compare without case, so "reading"
+ * and "Reading" are one list, shown as the first was written.
+ */
+export function groupLists(rows: readonly LinkedRow[]): LinkedList[] {
+  const lists = new Map<string, LinkedList>();
+  for (const row of rows) {
+    const key = row.listName.toLowerCase();
+    let list = lists.get(key);
+    if (!list) {
+      list = { name: row.listName, kinds: [], rows: [] };
+      lists.set(key, list);
+    }
+    if (!list.kinds.includes(row.kind)) list.kinds.push(row.kind);
+    list.rows.push(row);
+  }
+  return [...lists.values()];
+}
+
+/** Where a linked row opens in its own workspace. An event opens on its week in the calendar. */
+export function linkedHref(
+  kind: ListedKind,
+  id: string,
+  event?: { startsOn: string | null; startsAt: string | null },
+): string {
+  if (kind === 'reading') return `/learn/r/${id}`;
+  if (kind === 'saved_item') return `/shopping/saved/${id}`;
+  if (kind === 'contact') return `/jobs/contacts/${id}`;
+  const day = event?.startsOn ?? event?.startsAt?.slice(0, 10) ?? null;
+  const params = new URLSearchParams({ view: 'week', ...(day ? { date: day } : {}), event: id });
+  return `/todo/calendar?${params}`;
 }
 
 /** What a linked Learn aim shows, read from learn.aims and its cards. */

@@ -142,6 +142,7 @@ describe('runs', () => {
     expect(text).toContain('the kinds of weekly help to propose');
     expect(text).toContain('reference/sources.md');
     expect(text).toContain('"Information steps"');
+    expect(text).toContain('"Lists the goal needs"');
     expect(text).toContain('the questions the later steps');
     expect(text).not.toContain('errand');
   });

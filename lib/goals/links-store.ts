@@ -1,8 +1,14 @@
 import 'server-only';
 
+import type { SchemaClient } from '@/lib/ask/db';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   LINK_COLUMNS,
+  LISTED_KINDS,
+  groupLists,
+  isListedKind,
+  linkedHref,
+  listNameOf,
   toLink,
   type GoalLinks,
   type JobWeek,
@@ -11,6 +17,9 @@ import {
   type LinkRow,
   type LinkedAim,
   type LinkedJob,
+  type LinkedList,
+  type LinkedRow,
+  type ListedKind,
   type LensProgressView,
   type SubjectPreparation,
 } from '@/lib/goals/links';
@@ -53,20 +62,30 @@ export async function linkTarget(
   itemId: string,
   kind: LinkKind,
   targetId: string | null,
+  /**
+   * The list it goes in (plan #2330.1): a name, null for the kind's own list,
+   * or left out to keep the list a link already had. A live link given
+   * another name moves to that list.
+   */
+  listName?: string | null,
 ): Promise<boolean> {
   const item = await client.from('items').select('id').eq('id', itemId).is('archived_at', null);
   if (item.error) throw new Error(item.error.message);
   if ((item.data ?? []).length === 0) return false;
 
-  let existing = client.from('links').select('id, archived_at').eq('item_id', itemId).eq('kind', kind);
+  let existing = client.from('links').select('id, archived_at, list_name').eq('item_id', itemId).eq('kind', kind);
   existing = targetId === null ? existing.is('target_id', null) : existing.eq('target_id', targetId);
   const found = await existing.maybeSingle();
   if (found.error) throw new Error(found.error.message);
 
-  const row = found.data as { id: string; archived_at: string | null } | null;
+  const row = found.data as { id: string; archived_at: string | null; list_name: string | null } | null;
   if (row) {
-    if (row.archived_at === null) return true;
-    const { error } = await client.from('links').update({ archived_at: null }).eq('id', row.id);
+    const rename = listName !== undefined && (row.list_name ?? null) !== listName;
+    if (row.archived_at === null && !rename) return true;
+    const change: Record<string, unknown> = {};
+    if (row.archived_at !== null) change.archived_at = null;
+    if (rename) change.list_name = listName;
+    const { error } = await client.from('links').update(change).eq('id', row.id);
     if (error?.code === '23514') return false;
     if (error) throw new Error(error.message);
     return true;
@@ -74,7 +93,7 @@ export async function linkTarget(
 
   const { error } = await client
     .from('links')
-    .insert({ user_id: userId, item_id: itemId, kind, target_id: targetId });
+    .insert({ user_id: userId, item_id: itemId, kind, target_id: targetId, ...(listName ? { list_name: listName } : {}) });
   if (error?.code === '23514') return false;
   // A second press racing the first: the row is there, which is what was asked.
   if (error?.code === '23505') return true;
@@ -320,6 +339,138 @@ async function readJobs(jobs: AppSupabaseClient, links: Link[]): Promise<LinkedJ
     }
     return [];
   });
+}
+
+/** The workspaces a listed kind is read from, by schema. */
+const LISTED_SCHEMA: Record<ListedKind, string> = {
+  reading: 'learn',
+  event: 'todo',
+  saved_item: 'public',
+  contact: 'job_search',
+};
+
+type Target = Record<string, unknown>;
+
+/** The columns each listed kind is read with, and the table they come from. */
+const LISTED_READ: Record<ListedKind, { table: string; columns: string }> = {
+  reading: { table: 'readings', columns: 'id, title, status, started_at, finished_at' },
+  event: { table: 'events', columns: 'id, title, location, starts_on, ends_on, starts_at, ends_at' },
+  saved_item: {
+    table: 'saved_items',
+    columns: 'id, title, url, image_url, price_cents, currency, status, purchased_order_item_id',
+  },
+  contact: { table: 'contacts', columns: 'id, full_name, title, email, linkedin_url, companies ( name )' },
+};
+
+const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+/** One link and the row it points at (undefined once that row has gone) as the list shows it. */
+export function toLinkedRow(link: Link & { kind: ListedKind; targetId: string }, target: Target | undefined): LinkedRow {
+  const gone = target === undefined;
+  const t = target ?? {};
+  const base = { linkId: link.id, targetId: link.targetId, listName: listNameOf(link), gone };
+  switch (link.kind) {
+    case 'reading':
+      return {
+        ...base,
+        kind: 'reading',
+        href: gone ? null : linkedHref('reading', link.targetId),
+        title: text(t.title),
+        status: text(t.status),
+        startedAt: text(t.started_at),
+        finishedAt: text(t.finished_at),
+      };
+    case 'event': {
+      const startsOn = text(t.starts_on);
+      const startsAt = text(t.starts_at);
+      return {
+        ...base,
+        kind: 'event',
+        href: gone ? null : linkedHref('event', link.targetId, { startsOn, startsAt }),
+        title: text(t.title),
+        location: text(t.location),
+        startsOn,
+        endsOn: text(t.ends_on),
+        startsAt,
+        endsAt: text(t.ends_at),
+      };
+    }
+    case 'saved_item':
+      return {
+        ...base,
+        kind: 'saved_item',
+        href: gone ? null : linkedHref('saved_item', link.targetId),
+        title: text(t.title),
+        url: text(t.url),
+        imageUrl: text(t.image_url),
+        priceCents: typeof t.price_cents === 'number' ? t.price_cents : null,
+        currency: text(t.currency),
+        status: text(t.status),
+        bought: t.purchased_order_item_id != null,
+      };
+    case 'contact': {
+      const company = t.companies as { name?: unknown } | null | undefined;
+      return {
+        ...base,
+        kind: 'contact',
+        href: gone ? null : linkedHref('contact', link.targetId),
+        name: text(t.full_name),
+        role: text(t.title),
+        company: text(company?.name),
+        email: text(t.email),
+        linkedinUrl: text(t.linkedin_url),
+      };
+    }
+  }
+}
+
+/**
+ * A goal's or step's lists over rows other workspaces keep (plan #2330.1):
+ * its live reading, event, saved product and contact links, each with its
+ * row read live from that workspace, grouped into lists by list name.
+ *
+ * `db` is any client of the person's own session; each workspace is reached
+ * through `.schema()`, so its row level security decides what is seen. Only
+ * the kinds in `kinds` are read: leave out the kinds of a workspace that is
+ * switched off, and their links are left out with them. A row removed from
+ * its workspace since it was linked comes back as `gone`.
+ */
+export async function loadLinkedLists(
+  db: SchemaClient,
+  itemId: string,
+  kinds: readonly ListedKind[] = LISTED_KINDS,
+): Promise<LinkedList[]> {
+  if (kinds.length === 0) return [];
+  const { data, error } = await db
+    .schema('goals')
+    .from('links')
+    .select(LINK_COLUMNS)
+    .eq('item_id', itemId)
+    .in('kind', [...kinds])
+    .is('archived_at', null)
+    .order('created_at');
+  if (error) throw new Error(`Could not read the lists: ${error.message}`);
+  const links = ((data ?? []) as LinkRow[]).flatMap((row) => {
+    const link = toLink(row);
+    return link && isListedKind(link.kind) && link.targetId
+      ? [link as Link & { kind: ListedKind; targetId: string }]
+      : [];
+  });
+  if (links.length === 0) return [];
+
+  const byKind = new Map<ListedKind, Map<string, Target>>();
+  await Promise.all(
+    kinds.map(async (kind) => {
+      const ids = [...new Set(links.filter((link) => link.kind === kind).map((link) => link.targetId))];
+      if (ids.length === 0) return;
+      const read = LISTED_READ[kind];
+      const rows = await db.schema(LISTED_SCHEMA[kind]).from(read.table).select(read.columns).in('id', ids);
+      if (rows.error) throw new Error(`Could not read the linked ${read.table}: ${rows.error.message}`);
+      byKind.set(kind, new Map(((rows.data ?? []) as unknown as Target[]).map((row) => [row.id as string, row])));
+    }),
+  );
+
+  return groupLists(links.map((link) => toLinkedRow(link, byKind.get(link.kind)?.get(link.targetId))));
 }
 
 /**

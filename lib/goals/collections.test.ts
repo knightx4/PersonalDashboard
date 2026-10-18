@@ -42,7 +42,7 @@ const loans: CollectionField[] = [
 
 describe('field values', () => {
   it('has a test below for every type', () => {
-    expect(FIELD_TYPES).toHaveLength(10);
+    expect(FIELD_TYPES).toHaveLength(13);
   });
 
   it('takes empty as null for every type', () => {
@@ -126,6 +126,39 @@ describe('field values', () => {
     );
     expect(refused('link', 'javascript:alert(1)')).not.toBeNull();
   });
+
+  it('image: the http or https address of a picture (plan #2330.2)', () => {
+    expect(ok('image', ' https://cdn.example.com/pantry.jpg ')).toBe('https://cdn.example.com/pantry.jpg');
+    expect(refused('image', 'data:image/png;base64,AAAA')).toBe(
+      'Value must be a web address starting http:// or https://.',
+    );
+  });
+
+  it('place: an address of one line, with both coordinates or neither (plan #2330.2)', () => {
+    expect(ok('place', ' 12 High St, Leeds ')).toEqual({ address: '12 High St, Leeds' });
+    expect(ok('place', { address: '12 High St', lat: 53.8, lng: '-1.55' })).toEqual({
+      address: '12 High St',
+      lat: 53.8,
+      lng: -1.55,
+    });
+    expect(refused('place', { address: '12 High St', lat: 53.8 })).toBe(
+      'Value needs both coordinates, a latitude from -90 to 90 and a longitude from -180 to 180.',
+    );
+    expect(refused('place', { address: 'Pole', lat: 91, lng: 0 })).not.toBeNull();
+    expect(refused('place', { address: '12 High St', zip: 'LS1' })).toBe(
+      'Value holds an address, a latitude and a longitude, and nothing else.',
+    );
+    expect(refused('place', 'two\nlines')).toBe('Value must be an address of one line, up to 500 characters.');
+    expect(refused('place', { lat: 1, lng: 1 })).not.toBeNull();
+  });
+
+  it('ref: a row in the app as schema.table:id (plan #2330.2)', () => {
+    expect(ok('ref', 'learn.readings:3f1c0b8e-1111-4222-8333-444455556666')).toBe(
+      'learn.readings:3f1c0b8e-1111-4222-8333-444455556666',
+    );
+    expect(refused('ref', 'https://example.com')).toBe('Value must be a row in the app, as schema.table:id.');
+    expect(refused('ref', 'readings:1')).not.toBeNull();
+  });
 });
 
 describe('checkRecord', () => {
@@ -173,6 +206,15 @@ describe('checkRecord', () => {
     // "Federal" was an option when this was written, and has since been taken off.
     const result = checkRecord(fields, { kind: 'Federal' }, { kind: 'Federal' });
     expect(result).toEqual({ ok: true, data: { kind: 'Federal' } });
+  });
+});
+
+describe('a place kept as it was', () => {
+  it('is not re-checked when the write sends the same address and coordinates', () => {
+    const fields: CollectionField[] = [{ key: 'where', label: 'Where', type: 'place' }];
+    const previous = { where: { address: '12 High St', lat: 53.8, lng: -1.55 } };
+    const checked = checkRecord(fields, { where: { address: '12 High St', lat: 53.8, lng: -1.55 } }, previous);
+    expect(checked).toEqual({ ok: true, data: previous });
   });
 });
 

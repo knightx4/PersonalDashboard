@@ -3,6 +3,7 @@ import {
   formatReading,
   movementLine,
   numberFromChoices,
+  numberFromValue,
   parseMeasureFields,
   parseNumber,
   parseNumberFrom,
@@ -226,6 +227,34 @@ describe('a number worked out from a collection (plan #1024)', () => {
     expect(parseNumberFrom('', choices)).toEqual({ ok: true, value: null });
     expect(parseNumberFrom('sum|c1|name', choices).ok).toBe(false);
     expect(parseNumberFrom('sum|c2|balance', choices).ok).toBe(false);
+  });
+});
+
+describe('a number counting the rows of a list by status (plan #2330.5)', () => {
+  const events = {
+    id: 'c9',
+    name: 'Events',
+    fields: [
+      { key: 'name', label: 'Name', type: 'text' as const },
+      { key: 'status', label: 'Status', type: 'choice' as const, options: ['Going', 'Went'] },
+    ],
+  };
+
+  it('offers a count of the rows holding each option', () => {
+    const choices = numberFromChoices([events]);
+    expect(choices.map((c) => [c.value, c.label, c.unit])).toEqual([
+      ['count|c9|', 'Number of Events', 'events'],
+      ['count|c9|status|Going', 'Number of Events with status Going', 'events'],
+      ['count|c9|status|Went', 'Number of Events with status Went', 'events'],
+    ]);
+    expect(choices[2].from).toEqual({ collectionId: 'c9', field: 'status', how: 'count', value: 'Went' });
+  });
+
+  it('reads the saved value back as the same choice', () => {
+    const choices = numberFromChoices([events]);
+    const saved = numberFromValue({ collectionId: 'c9', field: 'status', how: 'count', value: 'Went' });
+    expect(parseNumberFrom(saved, choices)).toEqual({ ok: true, value: choices[2] });
+    expect(numberFromValue({ collectionId: 'c9', field: null, how: 'count', value: null })).toBe('count|c9|');
   });
 });
 

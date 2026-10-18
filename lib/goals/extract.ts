@@ -155,6 +155,12 @@ function valueSchema(field: CollectionField): JsonSchema {
       };
     case 'link':
       return nullable('string', { description: `${field.label}, a web address` });
+    case 'image':
+      return nullable('string', { description: `${field.label}, the web address of the picture` });
+    case 'place':
+      return nullable('string', { description: `${field.label}, the address on one line` });
+    case 'ref':
+      return { type: 'null', description: `${field.label}, a row in the app; always null when read from a document` };
     default:
       return nullable('string', { description: field.label });
   }
