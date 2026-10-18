@@ -192,7 +192,9 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
     // the id is where links written before Account had tabs still point.
     <section>
       <h3 className="text-ui font-semibold text-ink">Notifications</h3>
-      <Card className="mt-4 divide-y divide-border card-pad-x">
+      {/* No side padding: on the account page this card lies on the tab's own panel, so
+          its rows start on the heading's edge (law 18). */}
+      <Card className="mt-4 divide-y divide-border">
         {!publicKey ? (
           <p className="row-pad text-small text-ink-muted">
             Notifications are not set up on this server yet: the VAPID keys are missing from its
