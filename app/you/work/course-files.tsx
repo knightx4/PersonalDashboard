@@ -777,10 +777,12 @@ function ChosenRow({
                   id={`${idBase}-kind`}
                   aria-label={`What ${row.name} is`}
                   value={row.kind}
-                  // The guessed kind is quieter than the file it describes. Beside the
-                  // week it is only as wide as the kind it shows, so the week's name reads.
+                  // The guessed kind is quieter than the file it describes, in grey ink
+                  // inside a hairline rather than the control border: the field stays 16px
+                  // on a phone so iOS does not zoom, so the outline is what gives way. Beside
+                  // the week it is only as wide as the kind it shows, so the week's name reads.
                   className={cn(
-                    'relative text-ink-muted',
+                    'relative border-border text-ink-muted',
                     slots.length > 0 ? 'w-auto [field-sizing:content] sm:w-full' : 'w-full',
                   )}
                   onChange={(e) => onChange({ kind: e.target.value as CourseFileKind })}
@@ -794,37 +796,43 @@ function ChosenRow({
               </div>
               {slots.length > 0 ? (
                 // With the syllabus's weeks laid out, the week is picked by name, its
-                // topic cut to fit: a word or two beside the kind on a phone, more from laptop width.
-                <div className="relative min-w-0 flex-1">
+                // topic cut to a word or two beside the kind on a phone. From laptop width
+                // the topic is whole and the picker only as wide as the week it shows.
+                <div className="relative min-w-0 flex-1 sm:flex-initial">
                   <PressLabel htmlFor={`${idBase}-week`} />
                   <Select
                     id={`${idBase}-week`}
                     aria-label={`Week of ${row.name}`}
                     value={row.week.trim()}
-                    className="relative w-full text-ink-muted"
+                    className="relative w-full border-border text-ink-muted sm:w-auto sm:max-w-full sm:[field-sizing:content]"
                     onChange={(e) => onChange({ week: e.target.value })}
                   >
                     <option value="">No week</option>
                     {weekChoices(slots, row.week).map((choice) => (
                       <option key={choice.week} value={String(choice.week)}>
-                        {weekName({ week: choice.week, title: shortTopic(choice.title, wide ? 32 : 12) })}
+                        {weekName({ week: choice.week, title: wide ? choice.title : shortTopic(choice.title, 12) })}
                       </option>
                     ))}
                   </Select>
                 </div>
               ) : (
-              <div className="relative w-20">
-                <PressLabel htmlFor={`${idBase}-week`} />
-                <Input
-                  id={`${idBase}-week`}
-                  aria-label={`Week of ${row.name}`}
-                  inputMode="numeric"
-                  maxLength={2}
-                  value={row.week}
-                  placeholder="Week"
-                  className="relative w-full text-ink-muted"
-                  onChange={(e) => onChange({ week: e.target.value })}
-                />
+              // The week box is named by the word before it, so a bare 3 reads as a week.
+              <div className="flex items-center gap-1.5">
+                <label htmlFor={`${idBase}-week`} className="text-small text-ink-muted">
+                  Week
+                </label>
+                <div className="relative w-14">
+                  <PressLabel htmlFor={`${idBase}-week`} />
+                  <Input
+                    id={`${idBase}-week`}
+                    aria-label={`Week of ${row.name}`}
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={row.week}
+                    className="relative w-full border-border text-ink-muted"
+                    onChange={(e) => onChange({ week: e.target.value })}
+                  />
+                </div>
               </div>
               )}
             </div>
