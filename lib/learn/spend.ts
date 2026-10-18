@@ -214,6 +214,10 @@ export const LEARN_OPERATIONS = [
   // lesson is checked against (plan #976). Kept apart from 'embed-claim',
   // which a press records, because the background top-up records this one.
   'embed-lesson-claim',
+  // Embedding what a lesson's wanted figure would show, to group it with the
+  // other lessons asking for the same figure (plan #2321.9). One short text
+  // per wanted block, from the same background run as 'write-lesson'.
+  'embed-figure-need',
   // Writing the chain for a track's next unit so its lessons keep coming
   // (plan #977). The same call as 'generate-chain', recorded from the
   // background top-up rather than a press.

@@ -566,6 +566,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-figure-source-figure': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-chart': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-chart-missing': ['/learn/s/[id]/p/[piece]'],
+  'learn-figure-wanted': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-explorable': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-explorable-supply-demand': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-flow': ['/learn/s/[id]/p/[piece]'],

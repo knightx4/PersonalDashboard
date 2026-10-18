@@ -9306,6 +9306,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="chart" />,
   },
   {
+    /* A lesson that asked for a figure the app cannot draw yet (plan #2321.9). */
+    id: 'learn-figure-wanted',
+    label: 'Plan · A lesson whose figure is not built yet',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="wanted" />,
+  },
+  {
     id: 'learn-figure-chart-missing',
     label: 'Plan · A lesson whose chart’s series was not found',
     module: 'learn',
