@@ -17,12 +17,13 @@ const IDS = ROLE_TABS.map((id) => ({ id }));
 /**
  * How the role page keeps its tab in the address (the tabbed sections
  * pattern, lib/tabs.ts). Every tab is written, since the tab it opens on
- * changes with the stage; and the interview to scroll to belongs to the
- * Interviews tab and means nothing once you have left it.
+ * changes with the stage; the interview to scroll to belongs to the
+ * Interviews tab and the message to scroll to (a fact's origin, plan
+ * #2343.3) to the Mail tab, and each means nothing once you have left it.
  */
 export const ROLE_TAB_ADDRESS = {
   alwaysWrite: true,
-  belongsTo: { interview: 'interviews' },
+  belongsTo: { interview: 'interviews', message: 'mail' },
 } as const satisfies TabAddress;
 
 /** The tab a `?tab=` value names, or none when it names no tab here. */
