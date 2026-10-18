@@ -162,6 +162,9 @@ vi.mock('@/inngest/dev/idea-scores', () => ({
 vi.mock('@/inngest/you/insight-signals', () => ({
   runInsightSignals: vi.fn(async () => ({ tripwiresChecked: 2, tripwiresFired: 1 })),
 }));
+vi.mock('@/inngest/you/insights-tick', () => ({
+  runInsightsTick: vi.fn(async () => ({ skipped: 'the last run is less than a month old' })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
@@ -248,6 +251,9 @@ describe('the daily cron route', () => {
     // The insight numbers are counted every morning with no model call
     // (plan #2413.7).
     expect(body.results['insight-signals']).toEqual({ tripwiresChecked: 2, tripwiresFired: 1 });
+    // The insights stage runs once a day and starts the single call only
+    // when the last ready run is over 30 days old (plan #2413.10).
+    expect(body.results['insights-monthly']).toEqual({ skipped: 'the last run is less than a month old' });
 
     // Each open goal and feature gets its step counts for the day (plan #1836).
     expect(body.results['scope-days']).toEqual({ written: 23 });

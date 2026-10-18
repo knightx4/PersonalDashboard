@@ -4,9 +4,45 @@ import { insightsBrief, type InsightRunReason } from '@/lib/you/insights';
 import { INSIGHT_RUN_STALE_AFTER_MS, STALE_RUN_ERROR } from '@/lib/you/insights-run';
 
 /**
- * Start one insights run (plan #2413.6). The Look again button, the weekly
- * tick and the change trigger all come through here, so a run is queued,
- * fired and failed the same way whichever asked for it.
+ * Queue an insights run: a row the tab shows running at once (plan #2413.10).
+ * Look again, the monthly tick and the Full re-read link all begin here. A run
+ * left queued or running past the stale mark is marked failed before the
+ * check, so a session that died does not hold the next one; the partial
+ * unique index allows one open run at a time.
+ */
+export type QueueInsightRunResult =
+  | { queued: true; runId: string }
+  | { queued: false; reason: 'running' | 'error'; error: string };
+
+export async function queueInsightRun(input: {
+  client: YouSupabaseClient;
+  userId: string;
+  now?: number;
+}): Promise<QueueInsightRunResult> {
+  const { client, userId } = input;
+  const now = input.now ?? Date.now();
+  await client
+    .from('insight_runs')
+    .update({ status: 'failed', error: STALE_RUN_ERROR, finished_at: new Date(now).toISOString() })
+    .eq('user_id', userId)
+    .in('status', ['queued', 'running'])
+    .lt('requested_at', new Date(now - INSIGHT_RUN_STALE_AFTER_MS).toISOString());
+
+  const { data: row, error } = await client
+    .from('insight_runs')
+    .insert({ user_id: userId, status: 'queued' })
+    .select('id')
+    .single();
+  if (error?.code === '23505') return { queued: false, reason: 'running', error: 'Dash is already looking again.' };
+  if (error || !row) return { queued: false, reason: 'error', error: error?.message ?? 'Could not start the run.' };
+  return { queued: true, runId: row.id as string };
+}
+
+/**
+ * Start one insights run on the goals routine (plan #2413.6): the Full re-read
+ * link, which reads everything in a session on the person's plan. Look again
+ * and the monthly tick write through the single API call instead
+ * (inngest/you/insights-write.ts).
  *
  * The run row is made first, queued, so the tab shows it at once; the goals
  * routine is then fired with the insights brief naming it. A run left queued
@@ -36,31 +72,12 @@ export async function startInsightRun(input: {
       started: false,
       reason: 'no_routine',
       error:
-        'Insights run on the goals routine, which is not set up on this deployment: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
+        'A full re-read runs on the goals routine, which is not set up on this deployment: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
     };
   }
-  const now = input.now ?? Date.now();
-
-  await client
-    .from('insight_runs')
-    .update({ status: 'failed', error: STALE_RUN_ERROR, finished_at: new Date(now).toISOString() })
-    .eq('user_id', userId)
-    .in('status', ['queued', 'running'])
-    .lt('requested_at', new Date(now - INSIGHT_RUN_STALE_AFTER_MS).toISOString());
-
-  const { data: row, error } = await client
-    .from('insight_runs')
-    .insert({ user_id: userId, status: 'queued' })
-    .select('id')
-    .single();
-  // The partial unique index allows one run at a time.
-  if (error?.code === '23505') {
-    return { started: false, reason: 'running', error: 'Dash is already looking again.' };
-  }
-  if (error || !row) {
-    return { started: false, reason: 'error', error: error?.message ?? 'Could not start the run.' };
-  }
-  const runId = row.id as string;
+  const queued = await queueInsightRun({ client, userId, now: input.now });
+  if (!queued.queued) return { started: false, reason: queued.reason, error: queued.error };
+  const runId = queued.runId;
 
   const fired = await fireFeatureRoutine({
     apiKey: routine.token,

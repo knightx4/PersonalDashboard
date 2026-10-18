@@ -261,6 +261,12 @@ export const SPEND_OPERATIONS = {
     // from its file summaries on a press (plan #2401.7). One Haiku call
     // reading the stored summaries and key points, not the files.
     'collect-course-overview',
+    // A set of insights about the person (plan #2413.9): one Opus call at
+    // high effort reading the stored digest, the note extracts, the nightly
+    // signals, every earlier insight with its verdict and a few key notes,
+    // from Look again or the monthly run. A run estimated over two dollars
+    // is refused before it is sent.
+    'write-insights',
   ],
 } as const;
 

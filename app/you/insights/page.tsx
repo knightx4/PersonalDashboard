@@ -31,7 +31,9 @@ export default async function Page() {
       insights={insights}
       run={insightRunState(run)}
       runWhen={run ? formatDateTime(run.requestedAt, settings.timezone) : null}
-      available={Boolean(routine.id && routine.token)}
+      available={Boolean(process.env.ANTHROPIC_API_KEY?.trim())}
+      rereadAvailable={Boolean(routine.id && routine.token)}
+      timezone={settings.timezone}
     />
   );
 }

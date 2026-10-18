@@ -17,6 +17,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { formatDateInline } from '@/lib/jobs/applications/load';
+import { firedLine, firedSinceMark, type FiredTripwire } from '@/lib/you/insight-fired';
 import type {
   Insight,
   InsightConfidence,
@@ -26,7 +28,7 @@ import type {
   Verdict,
 } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { markInsight, startInsightRun, type MarkResult } from './actions';
+import { markInsight, startFullReread, startInsightRun, type MarkResult } from './actions';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -39,22 +41,32 @@ import { markInsight, startInsightRun, type MarkResult } from './actions';
  * the card under Earlier with the mark, so what the person has said is not
  * true about them stays on record. Later passes a card without marking it.
  *
- * Look again starts a run (startInsightRun); while one is queued or running a
- * banner takes the button's place and the page looks again every minute.
+ * A card whose tripwire fired since the person last marked it (plan #2413.11)
+ * comes back to the front of the deck with a dated line under the claim naming
+ * what happened and the evidence the nightly check recorded, folded. Marking
+ * it again clears the line until the tripwire fires again.
+ *
+ * Look again starts a run (startInsightRun), one model call that writes in a
+ * few minutes; while one is queued or running a banner takes the button's
+ * place and the page looks again every minute. Under the deck, Full re-read
+ * starts the slow session on the person's Claude plan (startFullReread).
  */
 
 export type InsightsActions = {
   mark: (insightId: string, verdict: Verdict, note?: string | null) => Promise<MarkResult>;
   lookAgain: () => Promise<{ error: string | null }>;
+  fullReread: () => Promise<{ error: string | null }>;
 };
 
-const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun };
+const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun, fullReread: startFullReread };
 
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
   evidence?: boolean;
   why?: Exclude<Verdict, 'right'>;
   earlier?: boolean;
+  /** The evidence under a card brought back by a tripwire. */
+  fired?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -87,10 +99,14 @@ const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
 };
 
 /**
- * A run reads for half an hour or so, with three readers beside it. No run
- * has been priced yet, so this is a guess and says so (law 16).
+ * Look again is one model call on the API; a run is refused before it starts
+ * if it is estimated over two dollars (lib/you/insights-write.ts). No run has
+ * been priced yet, so the figure is a guess and says so (law 16).
  */
-const LOOK_AGAIN_COST = 'About $2 to $5, uncertain';
+const LOOK_AGAIN_COST = 'Up to about $2, uncertain';
+
+/** A full re-read is a session on the person's Claude plan, with readers beside it, for half an hour or so. */
+const FULL_REREAD_COST = 'Uses your Claude plan for half an hour or so; about $2 to $5 at API prices, uncertain';
 
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
@@ -128,6 +144,8 @@ export function InsightsView({
   run,
   runWhen,
   available,
+  rereadAvailable = false,
+  timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
 }: {
@@ -136,14 +154,18 @@ export function InsightsView({
   run: InsightRunState;
   /** When the newest run was asked for, already written in their zone. */
   runWhen: string | null;
-  /** Whether the deployment can start a run (both routine variables set). */
+  /** Whether the deployment can write a run (the API key is set). */
   available: boolean;
+  /** Whether the deployment can start a full re-read (both routine variables set). */
+  rereadAvailable?: boolean;
+  /** Their timezone, for the date on a card brought back. */
+  timezone?: string;
   actions?: InsightsActions;
   open?: InsightsOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, InsightVerdict>>(new Map());
   const [choosing, setChoosing] = useState<{ id: string; verdict: Exclude<Verdict, 'right'> } | null>(() => {
-    const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict);
+    const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict && !insight.fired.length);
     return open.why && first ? { id: first.id, verdict: open.why } : null;
   });
   const [note, setNote] = useState('');
@@ -155,11 +177,25 @@ export function InsightsView({
   useRefreshWhileRunning(running);
 
   const verdictOf = (insight: Insight) => marks.get(insight.id) ?? insight.verdict;
-  const waiting = insights.filter((insight) => insight.status === 'shown' && !verdictOf(insight));
+  const broughtBack = (insight: Insight): FiredTripwire | null =>
+    insight.status === 'shown' ? firedSinceMark(insight.fired, verdictOf(insight)?.decidedAt) : null;
+  const isWaiting = (insight: Insight) =>
+    insight.status === 'shown' && (!verdictOf(insight) || broughtBack(insight) !== null);
+  // Cards brought back by a tripwire come first, the newest fire first; the
+  // rest keep their order.
+  const waiting = insights
+    .filter(isWaiting)
+    .map((insight, index) => ({ insight, index, fired: broughtBack(insight) }))
+    .sort((a, b) => {
+      if (a.fired && b.fired) return Date.parse(b.fired.firedAt) - Date.parse(a.fired.firedAt);
+      if (a.fired || b.fired) return a.fired ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map(({ insight }) => insight);
   const earlier = insights
     .flatMap((insight) => {
       const verdict = verdictOf(insight);
-      return verdict ? [{ insight, verdict }] : [];
+      return verdict && !isWaiting(insight) ? [{ insight, verdict }] : [];
     })
     .sort((a, b) => b.verdict.decidedAt.localeCompare(a.verdict.decidedAt));
 
@@ -190,6 +226,11 @@ export function InsightsView({
       const result = await actions.lookAgain();
       setRunError(result.error);
     });
+  const fullReread = () =>
+    startTransition(async () => {
+      const result = await actions.fullReread();
+      setRunError(result.error);
+    });
 
   const showLookAgain = available && run.kind !== 'running' && run.kind !== 'failed';
   const lookAgainButton = (
@@ -213,7 +254,10 @@ export function InsightsView({
       body: (
         <InsightCard
           insight={insight}
+          fired={broughtBack(insight)}
+          timezone={timezone}
           evidenceOpen={open.evidence}
+          firedOpen={open.fired}
           why={
             choice ? (
               <WhyLine
@@ -312,8 +356,8 @@ export function InsightsView({
 
         {!available && (
           <p className="text-ui text-ink-muted">
-            Runs are not set up on this deployment yet. They use the goals routine, which needs
-            CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.
+            Runs are not set up on this deployment yet. They need ANTHROPIC_API_KEY in the
+            project’s environment variables.
           </p>
         )}
 
@@ -355,6 +399,19 @@ export function InsightsView({
           />
         )}
 
+        {rereadAvailable && !nothing && run.kind !== 'running' && (
+          <DashAction
+            type="button"
+            variant="link"
+            pending={starting}
+            onClick={fullReread}
+            costText={FULL_REREAD_COST}
+            what="Cost of a full re-read"
+          >
+            Full re-read
+          </DashAction>
+        )}
+
         {earlier.length > 0 && (
           <SectionFold title="Earlier" count={earlier.length} defaultOpen={open.earlier ?? false}>
             <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border overflow-hidden')}>
@@ -376,11 +433,17 @@ export function InsightsView({
 /** One insight: the claim, the layers under it, and the evidence folded beneath. */
 function InsightCard({
   insight,
+  fired,
+  timezone,
   evidenceOpen,
+  firedOpen,
   why,
 }: {
   insight: Insight;
+  fired: FiredTripwire | null;
+  timezone: string;
   evidenceOpen?: boolean;
+  firedOpen?: boolean;
   why: React.ReactNode;
 }) {
   return (
@@ -396,6 +459,8 @@ function InsightCard({
         </p>
         <h2 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{insight.claim}</h2>
       </div>
+
+      {fired && <BroughtBack fired={fired} timezone={timezone} defaultOpen={firedOpen} />}
 
       {insight.layers.length > 0 && (
         <ol className="space-y-3">
@@ -426,6 +491,40 @@ function InsightCard({
 
       {why}
     </Card>
+  );
+}
+
+/**
+ * The dated line under the claim of a card a tripwire brought back: what
+ * happened, when the check saw it, and what it recorded, folded.
+ */
+function BroughtBack({
+  fired,
+  timezone,
+  defaultOpen,
+}: {
+  fired: FiredTripwire;
+  timezone: string;
+  defaultOpen?: boolean;
+}) {
+  const date = (iso: string) => (iso ? formatDateInline(iso, timezone) : '');
+  const line = firedLine(fired, date);
+  return (
+    <div className="space-y-1" data-insight-fired>
+      <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">{line.headline}</p>
+      <p className="text-small text-ink-muted">Back on {date(fired.firedAt)} because of this</p>
+      {line.details.length > 0 && (
+        <Disclosure title="What was seen" meta={String(line.details.length)} defaultOpen={defaultOpen}>
+          <ul className="space-y-1.5">
+            {line.details.map((detail, index) => (
+              <li key={index} className="text-ui text-ink-muted [overflow-wrap:anywhere]">
+                {detail}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
+    </div>
   );
 }
 
