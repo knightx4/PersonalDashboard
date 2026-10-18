@@ -63,6 +63,7 @@ describe('explainTurn', () => {
         hook: null,
         summary: 'Subtract what was lost.',
         example: '89 of 100 kept.',
+        figures: [],
         question: null,
         answer: null,
       }),

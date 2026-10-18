@@ -1,4 +1,12 @@
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { tableKind } from '@/lib/learn/figures/kinds/table';
+import { figureKind } from '@/lib/learn/figures/registry';
+import { explorableKind } from '@/lib/learn/figures/kinds/explorable';
+import { ExplorableMoved } from '@/lib/learn/figures/kinds/explorable-view';
+import { explorableModel } from '@/lib/learn/figures/models/registry';
+import { mapKind } from '@/lib/learn/figures/kinds/map';
+import { MapPressed, type MapData } from '@/lib/learn/figures/kinds/map-view';
+import { LessonCard } from '@/app/learn/s/[id]/p/[piece]/piece-view';
 import { MODELS } from '@/lib/core/models';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
 import { ListsView } from '@/app/learn/lists/lists-view';
@@ -814,6 +822,7 @@ const piecePage: PiecePage = {
           'A café puts its flat white up from £3.20 to £3.60, 12.5%, and sells 10% fewer. It now takes £324 from 90 cups where it took £320 from 100.',
         question: 'Petrol goes up 10% and people buy 2% less. Does the government’s fuel duty take go up or down?',
         answer: 'Up: demand for petrol is inelastic, so the quantity falls by much less than the price rose.',
+        figures: [tableKind.example].map((example) => ({ kind: tableKind.id, ...example })),
       },
     },
   ],
@@ -943,6 +952,182 @@ export function LearnPieceHeldSurface() {
       />
     </PaidCostsProvider>
   );
+}
+
+/**
+ * One figure kind drawn on a lesson, its phone fold open (plan #2321.1). Every
+ * kind in lib/learn/figures/registry.ts has one of these, named
+ * learn-figure-<id>, and draws its own example.
+ */
+export function LearnFigureSurface({
+  kind: id,
+  missing = false,
+}: {
+  kind: string;
+  /** Draws a fetched kind whose data could not be found (plan #2321.3). */
+  missing?: boolean;
+}) {
+  const kind = figureKind(id);
+  if (!kind) return null;
+  const idea = piecePage.ideas[0];
+  const figure = { kind: kind.id, ...kind.example, ...(missing ? { resolved: null } : {}) };
+  return (
+    <LessonCard
+      idea={{ ...idea, lesson: idea.lesson && { ...idea.lesson, figures: [figure] } }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
+  );
+}
+
+type ExplorableLesson = {
+  conceptId: string;
+  name: string;
+  claim: string;
+  lesson: { takeaway: string; context: string; summary: string; example: string; question: string; answer: string };
+};
+
+const PRICE_FORMATION_LESSON: ExplorableLesson = {
+  conceptId: supplyDemand.id,
+  name: 'How a market price forms',
+  claim: supplyDemand.claim,
+  lesson: {
+    takeaway: 'A price settles where what buyers want to buy meets what sellers want to sell, and moves when either side changes.',
+    context: 'Every market price, from coffee beans to rents, is set this way when there are many buyers and sellers.',
+    summary:
+      'Demand falls as the price rises; supply rises with it. Where they cross, nobody is left wanting to buy or sell at that price. Shift either curve and the crossing moves, and the price with it.',
+    example: 'Frost in Brazil in 2021 cut the coffee harvest, and the world price of arabica roughly doubled within a year.',
+    question: 'A new study says coffee is good for you. Which curve moves, which way, and what happens to the price?',
+    answer: 'Demand moves right: buyers want more at every price. The crossing moves up and right, so the price rises and more coffee is sold.',
+  },
+};
+
+/** The lessons on cities the urban models are drawn on (plan #2321.8), by model id. */
+const EXPLORABLE_LESSONS: Record<string, ExplorableLesson> = {
+  bid_rent: {
+    conceptId: 'c0000000-0000-4000-8000-000000002318',
+    name: 'The shape of the city',
+    claim: 'Land near a city’s centre goes to whoever will pay most to be close, so rent falls with distance and the land changes use where one bidder’s rent overtakes another’s.',
+    lesson: {
+      takeaway: 'Rent falls with distance from the centre because every km further out costs more commuting, and land goes to whichever use bids most for it.',
+      context: 'It explains why city centres are offices and towers, suburbs are houses with gardens, and the edge is fields.',
+      summary:
+        'Firms pay most to be central, so they take the middle. Households pay less for land the longer the commute, so homes come next. Where homes bid less than a farmer would, the city ends. Cheaper commuting or higher incomes push that edge out.',
+      example:
+        'When the Elizabeth line opened in 2022, house prices near its new stations in east London and Berkshire rose faster than in the streets around them.',
+      question: 'Petrol prices double. What happens to rents near the centre and to the city’s edge?',
+      answer: 'Commuting gets dearer, so households bid more for land near the centre and less far out: central rents rise and the edge moves in.',
+    },
+  },
+  agglomeration: {
+    conceptId: 'c0000000-0000-4000-8000-000000002319',
+    name: 'Why density pays',
+    claim: 'Workers in bigger cities produce more each, because size lets firms share suppliers, match workers to jobs and learn from each other, until congestion costs more than size adds.',
+    lesson: {
+      takeaway: 'Big cities pay higher wages because crowding people together makes each of them more productive, up to the point where congestion eats the gain.',
+      context: 'It is why firms pay London rents and why the most productive industries cluster in a few places.',
+      summary:
+        'Sharing: a big city supports specialist suppliers and transport no small town could. Matching: more workers and firms means a better fit for each. Learning: ideas spread faster between people who meet. Each newcomer adds a little less than the last, while congestion keeps growing, so output per worker peaks at a size.',
+      example: 'Doubling a city’s size raises output per worker by somewhere between 3 and 8 per cent, by most estimates.',
+      question: 'A city builds a metro that halves journey times. What happens to the size at which it stops gaining from growth?',
+      answer: 'Congestion costs less for every million people, so the gains of size win for longer and the best size grows.',
+    },
+  },
+};
+
+/**
+ * A lesson on how a market price forms, carrying an explorable model
+ * (plan #2321.7). With no model named it draws the explorable kind's own
+ * example at its start; naming a model draws that model's example with its
+ * sliders already moved, so the live caption and the starting curves show.
+ */
+export function LearnExplorableSurface({ model: id }: { model?: string }) {
+  const model = id ? explorableModel(id) : null;
+  const figure = model
+    ? { kind: explorableKind.id, caption: model.example.caption, spec: { model: model.id, start: model.example.start } }
+    : { kind: explorableKind.id, ...explorableKind.example };
+  const idea = piecePage.ideas[0];
+  const text = (model && EXPLORABLE_LESSONS[model.id]) ?? PRICE_FORMATION_LESSON;
+  const card = (
+    <LessonCard
+      idea={{
+        ...idea,
+        conceptId: text.conceptId,
+        name: text.name,
+        claim: text.claim,
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          ...text.lesson,
+          figures: [figure],
+        },
+      }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
+  );
+  return model ? <ExplorableMoved moved={{ [model.id]: model.example.moved }}>{card}</ExplorableMoved> : card;
+}
+
+/** Shenzhen from the Hong Kong border westward, located by Nominatim on 18 October 2026, with no years. */
+const SHENZHEN: MapData = {
+  area: 'Shenzhen, Guangdong',
+  places: [
+    { name: 'Luohu Station', note: 'The border crossing to Hong Kong, where the special economic zone of 1980 began.', year: null, lat: 22.53331, lon: 114.11318, url: 'https://www.openstreetmap.org/node/6753412235' },
+    { name: 'Huaqiangbei', note: 'The electronics market where hardware makers buy their parts by the reel.', year: null, lat: 22.54482, lon: 114.08154, url: 'https://www.openstreetmap.org/node/3373068621' },
+    { name: 'Shenzhen Stock Exchange', note: 'One of mainland China’s two stock exchanges, in the Futian business district.', year: null, lat: 22.54414, lon: 114.04881, url: 'https://www.openstreetmap.org/way/776182823' },
+    { name: 'Ping An Finance Center', note: 'The tallest tower in Futian, built on what was farmland in 1980.', year: null, lat: 22.53673, lon: 114.05036, url: 'https://www.openstreetmap.org/way/535860513' },
+    { name: 'Tencent Seafront Towers', note: 'Tencent’s headquarters in Nanshan, on land reclaimed from the bay.', year: null, lat: 22.52587, lon: 113.93041, url: 'https://www.openstreetmap.org/way/737149477' },
+    { name: 'Shekou', note: 'China Merchants opened an industrial zone here in 1979, a year before the zone itself.', year: null, lat: 22.49101, lon: 113.92248, url: 'https://www.openstreetmap.org/relation/9656468' },
+  ],
+  missing: [],
+};
+
+/**
+ * A lesson on a city carrying a map (plan #2321.6). By default the map
+ * kind's own example: the Big Dig in Boston, its places dated, so the year
+ * slider shows. `undated` draws Shenzhen with no years and no slider;
+ * `pressed` draws the Boston map with that place pressed, its note showing.
+ */
+export function LearnMapSurface({ undated = false, pressed }: { undated?: boolean; pressed?: number }) {
+  const figure = undated
+    ? {
+        kind: mapKind.id,
+        caption: 'Shenzhen from the Hong Kong border westward: where the special economic zone began and where its money and makers are now.',
+        spec: { area: SHENZHEN.area, places: SHENZHEN.places.map(({ name, note }) => ({ name, note })) },
+        resolved: SHENZHEN,
+      }
+    : { kind: mapKind.id, ...mapKind.example };
+  const idea = piecePage.ideas[0];
+  const card = (
+    <LessonCard
+      idea={{
+        ...idea,
+        name: undated ? 'How a special economic zone grows a city' : 'What a city buys when it buries a highway',
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          takeaway: undated
+            ? 'A zone with its own rules draws firms first to its edge with the outside world, then the city fills in behind them.'
+            : 'Moving a highway underground costs far more than building it, and pays back in the land and streets it gives the city.',
+          context: undated
+            ? 'Shenzhen went from a border town to a city of over seventeen million in forty years.'
+            : 'Boston’s Big Dig was the most expensive highway project in American history.',
+          summary: undated
+            ? 'The zone began at the Hong Kong crossing, where goods and money came in. Factories followed along the coast, then finance gathered in Futian and technology firms in Nanshan.'
+            : 'The elevated Central Artery cut downtown off from the waterfront. Replacing it took tunnels, a bridge and sixteen years, and left parks where the road had been.',
+          example: undated
+            ? 'Shekou’s industrial zone opened in 1979, a year before the zone was declared, as a trial run.'
+            : 'The harbour tunnel opened in 1995, the river bridge in 2003, and the parks on the old road’s line in 2008.',
+          figures: [figure],
+        },
+      }}
+      number={1}
+      writing={null}
+      figuresOpen
+    />
+  );
+  return pressed != null ? <MapPressed pressed={{ [undated ? SHENZHEN.area : mapKind.example.spec.area]: pressed }}>{card}</MapPressed> : card;
 }
 
 // ---- Questions on a subject ---------------------------------------------------------

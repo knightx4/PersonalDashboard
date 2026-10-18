@@ -14,6 +14,11 @@ Dash calls `hand_off`. That keeps the request in
 `core.dash_handoffs`, tells the person it has been passed on, and starts this
 routine. Code: `lib/talk/handoff.ts`, `lib/dash/ask.ts`.
 
+A request for an X post draft is not handed on: Dash saves it itself with
+`suggest_post` (`lib/dash/post-writes.ts`), and `handoffRequest` refuses one.
+If a hand-off for a post is open anyway, write the draft the way the posts
+skill does (`.claude/skills/posts/SKILL.md`) and say so in your reply.
+
 The person is watching the thread. It checks for your reply every twenty
 seconds for half an hour, so be quick: do the one thing they asked, reply, and
 stop.

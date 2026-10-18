@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { FoundFigure } from '@/lib/learn/catalogue/figures';
 import type { StructureDocumentInput, StructureReading, StructureUnit } from '@/lib/learn/catalogue/structure';
 import { fetchDocument } from './fetch';
 
@@ -549,7 +550,47 @@ export type OcwMaterial = {
   licence: string | null;
 };
 
-export type OcwCourseStructure = { document: StructureDocumentInput; material: OcwMaterial[] };
+export type OcwCourseStructure = { document: StructureDocumentInput; material: OcwMaterial[]; figures: FoundFigure[] };
+
+/** The licence every OpenCourseWare course is published under. */
+export const OCW_LICENCE = 'CC BY-NC-SA 4.0';
+
+/** Alt text shorter than this says nothing about the picture ("image", "photo"). */
+const MIN_ALT_CHARS = 12;
+const MAX_ALT_CHARS = 300;
+
+/**
+ * The content images on a course page: those served from the course's own
+ * folder, with alt text that describes them. The site's logos, icons and
+ * social buttons live under /static_shared/ or have no alt text, and are left
+ * out. Addresses are made absolute and lose their query; a repeat is kept once.
+ */
+export function imagesFromPage(html: string, pageUrl: string, courseUrl: string): FoundFigure[] {
+  const coursePath = new URL(courseUrl).pathname.replace(/\/?$/, '/');
+  const found: FoundFigure[] = [];
+  for (const tag of html.matchAll(/<img\b[^>]*>/gi)) {
+    const src = tag[0].match(/\ssrc="([^"]+)"/i)?.[1];
+    const alt = tag[0].match(/\salt="([^"]*)"/i)?.[1];
+    if (!src || alt === undefined) continue;
+    const altText = squash(decodeHtml(alt));
+    if (altText.length < MIN_ALT_CHARS || altText.length > MAX_ALT_CHARS) continue;
+    let url: URL;
+    try {
+      url = new URL(decodeHtml(src), OCW_ORIGIN);
+    } catch {
+      continue;
+    }
+    if (url.hostname !== OCW_HOST || !url.pathname.startsWith(coursePath) || url.pathname.startsWith(`${coursePath}resources/`)) continue;
+    if (!/\.(jpe?g|png|gif|webp|svg)$/i.test(url.pathname)) continue;
+    url.protocol = 'https:';
+    url.search = '';
+    url.hash = '';
+    const imageUrl = url.toString();
+    if (found.some((figure) => figure.imageUrl === imageUrl)) continue;
+    found.push({ imageUrl, altText, pageUrl, licence: OCW_LICENCE });
+  }
+  return found;
+}
 
 export type OcwCoursePages = {
   courseUrl: string;
@@ -636,7 +677,22 @@ export function courseStructureFromPages(pages: OcwCoursePages): OcwCourseStruct
     });
   }
 
-  return { document, material };
+  const pageHtml: [string | null | undefined, string][] = [
+    [pages.course, pages.courseUrl],
+    [pages.syllabus, info.pages.syllabus ?? pages.courseUrl],
+    [pages.calendar, info.pages.calendar ?? pages.courseUrl],
+    [pages.readings, info.pages.readings ?? pages.courseUrl],
+    [pages.lectureNotes, info.pages['lecture-notes'] ?? pages.courseUrl],
+  ];
+  const figures: FoundFigure[] = [];
+  for (const [html, url] of pageHtml) {
+    if (!html) continue;
+    for (const figure of imagesFromPage(html, url, pages.courseUrl)) {
+      if (!figures.some((known) => known.imageUrl === figure.imageUrl)) figures.push(figure);
+    }
+  }
+
+  return { document, material, figures };
 }
 
 // ---------------------------------------------------------------------------

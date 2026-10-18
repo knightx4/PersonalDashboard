@@ -136,6 +136,19 @@ The explanation at levels 4 to 6 is replaced by a case because explaining
 something is weaker evidence than doing it. Someone can describe a DCF clearly
 and still be unable to build one.
 
+At the explain levels, a figure question takes turns with the explanation
+(plan #2321.5): once a cell has been answered with an explanation, its next
+question asks you to use a figure instead, when the writer finds a form that
+fits the level's checks. The forms are registered on the figure kinds
+(`lib/learn/figures/types.ts`): fill a table's blank cell, say which way a
+chart of a real series went after the year it stops at, or pick the right
+diagram among two or three wrong ones. A pick is graded by code on the choice;
+a typed cell by code when it is plainly right or wrong, and otherwise by the
+grader with the figure and its answer in the prompt. Either way it is graded
+on the asked cell alone, so a figure answer never shows more than an
+explanation could, and its evidence goes through the same three rules. The
+piece page's check stays an explanation.
+
 ## Requirement links
 
 Within a topic, every level requires the level below it. That is implicit and
