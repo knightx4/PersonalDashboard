@@ -414,6 +414,7 @@ export default async function GoalMapPage({
     client,
     { id: map.goal.id, createdAt: map.goal.createdAt ?? null },
     account.timezone,
+    { core },
   )
     .then(async (counted): Promise<MetricView[]> => {
       const known = new Set(sources.map((list) => list.id));

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { countByPeriod, dateFields, metricInputError, type CountedRecord } from '@/lib/goals/metrics';
+import {
+  closedStepDays,
+  countByPeriod,
+  countDaysByPeriod,
+  dashFileDays,
+  dateFields,
+  metricInputError,
+  type CountedRecord,
+} from '@/lib/goals/metrics';
 
 const rec = (applied: string | null, extra: Partial<CountedRecord> = {}): CountedRecord => ({
   data: applied === null ? {} : { applied },
@@ -161,6 +169,88 @@ describe('countByPeriod by month', () => {
     });
     // Still 31 October in Los Angeles, so October is the last month.
     expect(counts).toEqual([{ startsOn: '2026-10-01', endsOn: '2026-11-01', count: 1 }]);
+  });
+});
+
+describe('closedStepDays', () => {
+  it('counts steps closed as done, on the day they closed in the account zone', () => {
+    const days = closedStepDays(
+      [
+        { status: 'done', closedAt: '2026-10-13T09:00:00Z' },
+        // Late on Sunday in UTC is Monday morning in Auckland.
+        { status: 'done', closedAt: '2026-10-11T20:00:00Z' },
+        { status: 'dropped', closedAt: '2026-10-13T10:00:00Z' },
+        { status: 'open', closedAt: null },
+        { status: 'blocked', closedAt: null },
+      ],
+      'Pacific/Auckland',
+    );
+    expect(days).toEqual(['2026-10-13', '2026-10-12']);
+  });
+});
+
+describe('dashFileDays', () => {
+  it('counts each file Dash wrote once, on the day it was made', () => {
+    const days = dashFileDays(
+      [
+        { id: 'f1', madeBy: 'claude', createdAt: '2026-10-13T09:00:00Z' },
+        // The same file linked to the goal and to a step under it.
+        { id: 'f1', madeBy: 'claude', createdAt: '2026-10-13T09:00:00Z' },
+        { id: 'f2', madeBy: 'you', createdAt: '2026-10-13T10:00:00Z' },
+        { id: 'f3', madeBy: 'claude', createdAt: '2026-09-30T23:30:00Z' },
+      ],
+      'UTC',
+    );
+    expect(days).toEqual(['2026-10-13', '2026-09-30']);
+  });
+});
+
+describe('countDaysByPeriod', () => {
+  const now = new Date('2026-10-15T12:00:00Z');
+
+  it('counts closed steps by week from the goal start, with a week of none as zero', () => {
+    const days = closedStepDays(
+      [
+        { status: 'done', closedAt: '2026-09-29T10:00:00Z' },
+        { status: 'done', closedAt: '2026-10-14T10:00:00Z' },
+        { status: 'dropped', closedAt: '2026-10-07T10:00:00Z' },
+      ],
+      'UTC',
+    );
+    expect(
+      countDaysByPeriod({ days, period: 'week', goalStartedAt: '2026-09-28T08:00:00Z', now, timeZone: 'UTC' }),
+    ).toEqual([
+      { startsOn: '2026-09-28', endsOn: '2026-10-05', count: 1 },
+      { startsOn: '2026-10-05', endsOn: '2026-10-12', count: 0 },
+      { startsOn: '2026-10-12', endsOn: '2026-10-19', count: 1 },
+    ]);
+  });
+
+  it('counts Dash files by month', () => {
+    const days = dashFileDays(
+      [
+        { id: 'f1', madeBy: 'claude', createdAt: '2026-09-02T10:00:00Z' },
+        { id: 'f2', madeBy: 'claude', createdAt: '2026-10-01T10:00:00Z' },
+        { id: 'f3', madeBy: 'claude', createdAt: '2026-10-09T10:00:00Z' },
+        { id: 'f4', madeBy: 'you', createdAt: '2026-10-10T10:00:00Z' },
+      ],
+      'UTC',
+    );
+    expect(
+      countDaysByPeriod({ days, period: 'month', goalStartedAt: '2026-09-01T08:00:00Z', now, timeZone: 'UTC' }),
+    ).toEqual([
+      { startsOn: '2026-09-01', endsOn: '2026-10-01', count: 1 },
+      { startsOn: '2026-10-01', endsOn: '2026-11-01', count: 2 },
+    ]);
+  });
+
+  it('gives a goal with nothing closed its periods at zero', () => {
+    expect(
+      countDaysByPeriod({ days: [], period: 'week', goalStartedAt: '2026-10-06T08:00:00Z', now, timeZone: 'UTC' }),
+    ).toEqual([
+      { startsOn: '2026-10-05', endsOn: '2026-10-12', count: 0 },
+      { startsOn: '2026-10-12', endsOn: '2026-10-19', count: 0 },
+    ]);
   });
 });
 

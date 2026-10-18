@@ -131,11 +131,29 @@ export function countByPeriod(options: {
   now: Date;
   timeZone: string;
 }): PeriodCount[] {
+  const { records, dateField, ...rest } = options;
+  return countDaysByPeriod({
+    ...rest,
+    days: records
+      .map((record) => countedDay(record, dateField))
+      .filter((day): day is string => day !== null),
+  });
+}
+
+/**
+ * countByPeriod over calendar days already picked out, one per thing counted:
+ * what the step and file counts below feed it.
+ */
+export function countDaysByPeriod(options: {
+  days: string[];
+  period: MetricPeriod;
+  goalStartedAt: string | null;
+  now: Date;
+  timeZone: string;
+}): PeriodCount[] {
   const zone = safeTimeZone(options.timeZone);
   const today = todayIn(zone, options.now);
-  const days = options.records
-    .map((record) => countedDay(record, options.dateField))
-    .filter((day): day is string => day !== null);
+  const days = options.days.filter((day) => DAY.test(day));
 
   const starts = days.slice();
   if (options.goalStartedAt) starts.push(dayIn(options.goalStartedAt, zone));
@@ -156,4 +174,38 @@ export function countByPeriod(options: {
     if (at !== undefined) periods[at].count += 1;
   }
   return periods;
+}
+
+/** A step under the goal as a steps metric reads it (goals.items). */
+export type CountedStep = { status: string; closedAt: string | null };
+
+/** A file linked under the goal as a files metric reads it (core.files). */
+export type CountedFile = { id: string; madeBy: string; createdAt: string };
+
+/**
+ * The days a steps metric counts (plan #2397.2): each step closed as done, on
+ * the day of its closed_at in the account's zone. A dropped step is closed
+ * too and is left out, as is one still open.
+ */
+export function closedStepDays(steps: CountedStep[], timeZone: string): string[] {
+  const zone = safeTimeZone(timeZone);
+  return steps.flatMap((step) =>
+    step.status === 'done' && step.closedAt ? [dayIn(step.closedAt, zone)] : [],
+  );
+}
+
+/**
+ * The days a files metric counts (plan #2397.2): each file Dash wrote, once,
+ * on the day it was made in the account's zone. A file linked to the goal and
+ * to a step under it is one file, and a new version is the same file, so
+ * neither counts again. Files you wrote are left out.
+ */
+export function dashFileDays(files: CountedFile[], timeZone: string): string[] {
+  const zone = safeTimeZone(timeZone);
+  const seen = new Set<string>();
+  return files.flatMap((file) => {
+    if (file.madeBy !== 'claude' || seen.has(file.id)) return [];
+    seen.add(file.id);
+    return [dayIn(file.createdAt, zone)];
+  });
 }
