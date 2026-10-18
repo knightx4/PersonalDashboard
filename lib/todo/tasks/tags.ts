@@ -27,3 +27,21 @@ export const tagList = z
 export function sortTags(tags: readonly string[]): string[] {
   return [...tags].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * The two tags offered first on every task (plan #2340.2): when it is for.
+ * They lead the picker whether or not they have been used yet.
+ */
+export const LEADING_TAGS = ['now', 'eventually'] as const;
+
+/**
+ * What the tag picker offers, in its order: Now and Eventually, then every
+ * other tag the person has used, in the order given. `typed` narrows the list
+ * to the tags that start with it, normalised as a tag is, so "Ho" finds "home".
+ */
+export function tagSuggestions(used: readonly string[], typed = ''): string[] {
+  const leading: readonly string[] = LEADING_TAGS;
+  const all = [...leading, ...used.filter((tag) => !leading.includes(tag))];
+  const prefix = typed.trim().toLowerCase();
+  return prefix ? all.filter((tag) => tag.startsWith(prefix)) : all;
+}
