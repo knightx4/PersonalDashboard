@@ -89,8 +89,11 @@ describe('StepPage', () => {
     expect(text(html)).toContain('Call each lender.');
     expect(text(html)).toContain('Call the card company');
     expect(text(html)).toContain('Compare the transfer fees');
-    // The page's own step links to the page it is on once: the path's last part.
-    expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(2);
+    // The page links to itself twice: the path's last part, and the Overview
+    // tab, which is the plain address (plan #2373.1). The row does not.
+    expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(3);
+    expect(text(html)).toContain('Sub-steps');
+    expect(text(html)).toContain('Activity');
     expect(html).toMatch(new RegExp(`aria-current="page"[^>]*href="/goals/${GOAL}/s/rates"`));
     expect(text(html.match(/<nav aria-label="Breadcrumb"[\s\S]*?<\/nav>/)![0])).toBe(
       'Goals › … › Money › Pay off the credit cards › Get the rates lowered',

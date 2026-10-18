@@ -386,10 +386,13 @@ import {
   GoalOpenedSurface,
   GoalStepSurface,
   GoalSubStepSurface,
+  GoalStepCommentsSurface,
+  GoalStepEmptySurface,
   GoalTreeSurface,
   GoalAssigneeTipSurface,
   GoalEmptySurface,
 } from './goal-surfaces';
+import { GoalStepMenuSurface } from './step-frame-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
@@ -4777,6 +4780,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* A step's page with its menu open from the title's line (plan #2373.1). */
+    id: 'goals-step-menu',
+    label: 'Goal · a step’s menu on its page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepMenuSurface />,
+  },
+  {
+    /* A step's page whose thread has a comment: the count on Activity (plan #2373.1). */
+    id: 'goals-step-comments',
+    label: 'Goal · a step’s comments on its Activity tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepCommentsSurface />,
+  },
+  {
+    /* A step lacking most facts: its properties say a dash (plan #2373.1). */
+    id: 'goals-step-empty',
+    label: 'Goal · a step with few facts, on its page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepEmptySurface />,
   },
   {
     /* Closing a step on its own page (plan #1623): the goal's close ring

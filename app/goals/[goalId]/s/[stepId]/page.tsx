@@ -105,6 +105,7 @@ export default async function StepOwnPage({
           progress={summariseProgress(entries)}
           arrivals={arrivals}
           canRun={owner}
+          timeZone={account.timezone}
         />
       </YourInitialProvider>
     </StepCloseRing>
