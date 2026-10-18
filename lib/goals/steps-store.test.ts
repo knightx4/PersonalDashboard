@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { loadLiveTree } from '@/lib/goals/steps-store';
+import { loadLiveTree, setStepNotify } from '@/lib/goals/steps-store';
 
 /**
  * A query that answers every filter by returning itself and resolves to the
@@ -84,5 +84,44 @@ describe('loadLiveTree and Dash prep steps (plan #1215)', () => {
       preparesId: null,
       prepCheckedAt: '2026-09-29T07:00:00Z',
     });
+  });
+});
+
+describe('setStepNotify (plan #2376.2)', () => {
+  /** Records every filter the update is narrowed by, and answers with `rows`. */
+  function recordingClient(rows: unknown[], calls: unknown[][]) {
+    return {
+      from(table: string) {
+        calls.push(['from', table]);
+        const query: Record<string, unknown> = {};
+        for (const name of ['update', 'eq', 'not', 'is', 'select']) {
+          query[name] = (...args: unknown[]) => {
+            calls.push([name, ...args]);
+            return query;
+          };
+        }
+        query.then = (resolve: (value: unknown) => unknown) => resolve({ data: rows, error: null });
+        return query;
+      },
+    } as unknown as GoalsSupabaseClient;
+  }
+
+  it("sets the switch only on an open, live step of Dash's", async () => {
+    const calls: unknown[][] = [];
+    expect(await setStepNotify(recordingClient([{ id: 's1' }], calls), 's1', true)).toBe(true);
+    expect(calls).toEqual([
+      ['from', 'items'],
+      ['update', { notify_on_done: true }],
+      ['eq', 'id', 's1'],
+      ['eq', 'level', 'step'],
+      ['eq', 'kind', 'claude'],
+      ['not', 'status', 'in', '(done,dropped)'],
+      ['is', 'archived_at', null],
+      ['select', 'id'],
+    ]);
+  });
+
+  it('says nothing changed when no such step took it', async () => {
+    expect(await setStepNotify(recordingClient([], []), 's1', false)).toBe(false);
   });
 });

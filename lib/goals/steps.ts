@@ -135,6 +135,11 @@ export type Step = {
    */
   estimatedTotal?: number | null;
   totalUnit?: string | null;
+  /**
+   * On a `claude` step, whether you asked for a phone message when Dash
+   * closes it as done (goals migration 0083, plan #2376). Absent reads as off.
+   */
+  notifyOnDone?: boolean;
 };
 
 /**

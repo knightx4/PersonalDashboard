@@ -36,7 +36,8 @@ Before each step, report it on the run row with `now_on` the step's title
    note, a comparison or a plan, is a **file** under the goal ("Files"),
    at any length: `goals.file_result` writes it, links it from the step and
    the goal, and returns its id. The step's `result` is then the answer in
-   two or three sentences, ending with the link. Only a step whose whole
+   two or three sentences, ending with the link, and the first sentence
+   stands alone (see below). Only a step whose whole
    result is a fact or a yes or no ("The office is open on Saturdays") keeps
    it in `result` alone. When the step is worked again, call the same
    function for the same step: it makes a new version of the step's file
@@ -50,6 +51,14 @@ Before each step, report it on the run row with `now_on` the step's title
    when it also lives at a link outside the app. Only a `claude` step takes
    either here; a step of the person's takes them only when it is prepared
    ("A step of yours to prepare").
+
+   **Open every result with one sentence of what you did or found.** The
+   phone notification for a finished step shows that sentence beside the
+   step's title, so it has to make sense alone: plain words, past tense, one
+   sentence under 140 characters, the finding itself and not "Done" or "See
+   the file". Anything longer follows it. For example: "Found three
+   Saturday volunteer sessions in Brooklyn, and the earliest is on 4
+   November." Then the two or three sentences and the link.
 
    ```sql
    set local goals.actor = 'claude';
