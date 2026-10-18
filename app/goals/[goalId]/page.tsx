@@ -555,8 +555,10 @@ export default async function GoalMapPage({
   const metrics = await metricsRead;
   const metricRows = await metricRowsRead;
   const lists = metricLists(sources);
+  // Every goal has steps and files to count (plan #2397.3), so the metrics
+  // show whether or not it holds a list.
   const metricsPart =
-    metricRows && (metricRows.length > 0 || lists.length > 0)
+    metricRows
       ? {
           node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
           count: Math.max(1, metricRows.length),
