@@ -863,7 +863,24 @@ function companyFixture(
 const companyRows: CompanyRow[] = [
   companyFixture('ledgerline', 'Ledgerline', 'target', 'active', ['ledgerline.io'], 2, 'London'),
   companyFixture('halcyon', 'Halcyon Health', 'target', 'no_activity', ['halcyonhealth.com'], 1, 'Boston'),
-  companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+  {
+    // The focused view's company (plan #2341.4): every fact filled and four
+    // of the six questions answered, one at the length real answers get.
+    ...companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+    industry: 'Data infrastructure',
+    website: 'https://northwind.ai',
+    careers_url: 'https://jobs.ashbyhq.com/northwind',
+    perspective_updated_at: '2026-10-02T09:00:00.000Z',
+    ...({
+      perspective_business:
+        'Sells a warehouse-native analytics layer to mid-market finance teams, priced per seat with a usage tier on top. Most revenue is annual contracts.',
+      perspective_why_now:
+        'Raised a Series B in August and is hiring its first FP&A lead; the CFO said on a podcast that forecasting is still a spreadsheet.',
+      perspective_problem:
+        'Moving from founder-led pricing to a model that survives usage growth, and building the first real board pack.',
+      perspective_next_move: 'Ask Priya for an introduction to the CFO before the role is posted.',
+    } as Record<string, string>),
+  } as CompanyRow,
   companyFixture('fabrikam', 'Fabrikam', 'interested', 'closed_out', ['fabrikam.com'], 1, 'Seattle'),
   companyFixture(
     'international-consolidated',
@@ -4274,6 +4291,41 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     render: () => (
       <CompaniesPage companies={companyRows} params={{ priority: 'passed', activity: 'active' }} />
+    ),
+  },
+  {
+    /* The focused view (plan #2341.4): one company in full, opened from its
+     * table row, with previous and next through the filtered, sorted list. */
+    id: 'jobs-companies-focus',
+    label: 'Companies · Focus',
+    module: 'jobs',
+    width: 'wide',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'northwind' }} />
+    ),
+  },
+  {
+    /* At the end of the list: Next goes grey, Previous still steps back. */
+    id: 'jobs-companies-focus-end',
+    label: 'Companies · Focus · Last company',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'wingtip' }} />
+    ),
+  },
+  {
+    /* Filtered to nothing: back to the table, or clear the filters. */
+    id: 'jobs-companies-focus-empty',
+    label: 'Companies · Focus · No companies match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage
+        companies={companyRows}
+        params={{ view: 'focus', priority: 'passed', activity: 'active' }}
+      />
     ),
   },
   {
