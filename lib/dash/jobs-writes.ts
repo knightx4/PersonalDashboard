@@ -338,23 +338,36 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     }
   }
 
-  if (Object.keys(update).length === 0) {
+  const priority = given(args, 'company_priority') ? oneOf(args, 'company_priority', PRIORITIES, false) : null;
+  if (Object.keys(update).length === 0 && !priority) {
     throw new JobsRefused('Nothing to change: give at least one field with its new value.');
   }
 
-  const { data, error } = await env.jobs
-    .from('roles')
-    .update(update)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error?.code === '23505') {
-    throw new JobsRefused('That company already has this same posting. The two can be merged from the company page.');
+  let after = before;
+  if (Object.keys(update).length > 0) {
+    const { data, error } = await env.jobs
+      .from('roles')
+      .update(update)
+      .eq('id', id)
+      .eq('user_id', env.userId)
+      .select('*')
+      .single();
+    if (error?.code === '23505') {
+      throw new JobsRefused('That company already has this same posting. The two can be merged from the company page.');
+    }
+    if (error || !data) throw new Error(`Changing the role failed: ${error?.message ?? 'no row'}`);
+    after = data as Row;
   }
-  if (error || !data) throw new Error(`Changing the role failed: ${error?.message ?? 'no row'}`);
-
-  const after = data as Row;
+  // The priority is the company's, so the role's Undo leaves it.
+  if (priority) {
+    const { error } = await env.jobs
+      .from('companies')
+      .update({ priority })
+      .eq('id', after.company_id as string)
+      .eq('user_id', env.userId);
+    if (error) throw new Error(`Marking the company failed: ${error.message}`);
+    changed.push(`its company's priority, to ${priority}`);
+  }
   const was = roleName(before, await companyName(env, before.company_id));
   const now = movedTo ? roleName(after, movedTo) : roleName(after, await companyName(env, after.company_id));
   const href = roleHref(id);
@@ -2973,7 +2986,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_role',
     description:
-      "Change a role in their Jobs workspace when they ask: its title, location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
+      "Change a role in their Jobs workspace when they ask: its title, location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
       type: 'object',
       properties: {
@@ -2990,6 +3003,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         pay_max: { type: 'number', description: 'The top of the yearly pay band. 0 clears it.' },
         pay_source: { type: 'string', description: `Where the pay came from: ${PAY_SOURCES.join(', ')}. ${CLEARABLE}` },
         company: { type: 'string', description: 'The company the role belongs to, by name.' },
+        company_priority: {
+          type: 'string',
+          enum: [...PRIORITIES],
+          description: "How much they want to work at the role's company, such as target. Set on the company, after any move, and kept if this change is undone.",
+        },
       },
       additionalProperties: false,
     },
@@ -3071,7 +3089,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_company',
     description:
-      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company.",
+      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company. To mark the company of a job already saved as a target, look up the role and pass its company here with priority target.",
     input_schema: {
       type: 'object',
       properties: {

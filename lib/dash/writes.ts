@@ -688,8 +688,21 @@ const LEAD_TITLE_MAX = 300;
  * either; the company stays.
  */
 async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
-  return saveJobLead(ctx, { url: text(args, 'url') || null, title: text(args, 'title'), company: text(args, 'company') });
+  const priority = text(args, 'company_priority') || null;
+  if (priority && !(COMPANY_PRIORITIES as readonly string[]).includes(priority)) {
+    throw new Refused(`company_priority must be one of: ${COMPANY_PRIORITIES.join(', ')}.`);
+  }
+  return saveJobLead(ctx, {
+    url: text(args, 'url') || null,
+    title: text(args, 'title'),
+    company: text(args, 'company'),
+    companyPriority: priority as CompanyPriority | null,
+  });
 }
+
+/** How much they want to work at a company, as the companies page sets it. */
+const COMPANY_PRIORITIES = ['target', 'interested', 'backup', 'passed'] as const;
+type CompanyPriority = (typeof COMPANY_PRIORITIES)[number];
 
 /** What saving a lead needs: the person, their workspaces, their clients and a way to read a posting. */
 export type JobLeadContext = Pick<DashWriteContext, 'userId' | 'enabledModules' | 'db' | 'readPosting'>;
@@ -732,7 +745,7 @@ function leadRefusalForPerson(message: string): string {
 
 async function saveJobLead(
   ctx: JobLeadContext,
-  input: { url: string | null; title: string; company: string },
+  input: { url: string | null; title: string; company: string; companyPriority?: CompanyPriority | null },
 ): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
   const url = input.url?.trim() || null;
@@ -790,6 +803,15 @@ async function saveJobLead(
     ats: !vendor || vendor === 'other' || vendor === 'unknown' ? null : vendor,
   });
   if (company.error) throw new Error(company.error);
+  // Marking the company (a target, say) is the company's, so the role's Undo leaves it.
+  if (input.companyPriority) {
+    const { error: marked } = await jobs
+      .from('companies')
+      .update({ priority: input.companyPriority })
+      .eq('id', company.id)
+      .eq('user_id', ctx.userId);
+    if (marked) throw new Error(marked.message);
+  }
 
   const role = await one<{ id: string }>(
     jobs
@@ -821,7 +843,9 @@ async function saveJobLead(
       op: 'insert',
       before: null,
       after: await readSubject(ctx.db, ref),
-      summary: `Dash saved ${roleTitle} to your leads.`,
+      summary: input.companyPriority
+        ? `Dash saved ${roleTitle} to your leads and marked ${companyName} as ${input.companyPriority}.`
+        : `Dash saved ${roleTitle} to your leads.`,
       row: { table: TABLE.role, ref: role.id, title: roleTitle, href: `/jobs/roles/${role.id}` },
     },
   );
@@ -1072,13 +1096,19 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_job_lead',
-    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this.',
+    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this. To mark the company a target as well, pass company_priority; for a job already saved, mark its company with change_company.',
     {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'The job posting link, when there is one.' },
         title: { type: 'string', description: 'The role title, when they gave it or you know it.' },
         company: { type: 'string', description: 'The company the role is at.' },
+        company_priority: {
+          type: 'string',
+          enum: [...COMPANY_PRIORITIES],
+          description:
+            'When they say so, how much they want to work at the company: target, interested, backup or passed. It is set on the company, found or added, and stays if the lead is undone. Leave it out to keep the company as it is.',
+        },
       },
       additionalProperties: false,
     },

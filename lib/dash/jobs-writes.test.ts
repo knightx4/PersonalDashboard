@@ -193,6 +193,17 @@ describe('the Jobs writes', () => {
   });
 });
 
+describe('change_role company_priority', () => {
+  it("marks an existing job's company a target, and alone changes nothing on the role", async () => {
+    const t = tables();
+    const change = await made('change_role', t, { role_ref: ROLE, company_priority: 'target' });
+    expect(t['job_search.companies'][0]).toMatchObject({ id: COMPANY, priority: 'target' });
+    expect(change.after).toEqual(change.before);
+    expect(change.summary).toBe("Dash changed its company's priority, to target on the role Role from email at Acme.");
+    expect(await refused('change_role', t, { role_ref: ROLE, company_priority: 'dream' })).toMatch(/must be one of/);
+  });
+});
+
 describe('change_company (plan #1894.6.2)', () => {
   it('renames a company, moving its slug with it, and tidies its domains', async () => {
     const change = await made('change_company', tables(), {

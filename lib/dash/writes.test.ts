@@ -310,6 +310,21 @@ describe('add_job_lead', () => {
     expect(tables['job_search.roles'].some((r) => r.jd_url === BARE)).toBe(false);
   });
 
+  it('marks the company a target when asked, and the Undo leaves the mark', async () => {
+    const result = ok(await apply('add_job_lead', { title: 'Data analyst', company: 'Acme', company_priority: 'target' }));
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Acme', priority: 'target' })]);
+    expect(result).toMatchObject({ summary: 'Dash saved Data analyst at Acme to your leads and marked Acme as target.' });
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ priority: 'target' })]);
+  });
+
+  it('refuses a priority that is not one, and saves nothing', async () => {
+    const result = await apply('add_job_lead', { title: 'Data analyst', company: 'Acme', company_priority: 'dream' });
+    expect(!result.ok && result.error).toContain('company_priority must be one of');
+    expect(tables['job_search.companies']).toEqual([]);
+  });
+
   it('prefers the company they gave over the one the page names', async () => {
     const ctx: DashWriteContext = {
       ...context(),
