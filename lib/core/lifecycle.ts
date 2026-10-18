@@ -369,6 +369,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   tension_status: 'a contradiction the vault found, settled by the notes',
   plan_runs_status_ck: 'state of a Dash run',
   company_research_status_ck: 'state of a Dash research run',
+  insight_runs_status_ck: 'state of a Dash run',
+  insights_status_ck: 'whether Dash still shows an insight it wrote',
   runs_status_ck: 'state of a Dash run',
   watches_status_ck: 'state of a Dash watch',
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
