@@ -105,6 +105,13 @@ export const learnActions: ModuleActions = {
   'app/learn/e/[id]/attached-actions.ts': {
     detachVaultNote: none('theirs', 'Takes a vault note off the essay; one Dash attached is taken off with its Undo on Home.'),
   },
+  'app/learn/e/[id]/notes-to-vault-actions.ts': {
+    previewEssayNotesInVaultNote: none('page'),
+    addEssayNotesToVaultNote: {
+      tool: 'edit_vault_note',
+      note: "Dash adds the essay's notes to the note with append.",
+    },
+  },
   'app/learn/e/[id]/guide-actions.ts': {
     changeEssayPlan: none('own'),
     updateNoteMap: none('spends', IN_THE_ESSAY),
