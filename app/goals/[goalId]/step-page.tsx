@@ -1,18 +1,18 @@
 'use client';
 
-import { PathLine } from '@/components/shell/back-link';
-import { parentCrumb } from '@/lib/core/back-from';
+import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Card } from '@/components/ui/card';
 import type { LinkedFile } from '@/lib/files/files';
 import { stepCrumbs } from '@/lib/goals/crumbs';
+import { STEP_TABS } from '@/lib/goals/goal-page';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import type { ItemProgress } from '@/lib/goals/progress';
 import type { StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { GoalRow } from './goal-row';
 import type { InformationSeam } from './information-step';
+import { StepGlance, StepProperties, stepDetailCount, stepLine } from './step-properties';
 import { useGoalRows } from './step-tree';
-import { PageColumn } from '@/components/shell/page-width';
 
 /** The row for a step anywhere in the tree, with the rows beside it. */
 function findRow(
@@ -38,6 +38,12 @@ function findRow(
  * way. Above the row, the path from Goals names the area, the goal and every
  * step this one sits under (plan #1622).
  *
+ * It sits in the goal page's frame (plan #2373.1): the path, the step's
+ * status you press and its title, the menu on the title's line, the
+ * Overview, Sub-steps and Activity tabs and the properties column. The row
+ * hands its status, title and menu to the frame (`frame` on TreeRow) and
+ * draws the rest of itself under the tabs.
+ *
  * The page's caller has already checked the step is under this goal; a step
  * the rows do not hold draws nothing.
  */
@@ -51,6 +57,7 @@ export function StepPage({
   arrivals,
   canRun = true,
   informationSeam,
+  timeZone = 'UTC',
 }: {
   map: GoalMap;
   stepId: string;
@@ -62,6 +69,8 @@ export function StepPage({
   canRun?: boolean;
   /** An information step's list as the gallery wants it. Nothing in the app passes it. */
   informationSeam?: InformationSeam;
+  /** The account's zone, for the day the step was added. */
+  timeZone?: string;
 }) {
   const { own, context } = useGoalRows(map, {
     todoOn,
@@ -81,24 +90,46 @@ export function StepPage({
   });
   const substeps = siblings.filter((sibling) => sibling.kind !== 'decision');
 
+  const open = row.rollup.live - row.rollup.done;
+  const tabs = STEP_TABS.map((tab) =>
+    tab.id === 'substeps'
+      ? { ...tab, count: open }
+      : tab.id === 'activity'
+        ? { ...tab, count: row.thread.length }
+        : tab,
+  );
+
   return (
-    <PageColumn>
-      {/* The path down to the step, through every step it sits under (plan #1622). */}
-      {crumbs && <PathLine crumbs={crumbs} fallback={parentCrumb(crumbs)} className="mb-3" />}
-      {/* The step's own row is the page's heading: its title, the status
-          you press to change and its menu, then the panel and sub-steps. */}
-      <Card padding="none">
-        <ul>
-          <GoalRow
-            node={row}
-            trail={[]}
-            context={context}
-            index={substeps.findIndex((sibling) => sibling.id === row.id)}
-            count={substeps.length}
-            page
-          />
-        </ul>
-      </Card>
-    </PageColumn>
+    <GoalRow
+      node={row}
+      trail={[]}
+      context={context}
+      index={substeps.findIndex((sibling) => sibling.id === row.id)}
+      count={substeps.length}
+      page
+      frame={({ status, title, menu, rows }) => (
+        <TabbedDetail
+          // The path down to the step, through every step it sits under (plan #1622).
+          subject={{ ref: null, path: crumbs ?? [] }}
+          // The status you press, then the title, as the goal's hexagon and title.
+          lead={status}
+          title={title}
+          description={<span className="text-small">{stepLine(row, timeZone)}</span>}
+          actions={menu}
+          glance={<StepGlance node={row} />}
+          detailCount={stepDetailCount(row)}
+          properties={<StepProperties node={row} />}
+          tabs={tabs}
+          label="Step"
+          className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
+        >
+          {/* The step's panel and its sub-steps, whole until the next step
+              (plan #2373.2) shares them out across the tabs. */}
+          <Card padding="none">
+            <ul className="pt-2">{rows}</ul>
+          </Card>
+        </TabbedDetail>
+      )}
+    />
   );
 }

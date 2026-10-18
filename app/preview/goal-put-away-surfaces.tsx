@@ -17,7 +17,7 @@ const nothing = () => undefined;
  * Opens the menu `trigger` names inside the box, then, when `item` is given,
  * presses that item in the open menu, which arms a confirm in place.
  */
-function OpenMenu({
+export function OpenMenu({
   trigger,
   item,
   children,

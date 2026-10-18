@@ -169,6 +169,14 @@ export function titleHead(title: string): string {
   return trimmed.slice(0, trimmed.length - titleTail(title).length);
 }
 
+/** What a `heading` row hands its page's frame: see `frame` on `TreeRow`. */
+export type TreeRowFrameParts = {
+  status: ReactNode;
+  title: ReactNode;
+  menu: ReactNode;
+  rows: ReactNode;
+};
+
 /** Everything under a row sits in from the tree by the same amount the title does. */
 export function rowInset(trail: readonly boolean[]): CSSProperties {
   return { paddingLeft: `${0.75 + trail.length * 1.25 + 1.25}rem` };
@@ -209,8 +217,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
   dimClosed = true,
   after,
   heading = false,
+  frame,
   titleHref,
 }: {
+  /**
+   * The page's frame around a `heading` row (a goal step's own page, plan
+   * #2373.1). The row hands it the status you press, the title (or its
+   * editor while renaming) and the menu for the page's header, and the rest
+   * of itself, the panel and the sub-steps, as list items for a `<ul>` under
+   * the tabs, in place of drawing its title as a row of its own.
+   */
+  frame?: (parts: TreeRowFrameParts) => ReactNode;
   /**
    * Where the title goes, when the row has a page of its own (a goal step's,
    * plan #1621). The title is then a link to it, and the chevron in the fold
@@ -446,6 +463,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // answering it differently should not be a form. It sits after the title.
   // What the state means rides on the menu's trigger as a Tooltip, rather
   // than on the label inside it, so the button keeps the one tab stop.
+  // In a page's frame the status is its glyph alone, as a goal's hexagon is,
+  // since the properties beside it say the word (plan #2373.1).
+  const glyphOnly = heading && Boolean(frame);
   const healthTrigger = (
     <ActionMenu
       label={`Status of #${node.outline} ${node.title}`}
@@ -475,9 +495,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
           glyph={health.name === 'dropped' ? null : health.glyph}
           // On a phone the glyph stands for the word, which stays for
           // screen readers, so a dropped row gets its slash back there.
-          wordClassName="max-sm:sr-only"
+          wordClassName={glyphOnly ? 'sr-only' : 'max-sm:sr-only'}
         >
-          {health.name === 'dropped' && <StatusGlyph glyph={health.glyph} className="sm:hidden" />}
+          {health.name === 'dropped' && <StatusGlyph glyph={health.glyph} className={glyphOnly ? undefined : 'sm:hidden'} />}
         </StateLabel>
       }
     />
@@ -613,7 +633,27 @@ export function TreeRow<E extends TreeCatalogEntry>({
     </>
   );
 
-  return (
+  // The title as a page's heading: the count and the marks run on after the
+  // title's last word and wrap with it, so a title that fits on one line
+  // keeps them on that line (plan #1623).
+  const headingTitle = (
+    <>
+      <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+        {titleHead(node.title)}
+      </span>
+      <span className="whitespace-nowrap">
+        <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+          {titleTail(node.title)}
+        </span>
+        <span className="ml-2 inline-flex items-center gap-1.5 align-middle font-sans text-ui font-normal tracking-normal">
+          <CommentCount count={node.thread.length} />
+          {marks}
+        </span>
+      </span>
+    </>
+  );
+
+  const titleRow = (
     <>
       {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
           the row clear of the pinned header it would otherwise arrive under. */}
@@ -724,21 +764,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
           ) : heading ? (
             <h1 className="min-w-0 flex-1 self-center pl-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
-              {/* The count and the marks run on after the title's last word
-                  and wrap with it, so a title that fits on one line keeps
-                  them on that line (plan #1623). */}
-              <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
-                {titleHead(node.title)}
-              </span>
-              <span className="whitespace-nowrap">
-                <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
-                  {titleTail(node.title)}
-                </span>
-                <span className="ml-2 inline-flex items-center gap-1.5 align-middle font-sans text-ui font-normal tracking-normal">
-                  <CommentCount count={node.thread.length} />
-                  {marks}
-                </span>
-              </span>
+              {headingTitle}
             </h1>
           ) : titleHref ? (
             <div className="min-w-0 flex-1 self-center text-left sm:self-start">{rowLines}</div>
@@ -837,7 +863,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
           <ActionMenu label={`Actions for #${node.outline}`} items={menu} />
         </div>
       </li>
+    </>
+  );
 
+  const rest = (
+    <>
       {notices}
 
       {row.editing && !titleEditor ? (
@@ -946,20 +976,29 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
                   {meta}
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      // On the step's own page its words line up with the text above.
-                      className={heading ? '-ml-2.5' : undefined}
-                      onClick={() => row.setEditing(true)}
-                    >
-                      {titleEditor ? 'Rename' : 'Edit'}
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={row.addChild}>
-                      Add a sub-step
-                    </Button>
+                  {/* Hidden when it holds nothing, as in a page's frame with no
+                      proposal or Ask Dash box open, so it leaves no gap. */}
+                  <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                    {/* In a page's frame Rename and Add a sub-step are in the
+                        menu on the title's line, so they are not said twice
+                        (plan #2373.1). */}
+                    {!glyphOnly && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          // On the step's own page its words line up with the text above.
+                          className={heading ? '-ml-2.5' : undefined}
+                          onClick={() => row.setEditing(true)}
+                        >
+                          {titleEditor ? 'Rename' : 'Edit'}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={row.addChild}>
+                          Add a sub-step
+                        </Button>
+                      </>
+                    )}
                     {panelActions}
                   </div>
                 </>
@@ -984,6 +1023,23 @@ export function TreeRow<E extends TreeCatalogEntry>({
           {addChild}
         </li>
       )}
+    </>
+  );
+
+  // On a page with a frame, the title row's parts go to the page's header.
+  if (heading && frame) {
+    return frame({
+      status: healthMenu,
+      title: row.editing && titleEditor ? titleEditor : headingTitle,
+      menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
+      rows: rest,
+    });
+  }
+
+  return (
+    <>
+      {titleRow}
+      {rest}
     </>
   );
 }

@@ -296,6 +296,22 @@ export function GoalSubStepSurface() {
 }
 
 /**
+ * A step's page with its comment showing on the Activity tab's label (plan
+ * #2373.1): Call the card company, which has one comment in its thread.
+ */
+export function GoalStepCommentsSurface() {
+  return <StepPage map={map} stepId="call" todoOn={false} />;
+}
+
+/**
+ * A step that lacks most facts (plan #2373.1): List every balance, done, with
+ * no date, no sub-steps and nothing it waits on, so its properties say a dash.
+ */
+export function GoalStepEmptySurface() {
+  return <StepPage map={map} stepId="list" todoOn={false} />;
+}
+
+/**
  * The same goal with some of its steps changed, for the moments on a step's
  * own page (app/preview/goal-moment-demos.tsx): a fresh forest each time, so
  * the fixtures above are never touched.
