@@ -1,4 +1,4 @@
-import { gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
+import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /** What Todo's pages let the person do, and the tool that does each (lib/agent-actions/types.ts). */
 export const todoActions: ModuleActions = {
@@ -20,7 +20,7 @@ export const todoActions: ModuleActions = {
     placeTask: none('setting', 'The order of a pile is how the person arranges their own list.'),
     removeTask: none('deletes'),
     tagTask: tool('edit_todo'),
-    untagTask: gap('Dash can tag a todo that has no tags, but cannot take a tag off one.'),
+    untagTask: none('deletes', 'Takes a tag off the todo. Dash only tags a todo that has none and never changes the tags a person chose.'),
     usedTaskTags: none('page'),
     errandAreas: none('page'),
     handTaskToDash: none('spends', 'Hands the task to a Dash routine as an errand.'),
