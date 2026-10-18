@@ -192,19 +192,22 @@ export function factWrites(changed: readonly ChangedFact[], sourceFor: (field: R
   return changed.map(({ field, cleared }) => (cleared ? { field, cleared: true as const } : { field, source: sourceFor(field) }));
 }
 
+/** The row a fact's origin hangs off: a role, or a company. */
+type Subject = { column: 'role_id' | 'company_id'; id: string };
+
 async function originsOnFile(
   supabase: AppSupabaseClient,
   userId: string,
-  roleId: string,
-  fields: readonly RoleFactField[],
+  subject: Subject,
+  fields: readonly FactField[],
 ): Promise<Map<string, OnFile>> {
   const { data, error } = await supabase
     .from('fact_origins')
     .select('id, field, origin, certainty')
     .eq('user_id', userId)
-    .eq('role_id', roleId)
+    .eq(subject.column, subject.id)
     .in('field', [...fields]);
-  if (error) throw new Error(`fact origins for role ${roleId}: ${error.message}`);
+  if (error) throw new Error(`fact origins for ${subject.column === 'role_id' ? 'role' : 'company'} ${subject.id}: ${error.message}`);
   return new Map(((data ?? []) as OnFile[]).map((row) => [row.field, row]));
 }
 
@@ -221,7 +224,7 @@ export async function moreCertainOnFile(
 ): Promise<{ field: RoleFactField; origin: FactOrigin; certainty: FactCertainty }[]> {
   const given = writes.filter((write): write is Extract<FactWrite, { source: FactSource }> => 'source' in write);
   if (given.length === 0) return [];
-  const onFile = await originsOnFile(supabase, userId, roleId, given.map((write) => write.field));
+  const onFile = await originsOnFile(supabase, userId, { column: 'role_id', id: roleId }, given.map((write) => write.field));
   const out: { field: RoleFactField; origin: FactOrigin; certainty: FactCertainty }[] = [];
   for (const write of given) {
     const existing = onFile.get(write.field) ?? null;
@@ -251,11 +254,21 @@ export async function recordRoleFactOrigins(
   writes: readonly FactWrite[],
   options: { force?: boolean; now?: Date } = {},
 ): Promise<{ recorded: RoleFactField[]; kept: RoleFactField[] }> {
-  const recorded: RoleFactField[] = [];
-  const kept: RoleFactField[] = [];
+  return recordOrigins(supabase, userId, { column: 'role_id', id: roleId }, writes, options);
+}
+
+async function recordOrigins<F extends FactField>(
+  supabase: AppSupabaseClient,
+  userId: string,
+  subject: Subject,
+  writes: readonly ({ field: F; source: FactSource } | { field: F; cleared: true })[],
+  options: { force?: boolean; now?: Date },
+): Promise<{ recorded: F[]; kept: F[] }> {
+  const recorded: F[] = [];
+  const kept: F[] = [];
   if (writes.length === 0) return { recorded, kept };
 
-  const onFile = await originsOnFile(supabase, userId, roleId, writes.map((write) => write.field));
+  const onFile = await originsOnFile(supabase, userId, subject, writes.map((write) => write.field));
   const recordedAt = (options.now ?? new Date()).toISOString();
 
   for (const write of writes) {
@@ -281,7 +294,7 @@ export async function recordRoleFactOrigins(
     };
     const { error } = existing
       ? await supabase.from('fact_origins').update(row).eq('id', existing.id).eq('user_id', userId)
-      : await supabase.from('fact_origins').insert({ user_id: userId, role_id: roleId, field: write.field, ...row });
+      : await supabase.from('fact_origins').insert({ user_id: userId, [subject.column]: subject.id, field: write.field, ...row });
     if (error) throw new Error(`recording the origin of ${write.field}: ${error.message}`);
     recorded.push(write.field);
   }
@@ -314,5 +327,83 @@ export async function recordHandEditOrigins(
     await recordRoleFactOrigins(supabase, userId, roleId, writes, { force: true, now: options.now });
   } catch (error) {
     console.error('role edit: recording where the facts came from failed', error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// A company's facts (plan #2343.4)
+// ---------------------------------------------------------------------------
+
+/** What a write did to one of a company's facts. */
+export type CompanyFactWrite = { field: CompanyFactField; source: FactSource } | { field: CompanyFactField; cleared: true };
+
+/** The origin on file for each of a company's facts, null where none is recorded. */
+export async function loadCompanyFactOrigins(
+  supabase: AppSupabaseClient,
+  userId: string,
+  companyId: string,
+): Promise<Record<CompanyFactField, FactOriginRecord | null>> {
+  const { data, error } = await supabase
+    .from('fact_origins')
+    .select(FACT_ORIGIN_COLUMNS)
+    .eq('user_id', userId)
+    .eq('company_id', companyId);
+  if (error) throw new Error(`fact origins for company ${companyId}: ${error.message}`);
+  const all = roleFactOrigins((data ?? []) as Row[]);
+  return Object.fromEntries(COMPANY_FACT_FIELDS.map((field) => [field, all[field]])) as Record<
+    CompanyFactField,
+    FactOriginRecord | null
+  >;
+}
+
+/**
+ * Record where a company's facts came from, once the values are written, by
+ * the same rule as recordRoleFactOrigins: a write replaces the origin on file
+ * only when it is at least as certain, unless `force` (the person's own
+ * edit), and an emptied fact loses its row.
+ */
+export async function recordCompanyFactOrigins(
+  supabase: AppSupabaseClient,
+  userId: string,
+  companyId: string,
+  writes: readonly CompanyFactWrite[],
+  options: { force?: boolean; now?: Date } = {},
+): Promise<{ recorded: CompanyFactField[]; kept: CompanyFactField[] }> {
+  return recordOrigins(supabase, userId, { column: 'company_id', id: companyId }, writes, options);
+}
+
+/**
+ * The origin of a stage the Wikidata lookup fills in. Dash read it from the
+ * company's Wikidata entry and links that entry, so it is secondhand; with no
+ * entry to quote it would be a guess.
+ */
+export function enrichmentStageSource(wikidataId: string | null): FactSource {
+  return wikidataId
+    ? { origin: 'dash', certainty: 'secondhand', sourceUrl: `https://www.wikidata.org/wiki/${wikidataId}` }
+    : { origin: 'dash', certainty: 'guess' };
+}
+
+/**
+ * The person's own edit of a company's stage: theirs and firsthand when they
+ * set it, replacing any origin on file, and no origin when they emptied it.
+ * A save that left the stage as it was records nothing. A failure is logged,
+ * since the edit itself saved.
+ */
+export async function recordCompanyStageEdit(
+  supabase: AppSupabaseClient,
+  userId: string,
+  companyId: string,
+  before: string | null,
+  after: string | null,
+  options: { now?: Date } = {},
+): Promise<void> {
+  if ((before ?? null) === (after ?? null)) return;
+  const write: CompanyFactWrite = blank(after)
+    ? { field: 'stage', cleared: true }
+    : { field: 'stage', source: { origin: 'you', certainty: 'firsthand' } };
+  try {
+    await recordCompanyFactOrigins(supabase, userId, companyId, [write], { force: true, now: options.now });
+  } catch (error) {
+    console.error('company edit: recording where the stage came from failed', error);
   }
 }

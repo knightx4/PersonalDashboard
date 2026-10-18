@@ -23,6 +23,13 @@ import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
 import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import {
+  enrichmentStageSource,
+  loadCompanyFactOrigins,
+  mayReplace,
+  recordCompanyFactOrigins,
+  recordCompanyStageEdit,
+} from '@/lib/jobs/fact-origins';
 
 /**
  * Add a company by name, from the Companies tab (note 8554f9d8). The same
@@ -61,6 +68,8 @@ const updateSchema = z.object({
   domains: z.string().optional(),
   industry: z.string().optional(),
   hqLocation: z.string().optional(),
+  /** Typed by the person, so recorded as theirs and firsthand (plan #2343.4). */
+  stage: z.string().max(200).optional(),
   careersUrl: z.string().optional(),
   linkedinUrl: z.string().optional(),
   website: z.string().optional(),
@@ -89,6 +98,7 @@ export async function updateCompany(
   if (parsed.data.research !== undefined) patch.research = parsed.data.research || null;
   if (parsed.data.industry !== undefined) patch.industry = parsed.data.industry || null;
   if (parsed.data.hqLocation !== undefined) patch.hq_location = parsed.data.hqLocation || null;
+  if (parsed.data.stage !== undefined) patch.stage = parsed.data.stage.trim() || null;
   if (parsed.data.careersUrl !== undefined) patch.careers_url = parsed.data.careersUrl || null;
   if (parsed.data.linkedinUrl !== undefined) patch.linkedin_url = parsed.data.linkedinUrl || null;
   if (parsed.data.website !== undefined) patch.website = parsed.data.website || null;
@@ -108,6 +118,20 @@ export async function updateCompany(
       .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(entry));
   }
 
+  // The stage before the save, so only a stage that moved gets a new origin.
+  let stageBefore: string | null = null;
+  if ('stage' in patch) {
+    const { data: before, error: readError } = await supabase
+      .from('companies')
+      .select('stage')
+      .eq('id', parsed.data.companyId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (readError) return { error: readError.message };
+    if (!before) return { error: 'That company is not on your list.' };
+    stageBefore = (before.stage as string | null) ?? null;
+  }
+
   const { error } = await supabase
     .from('companies')
     .update(patch)
@@ -115,6 +139,9 @@ export async function updateCompany(
     .eq('user_id', user.id);
 
   if (error) return { error: error.message };
+  if ('stage' in patch) {
+    await recordCompanyStageEdit(supabase, user.id, parsed.data.companyId, stageBefore, patch.stage as string | null);
+  }
   revalidatePath('/jobs/companies');
   revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
@@ -344,6 +371,19 @@ export async function applyCompanyEnrichment(
     return { applied: [], error: 'Could not reach Wikidata just now. Try again in a moment.' };
   }
 
+  // The lookup fills blanks only, but a stage with a more certain origin on
+  // file is kept even so: Wikidata's reading never replaces what you said.
+  const stageSource = enrichmentStageSource(parsed.data.wikidataId);
+  if (patch.stage) {
+    try {
+      const onFile = await loadCompanyFactOrigins(supabase, user.id, parsed.data.companyId);
+      if (!mayReplace(onFile.stage, stageSource.certainty)) delete patch.stage;
+    } catch (err) {
+      console.error('company enrichment: reading where the stage came from failed', err);
+      delete patch.stage;
+    }
+  }
+
   if (Object.keys(patch).length === 0) {
     return { applied: [], error: null };
   }
@@ -355,6 +395,14 @@ export async function applyCompanyEnrichment(
     .eq('user_id', user.id);
 
   if (writeError) return { applied: [], error: writeError.message };
+
+  if (patch.stage) {
+    try {
+      await recordCompanyFactOrigins(supabase, user.id, parsed.data.companyId, [{ field: 'stage', source: stageSource }]);
+    } catch (err) {
+      console.error('company enrichment: recording where the stage came from failed', err);
+    }
+  }
 
   // The detail page is where the button was pressed, so it is the page that
   // has to change. Revalidating only the list left the fields exactly as they

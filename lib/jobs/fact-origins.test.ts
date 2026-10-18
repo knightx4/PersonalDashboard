@@ -3,7 +3,11 @@ import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db'
 import type { AppSupabaseClient } from './db/schema-name';
 import {
   changedRoleFacts,
+  enrichmentStageSource,
+  loadCompanyFactOrigins,
   mayReplace,
+  recordCompanyFactOrigins,
+  recordCompanyStageEdit,
   originFromCompSource,
   recordHandEditOrigins,
   recordRoleFactOrigins,
@@ -99,6 +103,44 @@ describe('recordHandEditOrigins', () => {
     expect(originOf(t, 'comp')).toMatchObject({ origin: 'posting' });
     await recordHandEditOrigins(db(t), ME, ROLE, before, { comp_min_cents: 300, comp_max_cents: 400, comp_source: 'posted' }, { payFromPosting: true });
     expect(originOf(t, 'comp')).toMatchObject({ origin: 'posting', certainty: 'firsthand' });
+  });
+});
+
+describe('company stage origins', () => {
+  const COMPANY = '22222222-2222-4222-8222-222222222222';
+  const stageOf = (tables: FakeTables) => origins(tables).find((row) => row.company_id === COMPANY && row.field === 'stage');
+
+  it('records the Wikidata stage as secondhand with its entry, and a guess does not replace your stage', async () => {
+    const t: FakeTables = { 'job_search.fact_origins': [] };
+    expect(enrichmentStageSource(null)).toEqual({ origin: 'dash', certainty: 'guess' });
+    await recordCompanyFactOrigins(db(t), ME, COMPANY, [{ field: 'stage', source: enrichmentStageSource('Q95') }]);
+    expect(stageOf(t)).toMatchObject({
+      user_id: ME,
+      origin: 'dash',
+      certainty: 'secondhand',
+      source_url: 'https://www.wikidata.org/wiki/Q95',
+    });
+
+    await recordCompanyStageEdit(db(t), ME, COMPANY, 'Public company', 'Series C');
+    expect(stageOf(t)).toMatchObject({ origin: 'you', certainty: 'firsthand', source_url: null });
+
+    const out = await recordCompanyFactOrigins(db(t), ME, COMPANY, [{ field: 'stage', source: enrichmentStageSource(null) }]);
+    expect(out).toEqual({ recorded: [], kept: ['stage'] });
+    expect(stageOf(t)).toMatchObject({ origin: 'you', certainty: 'firsthand' });
+    expect((await loadCompanyFactOrigins(db(t), ME, COMPANY)).stage).toMatchObject({ origin: 'you', certainty: 'firsthand' });
+  });
+
+  it('records nothing for an unchanged stage, drops the origin of an emptied one, and touches no other account', async () => {
+    const t: FakeTables = {
+      'job_search.fact_origins': [
+        { id: 'c1', user_id: ME, company_id: COMPANY, field: 'stage', origin: 'dash', certainty: 'guess' },
+        { id: 'c2', user_id: SOMEONE, company_id: COMPANY, field: 'stage', origin: 'you', certainty: 'firsthand' },
+      ],
+    };
+    await recordCompanyStageEdit(db(t), ME, COMPANY, 'Seed', 'Seed');
+    expect(origins(t)).toHaveLength(2);
+    await recordCompanyStageEdit(db(t), ME, COMPANY, 'Seed', null);
+    expect(origins(t)).toEqual([expect.objectContaining({ id: 'c2', user_id: SOMEONE })]);
   });
 });
 
