@@ -12,6 +12,7 @@ import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
+import { runInsightsTick } from '@/inngest/you/insights-tick';
 import { runScopeDays } from '@/inngest/goals/scope-days';
 import { runBriefWatch } from '@/inngest/learn/brief-watch';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
@@ -86,6 +87,9 @@ export async function GET(request: NextRequest) {
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
+    // Weekly, and sooner after a rejection, an offer or a goal done; a few
+    // reads and one request (plan #2413.6).
+    { name: 'insights', run: () => runInsightsTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },
