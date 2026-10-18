@@ -455,6 +455,20 @@ const DEPENDENTS: Record<string, Dependent[]> = {
 /** A refusal the person reads. */
 class Refused extends Error {}
 
+/**
+ * The key in `undo` naming the tags Dash put on a todo with the change
+ * (plan #2340.4). Tags are rows of todo.task_tags, not columns of the task,
+ * so the rule takes them off by name after putting the task's row back.
+ */
+export const TAGS_ADDED = 'tags_added';
+
+/** The tags a change put on its todo, from its record. */
+export function tagsAdded(action: Pick<DashAction, 'subjectRef' | 'undo'>): string[] {
+  const tags = action.undo?.[TAGS_ADDED];
+  if (!action.subjectRef?.startsWith('todo.tasks:') || !Array.isArray(tags)) return [];
+  return tags.filter((tag): tag is string => typeof tag === 'string');
+}
+
 // ---------------------------------------------------------------------------
 // The rule, pure
 // ---------------------------------------------------------------------------
@@ -717,6 +731,9 @@ async function apply(deps: DashActionDeps, ref: string, plan: UndoPlan, current:
     return;
   }
 
+  // Nothing on the row itself to put back, such as a change that only tagged a todo.
+  if (plan.op === 'update' && Object.keys(plan.values).length === 0) return;
+
   let query =
     plan.op === 'delete' ? client.from(table).delete() : client.from(table).update(plan.values);
   query = query.eq('id', id);
@@ -774,6 +791,17 @@ export async function undoDashAction(
   } catch (error) {
     if (error instanceof Refused) return { ok: false, error: error.message, action };
     throw error;
+  }
+
+  const tags = tagsAdded(action);
+  if (tags.length > 0 && decided.plan.op !== 'delete') {
+    // A tag the person has taken off since is simply not there to take.
+    const { error: tagsError } = await (await deps.db('todo'))
+      .from('task_tags')
+      .delete()
+      .eq('task_id', ref!.slice(ref!.indexOf(':') + 1))
+      .in('tag', tags);
+    if (tagsError) return { ok: false, error: `Dash could not take its tags off: ${tagsError.message}`, action };
   }
 
   const { data, error } = await deps.core
