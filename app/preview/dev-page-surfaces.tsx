@@ -1270,7 +1270,7 @@ export function FinishNoticeSurface({
   return (
     <section className="max-w-2xl">
       <h3 className="text-ui font-semibold text-ink">Notifications</h3>
-      <Card className="mt-4 divide-y divide-border">
+      <Card className="mt-4 divide-y divide-border card-pad-x">
         <label className="row-pad flex items-start gap-3">
           <Switch checked readOnly className="mt-0.5" />
           <span className="min-w-0 flex-1">
