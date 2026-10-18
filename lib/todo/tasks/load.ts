@@ -5,6 +5,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
 import { sortTags } from '@/lib/todo/tasks/tags';
+import type { TagFilter } from '@/lib/todo/tasks/tag-filter';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
@@ -106,6 +107,8 @@ export async function loadDoneSinceMidnight(
 export interface AllTasksFilter {
   status?: TaskStatus | 'all';
   search?: string;
+  /** One tag, or the tasks with none (plan #2340.3). */
+  tag?: TagFilter;
 }
 
 /**
@@ -117,7 +120,23 @@ export interface AllTasksFilter {
 export async function loadAllTasks(userId: string, filter: AllTasksFilter = {}): Promise<Task[]> {
   const supabase = await createTodoClient();
 
-  let query = supabase.from('tasks').select(COLUMNS).eq('user_id', userId);
+  // The tag filter is a second embed of the same table under its own name,
+  // so the one in COLUMNS still brings every tag the row carries: filtering
+  // that embed itself would leave only the matching tag on each row. Inner
+  // keeps the rows that have the tag; a null test on a plain embed keeps the
+  // rows that have none.
+  const tag = filter.tag ?? null;
+  const columns =
+    tag?.kind === 'tag'
+      ? `${COLUMNS}, tag_match:task_tags!inner (tag)`
+      : tag?.kind === 'untagged'
+        ? `${COLUMNS}, tag_any:task_tags (tag)`
+        : COLUMNS;
+
+  let query = supabase.from('tasks').select(columns).eq('user_id', userId);
+
+  if (tag?.kind === 'tag') query = query.eq('tag_match.tag', tag.tag);
+  if (tag?.kind === 'untagged') query = query.is('tag_any', null);
 
   if (filter.status && filter.status !== 'all') query = query.eq('status', filter.status);
 
@@ -131,7 +150,7 @@ export async function loadAllTasks(userId: string, filter: AllTasksFilter = {}):
   assertSchemaExposed(error, TODO_SCHEMA);
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map(toTask);
+  return ((data ?? []) as unknown as Row[]).map(toTask);
 }
 
 /**
