@@ -110,7 +110,7 @@ explain why free cash flow is used rather than net income" is a check.
 "Understands DCF well" is not, and drafting must reject it.
 
 The descriptors are drafted by a model call (see "Drafting a topic"), approved
-by the person, and editable. An edited descriptor records when it was rewritten,
+by Dash when they are drafted, and editable by the person. An edited descriptor records when it was rewritten,
 the same as a claim does now.
 
 A cell can also hold claims. These are the concepts the claims graph already
@@ -398,9 +398,10 @@ migration. The call returns:
 - requirement links to existing topics, each at the lowest level needed, with
   a sentence saying why;
 - names and scopes of missing topics that the links need. These are drafted
-  by their own call only when you approve them.
+  by their own call once the topic that needs them is approved, which is
+  as soon as it is drafted.
 
-Before you see the draft, its scope is embedded and matched against existing
+Before the draft is approved, its scope is embedded and matched against existing
 topics. A close match is shown beside the draft, and you choose between
 merging and keeping both. With one shared map, a duplicate splits your
 evidence between two topics. Most of the cost of getting this wrong falls on
@@ -418,7 +419,8 @@ it cannot cite comes back with no source.
 
 The call runs twice, side by side, and the draft more of whose rows cite a
 source is kept. Both calls go to the ledger under `draft-topic`, so a draft
-costs two calls. Before Approve, the draft's page shows five checks:
+costs two calls. The draft's page shows five checks, after the fact and
+without holding the topic back:
 
 - **Coverage**: of the source lines that belong to this topic, how many a row
   cites. Lines the call puts with a neighbouring topic are not counted.
@@ -431,13 +433,17 @@ costs two calls. Before Approve, the draft's page shows five checks:
 - **Practitioner checklist**: three to five questions to read the top levels
   against.
 
-A row with no source cannot be approved until you mark it personal. The
-trigger `topics_cited_on_approve` (learn 0149) refuses the move from draft to
-approved while one is left, whoever writes it. The first four checks are kept
-on the topic as `drafting`; provenance is read from the rows.
+Dash approves a draft as soon as it is drafted, and the person is not asked
+(plan #2356). A row that cites no source is marked personal first, so the
+trigger `topics_cited_on_approve` (learn 0149), which refuses the move from
+draft to approved while an uncited row is left, never has a reason to refuse.
+A personal row is shown as such, and the person can recite or edit it later.
+The first four checks are kept on the topic as `drafting`; provenance is read
+from the rows. A topic whose checks come out poorly stays in the map, marked
+for a look, and is not pulled back to draft.
 
-Nothing is asked about a drafted topic until it is approved, the same as for
-the claims graph now. Each call's cost goes to the spend ledger in `core`.
+A drafted topic is asked about from the moment it is approved. Each call's
+cost goes to the spend ledger in `core`.
 The first twenty drafts are the measurement for the cost line this spec does
 not yet have.
 
@@ -448,7 +454,8 @@ the source lines that put it on the list, the Level 4 frame topic it refines
 and its target. `/api/cron/territory-draft?territory=<key>` drafts the topics
 not yet drafted, a few a call, each with the same two-draft call and checks
 as above, then sets the frame topic and adds the target to the subject's
-lens. It is fired by hand, since every call spends, and approves nothing.
+lens. It is fired by hand, since every call spends, and each topic it drafts
+is approved as drafted, as above.
 
 A territory also reads the structure store of syllabi, calendars and tables
 of contents (plan #2247.10). Its goal and performances are embedded as
@@ -456,7 +463,7 @@ queries and searched against every stored unit, so a week is found by what it
 covers, and a goal narrower than any course takes weeks from several. The
 matched units join the sources after the territory's own, each document as
 one source with its units in the order taught, which the call reads as weak
-evidence for a link it then proposes for approval. Only a unit's label,
+evidence for a link it then proposes. Only a unit's label,
 heading and topics reach the call, never its readings or the document's text.
 Each row's canonicality is set by how many independent documents it cites:
 two or more is canonical, one is practitioner, and two terms of one course
@@ -475,13 +482,13 @@ drafted topic was given, since a goal keeps none of its own. The draft is the
 topic the question is about, and the topics its links need are drafted from
 the same pages on its page. A web page is not a syllabus, so every row the
 pages support is emerging, and a row they do not support is marked personal
-before approval as above. The draft keeps the brief and the goal on
-`topics.drafting.brief`. Approving it adds the topic to the lens the goal reads,
+as above. The draft keeps the brief and the goal on
+`topics.drafting.brief`. Approval is automatic, and adds the topic to the lens the goal reads,
 its subject's, at the goal's depth and records the goal on the brief (`briefs.aim_id`, learn 0163).
 From then on, every card written from the brief carries the goal, and each
 answered sub-question gets a card of its own, written from the brief's section
 (Dash's answer and the words it quotes). Those cards are written as soon as
-the topic is approved.
+the topic is approved, which is when it is drafted.
 
 ## Migration from the claims graph
 
@@ -628,7 +635,7 @@ Each slice is usable before the next starts.
    status, level, fringe, the next question and lens progress, tested against
    maps written by hand. No model calls.
 2. **Drafting a topic.** The call, deduplication by scope, and the approval
-   screen. The topic page, read-only.
+   rule. The topic page, read-only.
 3. **Migration.** The five steps above, with a review screen for the edges
    and assignments the person needs to settle.
 4. **Explain questions and the grader.** The grading call, the three rules,
