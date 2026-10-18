@@ -24,8 +24,9 @@ export function orderUnbuilt(groups: readonly (UnbuiltFigure & { firstAskedAt?: 
 }
 
 /**
- * The need groups that include a lesson of the subject. Plan #2321.11 empties
- * the list as kinds land; the filter for a need already served goes here.
+ * The need groups that include a lesson of the subject. The view counts only
+ * the lessons not yet served (plan #2321.11), so the list empties as the
+ * daily backfill fills them; `asked` counts across all the person's subjects.
  */
 export async function loadSubjectFigureNeeds(
   learn: LearnSupabaseClient,
