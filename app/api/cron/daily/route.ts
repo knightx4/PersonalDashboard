@@ -17,6 +17,7 @@ import { runBriefWatch } from '@/inngest/learn/brief-watch';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
 import { runLitTopicPullsDaily } from '@/inngest/learn/lit-topic-pulls';
 import { runPreparationsDaily } from '@/inngest/learn/prepare';
+import { runFigureNeedStepsDaily } from '@/inngest/learn/figure-need-steps';
 import { runXReadsForAll } from '@/inngest/x/read';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
@@ -109,6 +110,9 @@ export async function GET(request: NextRequest) {
     // Subjects whose preparation stopped short (plan #2276.1). Each is started
     // in a function of its own, so this stage costs a few requests.
     { name: 'learn-preparations', run: () => runPreparationsDaily(origin) },
+    // Figures two lessons asked for, or one in a subject with a goal, become
+    // a plan step for the overnight run (plan #2321.10). A few reads.
+    { name: 'learn-figure-need-steps', run: () => runFigureNeedStepsDaily() },
   ];
 
   const results: Record<string, unknown> = {};
