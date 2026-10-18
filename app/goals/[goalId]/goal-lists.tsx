@@ -1,30 +1,33 @@
 'use client';
 
-import { useActionState, useEffect, useId, useRef, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, ExternalLink, List, Plus, X } from 'lucide-react';
+import { ChevronRight, List, Plus, X } from 'lucide-react';
 import { CommentCount } from '@/components/dev/comment-count';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Chip } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Input } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
-import Link from '@/components/ui/link';
+import { Note } from '@/components/ui/note';
 import { scrim } from '@/components/ui/popover';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import { chipLine, chipOf, type ListRowView, type ListView } from '@/lib/goals/goal-lists';
 import { isListedKind, type ListedKind } from '@/lib/goals/links';
-import { linkRowAction, type LinkActionState } from './link-actions';
+import { readListView, rememberListView } from '@/lib/goals/list-view-memory';
 import {
-  addGoalListAction,
-  addListRowAction,
-  confirmListRowAction,
-  type ListActionState,
-} from './list-actions';
+  LIST_VIEW_LABELS,
+  pickView,
+  viewsFor,
+  type ListViewKind,
+} from '@/lib/goals/list-views';
+import { RowMarks, RowTitle, Thumb } from './goal-list-parts';
+import { CalendarView, CompareView, GalleryView, MapView, type ViewsSeam } from './goal-list-views';
+import { linkRowAction, type LinkActionState } from './link-actions';
+import { addGoalListAction, addListRowAction, type ListActionState } from './list-actions';
 
 /**
  * A goal's lists on its page (plan #2330.3): one chip per list on the
@@ -38,8 +41,10 @@ import {
  * saved product or a contact found by search, and its rows open their own
  * pages in the workspaces that keep them.
  *
- * The views over a list (Compare, Gallery, a calendar, a map) are #2330.4's;
- * the panel draws the table, which every list has.
+ * Above the rows sits the view switch (plan #2330.4): Compare and Gallery
+ * when the rows have pictures, a calendar when they have dates, a map when
+ * they have places, and the table always (lib/goals/list-views.ts). The view
+ * last chosen is kept per list in this browser.
  */
 
 /** What the gallery opens on. Nothing in the app passes it. */
@@ -56,6 +61,10 @@ export type ListsSeam = {
   ruledOutOpen?: boolean;
   /** The new-list form, drawn open. */
   naming?: boolean;
+  /** The view drawn, in place of the one kept or the default. */
+  view?: ListViewKind;
+  /** The views' own open parts: a day or a pin, a month, tiles that failed. */
+  views?: ViewsSeam;
 };
 
 export function GoalListChips({
@@ -195,6 +204,7 @@ function ListPanel({
 }) {
   const id = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const views = useListView(goalId, list, seam);
 
   useEffect(() => {
     closeRef.current?.focus({ preventScroll: true });
@@ -227,19 +237,30 @@ function ListPanel({
           'md:inset-y-3 md:left-auto md:right-3 md:max-h-none md:w-[min(40rem,calc(100vw-1.5rem))] md:rounded-card md:border',
         )}
       >
-        <div className="flex items-start gap-3 px-4 pt-4 pb-2 md:px-5">
+        {/* From laptop width the view switch sits on the name's line, before the close button. */}
+        <div className="flex items-center gap-3 px-4 pt-4 pb-2 md:px-5">
           <div className="min-w-0 flex-1">
             <p className="truncate text-small text-ink-muted">On {goalTitle}</p>
             <h2 id={`${id}-title`} className="truncate text-title font-semibold text-ink">
               {list.name}
             </h2>
           </div>
+          {views.offered.length > 1 && (
+            <ViewSwitch list={list} views={views} className="max-md:hidden" />
+          )}
           <IconButton ref={closeRef} label={`Close ${list.name}`} onClick={onClose}>
             <X strokeWidth={1.75} aria-hidden />
           </IconButton>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-6 md:px-5">
-          <ListBody goalId={goalId} list={list} seam={seam} className="flex-1" />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 md:px-5">
+          <ListBody
+            goalId={goalId}
+            list={list}
+            seam={seam}
+            views={views}
+            switchInHeader
+            className="flex-1"
+          />
         </div>
       </aside>
     </div>,
@@ -247,8 +268,81 @@ function ListPanel({
   );
 }
 
+/** The views a list offers, the one drawn, and the press that changes it. */
+type ListViewState = {
+  offered: ListViewKind[];
+  view: ListViewKind;
+  choose: (next: ListViewKind) => void;
+};
+
 /**
- * A list's count line, rows and ruled-out fold: the panel's body, and the
+ * The view a list is drawn in: the one chosen here, else the one kept in
+ * this browser, else the default its rows give (lib/goals/list-views.ts).
+ * The server draws the default; the kept view is read in the browser.
+ */
+function useListView(goalId: string, list: ListView, seam?: ListsSeam): ListViewState {
+  const kept = useSyncExternalStore(
+    noSubscribe,
+    () => readListView(goalId, list.key),
+    () => null,
+  );
+  const [chosen, setChosen] = useState<ListViewKind | null>(seam?.view ?? null);
+  return {
+    offered: viewsFor(list),
+    view: pickView(list, chosen ?? (seam ? null : kept)),
+    choose: (next) => {
+      setChosen(next);
+      rememberListView(goalId, list.key, next);
+    },
+  };
+}
+
+/** The kept view changes only when this page writes it, and the page's own state already holds that. */
+const noSubscribe = () => () => {};
+
+/**
+ * The view switch: the views on a sunken track with the one drawn lifted out
+ * of it, quieter than the Add button beside it, as the reference draws it.
+ */
+function ViewSwitch({
+  list,
+  views,
+  className,
+}: {
+  list: ListView;
+  views: ListViewState;
+  className?: string;
+}) {
+  return (
+    <span
+      role="group"
+      aria-label={`View ${list.name} as`}
+      className={cn('inline-flex h-(--control-h) shrink-0 gap-0.5 rounded-control bg-sunken p-0.5', className)}
+    >
+      {views.offered.map((v) => {
+        const on = v === views.view;
+        return (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={on}
+            onClick={() => views.choose(v)}
+            className={cn(
+              'press press-area h-full rounded-control px-2.5 text-small font-semibold transition-colors duration-quick',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2',
+              on ? 'bg-raised text-accent shadow-sm' : 'text-ink-muted hover:text-ink',
+            )}
+          >
+            {LIST_VIEW_LABELS[v]}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
+ * A list's view switch, rows and ruled-out fold: the panel's body, and the
  * whole of a list's own tab on a goal with three lists or more. The add box
  * stays shut behind one button until it is wanted, so an open field never
  * repeats what the empty line says.
@@ -257,32 +351,82 @@ export function ListBody({
   goalId,
   list,
   seam,
+  views: given,
+  switchInHeader = false,
   className,
 }: {
   goalId: string;
   list: ListView;
   seam?: ListsSeam;
+  /** The panel's view state, when the panel draws the switch in its header. */
+  views?: ListViewState;
+  /** The panel shows the switch on its name's line from laptop width; the body then draws it on a phone only. */
+  switchInHeader?: boolean;
   /** In the panel, `flex-1`, so the ruled-out fold sits at the panel's foot. */
   className?: string;
 }) {
   const [adding, setAdding] = useState<string | null>(seam?.adding ?? null);
   const [boxOpen, setBoxOpen] = useState(Boolean(seam?.addState || seam?.adding));
+  const own = useListView(goalId, list, seam);
+  const views = given ?? own;
+  const view = views.view;
+  // Tiles that would not load put the table in the map's place, without forgetting the choice.
+  const [mapFailed, setMapFailed] = useState(Boolean(seam?.views?.tilesFailed));
   const shown = list.rows.length;
+  const body =
+    view === 'compare' ? (
+      <CompareView list={list} rows={list.rows} adding={adding} />
+    ) : view === 'gallery' ? (
+      <GalleryView list={list} rows={list.rows} adding={adding} />
+    ) : view === 'calendar' ? (
+      <CalendarView list={list} seam={seam?.views} />
+    ) : view === 'map' && !mapFailed ? (
+      <MapView list={list} seam={seam?.views} onFailed={() => setMapFailed(true)} />
+    ) : (
+      <ListRows list={list} rows={list.rows} adding={adding} />
+    );
+  const switches = views.offered.length > 1;
+  // An empty list says so once, in the box below.
+  const count =
+    shown > 0
+      ? `${shown} ${shown === 1 ? 'row' : 'rows'}${list.standout ? ` · ${list.standout}` : ''}`
+      : null;
+  const addLabel = list.kind === 'own' ? 'Add a link or name' : `Add to ${list.name}`;
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <div className="flex min-h-(--control-h) items-center justify-between gap-3">
-        {/* An empty list says so once, in the box below. */}
-        <p className="tabular min-w-0 truncate text-small text-ink-muted">
-          {shown > 0 &&
-            `${shown} ${shown === 1 ? 'row' : 'rows'}${list.standout ? ` · ${list.standout}` : ''}`}
+        {switches && (
+          <ViewSwitch list={list} views={views} className={cn(switchInHeader && 'md:hidden')} />
+        )}
+        <p
+          className={cn(
+            'tabular min-w-0 truncate text-small text-ink-muted',
+            switches && (switchInHeader ? 'max-md:hidden' : 'hidden'),
+          )}
+        >
+          {count}
         </p>
         {!boxOpen && (
-          <Button type="button" variant="secondary" size="sm" onClick={() => setBoxOpen(true)}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setBoxOpen(true)}
+            aria-label={addLabel}
+            className="ml-auto shrink-0"
+          >
             <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-            {list.kind === 'own' ? 'Add a link or name' : `Add to ${list.name}`}
+            {/* A phone has room for the switch and the one word beside it. */}
+            <span className={cn(switches && 'max-sm:hidden')}>{addLabel}</span>
+            {switches && <span className="sm:hidden">Add</span>}
           </Button>
         )}
       </div>
+      {switches && count && (
+        <p className={cn('tabular -mt-1 text-small text-ink-muted', switchInHeader ? 'md:hidden' : undefined)}>
+          {count}
+        </p>
+      )}
       {boxOpen &&
         (list.kind === 'own' && list.listId ? (
           <AddRowBox
@@ -294,7 +438,10 @@ export function ListBody({
         ) : (
           <AddLinkedBox goalId={goalId} list={list} onClose={() => setBoxOpen(false)} />
         ))}
-      {shown === 0 && !adding ? (
+      {view === 'map' && mapFailed && (
+        <Note tone="caution">The map could not load, so here is the table instead.</Note>
+      )}
+      {shown === 0 && !adding && view !== 'calendar' && view !== 'map' ? (
         <EmptyState
           size="box"
           align="start"
@@ -305,18 +452,24 @@ export function ListBody({
           }
         />
       ) : (
-        <ListRows list={list} rows={list.rows} adding={adding} />
+        body
       )}
       {list.ruledOut.length > 0 && (
         <Disclosure
           title={<span className="text-small font-normal text-ink-muted">Ruled out</span>}
           meta={String(list.ruledOut.length)}
           defaultOpen={seam?.ruledOutOpen}
-          className="mt-auto pt-2"
+          // In the panel the fold stays at its foot while the rows scroll above it.
+          className={cn(
+            'mt-auto pt-2',
+            switchInHeader && 'sticky bottom-0 max-h-[50dvh] overflow-y-auto bg-raised pb-4',
+          )}
         >
           <ListRows list={list} rows={list.ruledOut} adding={null} />
         </Disclosure>
       )}
+      {/* The panel's own breathing room at the foot, when no fold takes it. */}
+      {switchInHeader && list.ruledOut.length === 0 && <span className="h-3 shrink-0" aria-hidden />}
     </div>
   );
 }
@@ -367,77 +520,21 @@ const addingLine = (text: string) =>
 /** The status column, which a phone row shows on the name's line rather than among the figures. */
 const STATUS = 'status';
 
-/** A phone row's figures on one line: "Wide 30 · Deep 15.75 · $189.99". A figure that names itself goes without its label. */
-function figuresLine(list: ListView, row: ListRowView): string {
-  return list.columns
-    .filter((c) => c.key !== STATUS && row.cells[c.key])
-    .map((c) => {
-      const value = row.cells[c.key] as string;
-      return c.num && /^[^0-9-]/.test(value) ? value : `${c.label} ${value}`;
-    })
-    .join(' · ');
-}
-
-/** A picture's tile. The hairline is the photo's edge, so a white product shot does not melt into the panel. */
-const THUMB = 'block size-10 shrink-0 overflow-hidden rounded-control border border-border bg-sunken'; // ui-ok: hand-rolled-box -- a photo's frame, not a grouping
-
-function Thumb({ src }: { src: string | null }) {
-  return (
-    <span className={THUMB}>
-      {src && (
-        // eslint-disable-next-line @next/next/no-img-element -- arbitrary shop CDNs
-        <img src={src} alt="" className="size-full object-cover" />
-      )}
-    </span>
-  );
-}
-
-/** The row's name: a link to its own page, out to the page it was pasted from, or plain once it has gone. */
-function RowTitle({ row }: { row: ListRowView }) {
-  if (row.external && row.href) {
-    return (
-      <a
-        href={row.href}
-        target="_blank"
-        rel="noreferrer"
-        className="press-area break-words font-semibold text-ink hover:text-accent"
-      >
-        {row.title}
-        <ExternalLink
-          className="ml-1 inline size-3.5 align-[-0.125em] text-ink-muted"
-          strokeWidth={1.75}
-          aria-label="opens the page"
-        />
-      </a>
-    );
-  }
-  if (row.href) {
-    return (
-      <Link
-        href={row.href}
-        className="press-area break-words font-semibold text-ink hover:text-accent"
-      >
-        {row.title}
-      </Link>
-    );
-  }
-  return (
-    <span className={cn('break-words font-semibold', row.gone ? 'text-ink-muted' : 'text-ink')}>
-      {row.title}
-    </span>
-  );
-}
-
-/** What sits after the name on any row: gone, comments, and a draft's Confirm. */
-function RowMarks({ row }: { row: ListRowView }) {
-  if (!row.gone && row.comments < 1 && !row.draft) return null;
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      {row.gone && <Chip size="sm">No longer there</Chip>}
-      <CommentCount count={row.comments} />
-      {row.draft && <DraftConfirm recordId={row.id} />}
-    </span>
-  );
+/** A phone row's address on a line of its own, then its figures on one line: "Wide 30 · Deep 15.75 · $189.99". */
+function figuresLine(list: ListView, row: ListRowView): { place: string | null; rest: string[] } {
+  const shown = list.columns.filter((c) => c.key !== STATUS && row.cells[c.key]);
+  // An address takes a line of its own, without a label; it names itself.
+  const place = shown.find((c) => c.place);
+  return {
+    place: place ? (row.cells[place.key] as string) : null,
+    rest: shown
+      .filter((c) => !c.place)
+      .map((c) => {
+        const value = row.cells[c.key] as string;
+        // A price names itself too.
+        return c.num && /^[^0-9-]/.test(value) ? value : `${c.label} ${value}`;
+      }),
+  };
 }
 
 function PhoneRow({
@@ -470,7 +567,18 @@ function PhoneRow({
             </span>
           )}
         </div>
-        {figures && <p className="tabular text-small text-ink-muted">{figures}</p>}
+        {figures.place && <p className="text-small text-ink-muted">{figures.place}</p>}
+        {figures.rest.length > 0 && (
+          <p className="tabular text-small text-ink-muted">
+            {figures.rest.map((figure, i) => (
+              // Each figure keeps to one line, so a date never breaks in two.
+              <span key={i} className="whitespace-nowrap">
+                {i > 0 && ' · '}
+                {figure}
+              </span>
+            ))}
+          </p>
+        )}
         {(row.gone || row.draft) && <RowMarks row={{ ...row, comments: 0 }} />}
       </div>
     </li>
@@ -565,26 +673,6 @@ const KIND_HEADING: Record<ListedKind, string> = {
   saved_item: 'Product',
   contact: 'Person',
 };
-
-/** A row a link filled in: marked Draft, with the press that confirms it as it stands. */
-function DraftConfirm({ recordId }: { recordId: string }) {
-  const [state, confirm, pending] = useActionState(
-    async (_prev: ListActionState, form: FormData) => confirmListRowAction(form),
-    {},
-  );
-  return (
-    <form action={confirm} className="relative z-10 inline-flex items-center gap-1.5">
-      <input type="hidden" name="recordId" value={recordId} />
-      <Chip tone="caution" size="sm">
-        Draft
-      </Chip>
-      <Button type="submit" variant="secondary" size="xs" pending={pending}>
-        Confirm
-      </Button>
-      {state.error && <span className="text-small text-danger">{state.error}</span>}
-    </form>
-  );
-}
 
 /**
  * An own list's add box: a pasted link is read as a draft, anything else is
