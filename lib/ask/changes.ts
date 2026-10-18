@@ -10,7 +10,7 @@ import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
 import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { undoDiscoveredCompany } from '@/lib/dash/career-writes';
-import { undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
+import { undoAddedCompany, undoApplicationQuestions, undoContactRows, undoJobsRows, undoRoleEmail, undoRoleFromEmail, undoRoleMerge } from '@/lib/dash/jobs-writes';
 import { handStepToClaude } from '@/lib/plan/handover';
 import { roundConversationMoved } from '@/lib/dash/interview-writes';
 import { toRef } from '@/lib/core/refs';
@@ -1055,6 +1055,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
   // A startup added from Find takes its company out again while nothing holds it (plan #1894.6.7).
   if (change.kind === 'add_discovered_company') return undoMany(deps, change, surface, undoDiscoveredCompany);
+  // So does a company added from scratch.
+  if (change.kind === 'add_company') return undoMany(deps, change, surface, undoAddedCompany);
   // A merge of roles puts back every row it moved or took out (plan #1894.6.2).
   if (change.kind === 'merge_roles') return undoMany(deps, change, surface, undoRoleMerge);
   // So does an email linked, turned down or unlinked (plan #1894.6.5).
