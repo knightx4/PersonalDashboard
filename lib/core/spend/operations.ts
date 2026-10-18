@@ -248,6 +248,11 @@ export const SPEND_OPERATIONS = {
     // Personality tab asks for a fresh read. The notes are found with the
     // cached trait sentences, under 'embed-note-match'.
     'read-personality',
+    // Dash's summary and key points for one file kept under a course (plan
+    // #2401.4). One Haiku call per press of Summarise on the Work & school
+    // tab, reading the whole file: a PDF or photo as itself, a deck or Word
+    // file as its text.
+    'summarise-course-file',
   ],
 } as const;
 

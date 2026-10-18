@@ -50,14 +50,20 @@ export default async function Page() {
         }));
       }),
     // The files kept under each course (plan #2401.2).
+    // Each with Dash's summary when Summarise has been pressed on it (plan #2401.4).
     you
       .from('course_files')
-      .select('*')
+      .select('*, summary:course_file_summaries(summary, points, model, read_at)')
       .eq('user_id', user.id)
       .order('position')
       .then(({ data, error }) => {
         if (error) throw new Error(`Loading course files failed: ${error.message}`);
-        return ((data ?? []) as CourseFile[]).map((file) => ({ ...file, size_bytes: Number(file.size_bytes) }));
+        // The summary's key is the file's, so PostgREST embeds it as one object; an array is taken too.
+        return ((data ?? []) as Array<CourseFile & { summary: unknown }>).map((file) => ({
+          ...file,
+          size_bytes: Number(file.size_bytes),
+          summary: (Array.isArray(file.summary) ? file.summary[0] : file.summary) ?? null,
+        })) as CourseFile[];
       }),
     you
       .from('work_history')

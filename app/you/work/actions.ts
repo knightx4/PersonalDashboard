@@ -18,6 +18,10 @@ import {
   schoolField,
   transcriptContentType,
 } from '@/lib/you/education';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { recordSpendReports } from '@/lib/core/spend/record';
+import { readCourseFile, type CourseFileRead } from '@/lib/you/course-file-read';
+import { askCourseFileModel, COURSE_FILE_MODEL, COURSE_FILE_OPERATION } from '@/lib/you/course-file-model';
 import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/you/transcript-model';
 import { readTranscript, type DraftCourse } from '@/lib/you/transcript-read';
 import {
@@ -35,6 +39,7 @@ import {
   deleteCourseFile,
   deleteTranscript,
   TRANSCRIPTS_BUCKET,
+  type CourseFile,
   type TranscriptStore,
 } from '@/lib/you/transcripts';
 
@@ -421,4 +426,88 @@ export async function removeCourseFileAction(form: FormData): Promise<RemoveResu
   }
   revalidatePath(EDUCATION_HREF);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Dash's summary of a course file (plan #2401.4)
+// ---------------------------------------------------------------------------
+
+export type SummariseCourseFileState = { error?: string; summarised?: boolean };
+
+/**
+ * Have Dash read one file kept under a course and keep a short summary and
+ * up to five key points for it in you.course_file_summaries. It runs only on
+ * a press of Summarise, as decision #2401.3 chose, and is paid for each time.
+ * A second press replaces the summary. A read that fails keeps nothing,
+ * leaves any earlier summary as it was, and says why.
+ */
+// latency: pending
+export async function summariseCourseFileAction(
+  _prev: SummariseCourseFileState,
+  form: FormData,
+): Promise<SummariseCourseFileState> {
+  const user = await requireUser();
+  const fileId = id.safeParse(form.get('id'));
+  if (!fileId.success) return { error: 'That file could not be found.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot read files.' };
+
+  const you = await createYouClient();
+  const { data: row } = await you
+    .from('course_files')
+    .select('id, course_id, kind, title, week, storage_path, courses(title)')
+    .eq('id', fileId.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  const file = row as
+    | (Pick<CourseFile, 'id' | 'course_id' | 'kind' | 'title' | 'week' | 'storage_path'> & {
+        courses: { title: string } | { title: string }[] | null;
+      })
+    | null;
+  if (!file) return { error: 'That file could not be found.' };
+  const course = Array.isArray(file.courses) ? file.courses[0] : file.courses;
+
+  const { data: blob, error: downloadError } = await you.storage
+    .from(COURSE_FILES_BUCKET)
+    .download(file.storage_path);
+  if (downloadError || !blob) return { error: 'The stored file could not be opened. Try again.' };
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+
+  const spend = collectSpend();
+  let read: CourseFileRead;
+  try {
+    read = await readCourseFile(
+      {
+        name: file.storage_path,
+        bytes,
+        title: file.title,
+        kind: file.kind,
+        week: file.week,
+        courseTitle: course?.title ?? 'a course',
+      },
+      (source, system) => askCourseFileModel({ apiKey, onSpend: spend.sink }, source, system),
+    );
+  } catch {
+    read = { ok: false, error: 'That file could not be read. Try again.' };
+  }
+  await recordSpendReports(await createCoreClient(), user.id, { module: 'you', operation: COURSE_FILE_OPERATION }, spend.reports);
+
+  if (!read.ok) return { error: read.error };
+
+  const { error } = await you.from('course_file_summaries').upsert(
+    {
+      file_id: file.id,
+      user_id: user.id,
+      summary: read.summary,
+      points: read.points,
+      model: COURSE_FILE_MODEL,
+      read_at: new Date().toISOString(),
+    },
+    { onConflict: 'file_id' },
+  );
+  if (error) return { error: 'The summary was not saved. Try again.' };
+
+  revalidatePath(EDUCATION_HREF);
+  return { summarised: true };
 }

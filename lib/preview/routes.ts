@@ -184,6 +184,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-work-explain': ['/you/work'],
   'you-work-files': ['/you/work'],
   'you-work-files-remove': ['/you/work'],
+  'you-work-files-summarise': ['/you/work'],
   'you-work-files-empty': ['/you/work'],
   'you-work-files-add': ['/you/work'],
   'you-work-files-uploading': ['/you/work'],

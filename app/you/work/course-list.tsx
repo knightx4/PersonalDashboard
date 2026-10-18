@@ -36,6 +36,8 @@ export type FilesOpen = {
   uploading?: boolean;
   showRemove?: string;
   confirming?: string;
+  summarising?: string;
+  summariseErrors?: Record<string, string>;
 };
 
 /**
@@ -211,6 +213,8 @@ function CourseRow({
             uploading={filesOpen?.uploading}
             showRemove={filesOpen?.showRemove}
             confirming={filesOpen?.confirming}
+            summarising={filesOpen?.summarising}
+            summariseErrors={filesOpen?.summariseErrors}
           />
         </div>
       )}

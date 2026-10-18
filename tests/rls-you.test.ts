@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_files', 'courses', 'details','personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'courses', 'details', 'personality_results', 'places', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -233,5 +233,63 @@ describe('course files', () => {
   it('takes the files with the course, and the course with its transcript', async () => {
     await asUser(userA, (tx) => tx`delete from transcripts where id = ${transcriptA}`);
     expect(await admin`select id from course_files where course_id = ${courseA}`).toHaveLength(0);
+  });
+});
+
+describe('course file summaries', () => {
+  // migrations-you/0009_course_file_summaries.sql (plan #2401.4): Dash's
+  // summary and key points for one course file, one row per file.
+  let fileA = '';
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'summary-record.pdf', ${`${userA}/t-summary-record.pdf`}, 'application/pdf', 1)
+      returning id`;
+    const [c] = await admin<{ id: string }[]>`
+      insert into courses (user_id, transcript_id, school, title, position)
+      values (${userA}, ${t.id}, 'State University', 'Microeconomics', 0)
+      returning id`;
+    const [f] = await admin<{ id: string }[]>`
+      insert into course_files (user_id, course_id, kind, title, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, ${c.id}, 'slides', 'Week 1', 'week-1.pdf', ${`${userA}/${c.id}/week-1.pdf`}, 'application/pdf', 1)
+      returning id`;
+    fileA = f.id;
+  });
+
+  const write = (user: string, owner: string, points: string[] = ['Scarcity forces choice.']) =>
+    asUser(
+      user,
+      (tx) => tx`
+        insert into course_file_summaries (file_id, user_id, summary, points, model)
+        values (${fileA}, ${owner}, 'What the week covers.', ${points}, 'claude-haiku')
+        on conflict (file_id) do update set summary = excluded.summary, points = excluded.points
+        returning file_id`,
+    );
+
+  it('keeps one summary per file, to its owner only, replaced by the next', async () => {
+    await write(userA, userA);
+    await write(userA, userA, ['Opportunity cost is the next best thing given up.']);
+    const own = await asUser(userA, (tx) => tx`select points from course_file_summaries`);
+    expect(own).toEqual([{ points: ['Opportunity cost is the next best thing given up.'] }]);
+    expect(await asUser(userB, (tx) => tx`select file_id from course_file_summaries`)).toHaveLength(0);
+  });
+
+  it("refuses a summary of another account's file", async () => {
+    await expect(write(userB, userB)).rejects.toThrow();
+    await expect(write(userB, userA)).rejects.toThrow();
+  });
+
+  it('refuses no points, more than five, and an empty summary', async () => {
+    await expect(write(userA, userA, [])).rejects.toThrow();
+    await expect(write(userA, userA, ['1', '2', '3', '4', '5', '6'])).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update course_file_summaries set summary = '  ' where file_id = ${fileA}`),
+    ).rejects.toThrow();
+  });
+
+  it('goes with its file', async () => {
+    await asUser(userA, (tx) => tx`delete from course_files where id = ${fileA}`);
+    expect(await admin`select file_id from course_file_summaries where file_id = ${fileA}`).toHaveLength(0);
   });
 });

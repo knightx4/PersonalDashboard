@@ -485,4 +485,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // You: a personality result, its trait themes and up to fifteen cut notes
   // in, a few points out.
   'read-personality': run(SONNET, 7_000, 1_200),
+  // A lecture's slides or a reading of about twenty pages, read whole for a
+  // summary and five points (plan #2401.4).
+  'summarise-course-file': run(HAIKU, 30_000, 600),
 };

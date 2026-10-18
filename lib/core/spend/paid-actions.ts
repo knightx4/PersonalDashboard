@@ -185,6 +185,8 @@ export const PAID_ACTIONS = {
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
   // The one explain prompt on a graded course (plan #2172.4.2)
   'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
+  // Summarise on a file kept under a course (plan #2401.4)
+  'app/you/work/actions.ts#summariseCourseFileAction': ['summarise-course-file'],
   'app/you/work/job-actions.ts#readResumeAction': ['read-work-history'],
 
   // Dev: Dash's reply to a comment that tags it

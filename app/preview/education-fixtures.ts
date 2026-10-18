@@ -3,6 +3,7 @@ import { courseExplainPrompt, type CourseExplain } from '@/lib/learn/evidence/co
 import { groupCourses } from '@/lib/you/education';
 import type { ChosenFile } from '@/app/you/work/course-files';
 import type { Course, CourseFile, CourseFileKind, Transcript } from '@/lib/you/transcripts';
+import { HAIKU } from '@/lib/core/models';
 
 /** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
 
@@ -120,6 +121,7 @@ function kept(
   fileName: string,
   size: number,
   position: number,
+  summary: CourseFile['summary'] = null,
 ): CourseFile {
   const pptx = fileName.endsWith('.pptx');
   return {
@@ -136,19 +138,41 @@ function kept(
     size_bytes: size,
     uploaded_at: '2026-10-18T09:00:00Z',
     updated_at: '2026-10-18T09:00:00Z',
+    summary,
   };
+}
+
+/** Dash's summary of a file, as Summarise keeps it (plan #2401.4). */
+function summarised(summary: string, points: string[]): CourseFile['summary'] {
+  return { summary, points, model: HAIKU, read_at: '2026-10-18T10:00:00Z' };
 }
 
 /**
  * The files kept under ECON 101 (plan #2401.2): a syllabus, two weeks of
  * slides and notes, a deck with no week, a reading with a long title and one
- * with a week. Every other course holds none, and STATS 250 shows the empty
+ * with a week. The first week's slides have been summarised (plan #2401.4). Every other course holds none, and STATS 250 shows the empty
  * state when opened.
  */
 export const educationFiles: Record<string, CourseFile[]> = {
   c3: [
     kept('f1', 'syllabus', null, 'ECON 101 Winter 2018 syllabus', 'ECON101_W18_syllabus.pdf', 214_331, 0),
-    kept('f2', 'slides', 1, 'Lecture 01 Scarcity and choice', 'Lecture_01_Scarcity_and_choice.pptx', 6_402_118, 1),
+    kept(
+      'f2',
+      'slides',
+      1,
+      'Lecture 01 Scarcity and choice',
+      'Lecture_01_Scarcity_and_choice.pptx',
+      6_402_118,
+      1,
+      summarised(
+        'Economics studies how people choose when what they want outruns what they have. Every choice gives up the next best thing, and that forgone option is its real cost.',
+        [
+          'Scarcity means wants exceed the resources to meet them, so every society must choose.',
+          'The opportunity cost of a choice is the value of the best alternative given up.',
+          'People respond to incentives, so a change in costs or benefits changes behaviour.',
+        ],
+      ),
+    ),
     kept('f3', 'lecture_notes', 1, 'Week 1 notes', 'Week_1_notes.pdf', 88_204, 2),
     kept('f4', 'slides', 2, 'Lecture 02 Supply and demand', 'Lecture_02_Supply_and_demand.pptx', 9_870_552, 3),
     kept('f5', 'slides', null, 'Review session before the midterm', 'Review_session.pptx', 3_118_004, 4),

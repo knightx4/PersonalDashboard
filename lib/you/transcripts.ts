@@ -149,6 +149,21 @@ export type CourseFile = {
   size_bytes: number;
   uploaded_at: string;
   updated_at: string;
+  /**
+   * Dash's summary of the file, from you.course_file_summaries (plan
+   * #2401.4): not a column, joined on by the page. Null or absent before
+   * Summarise has been pressed on it.
+   */
+  summary?: StoredCourseFileSummary | null;
+};
+
+/** A row of you.course_file_summaries, without its keys. */
+export type StoredCourseFileSummary = {
+  summary: string;
+  /** One to five lines. */
+  points: string[];
+  model: string;
+  read_at: string;
 };
 
 /**

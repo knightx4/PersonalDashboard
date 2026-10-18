@@ -1,11 +1,12 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useActionState, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmStep } from '@/components/ui/confirm-step';
+import { DashAction } from '@/components/ui/dash-action';
 import { Input, PressLabel, Select } from '@/components/ui/field';
 import { Meter } from '@/components/ui/meter';
 import { useToast } from '@/components/ui/toast';
@@ -27,7 +28,12 @@ import {
   type CourseFile,
   type CourseFileKind,
 } from '@/lib/you/transcripts';
-import { addCourseFileAction, removeCourseFileAction } from './actions';
+import {
+  addCourseFileAction,
+  removeCourseFileAction,
+  summariseCourseFileAction,
+  type SummariseCourseFileState,
+} from './actions';
 
 /**
  * The files kept under one course (plan #2401.2): the syllabus, then the
@@ -37,6 +43,10 @@ import { addCourseFileAction, removeCourseFileAction } from './actions';
  * week, and uploaded one after another with its own progress. A file the
  * bucket would refuse says why on its row before anything is sent, and a
  * failed upload keeps its row with the reason.
+ *
+ * Each file has Summarise (plan #2401.4): Dash reads it once, on the press
+ * and at the cost its hint shows, and keeps a summary and up to five key
+ * points. A summarised file offers Summarise again; a read that fails keeps nothing and says why under the row.
  */
 
 /** One chosen file in the add drawer, and where its upload has got to. */
@@ -65,6 +75,8 @@ export function CourseFiles({
   uploading: initialUploading = false,
   showRemove,
   confirming,
+  summarising,
+  summariseErrors,
 }: {
   courseId: string;
   courseTitle: string;
@@ -79,6 +91,10 @@ export function CourseFiles({
   showRemove?: string;
   /** The gallery's way to draw one row's confirm armed. */
   confirming?: string;
+  /** The gallery's way to draw one row mid-read. */
+  summarising?: string;
+  /** The gallery's way to draw a failed read, by file id. */
+  summariseErrors?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(adding);
   const groups = groupCourseFiles(files);
@@ -100,6 +116,8 @@ export function CourseFiles({
                 file={file}
                 forceRemove={showRemove === file.id}
                 confirming={confirming === file.id}
+                summarising={summarising === file.id}
+                summariseError={summariseErrors?.[file.id]}
               />
             ))}
           </ul>
@@ -125,13 +143,36 @@ function FileRow({
   file,
   forceRemove,
   confirming,
+  summarising,
+  summariseError,
 }: {
   file: CourseFile;
   forceRemove: boolean;
   confirming: boolean;
+  summarising: boolean;
+  summariseError?: string;
 }) {
+  const toast = useToast();
+  const [state, summarise, reading] = useActionState<SummariseCourseFileState, FormData>(
+    async (prev, form) => {
+      const next: SummariseCourseFileState = await summariseCourseFileAction(prev, form).catch(() => ({
+        error: 'That file could not be read. Try again.',
+      }));
+      if (next.summarised) toast({ text: `Summarised ${file.title}.` });
+      return next;
+    },
+    summariseError ? { error: summariseError } : {},
+  );
+  const pending = reading || summarising;
   const kind = file.kind === 'slides' || file.kind === 'lecture_notes' ? COURSE_FILE_KIND_LABELS[file.kind] : null;
-  const meta = [file.week !== null ? `Week ${file.week}` : null, kind, courseFileSize(file.size_bytes)]
+  const meta = [
+    file.week !== null ? `Week ${file.week}` : null,
+    kind,
+    courseFileSize(file.size_bytes),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const phoneMeta = [file.week !== null ? `Week ${file.week}` : null, courseFileSize(file.size_bytes)]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -145,19 +186,47 @@ function FileRow({
         <FileText className="mt-1 size-4 shrink-0 text-ink-muted sm:mt-0" strokeWidth={1.75} aria-hidden />
         <span className="line-clamp-2 sm:truncate">{file.title}</span>
       </a>
-      {/* On a phone the title takes the whole line and the facts and Remove sit tight under it. */}
-      {/* While the confirm is armed it drops to a line of its own, so the
-        * facts keep the column the rows around them end on (5.75rem is the
-        * Remove slot and its gap). */}
-      <span className="mr-auto pl-5.5 text-small tabular-nums text-ink-muted sm:mr-0 sm:pl-0 sm:group-has-[p]:mr-23">
-        {meta}
-      </span>
+      {/* On a phone a file is two lines: the title across the whole row,
+        * then the facts with Summarise and Remove at their end. The kind is
+        * left to the heading there, for the room. From laptop width the
+        * wrapper steps aside and the facts, Summarise and Remove are columns
+        * every row ends on. While the confirm is armed it drops to a line of
+        * its own under the facts, so Summarise keeps its column (5.75rem is
+        * the Remove slot and its gap). */}
+      <div className="flex w-full flex-wrap items-center gap-x-2 pl-5.5 sm:contents">
+        <span className="mr-auto text-small tabular-nums text-ink-muted sm:mr-0">
+          <span className="sm:hidden">{phoneMeta}</span>
+          <span className="hidden sm:inline">{meta}</span>
+        </span>
+        <form action={summarise} className="-my-1 sm:my-0 sm:min-w-36 sm:group-has-[p]:mr-23">
+          <input type="hidden" name="id" value={file.id} />
+          <DashAction
+            type="submit"
+            size="xs"
+            variant="ghost"
+            pending={pending}
+            paid="app/you/work/actions.ts#summariseCourseFileAction"
+            what={`Cost of summarising ${file.title}`}
+          >
+            {pending ? (
+              'Summarising…'
+            ) : file.summary ? (
+              // The shorter word on a phone keeps the facts, the press and Remove on one line.
+              <>
+                <span className="sm:hidden">Re-summarise</span>
+                <span className="hidden sm:inline">Summarise again</span>
+              </>
+            ) : (
+              'Summarise'
+            )}
+          </DashAction>
+        </form>
       {/* Remove shows on hover and on focus; on a phone, with no hover, it is always there. */}
       <span
         className={cn(
           '-my-1 sm:my-0 sm:min-w-20 sm:text-right',
           'sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100',
-          'has-[p]:my-1 has-[p]:w-full has-[p]:pl-5.5 has-[p]:text-left sm:has-[p]:opacity-100',
+          'has-[p]:my-1 has-[p]:w-full has-[p]:text-left sm:has-[p]:pl-5.5 sm:has-[p]:opacity-100',
           forceRemove && 'sm:opacity-100',
         )}
       >
@@ -173,6 +242,13 @@ function FileRow({
           Remove
         </ConfirmStep>
       </span>
+      </div>
+      {/* A div, not a p: the facts and Remove make room for the confirm's own p. */}
+      {state.error && !pending && (
+        <div role="alert" className="w-full pl-5.5 text-small text-danger">
+          Not summarised: {state.error}
+        </div>
+      )}
     </li>
   );
 }

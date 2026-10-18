@@ -121,5 +121,11 @@ export const youSources: ModuleSources = {
         'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',
     },
   ],
-  notSources: [],
+  notSources: [
+    {
+      table: 'you.course_file_summaries',
+      reason:
+        "Dash's summary and key points of a course file, made on a press of Summarise; what the person kept is the file in you.course_files.",
+    },
+  ],
 };

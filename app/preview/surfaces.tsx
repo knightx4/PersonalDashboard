@@ -6122,6 +6122,33 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Summarise on course files (plan #2401.4): one deck mid-read with Dash
+     * at work on it, and one whose read failed, saying why under its row. */
+    id: 'you-work-files-summarise',
+    label: 'Work & school · Summarising a course file',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{
+            courseId: 'c3',
+            summarising: 'f4',
+            summariseErrors: {
+              f5: 'Its slides hold no words Dash can read. Slides made of pictures are read from a PDF: save the deck as a PDF and add that.',
+            },
+          }}
+        />
+      </>
+    ),
+  },
+  {
     /* A course opened with no files yet: what to add and the press that adds them. */
     id: 'you-work-files-empty',
     label: 'Work & school · A course with no files',
