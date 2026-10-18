@@ -8653,7 +8653,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Account · Tell me when Dash has finished, save failed',
     module: 'dev',
     width: 'page',
-    render: () => <FinishNoticeSurface enabled={false} error="Could not save that. Try again." />,
+    render: () => <FinishNoticeSurface enabled error="Could not turn off “Tell me when Dash has finished”. It is still on. Try again." />,
   },
   {
     /* The workspaces and the one list of settings links, with Timeline and Model spend (plan #1743). */

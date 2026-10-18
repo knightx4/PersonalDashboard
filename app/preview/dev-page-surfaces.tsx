@@ -27,6 +27,7 @@ import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
 import { FinishNoticeRow } from '@/app/account/notifications';
 import { Banner } from '@/components/ui/banner';
+import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/field';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
@@ -1268,8 +1269,8 @@ export function FinishNoticeSurface({
 }) {
   return (
     <section className="max-w-2xl">
-      <h3 className="text-ui font-semibold text-ink">Morning brief</h3>
-      <div className="mt-4 border-y border-border">
+      <h3 className="text-ui font-semibold text-ink">Notifications</h3>
+      <Card className="mt-4 divide-y divide-border">
         <label className="row-pad flex items-start gap-3">
           <Switch checked readOnly className="mt-0.5" />
           <span className="min-w-0 flex-1">
@@ -1280,7 +1281,7 @@ export function FinishNoticeSurface({
           </span>
         </label>
         <FinishNoticeRow enabled={loading ? null : enabled} busy={false} />
-      </div>
+      </Card>
       {error && (
         <div className="mt-3">
           <Banner tone="bad">{error}</Banner>
