@@ -206,7 +206,7 @@ export function TagPicker({
           placeholder="New tag"
           aria-label="New tag"
           aria-invalid={error ? true : undefined}
-          className="min-w-0 flex-1 sm:max-w-60"
+          className="min-w-0 flex-1 max-sm:min-h-11 sm:max-w-60"
         />
         <Button type="submit" variant="secondary" size="sm">
           Add
