@@ -4,7 +4,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { readDrafting } from '@/lib/learn/levels/draft-sources';
 import { runTopicDraft, type DraftRunResult } from '@/lib/learn/levels/draft-run';
 import { goalLensId } from '@/lib/learn/levels/lens-store';
-import { approveCitedDrafts } from '@/lib/learn/levels/store';
+import { approveDrafts } from '@/lib/learn/levels/store';
 import { goalTargetLevel } from '@/lib/learn/levels/lenses';
 import { FOUND_KIND_LABELS, readSections, type FoundKind } from './model';
 import { briefDraftSources, goalPerformances, readDraftedFromBrief, type BriefGoalOption, type BriefGoalPanel } from './topics';
@@ -155,22 +155,23 @@ export async function settleBriefTopic(
 
 /** What approving a topic as it is drafted did. */
 export type DraftedApproval = {
+  /** False only when the topic was no longer a draft. */
   approved: boolean;
-  /** Rows that cite nothing, when that kept the topic a draft. */
-  uncited: number;
+  /** Rows that cited nothing and were marked personal before approving. */
+  personal: number;
   /** The brief the topic was drafted from, settled under its goal; null for any other topic. */
   brief: { briefId: string; aimId: string } | null;
 };
 
 /**
  * Approve a topic the moment its draft is kept (plan #2356.2), on the
- * person's own client. A draft that cites a source on every row is approved
- * with its checks as drafted and, when a research brief drafted it, settled
- * the way approving it by hand settles it (`settleBriefTopic`); the caller
- * then writes the brief's cards. A draft with an uncited row stays a draft.
+ * person's own client, with its checks as drafted and any row that cites
+ * nothing marked personal (plan #2356.6). When a research brief drafted it,
+ * the brief is settled the way approving it by hand settles it
+ * (`settleBriefTopic`); the caller then writes the brief's cards.
  */
 export async function approveDraftedTopic(client: Client, userId: string, topicId: string): Promise<DraftedApproval> {
-  const { approved, kept } = await approveCitedDrafts(client, [topicId]);
-  if (approved.length === 0) return { approved: false, uncited: kept[0]?.uncited ?? 0, brief: null };
-  return { approved: true, uncited: 0, brief: await settleBriefTopic(client, userId, topicId) };
+  const [approved] = await approveDrafts(client, [topicId]);
+  if (!approved) return { approved: false, personal: 0, brief: null };
+  return { approved: true, personal: approved.personal, brief: await settleBriefTopic(client, userId, topicId) };
 }

@@ -1,8 +1,8 @@
 /**
  * A topic is approved as soon as it is drafted (plan #2356.2), from a goal
  * named on Topics, from a research brief, and from a territory tick. Each
- * path keeps a fully cited draft approved with no one pressing Approve, and
- * leaves a draft with an uncited row as a draft.
+ * path approves the draft with no one pressing Approve, marking any row that
+ * cites no source personal first (plan #2356.6).
  *
  * The drafting call itself is stubbed: it lays the topic's rows into an
  * in-memory learn schema the way saveDraft would, and the real approval code
@@ -56,7 +56,7 @@ vi.mock('@/lib/learn/briefs/topics-store', async (importOriginal) => ({
   draftBriefTopic: async () => keepDraft('brief question'),
 }));
 
-const { approveCitedDrafts } = await import('@/lib/learn/levels/store');
+const { approveDrafts } = await import('@/lib/learn/levels/store');
 const { draftTopicFromGoal } = await import('@/app/learn/topics/actions');
 const { draftBriefTopics } = await import('@/app/learn/b/[id]/actions');
 const { draftTerritoryTick } = await import('@/lib/learn/levels/territory-run');
@@ -66,12 +66,12 @@ let next = 0;
 /**
  * Prepares the draft the stubbed call keeps for `goal`: a topic with three
  * levels, every row citing S1 unless `uncitedLevel` names a level that cites
- * nothing.
+ * nothing. `uncitedAll` leaves the topic and every level citing nothing.
  */
-function prepare(goal: string, options: { uncitedLevel?: number; drafting?: FakeRow } = {}): string {
+function prepare(goal: string, options: { uncitedLevel?: number; uncitedAll?: boolean; drafting?: FakeRow } = {}): string {
   next += 1;
   const id = `aaaaaaaa-aaaa-4aaa-8aaa-${String(next).padStart(12, '0')}`;
-  const cited = { source: 'S1', canonicality: 'practitioner' };
+  const cited = options.uncitedAll ? { source: null, canonicality: null } : { source: 'S1', canonicality: 'practitioner' };
   state.drafts[goal] = {
     topic: {
       id,
@@ -98,6 +98,9 @@ function prepare(goal: string, options: { uncitedLevel?: number; drafting?: Fake
 }
 
 const topic = (id: string) => state.tables.topics.find((t) => t.id === id)!;
+const levels = (id: string) => state.tables.topic_cells.filter((c) => c.topic_id === id);
+/** The topic's canonicality, then each level's. */
+const marks = (id: string) => [topic(id).canonicality, ...levels(id).map((c) => c.canonicality)];
 
 function form(fields: Record<string, string>): FormData {
   const data = new FormData();
@@ -113,26 +116,40 @@ beforeEach(() => {
   state.afters = [];
 });
 
-describe('approveCitedDrafts', () => {
-  it('approves the cited drafts with their checks as drafted, keeps the uncited and passes over the approved', async () => {
+describe('approveDrafts', () => {
+  it('approves a fully cited draft as drafted and marks nothing personal', async () => {
     const cited = prepare('cited');
-    const uncited = prepare('uncited', { uncitedLevel: 2 });
     await keepDraft('cited');
-    await keepDraft('uncited');
     const client = fakeLearnClient(state.tables);
 
-    const first = await approveCitedDrafts(client, [cited, uncited]);
-    expect(first).toEqual({ approved: [cited], kept: [{ id: uncited, uncited: 1 }] });
+    expect(await approveDrafts(client, [cited])).toEqual([{ id: cited, personal: 0 }]);
     expect(topic(cited)).toMatchObject({ status: 'approved' });
     expect(topic(cited).approved_at).toEqual(expect.any(String));
-    expect(state.tables.topic_cells.filter((c) => c.topic_id === cited).map((c) => c.descriptor_original)).toEqual([
-      null,
-      null,
-      null,
-    ]);
-    expect(topic(uncited)).toMatchObject({ status: 'draft' });
+    expect(levels(cited).map((c) => c.descriptor_original)).toEqual([null, null, null]);
+    expect(marks(cited)).toEqual(['practitioner', 'practitioner', 'practitioner', 'practitioner']);
 
-    expect(await approveCitedDrafts(client, [cited])).toEqual({ approved: [], kept: [] });
+    expect(await approveDrafts(client, [cited])).toEqual([]);
+  });
+
+  it('approves a partly uncited draft with the uncited level marked personal', async () => {
+    const partly = prepare('partly', { uncitedLevel: 2 });
+    await keepDraft('partly');
+
+    expect(await approveDrafts(fakeLearnClient(state.tables), [partly])).toEqual([{ id: partly, personal: 1 }]);
+    expect(topic(partly)).toMatchObject({ status: 'approved' });
+    expect(marks(partly)).toEqual(['practitioner', 'practitioner', 'personal', 'practitioner']);
+    expect(levels(partly).map((c) => c.source)).toEqual(['S1', null, 'S1']);
+  });
+
+  it('approves a wholly uncited draft with the topic, every level and every link marked personal', async () => {
+    const wholly = prepare('wholly', { uncitedAll: true });
+    await keepDraft('wholly');
+    state.tables.cell_links.push({ id: 'link-1', requiring_cell_id: `${wholly}-2`, source: null, canonicality: null });
+
+    expect(await approveDrafts(fakeLearnClient(state.tables), [wholly])).toEqual([{ id: wholly, personal: 5 }]);
+    expect(topic(wholly)).toMatchObject({ status: 'approved' });
+    expect(marks(wholly)).toEqual(['personal', 'personal', 'personal', 'personal']);
+    expect(state.tables.cell_links[0]).toMatchObject({ canonicality: 'personal' });
   });
 });
 
@@ -143,10 +160,11 @@ describe('a topic drafted from a goal on Topics', () => {
     expect(topic(id)).toMatchObject({ status: 'approved' });
   });
 
-  it('stays a draft when a row cites nothing', async () => {
+  it('is approved with the row that cites nothing marked personal', async () => {
     const id = prepare('WACC', { uncitedLevel: 3 });
     await draftTopicFromGoal({}, form({ goal: 'WACC' }));
-    expect(topic(id)).toMatchObject({ status: 'draft' });
+    expect(topic(id)).toMatchObject({ status: 'approved' });
+    expect(levels(id).find((c) => c.level === 3)).toMatchObject({ canonicality: 'personal' });
   });
 });
 
@@ -170,13 +188,13 @@ describe('a topic drafted from a research brief', () => {
     expect(state.cards).toEqual([BRIEF]);
   });
 
-  it('stays a draft, off the goal, when a row cites nothing', async () => {
+  it('is approved and put on the goal’s lens when a row cites nothing, with that row marked personal', async () => {
     const id = prepare('brief question', { drafting: fromBrief, uncitedLevel: 1 });
     await draftBriefTopics(BRIEF, AIM);
-    expect(topic(id)).toMatchObject({ status: 'draft' });
-    expect(state.tables.lens_targets).toEqual([]);
-    expect(state.tables.briefs[0]).toMatchObject({ aim_id: null });
-    expect(state.afters).toEqual([]);
+    expect(topic(id)).toMatchObject({ status: 'approved' });
+    expect(levels(id).find((c) => c.level === 1)).toMatchObject({ canonicality: 'personal' });
+    expect(state.tables.lens_targets).toEqual([expect.objectContaining({ lens_id: 'goal-lens', topic_id: id })]);
+    expect(state.tables.briefs[0]).toMatchObject({ aim_id: AIM });
   });
 });
 
@@ -194,7 +212,7 @@ describe('a topic drafted in a territory tick', () => {
     ],
   };
 
-  it('is approved when every row cites a source, and stays a draft when one does not', async () => {
+  it('is approved whether every row cites a source or one is marked personal', async () => {
     state.tables.area_check_articles = [];
     state.tables.lenses = [{ id: 'subject-lens', user_id: ME, origin: 'subject', name: 'Valuation' }];
     state.tables.lens_targets = [];
@@ -210,9 +228,10 @@ describe('a topic drafted in a territory tick', () => {
 
     expect(tick.drafted.map((d) => [d.id, d.approved])).toEqual([
       [cited, true],
-      [uncited, false],
+      [uncited, true],
     ]);
     expect(topic(cited)).toMatchObject({ status: 'approved' });
-    expect(topic(uncited)).toMatchObject({ status: 'draft' });
+    expect(topic(uncited)).toMatchObject({ status: 'approved' });
+    expect(levels(uncited).find((c) => c.level === 2)).toMatchObject({ canonicality: 'personal' });
   });
 });

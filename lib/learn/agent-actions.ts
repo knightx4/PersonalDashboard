@@ -45,7 +45,7 @@ export const learnActions: ModuleActions = {
       note: 'Dash names the topic whose links want it as for_topic_id, and the levels that wanted it are linked to the draft.',
     },
     rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
-    markRowsPersonal: none('theirs', 'Whether an uncited row is the person’s own is theirs to say (plan #2138.11).'),
+    markRowsPersonal: none('theirs', 'Dash marks an uncited row personal when it approves a draft (plan #2356.6); taking the mark off or putting it back is the person’s.'),
   },
   'app/learn/flow/theme-lens-actions.ts': {
     makeLensFromTheme: none('theirs', 'Whether a vault theme becomes a lens of its own is the person’s to say (plan #2138.14).'),

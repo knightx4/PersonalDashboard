@@ -36,10 +36,9 @@ import {
  * way in: a chain of claims laid out, approved, and written to the subject.
  * The graph is now only read, so the goal goes to drafting a topic with its
  * ten levels (docs/LEARN-LEVELS-SPEC.md, "Drafting a topic"), the same press
- * as New topic on /learn/topics, and lands on the topic's page. A draft that
- * cites a source on every row is approved as soon as it is kept (plan
- * #2356.2); one with an uncited row stays a draft, and nothing is asked about
- * it until it is approved.
+ * as New topic on /learn/topics, and lands on the topic's page. The draft is
+ * approved as soon as it is kept (plan #2356.2), any row citing no source
+ * marked personal (plan #2356.6).
  */
 
 export type ProposeState = { error?: string };

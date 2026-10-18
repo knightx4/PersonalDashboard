@@ -8,7 +8,7 @@ import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name'
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { approveCitedDrafts } from '@/lib/learn/levels/store';
+import { approveDrafts } from '@/lib/learn/levels/store';
 import { roleRequirementSourceFrom } from '@/lib/learn/levels/role-sources';
 import { territorySources, topicsLeft, type Territory } from '@/lib/learn/levels/territory';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
@@ -33,9 +33,9 @@ import { findStoredUnits, liveStoredUnitPorts, type StoredUnitsFound } from '@/l
  * down the topics not yet drafted, compiling each with the two-draft call
  * from plan #2138.11 from the territory's sources, until the time is used.
  * Each draft is then pointed at the Level 4 frame topic it refines and given
- * its target on the subject's lens, and approved there and then when every
- * row of it cites a source (plan #2356.2). A draft with an uncited row stays
- * a draft.
+ * its target on the subject's lens, and approved there and then (plan
+ * #2356.2), any row that cites no source marked personal first (plan
+ * #2356.6).
  *
  * Runs on the service role, so every read names the owner. A topic is found
  * again by the ask it was drafted from (`topics.asked`), so calling again
@@ -233,7 +233,7 @@ export async function draftTerritoryTick(
       if (targetError) console.error('[learn territory] lens target', targetError.message);
     }
     // The draft is kept even if approving fails; the next approval pass takes it.
-    const approval = await approveCitedDrafts(learn, [result.id]).catch((e: unknown) => {
+    const approval = await approveDrafts(learn, [result.id]).catch((e: unknown) => {
       console.error('[learn territory] approve', e instanceof Error ? e.message : e);
       return null;
     });
@@ -241,7 +241,7 @@ export async function draftTerritoryTick(
       ask: topic.ask,
       id: result.id,
       name: (saved?.name as string | undefined) ?? topic.ask,
-      approved: (approval?.approved.length ?? 0) > 0,
+      approved: (approval?.length ?? 0) > 0,
     });
     out.remaining -= 1;
   }

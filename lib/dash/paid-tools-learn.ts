@@ -141,9 +141,11 @@ const draftTopicTool: DashPaidTool = {
       ok: true,
       subjectRef: toRef('learn.topics', result.id),
       op: 'insert',
-      summary: approval?.approved
-        ? `Dash drafted and approved the topic ${name}.`
-        : `Dash drafted the topic ${name}, kept as a draft on its page because some rows name no source.`,
+      summary: !approval?.approved
+        ? `Dash drafted the topic ${name}, kept as a draft on its page because approving it failed.`
+        : approval.personal > 0
+          ? `Dash drafted and approved the topic ${name}, with ${approval.personal} ${approval.personal === 1 ? 'row' : 'rows'} that name no source marked personal.`
+          : `Dash drafted and approved the topic ${name}.`,
     };
   },
 };

@@ -12,9 +12,9 @@ import { roleRequirementSource } from '@/lib/learn/levels/role-sources';
 
 /**
  * Naming a goal on the topics page drafts its topic (docs/LEARN-LEVELS-SPEC.md,
- * "Drafting a topic"; plan #2138.2). A draft that cites a source on every row
- * is approved as soon as it is kept (plan #2356.2), and the press lands on
- * the topic's page. One with an uncited row stays a draft there.
+ * "Drafting a topic"; plan #2138.2). The draft is approved as soon as it is
+ * kept (plan #2356.2), any row citing no source marked personal (plan
+ * #2356.6), and the press lands on the topic's page.
  *
  * Since plan #2138.11 the box also takes what to draft from: the goal's
  * performances, pasted sources, and a phrase naming roles in job_search whose
