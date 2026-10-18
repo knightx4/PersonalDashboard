@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 
 /**
@@ -74,4 +74,40 @@ export async function removeNotificationSubscription(endpoint: string): Promise<
     .eq('endpoint', endpoint);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+export type FinishNoticeResult = { ok: true; enabled: boolean } | { ok: false; error: string };
+
+/**
+ * Whether Dash tells this person when it has finished its work (plan #2389).
+ * No row yet reads as on, the column's default; the row is made the first time
+ * the switch is turned.
+ */
+// latency: pending
+export async function readFinishNotice(): Promise<FinishNoticeResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('dash_finish_notifications')
+    .select('enabled')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (error) return { ok: false, error: 'Could not read this setting. Reload to try again.' };
+  return { ok: true, enabled: data?.enabled ?? true };
+}
+
+// latency: pending
+export async function saveFinishNotice(enabled: boolean): Promise<FinishNoticeResult> {
+  if (typeof enabled !== 'boolean') return { ok: false, error: 'That setting was not understood.' };
+  const user = await requireUser();
+  const supabase = await createClient();
+  // updated_at is not set by a trigger, so it goes in with every write.
+  const { error } = await supabase
+    .from('dash_finish_notifications')
+    .upsert(
+      { user_id: user.id, enabled, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    );
+  if (error) return { ok: false, error: 'Could not save that. Try again.' };
+  return { ok: true, enabled };
 }

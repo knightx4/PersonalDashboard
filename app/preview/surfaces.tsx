@@ -508,6 +508,7 @@ import { RunLinesSurface } from './run-lines-surfaces';
 import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
+  FinishNoticeSurface,
   DevBugsSurface,
   DevChangelogSurface,
   DevChangelogScreensSurface,
@@ -8629,6 +8630,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AccountSurface tab="notifications" />,
+  },
+  {
+    /* The switch for Dash's finished-work notification, under the morning brief (plan #2389.4). */
+    id: 'account-notifications-finish',
+    label: 'Account · Tell me when Dash has finished',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface />,
+  },
+  {
+    /* The same switch before its row is read: disabled (plan #2389.4). */
+    id: 'account-notifications-finish-loading',
+    label: 'Account · Tell me when Dash has finished, loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface loading />,
+  },
+  {
+    /* A save that failed: the message, and the switch back where it was (plan #2389.4). */
+    id: 'account-notifications-finish-error',
+    label: 'Account · Tell me when Dash has finished, save failed',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface enabled={false} error="Could not save that. Try again." />,
   },
   {
     /* The workspaces and the one list of settings links, with Timeline and Model spend (plan #1743). */

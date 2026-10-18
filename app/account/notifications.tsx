@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
 import { Switch } from '@/components/ui/field';
-import { removeNotificationSubscription, saveNotificationSubscription } from './notification-actions';
+import {
+  readFinishNotice,
+  removeNotificationSubscription,
+  saveFinishNotice,
+  saveNotificationSubscription,
+} from './notification-actions';
 
 /**
  * The switch that sends the morning brief to this device (plan #1124).
@@ -47,10 +52,60 @@ async function currentSubscription(): Promise<PushSubscription | null> {
   return registration ? registration.pushManager.getSubscription() : null;
 }
 
+/**
+ * The second switch (plan #2389.4): whether Dash sends a notification when it
+ * has finished its work. Per person, so it applies to every subscribed device.
+ * `enabled` is null until the row is read, which draws the switch disabled.
+ */
+export function FinishNoticeRow({
+  enabled,
+  busy,
+  onChange,
+}: {
+  enabled: boolean | null;
+  busy: boolean;
+  /** Left out by the gallery, which draws the row and cannot pass a handler. */
+  onChange?: (on: boolean) => void;
+}) {
+  return (
+    <label className="row-pad flex items-start gap-3 border-t border-border">
+      <Switch
+        checked={enabled ?? true}
+        disabled={busy || enabled === null}
+        onChange={(event) => onChange?.(event.target.checked)}
+        className="mt-0.5"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-ui font-medium text-ink">
+          {busy ? 'Saving…' : 'Tell me when Dash has finished'}
+        </span>
+        <span className="block text-small leading-snug text-ink-muted">
+          One notification when Dash has no run going and has finished something, with the count of
+          your Dev inbox. Applies to every device you have turned notifications on for.
+        </span>
+      </span>
+    </label>
+  );
+}
+
 export function NotificationsSection({ publicKey }: { publicKey: string | null }) {
   const [status, setStatus] = useState<Status>('loading');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [finishEnabled, setFinishEnabled] = useState<boolean | null>(null);
+  const [finishBusy, setFinishBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readFinishNotice().then((result) => {
+      if (cancelled) return;
+      if (result.ok) setFinishEnabled(result.enabled);
+      else setError(result.error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +166,23 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
     }
   }
 
+  async function toggleFinish(on: boolean) {
+    const before = finishEnabled;
+    setFinishBusy(true);
+    setError(null);
+    setFinishEnabled(on);
+    try {
+      const saved = await saveFinishNotice(on);
+      if (!saved.ok) throw new Error(saved.error);
+      setFinishEnabled(saved.enabled);
+    } catch (err) {
+      setFinishEnabled(before);
+      setError(err instanceof Error ? err.message : 'Could not save that. Try again.');
+    } finally {
+      setFinishBusy(false);
+    }
+  }
+
   return (
     // Dash points at this tab when a watch would reach no phone (lib/watch/start.ts);
     // the id is where links written before Account had tabs still point.
@@ -149,6 +221,13 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
               </span>
             </span>
           </label>
+        )}
+        {publicKey && status === 'on' && (
+          <FinishNoticeRow
+            enabled={finishEnabled}
+            busy={finishBusy}
+            onChange={(on) => void toggleFinish(on)}
+          />
         )}
       </div>
 
