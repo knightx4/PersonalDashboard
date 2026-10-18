@@ -58,9 +58,9 @@ describe('usageReport', () => {
 });
 
 const functions = functionSpendRows([
-  { module: 'learn', operation: 'plan-topic', spend_7: 2_000_000, spend_30: 8_500_000, calls_30: 40, unpriced_30: 0 },
-  { module: 'core', operation: 'ask-dash', spend_7: 50_000, spend_30: 90_000, calls_30: 9, unpriced_30: 0 },
-  { module: 'website', operation: 'odd-job', spend_7: 0, spend_30: 300_000, calls_30: 7, unpriced_30: 1 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 2_000_000, spend_30: 8_500_000, calls_30: 40, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'core', operation: 'ask-dash', spend_7: 50_000, spend_30: 90_000, calls_30: 9, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'website', operation: 'odd-job', spend_7: 0, spend_30: 300_000, calls_30: 7, unpriced_30: 1, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
 ]);
 
 describe('UsageScreen', () => {

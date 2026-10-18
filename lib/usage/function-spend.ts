@@ -21,6 +21,12 @@ export type FunctionSpend = {
   calls30: number;
   /** Calls whose model had no published rate, so the sums are short by them. */
   unpriced30: number;
+  /** Input tokens billed at the full rate, over the 30 days. */
+  inputTokens30: number;
+  /** Input tokens read from the prompt cache. */
+  cachedTokens30: number;
+  /** Input tokens written to the prompt cache. */
+  cacheWriteTokens30: number;
 };
 
 type FunctionSpendRow = {
@@ -30,6 +36,9 @@ type FunctionSpendRow = {
   spend_30: number | string;
   calls_30: number;
   unpriced_30: number;
+  input_tokens_30: number | string;
+  cached_tokens_30: number | string;
+  cache_write_tokens_30: number | string;
 };
 
 const KNOWN_OPERATIONS: ReadonlySet<string> = new Set([
@@ -44,6 +53,18 @@ export function operationLabel(operation: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * The share of a function's input that came from the prompt cache over the 30
+ * days: cached / (input + cached + cache write). Null when it had no input at
+ * all, so a function that sent nothing shows no rate rather than 0%.
+ */
+export function hitRate(
+  row: Pick<FunctionSpend, 'inputTokens30' | 'cachedTokens30' | 'cacheWriteTokens30'>,
+): number | null {
+  const total = row.inputTokens30 + row.cachedTokens30 + row.cacheWriteTokens30;
+  return total > 0 ? row.cachedTokens30 / total : null;
+}
+
 /** One row per function, biggest 30-day spender first, ties by calls then name. */
 export function functionSpendRows(rows: readonly FunctionSpendRow[]): FunctionSpend[] {
   return rows
@@ -55,6 +76,9 @@ export function functionSpendRows(rows: readonly FunctionSpendRow[]): FunctionSp
       spend30: Number(row.spend_30),
       calls30: row.calls_30,
       unpriced30: row.unpriced_30,
+      inputTokens30: Number(row.input_tokens_30),
+      cachedTokens30: Number(row.cached_tokens_30),
+      cacheWriteTokens30: Number(row.cache_write_tokens_30),
     }))
     .sort(
       (a, b) =>
