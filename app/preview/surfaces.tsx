@@ -393,6 +393,8 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashStepNotifyErrorSurface,
+  GoalDashStepSurface,
   GoalOpenedSurface,
   GoalStepSurface,
   GoalSubStepSurface,
@@ -4925,6 +4927,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* A step Dash is doing on its own page (plan #2376.2): the switch for a
+     * phone message when Dash finishes it, turned on. */
+    id: 'goals-step-dash',
+    label: 'Goal · a Dash step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepSurface />,
+  },
+  {
+    /* That switch after a save that failed: off again, the reason beneath. */
+    id: 'goals-step-dash-notify-error',
+    label: 'Goal · the notify switch, save failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepNotifyErrorSurface />,
   },
   {
     /* Closing a step on its own page (plan #1623): the goal's close ring
