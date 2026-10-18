@@ -8515,6 +8515,30 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A card brought back by a tripwire (plan #2413.11): first in the deck
+     * with a dated line under the claim; a second comes back after its mark. */
+    id: 'you-insights-fired',
+    label: 'You · Insights, a card brought back by a tripwire',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview fired />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-fired-evidence',
+    label: 'You · Insights, the evidence under a card brought back',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview fired open={{ fired: true }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-earlier',
     label: 'You · Insights, Earlier open with your marks',
     module: 'you',

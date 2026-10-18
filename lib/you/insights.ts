@@ -1,4 +1,5 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { firedFrom, type FiredTripwire } from '@/lib/you/insight-fired';
 
 /**
  * Deep insights about the person (you.insights, you.insight_verdicts and
@@ -52,6 +53,8 @@ export type Insight = {
   supersededBy: string | null;
   createdAt: string;
   verdict: InsightVerdict | null;
+  /** Tripwires that have fired on it (plan #2413.11); firedSinceMark picks the one that brings it back. */
+  fired: FiredTripwire[];
 };
 
 export type InsightRun = {
@@ -67,7 +70,8 @@ export type InsightRun = {
 
 export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
-  'insight_verdicts(verdict, note, decided_at)';
+  'insight_verdicts(verdict, note, decided_at), ' +
+  'insight_tripwires(kind, last_fired_at, fired_evidence)';
 
 export const RUN_COLUMNS =
   'id, status, summary, error, run_url, requested_at, started_at, finished_at';
@@ -162,6 +166,7 @@ export function insightFromRow(row: Record<string, unknown>): Insight | null {
     supersededBy: textOrNull(row.superseded_by),
     createdAt: text(row.created_at),
     verdict: verdictOf(row.insight_verdicts),
+    fired: firedFrom(row.insight_tripwires),
   };
 }
 

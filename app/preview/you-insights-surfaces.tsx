@@ -69,6 +69,7 @@ const waiting: Insight[] = [
     supersededBy: null,
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
+    fired: [],
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -89,6 +90,7 @@ const waiting: Insight[] = [
     supersededBy: null,
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
+    fired: [],
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -106,6 +108,7 @@ const waiting: Insight[] = [
     supersededBy: null,
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
+    fired: [],
   },
 ];
 
@@ -127,6 +130,7 @@ const marked: Insight[] = [
       note: 'Recruiters email first, so I answer that way. I am fine on the phone.',
       decidedAt: '2026-10-11T08:00:00Z',
     },
+    fired: [],
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
@@ -141,8 +145,64 @@ const marked: Insight[] = [
     supersededBy: null,
     createdAt: '2026-10-10T21:10:00Z',
     verdict: { verdict: 'not_quite', note: 'Both matter; the team decides between two good products.', decidedAt: '2026-10-11T08:05:00Z' },
+    fired: [],
   },
 ];
+
+/**
+ * Tripwires fired (plan #2413.11): building while an application waits puts the
+ * first card, about stepping away from judgement, at the front; the earlier
+ * "not quite" on who you work with comes back after its mark.
+ */
+const firedBuilding: Insight['fired'] = [
+  {
+    kind: 'building_while_waiting',
+    firedAt: '2026-10-18T02:00:00Z',
+    evidence: {
+      build_days: ['2026-10-14', '2026-10-15', '2026-10-17'],
+      waiting: [
+        {
+          application_id: 'a1',
+          company: 'ReSpark Interactive Learning Technologies',
+          role: 'Senior Product Designer, Growth and Onboarding',
+          submitted_at: '2026-10-13T10:00:00Z',
+          build_days_since: 3,
+        },
+        {
+          application_id: 'a2',
+          company: 'Northwind',
+          role: 'Designer',
+          submitted_at: '2026-10-14T10:00:00Z',
+          build_days_since: 2,
+        },
+      ],
+    },
+  },
+];
+const firedWant: Insight['fired'] = [
+  {
+    kind: 'want_recurring',
+    firedAt: '2026-10-17T02:00:00Z',
+    evidence: {
+      words: ['a smaller team'],
+      mentions: [
+        { source: 'job_search.thoughts', row_id: 't1', at: '2026-10-02T18:00:00Z' },
+        { source: 'obsidian.notes', row_id: 'Journal/2026-10-09.md', at: '2026-10-09T21:00:00Z' },
+      ],
+    },
+  },
+];
+
+const withFired = (): Insight[] => {
+  const cards = [...waiting, ...marked];
+  return cards.map((card) =>
+    card.id.endsWith('1')
+      ? { ...card, fired: firedBuilding }
+      : card.id.endsWith('5')
+        ? { ...card, fired: firedWant }
+        : card,
+  );
+};
 
 const run = (status: InsightRun['status'], error: string | null = null): InsightRun => ({
   id: '00000000-0000-4000-8000-0000000000aa',
@@ -159,10 +219,13 @@ export function YouInsightsPreview({
   open,
   state = 'ready',
   empty = false,
+  fired = false,
 }: {
   open?: InsightsOpen;
   state?: 'ready' | 'running' | 'failed';
   empty?: boolean;
+  /** Cards brought back by a tripwire. */
+  fired?: boolean;
 }) {
   const latest =
     state === 'running'
@@ -172,11 +235,12 @@ export function YouInsightsPreview({
         : run('ready');
   return (
     <InsightsView
-      insights={empty ? [] : [...waiting, ...marked]}
+      insights={empty ? [] : fired ? withFired() : [...waiting, ...marked]}
       run={insightRunState(empty && state === 'ready' ? null : latest, NOW)}
       runWhen="Today, 9:40 AM BST"
       available
       rereadAvailable
+      timezone="Europe/London"
       actions={actions}
       open={open}
     />
