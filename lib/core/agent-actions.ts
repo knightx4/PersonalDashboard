@@ -33,6 +33,8 @@ export const coreActions: ModuleActions = {
   'app/account/notification-actions.ts': {
     saveNotificationSubscription: none('account', 'Registers this device for pushes.'),
     removeNotificationSubscription: none('account', 'Unregisters this device.'),
+    readFinishNotice: none('setting'),
+    saveFinishNotice: none('setting'),
   },
   'app/ask/actions.ts': {
     askDashPageLabel: none('page'),

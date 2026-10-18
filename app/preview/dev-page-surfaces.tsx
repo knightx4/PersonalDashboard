@@ -25,6 +25,10 @@ import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
+import { FinishNoticeRow } from '@/app/account/notifications';
+import { Banner } from '@/components/ui/banner';
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/field';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
   isOutstanding,
@@ -306,12 +310,12 @@ const report = usageReport(
 // order are what the page gets: a workspace, `core`, a module that is no
 // workspace, an operation no list declares, and unpriced calls.
 const functions = functionSpendRows([
-  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0 },
-  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0 },
-  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3 },
-  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0 },
-  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0 },
-  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0 },
+  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0, input_tokens_30: 120_000, cached_tokens_30: 880_000, cache_write_tokens_30: 40_000 },
+  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0, input_tokens_30: 610_000, cached_tokens_30: 90_000, cache_write_tokens_30: 30_000 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3, input_tokens_30: 420_000, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0, input_tokens_30: 35_000, cached_tokens_30: 240_000, cache_write_tokens_30: 12_000 },
+  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0, input_tokens_30: 9_000, cached_tokens_30: 6_000, cache_write_tokens_30: 2_000 },
+  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
   {
     module: 'website',
     operation: 'draft-weekly-changelog-summary-for-the-public-site',
@@ -319,6 +323,9 @@ const functions = functionSpendRows([
     spend_30: 0,
     calls_30: 2,
     unpriced_30: 2,
+    input_tokens_30: 0,
+    cached_tokens_30: 0,
+    cache_write_tokens_30: 0,
   },
 ]);
 
@@ -1242,5 +1249,47 @@ export function DevRunnerCrewSurface() {
       />
       <OvernightControl run={null} canSend night={null} push={null} ready={2} />
     </>,
+  );
+}
+
+// ---- The "Tell me when Dash has finished" switch (plan #2389.4) -----------
+
+/**
+ * The notifications section as it reads on a device that has notifications
+ * on: the morning-brief switch above and the finish switch beneath it. The
+ * browser's own state is what draws the real section, so the gallery draws
+ * the same two rows with fixtures: `loading` is the finish switch before the
+ * row is read, `error` is a save that failed, with the switch back where it was.
+ */
+export function FinishNoticeSurface({
+  enabled = true,
+  loading,
+  error,
+}: {
+  enabled?: boolean;
+  loading?: boolean;
+  error?: string;
+}) {
+  return (
+    <section className="max-w-2xl">
+      <h3 className="text-ui font-semibold text-ink">Notifications</h3>
+      <Card className="mt-4 divide-y divide-border card-pad-x">
+        <label className="row-pad flex items-start gap-3">
+          <Switch checked readOnly className="mt-0.5" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-ui font-medium text-ink">Send me the morning brief</span>
+            <span className="block text-small leading-snug text-ink-muted">
+              On this device only. Turn it on from each phone or computer you want it on.
+            </span>
+          </span>
+        </label>
+        <FinishNoticeRow enabled={loading ? null : enabled} busy={false} />
+      </Card>
+      {error && (
+        <div className="mt-3">
+          <Banner tone="bad">{error}</Banner>
+        </div>
+      )}
+    </section>
   );
 }

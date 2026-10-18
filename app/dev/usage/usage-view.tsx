@@ -9,6 +9,7 @@ import { openedText, type FunctionSpend, type UsageGroup, type UsageReport } fro
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageColumn } from '@/components/shell/page-width';
 import { DayBarChart } from '@/components/ui/day-bar-chart';
+import { hitRate } from '@/lib/usage/function-spend';
 import type { DayValue } from '@/lib/usage/day-bars';
 import type { SpendDays } from '@/lib/usage/per-day';
 
@@ -24,6 +25,9 @@ import type { SpendDays } from '@/lib/usage/per-day';
  */
 
 const OUTSIDE = 'Outside a workspace';
+
+/** A function whose prompt-cache hit rate is below this is marked (plan #2393.2). */
+export const LOW_HIT_RATE = 0.5;
 
 /** The ledger's module as the app names it; `core` is the app as a whole. */
 export function workspaceLabel(module: string): string {
@@ -41,12 +45,20 @@ function plural(count: number, one: string, many: string): string {
 }
 
 function FunctionRow({ row }: { row: FunctionSpend }) {
+  const rate = hitRate(row);
   return (
     <li className="flex items-baseline justify-between gap-3 px-4 py-2.5">
       <span className="min-w-0">
         <span className="block truncate text-ui text-ink">{row.label}</span>
         <span className="block truncate text-small text-ink-muted">
-          {workspaceLabel(row.workspace)}
+          {rate === null ? (
+            'no input'
+          ) : (
+            <span className={rate < LOW_HIT_RATE ? 'font-medium text-caution' : undefined}>
+              {Math.round(rate * 100)}% cached
+            </span>
+          )}
+          {` · ${workspaceLabel(row.workspace)}`}
           {row.unpriced30 > 0 && row.spend30 > 0 && ` · ${row.unpriced30} not priced`}
         </span>
       </span>
