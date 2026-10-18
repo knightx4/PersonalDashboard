@@ -139,6 +139,8 @@ describe('RLS coverage', () => {
       'evidence_links',
       'external_checks',
       'feed_cards',
+      'figure_need_steps',
+      'figure_needs',
       'figure_places',
       'figure_series',
       'goals',

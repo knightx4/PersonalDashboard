@@ -214,6 +214,13 @@ export const LEARN_OPERATIONS = [
   // lesson is checked against (plan #976). Kept apart from 'embed-claim',
   // which a press records, because the background top-up records this one.
   'embed-lesson-claim',
+  // Embedding what a lesson's wanted figure would show, to group it with the
+  // other lessons asking for the same figure (plan #2321.9). One short text
+  // per wanted block, from the same background run as 'write-lesson'.
+  'embed-figure-need',
+  // Filling a lesson's wanted figure once its kind is built (plan #2321.11):
+  // one Sonnet call per block, at most ten a day, from the daily run.
+  'write-figure-backfill',
   // Writing the chain for a track's next unit so its lessons keep coming
   // (plan #977). The same call as 'generate-chain', recorded from the
   // background top-up rather than a press.

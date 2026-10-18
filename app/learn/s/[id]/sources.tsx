@@ -14,6 +14,7 @@ import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import type { StartTopicNow } from '@/lib/learn/prepare/start-load';
 import type { PreparationSources } from '@/lib/learn/prepare/view';
 import type { SubjectReading } from '@/lib/learn/chat/subject-load';
+import { NEED_NAME, type UnbuiltFigure } from '@/lib/learn/figures/needs-load';
 
 /**
  * What a finished preparation leaves on the subject's page (plan #2276.6).
@@ -215,12 +216,15 @@ export function SourcesSection({
   subjectId,
   sources,
   readings,
+  unbuilt = [],
   live = true,
   defaultOpen = true,
 }: {
   subjectId: string;
   sources: PreparationSources;
   readings: readonly SubjectReading[];
+  /** Figures its lessons asked for that the app cannot draw (plan #2321.12). */
+  unbuilt?: readonly UnbuiltFigure[];
   /** False in the gallery, which keeps no memory of the fold. */
   live?: boolean;
   /** The gallery draws it folded, as a later visit finds it once read. */
@@ -275,6 +279,23 @@ export function SourcesSection({
                   And {readings.length - READINGS_SHOWN} more under Reading.
                 </p>
               )}
+            </div>
+          )}
+
+          {unbuilt.length > 0 && (
+            <div className="card-pad">
+              <h3 className="text-ui font-semibold text-ink-muted">Figures its lessons asked for</h3>
+              <ul className="mt-1 space-y-2">
+                {unbuilt.map((figure) => (
+                  <li key={figure.key} className="text-ui text-ink">
+                    <span className="text-ink-muted">{NEED_NAME[figure.need]}: </span>
+                    {figure.shows}
+                    <span className="block text-small text-ink-muted">
+                      Asked by {figure.asked} {figure.asked === 1 ? 'lesson' : 'lessons'} · not built yet
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

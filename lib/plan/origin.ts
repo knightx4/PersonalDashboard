@@ -116,7 +116,16 @@ export function sessionStamp(origin: SessionOrigin): string {
     : `Added by a session on ${origin.date}.`;
 }
 
-const SESSION_PATTERN = /^Added by (?:session (\S+)|a session) on (\d{4}-\d{2}-\d{2})\.$/m;
+/**
+ * The same line for a step the app's own runs wrote, with no session behind
+ * them: the daily cron's figure steps (plan #2321.10). It reads back as a
+ * session stamp with no session, so the page marks it and offers the drop.
+ */
+export function dashStamp(date: string): string {
+  return `Added by Dash on ${date}.`;
+}
+
+const SESSION_PATTERN = /^Added by (?:session (\S+)|a session|Dash) on (\d{4}-\d{2}-\d{2})\.$/m;
 
 /** Read it back, or null when the step was not written ready by a session. */
 export function sessionOrigin(comment: string | null): SessionOrigin | null {

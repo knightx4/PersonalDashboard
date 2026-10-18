@@ -10,14 +10,16 @@ import { treeKind } from './kinds/tree';
 import { twoByTwoKind } from './kinds/two-by-two';
 import { timelineKind } from './kinds/timeline';
 import { mapKind } from './kinds/map';
+import { wantedKind } from './kinds/wanted';
 
 /**
  * Every figure kind a lesson can carry (plan #2321.1), and the reads that go
  * through them. The writer's prompt and tool, the store and the page all
- * read this list, so a kind added here reaches all three.
+ * read this list, so a kind added here reaches all three. `wanted` stays
+ * last: its writer line points at the kinds above it.
  */
 
-export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind, flowKind, cycleKind, treeKind, twoByTwoKind, timelineKind, chartKind, sourceFigureKind, explorableKind, mapKind] as unknown as readonly FigureKind[];
+export const FIGURE_KINDS: readonly FigureKind[] = [tableKind, compareKind, flowKind, cycleKind, treeKind, twoByTwoKind, timelineKind, chartKind, sourceFigureKind, explorableKind, mapKind, wantedKind] as unknown as readonly FigureKind[];
 
 /** At most this many figures on one lesson: a lesson teaches one idea, and an idea gets one figure. */
 export const MAX_FIGURES_PER_LESSON = 1;

@@ -19,6 +19,8 @@ import { lessonWhy, type LessonOutcome, type LessonTopUpPorts } from '@/lib/lear
 import { WRITE_LESSON_MODEL, writeLesson } from '@/lib/learn/lessons/write-lesson';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { resolveFigures, writerResolveContext } from '@/lib/learn/figures/resolve';
+import { recordFigureNeeds } from '@/lib/learn/figures/needs';
+import { embedOne } from '@/lib/learn/embed/embed';
 
 /**
  * The real ports for writing Learn now lessons (plan #978), used by the
@@ -28,6 +30,7 @@ import { resolveFigures, writerResolveContext } from '@/lib/learn/figures/resolv
 
 const WRITE_OPERATION: LearnOperation = 'write-lesson';
 const EMBED_OPERATION: LearnOperation = 'embed-lesson-claim';
+const NEED_OPERATION: LearnOperation = 'embed-figure-need';
 const CHECK_OPERATION: LearnOperation = 'write-unit-check';
 
 /** Postgres's unique violation: another run stored a lesson for this concept first. */
@@ -160,12 +163,33 @@ export async function writeLessonCard(
         }
       : { status: 'dropped', drop_reason: result.reason }),
   };
-  const { error } = await learn.from('feed_cards').insert(row);
+  const { data: saved, error } = await learn.from('feed_cards').insert(row).select('id').single();
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return { outcome: 'already', detail: 'Written by another run first.' };
     return { outcome: 'failed', detail: `Saving the lesson failed: ${error.message}` };
   }
-  return result.outcome === 'ready' ? { outcome: 'ready' } : { outcome: 'dropped', detail: result.reason };
+  if (result.outcome !== 'ready') return { outcome: 'dropped', detail: result.reason };
+
+  // A figure the lesson asked for and the app cannot draw is kept, grouped
+  // with the other lessons asking for the same thing (plan #2321.9). The
+  // lesson is saved whatever this comes to.
+  const cardId = (saved as { id: string } | null)?.id;
+  if (cardId && result.figures.some((figure) => figure.kind === 'wanted')) {
+    const needSpend: SpendReport[] = [];
+    const needs = await recordFigureNeeds(
+      learn,
+      { userId, subjectId: pick.subjectId, cardId, figures: result.figures },
+      async (text) => {
+        const embedded = await embedOne(text, { inputType: 'document', onSpend: (report) => needSpend.push(report) });
+        return embedded.ok ? { vector: embedded.vector, model: embedded.model } : null;
+      },
+    );
+    for (const report of needSpend) {
+      await recordSpend(core, userId, { module: 'learn', operation: NEED_OPERATION, model: report.model, usage: report.usage });
+    }
+    if (needs.detail) console.warn(`[learn] ${needs.detail}`);
+  }
+  return { outcome: 'ready' };
 }
 
 export function createLessonPorts(context: {
