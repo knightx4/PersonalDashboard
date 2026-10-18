@@ -53,6 +53,28 @@ export const youSources: ModuleSources = {
         'The file is in the private you-course-files bucket at storage_path; a course holds at most 20.',
     },
     {
+      table: 'you.course_weeks',
+      module: 'You',
+      holds: "The weeks of a course they took and each week's topic, read from its syllabus and corrected by them.",
+      weight: 'record',
+      search: ['title'],
+      title: 'title',
+      facts: ['week', 'edited_at', 'removed_at'],
+      newest: 'created_at',
+      // A week opens on its course's line, which its ref alone cannot name.
+      page: {
+        title: 'title',
+        reads: ['course_id'],
+        href: (row) => (row.course_id ? courseHref(String(row.course_id)) : null),
+        section: WORK,
+        parent: parentBy('course_id', 'you.courses'),
+      },
+      note:
+        'course_id points at you.courses. week is the week number; a file in you.course_files with the same course_id and week sits in it. ' +
+        'title is null for a week the syllabus names without a topic. edited_at is set when they changed the title themselves; ' +
+        'a row with removed_at is a week they removed, so leave it out.',
+    },
+    {
       table: 'you.transcripts',
       module: 'You',
       holds: 'The academic transcripts they have uploaded, one per school record, with the original file kept.',

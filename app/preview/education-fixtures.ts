@@ -2,7 +2,7 @@ import type { TranscriptDraft } from '@/app/you/work/actions';
 import { courseExplainPrompt, type CourseExplain } from '@/lib/learn/evidence/course-explain';
 import { groupCourses } from '@/lib/you/education';
 import type { ChosenFile } from '@/app/you/work/course-files';
-import type { Course, CourseFile, CourseFileKind, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, CourseFileKind, CourseWeek, Transcript } from '@/lib/you/transcripts';
 import { HAIKU } from '@/lib/core/models';
 
 /** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
@@ -225,4 +225,31 @@ export const educationUploading: ChosenFile[] = [
     problem: 'The connection dropped. Try again.',
   }),
   chosen(4, 'Krugman, The age of diminished expectations, chapter 2.pdf', 3_402_118, 'reading', '3'),
+];
+
+function slot(week: number, title: string | null, extra: Partial<CourseWeek> = {}): CourseWeek {
+  return { id: `w${week}`, course_id: 'c3', week, title, edited_at: null, removed_at: null, ...extra };
+}
+
+/**
+ * ECON 101's weeks as Dash laid them out from its syllabus (plan #2401.6):
+ * the first two hold files, three to seven are empty slots, week 4's topic
+ * was edited by hand, week 5 was removed, and week 7 has the longest topic.
+ */
+export const educationWeeks: Record<string, CourseWeek[]> = {
+  c3: [
+    slot(1, 'Scarcity and choice'),
+    slot(2, 'Supply and demand'),
+    slot(3, 'Elasticity'),
+    slot(4, 'Consumer choice and utility', { edited_at: '2026-10-18T11:00:00Z' }),
+    slot(5, 'Midterm', { removed_at: '2026-10-18T11:00:00Z' }),
+    slot(6, null),
+    slot(7, 'Market structures: perfect competition, monopoly, oligopoly and monopolistic competition'),
+  ],
+};
+
+/** The add drawer on a course with weeks laid out: two files, each with its week picked by name. */
+export const educationChosenWeeks: ChosenFile[] = [
+  chosen(0, 'Lecture_03_Elasticity.pptx', 7_204_118, 'slides', '3'),
+  chosen(1, 'Krugman, The age of diminished expectations, chapter 2.pdf', 3_402_118, 'reading', '7'),
 ];

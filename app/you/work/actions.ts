@@ -21,7 +21,20 @@ import {
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { readCourseFile, type CourseFileRead } from '@/lib/you/course-file-read';
-import { askCourseFileModel, COURSE_FILE_MODEL, COURSE_FILE_OPERATION } from '@/lib/you/course-file-model';
+import {
+  askCourseFileModel,
+  COURSE_FILE_MODEL,
+  COURSE_FILE_OPERATION,
+  SYLLABUS_WEEKS_OPERATION,
+} from '@/lib/you/course-file-model';
+import {
+  mergeSyllabusWeeks,
+  parseWeekTitle,
+  readSyllabusWeeks,
+  WEEKS_INSTRUCTION,
+  weeksTool,
+  type SyllabusRead,
+} from '@/lib/you/syllabus-weeks';
 import { askTranscriptModel, TRANSCRIPT_OPERATION } from '@/lib/you/transcript-model';
 import { readTranscript, type DraftCourse } from '@/lib/you/transcript-read';
 import {
@@ -40,6 +53,7 @@ import {
   deleteTranscript,
   TRANSCRIPTS_BUCKET,
   type CourseFile,
+  type CourseWeek,
   type TranscriptStore,
 } from '@/lib/you/transcripts';
 
@@ -510,4 +524,148 @@ export async function summariseCourseFileAction(
 
   revalidatePath(EDUCATION_HREF);
   return { summarised: true };
+}
+
+// ---------------------------------------------------------------------------
+// A course's weeks, laid out from its syllabus (plan #2401.6)
+// ---------------------------------------------------------------------------
+
+export type ReadSyllabusWeeksState = { error?: string; laidOut?: number };
+
+/**
+ * Have Dash read a course's syllabus and lay out its weeks in
+ * you.course_weeks, one row per week with its topic. It runs only on a press,
+ * as decision #2401.3 chose, and is paid for each time. A second read leaves
+ * weeks the person edited or removed as they left them, rewrites the others
+ * and adds any new ones (mergeSyllabusWeeks). A read that fails changes
+ * nothing and says why.
+ */
+// latency: pending
+export async function readSyllabusWeeksAction(
+  _prev: ReadSyllabusWeeksState,
+  form: FormData,
+): Promise<ReadSyllabusWeeksState> {
+  const user = await requireUser();
+  const courseId = id.safeParse(form.get('courseId'));
+  if (!courseId.success) return { error: 'That course could not be found.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot read files.' };
+
+  const you = await createYouClient();
+  const [{ data: course }, { data: syllabus }, { data: keptRows }] = await Promise.all([
+    you.from('courses').select('id, title').eq('id', courseId.data).eq('user_id', user.id).maybeSingle(),
+    you
+      .from('course_files')
+      .select('storage_path')
+      .eq('course_id', courseId.data)
+      .eq('user_id', user.id)
+      .eq('kind', 'syllabus')
+      .order('position')
+      .limit(1)
+      .maybeSingle(),
+    you
+      .from('course_weeks')
+      .select('id, course_id, week, title, edited_at, removed_at')
+      .eq('course_id', courseId.data)
+      .eq('user_id', user.id),
+  ]);
+  const courseRow = course as { id: string; title: string } | null;
+  const syllabusRow = syllabus as { storage_path: string } | null;
+  if (!courseRow) return { error: 'That course could not be found.' };
+  if (!syllabusRow) return { error: 'This course has no syllabus to read. Add one first.' };
+
+  const { data: blob, error: downloadError } = await you.storage
+    .from(COURSE_FILES_BUCKET)
+    .download(syllabusRow.storage_path);
+  if (downloadError || !blob) return { error: 'The stored syllabus could not be opened. Try again.' };
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+
+  const spend = collectSpend();
+  let read: SyllabusRead;
+  try {
+    read = await readSyllabusWeeks(
+      { name: syllabusRow.storage_path, bytes, courseTitle: courseRow.title },
+      (source, system) =>
+        askCourseFileModel({ apiKey, onSpend: spend.sink }, source, system, {
+          tool: weeksTool(),
+          instruction: WEEKS_INSTRUCTION,
+        }),
+    );
+  } catch {
+    read = { ok: false, error: 'The syllabus could not be read. Try again.' };
+  }
+  await recordSpendReports(
+    await createCoreClient(),
+    user.id,
+    { module: 'you', operation: SYLLABUS_WEEKS_OPERATION },
+    spend.reports,
+  );
+
+  if (!read.ok) return { error: read.error };
+
+  const change = mergeSyllabusWeeks((keptRows ?? []) as CourseWeek[], read.weeks);
+  if (change.upsert.length > 0) {
+    const { error } = await you.from('course_weeks').upsert(
+      change.upsert.map((week) => ({ user_id: user.id, course_id: courseRow.id, week: week.week, title: week.title })),
+      { onConflict: 'course_id,week' },
+    );
+    if (error) return { error: 'The weeks were not saved. Try again.' };
+  }
+  if (change.remove.length > 0) {
+    const { error } = await you.from('course_weeks').delete().in('id', change.remove).eq('user_id', user.id);
+    if (error) return { error: 'The weeks were not saved. Try again.' };
+  }
+
+  revalidatePath(EDUCATION_HREF);
+  return { laidOut: read.weeks.length };
+}
+
+export type CourseWeekResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Change the topic of one week laid out from the syllabus. The week is marked
+ * edited, so reading the syllabus again keeps the person's title.
+ */
+// latency: pending
+export async function renameCourseWeekAction(form: FormData): Promise<CourseWeekResult> {
+  const user = await requireUser();
+  const weekId = id.safeParse(form.get('id'));
+  if (!weekId.success) return { ok: false, error: 'That week could not be found.' };
+  const title = parseWeekTitle(form.get('title'));
+  if (!title.ok) return { ok: false, error: 'Keep the topic under 200 characters.' };
+  const you = await createYouClient();
+  const { data, error } = await you
+    .from('course_weeks')
+    .update({ title: title.title, edited_at: new Date().toISOString() })
+    .eq('id', weekId.data)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) return { ok: false, error: 'The week was not saved. Try again.' };
+  if (!data?.length) return { ok: false, error: 'That week could not be found.' };
+  revalidatePath(EDUCATION_HREF);
+  return { ok: true };
+}
+
+/**
+ * Remove one week laid out from the syllabus. The row is kept, marked
+ * removed, so reading the syllabus again does not bring the week back. Files
+ * in that week keep their week and still show under it.
+ */
+// latency: pending
+export async function removeCourseWeekAction(form: FormData): Promise<CourseWeekResult> {
+  const user = await requireUser();
+  const weekId = id.safeParse(form.get('id'));
+  if (!weekId.success) return { ok: false, error: 'That week could not be found.' };
+  const you = await createYouClient();
+  const { data, error } = await you
+    .from('course_weeks')
+    .update({ removed_at: new Date().toISOString() })
+    .eq('id', weekId.data)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) return { ok: false, error: 'The week was not removed. Try again.' };
+  if (!data?.length) return { ok: false, error: 'That week could not be found.' };
+  revalidatePath(EDUCATION_HREF);
+  return { ok: true };
 }

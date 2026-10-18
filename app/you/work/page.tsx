@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { groupCourses } from '@/lib/you/education';
-import type { Course, CourseFile, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, CourseWeek, Transcript } from '@/lib/you/transcripts';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { resumeHash } from '@/lib/you/resume-hash';
 import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
@@ -28,7 +28,7 @@ export default async function Page() {
   const you = await createYouClient();
   const user = await requireUser();
   const jobsClient = await createJobsClient();
-  const [transcripts, courses, courseFiles, jobs, resume] = await Promise.all([
+  const [transcripts, courses, courseFiles, courseWeeks, jobs, resume] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -64,6 +64,16 @@ export default async function Page() {
           size_bytes: Number(file.size_bytes),
           summary: (Array.isArray(file.summary) ? file.summary[0] : file.summary) ?? null,
         })) as CourseFile[];
+      }),
+    // The weeks laid out from each course's syllabus (plan #2401.6), removed ones too, so the list can leave them out.
+    you
+      .from('course_weeks')
+      .select('id, course_id, week, title, edited_at, removed_at')
+      .eq('user_id', user.id)
+      .order('week')
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Loading course weeks failed: ${error.message}`);
+        return (data ?? []) as CourseWeek[];
       }),
     you
       .from('work_history')
@@ -101,6 +111,9 @@ export default async function Page() {
   const filesByCourse: Record<string, CourseFile[]> = {};
   for (const file of courseFiles) (filesByCourse[file.course_id] ??= []).push(file);
 
+  const weeksByCourse: Record<string, CourseWeek[]> = {};
+  for (const week of courseWeeks) (weeksByCourse[week.course_id] ??= []).push(week);
+
   const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
 
   return (
@@ -118,6 +131,7 @@ export default async function Page() {
         courses={courses.length}
         explains={explains}
         files={filesByCourse}
+        weeks={weeksByCourse}
       />
     </PageColumn>
   );

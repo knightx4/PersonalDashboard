@@ -15,7 +15,7 @@ import {
   transcriptFileHref,
   type SchoolGroup,
 } from '@/lib/you/education';
-import type { Course, CourseFile, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, CourseWeek, Transcript } from '@/lib/you/transcripts';
 import { courseFilesCount } from '@/lib/you/course-files';
 import {
   removeCourseAction,
@@ -40,6 +40,12 @@ export type FilesOpen = {
   summariseErrors?: Record<string, string>;
   summaryOpen?: string;
   costOpen?: string;
+  /** A week heading being edited, by its week row's id (plan #2401.6). */
+  editingWeek?: string;
+  /** A failed read of the syllabus's weeks. */
+  weeksError?: string;
+  /** The syllabus mid-read for its weeks. */
+  readingWeeks?: boolean;
 };
 
 /**
@@ -53,6 +59,7 @@ export function SchoolCourses({
   explains = {},
   explaining,
   files = {},
+  weeks = {},
   filesOpen,
 }: {
   group: SchoolGroup;
@@ -64,6 +71,8 @@ export function SchoolCourses({
   explaining?: string;
   /** The files kept under each course, by course id (plan #2401.2). */
   files?: Record<string, CourseFile[]>;
+  /** The weeks laid out from each course's syllabus, by course id (plan #2401.6). */
+  weeks?: Record<string, CourseWeek[]>;
   filesOpen?: FilesOpen;
 }) {
   const courses = group.terms.flatMap((term) => term.courses);
@@ -93,6 +102,7 @@ export function SchoolCourses({
                 explain={explains[course.id]}
                 explaining={explaining === course.id}
                 files={files[course.id] ?? []}
+                weeks={weeks[course.id] ?? []}
                 filesOpen={filesOpen?.courseId === course.id ? filesOpen : undefined}
               />
             ))}
@@ -125,12 +135,14 @@ function CourseRow({
   explain,
   explaining = false,
   files,
+  weeks,
   filesOpen,
 }: {
   course: Course;
   explain?: CourseExplain;
   explaining?: boolean;
   files: CourseFile[];
+  weeks: CourseWeek[];
   filesOpen?: FilesOpen;
 }) {
   const [editing, setEditing] = useState(false);
@@ -210,6 +222,7 @@ function CourseRow({
             courseId={course.id}
             courseTitle={course.title}
             files={files}
+            weeks={weeks}
             adding={addFiles > 0}
             chosen={filesOpen?.chosen}
             uploading={filesOpen?.uploading}
@@ -219,6 +232,9 @@ function CourseRow({
             summariseErrors={filesOpen?.summariseErrors}
             summaryOpen={filesOpen?.summaryOpen}
             costOpen={filesOpen?.costOpen}
+            editingWeek={filesOpen?.editingWeek}
+            weeksError={filesOpen?.weeksError}
+            readingWeeks={filesOpen?.readingWeeks}
           />
         </div>
       )}

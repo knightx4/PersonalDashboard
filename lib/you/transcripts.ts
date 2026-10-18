@@ -167,6 +167,20 @@ export type StoredCourseFileSummary = {
 };
 
 /**
+ * A row of you.course_weeks (plan #2401.6): one week of a course as Dash read
+ * it from the syllabus. edited_at is set when the person changed its title,
+ * removed_at when they removed it; a second read leaves both alone.
+ */
+export type CourseWeek = {
+  id: string;
+  course_id: string;
+  week: number;
+  title: string | null;
+  edited_at: string | null;
+  removed_at: string | null;
+};
+
+/**
  * Where a new course file goes: the account's folder, the course's folder in
  * it, then a fresh uuid and the name made safe, as for a transcript. The
  * table's check holds a row to exactly this folder.

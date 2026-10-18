@@ -6,8 +6,9 @@ import {
   ownsCourseFilePath,
   parseWeek,
   refuseCourseFiles,
+  weekName,
 } from '@/lib/you/course-files';
-import { COURSE_FILE_MAX_BYTES, type CourseFile, type CourseFileKind } from '@/lib/you/transcripts';
+import { COURSE_FILE_MAX_BYTES, type CourseFile, type CourseFileKind, type CourseWeek } from '@/lib/you/transcripts';
 
 const U = '00000000-0000-4000-8000-000000000001';
 const C = '00000000-0000-4000-8000-0000000000c1';
@@ -109,5 +110,35 @@ describe('groupCourseFiles', () => {
 
   it('leaves out empty groups', () => {
     expect(groupCourseFiles([])).toEqual([]);
+  });
+
+  it("shows the syllabus's weeks as slots, empty ones too, and a removed week only when a file names it", () => {
+    const slot = (week: number, title: string | null, removed = false): CourseWeek => ({
+      id: `w${week}`,
+      course_id: C,
+      week,
+      title,
+      edited_at: null,
+      removed_at: removed ? '2026-10-18T00:00:00Z' : null,
+    });
+    const groups = groupCourseFiles(
+      [file('s1', 'slides', 1), file('s5', 'slides', 5), file('s4', 'slides', 4)],
+      [slot(1, 'Scarcity'), slot(2, null), slot(3, 'Elasticity', true), slot(4, 'Gone', true)],
+    );
+    expect(groups.map((g) => [g.label, g.slot?.title ?? null, g.files.map((f) => f.id)])).toEqual([
+      ['Week 1', 'Scarcity', ['s1']],
+      ['Week 2', null, []],
+      ['Week 4', null, ['s4']],
+      ['Week 5', null, ['s5']],
+    ]);
+    expect(groups[1].slot?.id).toBe('w2');
+    expect(groups[2].slot).toBeUndefined();
+  });
+});
+
+describe('weekName', () => {
+  it('puts the topic after the week when there is one', () => {
+    expect(weekName({ week: 3, title: 'Elasticity' })).toBe('Week 3 · Elasticity');
+    expect(weekName({ week: 3, title: null })).toBe('Week 3');
   });
 });

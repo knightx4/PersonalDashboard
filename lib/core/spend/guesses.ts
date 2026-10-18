@@ -488,4 +488,6 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A lecture's slides or a reading of about twenty pages, read whole for a
   // summary and five points (plan #2401.4).
   'summarise-course-file': run(HAIKU, 30_000, 600),
+  // A syllabus of five to ten pages in, a list of fifteen weeks out (plan #2401.6).
+  'read-syllabus-weeks': run(HAIKU, 12_000, 700),
 };

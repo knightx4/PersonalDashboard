@@ -525,6 +525,14 @@ The files they kept from a course: its syllabus, lecture slides, lecture notes a
 - Name a row by `title`; link it by `id`
 - course_id points at you.courses. kind is syllabus, slides, lecture_notes or reading. week is the week of the course, or null for a file that spans it. The file is in the private you-course-files bucket at storage_path; a course holds at most 20.
 
+### `you.course_weeks` (You)
+
+The weeks of a course they took and each week's topic, read from its syllabus and corrected by them.
+
+- Search: `title`
+- Name a row by `title`; link it by `id`
+- course_id points at you.courses. week is the week number; a file in you.course_files with the same course_id and week sits in it. title is null for a week the syllabus names without a topic. edited_at is set when they changed the title themselves; a row with removed_at is a week they removed, so leave it out.
+
 ### `you.transcripts` (You)
 
 The academic transcripts they have uploaded, one per school record, with the original file kept.

@@ -253,6 +253,10 @@ export const SPEND_OPERATIONS = {
     // tab, reading the whole file: a PDF or photo as itself, a deck or Word
     // file as its text.
     'summarise-course-file',
+    // A course's weeks and their topics, read from its syllabus on a press of
+    // "Lay out the weeks" (plan #2401.6). One Haiku call reading the whole
+    // syllabus.
+    'read-syllabus-weeks',
   ],
 } as const;
 

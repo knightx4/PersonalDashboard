@@ -15,7 +15,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { YouOperation } from '@/lib/core/spend/operations';
-import { SUMMARY_TOOL, summaryTool } from '@/lib/you/course-file-read';
+import { summaryTool } from '@/lib/you/course-file-read';
 import { MODELS } from '@/lib/core/models';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 
@@ -23,6 +23,9 @@ export const COURSE_FILE_MODEL = MODELS.youCourseFileSummary;
 
 /** The spend ledger's name for one read (lib/core/spend/operations.ts). */
 export const COURSE_FILE_OPERATION: YouOperation = 'summarise-course-file';
+
+/** The spend ledger's name for laying out a syllabus's weeks (plan #2401.6). */
+export const SYLLABUS_WEEKS_OPERATION: YouOperation = 'read-syllabus-weeks';
 
 export type CourseFileModelOptions = {
   apiKey: string;
@@ -32,11 +35,28 @@ export type CourseFileModelOptions = {
   onSpend?: SpendSink;
 };
 
+/**
+ * The tool the answer comes back through and what the file is sent with.
+ * Summarise's by default; laying out a syllabus's weeks (plan #2401.6,
+ * lib/you/syllabus-weeks.ts) passes its own.
+ */
+export type CourseFileAsk = {
+  tool: { name: string; description: string; input_schema: Record<string, unknown> };
+  instruction: string;
+  maxTokens?: number;
+};
+
+const SUMMARISE: CourseFileAsk = {
+  tool: summaryTool(),
+  instruction: 'Summarise this file and list the points worth keeping.',
+};
+
 /** Ask; get back the tool input, or why there is none. */
 export async function askCourseFileModel(
   options: CourseFileModelOptions,
   source: ExtractSource,
   system: string,
+  ask: CourseFileAsk = SUMMARISE,
 ): Promise<ExtractResult> {
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
 
@@ -51,14 +71,14 @@ export async function askCourseFileModel(
   try {
     response = await client.messages.create({
       model: COURSE_FILE_MODEL,
-      max_tokens: 2_000,
+      max_tokens: ask.maxTokens ?? 2_000,
       system,
-      tools: [summaryTool() as Anthropic.Tool],
-      tool_choice: forceTool(SUMMARY_TOOL, COURSE_FILE_MODEL),
+      tools: [ask.tool as Anthropic.Tool],
+      tool_choice: forceTool(ask.tool.name, COURSE_FILE_MODEL),
       messages: [
         {
           role: 'user',
-          content: [given, { type: 'text', text: 'Summarise this file and list the points worth keeping.' }],
+          content: [given, { type: 'text', text: ask.instruction }],
         },
       ],
     });
@@ -80,7 +100,7 @@ export async function askCourseFileModel(
   options.onSpend?.({ model: COURSE_FILE_MODEL, usage: usageFrom(response.usage) });
 
   const reported = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === SUMMARY_TOOL,
+    (block) => block.type === 'tool_use' && block.name === ask.tool.name,
   );
   if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back. Try again.' };
   return { ok: true, input: reported.input };

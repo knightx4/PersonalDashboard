@@ -311,9 +311,11 @@ import {
 } from './brief-surfaces';
 import {
   educationChosen,
+  educationChosenWeeks,
   educationCounts,
   educationExplains,
   educationFiles,
+  educationWeeks,
   educationGroups,
   educationUploading,
 } from './education-fixtures';
@@ -3262,8 +3264,24 @@ const guessedSummary: CostEstimate = {
   models: [HAIKU],
 };
 
-/** What Summarise on a course file costs, for the files surfaces (plan #2401.4). */
-const summariseCosts = { 'app/you/work/actions.ts#summariseCourseFileAction': guessedSummary } as const;
+const guessedWeeks: CostEstimate = {
+  lowMicros: 10_000,
+  medianMicros: 20_000,
+  highMicros: 40_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU],
+};
+
+/**
+ * What Summarise on a course file (plan #2401.4) and laying out a syllabus's
+ * weeks (plan #2401.6) cost, for the files surfaces.
+ */
+const summariseCosts = {
+  'app/you/work/actions.ts#summariseCourseFileAction': guessedSummary,
+  'app/you/work/actions.ts#readSyllabusWeeksAction': guessedWeeks,
+} as const;
 
 const perReading: CostEstimate = {
   lowMicros: 12_000,
@@ -6273,6 +6291,79 @@ export const SURFACES: readonly Surface[] = [
           courses={9}
           files={educationFiles}
           filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A course's weeks laid out from its syllabus (plan #2401.6): each week
+     * with its topic, the empty ones saying nothing is kept for them yet, a
+     * week with a long topic, and Read the weeks again under the syllabus. */
+    id: 'you-work-files-weeks',
+    label: 'Work & school · A course\'s weeks from its syllabus',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A week's Edit opened (plan #2401.6): its topic in a field, Save,
+     * Cancel and Remove week. */
+    id: 'you-work-files-week-edit',
+    label: 'Work & school · Editing a course week',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{ courseId: 'c3', editingWeek: 'w3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The add drawer on a course whose weeks are laid out (plan #2401.6):
+     * each file's week picked by name, and a read of the syllabus that
+     * failed, saying why under its press. */
+    id: 'you-work-files-weeks-add',
+    label: 'Work & school · Adding files to a course\'s weeks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{
+            courseId: 'c3',
+            adding: true,
+            chosen: educationChosenWeeks,
+            weeksError: 'Dash found no weeks in it. It lists the topics with no schedule.',
+          }}
         />
       </PaidCostsProvider>
     ),
