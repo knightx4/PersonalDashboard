@@ -65,15 +65,18 @@ export function TagChips({
       {tags.map((tag) => (
         <span
           key={tag}
+          title={tag}
           className={cn(
             chipVariants({ size: 'sm' }),
             'group/tag gap-0',
-            // A long tag that does not fit moves to the next line whole, and
-            // ends in an ellipsis only when it is wider than the row.
             'min-w-0 max-w-full shrink',
           )}
         >
-          <span className="min-w-0 truncate">{tag}</span>
+          {/* A long tag is cut at 80px, about a dozen characters, so it and the
+              chips after it share one line at 390 rather than taking a line
+              of their own (plan #2340.2's critic). The whole name is on the
+              chip's hover, and in the picker, which writes it out. */}
+          <span className="min-w-0 max-w-20 truncate">{tag}</span>
           {editable && (
             <Tooltip label={`Remove ${tag}`}>
               <button

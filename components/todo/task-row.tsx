@@ -271,8 +271,10 @@ export function TaskRow({
   const overdue = archive && task.status === 'open' && due !== null && due < todayIn(timezone);
   // The title and the date pad their text by 4px for their hover ground; on
   // All the rest of the row's lines take the same inset, so each starts on
-  // the title's left edge.
-  const inset = archive && 'px-1';
+  // the title's left edge. On the agenda the date starts the line under the
+  // title, so the rest follow it, except on an undated row, where "On you"
+  // starts that line itself and takes the inset too (plan #2340.2's critic).
+  const inset = (archive || (!task.dueOn && !task.dueAt)) && 'px-1';
 
   /**
    * Run one of the writes the row does not draw ahead of: a move, a place, a
