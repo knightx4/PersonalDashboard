@@ -44,6 +44,10 @@ const FILL: Record<string, (user: string, id: string) => Record<string, unknown>
   'obsidian.notes': () => ({ path: 'Career/A note.md' }),
   'you.places': () => ({ moved_in: '2020', moved_out: null }),
   'you.work_history': () => ({ started: '2020', ended: null }),
+  'you.course_files': (user, id) => {
+    const course = randomUUID();
+    return { course_id: course, storage_path: `${user}/${course}/${id}-a.pdf` };
+  },
   'you.transcripts': (user) => ({ storage_path: `${user}/a.pdf` }),
   'public.plan_items': () => ({ number: 4242 }),
   'public.social_posts': () => ({ body: '["x"]', draft: '["x"]' }),

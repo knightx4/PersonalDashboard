@@ -31,6 +31,11 @@ export const youActions: ModuleActions = {
       'The explain answer is what the person writes about a course, graded on a press; Dash does not answer for them.',
     ),
     removeTranscriptAction: none('deletes'),
+    addCourseFileAction: none(
+      'own',
+      'Keeps a file the person has just uploaded under a course, as they chose its kind and week; Dash does not hold their files.',
+    ),
+    removeCourseFileAction: none('deletes'),
   },
   'app/you/places/actions.ts': {
     // A place is added through capture (plan #1950.7); the form only changes one.
