@@ -310,12 +310,12 @@ const report = usageReport(
 // order are what the page gets: a workspace, `core`, a module that is no
 // workspace, an operation no list declares, and unpriced calls.
 const functions = functionSpendRows([
-  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0 },
-  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0 },
-  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3 },
-  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0 },
-  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0 },
-  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0 },
+  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
+  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0, input_tokens_30: 0, cached_tokens_30: 0, cache_write_tokens_30: 0 },
   {
     module: 'website',
     operation: 'draft-weekly-changelog-summary-for-the-public-site',
@@ -323,6 +323,9 @@ const functions = functionSpendRows([
     spend_30: 0,
     calls_30: 2,
     unpriced_30: 2,
+    input_tokens_30: 0,
+    cached_tokens_30: 0,
+    cache_write_tokens_30: 0,
   },
 ]);
 
