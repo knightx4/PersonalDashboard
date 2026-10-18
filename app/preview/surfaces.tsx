@@ -275,6 +275,8 @@ import {
   LearnSubjectPrepareFinishedSurface,
   LearnSubjectPrepareSourcesEmptySurface,
   LearnSubjectPrepareSourcesFoldedSurface,
+  LearnSubjectSourcesUnbuiltSurface,
+  LearnSubjectSourcesUnbuiltNoneSurface,
   LearnSubjectPrepareStartingSurface,
   LearnSubjectPrepareStartSurface,
   LearnSubjectPrepareStartPendingSurface,
@@ -9708,6 +9710,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Figures the subject's lessons asked for and the app cannot draw (plan #2321.12). */
+    id: 'learn-subject-sources-unbuilt',
+    label: 'Subject · Sources listing the figures its lessons asked for',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltSurface />,
+  },
+  {
+    id: 'learn-subject-sources-unbuilt-none',
+    label: 'Subject · Sources with no figures outstanding',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltNoneSurface />,
   },
   {
     /* Add a source (plan #2307.4): the press closed under Sources, with a

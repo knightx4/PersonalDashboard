@@ -610,6 +610,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-start-pending': ['/learn/s/[id]'],
   'learn-subject-prepare-sources-empty': ['/learn/s/[id]'],
   'learn-subject-prepare-sources-folded': ['/learn/s/[id]'],
+  'learn-subject-sources-unbuilt': ['/learn/s/[id]'],
+  'learn-subject-sources-unbuilt-none': ['/learn/s/[id]'],
   'learn-subject-prepare-direction': ['/learn/s/[id]'],
   'learn-subject-prepare-branch': ['/learn/s/[id]'],
   'news-all': ['/news/all'],
@@ -683,6 +685,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-prepare-start-pending': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-empty': ['app/learn/s/[id]/sources.tsx'],
   'learn-subject-prepare-sources-folded': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-sources-unbuilt': ['app/learn/s/[id]/sources.tsx'],
+  'learn-subject-sources-unbuilt-none': ['app/learn/s/[id]/sources.tsx'],
   // Add a source (plan #2307.4), closed, open, fetching and failed.
   'learn-subject-add-source': ['app/learn/s/[id]/add-source.tsx'],
   'learn-subject-add-source-open': ['app/learn/s/[id]/add-source.tsx'],
