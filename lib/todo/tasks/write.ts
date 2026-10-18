@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { taskInput, type TaskInput } from '@/lib/todo/tasks/input';
+import { tagList, tagName } from '@/lib/todo/tasks/tags';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
@@ -65,6 +66,10 @@ export async function insertTask(
   input: TaskInput,
   timezone: string,
 ): Promise<{ id: string | null; error: string | null }> {
+  // Checked before the task is written, so a bad tag writes nothing at all.
+  const tags = tagList.safeParse(input.tags ?? []);
+  if (!tags.success) return { id: null, error: tags.error.issues[0].message };
+
   const { data, error } = await supabase
     .from('tasks')
     .insert({
@@ -77,7 +82,88 @@ export async function insertTask(
     .select('id')
     .single();
 
-  return { id: (data?.id as string) ?? null, error: error?.message ?? null };
+  const id = (data?.id as string) ?? null;
+  if (error || !id || tags.data.length === 0) return { id, error: error?.message ?? null };
+
+  const { error: tagsError } = await supabase
+    .from('task_tags')
+    .insert(tags.data.map((tag) => ({ task_id: id, tag })));
+
+  if (tagsError) {
+    // The task and its tags were asked for together, so a task left without
+    // the tags it was written with is taken back out rather than kept.
+    await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);
+    return { id: null, error: tagsError.message };
+  }
+
+  return { id, error: null };
+}
+
+/** Postgres's unique_violation: the tag is already on the task. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Put one tag on a task. The name is normalised first ("  Home " is "home"),
+ * and a blank one, a long one, or one the task already carries is refused.
+ *
+ * The task is looked up under the user first: the tag table has no user_id
+ * and RLS does not reach a service-role client, so this is what keeps a
+ * borrowed id from tagging somebody else's task.
+ */
+export async function addTaskTag(
+  userId: string,
+  taskId: string,
+  tag: string,
+  client?: TodoSupabaseClient,
+): Promise<{ tag: string | null; error: string | null }> {
+  const parsed = tagName.safeParse(tag);
+  if (!parsed.success) return { tag: null, error: parsed.error.issues[0].message };
+
+  const supabase = client ?? (await createTodoClient());
+  if (!(await ownsTask(supabase, userId, taskId))) return { tag: null, error: 'No such task.' };
+
+  const { error } = await supabase.from('task_tags').insert({ task_id: taskId, tag: parsed.data });
+
+  if (error?.code === UNIQUE_VIOLATION) {
+    return { tag: null, error: `It is already tagged ${parsed.data}.` };
+  }
+  return { tag: error ? null : parsed.data, error: error?.message ?? null };
+}
+
+/** Take one tag off a task. Taking off a tag it does not carry is not an error. */
+export async function removeTaskTag(
+  userId: string,
+  taskId: string,
+  tag: string,
+  client?: TodoSupabaseClient,
+): Promise<{ error: string | null }> {
+  const parsed = tagName.safeParse(tag);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = client ?? (await createTodoClient());
+  if (!(await ownsTask(supabase, userId, taskId))) return { error: 'No such task.' };
+
+  const { error } = await supabase
+    .from('task_tags')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('tag', parsed.data);
+
+  return { error: error?.message ?? null };
+}
+
+async function ownsTask(
+  supabase: TodoSupabaseClient,
+  userId: string,
+  taskId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 /**
@@ -108,6 +194,7 @@ export async function createItem(
   return { id: (data?.id as string) ?? null, error: error?.message ?? null };
 }
 
+/** Writes every column the form carries. Tags are not one: see addTaskTag. */
 export async function updateTask(
   userId: string,
   id: string,

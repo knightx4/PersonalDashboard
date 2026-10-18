@@ -14,7 +14,22 @@ describe('isAllowedConnectorRedirect', () => {
     );
     expect(isAllowedConnectorRedirect('https://evilclaude.ai/api/mcp/auth_callback')).toBe(false);
     expect(isAllowedConnectorRedirect('https://www.claude.ai/api/mcp/auth_callback')).toBe(false);
-    expect(isAllowedConnectorRedirect('http://localhost:3000/callback')).toBe(false);
+  });
+
+  it("allows a loopback address on the person's own computer, at any port", () => {
+    expect(isAllowedConnectorRedirect('http://127.0.0.1:53682/callback')).toBe(true);
+    expect(isAllowedConnectorRedirect('http://localhost:3000/callback')).toBe(true);
+    expect(isAllowedConnectorRedirect('http://[::1]:8080/oauth/callback')).toBe(true);
+    expect(isAllowedConnectorRedirect('http://127.0.0.1/callback')).toBe(true);
+  });
+
+  it('refuses an address that only looks like loopback', () => {
+    expect(isAllowedConnectorRedirect('http://127.0.0.2:5000/callback')).toBe(false);
+    expect(isAllowedConnectorRedirect('http://localhost.evil.example/callback')).toBe(false);
+    expect(isAllowedConnectorRedirect('http://127.0.0.1.nip.io/callback')).toBe(false);
+    expect(isAllowedConnectorRedirect('http://a:b@127.0.0.1:5000/callback')).toBe(false);
+    expect(isAllowedConnectorRedirect('http://127.0.0.1:5000/callback?x=1')).toBe(false);
+    expect(isAllowedConnectorRedirect('ftp://127.0.0.1/callback')).toBe(false);
   });
 
   it('refuses another path on claude.ai', () => {
@@ -49,6 +64,12 @@ describe('isAllowedConnectorReturn', () => {
         'https://claude.ai/api/mcp/auth_callback?error=access_denied&state=xyz',
       ),
     ).toBe(true);
+  });
+
+  it('allows a loopback callback with the code and the state', () => {
+    expect(isAllowedConnectorReturn('http://127.0.0.1:53682/callback?code=abc&state=xyz')).toBe(
+      true,
+    );
   });
 
   it('refuses any other address', () => {

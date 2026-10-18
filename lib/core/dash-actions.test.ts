@@ -122,6 +122,30 @@ describe('undoDashAction', () => {
     expect(tables['todo.tasks'][0].due_on).toBe('2026-10-09');
   });
 
+  describe('a todo Dash tagged (plan #2340.4)', () => {
+    it('takes off the tags it put on, with the row change, and leaves the person’s own', async () => {
+      const { tables, deps } = setup({ action: { kind: 'edit_todo', undo: { tags_added: ['now'] } } });
+      tables['todo.task_tags'] = [
+        { task_id: TASK, tag: 'now' },
+        { task_id: TASK, tag: 'car' },
+      ];
+      expect((await undoDashAction(deps, ACTION)).ok).toBe(true);
+      expect(tables['todo.tasks'][0].due_on).toBe('2026-10-02');
+      expect(tables['todo.task_tags']).toEqual([{ task_id: TASK, tag: 'car' }]);
+    });
+
+    it('undoes a change that only tagged it, with nothing to put back on the row', async () => {
+      const { tables, deps } = setup({
+        task: TASK_BEFORE,
+        action: { kind: 'edit_todo', after_values: TASK_BEFORE, undo: { tags_added: ['eventually'] } },
+      });
+      tables['todo.task_tags'] = [{ task_id: TASK, tag: 'eventually' }];
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({ ok: true, action: { status: 'undone' } });
+      expect(tables['todo.tasks'][0]).toEqual(TASK_BEFORE);
+      expect(tables['todo.task_tags']).toEqual([]);
+    });
+  });
+
   describe('a research brief Dash started (plan #2023.3)', () => {
     const BRIEF = id(70);
     const TRACK = id(71);

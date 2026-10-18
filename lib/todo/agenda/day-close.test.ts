@@ -22,6 +22,7 @@ function task(over: Partial<Task>): Task {
     createdAt: '2026-03-01T09:00:00.000Z',
     position: null,
     parentId: null,
+    tags: [],
     ...over,
   };
 }
