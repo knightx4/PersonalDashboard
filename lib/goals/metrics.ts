@@ -20,13 +20,23 @@ import { dayIn } from '@/lib/todo/time';
 export const METRIC_PERIODS = ['week', 'month'] as const;
 export type MetricPeriod = (typeof METRIC_PERIODS)[number];
 
+/**
+ * What a metric counts (plan #2397.1, migration goals 0085): the records of a
+ * list, the goal's closed steps, or the files Dash wrote under the goal. Only
+ * a list metric has a list and a date field; the others have null in both.
+ */
+export const METRIC_SOURCES = ['list', 'steps', 'files'] as const;
+export type MetricSource = (typeof METRIC_SOURCES)[number];
+
 export type Metric = {
   id: string;
   goalId: string;
   name: string;
-  collectionId: string;
-  /** The key of a date field of the list. */
-  dateField: string;
+  source: MetricSource;
+  /** The list counted, for a list metric; null otherwise. */
+  collectionId: string | null;
+  /** The key of a date field of the list, for a list metric; null otherwise. */
+  dateField: string | null;
   period: MetricPeriod;
   /** How many per period you are aiming for, or null. */
   target: number | null;
@@ -36,8 +46,11 @@ export type Metric = {
 /** What the form saves. */
 export type MetricInput = {
   name: string;
-  collectionId: string;
-  dateField: string;
+  source: MetricSource;
+  /** Read only for a list metric. */
+  collectionId: string | null;
+  /** Read only for a list metric. */
+  dateField: string | null;
   period: MetricPeriod;
   target: number | null;
 };
@@ -50,9 +63,14 @@ export function metricInputError(input: MetricInput): { field: keyof MetricInput
   const name = input.name.trim();
   if (!name) return { field: 'name', error: 'Give the metric a name.' };
   if (name.length > 200) return { field: 'name', error: 'Keep the name under 200 characters.' };
-  if (!input.collectionId) return { field: 'collectionId', error: 'Choose a list to count.' };
-  if (!/^[a-z][a-z0-9_]{0,39}$/.test(input.dateField)) {
-    return { field: 'dateField', error: 'Choose the date to count by.' };
+  if (!METRIC_SOURCES.includes(input.source)) {
+    return { field: 'source', error: 'Choose what to count.' };
+  }
+  if (input.source === 'list') {
+    if (!input.collectionId) return { field: 'collectionId', error: 'Choose a list to count.' };
+    if (!input.dateField || !/^[a-z][a-z0-9_]{0,39}$/.test(input.dateField)) {
+      return { field: 'dateField', error: 'Choose the date to count by.' };
+    }
   }
   if (!METRIC_PERIODS.includes(input.period)) {
     return { field: 'period', error: 'Count by week or by month.' };

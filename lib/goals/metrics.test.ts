@@ -165,7 +165,7 @@ describe('countByPeriod by month', () => {
 });
 
 describe('metricInputError', () => {
-  const good = { name: 'Applications', collectionId: 'c1', dateField: 'applied', period: 'week' as const, target: 5 };
+  const good = { name: 'Applications', source: 'list' as const, collectionId: 'c1', dateField: 'applied', period: 'week' as const, target: 5 };
 
   it('passes a whole metric and one with no target', () => {
     expect(metricInputError(good)).toBeNull();
@@ -179,6 +179,14 @@ describe('metricInputError', () => {
     expect(metricInputError({ ...good, period: 'day' as never })?.field).toBe('period');
     expect(metricInputError({ ...good, target: 0 })?.field).toBe('target');
     expect(metricInputError({ ...good, target: 2.5 })?.field).toBe('target');
+    expect(metricInputError({ ...good, source: 'notes' as never })?.field).toBe('source');
+    expect(metricInputError({ ...good, dateField: null })?.field).toBe('dateField');
+  });
+
+  it('asks for a list and a date only when counting a list', () => {
+    for (const source of ['steps', 'files'] as const) {
+      expect(metricInputError({ ...good, source, collectionId: null, dateField: null })).toBeNull();
+    }
   });
 });
 

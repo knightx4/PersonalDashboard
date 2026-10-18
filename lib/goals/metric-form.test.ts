@@ -33,10 +33,22 @@ describe('parseMetricForm', () => {
   it('reads a whole form, with the target optional', () => {
     expect(parseMetricForm(form(good), lists)).toEqual({
       ok: true,
-      value: { name: 'Applications per week', collectionId: 'jobs', dateField: 'applied', period: 'week', target: null },
+      value: { name: 'Applications per week', source: 'list', collectionId: 'jobs', dateField: 'applied', period: 'week', target: null },
     });
     const withTarget = parseMetricForm(form({ ...good, target: ' 5 ' }), lists);
     expect(withTarget.ok && withTarget.value.target).toBe(5);
+  });
+
+  it('reads a steps or files metric without a list', () => {
+    expect(parseMetricForm(form({ name: 'Steps', source: 'steps', period: 'month', collectionId: 'people' }), lists)).toEqual({
+      ok: true,
+      value: { name: 'Steps', source: 'steps', collectionId: null, dateField: null, period: 'month', target: null },
+    });
+    expect(parseMetricForm(form({ ...good, source: 'files' }), lists)).toMatchObject({
+      ok: true,
+      value: { source: 'files', collectionId: null, dateField: null },
+    });
+    expect(parseMetricForm(form({ ...good, source: 'notes' }), lists)).toMatchObject({ field: 'source' });
   });
 
   it('puts each problem beside its field', () => {
@@ -64,6 +76,7 @@ describe('metricLine', () => {
     id: 'm1',
     goalId: 'g1',
     name: 'Applications per week',
+    source: 'list',
     collectionId: 'jobs',
     dateField: 'applied',
     period: 'week',
@@ -76,6 +89,12 @@ describe('metricLine', () => {
     expect(metricLine({ ...metric, target: null, period: 'month' }, lists)).toBe(
       'Applications · Applied on · monthly',
     );
+  });
+
+  it('names closed steps and Dash files', () => {
+    const counted = { ...metric, collectionId: null, dateField: null };
+    expect(metricLine({ ...counted, source: 'steps', target: 3 }, lists)).toBe('Steps closed · weekly · aim 3');
+    expect(metricLine({ ...counted, source: 'files', period: 'month', target: null }, lists)).toBe('Dash files · monthly');
   });
 
   it('says when the list or its date is gone', () => {

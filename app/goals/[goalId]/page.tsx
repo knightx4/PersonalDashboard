@@ -419,7 +419,7 @@ export default async function GoalMapPage({
       const known = new Set(sources.map((list) => list.id));
       const others = await Promise.all(
         [...new Set(counted.map((m) => m.collectionId))]
-          .filter((id) => !known.has(id))
+          .filter((id): id is string => id !== null && !known.has(id))
           .map((id) => loadCollection(client, id)),
       );
       const lists: MetricList[] = [...sources, ...others.filter((list) => list !== null)];

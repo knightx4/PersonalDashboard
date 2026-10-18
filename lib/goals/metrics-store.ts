@@ -8,6 +8,7 @@ import {
   type Metric,
   type MetricInput,
   type MetricPeriod,
+  type MetricSource,
   type PeriodCount,
 } from '@/lib/goals/metrics';
 
@@ -26,19 +27,21 @@ type MetricRow = {
   id: string;
   goal_id: string;
   name: string;
-  collection_id: string;
-  date_field: string;
+  source: MetricSource;
+  collection_id: string | null;
+  date_field: string | null;
   period: MetricPeriod;
   target: number | null;
   position: number;
 };
 
-const METRIC_COLUMNS = 'id, goal_id, name, collection_id, date_field, period, target, position';
+const METRIC_COLUMNS = 'id, goal_id, name, source, collection_id, date_field, period, target, position';
 
 const toMetric = (row: MetricRow): Metric => ({
   id: row.id,
   goalId: row.goal_id,
   name: row.name,
+  source: row.source,
   collectionId: row.collection_id,
   dateField: row.date_field,
   period: row.period,
@@ -46,10 +49,12 @@ const toMetric = (row: MetricRow): Metric => ({
   position: row.position,
 });
 
+/** Only a list metric keeps a list and a date; the table's check holds it so. */
 const toRow = (input: MetricInput) => ({
   name: input.name.trim(),
-  collection_id: input.collectionId,
-  date_field: input.dateField,
+  source: input.source,
+  collection_id: input.source === 'list' ? input.collectionId : null,
+  date_field: input.source === 'list' ? input.dateField : null,
   period: input.period,
   target: input.target,
 });
@@ -157,12 +162,14 @@ export async function loadMetricCounts(
 ): Promise<MetricCounts[]> {
   const metrics = await loadMetrics(client, goal.id);
   const lists = new Map<string, Awaited<ReturnType<typeof loadRecords>>>();
-  for (const id of new Set(metrics.map((m) => m.collectionId))) {
-    lists.set(id, await loadRecords(client, id));
+  for (const metric of metrics) {
+    if (metric.source !== 'list' || !metric.collectionId || lists.has(metric.collectionId)) continue;
+    lists.set(metric.collectionId, await loadRecords(client, metric.collectionId));
   }
   return metrics.map((metric) => ({
     ...metric,
-    counts: countByPeriod({
+    // Counting closed steps and Dash files is plan #2397.2; until then they have none.
+    counts: metric.source !== 'list' || !metric.collectionId || !metric.dateField ? [] : countByPeriod({
       records: lists.get(metric.collectionId) ?? [],
       dateField: metric.dateField,
       period: metric.period,
