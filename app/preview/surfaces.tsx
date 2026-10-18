@@ -81,6 +81,7 @@ import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
+import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -520,6 +521,7 @@ import {
   NewsSettingsSurface,
   NewsStorySurface,
   TodoAllSurface,
+  TodoAllTaggedSurface,
   TodoSettingsSurface,
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
@@ -8222,6 +8224,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TaskTagsHoverSurface />,
   },
 
+  /* The agenda narrowed by a tag (plan #2340.3): Now chosen, and a tag
+   * nothing carries with the way back to everything. */
+  {
+    id: 'todo-agenda-tagged',
+    label: 'Todo · The agenda filtered by a tag',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-more',
+    label: 'Todo · The tag filter, More open on a phone',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedMoreSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-empty',
+    label: 'Todo · The agenda filtered by a tag nothing carries',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedEmptySurface />,
+  },
+
   /* The end of Quick read (plan #1557): played by passing the last story,
    * and as a page that loads already caught up. */
   {
@@ -9447,6 +9473,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'page',
     render: () => <TodoAllSurface />,
+  },
+  {
+    id: 'todo-all-tagged',
+    label: 'Todo · All tasks, filtered by a tag',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoAllTaggedSurface />,
   },
   {
     id: 'todo-settings',
