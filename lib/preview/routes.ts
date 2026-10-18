@@ -53,8 +53,6 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-companies-table-column-menu': ['/jobs/companies'],
   'jobs-companies-table-empty': ['/jobs/companies'],
   'jobs-companies-focus': ['/jobs/companies'],
-  'jobs-companies-focus-end': ['/jobs/companies'],
-  'jobs-companies-focus-empty': ['/jobs/companies'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
   'shopping-item-details-catalogue': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],

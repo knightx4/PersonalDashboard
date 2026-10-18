@@ -4,10 +4,7 @@ import {
   companiesHref,
   companyColumnFilters,
   filterCompanies,
-  focusHref,
-  focusIndex,
   hasColumnFilters,
-  tableHref,
   parseCompanies,
   type CompanyRow,
 } from './companies-view';
@@ -92,12 +89,11 @@ describe('companiesHref', () => {
         domains: 'none',
         sort: 'priority',
       }),
-    ).toBe('/jobs/companies?sort=priority&view=table');
+    ).toBe('/jobs/companies?sort=priority');
   });
 
-  it('clears the filters of the table onto the table', () => {
-    expect(clearFiltersHref({ priority: 'target' })).toBe('/jobs/companies?view=table');
-    expect(clearFiltersHref({ view: 'focus', priority: 'target' })).toBe('/jobs/companies');
+  it('clears the filters in the view they were set in', () => {
+    expect(clearFiltersHref({ priority: 'target' })).toBe('/jobs/companies');
     expect(clearFiltersHref({ view: 'table', priority: 'target' })).toBe(
       '/jobs/companies?view=table',
     );
@@ -118,75 +114,24 @@ describe('companyColumnFilters', () => {
       current: true,
     });
     expect(filters.roles.choices.find((c) => c.id === 'roles-none')?.href).toBe(
-      '/jobs/companies?priority=target&domain=acme&view=table&roles=none',
+      '/jobs/companies?priority=target&domain=acme&roles=none',
     );
   });
 });
 
-describe('the focused view (plan #2341.4)', () => {
-  it('reads focus from the address', () => {
-    expect(parseCompanies({ view: 'focus' }).view).toBe('focus');
-    expect(parseCompanies({ view: 'focus', company: 'acme' }).company).toBe('acme');
-    expect(parseCompanies({ company: '  ' }).company).toBeNull();
+describe('the views', () => {
+  it('opens on the focused view, whatever is filtered, unless the address names the table', () => {
+    expect(parseCompanies({}).view).toBe('focus');
+    expect(parseCompanies({ view: 'board' }).view).toBe('focus');
+    expect(parseCompanies({ priority: 'target' }).view).toBe('focus');
+    expect(parseCompanies({ view: 'table', priority: 'target' }).view).toBe('table');
   });
 
-  it('opens on a company with the filters and sort kept and the page dropped', () => {
-    expect(focusHref({ priority: 'target', sort: 'priority', page: '2' }, 'acme')).toBe(
-      '/jobs/companies?priority=target&sort=priority&view=focus&company=acme',
-    );
-    expect(tableHref({ view: 'focus', company: 'acme', priority: 'target' })).toBe(
-      '/jobs/companies?view=table&priority=target',
-    );
-  });
-
-  it('starts on the named company, or the first when it is filtered out', () => {
-    const list = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }];
-    expect(focusIndex(list, 'b')).toBe(1);
-    expect(focusIndex(list, 'gone')).toBe(0);
-    expect(focusIndex(list, null)).toBe(0);
-  });
-
-  it('leaves the focused company behind from a column menu', () => {
-    const params = { view: 'focus', company: 'acme' };
+  it('keeps the view a column menu is opened from', () => {
+    const params = { view: 'table' };
     const filters = companyColumnFilters(params, parseCompanies(params), rows);
     expect(filters.roles.choices.find((c) => c.id === 'roles-none')?.href).toBe(
       '/jobs/companies?view=table&roles=none',
     );
-  });
-});
-
-describe('the view switch and the opening view (plan #2341.5)', () => {
-  it('opens on the focused view, falling back to it for a view it does not have', () => {
-    expect(parseCompanies({}).view).toBe('focus');
-    expect(parseCompanies({ view: 'board' }).view).toBe('focus');
-    expect(parseCompanies({ q: 'acme' }).view).toBe('focus');
-    expect(parseCompanies({ view: 'table' }).view).toBe('table');
-  });
-
-  it('opens on the table when a column or rail filter is in the address', () => {
-    for (const params of [
-      { priority: 'target' },
-      { active: '1' },
-      { name: 'ac' },
-      { activity: 'active' },
-      { roles: 'none' },
-      { domains: 'some' },
-      { domain: '.io' },
-    ]) {
-      expect(parseCompanies(params).view).toBe('table');
-    }
-  });
-
-  it('lets an address name the focused view even with a filter, as a saved view does', () => {
-    expect(parseCompanies({ view: 'focus', priority: 'target' }).view).toBe('focus');
-  });
-
-  it('keeps view=focus in a link only while a filter is set', () => {
-    expect(focusHref({}, 'acme')).toBe('/jobs/companies?company=acme');
-    expect(focusHref({ priority: 'target' })).toBe('/jobs/companies?priority=target&view=focus');
-    expect(focusHref({ priority: 'target', view: 'focus' })).toBe(
-      '/jobs/companies?priority=target&view=focus',
-    );
-    expect(focusHref({ sort: 'priority', view: 'table' })).toBe('/jobs/companies?sort=priority');
   });
 });

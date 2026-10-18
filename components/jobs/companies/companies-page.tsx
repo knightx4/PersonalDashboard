@@ -46,22 +46,20 @@ import {
   COMPANY_PRIORITIES,
   filterCompanies,
   filterNames,
-  focusHref,
   hasColumnFilters,
   isActiveCompany,
   parseCompanies,
-  tableHref,
   type CompaniesParams,
   type CompanyRow,
 } from '@/lib/jobs/companies-view';
-import { CompaniesFocus } from '@/components/jobs/companies/companies-focus';
 
 /**
  * The Companies page (plan #2341.3), apart from its loading so the gallery
- * can draw it with fixtures. The table is filtered from its column headers,
- * paged at 50 and kept in the address (lib/jobs/companies-view.ts). A row
- * opens the focused view on that company (plan #2341.4), which steps through
- * the same filtered rows in the table's order, every page of them.
+ * can draw it with fixtures. Two views, as Pipeline has: Focused, the
+ * default, leads with the targets and puts the priority rail beside the
+ * table; Table is the table alone, full width. Either table is filtered from
+ * its column headers, paged at 50 and kept in the address
+ * (lib/jobs/companies-view.ts). A row opens the company.
  */
 export function CompaniesPage({
   companies,
@@ -98,10 +96,9 @@ export function CompaniesPage({
 
   const state = parseCompanies(params);
   const filtered = filterCompanies(companies, state);
-  // Every link keeps the mode the person is in, so a filter set from the
-  // focused view stays focused.
+  // Every link keeps the view the person is in.
   const href = (changes: Partial<Record<keyof CompaniesParams, string | undefined>>) =>
-    companiesHref(params, { view: state.view, ...changes });
+    companiesHref(params, changes);
 
   // Two rows for one employer split its roles and mail between them, so the
   // pairs are named here with the merge one click away on either page.
@@ -125,7 +122,7 @@ export function CompaniesPage({
   const narrowed = hasColumnFilters(state);
   const focus = state.view === 'focus';
   const showTargets =
-    !focus &&
+    focus &&
     state.terms.length === 0 &&
     (!narrowed || (state.priority === 'target' && hasOnlyPriority(params)));
 
@@ -141,6 +138,109 @@ export function CompaniesPage({
   const count = companiesCount(state, filtered.length, companies.length, params.q);
   const searchedOut = filtered.length === 0 && state.terms.length > 0 && !narrowed;
 
+  const list = (
+    <>
+      {/* Directly above the table it narrows, like every other list in the
+          app. Every filter, the sort and the page are on the URL and the
+          field carries them, so searching a narrowed table stays narrowed. */}
+      <div className="mb-4 flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <SearchField placeholder="Search companies" />
+        </div>
+        {/* On a phone the header has no room for it beside the switch and
+            the add button, so it sits beside the search, worded, since its
+            icon is the one the Filters button above it carries. */}
+        <DisplayMenu menu={menu} className="sm:hidden" />
+      </div>
+
+      {/* The rail sets this one and no column header does, so the table
+          names it with the way back. */}
+      {!focus && state.activeOnly && (
+        <p className="mb-3 text-small text-ink-muted">
+          In process or beyond only ·{' '}
+          <Link href={href({ active: undefined })}>Show every company</Link>
+        </p>
+      )}
+
+      {searchedOut ? (
+        <SearchEmpty query={params.q ?? ''} />
+      ) : filtered.length === 0 ? (
+        // The header stays, so a filter can be loosened from its column.
+        <Card className="overflow-hidden">
+          <CompaniesTable
+            rows={[]}
+            sorts={menu.sorts}
+            defaultSort={displaySpec.defaultSort}
+            hidden={display.hidden}
+            filters={filters}
+            openColumn={openColumn}
+            rowHref={(company) => `/jobs/companies/${company.slug}`}
+          />
+          <div className="border-border px-4 py-10 text-center md:border-t">
+            <p className="text-body font-medium text-ink">No rows match these filters</p>
+            <p className="mt-1 text-small text-ink-muted">{filterNames(state).join(' · ')}</p>
+            <Link
+              href={clearFiltersHref(params)}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mt-4')}
+            >
+              Clear filters
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-5">
+          {
+            /* ui-ok: one card per group of rows, each holding its rows as one table, not a card per row */ sections.map(
+              (section) => (
+                <div key={section.key} className="space-y-2">
+                  {display.group !== NO_GROUP && (
+                    <GroupHeader label={section.label} count={section.count} />
+                  )}
+                  <Card className="overflow-hidden">
+                    <CompaniesTable
+                      rows={section.rows}
+                      sorts={menu.sorts}
+                      defaultSort={displaySpec.defaultSort}
+                      hidden={display.hidden}
+                      filters={filters}
+                      openColumn={section === sections[0] ? openColumn : undefined}
+                      rowHref={(company) => `/jobs/companies/${company.slug}`}
+                    />
+                  </Card>
+                </div>
+              ),
+            )
+          }
+          <nav aria-label="Pages" className="flex items-center justify-between gap-3">
+            <span className="tabular text-small text-ink-muted">
+              {paged.pages > 1 ? `${paged.first}–${paged.last} · ${count}` : count}
+            </span>
+            {paged.pages > 1 && (
+              <span className="flex gap-2">
+                {paged.page > 1 && (
+                  <Link
+                    href={href({ page: String(paged.page - 1) })}
+                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                  >
+                    Previous
+                  </Link>
+                )}
+                {paged.page < paged.pages && (
+                  <Link
+                    href={href({ page: String(paged.page + 1) })}
+                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                  >
+                    Next
+                  </Link>
+                )}
+              </span>
+            )}
+          </nav>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <PageWide>
       <PageHeader
@@ -152,8 +252,8 @@ export function CompaniesPage({
               label="Companies view"
               current={state.view}
               views={[
-                { value: 'focus', label: 'Focused', Icon: ListChecks, href: focusHref(params, state.company) },
-                { value: 'table', label: 'Table', Icon: Table2, href: tableHref(params) },
+                { value: 'focus', label: 'Focused', Icon: ListChecks, href: href({ view: undefined }) },
+                { value: 'table', label: 'Table', Icon: Table2, href: href({ view: 'table' }) },
               ]}
             />
             <DisplayMenu menu={menu} className="max-sm:hidden" />
@@ -236,166 +336,74 @@ export function CompaniesPage({
         </section>
       )}
 
-      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-        <LeftRail active={filterNames(state).length}>
-          <RailGroup label="Priority">
-            <RailItem
-              label="All"
-              href={href({ priority: undefined })}
-              active={!state.priority}
-              count={companies.length}
-            />
-            {COMPANY_PRIORITIES.map((entry) => (
+      {focus ? (
+        <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
+          <LeftRail active={filterNames(state).length}>
+            <RailGroup label="Priority">
               <RailItem
-                key={entry}
-                label={entry}
-                href={href({ priority: entry })}
-                active={state.priority === entry}
-                count={companies.filter((c) => c.priority === entry).length}
+                label="All"
+                href={href({ priority: undefined })}
+                active={!state.priority}
+                count={companies.length}
               />
-            ))}
-          </RailGroup>
+              {COMPANY_PRIORITIES.map((entry) => (
+                <RailItem
+                  key={entry}
+                  label={entry}
+                  href={href({ priority: entry })}
+                  active={state.priority === entry}
+                  count={companies.filter((c) => c.priority === entry).length}
+                />
+              ))}
+            </RailGroup>
 
-          <RailGroup label="Pursuing">
-            <RailItem
-              label="In process or beyond"
-              href={href({ active: state.activeOnly ? undefined : '1' })}
-              active={state.activeOnly}
-              count={companies.filter(isActiveCompany).length}
-            />
-          </RailGroup>
-        </LeftRail>
+            <RailGroup label="Pursuing">
+              <RailItem
+                label="In process or beyond"
+                href={href({ active: state.activeOnly ? undefined : '1' })}
+                active={state.activeOnly}
+                count={companies.filter(isActiveCompany).length}
+              />
+            </RailGroup>
+          </LeftRail>
 
-        <div className="min-w-0 flex-1">
-          {!focus && duplicates.length > 0 && (
-            <Banner tone="warn" className="mb-4">
-              <div className="space-y-1">
-                <p>
-                  {duplicates.length === 1
-                    ? 'These two look like the same company.'
-                    : `${duplicates.length} pairs look like the same company.`}{' '}
-                  Open the one to keep and use Merge to fold the other into it.
-                </p>
-                <ul className="text-small">
-                  {duplicates.map(({ a, b, reason }) => (
-                    <li key={`${a.id}-${b.id}`}>
-                      <Link href={`/jobs/companies/${a.slug}`}>{a.name}</Link> and{' '}
-                      <Link href={`/jobs/companies/${b.slug}`}>{b.name}</Link>
-                      <span className="text-ink-muted">
-                        {' '}
-                        ·{' '}
-                        {reason === 'board'
-                          ? 'same job board'
-                          : reason === 'domain'
-                            ? 'same domain'
-                            : 'same name'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Banner>
-          )}
+          <div className="min-w-0 flex-1">
+            {duplicates.length > 0 && (
+              <Banner tone="warn" className="mb-4">
+                <div className="space-y-1">
+                  <p>
+                    {duplicates.length === 1
+                      ? 'These two look like the same company.'
+                      : `${duplicates.length} pairs look like the same company.`}{' '}
+                    Open the one to keep and use Merge to fold the other into it.
+                  </p>
+                  <ul className="text-small">
+                    {duplicates.map(({ a, b, reason }) => (
+                      <li key={`${a.id}-${b.id}`}>
+                        <Link href={`/jobs/companies/${a.slug}`}>{a.name}</Link> and{' '}
+                        <Link href={`/jobs/companies/${b.slug}`}>{b.name}</Link>
+                        <span className="text-ink-muted">
+                          {' '}
+                          ·{' '}
+                          {reason === 'board'
+                            ? 'same job board'
+                            : reason === 'domain'
+                              ? 'same domain'
+                              : 'same name'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Banner>
+            )}
 
-          {/* Directly above the table it narrows, like every other list in the
-              app. Every filter, the sort and the page are on the URL and the
-              field carries them, so searching a narrowed table stays narrowed. */}
-          <div className="mb-4 flex items-start gap-1">
-            <div className="min-w-0 flex-1">
-              <SearchField placeholder="Search companies" />
-            </div>
-            {/* On a phone the header has no room for it beside the switch and
-                the add button, so it sits beside the search, worded, since its
-                icon is the one the Filters button above it carries. */}
-            <DisplayMenu menu={menu} className="sm:hidden" />
+            {list}
           </div>
-
-          {searchedOut ? (
-            <SearchEmpty query={params.q ?? ''} />
-          ) : focus ? (
-            <CompaniesFocus
-              // In the table's order: its groups, then its sort within each.
-              rows={groupRows(sorted, display.groupBy).flatMap((section) => section.rows)}
-              params={params}
-              state={state}
-              timezone={timezone}
-            />
-          ) : filtered.length === 0 ? (
-            // The header stays, so a filter can be loosened from its column.
-            <Card className="overflow-hidden">
-              <CompaniesTable
-                rows={[]}
-                sorts={menu.sorts}
-                defaultSort={displaySpec.defaultSort}
-                hidden={display.hidden}
-                filters={filters}
-                openColumn={openColumn}
-                rowHref={(company) => focusHref(params, company.slug)}
-              />
-              <div className="border-border px-4 py-10 text-center md:border-t">
-                <p className="text-body font-medium text-ink">No rows match these filters</p>
-                <p className="mt-1 text-small text-ink-muted">{filterNames(state).join(' · ')}</p>
-                <Link
-                  href={clearFiltersHref(params)}
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mt-4')}
-                >
-                  Clear filters
-                </Link>
-              </div>
-            </Card>
-          ) : (
-            <div className="space-y-5">
-              {
-                /* ui-ok: one card per group of rows, each holding its rows as one table, not a card per row */ sections.map(
-                  (section) => (
-                    <div key={section.key} className="space-y-2">
-                      {display.group !== NO_GROUP && (
-                        <GroupHeader label={section.label} count={section.count} />
-                      )}
-                      <Card className="overflow-hidden">
-                        <CompaniesTable
-                          rows={section.rows}
-                          sorts={menu.sorts}
-                          defaultSort={displaySpec.defaultSort}
-                          hidden={display.hidden}
-                          filters={filters}
-                          openColumn={section === sections[0] ? openColumn : undefined}
-                          rowHref={(company) => focusHref(params, company.slug)}
-                        />
-                      </Card>
-                    </div>
-                  ),
-                )
-              }
-              <nav aria-label="Pages" className="flex items-center justify-between gap-3">
-                <span className="tabular text-small text-ink-muted">
-                  {paged.pages > 1 ? `${paged.first}–${paged.last} · ${count}` : count}
-                </span>
-                {paged.pages > 1 && (
-                  <span className="flex gap-2">
-                    {paged.page > 1 && (
-                      <Link
-                        href={href({ page: String(paged.page - 1) })}
-                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                      >
-                        Previous
-                      </Link>
-                    )}
-                    {paged.page < paged.pages && (
-                      <Link
-                        href={href({ page: String(paged.page + 1) })}
-                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                      >
-                        Next
-                      </Link>
-                    )}
-                  </span>
-                )}
-              </nav>
-            </div>
-          )}
         </div>
-      </div>
+      ) : (
+        list
+      )}
     </PageWide>
   );
 }

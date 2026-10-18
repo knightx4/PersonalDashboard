@@ -4387,39 +4387,12 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The focused view (plan #2341.4): one company in full, opened from its
-     * table row, with previous and next through the filtered, sorted list. */
+    /* The page as it opens: the targets, then the rail beside the table. */
     id: 'jobs-companies-focus',
-    label: 'Companies · Focus',
+    label: 'Companies · Focused',
     module: 'jobs',
     width: 'wide',
-    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
-    render: () => (
-      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'northwind' }} />
-    ),
-  },
-  {
-    /* At the end of the list: Next goes grey, Previous still steps back. */
-    id: 'jobs-companies-focus-end',
-    label: 'Companies · Focus · Last company',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'wingtip' }} />
-    ),
-  },
-  {
-    /* Filtered to nothing: back to the table, or clear the filters. */
-    id: 'jobs-companies-focus-empty',
-    label: 'Companies · Focus · No companies match',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <CompaniesPage
-        companies={companyRows}
-        params={{ view: 'focus', priority: 'passed', activity: 'active' }}
-      />
-    ),
+    render: () => <CompaniesPage companies={companyRows} params={{}} />,
   },
   {
     /* The page as it opens: what is in process, waiting and to apply. */
