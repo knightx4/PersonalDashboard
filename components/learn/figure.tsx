@@ -36,7 +36,6 @@ export function Figure({
       </div>
       <Disclosure
         title={figure.caption}
-        meta={drawn.kind.label}
         defaultOpen={defaultOpen}
         className="sm:hidden"
         summaryClassName="items-start"

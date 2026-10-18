@@ -67,7 +67,7 @@ export type FigureKind<Spec = unknown> = {
   data: FigureData;
 };
 
-/** The gallery surface every kind is drawn on. */
+/** The gallery surface every kind is drawn on. A surface id takes no underscore, so `two_by_two` is drawn on `learn-figure-two-by-two`. */
 export function figureSurface(kind: Pick<FigureKind, 'id'>): string {
-  return `learn-figure-${kind.id}`;
+  return `learn-figure-${kind.id.replace(/_/g, '-')}`;
 }
