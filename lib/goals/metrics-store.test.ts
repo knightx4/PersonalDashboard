@@ -36,6 +36,7 @@ const row = {
   id: 'm1',
   goal_id: 'g1',
   name: 'Applications',
+  source: 'list',
   collection_id: 'c1',
   date_field: 'applied',
   period: 'week',
@@ -43,14 +44,14 @@ const row = {
   position: 0,
 };
 
-const input = { name: ' Applications ', collectionId: 'c1', dateField: 'applied', period: 'week' as const, target: 5 };
+const input = { name: ' Applications ', source: 'list' as const, collectionId: 'c1', dateField: 'applied', period: 'week' as const, target: 5 };
 
 describe('loadMetrics', () => {
   it('reads the live metrics on the goal, in order', async () => {
     const { client, calls } = fakeClient({ metrics: { data: [row], error: null } });
     const metrics = await loadMetrics(client, 'g1');
     expect(metrics).toEqual([
-      { id: 'm1', goalId: 'g1', name: 'Applications', collectionId: 'c1', dateField: 'applied', period: 'week', target: 5, position: 0 },
+      { id: 'm1', goalId: 'g1', name: 'Applications', source: 'list', collectionId: 'c1', dateField: 'applied', period: 'week', target: 5, position: 0 },
     ]);
     expect(calls).toContainEqual({ table: 'metrics', op: 'eq', args: ['goal_id', 'g1'] });
     expect(calls).toContainEqual({ table: 'metrics', op: 'is', args: ['archived_at', null] });
@@ -70,11 +71,28 @@ describe('addMetric', () => {
       goal_id: 'g1',
       position: 1,
       name: 'Applications',
+      source: 'list',
       collection_id: 'c1',
       date_field: 'applied',
       period: 'week',
       target: 5,
     });
+  });
+
+  it('writes a steps or files metric with no list and no date', async () => {
+    for (const source of ['steps', 'files'] as const) {
+      const { client, calls } = fakeClient({
+        metrics: { data: [], error: null, single: { data: { id: 'm3' }, error: null } },
+      });
+      // A list left over from the form is not sent with it.
+      const result = await addMetric(client, 'u1', 'g1', { ...input, source, collectionId: 'c1', dateField: 'applied' });
+      expect(result).toEqual({ ok: true, value: 'm3' });
+      expect(calls.find((c) => c.op === 'insert')?.args[0]).toMatchObject({
+        source,
+        collection_id: null,
+        date_field: null,
+      });
+    }
   });
 
   it('refuses a bad metric without sending it', async () => {
@@ -120,6 +138,87 @@ describe('updateMetric and archiveMetric', () => {
   });
 });
 
+describe('loadMetrics for each kind', () => {
+  it('reads back a steps and a files metric with no list', async () => {
+    const steps = { ...row, id: 'm2', source: 'steps', collection_id: null, date_field: null, position: 1 };
+    const files = { ...row, id: 'm3', source: 'files', collection_id: null, date_field: null, position: 2 };
+    const { client } = fakeClient({ metrics: { data: [row, steps, files], error: null } });
+    const metrics = await loadMetrics(client, 'g1');
+    expect(metrics.map((m) => [m.source, m.collectionId, m.dateField])).toEqual([
+      ['list', 'c1', 'applied'],
+      ['steps', null, null],
+      ['files', null, null],
+    ]);
+  });
+
+  it('reads no list, steps or files for a goal with only a list metric', async () => {
+    const { client, calls } = fakeClient({ metrics: { data: [row], error: null }, records: { data: [], error: null } });
+    const { client: core, calls: coreCalls } = fakeClient({});
+    await loadMetricCounts(client, { id: 'g1', createdAt: null }, 'UTC', { core: core as never });
+    expect(calls.some((c) => c.table === 'items' || c.table === 'links')).toBe(false);
+    expect(coreCalls).toEqual([]);
+  });
+});
+
+/** Live items: the goal, two steps under it, one under a step, and another goal's step. */
+const items = [
+  { id: 'g1', parent_id: null, level: 'goal', status: 'open', closed_at: null },
+  { id: 's1', parent_id: 'g1', level: 'step', status: 'done', closed_at: '2026-10-13T09:00:00Z' },
+  { id: 's2', parent_id: 'g1', level: 'step', status: 'open', closed_at: null },
+  { id: 's3', parent_id: 's2', level: 'step', status: 'done', closed_at: '2026-09-30T09:00:00Z' },
+  { id: 's4', parent_id: 's2', level: 'step', status: 'dropped', closed_at: '2026-10-14T09:00:00Z' },
+  { id: 'g2', parent_id: null, level: 'goal', status: 'open', closed_at: null },
+  { id: 'x1', parent_id: 'g2', level: 'step', status: 'done', closed_at: '2026-10-13T09:00:00Z' },
+];
+
+describe('loadMetricCounts for steps and files', () => {
+  const goal = { id: 'g1', createdAt: '2026-09-28T08:00:00Z' };
+  const now = new Date('2026-10-15T12:00:00Z');
+
+  it('counts the steps closed as done at any depth under the goal', async () => {
+    const steps = { ...row, id: 'm2', source: 'steps', collection_id: null, date_field: null };
+    const { client } = fakeClient({ metrics: { data: [steps], error: null }, items: { data: items, error: null } });
+    const { client: core } = fakeClient({});
+    const [metric] = await loadMetricCounts(client, goal, 'UTC', { core: core as never, now });
+    expect(metric.counts.map((p) => [p.startsOn, p.count])).toEqual([
+      ['2026-09-28', 1],
+      ['2026-10-05', 0],
+      ['2026-10-12', 1],
+    ]);
+  });
+
+  it('counts each Dash file linked to the goal or a step under it once', async () => {
+    const files = { ...row, id: 'm3', source: 'files', collection_id: null, date_field: null };
+    const { client, calls } = fakeClient({
+      metrics: { data: [files], error: null },
+      items: { data: items, error: null },
+      links: { data: [{ target_id: 'f1' }, { target_id: 'f1' }, { target_id: 'f2' }, { target_id: 'f3' }], error: null },
+    });
+    const file = (id: string, made_by: string, created_at: string) => ({
+      id, title: id, summary: null, made_by, version: 3, origin: null, created_at, updated_at: created_at, read_at: null,
+    });
+    const { client: core, calls: coreCalls } = fakeClient({
+      files: {
+        data: [
+          file('f1', 'claude', '2026-10-13T09:00:00Z'),
+          file('f2', 'you', '2026-10-13T09:00:00Z'),
+          file('f3', 'claude', '2026-10-01T09:00:00Z'),
+        ],
+        error: null,
+      },
+    });
+    const [metric] = await loadMetricCounts(client, goal, 'UTC', { core: core as never, now });
+    expect(metric.counts.map((p) => [p.startsOn, p.count])).toEqual([
+      ['2026-09-28', 1],
+      ['2026-10-05', 0],
+      ['2026-10-12', 1],
+    ]);
+    expect(calls).toContainEqual({ table: 'links', op: 'in', args: ['item_id', ['g1', 's1', 's2', 's3', 's4']] });
+    expect(calls).toContainEqual({ table: 'links', op: 'eq', args: ['kind', 'file'] });
+    expect(coreCalls).toContainEqual({ table: 'files', op: 'in', args: ['id', ['f1', 'f2', 'f3']] });
+  });
+});
+
 describe('loadMetricCounts', () => {
   it('counts each metric from its list’s live records', async () => {
     const { client } = fakeClient({
@@ -136,7 +235,7 @@ describe('loadMetricCounts', () => {
       client,
       { id: 'g1', createdAt: '2026-10-06T09:00:00Z' },
       'UTC',
-      new Date('2026-10-15T12:00:00Z'),
+      { core: fakeClient({}).client as never, now: new Date('2026-10-15T12:00:00Z') },
     );
     expect(metric.counts.map((p) => [p.startsOn, p.count])).toEqual([
       ['2026-10-05', 0],

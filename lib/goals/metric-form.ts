@@ -3,9 +3,11 @@ import {
   dateFields,
   metricInputError,
   METRIC_PERIODS,
+  METRIC_SOURCES,
   type Metric,
   type MetricInput,
   type MetricPeriod,
+  type MetricSource,
 } from '@/lib/goals/metrics';
 
 /**
@@ -61,10 +63,16 @@ export function parseMetricForm(
     target = Number(targetText);
   }
   const period = text(get('period'));
+  // A form without the choice of what to count counts a list, as every form did before plan #2397.
+  const sourceText = text(get('source')) || 'list';
+  const source = (METRIC_SOURCES as readonly string[]).includes(sourceText)
+    ? (sourceText as MetricSource)
+    : ('' as MetricSource);
   const input: MetricInput = {
     name: text(get('name')),
-    collectionId: text(get('collectionId')),
-    dateField: text(get('dateField')),
+    source,
+    collectionId: source === 'list' ? text(get('collectionId')) : null,
+    dateField: source === 'list' ? text(get('dateField')) : null,
     period: (METRIC_PERIODS as readonly string[]).includes(period)
       ? (period as MetricPeriod)
       : ('' as MetricPeriod),
@@ -72,7 +80,7 @@ export function parseMetricForm(
   };
 
   // The list comes first: the date only means something once the list is right.
-  if (input.name && input.collectionId) {
+  if (input.name && input.source === 'list' && input.collectionId) {
     const list = lists.find((l) => l.id === input.collectionId);
     if (!list) return { ok: false, field: 'collectionId', error: 'That list is not on this goal.' };
     if (list.dateFields.length === 0) {
@@ -96,6 +104,15 @@ export function parseMetricForm(
  * weekly · aim 5". A list or a date gone from the goal is said, not hidden.
  */
 export function metricLine(metric: Metric, lists: MetricList[]): string {
+  if (metric.source !== 'list') {
+    return [
+      metric.source === 'steps' ? 'Steps closed' : 'Dash files',
+      metric.period === 'week' ? 'weekly' : 'monthly',
+      metric.target !== null ? `aim ${metric.target}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
   const list = lists.find((l) => l.id === metric.collectionId);
   const date = list?.dateFields.find((f) => f.key === metric.dateField);
   const parts = [

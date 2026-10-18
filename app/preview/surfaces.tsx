@@ -445,6 +445,7 @@ import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
   GoalMetricPropsEmptySurface,
   GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormStepsSurface,
   GoalMetricPropsFormSurface,
   GoalMetricPropsMenuSurface,
   GoalMetricPropsPendingSurface,
@@ -7931,6 +7932,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsFormSurface />,
   },
   {
+    /* Adding one where no list has a date: on Steps closed, no date asked (plan #2397.3). */
+    id: 'goals-metrics-props-form-steps',
+    label: 'Goal · Metrics, adding one on steps',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormStepsSurface />,
+  },
+  {
     /* A metric's row pointed at, its Change and Remove menu showing. */
     id: 'goals-metrics-props-menu',
     label: 'Goal · Metrics, a row’s menu',
@@ -7939,9 +7948,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsMenuSurface />,
   },
   {
-    /* No list on the goal has a date to count by. */
+    /* No metric yet on a goal with no list: what can be counted. */
     id: 'goals-metrics-props-empty',
-    label: 'Goal · Metrics, nothing to count',
+    label: 'Goal · Metrics, none yet',
     module: 'goals',
     width: 'narrow',
     render: () => <GoalMetricPropsEmptySurface />,
@@ -7955,7 +7964,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsPendingSurface />,
   },
   {
-    /* A change refused, its message beside the field. */
+    /* A change to a steps metric refused, its message beside the aim. */
     id: 'goals-metrics-props-error',
     label: 'Goal · Metrics, a change refused',
     module: 'goals',

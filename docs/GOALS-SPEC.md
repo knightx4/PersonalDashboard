@@ -1048,6 +1048,37 @@ usual, which the morning review reads (plan #1738). The four days, the six
 and eight weeks and the one and a half are named constants at the top of
 the file.
 
+### Metrics
+
+A metric counts something on the goal by week or by month, with an optional
+aim per period (feature #2084, `goals.metrics`). It counts one of three
+things, its `source` (plan #2397):
+
+- **A list**: the records of one of the goal's lists, each in the period one
+  of its date fields falls in ("Applications · Applied on · weekly · aim 5").
+  A record with no date is not counted, and neither is a draft.
+- **Steps closed**: the goal's steps, each in the period it was closed
+  ("Steps closed · weekly · aim 3").
+- **Dash files**: the files Dash wrote under the goal or one of its steps,
+  each in the period it was filed ("Dash files · monthly").
+
+The metrics sit in the properties column under **Metrics**, each as its name
+over that line (`metricLine` in `lib/goals/metric-form.ts`), with **Change**
+and **Remove** in its row menu. Every goal shows the section, since every
+goal has steps and files to count. With no metric yet it says what can be
+counted, then **Add a metric**, which opens the form in place: the name,
+**What to count** (the goal's lists, then Steps closed and Dash files), the
+date to count by when a list is chosen, week or month, and the aim. A list
+with no date field is offered greyed out. A refused save says why beside the
+field at fault (`parseMetricForm`). Removing a metric archives it and leaves
+what it counted.
+
+Each metric draws a bar chart on the Overview, one bar per period from when
+the goal was made (`goal-metrics.tsx`), with the aim as a dashed line. A
+metric with nothing counted yet says what it counts in place of the chart.
+The counts are worked out when the page is read and never stored
+(`lib/goals/metrics.ts`).
+
 ## Your examples, broken down
 
 These are the first goals to enter once it exists, and a check on whether the
