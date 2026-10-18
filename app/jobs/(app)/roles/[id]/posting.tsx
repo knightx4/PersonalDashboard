@@ -303,9 +303,10 @@ function RoleDetailsCard({
       setError('Compensation has to be a number.');
       return;
     }
+    const nextUrl = jdUrlDraft.trim() || null;
     startTransition(async () => {
       const result = await updateRole(roleId, {
-        jdUrl: jdUrlDraft.trim() || null,
+        jdUrl: nextUrl,
         location: locationDraft.trim() || null,
         atsJobId: atsJobIdDraft.trim() || null,
         compMinCents: min,
@@ -321,6 +322,9 @@ function RoleDetailsCard({
       }
       setEditing(false);
       router.refresh();
+      // A link added to a role with no description is the moment to read
+      // it, rather than leaving Look it up for you to press (note 1efa0fe4).
+      if (nextUrl && nextUrl !== jdUrl && !jdText) lookItUp();
     });
   };
 
