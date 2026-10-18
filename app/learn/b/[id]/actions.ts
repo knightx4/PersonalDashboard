@@ -2,12 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { startEssayFromBrief } from '@/lib/learn/briefs/essay';
 import { retryBriefFor } from '@/lib/learn/briefs/retry';
-import { draftBriefTopic } from '@/lib/learn/briefs/topics-store';
+import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
+import { approveDraftedTopic, draftBriefTopic } from '@/lib/learn/briefs/topics-store';
 
 /**
  * The brief page's writes (plan #2023.4): the short answer, the weekly check's
@@ -132,9 +134,11 @@ export async function startEssayOnBrief(briefId: string): Promise<{ error: strin
 /**
  * Draft the topic a ready brief is about, under the goal chosen beside it
  * (plan #2184.1): the topic compiler run twice on the brief's pages and the
- * goal's performances. The draft opens on its own page, to be read and
- * approved; approving it puts it on the goal's lens and the brief under the
- * goal. The topics its links need are drafted from the same pages there.
+ * goal's performances. A draft that cites a source on every row is approved
+ * as soon as it is kept (plan #2356.2), which puts it on the goal's lens and
+ * the brief under the goal, and the brief's cards are written for that goal
+ * after the response. The press lands on the topic's page, where the topics
+ * its links need are drafted from the same pages.
  */
 // latency: pending
 export async function draftBriefTopics(briefId: string, aimId: string): Promise<{ error: string }> {
@@ -143,13 +147,23 @@ export async function draftBriefTopics(briefId: string, aimId: string): Promise<
   if (!Id.safeParse(aimId).success) return { error: 'Choose the goal this research is for.' };
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
+  const client = await createLearnClient();
   let id: string;
   try {
-    const result = await draftBriefTopic(await createLearnClient(), user.id, { briefId, aimId, anthropicApiKey: apiKey });
+    const result = await draftBriefTopic(client, user.id, { briefId, aimId, anthropicApiKey: apiKey });
     if (!result.ok) return { error: result.detail };
     id = result.id;
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Drafting the topic failed.' };
+  }
+  // The draft is kept even if approving fails: its page still has Approve.
+  const approval = await approveDraftedTopic(client, user.id, id).catch((caught: unknown) => {
+    console.error('[learn brief] approve on draft', caught instanceof Error ? caught.message : caught);
+    return null;
+  });
+  if (approval?.brief) {
+    const settled = approval.brief.briefId;
+    after(() => writeCardsForBrief(user.id, settled).then(() => undefined));
   }
   page(briefId);
   revalidatePath('/learn/topics');

@@ -68,7 +68,7 @@ export const learnActions: ModuleActions = {
     setBriefArchived: none('own'),
     retryBrief: tool('retry_research_brief'),
     startEssayOnBrief: none('own'),
-    draftBriefTopics: none('theirs', 'Which goal a research brief feeds is the person’s to choose, and the draft is read and approved on its page (plan #2184.1).'),
+    draftBriefTopics: none('theirs', 'Which goal a research brief feeds is the person’s to choose (plan #2184.1); the draft is approved as it is kept when every row cites a source (plan #2356.2).'),
   },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
