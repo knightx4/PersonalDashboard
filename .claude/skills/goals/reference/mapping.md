@@ -29,6 +29,15 @@ person to find halfway through. The pass ends in a file called **Blind
 spots** under the goal, and what it finds goes into the map like anything
 else you learned.
 
+**When it runs.** Once per goal, the first time the goal is mapped. Run the
+query under "The file" below before anything else: if it finds a Blind spots
+file, the goal has been through the pass, so skip steps 1 to 5 and map as
+usual. The pass does not run on a later Ask Dash press, on the overnight map
+of a goal that already has stages, on a re-shape, on an area plan, or on an
+errand ("An errand"). A comment from the person on the Blind spots file is
+the request for a fresh pass: on that run, do the pass again and revise the
+file in place.
+
 1. **Read first, so you list only gaps.** The goal's title, `detail` and
    `acceptance`, the steps already under it and the questions already
    answered, its area, its `goals.context`, and the other modules as
@@ -99,8 +108,9 @@ select '<user>', '<goal id>', 'file', id from f
 returning target_id;
 ```
 
-Before writing it, look for one already there: a live file of Dash's titled
-Blind spots, linked from the goal.
+Look for one before you do anything else in the pass, and again before you
+write: a live file of Dash's titled Blind spots, linked from the goal. Never
+write a second one for a goal.
 
 ```sql
 select f.id, f.body, f.updated_at
@@ -116,6 +126,12 @@ When there is one, read its thread (`core.thread_turns`, ref
 `change_note`, as "Files" in `working-steps.md` says for a file on the same
 question, rather than writing a second. List the blind spots in the run
 summary too, with what you did with each.
+
+The query finds the file by its title and maker, so a file the person has
+renamed is not found, and the goal reads as not yet through the pass. That is
+accepted: the pass then runs once more and writes a new file. If you see a
+renamed file of Dash's under the goal whose body is a blind-spot table, treat
+it as the goal's file and revise it instead.
 
 ### Stages and sub-steps
 
@@ -550,6 +566,8 @@ down to fit:
   with `acts` if Dash would do it, as "Steps that act outside the plan" says.
 - **No weekly help.** Leave `proposed_help_kinds` empty; an errand is over
   before a weekly run would help it.
+- **Skip the blind-spot pass.** An errand is a one-off job with a date and at
+  most one question, so write no Blind spots file for it.
 - Leave the goal's note as for any run. The errand closes as any goal does:
   propose `met` in the morning review once its done-when holds.
 
