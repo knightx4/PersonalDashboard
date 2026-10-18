@@ -167,6 +167,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One passage of a note with its Folder > Note > Heading place in front.
   'embed-note-blocks': background(unit(VOYAGE_LITE, 400, 0)),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
+  // A note's folder, title, tags and first 1,500 characters, and a voice and
+  // one sentence back.
+  'tag-note-voice': background(unit(HAIKU, 900, 60)),
   // A note, its eight nearest notes cut to 1,500 characters, and up to
   // sixteen positions with quotes, plus up to two searches read back. The
   // material is cached, so the rounds after the first read it at a tenth.
@@ -198,6 +201,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One call per lesson: the concept, its checks, and at most one catalogue section.
   'write-lesson': background(unit(SONNET, 3_500, 1_200)),
   'embed-lesson-claim': background(unit(VOYAGE_LITE, 100, 0)),
+  'embed-figure-need': background(unit(VOYAGE_LITE, 60, 0)),
+  'write-figure-backfill': background(unit(SONNET, 3_000, 600)),
   'lay-out-lesson-unit': background(unit(SONNET, 4_000, 3_000)),
   // One unit, given the units so far and up to forty concept names in each list.
   'write-next-unit': background(unit(SONNET, 2_000, 300)),
@@ -483,4 +488,11 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // You: a personality result, its trait themes and up to fifteen cut notes
   // in, a few points out.
   'read-personality': run(SONNET, 7_000, 1_200),
+  // A lecture's slides or a reading of about twenty pages, read whole for a
+  // summary and five points (plan #2401.4).
+  'summarise-course-file': run(HAIKU, 30_000, 600),
+  // A syllabus of five to ten pages in, a list of fifteen weeks out (plan #2401.6).
+  'read-syllabus-weeks': run(HAIKU, 12_000, 700),
+  // Up to twenty files' summaries and points in, a paragraph and eight ideas out (plan #2401.7).
+  'collect-course-overview': run(HAIKU, 6_000, 900),
 };

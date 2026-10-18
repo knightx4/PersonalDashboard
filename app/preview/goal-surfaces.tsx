@@ -1,6 +1,8 @@
 import { StepPage } from '@/app/goals/[goalId]/step-page';
+import { NotifySwitch } from '@/app/goals/[goalId]/notify-switch';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import { SetTab } from './set-tab';
+import { Card } from '@/components/ui/card';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -389,6 +391,27 @@ export function GoalStepProposedSurface() {
       stepId="rates"
       todoOn={false}
     />
+  );
+}
+
+/**
+ * A step Dash is doing, on its own page (plan #2376.2): Compare the transfer
+ * fees, open, with the phone notification switched on.
+ */
+export function GoalDashStepSurface() {
+  return (
+    <StepPage map={goalMapWith({ fees: { notifyOnDone: true } })} stepId="fees" todoOn={false} />
+  );
+}
+
+/** The notification switch after a save that failed: back off, with the reason beneath. */
+export function GoalDashStepNotifyErrorSurface() {
+  const fees = goalMapWith({}).steps.flatMap((one) => one.children).find((one) => one.id === 'fees');
+  if (!fees) return null;
+  return (
+    <Card padding="standard">
+      <NotifySwitch node={fees} error="The notification setting could not be saved. Try again." />
+    </Card>
   );
 }
 

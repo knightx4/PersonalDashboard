@@ -53,6 +53,28 @@ export const youSources: ModuleSources = {
         'The file is in the private you-course-files bucket at storage_path; a course holds at most 20.',
     },
     {
+      table: 'you.course_weeks',
+      module: 'You',
+      holds: "The weeks of a course they took and each week's topic, read from its syllabus and corrected by them.",
+      weight: 'record',
+      search: ['title'],
+      title: 'title',
+      facts: ['week', 'edited_at', 'removed_at'],
+      newest: 'created_at',
+      // A week opens on its course's line, which its ref alone cannot name.
+      page: {
+        title: 'title',
+        reads: ['course_id'],
+        href: (row) => (row.course_id ? courseHref(String(row.course_id)) : null),
+        section: WORK,
+        parent: parentBy('course_id', 'you.courses'),
+      },
+      note:
+        'course_id points at you.courses. week is the week number; a file in you.course_files with the same course_id and week sits in it. ' +
+        'title is null for a week the syllabus names without a topic. edited_at is set when they changed the title themselves; ' +
+        'a row with removed_at is a week they removed, so leave it out.',
+    },
+    {
       table: 'you.transcripts',
       module: 'You',
       holds: 'The academic transcripts they have uploaded, one per school record, with the original file kept.',
@@ -121,5 +143,21 @@ export const youSources: ModuleSources = {
         'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',
     },
   ],
-  notSources: [],
+  notSources: [
+    {
+      table: 'you.course_overviews',
+      reason:
+        "Dash's account of what a course was about and which ideas recurred, made on a press from the file summaries; what the person kept is the files in you.course_files.",
+    },
+    {
+      table: 'you.course_file_summaries',
+      reason:
+        "Dash's summary and key points of a course file, made on a press of Summarise; what the person kept is the file in you.course_files.",
+    },
+    // Dash's writing about the person (plan #2413.1). Goals reading them would
+    // cite Dash to itself as though it were something the person said.
+    { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
+    { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
+    { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+  ],
 };

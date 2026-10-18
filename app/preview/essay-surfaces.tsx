@@ -18,6 +18,10 @@ import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
 import type { StudyItem } from '@/lib/learn/essays/study';
 import type { EssayResearch } from '@/lib/learn/essays/research';
 import type { StudyState } from '@/app/learn/e/[id]/essay-study';
+import type { MergeDialogState } from '@/app/learn/e/[id]/merge-note-dialog';
+import { joinNotes } from '@/lib/learn/essays/join-notes';
+import { NOTES_TO_VAULT_ERRORS } from '@/lib/learn/essays/notes-to-vault';
+import type { VaultNoteMatch } from '@/lib/learn/essays/vault-notes';
 
 /**
  * The Essays list and the essay editor (plan #1865), from fixtures shaped like
@@ -973,4 +977,107 @@ export function LearnEssayDraftFromNotesSurface() {
       <EssayView essay={notesEssay} initialView="draft" planFrozen study={STUDY_WAITING} />
     </WithCosts>
   );
+}
+
+/**
+ * Merge with a vault note, on Prepare (plan #2357.5): the dialog open over the
+ * notes essay in each of its states. The vault notes are invented; one has no
+ * title, so it shows by its path, and one has the longest title a note gets.
+ */
+const mergeMatches: VaultNoteMatch[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000e1',
+    path: 'Economics/Mortgages and the monthly payment.md',
+    title: 'Mortgages and the monthly payment',
+  },
+  { id: '00000000-0000-4000-8000-0000000000e2', path: 'Inbox/2026-09-30 mortgage call.md', title: '' },
+  {
+    id: '00000000-0000-4000-8000-0000000000e3',
+    path: 'Reading/How a rate decision travels from the Monetary Policy Committee to a fixed-rate remortgage.md',
+    title: 'How a rate decision travels from the Monetary Policy Committee to a fixed-rate remortgage',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000e4',
+    path: 'Economics/Mortgage brokers.md',
+    title: 'Mortgage brokers',
+  },
+];
+
+const mortgageNote = `A two-year fix ends and the payment resets to whatever the rate is then. Most of the people we know remortgaged in 2023, all within about a year of each other.
+
+The broker said lenders cap what you borrow at about four and a half times income, but the stress test at a higher rate is what actually decides it.`;
+
+const vaultNoteText = `# Mortgages and the monthly payment
+
+${mortgageNote}`;
+
+const intoNotes: MergeDialogState = {
+  query: 'mort',
+  search: { kind: 'found', notes: mergeMatches },
+  picked: mergeMatches[0]!,
+  direction: 'into-notes',
+  preview: {
+    kind: 'ready',
+    before: houseNotes,
+    after: joinNotes(houseNotes, mortgageNote, mergeMatches[0]!.title, '2026-10-18'),
+    unchanged: false,
+    blobSha: null,
+  },
+  saving: false,
+  error: null,
+};
+
+const intoVault: MergeDialogState = {
+  ...intoNotes,
+  direction: 'into-vault',
+  preview: {
+    kind: 'ready',
+    before: vaultNoteText,
+    after: joinNotes(vaultNoteText, houseNotes, 'Why rate rises move house prices', '2026-10-18'),
+    unchanged: false,
+    blobSha: 'a1b2c3',
+  },
+  error: NOTES_TO_VAULT_ERRORS['read-only'],
+};
+
+function MergeSurface({ state }: { state: MergeDialogState }) {
+  return (
+    <WithCosts>
+      <EssayView essay={notesEssay} initialView="prepare" planFrozen study={STUDY_WAITING} mergeView={state} />
+    </WithCosts>
+  );
+}
+
+/** The dialog open on a search with matches. */
+export function LearnEssayMergeSurface() {
+  return <MergeSurface state={{ ...intoNotes, picked: null, preview: null }} />;
+}
+
+/** A search that matches nothing. */
+export function LearnEssayMergeEmptySurface() {
+  return (
+    <MergeSurface
+      state={{ ...intoNotes, query: 'zoning', search: { kind: 'found', notes: [] }, picked: null, preview: null }}
+    />
+  );
+}
+
+/** Searching. */
+export function LearnEssayMergeLoadingSurface() {
+  return <MergeSurface state={{ ...intoNotes, search: { kind: 'searching' }, picked: null, preview: null }} />;
+}
+
+/** A note picked: what goes into the notes, and where. */
+export function LearnEssayMergePreviewSurface() {
+  return <MergeSurface state={intoNotes} />;
+}
+
+/** Adding the note to the notes. */
+export function LearnEssayMergeSavingSurface() {
+  return <MergeSurface state={{ ...intoNotes, saving: true }} />;
+}
+
+/** The other way, into the vault note, refused because the vault token cannot write. */
+export function LearnEssayMergeErrorSurface() {
+  return <MergeSurface state={intoVault} />;
 }

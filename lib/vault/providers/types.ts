@@ -102,6 +102,14 @@ export interface VaultSource {
   /** A file's text. Only ever called for paths that survived the filter. */
   readBlob(blobSha: string): Promise<string>;
 
+  /**
+   * When the first commit that added a note at its vault path was authored
+   * (plan #2413.2), or null when the branch has none. Optional so that a
+   * source with no history, and the fakes in tests, need not answer it; the
+   * dating pass then goes on the note's own evidence alone.
+   */
+  firstCommitAt?(vaultPath: string): Promise<string | null>;
+
   /** A file's bytes, for copying an attachment into storage. */
   readBlobBytes(blobSha: string): Promise<ArrayBuffer>;
 

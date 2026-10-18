@@ -53,6 +53,7 @@ type PrepInterviewRow = {
   interview_participants: { contacts: { id: string } | null }[] | null;
 };
 import { RoleDetailPanels } from './panels';
+import { AutoLookup } from './auto-lookup';
 import { defaultRoleTab } from './tabs';
 import { RoleTodos } from './todos';
 import { ClosedSummary } from './closed-summary';
@@ -100,7 +101,7 @@ export default async function RoleDetailPage({
   const { data: role } = await supabase
     .from('roles')
     .select(
-      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
+      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, jd_lookup_at, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, stage, ats_type, priority, logo_url, domains, website, careers_url )`,
@@ -575,13 +576,19 @@ export default async function RoleDetailPage({
 
         <RelatedNotes notes={related} />
 
+        {Boolean(role.jd_url) && !(role.jd_text as string | null)?.trim() && !role.jd_lookup_at && (
+          <AutoLookup roleId={role.id as string} />
+        )}
+
         <RoleDetailPanels
           roleId={role.id as string}
           applicationId={current.id as string}
           status={status}
           jdText={(role.jd_text as string) ?? ''}
           jdLookupNote={(role.jd_lookup_note as string) ?? null}
+          jdLookupAt={(role.jd_lookup_at as string) ?? null}
           jdUrl={(role.jd_url as string) ?? null}
+          location={(role.location as string | null) ?? null}
           atsJobId={(role.ats_job_id as string) ?? null}
           compMinCents={(role.comp_min_cents as number) ?? null}
           compMaxCents={(role.comp_max_cents as number) ?? null}

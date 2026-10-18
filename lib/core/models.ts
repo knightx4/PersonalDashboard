@@ -230,10 +230,14 @@ export const MODELS = {
   maya: OPUS,
   /** lib/vault/notes/connections-model.ts */
   vaultConnections: HAIKU,
+  /** lib/vault/notes/voice.ts: whose words each note is (plan #2413.3) */
+  vaultNoteVoice: HAIKU,
   /** lib/you/transcript-model.ts */
   vaultTranscript: HAIKU,
   /** lib/you/work-history-model.ts */
   youWorkHistory: HAIKU,
+  /** lib/you/course-file-model.ts; Summarise on a course file, which can run to a hundred pages */
+  youCourseFileSummary: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
 } as const;

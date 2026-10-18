@@ -28,6 +28,17 @@ export function docxText(file: Uint8Array): string | null {
 }
 
 function zipEntry(file: Uint8Array, wanted: string): string | null {
+  return zipEntries(file, (name) => name === wanted)?.get(wanted) ?? null;
+}
+
+/**
+ * The text of every entry in a zip whose name `want` accepts, by name, or
+ * null when the file is not a zip this can read. An entry that cannot be
+ * inflated is left out. Also read by the PowerPoint reader (lib/you/pptx.ts),
+ * which needs a deck's slides, notes and the files that order them.
+ */
+export function zipEntries(file: Uint8Array, want: (name: string) => boolean): Map<string, string> | null {
+  if (file.length < 22) return null;
   const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
   // The end record is in the last 22 bytes plus a comment of up to 64 KB.
   let end = -1;
@@ -39,9 +50,11 @@ function zipEntry(file: Uint8Array, wanted: string): string | null {
   }
   if (end < 0) return null;
 
+  const found = new Map<string, string>();
   const count = view.getUint16(end + 10, true);
   let at = view.getUint32(end + 16, true);
   const decoder = new TextDecoder();
+  let total = 0;
   for (let n = 0; n < count; n++) {
     if (at + 46 > file.length || view.getUint32(at, true) !== DIRECTORY_ENTRY) return null;
     const method = view.getUint16(at + 10, true);
@@ -52,22 +65,28 @@ function zipEntry(file: Uint8Array, wanted: string): string | null {
     const local = view.getUint32(at + 42, true);
     const name = decoder.decode(file.subarray(at + 46, at + 46 + nameLength));
     at += 46 + nameLength + extraLength + commentLength;
-    if (name !== wanted) continue;
+    if (!want(name)) continue;
 
-    if (local + 30 > file.length || view.getUint32(local, true) !== LOCAL_HEADER) return null;
+    if (local + 30 > file.length || view.getUint32(local, true) !== LOCAL_HEADER) continue;
     const start =
       local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     const body = file.subarray(start, start + compressed);
-    if (body.length !== compressed) return null;
+    if (body.length !== compressed) continue;
     try {
-      if (method === 0) return decoder.decode(body);
-      if (method === 8) return decoder.decode(inflateRawSync(body, { maxOutputLength: XML_MAX }));
+      const text =
+        method === 0
+          ? decoder.decode(body)
+          : method === 8
+            ? decoder.decode(inflateRawSync(body, { maxOutputLength: Math.max(1, XML_MAX - total) }))
+            : null;
+      if (text === null) continue;
+      total += text.length;
+      found.set(name, text);
     } catch {
-      return null;
+      continue;
     }
-    return null;
   }
-  return null;
+  return found;
 }
 
 const ENTITIES: Record<string, string> = {
@@ -78,6 +97,15 @@ const ENTITIES: Record<string, string> = {
   apos: "'",
 };
 
+/** One XML entity, `&amp;` or `&#8217;`, as the character it stands for. */
+export function decodeEntity(match: string, code: string): string {
+  if (code[0] === '#') {
+    const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+    return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : match;
+  }
+  return ENTITIES[code.toLowerCase()] ?? match;
+}
+
 /** The text in word/document.xml, a line per paragraph and a tab between table cells. */
 export function documentXmlText(xml: string): string {
   return xml
@@ -86,13 +114,7 @@ export function documentXmlText(xml: string): string {
     .replace(/<\/w:tc>/g, '\t')
     .replace(/<\/w:(p|tr)>/g, '\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code: string) => {
-      if (code[0] === '#') {
-        const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-        return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : match;
-      }
-      return ENTITIES[code.toLowerCase()] ?? match;
-    })
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decodeEntity)
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

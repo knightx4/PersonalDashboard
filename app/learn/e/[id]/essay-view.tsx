@@ -48,7 +48,8 @@ import { EssayBriefFold } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
 import { EssayResearchCard, useEssayResearch } from './essay-research';
-import { logEssayView } from './guide-actions';
+import { changeEssayPlan, logEssayView } from './guide-actions';
+import { MergeVaultNote, type MergeDialogState } from './merge-note-dialog';
 import {
   FromNotesCard,
   ModelDraftPanel,
@@ -56,7 +57,8 @@ import {
   NotesEditor,
   useEssayPlan,
 } from './essay-notebook';
-import { EMPTY_PLAN } from '@/lib/learn/essays/plan';
+import { EMPTY_PLAN, type EssayPlan } from '@/lib/learn/essays/plan';
+import { notesOf } from '@/lib/learn/essays/notebook';
 import { Segmented } from '@/components/ui/segmented';
 import { MODELS } from '@/lib/core/models';
 import { EssayFinishCard, type FinishView } from './essay-finish';
@@ -574,6 +576,7 @@ export function EssayView({
   initialView,
   planFrozen = false,
   attachedNotes = [],
+  mergeView,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -603,6 +606,8 @@ export function EssayView({
   planFrozen?: boolean;
   /** Vault notes attached to the essay's notes (attach_vault_note). */
   attachedNotes?: readonly AttachedNote[];
+  /** The merge dialog drawn open in this state and never calling the server, for the gallery (plan #2357.5). */
+  mergeView?: MergeDialogState;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -699,6 +704,35 @@ export function EssayView({
     const end = handle.doc().length;
     handle.replace({ from: end, to: end, insert: text });
   }, []);
+  /**
+   * Save what the notes editor holds before a merge reads the saved notes
+   * (plan #2357.5). Queued behind any save already on its way.
+   */
+  const planRun = planApi.run;
+  const saveNotes = useCallback(async () => {
+    const text = notesEditor.current?.doc();
+    if (text === undefined || text === notesOf(brief, plan)) return true;
+    return planRun(() => changeEssayPlan(essay.id, { kind: 'notes', text }));
+  }, [brief, essay.id, plan, planRun]);
+  /**
+   * A vault note added to the notes: the editor takes the merged text, so its
+   * own next save keeps it rather than writing back what it held, and the page
+   * moves to the Notes tab to show it.
+   */
+  const setPlan = planApi.setPlan;
+  const onAddedToNotes = useCallback(
+    (next: EssayPlan) => {
+      setPlan(next);
+      const text = next.notes;
+      go('notes', () => {
+        const handle = notesEditor.current;
+        if (!handle) return;
+        handle.replace({ from: 0, to: handle.doc().length, insert: text });
+        handle.focus();
+      });
+    },
+    [go, setPlan],
+  );
 
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
@@ -904,7 +938,18 @@ export function EssayView({
         className="mb-0"
       />
       <NoteMapCard essayId={essay.id} api={planApi} append={appendToNotes} />
-      <AttachedNotesCard essayId={essay.id} initial={attachedNotes} />
+      <AttachedNotesCard
+        essayId={essay.id}
+        initial={attachedNotes}
+        merge={
+          <MergeVaultNote
+            essayId={essay.id}
+            saveNotes={saveNotes}
+            onAddedToNotes={onAddedToNotes}
+            shown={mergeView}
+          />
+        }
+      />
       <FromNotesCard
         essayId={essay.id}
         api={planApi}

@@ -96,6 +96,7 @@ type ItemRow = {
   closed_at?: string | null;
   estimated_total?: number | string | null;
   total_unit?: string | null;
+  notify_on_done?: boolean | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -125,7 +126,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -166,6 +167,7 @@ const toStep = (row: ItemRow): Step => ({
       ? null
       : Number(row.estimated_total),
   totalUnit: row.total_unit ?? null,
+  notifyOnDone: row.notify_on_done ?? false,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -790,6 +792,30 @@ export async function setStepOnTodo(
     .is('archived_at', null);
   if (onTodo) query = query.eq('kind', 'mine').eq('status', 'open');
   const { data, error } = await query.select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Ask for a phone message when Dash closes a step as done, or stop asking
+ * (plan #2376.2). Only one of Dash's steps that is still open takes it: a
+ * step of yours is closed by you, and a closed step has nothing left to
+ * announce. False when nothing changed.
+ */
+export async function setStepNotify(
+  client: GoalsSupabaseClient,
+  id: string,
+  on: boolean,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ notify_on_done: on })
+    .eq('id', id)
+    .eq('level', 'step')
+    .eq('kind', 'claude')
+    .not('status', 'in', '(done,dropped)')
+    .is('archived_at', null)
+    .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
 }

@@ -23,6 +23,8 @@ import { loadProjectView } from '@/lib/learn/lessons/project-store';
 import { isOwner } from '@/lib/dev/owner';
 import { loadSubjectChannels, type SubjectChannels } from '@/lib/learn/youtube/subject-channels';
 import { deleteSubject } from './actions';
+import { ArchivedBanner, ArchiveSubject } from './archive';
+import { whenDate } from '@/lib/core/when';
 import { loadSubjectLearning, type SubjectLearning } from '@/lib/learn/chat/subject-load';
 import { ChannelsSection } from './channels';
 import { ChatLearningSection } from './chat-learning';
@@ -45,6 +47,7 @@ import {
   unitsComeAtStep,
   withAddedSources,
 } from '@/lib/learn/prepare/view';
+import { loadSubjectFigureNeeds, type UnbuiltFigure } from '@/lib/learn/figures/needs-load';
 import { loadAddedSources } from '@/lib/learn/prepare/add-source-run';
 import type { SourceDocument } from '@/lib/learn/prepare/finish-step';
 import { countStates } from '@/lib/learn/graph/model';
@@ -73,8 +76,8 @@ export const maxDuration = 300;
  * Below the plan, the readings related to the subject from any list and the
  * conversations logged about it (plan #1814).
  *
- * Writes from here: writing a curriculum for a track that has none; deleting
- * the track; finding YouTube channels for it and unfollowing one (the owner
+ * Writes from here: writing a curriculum for a track that has none; archiving
+ * and restoring the subject (plan #2355.2); deleting the track; finding YouTube channels for it and unfollowing one (the owner
  * only); and naming Wikipedia articles at the foot of the page, which stores
  * them in the shared catalogue.
  */
@@ -177,7 +180,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added] =
+  const [graph, goals, settings, interest, units, pieces, learning, preparation, direction, territory, lensRead, added, unbuilt] =
     await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
@@ -206,6 +209,9 @@ export default async function SubjectPage({
     // What the person added with Add a source (plan #2307.4). Ones that
     // cannot be read leave the Sources section with the run's documents.
     loadAddedSources(supabase, user.id, id).catch((): SourceDocument[] => []),
+    // Figures its lessons asked for that cannot be drawn (plan #2321.12).
+    // Ones that cannot be read leave the list out of Sources.
+    loadSubjectFigureNeeds(supabase, user.id, id).catch((): UnbuiltFigure[] => []),
   ]);
   const lensId = lensRead?.id ?? null;
   const held = lensRead?.held ?? null;
@@ -274,24 +280,39 @@ export default async function SubjectPage({
         actions={
           <>
             <SubjectPresses id={id} lensId={lensId} owner={owner} />
-            <ConfirmStep
-              action={deleteSubject}
-              fields={{ subjectId: id }}
-              prompt={
-                counts.total === 0
-                  ? 'Deletes this subject and its curriculum.'
-                  : `Deletes this subject, its curriculum, its ${counts.total} ${
-                      counts.total === 1 ? 'idea' : 'ideas'
-                    } and everything you answered on them. Readings stay on their lists.`
-              }
-              confirmLabel="Yes, delete it"
-              pendingLabel="Deleting…"
-            >
-              Delete subject
-            </ConfirmStep>
+            {/* Archive (plan #2355.2) and Delete, the two quiet presses that
+                put the subject away, kept together on one line. Archive asks
+                for no confirmation, since Restore on the banner undoes it. */}
+            <div className="flex items-start gap-1">
+              {!subject.archivedAt && <ArchiveSubject subjectId={id} />}
+              <ConfirmStep
+                action={deleteSubject}
+                fields={{ subjectId: id }}
+                prompt={
+                  counts.total === 0
+                    ? 'Deletes this subject and its curriculum.'
+                    : `Deletes this subject, its curriculum, its ${counts.total} ${
+                        counts.total === 1 ? 'idea' : 'ideas'
+                      } and everything you answered on them. Readings stay on their lists.`
+                }
+                confirmLabel="Yes, delete it"
+                pendingLabel="Deleting…"
+              >
+                Delete subject
+              </ConfirmStep>
+            </div>
           </>
         }
       />
+
+      {/* An archived subject still opens by its link (plan #2355.2), and says
+          so first, with the press that puts it back. */}
+      {subject.archivedAt && (
+        <ArchivedBanner
+          subjectId={id}
+          archivedOn={whenDate(subject.archivedAt, { timeZone: settings.timezone, year: 'auto' })}
+        />
+      )}
 
       {/* What the opening questions established, said once on the way in. A
           concept marked known is one this page deliberately stops showing, so
@@ -363,7 +384,7 @@ export default async function SubjectPage({
       )}
 
       {sourceList && (
-        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} />
+        <SourcesSection subjectId={id} sources={sourceList} readings={learning.readings} unbuilt={unbuilt} />
       )}
       {/* One press feeds the bank the preparation reads (plan #2307.4). */}
       <AddSource subjectId={id} />

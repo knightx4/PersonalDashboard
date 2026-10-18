@@ -11,6 +11,7 @@ import {
   linkStep,
   moveStep,
   setStepArchived,
+  setStepNotify,
   setStepOnTodo,
   setStepStatus,
   unlinkStep,
@@ -120,6 +121,25 @@ export async function setStepOnTodoAction(form: FormData): Promise<StepActionSta
   }
   revalidatePath('/todo', 'layout');
   revalidatePath('/home');
+  return saved();
+}
+
+/**
+ * Ask for a phone message when Dash finishes the step, or stop asking (plan
+ * #2376.2). Refused on a step that is not Dash's or is already closed.
+ */
+// latency: pending
+export async function setStepNotifyAction(form: FormData): Promise<StepActionState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  const on = form.get('on') === 'true';
+  try {
+    const changed = await setStepNotify(await createGoalsClient(), id.data, on);
+    if (!changed) return { error: 'Only an open step Dash is doing can send a notification.' };
+  } catch {
+    return { error: 'The notification setting could not be saved. Try again.' };
+  }
   return saved();
 }
 

@@ -31,6 +31,7 @@ const METRICS: Metric[] = [
     id: 'm-applied',
     goalId: GOAL_ID,
     name: 'Applications sent to funds and banks each week',
+    source: 'list',
     collectionId: 'l-applications',
     dateField: 'applied',
     period: 'week',
@@ -41,11 +42,34 @@ const METRICS: Metric[] = [
     id: 'm-interviews',
     goalId: GOAL_ID,
     name: 'Interviews',
+    source: 'list',
     collectionId: 'l-applications',
     dateField: 'interview',
     period: 'month',
     target: null,
     position: 1,
+  },
+  {
+    id: 'm-steps',
+    goalId: GOAL_ID,
+    name: 'Steps closed',
+    source: 'steps',
+    collectionId: null,
+    dateField: null,
+    period: 'week',
+    target: 3,
+    position: 2,
+  },
+  {
+    id: 'm-files',
+    goalId: GOAL_ID,
+    name: 'Drafts and notes from Dash',
+    source: 'files',
+    collectionId: null,
+    dateField: null,
+    period: 'month',
+    target: null,
+    position: 3,
   },
 ];
 
@@ -81,7 +105,7 @@ function Metrics({
   );
 }
 
-/** Two metrics, one with the longest name, and the line that adds another. */
+/** Four metrics: two on a list, one with the longest name, then closed steps and Dash files. */
 export function GoalMetricPropsSurface() {
   return <Metrics />;
 }
@@ -100,9 +124,17 @@ export function GoalMetricPropsMenuSurface() {
   );
 }
 
-/** A goal whose only list has no date: nothing to count, and it says so. */
+/** A goal with no metrics and no list: what can be counted, and the add line. */
 export function GoalMetricPropsEmptySurface() {
-  return <Metrics metrics={[]} lists={[LISTS[1]]} />;
+  return <Metrics metrics={[]} lists={[]} />;
+}
+
+/**
+ * Adding one on a goal whose only list has no date: the choice starts on
+ * Steps closed, and no date is asked for (plan #2397.3).
+ */
+export function GoalMetricPropsFormStepsSurface() {
+  return <Metrics metrics={[]} lists={[LISTS[1]]} shown={{ open: 'add' }} />;
 }
 
 /** A new metric being saved: the button holds its pending state. */
@@ -110,13 +142,17 @@ export function GoalMetricPropsPendingSurface() {
   return <Metrics shown={{ open: 'add', pending: true }} />;
 }
 
-/** A change refused: the message sits beside the date it is about. */
+/**
+ * A change to the steps metric refused: the message sits beside the aim it
+ * is about, and no date is asked for (plan #2397.3).
+ */
 export function GoalMetricPropsErrorSurface() {
   return (
     <Metrics
       shown={{
-        open: 'm-applied',
-        state: { field: 'dateField', error: 'That date is no longer in Applications. Choose another.' },
+        open: 'm-steps',
+        target: '0',
+        state: { field: 'target', error: 'The target is a whole number of at least 1.' },
       }}
     />
   );

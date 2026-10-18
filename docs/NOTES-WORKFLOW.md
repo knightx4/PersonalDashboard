@@ -39,9 +39,11 @@ filed before it existed has no `route` and shows nothing for it. The twelve
 trial notes were hand-written for the trial and not kept, so they cannot be
 run again. It is scored instead on the first twelve real notes filed after it
 shipped: each note's route against how it was actually handled, a fix that a
-session closed in one commit or a note that went to the plan. The score goes
-here as a count out of twelve, with how many were under 0.8. Pending until
-those twelve have been handled.
+session closed in one commit or a note that went to the plan. The first twelve,
+filed 11 to 14 October 2026, scored 7 of 12: the route matched the handling on 7,
+and all 5 misses were notes read as Plan that a session closed in one commit. 8 of the twelve
+answers were under 0.8, and every miss was one of them. Both notes at 0.98 or above that read
+Plan went to the ideas page, as the route said.
 
 ## Working them
 

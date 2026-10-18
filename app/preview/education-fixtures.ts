@@ -2,7 +2,9 @@ import type { TranscriptDraft } from '@/app/you/work/actions';
 import { courseExplainPrompt, type CourseExplain } from '@/lib/learn/evidence/course-explain';
 import { groupCourses } from '@/lib/you/education';
 import type { ChosenFile } from '@/app/you/work/course-files';
-import type { Course, CourseFile, CourseFileKind, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, CourseFileKind, CourseWeek, Transcript } from '@/lib/you/transcripts';
+import { HAIKU } from '@/lib/core/models';
+import type { CourseNote, CourseOverview } from '@/lib/you/course-overview';
 
 /** Fixtures for the Work & school tab's surfaces in the preview gallery (plan #1308). */
 
@@ -120,6 +122,7 @@ function kept(
   fileName: string,
   size: number,
   position: number,
+  summary: CourseFile['summary'] = null,
 ): CourseFile {
   const pptx = fileName.endsWith('.pptx');
   return {
@@ -136,19 +139,42 @@ function kept(
     size_bytes: size,
     uploaded_at: '2026-10-18T09:00:00Z',
     updated_at: '2026-10-18T09:00:00Z',
+    summary,
   };
+}
+
+/** Dash's summary of a file, as Summarise keeps it (plan #2401.4). */
+function summarised(summary: string, points: string[]): CourseFile['summary'] {
+  return { summary, points, model: HAIKU, read_at: '2026-10-18T10:00:00Z' };
 }
 
 /**
  * The files kept under ECON 101 (plan #2401.2): a syllabus, two weeks of
  * slides and notes, a deck with no week, a reading with a long title and one
- * with a week. Every other course holds none, and STATS 250 shows the empty
- * state when opened.
+ * with a week. The first week's slides and the long reading have been
+ * summarised (plan #2401.4). Every other course holds none, and STATS 250
+ * shows the empty state when opened.
  */
 export const educationFiles: Record<string, CourseFile[]> = {
   c3: [
     kept('f1', 'syllabus', null, 'ECON 101 Winter 2018 syllabus', 'ECON101_W18_syllabus.pdf', 214_331, 0),
-    kept('f2', 'slides', 1, 'Lecture 01 Scarcity and choice', 'Lecture_01_Scarcity_and_choice.pptx', 6_402_118, 1),
+    kept(
+      'f2',
+      'slides',
+      1,
+      'Lecture 01 Scarcity and choice',
+      'Lecture_01_Scarcity_and_choice.pptx',
+      6_402_118,
+      1,
+      summarised(
+        'Economics studies how people choose when what they want outruns what they have. Every choice gives up the next best thing, and that forgone option is its real cost.',
+        [
+          'Scarcity means wants exceed the resources to meet them, so every society must choose.',
+          'The opportunity cost of a choice is the value of the best alternative given up.',
+          'People respond to incentives, so a change in costs or benefits changes behaviour.',
+        ],
+      ),
+    ),
     kept('f3', 'lecture_notes', 1, 'Week 1 notes', 'Week_1_notes.pdf', 88_204, 2),
     kept('f4', 'slides', 2, 'Lecture 02 Supply and demand', 'Lecture_02_Supply_and_demand.pptx', 9_870_552, 3),
     kept('f5', 'slides', null, 'Review session before the midterm', 'Review_session.pptx', 3_118_004, 4),
@@ -160,6 +186,16 @@ export const educationFiles: Record<string, CourseFile[]> = {
       'Mankiw_ch4.pdf',
       2_480_916,
       5,
+      summarised(
+        'A market brings buyers and sellers of one good together, and in a competitive market no single one of them sets the price. Demand falls as the price rises and supply rises with it, and the price settles where the quantity buyers want meets the quantity sellers offer. A shift in either curve, from tastes, incomes, input costs or the number of sellers, moves that price and quantity to a new equilibrium.',
+        [
+          'The law of demand: other things equal, the quantity demanded falls when the price rises.',
+          'The law of supply: other things equal, the quantity supplied rises when the price rises.',
+          'Market demand and supply are the sums of every buyer and seller at each price.',
+          'At equilibrium the quantity demanded equals the quantity supplied; a surplus or a shortage pushes the price back toward it.',
+          'A change in the price moves along a curve, while a change in anything else shifts the whole curve.',
+        ],
+      ),
     ),
     kept('f7', 'reading', null, 'Hayek, The use of knowledge in society', 'Hayek_1945.pdf', 1_204_448, 6),
   ],
@@ -190,4 +226,73 @@ export const educationUploading: ChosenFile[] = [
     problem: 'The connection dropped. Try again.',
   }),
   chosen(4, 'Krugman, The age of diminished expectations, chapter 2.pdf', 3_402_118, 'reading', '3'),
+];
+
+function slot(week: number, title: string | null, extra: Partial<CourseWeek> = {}): CourseWeek {
+  return { id: `w${week}`, course_id: 'c3', week, title, edited_at: null, removed_at: null, ...extra };
+}
+
+/**
+ * ECON 101's weeks as Dash laid them out from its syllabus (plan #2401.6):
+ * the first two hold files, three to seven are empty slots, week 4's topic
+ * was edited by hand, week 5 was removed, and week 7 has the longest topic.
+ */
+export const educationWeeks: Record<string, CourseWeek[]> = {
+  c3: [
+    slot(1, 'Scarcity and choice'),
+    slot(2, 'Supply and demand'),
+    slot(3, 'Elasticity'),
+    slot(4, 'Consumer choice and utility', { edited_at: '2026-10-18T11:00:00Z' }),
+    slot(5, 'Midterm', { removed_at: '2026-10-18T11:00:00Z' }),
+    slot(6, null),
+    slot(7, 'Market structures: perfect competition, monopoly, oligopoly and monopolistic competition'),
+  ],
+};
+
+/**
+ * What ECON 101 was about, as Dash pulled it together from its two read
+ * files (plan #2401.7): a paragraph and three ideas that came back, the last
+ * the longest.
+ */
+export const educationOverviews: Record<string, CourseOverview> = {
+  c3: {
+    about:
+      'An introduction to how people and markets decide what to make and who gets it when there is not enough of everything. It starts from scarcity and the cost of each choice, then builds the supply and demand model and uses it to explain how prices form and why they move.',
+    recurring: [
+      { idea: 'Every choice has a cost: the best alternative given up.', file_ids: ['f2', 'f6'] },
+      { idea: 'People respond to incentives, so a change in a price changes what they do.', file_ids: ['f2', 'f6'] },
+      {
+        idea: 'A market price is set by no one in particular; it settles where what buyers want meets what sellers offer, and moves when anything behind either side changes.',
+        file_ids: ['f2', 'f6'],
+      },
+    ],
+    file_ids: ['f2', 'f6'],
+    model: HAIKU,
+    read_at: '2026-10-18T11:30:00Z',
+  },
+};
+
+/** The person's own vault notes that name ECON 101, the second with a long title. */
+export const educationNotes: Record<string, CourseNote[]> = {
+  c3: [
+    {
+      id: 'n1',
+      path: 'School/ECON 101 - Principles of Economics.md',
+      title: 'ECON 101 - Principles of Economics',
+      excerpt: 'Took ECON 101 with Professor Dittmar in winter 2018. The supply and demand week finally made the housing market make sense to me…',
+    },
+    {
+      id: 'n2',
+      path: 'Journal/2018-02-14 Why I keep thinking about opportunity cost when choosing what to read next.md',
+      title: 'Why I keep thinking about opportunity cost when choosing what to read next',
+      excerpt: '…the idea from ECON 101 that the real cost is the next best thing you give up has stuck with me longer than anything else from that year…',
+    },
+    { id: 'n3', path: 'School/Winter 2018 courses.md', title: 'Winter 2018 courses', excerpt: '…ECON101, STATS 250, ENGLISH 125…' },
+  ],
+};
+
+/** The add drawer on a course with weeks laid out: two files, each with its week picked by name. */
+export const educationChosenWeeks: ChosenFile[] = [
+  chosen(0, 'Lecture_03_Elasticity.pptx', 7_204_118, 'slides', '3'),
+  chosen(1, 'Krugman, The age of diminished expectations, chapter 2.pdf', 3_402_118, 'reading', '7'),
 ];

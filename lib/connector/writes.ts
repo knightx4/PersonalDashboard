@@ -805,7 +805,7 @@ const addIdea = sharedWrite(
 
 const addJobLead = sharedWrite(
   'add_job_lead',
-  'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. It is listed on Home with an Undo.',
+  'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. When they say the company is a target (or interested, backup or passed), pass company_priority and the company is marked so; for a job already saved, mark its company with change_company. It is listed on Home with an Undo.',
 );
 
 const addInterviewRound = sharedWrite(

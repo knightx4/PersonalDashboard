@@ -12,11 +12,14 @@ import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
+import { runInsightsTick } from '@/inngest/you/insights-tick';
 import { runScopeDays } from '@/inngest/goals/scope-days';
 import { runBriefWatch } from '@/inngest/learn/brief-watch';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
 import { runLitTopicPullsDaily } from '@/inngest/learn/lit-topic-pulls';
 import { runPreparationsDaily } from '@/inngest/learn/prepare';
+import { runFigureNeedStepsDaily } from '@/inngest/learn/figure-need-steps';
+import { runFigureBackfillDaily } from '@/inngest/learn/figure-backfill';
 import { runXReadsForAll } from '@/inngest/x/read';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
@@ -84,6 +87,9 @@ export async function GET(request: NextRequest) {
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
+    // Weekly, and sooner after a rejection, an offer or a goal done; a few
+    // reads and one request (plan #2413.6).
+    { name: 'insights', run: () => runInsightsTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },
@@ -109,6 +115,12 @@ export async function GET(request: NextRequest) {
     // Subjects whose preparation stopped short (plan #2276.1). Each is started
     // in a function of its own, so this stage costs a few requests.
     { name: 'learn-preparations', run: () => runPreparationsDaily(origin) },
+    // Figures two lessons asked for, or one in a subject with a goal, become
+    // a plan step for the overnight run (plan #2321.10). A few reads.
+    { name: 'learn-figure-need-steps', run: () => runFigureNeedStepsDaily() },
+    // Lessons that asked for a figure whose step is now built get it in place
+    // of the wanted block (plan #2321.11). At most ten blocks, one call each.
+    { name: 'learn-figure-backfill', run: () => runFigureBackfillDaily() },
   ];
 
   const results: Record<string, unknown> = {};

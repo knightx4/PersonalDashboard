@@ -13,7 +13,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
-import { YouTabEmpty } from '@/app/you/you-tabs';
+import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -127,6 +127,8 @@ import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
+import { CompaniesPage } from '@/components/jobs/companies/companies-page';
+import type { CompanyRow } from '@/lib/jobs/companies-view';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
@@ -260,6 +262,12 @@ import {
   LearnEssayInterviewSurface,
   LearnEssayNotesMapSurface,
   LearnEssayDraftFromNotesSurface,
+  LearnEssayMergeEmptySurface,
+  LearnEssayMergeErrorSurface,
+  LearnEssayMergeLoadingSurface,
+  LearnEssayMergePreviewSurface,
+  LearnEssayMergeSavingSurface,
+  LearnEssayMergeSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
   LearnSubjectPlanSurface,
@@ -275,6 +283,8 @@ import {
   LearnSubjectPrepareFinishedSurface,
   LearnSubjectPrepareSourcesEmptySurface,
   LearnSubjectPrepareSourcesFoldedSurface,
+  LearnSubjectSourcesUnbuiltSurface,
+  LearnSubjectSourcesUnbuiltNoneSurface,
   LearnSubjectPrepareStartingSurface,
   LearnSubjectPrepareStartSurface,
   LearnSubjectPrepareStartPendingSurface,
@@ -301,9 +311,13 @@ import {
 } from './brief-surfaces';
 import {
   educationChosen,
+  educationChosenWeeks,
   educationCounts,
   educationExplains,
   educationFiles,
+  educationNotes,
+  educationOverviews,
+  educationWeeks,
   educationGroups,
   educationUploading,
 } from './education-fixtures';
@@ -321,12 +335,21 @@ import {
 } from './todays-piece-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
-import { SubjectPresses, subjectDescription } from '@/app/learn/s/[id]/header';
+import {
+  LearnArchivedEmptyPreview,
+  LearnArchivedErrorPreview,
+  LearnArchivedLoadingPreview,
+  LearnArchivedPreview,
+  LearnSubjectArchivedPreview,
+  LearnSubjectHeaderPreview,
+  LearnSubjectsHeaderPreview,
+} from './learn-archive-surfaces';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
@@ -383,6 +406,8 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashStepNotifyErrorSurface,
+  GoalDashStepSurface,
   GoalOpenedSurface,
   GoalStepSurface,
   GoalSubStepSurface,
@@ -431,6 +456,7 @@ import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import {
   GoalMetricPropsEmptySurface,
   GoalMetricPropsErrorSurface,
+  GoalMetricPropsFormStepsSurface,
   GoalMetricPropsFormSurface,
   GoalMetricPropsMenuSurface,
   GoalMetricPropsPendingSurface,
@@ -532,6 +558,7 @@ import { RunLinesSurface } from './run-lines-surfaces';
 import { PlanRunSurface } from './plan-run-surfaces';
 import {
   AccountSurface,
+  FinishNoticeSurface,
   DevBugsSurface,
   DevChangelogSurface,
   DevChangelogScreensSurface,
@@ -679,9 +706,11 @@ const rolePanels: PanelProps = {
   applicationId: 'app-1',
   status: 'in_process',
   jdText:
-    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
+    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.\n- 4-8 years of experience building research or trading systems\n- 2+ years in a systematic fund or a quantitative startup',
   jdLookupNote: null,
+  jdLookupAt: '2026-10-01T08:00:00Z',
   jdUrl: 'https://example.com/jobs/quant-dev',
+  location: 'London, hybrid three days a week',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,
@@ -859,6 +888,77 @@ const pipelineRow = (
   coverage: { covered: 0, total: 0, gaps: 0, rate: null },
   ...row,
 });
+
+/* The Companies table (plan #2341.3): ten companies, one with a name as long
+ * as real ones get, several without a domain or a role. */
+function companyFixture(
+  slug: string,
+  name: string,
+  priority: string,
+  status: string,
+  domains: string[],
+  roles: number,
+  hq: string | null = null,
+): CompanyRow {
+  return {
+    id: `co-${slug}`,
+    name,
+    slug,
+    priority,
+    status,
+    industry: null,
+    hq_location: hq,
+    domains,
+    website: null,
+    careers_url: null,
+    logo_url: null,
+    ats_type: 'unknown',
+    ats_board_token: null,
+    perspective_updated_at: null,
+    roles: Array.from({ length: roles }, (_, i) => ({
+      id: `${slug}-r${i}`,
+      applications: [{ status: status === 'active' ? 'in_process' : status === 'closed_out' ? 'rejected' : 'lead' }],
+    })),
+  };
+}
+
+const companyRows: CompanyRow[] = [
+  companyFixture('ledgerline', 'Ledgerline', 'target', 'active', ['ledgerline.io'], 2, 'London'),
+  companyFixture('halcyon', 'Halcyon Health', 'target', 'no_activity', ['halcyonhealth.com'], 1, 'Boston'),
+  {
+    // The focused view's company (plan #2341.4): every fact filled and four
+    // of the six questions answered, one at the length real answers get.
+    ...companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+    industry: 'Data infrastructure',
+    website: 'https://northwind.ai',
+    careers_url: 'https://jobs.ashbyhq.com/northwind',
+    perspective_updated_at: '2026-10-02T09:00:00.000Z',
+    ...({
+      perspective_business:
+        'Sells a warehouse-native analytics layer to mid-market finance teams, priced per seat with a usage tier on top. Most revenue is annual contracts.',
+      perspective_why_now:
+        'Raised a Series B in August and is hiring its first FP&A lead; the CFO said on a podcast that forecasting is still a spreadsheet.',
+      perspective_problem:
+        'Moving from founder-led pricing to a model that survives usage growth, and building the first real board pack.',
+      perspective_next_move: 'Ask Priya for an introduction to the CFO before the role is posted.',
+    } as Record<string, string>),
+  } as CompanyRow,
+  companyFixture('fabrikam', 'Fabrikam', 'interested', 'closed_out', ['fabrikam.com'], 1, 'Seattle'),
+  companyFixture(
+    'international-consolidated',
+    'International Consolidated Logistics and Freight Holdings',
+    'backup',
+    'no_activity',
+    [],
+    0,
+    'Rotterdam',
+  ),
+  companyFixture('globex', 'Globex', 'backup', 'closed_out', ['globex.example'], 2),
+  companyFixture('initech', 'Initech', 'interested', 'no_activity', [], 0, 'Austin'),
+  companyFixture('contoso', 'Contoso', 'passed', 'closed_out', ['contoso.com'], 1, 'Redmond'),
+  companyFixture('tailspin', 'Tailspin Toys', 'interested', 'no_activity', ['tailspin.toys'], 0),
+  companyFixture('wingtip', 'Wingtip', 'backup', 'active', ['wingtip.dev'], 1, 'Berlin'),
+];
 
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
@@ -1533,7 +1633,7 @@ const roleFactsOrigins = factOriginFixtures({
   location: { origin: 'posting', certainty: 'firsthand' },
   work_mode: { origin: 'you', certainty: 'firsthand' },
   seniority: { origin: 'dash', certainty: 'guess' },
-  posting_status: { origin: 'unknown', certainty: null },
+  posting_status: { origin: 'posting', certainty: 'firsthand' },
 });
 
 const referrerFixtures: ReferrerOption[] = [
@@ -3187,6 +3287,37 @@ const guessedSummary: CostEstimate = {
   models: [HAIKU],
 };
 
+const guessedWeeks: CostEstimate = {
+  lowMicros: 10_000,
+  medianMicros: 20_000,
+  highMicros: 40_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU],
+};
+
+const guessedOverview: CostEstimate = {
+  lowMicros: 8_000,
+  medianMicros: 14_000,
+  highMicros: 25_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU],
+};
+
+/**
+ * What Summarise on a course file (plan #2401.4), laying out a syllabus's
+ * weeks (plan #2401.6) and pulling a course together (plan #2401.7) cost,
+ * for the files surfaces.
+ */
+const summariseCosts = {
+  'app/you/work/actions.ts#summariseCourseFileAction': guessedSummary,
+  'app/you/work/actions.ts#readSyllabusWeeksAction': guessedWeeks,
+  'app/you/work/actions.ts#collectCourseOverviewAction': guessedOverview,
+} as const;
+
 const perReading: CostEstimate = {
   lowMicros: 12_000,
   medianMicros: 18_000,
@@ -4120,8 +4251,8 @@ export const SURFACES: readonly Surface[] = [
     /* The role page's header and facts with an origin under each of the role's
      * own (plan #2343.3): pay from a recruiter's email with the message
      * linked, the location from the posting, the work mode typed by you, the
-     * seniority Dash guessed, a posting status saved before origins were kept
-     * (no label) and a company stage nobody has filled in. */
+     * seniority Dash guessed, the posting status from the posting and a company
+     * stage nobody has filled in (no label). */
     id: 'jobs-role-facts',
     label: 'Role · Facts and where they came from',
     module: 'jobs',
@@ -4221,6 +4352,72 @@ export const SURFACES: readonly Surface[] = [
         rows={pipelineRows}
         params={{ view: 'table', company: pipelineRows[0].companySlug }}
         openColumn="company"
+      />
+    ),
+  },
+  {
+    /* The Companies table (plan #2341.3): every column a menu of filters
+     * from its header, paged at 50, all of it in the address. */
+    id: 'jobs-companies-table',
+    label: 'Companies · Table',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompaniesPage companies={companyRows} params={{ view: 'table' }} />,
+  },
+  {
+    /* A text column's menu open: its sort, then the field that narrows by a
+     * typed value. Priority is filtered, so its header carries the mark. */
+    id: 'jobs-companies-table-column-menu',
+    label: 'Companies · Table · Column filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'interested' }} openColumn="name" />
+    ),
+  },
+  {
+    /* Filtered to nothing: the headers stay so a filter can be loosened, and
+     * the box under them clears every one. */
+    id: 'jobs-companies-table-empty',
+    label: 'Companies · Table · No rows match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'table', priority: 'passed', activity: 'active' }} />
+    ),
+  },
+  {
+    /* The focused view (plan #2341.4): one company in full, opened from its
+     * table row, with previous and next through the filtered, sorted list. */
+    id: 'jobs-companies-focus',
+    label: 'Companies · Focus',
+    module: 'jobs',
+    width: 'wide',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'northwind' }} />
+    ),
+  },
+  {
+    /* At the end of the list: Next goes grey, Previous still steps back. */
+    id: 'jobs-companies-focus-end',
+    label: 'Companies · Focus · Last company',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'wingtip' }} />
+    ),
+  },
+  {
+    /* Filtered to nothing: back to the table, or clear the filters. */
+    id: 'jobs-companies-focus-empty',
+    label: 'Companies · Focus · No companies match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage
+        companies={companyRows}
+        params={{ view: 'focus', priority: 'passed', activity: 'active' }}
       />
     ),
   },
@@ -4848,6 +5045,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalStepEditingSurface />,
+  },
+  {
+    /* A step Dash is doing on its own page (plan #2376.2): the switch for a
+     * phone message when Dash finishes it, turned on. */
+    id: 'goals-step-dash',
+    label: 'Goal · a Dash step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepSurface />,
+  },
+  {
+    /* That switch after a save that failed: off again, the reason beneath. */
+    id: 'goals-step-dash-notify-error',
+    label: 'Goal · the notify switch, save failed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashStepNotifyErrorSurface />,
   },
   {
     /* Closing a step on its own page (plan #1623): the goal's close ring
@@ -6004,13 +6218,16 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* A course opened to its files (plan #2401.2): the syllabus, then the lectures week by week, then the readings, each with its size. */
+    /* A course opened to its files (plan #2401.2): the syllabus, then each
+     * week with its lectures before its readings, then the files with no
+     * week. A summarised file shows two lines of its summary under it (plan
+     * #2401.5); the others offer Summarise. */
     id: 'you-work-files',
     label: 'Work & school · A course\'s files',
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6020,7 +6237,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3' }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6031,7 +6248,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6041,7 +6258,97 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', showRemove: 'f2', confirming: 'f4' }}
         />
-      </>
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* Summarise on course files (plan #2401.4): one deck mid-read with Dash
+     * at work on it, and one whose read failed, saying why under its row. */
+    id: 'you-work-files-summarise',
+    label: 'Work & school · Summarising a course file',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{
+            courseId: 'c3',
+            summarising: 'f4',
+            summariseErrors: {
+              f5: 'Its slides hold no words Dash can read. Slides made of pictures are read from a PDF: save the deck as a PDF and add that.',
+            },
+          }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A file's summary opened in place (plan #2401.5): the whole summary,
+     * its key points and Summarise again with its cost. */
+    id: 'you-work-files-summary',
+    label: 'Work & school · A course file\'s summary opened',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', summaryOpen: 'f6' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A course whose files Dash has not read yet: the line saying so above
+     * the weeks, and Summarise on every row (plan #2401.5). */
+    id: 'you-work-files-unread',
+    label: 'Work & school · A course with no file read',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={{ c3: educationFiles.c3.map((file) => ({ ...file, summary: null })) }}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* Summarise's cost hint open, as hover and focus open it (plan #2401.5),
+     * beside an unread file's press. */
+    id: 'you-work-files-cost',
+    label: 'Work & school · What summarising a file costs',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          filesOpen={{ courseId: 'c3', costOpen: 'f3' }}
+        />
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6071,7 +6378,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6081,7 +6388,7 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', adding: true, chosen: educationChosen }}
         />
-      </>
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6091,7 +6398,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => (
-      <>
+      <PaidCostsProvider costs={summariseCosts}>
         <PageHeader title="Work & school" />
         <EducationSection
           groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
@@ -6101,7 +6408,193 @@ export const SURFACES: readonly Surface[] = [
           files={educationFiles}
           filesOpen={{ courseId: 'c3', adding: true, chosen: educationUploading, uploading: true }}
         />
-      </>
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A course's weeks laid out from its syllabus (plan #2401.6): each week
+     * with its topic, the empty ones saying nothing is kept for them yet, a
+     * week with a long topic, and Read the weeks again under the syllabus. */
+    id: 'you-work-files-weeks',
+    label: 'Work & school · A course\'s weeks from its syllabus',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A week's Edit opened (plan #2401.6): its topic in a field, Save,
+     * Cancel and Remove week. */
+    id: 'you-work-files-week-edit',
+    label: 'Work & school · Editing a course week',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{ courseId: 'c3', editingWeek: 'w3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The add drawer on a course whose weeks are laid out (plan #2401.6):
+     * each file's week picked by name, and a read of the syllabus that
+     * failed, saying why under its press. */
+    id: 'you-work-files-weeks-add',
+    label: 'Work & school · Adding files to a course\'s weeks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          filesOpen={{
+            courseId: 'c3',
+            adding: true,
+            chosen: educationChosenWeeks,
+            weeksError: 'Dash found no weeks in it. It lists the topics with no schedule.',
+          }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The block at the head of a course (plan #2401.7): what it was about
+     * and the ideas that came back, in Dash's words, how many files that
+     * was read from with the press to do it again, and the person's own
+     * notes naming the course. */
+    id: 'you-work-files-overview',
+    label: 'Work & school · What a course was about',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          weeks={educationWeeks}
+          overviews={educationOverviews}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* Two files read and nothing pulled together yet: the press with its
+     * cost hint open, as hover opens it, above the person's notes. */
+    id: 'you-work-files-overview-ready',
+    label: 'Work & school · Pulling a course together',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', overviewCostOpen: true }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* One file read: the block says how many more are needed. */
+    id: 'you-work-files-overview-empty',
+    label: 'Work & school · A course with one file read',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={{ c3: educationFiles.c3.map((file) => (file.id === 'f6' ? { ...file, summary: null } : file)) }}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3' }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* The course mid-read, with Dash at work on the press. */
+    id: 'you-work-files-overview-pending',
+    label: 'Work & school · A course being pulled together',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', collecting: true }}
+        />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    /* A second read that failed: the overview stays as it was and the
+     * reason shows in the block. */
+    id: 'you-work-files-overview-error',
+    label: 'Work & school · A course that could not be pulled together again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <PaidCostsProvider costs={summariseCosts}>
+        <PageHeader title="Work & school" />
+        <EducationSection
+          groups={educationGroups.filter((g) => g.school === 'University of Michigan')}
+          courseCounts={educationCounts}
+          transcripts={2}
+          courses={9}
+          files={educationFiles}
+          overviews={educationOverviews}
+          notes={educationNotes}
+          filesOpen={{ courseId: 'c3', overviewError: 'Reading is rate-limited right now. Try again in a minute.' }}
+        />
+      </PaidCostsProvider>
     ),
   },
   {
@@ -6592,21 +7085,59 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The top of a prepared subject's page with no claims behind it (plan
-     * #2307.1): lens progress as tested and inferred, and both presses. */
+     * #2307.1): lens progress as tested and inferred, and both presses, with
+     * Archive beside Delete subject (plan #2355.2). */
     id: 'learn-subject-header',
     label: 'Subject · Header of a prepared subject',
     module: 'learn',
     width: 'page',
-    render: () => (
-      <PageHeader
-        title="Urban economics and the economics of housing supply"
-        description={subjectDescription(
-          { tested: 12, inferred: 9, declared: 0, total: 46 },
-          { unknown: 0, shaky: 0, recognised: 0, known: 0, sharp: 0, misconception: 0, total: 0 },
-        )}
-        actions={<SubjectPresses id="s1" lensId="l1" owner />}
-      />
-    ),
+    render: () => <LearnSubjectHeaderPreview />,
+  },
+  {
+    /* An archived subject's page opens on a banner with Restore, and its
+     * header loses the Archive press (plan #2355.2). */
+    id: 'learn-subject-archived',
+    label: 'Subject · Archived, with Restore',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSubjectArchivedPreview />,
+  },
+  {
+    /* The Subjects list's header, with the Archived link (plan #2355.2). */
+    id: 'learn-subjects-header',
+    label: 'Subjects · Header, with Topics and Archived',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnSubjectsHeaderPreview />,
+  },
+  {
+    /* Archived subjects, newest first, each with Restore (plan #2355.2). */
+    id: 'learn-archived',
+    label: 'Archived subjects · The list',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedPreview />,
+  },
+  {
+    id: 'learn-archived-empty',
+    label: 'Archived subjects · Nothing archived',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedEmptyPreview />,
+  },
+  {
+    id: 'learn-archived-loading',
+    label: 'Archived subjects · Loading',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedLoadingPreview />,
+  },
+  {
+    id: 'learn-archived-error',
+    label: 'Archived subjects · A restore that failed',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnArchivedErrorPreview />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything
@@ -6681,6 +7212,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+  {
+    /* The account icon's menu (note 6d32355f): the way to the settings, then
+     * the theme, changed without leaving the page. Drawn open, hung from its
+     * icon at the right of the strip. */
+    id: 'shell-account-menu',
+    label: 'Top bar · Account menu',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      // The top bar's rule for its icon buttons, so the picture shows the
+      // theme controls as they are drawn inside the bar.
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
+        <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
+      </div>
+    ),
   },
   {
     /* Capture aimed at a kind (plan #1950.1), what an Add button on a list
@@ -7770,6 +8317,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsFormSurface />,
   },
   {
+    /* Adding one where no list has a date: on Steps closed, no date asked (plan #2397.3). */
+    id: 'goals-metrics-props-form-steps',
+    label: 'Goal · Metrics, adding one on steps',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormStepsSurface />,
+  },
+  {
     /* A metric's row pointed at, its Change and Remove menu showing. */
     id: 'goals-metrics-props-menu',
     label: 'Goal · Metrics, a row’s menu',
@@ -7778,9 +8333,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsMenuSurface />,
   },
   {
-    /* No list on the goal has a date to count by. */
+    /* No metric yet on a goal with no list: what can be counted. */
     id: 'goals-metrics-props-empty',
-    label: 'Goal · Metrics, nothing to count',
+    label: 'Goal · Metrics, none yet',
     module: 'goals',
     width: 'narrow',
     render: () => <GoalMetricPropsEmptySurface />,
@@ -7794,7 +8349,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricPropsPendingSurface />,
   },
   {
-    /* A change refused, its message beside the field. */
+    /* A change to a steps metric refused, its message beside the aim. */
     id: 'goals-metrics-props-error',
     label: 'Goal · Metrics, a change refused',
     module: 'goals',
@@ -7917,11 +8472,94 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Insights (plan #2413.5): one insight at a time on the deck, claim,
+     * layers and folded evidence, with Right, Not quite and Wrong in the
+     * forward row and two marked cards under Earlier. */
     id: 'you-insights',
+    label: 'You · Insights, three waiting',
+    module: 'you',
+    width: 'page',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] [data-insight-claim]',
+      direction: 'left',
+      shows: 'The insight follows the finger left, then the next one comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-evidence',
+    label: 'You · Insights, evidence open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ evidence: true }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-why',
+    label: 'You · Insights, Not quite pressed with its line of why',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ why: 'not_quite' }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-earlier',
+    label: 'You · Insights, Earlier open with your marks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ earlier: true }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-running',
+    label: 'You · Insights, a run going in place of Look again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-failed',
+    label: 'You · Insights, the last run failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-insights-empty',
     label: 'You · Insights, before Dash has noticed anything',
     module: 'you',
     width: 'page',
-    render: () => <YouTabEmpty tab="insights" />,
+    render: () => <YouInsightsPreview empty />,
+  },
+  {
+    id: 'you-insights-loading',
+    label: 'You · Insights, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouInsightsLoadingPreview />,
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
@@ -8839,6 +9477,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AccountSurface tab="notifications" />,
   },
   {
+    /* The switch for Dash's finished-work notification, under the morning brief (plan #2389.4). */
+    id: 'account-notifications-finish',
+    label: 'Account · Tell me when Dash has finished',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface />,
+  },
+  {
+    /* The same switch before its row is read: disabled (plan #2389.4). */
+    id: 'account-notifications-finish-loading',
+    label: 'Account · Tell me when Dash has finished, loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface loading />,
+  },
+  {
+    /* A save that failed: the message, and the switch back where it was (plan #2389.4). */
+    id: 'account-notifications-finish-error',
+    label: 'Account · Tell me when Dash has finished, save failed',
+    module: 'dev',
+    width: 'page',
+    render: () => <FinishNoticeSurface enabled error="Could not turn off “Tell me when Dash has finished”. It is still on. Try again." />,
+  },
+  {
     /* The workspaces and the one list of settings links, with Timeline and Model spend (plan #1743). */
     id: 'account-workspaces',
     label: 'Account · Workspaces and settings links',
@@ -9514,6 +10176,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="chart" />,
   },
   {
+    /* A lesson that asked for a figure the app cannot draw yet (plan #2321.9). */
+    id: 'learn-figure-wanted',
+    label: 'Plan · A lesson whose figure is not built yet',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="wanted" />,
+  },
+  {
     id: 'learn-figure-chart-missing',
     label: 'Plan · A lesson whose chart’s series was not found',
     module: 'learn',
@@ -9826,6 +10496,48 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnEssayDraftFromNotesSurface />,
   },
   {
+    id: 'learn-essay-merge',
+    label: 'Essay · Merge with a vault note, searching the vault',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergeSurface />,
+  },
+  {
+    id: 'learn-essay-merge-empty',
+    label: 'Essay · Merge with a vault note, no notes match',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergeEmptySurface />,
+  },
+  {
+    id: 'learn-essay-merge-loading',
+    label: 'Essay · Merge with a vault note, searching',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergeLoadingSurface />,
+  },
+  {
+    id: 'learn-essay-merge-preview',
+    label: 'Essay · Merge with a vault note, what will be added',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergePreviewSurface />,
+  },
+  {
+    id: 'learn-essay-merge-saving',
+    label: 'Essay · Merge with a vault note, adding',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergeSavingSurface />,
+  },
+  {
+    id: 'learn-essay-merge-error',
+    label: 'Essay · Merge into the vault note, refused',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMergeErrorSurface />,
+  },
+  {
     id: 'learn-plan-finished',
     label: 'Subject · A finished plan, ready to write about',
     module: 'learn',
@@ -9908,6 +10620,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Figures the subject's lessons asked for and the app cannot draw (plan #2321.12). */
+    id: 'learn-subject-sources-unbuilt',
+    label: 'Subject · Sources listing the figures its lessons asked for',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltSurface />,
+  },
+  {
+    id: 'learn-subject-sources-unbuilt-none',
+    label: 'Subject · Sources with no figures outstanding',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltNoneSurface />,
   },
   {
     /* Add a source (plan #2307.4): the press closed under Sources, with a
