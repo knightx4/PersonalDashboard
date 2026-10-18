@@ -140,8 +140,8 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
-  // Approved as soon as it is kept when every row cites a source (plan
-  // #2356.2); the draft stays if approving fails, and its page still has Approve.
+  // Approved as soon as it is kept (plan #2356.2), uncited rows marked
+  // personal; the draft stays if approving fails, and its page still has Approve.
   const approval = await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) => {
     console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error);
     return null;

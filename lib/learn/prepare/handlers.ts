@@ -19,8 +19,8 @@ import { findStoredUnits, liveStoredUnitPorts } from '@/lib/learn/levels/stored-
 import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { CURRICULUM_MODEL, writeCurriculum } from '@/lib/learn/graph/curriculum';
-import { approveCitedDrafts } from '@/lib/learn/levels/store';
-import { draftTopicsStep, writeUnitsStep, type KeptDraft, type SubjectUnit } from './draft-steps';
+import { approveDrafts } from '@/lib/learn/levels/store';
+import { draftTopicsStep, writeUnitsStep, type SubjectUnit } from './draft-steps';
 import { compileStep, compileTerritory, FRAMES_OFFERED, type CompileDocument } from './compile-territory';
 import { finishPreparationStep } from './finish-step';
 import { addedSourceItems, addedSourceWeeks } from './add-source-run';
@@ -322,24 +322,17 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
       const asks = topics.map((t) => t.ask);
       const { data, error } = await learn
         .from('topics')
-        .select('id, asked, name, status')
+        .select('id, status')
         .eq('user_id', userId)
         .in('asked', asks);
       if (error) throw new Error(`Reading the drafted topics failed: ${error.message}`);
-      const rows = (data ?? []) as { id: string; asked: string; name: string; status: string }[];
-      const drafts = rows.filter((r) => r.status === 'draft');
-      const settled = await approveCitedDrafts(
+      const rows = (data ?? []) as { id: string; status: string }[];
+      // Every draft is approved, its uncited rows marked personal (plan #2356.6), so none is kept.
+      const settled = await approveDrafts(
         learn,
-        drafts.map((r) => r.id),
+        rows.filter((r) => r.status === 'draft').map((r) => r.id),
       );
-      const byId = new Map(drafts.map((r) => [r.id, r]));
-      const kept: KeptDraft[] = settled.kept.flatMap(({ id, uncited }) => {
-        const row = byId.get(id);
-        return row
-          ? [{ ask: row.asked, name: row.name, reason: `${uncited} ${uncited === 1 ? 'row cites' : 'rows cite'} no source` }]
-          : [];
-      });
-      return { approved: rows.filter((r) => r.status === 'approved').length + settled.approved.length, kept };
+      return { approved: rows.filter((r) => r.status === 'approved').length + settled.length, kept: [] };
     },
   });
 

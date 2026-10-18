@@ -515,37 +515,35 @@ export async function approveDraft(
   return { rewritten };
 }
 
-/** A draft left as a draft because some of its rows cite no source. */
-export type KeptUncitedDraft = { id: string; uncited: number };
+/** A topic Dash approved as drafted, with how many of its rows it marked personal. */
+export type ApprovedDraft = { id: string; personal: number };
 
 /**
- * Approve each of these topics that is still a draft and cites a source on
- * every row, with its checks as drafted (plan #2356.2). Every drafting path
- * calls this once its draft is kept, so no topic waits for the person to press
- * Approve. A draft with an uncited row stays a draft and comes back in `kept`
- * with how many rows cite nothing; a topic that is no longer a draft is passed
- * over. Ids are read one at a time, in the order given.
+ * Approve each of these topics that is still a draft, with its checks as
+ * drafted (plan #2356.2). Every drafting path calls this once its draft is
+ * kept, so no topic waits for the person to press Approve. A row that cites
+ * no source is marked personal first, as #2356.1 decided, so the approval
+ * trigger has nothing to refuse; the topic's page shows the mark and the
+ * person can cite or edit the row later. A topic that is no longer a draft is
+ * passed over. Ids are read one at a time, in the order given.
  */
-export async function approveCitedDrafts(
-  client: Client,
-  topicIds: readonly string[],
-): Promise<{ approved: string[]; kept: KeptUncitedDraft[] }> {
-  const approved: string[] = [];
-  const kept: KeptUncitedDraft[] = [];
+export async function approveDrafts(client: Client, topicIds: readonly string[]): Promise<ApprovedDraft[]> {
+  const approved: ApprovedDraft[] = [];
   for (const id of topicIds) {
     const { data: topic, error } = await client.from('topics').select('status').eq('id', id).maybeSingle();
     if (error) throw new Error(`Reading the draft failed: ${error.message}`);
     if (!topic || topic.status !== 'draft') continue;
-    const uncited = await uncitedRows(client, id);
-    if (uncited > 0) {
-      kept.push({ id, uncited });
-      continue;
+    const uncited = await uncitedRowIds(client, id);
+    let personal = 0;
+    for (const kind of Object.keys(uncited) as CitedRowKind[]) {
+      await markPersonal(client, kind, uncited[kind], true);
+      personal += uncited[kind].length;
     }
     // The drafted checks stay as they are: an empty map rewrites nothing.
     await approveDraft(client, id, new Map());
-    approved.push(id);
+    approved.push({ id, personal });
   }
-  return { approved, kept };
+  return approved;
 }
 
 /**
@@ -555,6 +553,12 @@ export async function approveCitedDrafts(
  * the same rule for every writer.
  */
 export async function uncitedRows(client: Client, topicId: string): Promise<number> {
+  const ids = await uncitedRowIds(client, topicId);
+  return ids.topic.length + ids.cell.length + ids.link.length;
+}
+
+/** The rows `uncitedRows` counts, by kind, so they can be marked personal. */
+export async function uncitedRowIds(client: Client, topicId: string): Promise<Record<CitedRowKind, string[]>> {
   const { data: topic, error } = await client
     .from('topics')
     .select('ceiling, source, canonicality')
@@ -566,15 +570,13 @@ export async function uncitedRows(client: Client, topicId: string): Promise<numb
     .select('id, level, source, canonicality')
     .eq('topic_id', topicId);
   if (cellsError) throw new Error(`Reading the draft's levels failed: ${cellsError.message}`);
-  type Cited = { source: string | null; canonicality: string | null };
-  const inside = ((cells ?? []) as ({ id: string; level: number } & Cited)[]).filter(
-    (c) => c.level <= (topic.ceiling as number),
-  );
+  type Cited = { id: string; source: string | null; canonicality: string | null };
+  const inside = ((cells ?? []) as (Cited & { level: number })[]).filter((c) => c.level <= (topic.ceiling as number));
   let links: Cited[] = [];
   if (inside.length > 0) {
     const { data, error: linksError } = await client
       .from('cell_links')
-      .select('source, canonicality')
+      .select('id, source, canonicality')
       .in(
         'requiring_cell_id',
         inside.map((c) => c.id),
@@ -582,7 +584,12 @@ export async function uncitedRows(client: Client, topicId: string): Promise<numb
     if (linksError) throw new Error(`Reading the draft's links failed: ${linksError.message}`);
     links = (data ?? []) as Cited[];
   }
-  return [topic as Cited, ...inside, ...links].filter((row) => isUncited(citationOf(row))).length;
+  const uncited = (rows: Cited[]) => rows.filter((row) => isUncited(citationOf(row))).map((row) => row.id);
+  return {
+    topic: isUncited(citationOf(topic as Omit<Cited, 'id'>)) ? [topicId] : [],
+    cell: uncited(inside),
+    link: uncited(links),
+  };
 }
 
 /** Which row of a draft a personal mark is for. */
