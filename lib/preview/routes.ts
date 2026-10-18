@@ -550,6 +550,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-piece-held': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-table': ['/learn/s/[id]/p/[piece]'],
   'learn-figure-compare': ['/learn/s/[id]/p/[piece]'],
+  'learn-figure-source_figure': ['/learn/s/[id]/p/[piece]'],
   'learn-probe': ['/learn/s/[id]/probe'],
   'learn-videos': ['/learn/videos'],
   'learn-video': ['/learn/videos/[videoId]'],

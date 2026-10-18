@@ -336,6 +336,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
+    { table: 'learn.catalogue_figures', reason: 'Images found on the pages of a pulled course, in the shared catalogue, not theirs.' },
     { table: 'learn.catalogue_items', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_judgements', reason: 'Model judgements on catalogue items.' },
     { table: 'learn.catalogue_links', reason: 'Model links from catalogue items to concepts.' },

@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type postgres from 'postgres';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { storeCatalogueFigures } from '@/lib/learn/catalogue/figures';
 import { storeStructureMaterial } from '@/lib/learn/catalogue/structure-material';
 import { storeStructure } from '@/lib/learn/catalogue/structure-store';
 import type { GoalToClassify } from '@/lib/learn/goal-kind';
@@ -156,6 +157,7 @@ export function livePorts(sql: postgres.Sql, onRefused?: OcwStructureRefused): O
         providerSlug: OCW_PROVIDER_SLUG,
         material: structure.material,
       });
+      await storeCatalogueFigures(sql, stored.itemId, structure.figures);
       return { itemId: stored.itemId, unchanged: stored.unchanged, material: material.written };
     },
   };

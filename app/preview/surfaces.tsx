@@ -9049,6 +9049,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="compare" />,
   },
   {
+    id: 'learn-figure-source_figure',
+    label: 'Plan · A lesson with a course figure',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="source_figure" />,
+  },
+  {
     id: 'learn-probe',
     label: 'Subject · Questions, before the first',
     module: 'learn',

@@ -9,6 +9,8 @@ import type { LessonSource } from './closest-source';
 import { MODELS } from '@/lib/core/models';
 import { MAX_FIGURES_PER_LESSON, figureKindIds, figureWriterLines, readWrittenFigures } from '@/lib/learn/figures/registry';
 import type { FigureBlock } from '@/lib/learn/figures/types';
+import type { OfferedFigure } from '@/lib/learn/catalogue/figures';
+import { resolveSourceFigures } from '@/lib/learn/figures/kinds/source-figure';
 
 /**
  * Writing the lesson for one concept in a track (LEARN-LESSONS-SPEC, "A
@@ -75,6 +77,8 @@ export type LessonToWrite = {
   prerequisites?: string[];
   /** The closest catalogue section, from `findLessonSource`, or null. */
   source: LessonSource | null;
+  /** Stored figures of the source's course that may be shown (plan #2321.4); the only ones a source_figure may name. */
+  sourceFigures?: OfferedFigure[];
 };
 
 /** The source a lesson used, as the row stores it. */
@@ -210,7 +214,7 @@ function badPart(label: string, value: string, cap: number): string | null {
  * model did not vouch for. A contradiction drops the lesson before its parts
  * are read, since it is not served whatever they say.
  */
-export function readLessonReport(input: unknown, hasSource: boolean): LessonReport {
+export function readLessonReport(input: unknown, hasSource: boolean, offered: readonly OfferedFigure[] = []): LessonReport {
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) {
     const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
@@ -270,7 +274,7 @@ export function readLessonReport(input: unknown, hasSource: boolean): LessonRepo
       question: asked ? question : null,
       answer: asked ? answer : null,
     },
-    figures: readWrittenFigures(data.figures),
+    figures: readWrittenFigures(resolveSourceFigures(data.figures, offered)),
     source: sourceVerdict ? { verdict: sourceVerdict, note } : null,
   };
 }
@@ -309,6 +313,12 @@ export function lessonPrompt(lesson: LessonToWrite): string {
           '<source>',
           cut ? text.slice(0, MAX_SOURCE_CHARS) : text,
           '</source>',
+          ...((lesson.sourceFigures ?? []).length > 0
+            ? [
+                'Figures from the course (name one with a source_figure only if it shows what the lesson says):',
+                ...(lesson.sourceFigures ?? []).map((figure) => `- ${figure.id}: ${clean(figure.altText)}`),
+              ]
+            : []),
         ]
           .filter(Boolean)
           .join('\n')
@@ -425,7 +435,7 @@ export async function writeLesson(input: {
   // every concept after it, back for good (note 727c77a2).
   if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
 
-  const report = readLessonReport(block.input, source !== null);
+  const report = readLessonReport(block.input, source !== null, prepared.sourceFigures ?? []);
   if (report.verdict === 'failed') return { outcome: 'failed', detail: report.reason };
   if (report.verdict === 'dropped') {
     return {
