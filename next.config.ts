@@ -50,11 +50,11 @@ const nextConfig: NextConfig = {
     // The memory sweep copies the specs into search by meaning (plan #1321),
     // and Ask Dash reads them in the app and over MCP (read_spec, find_dev_text).
     '/api/cron/memory-sweep': ['./docs/**/*.md'],
-    '/ask': ['./docs/**/*.md'],
-    '/ask/*': ['./docs/**/*.md'],
-    '/api/mcp': ['./docs/**/*.md'],
+    '/ask': ['./docs/**/*.md', './public/posts/*.png'],
+    '/ask/*': ['./docs/**/*.md', './public/posts/*.png'],
+    '/api/mcp': ['./docs/**/*.md', './public/posts/*.png'],
     // The sheet asks through this route, which streams the lookups (plan #1438).
-    '/api/ask': ['./docs/**/*.md'],
+    '/api/ask': ['./docs/**/*.md', './public/posts/*.png'],
     // A screen step's row shows the mockup registered for the screen, whose
     // pictures are kept under docs/references (plan #2215.10).
     '/dev/plan/reference': ['./docs/references/**/*.{png,jpg,jpeg,webp}'],
