@@ -1,4 +1,5 @@
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import { readTerritory, type Territory } from '@/lib/learn/levels/territory';
 import type {
   ClaimedPreparation,
@@ -190,7 +191,10 @@ export async function unfinishedPreparations(
     .order('created_at', { ascending: true })
     .limit(limit * 4);
   if (error) throw new Error(`Reading unfinished preparations failed: ${error.message}`);
+  // An archived subject's run waits where it is until the subject is restored (plan #2355.4).
+  const archived = await archivedSubjectIds(learn, userId);
   return ((data ?? []) as { subject_id: string; branch_key: string | null; status: string; failures: number }[])
+    .filter((r) => !archived.has(r.subject_id))
     .filter((r) => r.status !== 'failed' || r.failures < CRON_RETRIES)
     .slice(0, limit)
     .map((r) => ({ subjectId: r.subject_id, branch: r.branch_key }));
@@ -241,6 +245,8 @@ export async function loadPreparingSubjects(learn: LearnSupabaseClient, userId: 
       .from('subjects')
       .select('id, name, survey')
       .eq('user_id', userId)
+      // An archived subject is off Now, its preparation with it (plan #2355.4).
+      .is('archived_at', null)
       .in('id', runs.map((run) => run.subjectId)),
   ]);
   if (steps.error) throw new Error(`Reading the preparations' steps failed: ${steps.error.message}`);

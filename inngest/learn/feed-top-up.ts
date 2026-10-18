@@ -4,6 +4,7 @@ import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
   READY_BATCH,
@@ -377,7 +378,11 @@ async function topUpWith(
 
   const plans: PlanLayoutSummary | null = await layOutPlans(
     {
-      due: (id, limit) => loadPlanLayoutsDue(learn, id, limit),
+      // An archived subject's plan is not laid out (plan #2355.4).
+      due: async (id, limit) => {
+        const [due, archived] = await Promise.all([loadPlanLayoutsDue(learn, id, limit), archivedSubjectIds(learn, id)]);
+        return due.filter((one) => !archived.has(one.subjectId));
+      },
       layOut: lessonPorts.layOut,
       hold: lessonPorts.hold,
       now: Date.now,

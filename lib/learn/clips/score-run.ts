@@ -57,7 +57,13 @@ export function fingerprintOf(trackIds: readonly string[], goalIds: readonly str
  * so a person with nothing to score costs no profile load.
  */
 export async function profileFingerprint(learn: LearnSupabaseClient, userId: string): Promise<string> {
-  const subjects = await learn.from('subjects').select('id').eq('user_id', userId).eq('survey', false);
+  // Archived subjects are left out, as loadLearnerProfile leaves them (plan #2355.4).
+  const subjects = await learn
+    .from('subjects')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('survey', false)
+    .is('archived_at', null);
   if (subjects.error) throw new Error(`Reading your subjects failed: ${subjects.error.message}`);
   const goals = await learn
     .schema('goals')
