@@ -14,6 +14,7 @@ import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { Field, FieldError, Textarea, Input } from '@/components/ui/field';
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { experienceAsk, experienceRange } from '@/lib/jobs/jd/experience';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -281,6 +282,7 @@ function RoleDetailsCard({
   const [looking, startLooking] = useTransition();
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
+  const experience = experienceAsk(jdText);
 
   // The nightly pass walks six companies a night. A role you are looking at now
   // should not wait behind two hundred you are not, and the answer arrives in
@@ -367,6 +369,25 @@ function RoleDetailsCard({
                   {compSource && (
                     <span className="ml-1.5 text-small text-ink-muted">from the {compSource}</span>
                   )}
+                </>
+              ) : null
+            }
+          />
+          {/* Read from the description, so it has no field of its own to
+              edit: the range, then the lines it came from (note a7495ede). */}
+          <ValueRow
+            label="Experience"
+            value={
+              experience ? (
+                <>
+                  {experienceRange(experience)}
+                  <ul className="mt-1 space-y-0.5">
+                    {experience.lines.map((line) => (
+                      <li key={line} className="text-small text-ink-muted">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
                 </>
               ) : null
             }

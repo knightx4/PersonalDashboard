@@ -694,7 +694,7 @@ const rolePanels: PanelProps = {
   applicationId: 'app-1',
   status: 'in_process',
   jdText:
-    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
+    'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.\n- 4-8 years of experience building research or trading systems\n- 2+ years in a systematic fund or a quantitative startup',
   jdLookupNote: null,
   jdUrl: 'https://example.com/jobs/quant-dev',
   location: 'London, hybrid three days a week',
