@@ -159,6 +159,10 @@ vi.mock('@/inngest/dev/idea-scores', () => ({
   runIdeaScoreCatchUp: vi.fn(async () => [{ userId: 'u', scored: 3, failed: 0, left: 0 }]),
 }));
 
+vi.mock('@/inngest/you/insight-signals', () => ({
+  runInsightSignals: vi.fn(async () => ({ tripwiresChecked: 2, tripwiresFired: 1 })),
+}));
+
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
 const { runRecurringReread } = await import('@/inngest/cron/recurring-reread');
@@ -240,6 +244,10 @@ describe('the daily cron route', () => {
     // reads what is still going (plan #1002).
     expect(runGoalsQuietSweep).toHaveBeenCalled();
     expect(body.results['goals-quiet-runs']).toEqual({ closed: ['run-0'] });
+
+    // The insight numbers are counted every morning with no model call
+    // (plan #2413.7).
+    expect(body.results['insight-signals']).toEqual({ tripwiresChecked: 2, tripwiresFired: 1 });
 
     // Each open goal and feature gets its step counts for the day (plan #1836).
     expect(body.results['scope-days']).toEqual({ written: 23 });

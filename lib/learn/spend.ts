@@ -180,6 +180,10 @@ export const LEARN_OPERATIONS = [
   // call per note version that no folder rule decides, from the map sweep's
   // tick. Recorded against the note's owner.
   'tag-note-voice',
+  // Pulling the lines that say who the person is out of a private note (plan
+  // #2413.8): one Haiku call per private note version, from the map sweep's
+  // tick after the voice tagging. Recorded against the note's owner.
+  'extract-note-lines',
   // Maya's answer to a reply in one of its threads (plan #1286): one Sonnet
   // call that also rewrites where the person has got to. Recorded against the
   // thread's owner.
