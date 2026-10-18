@@ -1618,7 +1618,7 @@ const roleFactsOrigins = factOriginFixtures({
   location: { origin: 'posting', certainty: 'firsthand' },
   work_mode: { origin: 'you', certainty: 'firsthand' },
   seniority: { origin: 'dash', certainty: 'guess' },
-  posting_status: { origin: 'unknown', certainty: null },
+  posting_status: { origin: 'posting', certainty: 'firsthand' },
 });
 
 const referrerFixtures: ReferrerOption[] = [
@@ -4205,8 +4205,8 @@ export const SURFACES: readonly Surface[] = [
     /* The role page's header and facts with an origin under each of the role's
      * own (plan #2343.3): pay from a recruiter's email with the message
      * linked, the location from the posting, the work mode typed by you, the
-     * seniority Dash guessed, a posting status saved before origins were kept
-     * (no label) and a company stage nobody has filled in. */
+     * seniority Dash guessed, the posting status from the posting and a company
+     * stage nobody has filled in (no label). */
     id: 'jobs-role-facts',
     label: 'Role · Facts and where they came from',
     module: 'jobs',
