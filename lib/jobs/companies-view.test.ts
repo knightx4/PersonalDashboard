@@ -4,7 +4,10 @@ import {
   companiesHref,
   companyColumnFilters,
   filterCompanies,
+  focusHref,
+  focusIndex,
   hasColumnFilters,
+  tableHref,
   parseCompanies,
   type CompanyRow,
 } from './companies-view';
@@ -107,6 +110,40 @@ describe('companyColumnFilters', () => {
     });
     expect(filters.roles.choices.find((c) => c.id === 'roles-none')?.href).toBe(
       '/jobs/companies?priority=target&domain=acme&roles=none',
+    );
+  });
+});
+
+describe('the focused view (plan #2341.4)', () => {
+  it('reads focus from the address and falls back to the table', () => {
+    expect(parseCompanies({ view: 'focus' }).view).toBe('focus');
+    expect(parseCompanies({}).view).toBe('table');
+    expect(parseCompanies({ view: 'board' }).view).toBe('table');
+    expect(parseCompanies({ view: 'focus', company: 'acme' }).company).toBe('acme');
+    expect(parseCompanies({ company: '  ' }).company).toBeNull();
+  });
+
+  it('opens on a company with the filters and sort kept and the page dropped', () => {
+    expect(focusHref({ priority: 'target', sort: 'priority', page: '2' }, 'acme')).toBe(
+      '/jobs/companies?priority=target&sort=priority&view=focus&company=acme',
+    );
+    expect(tableHref({ view: 'focus', company: 'acme', priority: 'target' })).toBe(
+      '/jobs/companies?priority=target',
+    );
+  });
+
+  it('starts on the named company, or the first when it is filtered out', () => {
+    const list = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }];
+    expect(focusIndex(list, 'b')).toBe(1);
+    expect(focusIndex(list, 'gone')).toBe(0);
+    expect(focusIndex(list, null)).toBe(0);
+  });
+
+  it('leaves the focused company behind from a column menu', () => {
+    const params = { view: 'focus', company: 'acme' };
+    const filters = companyColumnFilters(params, parseCompanies(params), rows);
+    expect(filters.roles.choices.find((c) => c.id === 'roles-none')?.href).toBe(
+      '/jobs/companies?roles=none',
     );
   });
 });

@@ -1,4 +1,5 @@
-import { Building2 } from 'lucide-react';
+import { Building2, Table as TableIcon } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { AddCompany } from '@/app/jobs/(app)/companies/add-company';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -45,17 +46,22 @@ import {
   COMPANY_PRIORITIES,
   filterCompanies,
   filterNames,
+  focusHref,
   hasColumnFilters,
   isActiveCompany,
   parseCompanies,
+  tableHref,
   type CompaniesParams,
   type CompanyRow,
 } from '@/lib/jobs/companies-view';
+import { CompaniesFocus } from '@/components/jobs/companies/companies-focus';
 
 /**
  * The Companies page (plan #2341.3), apart from its loading so the gallery
  * can draw it with fixtures. The table is filtered from its column headers,
- * paged at 50 and kept in the address (lib/jobs/companies-view.ts).
+ * paged at 50 and kept in the address (lib/jobs/companies-view.ts). A row
+ * opens the focused view on that company (plan #2341.4), which steps through
+ * the same filtered rows in the table's order, every page of them.
  */
 export function CompaniesPage({
   companies,
@@ -115,7 +121,9 @@ export function CompaniesPage({
         ) || a.company.name.localeCompare(b.company.name),
     );
   const narrowed = hasColumnFilters(state);
+  const focus = state.view === 'focus';
   const showTargets =
+    !focus &&
     state.terms.length === 0 &&
     (!narrowed || (state.priority === 'target' && hasOnlyPriority(params)));
 
@@ -124,7 +132,8 @@ export function CompaniesPage({
   const listParams = withoutPage(params);
   const menu = listDisplayMenu(displaySpec, listParams, savedViews);
   const display = parseListDisplay(displaySpec, listParams);
-  const paged = pageOf(sortRows(filtered, display), state.page);
+  const sorted = sortRows(filtered, display);
+  const paged = pageOf(sorted, state.page);
   const sections = groupRows(paged.rows, display.groupBy);
   const filters = companyColumnFilters(params, state, companies);
   const count = companiesCount(state, filtered.length, companies.length, params.q);
@@ -137,6 +146,19 @@ export function CompaniesPage({
         title="Companies"
         actions={
           <>
+            {/* An icon, so the header keeps to one line on a phone. The view
+                switch takes its place (plan #2341.5). */}
+            {focus && (
+              <Tooltip label="Back to the table" align="end">
+                <Link
+                  href={tableHref(params)}
+                  aria-label="Back to the table"
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  <TableIcon className="size-4" strokeWidth={1.75} aria-hidden />
+                </Link>
+              </Tooltip>
+            )}
             <DisplayMenu menu={menu} />
             <AddCompany />
           </>
@@ -248,7 +270,7 @@ export function CompaniesPage({
         </LeftRail>
 
         <div className="min-w-0 flex-1">
-          {duplicates.length > 0 && (
+          {!focus && duplicates.length > 0 && (
             <Banner tone="warn" className="mb-4">
               <div className="space-y-1">
                 <p>
@@ -287,6 +309,14 @@ export function CompaniesPage({
 
           {searchedOut ? (
             <SearchEmpty query={params.q ?? ''} />
+          ) : focus ? (
+            <CompaniesFocus
+              // In the table's order: its groups, then its sort within each.
+              rows={groupRows(sorted, display.groupBy).flatMap((section) => section.rows)}
+              params={params}
+              state={state}
+              timezone={timezone}
+            />
           ) : filtered.length === 0 ? (
             // The header stays, so a filter can be loosened from its column.
             <Card className="overflow-hidden">
@@ -297,6 +327,7 @@ export function CompaniesPage({
                 hidden={display.hidden}
                 filters={filters}
                 openColumn={openColumn}
+                rowHref={(company) => focusHref(params, company.slug)}
               />
               <div className="border-border px-4 py-10 text-center md:border-t">
                 <p className="text-body font-medium text-ink">No rows match these filters</p>
@@ -326,6 +357,7 @@ export function CompaniesPage({
                           hidden={display.hidden}
                           filters={filters}
                           openColumn={section === sections[0] ? openColumn : undefined}
+                          rowHref={(company) => focusHref(params, company.slug)}
                         />
                       </Card>
                     </div>
@@ -429,8 +461,11 @@ function CompaniesTable({
   hidden,
   filters,
   openColumn,
+  rowHref,
 }: {
   rows: readonly CompanyRow[];
+  /** Where a row goes: the focused view on that company. */
+  rowHref: (company: CompanyRow) => string;
   /** The Display panel's sort links, so a header and the panel agree. */
   sorts: readonly DisplayChoice[];
   /** The sort the table opens on, whose header stays grey (law 17). */
@@ -446,7 +481,12 @@ function CompaniesTable({
        * facts on one grey line (law 9), as Pipeline's table does. */}
       <ul className="divide-y divide-border md:hidden">
         {rows.map((company) => (
-          <CompanyLine key={company.id} company={company} showing={showing} />
+          <CompanyLine
+            key={company.id}
+            company={company}
+            href={rowHref(company)}
+            showing={showing}
+          />
         ))}
       </ul>
       <div className="max-md:hidden">
@@ -476,7 +516,7 @@ function CompaniesTable({
           </THead>
           <TBody>
             {rows.map((company) => (
-              <TR key={company.id} href={`/jobs/companies/${company.slug}`}>
+              <TR key={company.id} href={rowHref(company)}>
                 <TD primary className="max-w-0">
                   <CompanyName company={company} location />
                 </TD>
@@ -513,9 +553,11 @@ function CompaniesTable({
 
 function CompanyLine({
   company,
+  href,
   showing,
 }: {
   company: CompanyRow;
+  href: string;
   showing: (id: string) => boolean;
 }) {
   const facts = [
@@ -529,10 +571,7 @@ function CompanyLine({
   return (
     <li>
       {/* The whole row is the link, so it is a full-height press target. */}
-      <RowLink
-        href={`/jobs/companies/${company.slug}`}
-        className="group block row-pad px-4 hover:bg-sunken"
-      >
+      <RowLink href={href} className="group block row-pad px-4 hover:bg-sunken">
         <span className="block text-ui font-medium text-ink group-hover:text-accent">
           <CompanyName company={company} location />
         </span>

@@ -41,6 +41,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-answers-letter-drafting': ['/jobs/roles/[id]'],
   'jobs-role-answers-letter-error': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
+  'jobs-role-facts': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
   'jobs-moment-forward': ['/jobs/pipeline'],
   'jobs-moment-offer': ['/jobs/pipeline'],
@@ -51,6 +52,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-companies-table': ['/jobs/companies'],
   'jobs-companies-table-column-menu': ['/jobs/companies'],
   'jobs-companies-table-empty': ['/jobs/companies'],
+  'jobs-companies-focus': ['/jobs/companies'],
+  'jobs-companies-focus-end': ['/jobs/companies'],
+  'jobs-companies-focus-empty': ['/jobs/companies'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
   'shopping-item-details-catalogue': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
@@ -443,6 +447,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-agenda-header': ['/todo'],
   'todo-agenda-rows': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
+  'todo-task-tags': ['/todo', '/todo/all'],
+  'todo-task-tags-picker': ['/todo', '/todo/all'],
+  'todo-task-tags-hover': ['/todo', '/todo/all'],
+  // The agenda narrowed to one tag, and a tag nothing carries (plan #2340.3).
+  'todo-agenda-tagged': ['/todo'],
+  'todo-agenda-tagged-more': ['/todo', '/todo/all'],
+  'todo-agenda-tagged-empty': ['/todo'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
   'home-arrival': ['/home'],
@@ -590,6 +601,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-story': ['/news/i/[id]/s/[index]'],
   'news-settings': ['/news/settings'],
   'todo-all': ['/todo/all'],
+  'todo-all-tagged': ['/todo/all'],
   'todo-settings': ['/todo/settings'],
   'todo-waiting': ['/todo/waiting'],
   'shopping-dashboard': ['/shopping/dashboard'],
@@ -677,6 +689,14 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'core-close-buttons': ['components/inbox/close-button.tsx'],
   // The agenda's borrowed rows (plan #1957.9), with the one Later menu.
   'todo-agenda-rows': ['components/todo/agenda-item-row.tsx'],
+  // Tags on a todo row (plan #2340.2), at rest, picking and pointed at.
+  'todo-task-tags': ['components/todo/task-tags.tsx'],
+  'todo-task-tags-picker': ['components/todo/task-tags.tsx'],
+  'todo-task-tags-hover': ['components/todo/task-tags.tsx'],
+  // The tag filter's chips and its empty list (plan #2340.3).
+  'todo-agenda-tagged': ['components/todo/tag-filter.tsx', 'components/todo/agenda-piles.tsx'],
+  'todo-agenda-tagged-more': ['components/todo/tag-filter.tsx'],
+  'todo-agenda-tagged-empty': ['components/todo/tag-filter.tsx'],
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],

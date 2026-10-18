@@ -6,8 +6,7 @@ import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
 import { chipVariants } from '@/components/ui/chip';
 import { PageHeader } from '@/components/shell/page-header';
-import { Property } from '@/components/shell/detail-layout';
-import { DetailFacts } from '@/components/patterns/list-detail';
+import { loadRoleFactOrigins, roleFactOrigins } from '@/lib/jobs/fact-origins';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { MoveLabel } from '@/components/ui/move-label';
@@ -62,6 +61,7 @@ import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
 import { ExcitementPicker } from './excitement-picker';
 import { ChannelPicker } from './channel-picker';
+import { HeaderFacts, RoleFacts } from './role-facts';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 import { PageColumn } from '@/components/shell/page-width';
 
@@ -103,7 +103,7 @@ export default async function RoleDetailPage({
       `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
-       companies!inner ( id, name, slug, ats_type, priority, logo_url, domains, website, careers_url )`,
+       companies!inner ( id, name, slug, stage, ats_type, priority, logo_url, domains, website, careers_url )`,
     )
     .eq('id', id)
     .eq('user_id', user.id)
@@ -115,6 +115,7 @@ export default async function RoleDetailPage({
     id: string;
     name: string;
     slug: string;
+    stage: string | null;
     ats_type: string;
     priority: string;
     logo_url: string | null;
@@ -173,6 +174,7 @@ export default async function RoleDetailPage({
     { data: allCompanies },
     { drafts: storedDrafts },
     { drafts: storedLetter },
+    factOrigins,
   ] = await Promise.all([
     supabase
       .from('application_events')
@@ -252,6 +254,9 @@ export default async function RoleDetailPage({
     loadDrafts(supabase, current.id as string, 'answers'),
     // The cover letter Dash drafted and its questions about it (plan #2135.2).
     loadDrafts(supabase, current.id as string, 'cover_letter'),
+    // Where each fact in the properties came from (plan #2343.3). A failed
+    // read shows the facts with no labels, as for a fact saved before origins.
+    loadRoleFactOrigins(supabase, id, company.id).catch(() => roleFactOrigins([])),
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -448,9 +453,14 @@ export default async function RoleDetailPage({
                   slug={company.slug}
                   companies={(allCompanies ?? []).map((row) => row.name as string)}
                 />
-                {role.location ? ` · ${role.location}` : ''}
-                {role.work_mode ? ` · ${role.work_mode}` : ''}
-                {role.seniority ? ` · ${role.seniority}` : ''}
+                <HeaderFacts
+                  facts={[
+                    ['location', (role.location as string | null) ?? null],
+                    ['work_mode', (role.work_mode as string | null) ?? null],
+                    ['seniority', (role.seniority as string | null) ?? null],
+                  ]}
+                  origins={factOrigins}
+                />
               </>
             }
             actions={
@@ -510,56 +520,40 @@ export default async function RoleDetailPage({
             </Banner>
           )}
         </>
-        <DetailFacts>
-          <Property
-            label="Applied"
-            value={formatDate(current.submitted_at as string | null, timezone)}
-          />
-          <Property
-            label="Confirmed"
-            value={formatDate(current.confirmation_received_at as string | null, timezone)}
-          />
-          <Property
-            label="First human reply"
-            value={formatDate(current.first_human_response_at as string | null, timezone)}
-            hint="Automated confirmations never set this."
-          />
-          <Property
-            label="Channel"
-            value={
-              <ChannelPicker
-                applicationId={current.id as string}
-                source={current.source as ApplicationSource}
-                referralContactId={(current.referral_contact_id as string | null) ?? null}
-                contacts={referrerOptions(contactRows ?? [])}
-              />
-            }
-          />
-          <Property
-            label="Comp band"
-            value={
-              formatCompBand(
-                role.comp_min_cents as number | null,
-                role.comp_max_cents as number | null,
-              ) ?? '—'
-            }
-            hint={role.comp_source ? `From the ${role.comp_source}` : undefined}
-          />
-          <Property label="Posting" value={(role.posting_status as string) ?? 'unknown'} />
-          <Property label="ATS" value={company.ats_type === 'unknown' ? '—' : company.ats_type} />
-          <Property
-            label="Outcome"
-            value={
-              current.outcome
-                ? `${current.outcome}${
-                    current.rejection_stage_override || current.rejection_stage
-                      ? ` at ${(current.rejection_stage_override ?? current.rejection_stage) as string}`
-                      : ''
-                  }`
-                : '—'
-            }
-          />
-        </DetailFacts>
+        <RoleFacts
+          roleId={role.id as string}
+          applied={formatDate(current.submitted_at as string | null, timezone)}
+          confirmed={formatDate(current.confirmation_received_at as string | null, timezone)}
+          firstHumanReply={formatDate(current.first_human_response_at as string | null, timezone)}
+          channel={
+            <ChannelPicker
+              applicationId={current.id as string}
+              source={current.source as ApplicationSource}
+              referralContactId={(current.referral_contact_id as string | null) ?? null}
+              contacts={referrerOptions(contactRows ?? [])}
+            />
+          }
+          compBand={formatCompBand(
+            role.comp_min_cents as number | null,
+            role.comp_max_cents as number | null,
+          )}
+          location={(role.location as string | null) ?? null}
+          workMode={(role.work_mode as string | null) ?? null}
+          seniority={(role.seniority as string | null) ?? null}
+          postingStatus={(role.posting_status as string | null) ?? null}
+          companyStage={company.stage}
+          ats={company.ats_type === 'unknown' ? '—' : company.ats_type}
+          outcome={
+            current.outcome
+              ? `${current.outcome}${
+                  current.rejection_stage_override || current.rejection_stage
+                    ? ` at ${(current.rejection_stage_override ?? current.rejection_stage) as string}`
+                    : ''
+                }`
+              : '—'
+          }
+          origins={factOrigins}
+        />
       <div className="space-y-6">
         {closedLine && <ClosedSummary text={closedLine} />}
 

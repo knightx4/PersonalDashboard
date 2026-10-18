@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { writeChange, type ChangeDeps } from '@/lib/ask/changes';
-import { checkChange, type ProposalToolName } from '@/lib/ask/propose';
+import { checkChange, taggedWords, type ProposalToolName } from '@/lib/ask/propose';
 import { isUuid, type AskRow } from '@/lib/ask/db';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
@@ -41,7 +41,8 @@ import { POST_WRITE_TOOLS } from './post-writes';
  * values before and after. The surface keeps that report as the record
  * (core.dash_actions), and the record is what Undo reads.
  *
- *   add_todo         a todo, with the day it is due.
+ *   add_todo         a todo, with the day it is due, tagged now or
+ *                    eventually by that day (plan #2340.4).
  *   change_todo      a todo renamed, or moved to another day.
  *   close_todo       a todo ticked off, with the items on its list.
  *   add_goal         a goal under one of their areas.
@@ -257,7 +258,7 @@ async function addTodo(ctx: DashWriteContext, input: unknown): Promise<DashWrite
   return writeAsConfirmed(ctx, 'propose_todo', input, (change, id) => {
     const todo = change.input as DashChangeInput['add_todo'];
     return {
-      summary: `Dash added the todo "${todo.title}"${todo.dueOn ? `, due ${todo.dueOn}` : ''}.`,
+      summary: `Dash added the todo "${todo.title}"${todo.dueOn ? `, due ${todo.dueOn}` : ''}${taggedWords(todo.tags)}.`,
       row: { table: TABLE.task, ref: id, title: todo.title, href: todoHref(id) },
     };
   });
@@ -931,6 +932,16 @@ function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promi
 
 const DAY_PROP = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } as const;
 
+/** How a todo Dash adds is tagged (plan #2340.4); the rule itself is lib/todo/tasks/dash-tags.ts. */
+const ADD_TAGS_HELP =
+  'It arrives tagged: now when it is due today or before, eventually when it has no date or one more than two weeks off; that tag is added for you. Send tags only for more: now for one they said they need today without a day, and any tag they already use (the todos lookup lists them in tags_in_use) that clearly fits. Do not make up new tags.';
+
+const TAGS_PROP = {
+  type: 'array',
+  items: { type: 'string' },
+  description: 'Tags beyond the one its date gives, lowercase, from the ones they already use.',
+} as const;
+
 function tool(
   name: DashChangeKind,
   description: string,
@@ -949,12 +960,13 @@ function tool(
 export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_todo',
-    "Add a todo to the person's list, when they ask you to.",
+    `Add a todo to the person's list, when they ask you to. ${ADD_TAGS_HELP}`,
     {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'The todo as they would write it, in a short line.' },
-        due_on: { ...DAY_PROP, description: 'The day it is due, YYYY-MM-DD, only when they named one ("on Friday").' },
+        due_on: { ...DAY_PROP, description: 'The day it is due, YYYY-MM-DD, only when they named one ("on Friday", "today").' },
+        tags: TAGS_PROP,
       },
       required: ['title'],
       additionalProperties: false,

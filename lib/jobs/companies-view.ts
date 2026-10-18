@@ -5,6 +5,7 @@ import {
   choiceColumn,
   columnFilters,
   parsePage,
+  parseView,
   type AddressChanges,
   type ColumnFilter,
   type FilterColumn,
@@ -23,8 +24,11 @@ import {
 
 export const COMPANIES_PATH = '/jobs/companies';
 
-/** The views the page has. The table alone for now; a focused view follows. */
-export const COMPANY_VIEWS = ['table'] as const;
+/**
+ * The views the page has: the table, and the focused view of one company at
+ * a time (plan #2341.4). The table is the default until the view switch.
+ */
+export const COMPANY_VIEWS = ['table', 'focus'] as const;
 export type CompaniesViewName = (typeof COMPANY_VIEWS)[number];
 
 export const COMPANY_PRIORITIES = ['target', 'interested', 'backup', 'passed'] as const;
@@ -73,6 +77,8 @@ export type CompaniesParams = {
   domains?: string;
   /** Typed in the Domains column: a domain holds it. */
   domain?: string;
+  /** The focused view's company, by slug. */
+  company?: string;
   page?: string;
   sort?: string;
   group?: string;
@@ -89,6 +95,8 @@ export type CompaniesState = {
   roles: 'some' | 'none' | null;
   domains: 'some' | 'none' | null;
   domainTerms: string[];
+  /** The slug the focused view opens on, or null for the first company. */
+  company: string | null;
   /** One-based. */
   page: number;
 };
@@ -99,7 +107,7 @@ function someOrNone(value: string | undefined): 'some' | 'none' | null {
 
 export function parseCompanies(params: CompaniesParams): CompaniesState {
   return {
-    view: 'table',
+    view: parseView(params.view, COMPANY_VIEWS, 'table'),
     priority: COMPANY_PRIORITIES.find((p) => p === params.priority) ?? null,
     activeOnly: params.active === '1',
     terms: searchTerms(params.q),
@@ -108,6 +116,7 @@ export function parseCompanies(params: CompaniesParams): CompaniesState {
     roles: someOrNone(params.roles),
     domains: someOrNone(params.domains),
     domainTerms: searchTerms(params.domain),
+    company: params.company?.trim() || null,
     page: parsePage(params.page),
   };
 }
@@ -178,6 +187,29 @@ export function companiesHref(
   return addressHref(COMPANIES_ADDRESS, params, changes);
 }
 
+/**
+ * The focused view on one company, with every filter and the sort kept, so
+ * previous and next step through the rows the table showed. The table's page
+ * is dropped: the focused view steps through every page.
+ */
+export function focusHref(params: CompaniesParams, slug: string): string {
+  return companiesHref(params, { view: 'focus', company: slug });
+}
+
+/** The table with the same filters, leaving the focused company behind. */
+export function tableHref(params: CompaniesParams): string {
+  return companiesHref(params, { view: 'table', company: undefined });
+}
+
+/**
+ * Where the focused view starts in `rows`: the company the address names, or
+ * the first when it names none or one the filters have left out.
+ */
+export function focusIndex(rows: readonly Pick<CompanyRow, 'slug'>[], slug: string | null): number {
+  if (!slug) return 0;
+  return Math.max(0, rows.findIndex((row) => row.slug === slug));
+}
+
 /** The same table with every filter off, the search included; the arrangement stays. */
 export function clearFiltersHref(params: CompaniesParams): string {
   return companiesHref(params, {
@@ -204,7 +236,7 @@ export function companyColumnFilters(
 ): Record<string, ColumnFilter> {
   // The table is where these menus are, so every link stays on it.
   const href = (changes: AddressChanges<CompaniesParams>) =>
-    companiesHref(params, { view: 'table', ...changes });
+    companiesHref(params, { view: 'table', company: undefined, ...changes });
   const count = (keep: (row: CompanyRow) => boolean) => rows.filter(keep).length;
 
   const name: FilterColumn<CompaniesParams> = {

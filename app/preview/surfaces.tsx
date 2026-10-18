@@ -28,9 +28,9 @@ import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
 import { AnswerCard } from '@/app/jobs/(app)/roles/[id]/application';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
-import { Property } from '@/components/shell/detail-layout';
-import { DetailFacts } from '@/components/patterns/list-detail';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
+import { HeaderFacts, RoleFacts } from '@/app/jobs/(app)/roles/[id]/role-facts';
+import { roleFactOrigins, type FactField, type FactOriginRecord, type RoleFactOrigins } from '@/lib/jobs/fact-origins';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
@@ -80,6 +80,8 @@ import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurfa
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
+import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
+import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -521,6 +523,7 @@ import {
   NewsSettingsSurface,
   NewsStorySurface,
   TodoAllSurface,
+  TodoAllTaggedSurface,
   TodoSettingsSurface,
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
@@ -621,6 +624,7 @@ const roleTasks: Task[] = [
     createdAt: '2026-09-15T16:00:00.000Z',
     position: null,
     parentId: null,
+    tags: [],
   },
 ];
 
@@ -859,7 +863,24 @@ function companyFixture(
 const companyRows: CompanyRow[] = [
   companyFixture('ledgerline', 'Ledgerline', 'target', 'active', ['ledgerline.io'], 2, 'London'),
   companyFixture('halcyon', 'Halcyon Health', 'target', 'no_activity', ['halcyonhealth.com'], 1, 'Boston'),
-  companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+  {
+    // The focused view's company (plan #2341.4): every fact filled and four
+    // of the six questions answered, one at the length real answers get.
+    ...companyFixture('northwind', 'Northwind Analytics', 'interested', 'active', ['northwind.ai', 'nwa.co'], 3, 'Remote'),
+    industry: 'Data infrastructure',
+    website: 'https://northwind.ai',
+    careers_url: 'https://jobs.ashbyhq.com/northwind',
+    perspective_updated_at: '2026-10-02T09:00:00.000Z',
+    ...({
+      perspective_business:
+        'Sells a warehouse-native analytics layer to mid-market finance teams, priced per seat with a usage tier on top. Most revenue is annual contracts.',
+      perspective_why_now:
+        'Raised a Series B in August and is hiring its first FP&A lead; the CFO said on a podcast that forecasting is still a spreadsheet.',
+      perspective_problem:
+        'Moving from founder-led pricing to a model that survives usage growth, and building the first real board pack.',
+      perspective_next_move: 'Ask Priya for an introduction to the CFO before the role is posted.',
+    } as Record<string, string>),
+  } as CompanyRow,
   companyFixture('fabrikam', 'Fabrikam', 'interested', 'closed_out', ['fabrikam.com'], 1, 'Seattle'),
   companyFixture(
     'international-consolidated',
@@ -1526,6 +1547,33 @@ const contact: ContactRow = {
 };
 
 /** People to name as a referrer: one with the longest name, one with no company. */
+/** Fact origins for the role page's gallery entries (plan #2343.3). */
+function factOriginFixtures(
+  given: Partial<Record<FactField, Pick<FactOriginRecord, 'origin' | 'certainty'> & { messageId?: string }>>,
+): RoleFactOrigins {
+  const out = roleFactOrigins([]);
+  for (const [field, record] of Object.entries(given) as Array<[FactField, NonNullable<(typeof given)[FactField]>]>) {
+    out[field] = {
+      field,
+      origin: record.origin,
+      certainty: record.certainty,
+      messageId: record.messageId ?? null,
+      sourceUrl: null,
+      recordedAt: '2026-08-01T12:00:00.000Z',
+    };
+  }
+  return out;
+}
+
+/** The facts surface's origins: one of each look the step draws. */
+const roleFactsOrigins = factOriginFixtures({
+  comp: { origin: 'recruiter_email', certainty: 'secondhand', messageId: 'msg-1' },
+  location: { origin: 'posting', certainty: 'firsthand' },
+  work_mode: { origin: 'you', certainty: 'firsthand' },
+  seniority: { origin: 'dash', certainty: 'guess' },
+  posting_status: { origin: 'unknown', certainty: null },
+});
+
 const referrerFixtures: ReferrerOption[] = [
   { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The Halloran-Achterberg group' },
   { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
@@ -4079,25 +4127,77 @@ export const SURFACES: readonly Surface[] = [
               </div>
             }
           />
-          <DetailFacts>
-            <Property label="Applied" value="31 Jul 2026" />
-            <Property label="Confirmed" value="31 Jul 2026" />
-            <Property label="First human reply" value="6 Aug 2026" />
-            <Property
-              label="Channel"
-              value={
-                <ChannelPicker
-                  applicationId="app-1"
-                  source="referral"
-                  referralContactId="contact-2"
-                  contacts={referrerFixtures}
-                />
-              }
-            />
-            <Property label="Comp band" value="$180k–$220k" />
-            <Property label="Outcome" value="—" />
-          </DetailFacts>
+          <RoleFacts
+            roleId="role-1"
+            applied="31 Jul 2026"
+            confirmed="31 Jul 2026"
+            firstHumanReply="6 Aug 2026"
+            channel={
+              <ChannelPicker
+                applicationId="app-1"
+                source="referral"
+                referralContactId="contact-2"
+                contacts={referrerFixtures}
+              />
+            }
+            compBand="$180k–$220k"
+            location="New York"
+            workMode="Hybrid"
+            seniority="Senior"
+            postingStatus="open"
+            companyStage={null}
+            ats="greenhouse"
+            outcome="—"
+            origins={factOriginFixtures({ comp: { origin: 'posting', certainty: 'firsthand' } })}
+          />
         <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
+      </div>
+    ),
+  },
+  {
+    /* The role page's header and facts with an origin under each of the role's
+     * own (plan #2343.3): pay from a recruiter's email with the message
+     * linked, the location from the posting, the work mode typed by you, the
+     * seniority Dash guessed, a posting status saved before origins were kept
+     * (no label) and a company stage nobody has filled in. */
+    id: 'jobs-role-facts',
+    label: 'Role · Facts and where they came from',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <div className="space-y-4">
+        <PageHeader
+          title="Staff Machine Learning Engineer, Ranking and Recommendations Infrastructure"
+          description={
+            <>
+              The Halloran-Achterberg group
+              <HeaderFacts
+                facts={[
+                  ['location', 'San Francisco, New York or remote in the US'],
+                  ['work_mode', 'Hybrid'],
+                  ['seniority', 'Staff'],
+                ]}
+                origins={roleFactsOrigins}
+              />
+            </>
+          }
+        />
+        <RoleFacts
+          roleId="role-1"
+          applied="31 Jul 2026"
+          confirmed="—"
+          firstHumanReply="—"
+          channel="Careers page"
+          compBand="$240k–$310k"
+          location="San Francisco, New York or remote in the US"
+          workMode="Hybrid"
+          seniority="Staff"
+          postingStatus="open"
+          companyStage={null}
+          ats="ashby"
+          outcome="—"
+          origins={roleFactsOrigins}
+        />
       </div>
     ),
   },
@@ -4191,6 +4291,41 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     render: () => (
       <CompaniesPage companies={companyRows} params={{ priority: 'passed', activity: 'active' }} />
+    ),
+  },
+  {
+    /* The focused view (plan #2341.4): one company in full, opened from its
+     * table row, with previous and next through the filtered, sorted list. */
+    id: 'jobs-companies-focus',
+    label: 'Companies · Focus',
+    module: 'jobs',
+    width: 'wide',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'northwind' }} />
+    ),
+  },
+  {
+    /* At the end of the list: Next goes grey, Previous still steps back. */
+    id: 'jobs-companies-focus-end',
+    label: 'Companies · Focus · Last company',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage companies={companyRows} params={{ view: 'focus', company: 'wingtip' }} />
+    ),
+  },
+  {
+    /* Filtered to nothing: back to the table, or clear the filters. */
+    id: 'jobs-companies-focus-empty',
+    label: 'Companies · Focus · No companies match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <CompaniesPage
+        companies={companyRows}
+        params={{ view: 'focus', priority: 'passed', activity: 'active' }}
+      />
     ),
   },
   {
@@ -5428,6 +5563,7 @@ export const SURFACES: readonly Surface[] = [
             createdAt: '2026-09-02T08:00:00.000Z',
             position: null,
             parentId: null,
+            tags: [],
           },
         ]}
       />
@@ -8282,6 +8418,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TaskFilesSurface />,
   },
 
+  /* Tags on todo rows (plan #2340.2): the chips, the picker open under a
+   * row, and the pointer's controls held (remove on a chip, the plus chip). */
+  {
+    id: 'todo-task-tags',
+    label: 'Todo · Tags on a task',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsSurface />,
+  },
+  {
+    id: 'todo-task-tags-picker',
+    label: 'Todo · Tags on a task, the picker open',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsPickerSurface />,
+  },
+  {
+    id: 'todo-task-tags-hover',
+    label: 'Todo · Tags on a task, pointed at',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsHoverSurface />,
+  },
+
+  /* The agenda narrowed by a tag (plan #2340.3): Now chosen, and a tag
+   * nothing carries with the way back to everything. */
+  {
+    id: 'todo-agenda-tagged',
+    label: 'Todo · The agenda filtered by a tag',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-more',
+    label: 'Todo · The tag filter, More open on a phone',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedMoreSurface />,
+  },
+  {
+    id: 'todo-agenda-tagged-empty',
+    label: 'Todo · The agenda filtered by a tag nothing carries',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaTaggedEmptySurface />,
+  },
+
   /* The end of Quick read (plan #1557): played by passing the last story,
    * and as a page that loads already caught up. */
   {
@@ -9507,6 +9691,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'page',
     render: () => <TodoAllSurface />,
+  },
+  {
+    id: 'todo-all-tagged',
+    label: 'Todo · All tasks, filtered by a tag',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoAllTaggedSurface />,
   },
   {
     id: 'todo-settings',
