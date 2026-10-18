@@ -187,6 +187,33 @@ export async function loadTask(userId: string, id: string): Promise<Task | null>
   return data ? toTask(data) : null;
 }
 
+/**
+ * Every tag the person has put on a task, the most used first, then by name
+ * (plan #2340.2). What the tag picker offers after Now and Eventually.
+ *
+ * Scoped through the task, since a tag row has no user_id of its own.
+ */
+export async function loadUsedTags(userId: string, client?: TodoSupabaseClient): Promise<string[]> {
+  const supabase = client ?? (await createTodoClient());
+
+  const { data, error } = await supabase
+    .from('task_tags')
+    .select('tag, tasks!inner(user_id)')
+    .eq('tasks.user_id', userId)
+    .limit(LIMIT * 4);
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as { tag: string }[]) {
+    counts.set(row.tag, (counts.get(row.tag) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .map(([tag]) => tag);
+}
+
 /** How many are open and not deferred — for the nav badge and the home slice. */
 export async function countOpenTasks(userId: string): Promise<number> {
   const supabase = await createTodoClient();

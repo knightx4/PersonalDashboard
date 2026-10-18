@@ -80,6 +80,7 @@ import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurfa
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
 import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
+import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -8195,6 +8196,30 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <TaskFilesSurface />,
+  },
+
+  /* Tags on todo rows (plan #2340.2): the chips, the picker open under a
+   * row, and the pointer's controls held (remove on a chip, the plus chip). */
+  {
+    id: 'todo-task-tags',
+    label: 'Todo · Tags on a task',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsSurface />,
+  },
+  {
+    id: 'todo-task-tags-picker',
+    label: 'Todo · Tags on a task, the picker open',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsPickerSurface />,
+  },
+  {
+    id: 'todo-task-tags-hover',
+    label: 'Todo · Tags on a task, pointed at',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskTagsHoverSurface />,
   },
 
   /* The end of Quick read (plan #1557): played by passing the last story,
