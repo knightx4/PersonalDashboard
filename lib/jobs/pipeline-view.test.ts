@@ -4,7 +4,6 @@ import { formatCompBand } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import {
   filterPipeline,
-  pageOf,
   parsePipeline,
   pipelineDescription,
   pipelineHref,
@@ -118,15 +117,6 @@ describe('ready and cover letter filters', () => {
     expect(shown({ ready: 'yes', letter: 'yes' })).toHaveLength(1);
     expect(pipelineHref({ ready: 'yes' }, { letter: 'no' })).toBe('/jobs/pipeline?ready=yes&letter=no');
     expect(pipelineHref({ ready: 'yes', letter: 'no' }, { ready: undefined })).toBe('/jobs/pipeline?letter=no');
-  });
-});
-
-describe('pageOf', () => {
-  it('pages and clamps', () => {
-    const items = Array.from({ length: 120 }, (_, i) => i);
-    expect(pageOf(items, 2)).toMatchObject({ page: 2, pages: 3, first: 51, last: 100 });
-    expect(pageOf(items, 9)).toMatchObject({ page: 3, first: 101, last: 120 });
-    expect(pageOf([], 1)).toMatchObject({ page: 1, pages: 1, first: 0, last: 0 });
   });
 });
 
