@@ -26,8 +26,11 @@ import type { SeriesLoader } from './series-store';
  *   (plan #2321.4).
  * - `places`: places the writer names, located by a registered geocoder
  *   (plan #2321.6).
+ * - `wanted`: nothing to draw. The writer asked for a figure no kind can
+ *   draw yet, and the lesson shows its caption with a line saying so
+ *   (plan #2321.9).
  */
-export type FigureData = 'none' | 'series' | 'source' | 'places';
+export type FigureData = 'none' | 'series' | 'source' | 'places' | 'wanted';
 
 /**
  * One figure as `learn.feed_cards.figures` stores it, in order.

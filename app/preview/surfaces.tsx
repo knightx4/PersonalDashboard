@@ -275,6 +275,8 @@ import {
   LearnSubjectPrepareFinishedSurface,
   LearnSubjectPrepareSourcesEmptySurface,
   LearnSubjectPrepareSourcesFoldedSurface,
+  LearnSubjectSourcesUnbuiltSurface,
+  LearnSubjectSourcesUnbuiltNoneSurface,
   LearnSubjectPrepareStartingSurface,
   LearnSubjectPrepareStartSurface,
   LearnSubjectPrepareStartPendingSurface,
@@ -9468,6 +9470,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnFigureSurface kind="chart" />,
   },
   {
+    /* A lesson that asked for a figure the app cannot draw yet (plan #2321.9). */
+    id: 'learn-figure-wanted',
+    label: 'Plan · A lesson whose figure is not built yet',
+    module: 'learn',
+    width: 'wide',
+    render: () => <LearnFigureSurface kind="wanted" />,
+  },
+  {
     id: 'learn-figure-chart-missing',
     label: 'Plan · A lesson whose chart’s series was not found',
     module: 'learn',
@@ -9862,6 +9872,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnSubjectPrepareSourcesFoldedSurface />,
+  },
+  {
+    /* Figures the subject's lessons asked for and the app cannot draw (plan #2321.12). */
+    id: 'learn-subject-sources-unbuilt',
+    label: 'Subject · Sources listing the figures its lessons asked for',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltSurface />,
+  },
+  {
+    id: 'learn-subject-sources-unbuilt-none',
+    label: 'Subject · Sources with no figures outstanding',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectSourcesUnbuiltNoneSurface />,
   },
   {
     /* Add a source (plan #2307.4): the press closed under Sources, with a
