@@ -10,6 +10,7 @@ import {
   useState,
   useTransition,
 } from 'react';
+import NextLink from 'next/link';
 import { Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -36,6 +37,8 @@ export type ToastInput = {
   /** Offered for `duration`; when it runs, the toast says `undone`. */
   undo?: () => void | Promise<void>;
   undone?: string;
+  /** A way to what the toast reports, such as the note just written to. Pressing it dismisses the toast. */
+  link?: { label: string; href: string };
   /** Milliseconds. Long enough to read and reach for; short enough to forget. */
   duration?: number;
 };
@@ -166,6 +169,15 @@ function ToastItem({
           <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
           {pending ? 'Undoing…' : 'Undo'}
         </button>
+      )}
+      {toast.link && toast.state === 'open' && (
+        <NextLink
+          href={toast.link.href}
+          onClick={() => dismiss(toast.id)}
+          className="press inline-flex items-center rounded-control px-1.5 py-0.5 font-sans text-ui font-semibold text-accent hover:bg-accent-tint"
+        >
+          {toast.link.label}
+        </NextLink>
       )}
       <button
         type="button"
