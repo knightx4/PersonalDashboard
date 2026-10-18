@@ -148,14 +148,23 @@ export function revive(row: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-/** Post one statement to public.service_sql. */
-export function restTransport(url: string, key: string): Transport {
-  const endpoint = `${url.replace(/\/$/, '')}/rest/v1/rpc/service_sql`;
+/**
+ * Post one statement to public.service_sql, or with `settings` (goals.actor
+ * and the like) to public.service_sql_with (migration 0256), which makes them
+ * in the statement's own transaction first.
+ */
+export function restTransport(url: string, key: string, settings?: Record<string, string>): Transport {
+  const name = settings ? 'service_sql_with' : 'service_sql';
+  const endpoint = `${url.replace(/\/$/, '')}/rest/v1/rpc/${name}`;
   return async (query, returns) => {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_query: query, p_returns: returns }),
+      body: JSON.stringify(
+        settings
+          ? { p_settings: settings, p_query: query, p_returns: returns }
+          : { p_query: query, p_returns: returns },
+      ),
     });
     const body = await response.text();
     if (!response.ok) {

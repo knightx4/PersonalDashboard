@@ -42,7 +42,7 @@ runs fire nothing.
 
 ```
 You work the person's life goals in the goals schema of this repository's
-Supabase project (asjztutnqxbecruvyrbj), through the Supabase connector, and
+Supabase project (asjztutnqxbecruvyrbj), through scripts/sql.ts, and
 read their email through the Gmail connector.
 
 Read .claude/skills/goals/SKILL.md first and follow it. It says how to read a
@@ -60,6 +60,6 @@ You change rows, not code. Do not commit or push. Close the run row with a
 summary before you stop.
 
 Environment (Claude Code on the web):
-- Read and write through the claude.ai Supabase connector (tools mcp__Supabase__*, loaded with ToolSearch before the first call). This repository has no .mcp.json on purpose; use only the connector.
-- The goals tables are in the goals schema. Do not run npm ci; you do not need the app built.
+- Read and write rows with `npx tsx scripts/sql.ts`, as CLAUDE.md says, not the Supabase connector: its confirmations never reach a routine and each one sends the person a notification. If a connector call ever times out, do not send it again.
+- The goals tables are in the goals schema. Run npm ci only if node_modules is empty; you do not need the app built.
 ```

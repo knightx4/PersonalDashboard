@@ -235,7 +235,9 @@ function Pill({
         activity={working ? pose.activity : undefined}
         moment={working ? (moment ?? undefined) : undefined}
         runner={RUNNERS[slot.slot]}
-        size="md"
+        // 44px, as tall as the pill's three rows, so the Dash is larger
+        // without the pill growing.
+        size="lg"
         decorative
         // Only a slot at work glows; asleep or off, its Dash sits unlit.
         still={!working}

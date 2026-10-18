@@ -10,6 +10,16 @@ import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
 import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
+import {
+  changedRoleFacts,
+  factWrites,
+  moreCertainOnFile,
+  recordRoleFactOrigins,
+  type FactOrigin,
+  type FactSource,
+  type FactWrite,
+  type RoleFactField,
+} from '@/lib/jobs/fact-origins';
 import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
@@ -48,6 +58,9 @@ import { JobsRefused } from './jobs-refused';
  *
  *   change_company      a company's name, priority, research notes, domains,
  *                       industry, headquarters and links.
+ *   add_company         a company added from scratch, with its priority and
+ *                       details (AddedCompanyUndo; undoAddedCompany takes it
+ *                       out again while nothing hangs on it).
  *   merge_roles         fold duplicate roles at one company into the one
  *                       they keep.
  *
@@ -249,6 +262,66 @@ async function namedRole(env: JobsWriteEnv, args: Args): Promise<Row> {
   return ownRow(env.jobs, 'roles', application.role_id as string, env.userId, 'role');
 }
 
+const FACT_SOURCES = ['posting', 'email', 'person', 'guess'] as const;
+
+const FACT_WORDS: Record<RoleFactField, string> = {
+  comp: 'The pay on file',
+  location: 'The location on file',
+  work_mode: 'The work mode on file',
+  seniority: 'The seniority on file',
+  posting_status: 'Whether the posting is open',
+};
+
+const ORIGIN_WORDS: Record<FactOrigin, string> = {
+  posting: 'the posting',
+  recruiter_email: "a recruiter's email",
+  dash: 'Dash',
+  you: 'them',
+  unknown: 'somewhere unrecorded',
+};
+
+/**
+ * Where the facts a change_role call sets came from (plan #2343.2). Dash's
+ * write records Dash, firsthand when it quotes the posting, secondhand and
+ * linked to the email when it quotes one, and a guess otherwise; what the
+ * person told Dash in so many words is theirs and firsthand. Without a
+ * fact_source, pay takes the certainty of its pay_source, and a band read
+ * from a description Dash was given came from that posting text.
+ */
+async function dashFactWrites(env: JobsWriteEnv, args: Args, before: Row, update: Row): Promise<FactWrite[]> {
+  const factSource = given(args, 'fact_source') ? oneOf(args, 'fact_source', FACT_SOURCES, false) : null;
+  let messageId: string | null = null;
+  if (factSource === 'email') {
+    let ref = text(args, 'email_ref');
+    if (ref.startsWith('job_search.inbox_messages:')) ref = ref.slice('job_search.inbox_messages:'.length);
+    if (!ref) throw new JobsRefused('fact_source email needs email_ref: the email the values were read from.');
+    messageId = (await namedEmail(env, ref)).id as string;
+  } else if (given(args, 'email_ref')) {
+    throw new JobsRefused('email_ref goes with fact_source "email".');
+  }
+  const postingUrl = (('jd_url' in update ? update.jd_url : before.jd_url) as string | null) ?? null;
+  const bandFromDescription = given(args, 'description') && !given(args, 'pay_min') && !given(args, 'pay_max') && update.comp_source === 'posted';
+  const paySource = 'comp_source' in update ? update.comp_source : before.comp_source;
+
+  return factWrites(changedRoleFacts(before, update), (field): FactSource => {
+    switch (factSource) {
+      case 'person':
+        return { origin: 'you', certainty: 'firsthand' };
+      case 'posting':
+        return { origin: 'dash', certainty: 'firsthand', sourceUrl: postingUrl };
+      case 'email':
+        return { origin: 'dash', certainty: 'secondhand', messageId };
+      case 'guess':
+        return { origin: 'dash', certainty: 'guess' };
+    }
+    if (field === 'comp' && (bandFromDescription || (given(args, 'pay_source') && paySource === 'posted'))) {
+      return { origin: 'dash', certainty: 'firsthand', sourceUrl: postingUrl };
+    }
+    if (field === 'comp' && given(args, 'pay_source') && paySource === 'recruiter') return { origin: 'dash', certainty: 'secondhand' };
+    return { origin: 'dash', certainty: 'guess' };
+  });
+}
+
 async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = await namedRole(env, args);
   const id = before.id as string;
@@ -339,6 +412,16 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     throw new JobsRefused('Nothing to change: give at least one field with its new value.');
   }
 
+  const origins = await dashFactWrites(env, args, before, update);
+  const factsDb = env.jobs as unknown as AppSupabaseClient;
+  const firmer = await moreCertainOnFile(factsDb, env.userId, id, origins);
+  if (firmer.length > 0) {
+    const kept = firmer.map((fact) => `${FACT_WORDS[fact.field]} came from ${ORIGIN_WORDS[fact.origin]} (${fact.certainty})`);
+    throw new JobsRefused(
+      `${listed(kept)}, and a less certain value does not replace it. Leave it out, or give fact_source posting, email or person when the new value comes from one of those.`,
+    );
+  }
+
   const { data, error } = await env.jobs
     .from('roles')
     .update(update)
@@ -350,6 +433,12 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     throw new JobsRefused('That company already has this same posting. The two can be merged from the company page.');
   }
   if (error || !data) throw new Error(`Changing the role failed: ${error?.message ?? 'no row'}`);
+
+  try {
+    await recordRoleFactOrigins(factsDb, env.userId, id, origins);
+  } catch (originError) {
+    console.error('change_role: recording where the facts came from failed', originError);
+  }
 
   const after = data as Row;
   const was = roleName(before, await companyName(env, before.company_id));
@@ -990,6 +1079,113 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     row: { table: COMPANIES, ref: id, title: now, href },
     undo: null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// add_company
+// ---------------------------------------------------------------------------
+
+/** What add_company keeps in `undo`: the company it made. */
+export type AddedCompanyUndo = { company_id: string };
+
+/**
+ * A company added from scratch, as the companies page's Add company does: by
+ * name, matched against theirs first so a company already on file is named
+ * back rather than made twice, then given the priority and details the call
+ * names. Its Undo takes the company out again while nothing hangs on it.
+ */
+async function addCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const name = text(args, 'name');
+  if (!name) throw new JobsRefused('Name the company to add.');
+  if (name.length > COMPANY_NAME_MAX) throw new JobsRefused(`Keep the name under ${COMPANY_NAME_MAX} characters.`);
+
+  // Every field is checked before anything is written.
+  const update: Row = {};
+  const said: string[] = [];
+  if (given(args, 'priority')) update.priority = oneOf(args, 'priority', PRIORITIES, false);
+  for (const field of COMPANY_FIELDS) {
+    if (field.column.startsWith('perspective_') || !given(args, field.arg)) continue;
+    const value = clearable(args, field.arg, field.max);
+    if (value === null) continue;
+    update[field.column] = value;
+    said.push(field.said);
+  }
+  const domains = given(args, 'domains') ? domainsOf(args.domains) : [];
+
+  const company = await ensureCompany(env.jobs as unknown as AppSupabaseClient, env.userId, name, {
+    website: (update.website as string | undefined) ?? null,
+    careersUrl: (update.careers_url as string | undefined) ?? null,
+  });
+  if (company.error) throw new Error(`Adding the company failed: ${company.error}`);
+  if (!company.created) {
+    const held = await ownRow(env.jobs, 'companies', company.id, env.userId, 'company');
+    throw new JobsRefused(
+      `They already have ${held.name as string} on file (${toRef(COMPANIES, company.id)}). Change it with change_company instead.`,
+    );
+  }
+
+  if (domains.length > 0) {
+    const { data: made } = await env.jobs.from('companies').select('domains').eq('id', company.id).eq('user_id', env.userId).maybeSingle();
+    update.domains = [...new Set([...(((made as Row | null)?.domains as string[] | null) ?? []), ...domains])];
+    said.push('the domains');
+  }
+  let after: Row;
+  if (Object.keys(update).length > 0) {
+    const { data, error } = await env.jobs.from('companies').update(update).eq('id', company.id).eq('user_id', env.userId).select('*').single();
+    if (error || !data) {
+      await env.jobs.from('companies').delete().eq('id', company.id).eq('user_id', env.userId);
+      throw new Error(`Setting the company's details failed: ${error?.message ?? 'no row'}`);
+    }
+    after = data as Row;
+  } else {
+    after = await ownRow(env.jobs, 'companies', company.id, env.userId, 'company');
+  }
+
+  const now = after.name as string;
+  const priority = after.priority as string;
+  const href = companyHref(after.slug as string);
+  const undo: AddedCompanyUndo = { company_id: company.id };
+  return {
+    kind: 'add_company',
+    input: {
+      verb: 'Added',
+      what: now,
+      rest: ` to your companies as ${priority}`,
+      href,
+      where: 'Open the company',
+      paths: ['/jobs', '/jobs/companies', href],
+    },
+    subjectRef: toRef(COMPANIES, company.id),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash added ${now} to the companies as ${priority}${said.length > 0 ? `, with ${listed(said)}` : ''}.`,
+    row: { table: COMPANIES, ref: company.id, title: now, href },
+    undo: undo as unknown as Record<string, unknown>,
+  };
+}
+
+/**
+ * Undo a company added from scratch (AddedCompanyUndo): it is taken out while
+ * nothing hangs on it, and stays once a role, contact or note has been filed
+ * under it. Ask's undo calls it for every surface (lib/ask/changes.ts, undoMany).
+ */
+export async function undoAddedCompany(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number } | { ok: false; error: string }> {
+  const companyId = recorded?.company_id;
+  if (typeof companyId !== 'string' || !isUuid(companyId)) {
+    return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
+  }
+  if (await companyHeld(deps, companyId)) {
+    return { ok: false, error: 'Something has been filed under this company since, so it stays. Take it out on its page.' };
+  }
+  const jobs = await deps.db('job_search');
+  const { data, error } = await jobs.from('companies').delete().eq('id', companyId).eq('user_id', deps.userId).select('id');
+  if (error) throw new Error(`companies: ${error.message}`);
+  if ((data ?? []).length === 0) return { ok: false, error: 'The company has gone already.' };
+  return { ok: true, restored: 1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -2880,6 +3076,13 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         pay_max: { type: 'number', description: 'The top of the yearly pay band. 0 clears it.' },
         pay_source: { type: 'string', description: `Where the pay came from: ${PAY_SOURCES.join(', ')}. ${CLEARABLE}` },
         company: { type: 'string', description: 'The company the role belongs to, by name.' },
+        fact_source: {
+          type: 'string',
+          enum: [...FACT_SOURCES],
+          description:
+            'Where the location, work mode, seniority, posting status and pay given came from: posting when quoted from the posting, email when quoted from an email (give email_ref), person when they told you the value, guess when you worked it out. Left out, they are recorded as your guess, except pay with pay_source posted or recruiter. A guess does not replace a value that came from the posting or an email.',
+        },
+        email_ref: { type: 'string', description: 'With fact_source email: the ref search_mail or a lookup returned for the email the values came from.' },
       },
       additionalProperties: false,
     },
@@ -2989,6 +3192,28 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: changeCompany,
+  },
+  {
+    name: 'add_company',
+    description:
+      "Add a company to their Jobs workspace from scratch when they ask, as the companies page's Add company does: by name, with how much they want to work there (priority, interested when they do not say) and any details they gave. A company already on file under that name, domain or job board is refused with its ref; change it with change_company. One company per call. A role at it is add_job_lead, a person there is change_contact.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The company\'s name.' },
+        priority: { type: 'string', enum: [...PRIORITIES], description: 'How much they want to work there: target, interested, backup or passed. interested when left out.' },
+        website: { type: 'string', description: 'The homepage link. It also links their mail from the company\'s domain.' },
+        careers_url: { type: 'string', description: 'The careers page link.' },
+        linkedin_url: { type: 'string', description: 'The LinkedIn page link.' },
+        industry: { type: 'string', description: 'The industry.' },
+        hq_location: { type: 'string', description: 'Where it is headquartered.' },
+        research: { type: 'string', description: 'Research notes on the company, such as why it is on their list.' },
+        domains: { type: 'string', description: 'Email domains beyond the website\'s, such as "acme.io".' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+    run: addCompany,
   },
   {
     name: 'merge_roles',

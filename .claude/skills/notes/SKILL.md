@@ -54,8 +54,8 @@ exits immediately there. That is the normal case for a scheduled run, not a
 fault — fall back to the Supabase MCP tools against `feedback_items` and do
 not spend the session diagnosing it.
 
-Use the **`Supabase`** connector, `mcp__Supabase__*`. Project ref:
-`asjztutnqxbecruvyrbj`. `feedback_items` is in `public`. Most of the app's own
+Read and write rows with `npx tsx scripts/sql.ts` (CLAUDE.md), not the
+connector's `execute_sql`. Project ref: `asjztutnqxbecruvyrbj`. `feedback_items` is in `public`. Most of the app's own
 tables are not: they are in a schema per workspace, such as `todo.`,
 `job_search.`, `goals.`, `learn.`, `news.` and `core.`, and the vault's are in
 `obsidian.`.
@@ -512,8 +512,8 @@ gallery:
    `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, then run
    `npm run ui-check -- <note-id> <surface> <round>`. That writes the round
    to `public.ui_checks` keyed by the note, and uploads the shots where the
-   service key is set. Without any database access it prints the insert for
-   the connector's `execute_sql`; the building reference's "Recording a
+   service key is set. Without any database access it prints the insert, to
+   send through `scripts/sql.ts --file`; the building reference's "Recording a
    round" says what each kind of session can reach.
 4. On `fix`, make the changes, shoot again and run the next round. You never
    write the verdict yourself.

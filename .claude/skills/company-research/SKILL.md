@@ -22,8 +22,8 @@ In anything the person reads, the assistant is **Dash**. Never write
 
 ## How you read and write
 
-Through the **Supabase** connector (`mcp__Supabase__execute_sql`, loaded
-with ToolSearch), project `asjztutnqxbecruvyrbj`. Filter every read and every
+Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through scripts/sql.ts"), not the Supabase connector, whose confirmations never reach
+a routine. Filter every read and every
 write by the `user_id` in your brief. You are writing as the service role, so
 row level security does not stop you touching another account's rows; the
 filter is the only thing that does.

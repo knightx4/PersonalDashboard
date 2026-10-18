@@ -15,6 +15,7 @@
     "check:specs": "tsx scripts/check-specs.ts",
     "check:phone": "tsx scripts/check-phone.ts",
     "sources:write": "tsx scripts/sources-write.ts",
+    "sql": "tsx scripts/sql.ts",
     "pages:write": "tsx scripts/pages-write.ts",
     "preview": "UI_PREVIEW=1 next build && UI_PREVIEW=1 next start -p ${PREVIEW_PORT:-3400}",
     "shoot": "tsx scripts/shoot.ts",

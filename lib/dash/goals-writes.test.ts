@@ -607,6 +607,25 @@ describe('the Goals writes', () => {
       expect(row(data, 'goals.records', CHASE).archived_at).toBeNull();
     });
 
+    it('adds a row to a list serving a goal by label, and changes it (note 75fdbf3d)', async () => {
+      const data = formTables();
+      expect(await refused('change_goal_form', data, { change: 'add_record', goal_ref: GOAL, collection: 'Spaces', values: { Lender: 'Amex' } })).toBe(
+        'That goal has no collection called "Spaces". It has "Loans".',
+      );
+      expect(await refused('change_goal_form', data, { change: 'add_record', goal_ref: GOAL, values: { Colour: 'red' } })).toMatch(/no field/);
+      const added = await made('change_goal_form', data, { change: 'add_record', goal_ref: GOAL, values: { lender: 'Amex', Balance: 50 } });
+      expect(added.op).toBe('insert');
+      expect(added.subjectRef).toMatch(/^goals\.records:/);
+      expect(added.after).toMatchObject({ user_id: ME, collection_id: LOANS, data: { lender: 'Amex', balance: 50 }, draft: false, position: 2 });
+      expect(added.summary).toBe('Dash added "Amex, 50" to Loans on "Run a half marathon".');
+      const changed = await made('change_goal_form', data, { change: 'edit_record', step_ref: FORM_STEP, record: 'amex', values: { Balance: 75 } });
+      expect(changed.op).toBe('update');
+      expect(changed.after).toMatchObject({ data: { lender: 'Amex', balance: 75 } });
+      expect(await refused('change_goal_form', data, { change: 'edit_record', step_ref: FORM_STEP, record: 'amex', values: { Balance: 75 } })).toBe(
+        'That row has those values already.',
+      );
+    });
+
     it('edits a kind of document, keeping its field notes, and forgets it', async () => {
       const data = formTables();
       const edited = await made('change_goal_form', data, {

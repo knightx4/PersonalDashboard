@@ -60,7 +60,9 @@ import { threadRef } from '@/lib/thread/subjects';
  * Last comes the comment thread (plan #2202.2), on a waiting or posted draft:
  * an Add a comment control until one is written. "@dash make this shorter"
  * gets a reply, and on a waiting draft Dash rewrites the text with
- * rewrite_post; a comment without the tag is only kept.
+ * rewrite_post; a comment without the tag is only kept. A draft Dash saved
+ * from Ask with suggest_post (plan #2384.3) is an ordinary suggested draft
+ * here, its gallery picture drawn like any other site path.
  */
 
 function useCopy() {

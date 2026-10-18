@@ -18,7 +18,7 @@ import {
 } from '@/lib/goals/store';
 import { stepHref } from '@/lib/goals/all-goals';
 import { MAX_QUESTIONS, MAX_QUESTION_LENGTH, questionKey, readQuestions, type StepQuestion } from '@/lib/goals/answers';
-import type { CollectionField } from '@/lib/goals/collections';
+import { checkRecord, type CollectionField, type RecordValues } from '@/lib/goals/collections';
 import { archiveRecord, restoreRecord } from '@/lib/goals/collections-store';
 import { KIND_NAME_MAX, RECOGNISE_MAX, SKIPPED_LABEL_MAX, SKIPPED_MAX, parseSenders } from '@/lib/goals/document-kinds';
 import { editKind, forgetKind } from '@/lib/goals/document-kinds-store';
@@ -1311,7 +1311,15 @@ async function changeGoalLink(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
   };
 }
 
-const FORM_CHANGES = ['set_questions', 'archive_record', 'restore_record', 'edit_document_kind', 'forget_document_kind'] as const;
+const FORM_CHANGES = [
+  'set_questions',
+  'add_record',
+  'edit_record',
+  'archive_record',
+  'restore_record',
+  'edit_document_kind',
+  'forget_document_kind',
+] as const;
 type FormChange = (typeof FORM_CHANGES)[number];
 const RECORDS = 'goals.records';
 const KINDS = 'goals.document_kinds';
@@ -1401,9 +1409,148 @@ function nextQuestions(existing: StepQuestion[], wanted: string[]): StepQuestion
   return out;
 }
 
+/**
+ * The values a row is given, by field key or label, as the record check takes them. A
+ * label that names no field is passed on under its own words, so the check refuses it.
+ */
+function recordValues(fields: CollectionField[], args: Args): Record<string, unknown> {
+  const raw = args.values;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new GoalsRefused(
+      `values is missing: give the row's values by field, such as ${fields
+        .filter((f) => !f.removed)
+        .slice(0, 6)
+        .map((f) => `"${f.label}"`)
+        .join(', ')}.`,
+    );
+  }
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    const key = name.trim().toLowerCase();
+    const field = fields.find((f) => !f.removed && (f.key === name || f.label.trim().toLowerCase() === key));
+    out[field ? field.key : name] = value;
+  }
+  return out;
+}
+
+/**
+ * Add a row to a form, or change one, when the person tells Dash its values
+ * (note 75fdbf3d). The form is a step's, by step_ref, or one serving a goal,
+ * by goal_ref and collection, such as the spaces list on a home goal. A row
+ * added this way is the person's own, so it is not a draft.
+ */
+async function changeGoalRecord(env: GoalsWriteEnv, args: Args, change: 'add_record' | 'edit_record'): Promise<GoalsMade> {
+  let collectionId: string;
+  let owner: Row;
+  if (text(args, 'step_ref')) {
+    owner = await ownStep(env, text(args, 'step_ref'), 'step_ref');
+    if (owner.archived_at != null) throw new GoalsRefused('That step is archived. Restore it first.');
+    const id = owner.collection_id as string | null;
+    if (!id) throw new GoalsRefused('That step has no form. Only a step that gathers information has one.');
+    collectionId = id;
+  } else {
+    owner = await ownGoal(env, text(args, 'goal_ref'));
+    const sources = await goalSources(env, owner.id as string);
+    if (sources.length === 0) throw new GoalsRefused('No collection serves that goal.');
+    const wanted = text(args, 'collection').toLowerCase();
+    const found = wanted
+      ? sources.filter((c) => c.id === wanted || c.name.trim().toLowerCase() === wanted || c.name.toLowerCase().includes(wanted))
+      : sources;
+    if (found.length !== 1) {
+      const names = sources.map((c) => `"${c.name}"`).join(', ');
+      throw new GoalsRefused(
+        wanted && found.length === 0
+          ? `That goal has no collection called "${text(args, 'collection')}". It has ${names}.`
+          : `Say which collection: the goal has ${names}.`,
+      );
+    }
+    collectionId = found[0].id;
+  }
+  const collection = await ownRow(env.goals, 'collections', collectionId, env.userId);
+  if (!collection || collection.archived_at != null) throw new GoalsRefused('That collection is gone.');
+  const fields = (collection.fields ?? []) as CollectionField[];
+  const listName = named(collection.name, 'the list');
+  const values = recordValues(fields, args);
+  const goal = owner.level === 'goal' ? owner : await goalAbove(env, owner);
+  const goalId = goal.id as string;
+  const href = owner.level === 'goal' ? goalHref(goalId) : stepHref(goalId, owner.id as string);
+  const title = named(owner.title, owner.level === 'goal' ? 'the goal' : 'the step');
+  const input = (verb: string, what: string): GoalsChangeInput => ({
+    verb,
+    what,
+    rest: ` in ${listName}`,
+    href,
+    where: owner.level === 'goal' ? 'Open the goal' : 'Open the step',
+    paths: [...GOAL_PATHS, goalHref(goalId)],
+  });
+  const row: AskRow = { table: ITEM, ref: owner.id as string, title, href };
+  const client = await env.write({});
+
+  if (change === 'add_record') {
+    const { data: live, error: liveError } = await env.goals
+      .from('records')
+      .select('id')
+      .eq('user_id', env.userId)
+      .eq('collection_id', collectionId)
+      .is('archived_at', null);
+    if (liveError) throw new Error(`Reading the rows failed: ${liveError.message}`);
+    const count = (live ?? []).length;
+    if (collection.shape === 'one' && count > 0) {
+      throw new GoalsRefused(`${listName} holds one row and already has it. Change it with edit_record.`);
+    }
+    const checked = checkRecord(fields, values, null);
+    if (!checked.ok) throw new GoalsRefused(checked.error);
+    if (Object.keys(checked.data).length === 0) throw new GoalsRefused('Those values fill in no field, so there is no row to add.');
+    const { data, error } = await client
+      .from('records')
+      .insert({ user_id: env.userId, collection_id: collectionId, data: checked.data, source: 'typed', draft: false, position: count })
+      .select('*')
+      .single();
+    if (error) throw new GoalsRefused(`The row could not be added: ${error.message}`);
+    const after = data as Row;
+    const said = describeRecord(fields, after.data);
+    return {
+      kind: 'change_goal_form',
+      input: input('Added', said),
+      subjectRef: toRef(RECORDS, after.id as string),
+      op: 'insert',
+      before: null,
+      after,
+      undo: null,
+      summary: `Dash added "${said}" to ${listName} on "${title}".`,
+      row,
+    };
+  }
+
+  const before = await findRecord(env, collectionId, fields, text(args, 'record'), false);
+  const checked = checkRecord(fields, values, (before.data ?? {}) as RecordValues);
+  if (!checked.ok) throw new GoalsRefused(checked.error);
+  if (JSON.stringify(checked.data) === JSON.stringify(before.data ?? {})) throw new GoalsRefused('That row has those values already.');
+  const { error } = await client
+    .from('records')
+    .update({ data: checked.data, source: 'typed', draft: false })
+    .eq('id', before.id as string)
+    .eq('user_id', env.userId);
+  if (error) throw new GoalsRefused(`The row could not be changed: ${error.message}`);
+  const after = await ownRow(env.goals, 'records', before.id as string, env.userId);
+  const said = describeRecord(fields, after?.data);
+  return {
+    kind: 'change_goal_form',
+    input: input('Changed', said),
+    subjectRef: toRef(RECORDS, before.id as string),
+    op: 'update',
+    before,
+    after,
+    undo: null,
+    summary: `Dash changed the row "${describeRecord(fields, before.data)}" in ${listName} on "${title}"${said !== describeRecord(fields, before.data) ? `, now "${said}"` : ''}.`,
+    row,
+  };
+}
+
 /** An information step's form: its questions, its rows, and the kinds of document it has learned to read. */
 async function changeGoalForm(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
   const change: FormChange = oneOf(args, FORM_CHANGES);
+  if (change === 'add_record' || change === 'edit_record') return changeGoalRecord(env, args, change);
   const step = await ownStep(env, text(args, 'step_ref'), 'step_ref');
   if (step.archived_at != null) throw new GoalsRefused('That step is archived. Restore it first.');
   const collectionId = step.collection_id as string | null;
@@ -1815,21 +1962,28 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_form',
     description:
-      "Change the form on one of the person's steps that gathers information, when they ask: set the questions it asks (change set_questions, with questions as the whole list; a wording kept keeps its answer, and an empty list clears them), archive one of its rows or bring an archived one back (archive_record, restore_record, with record as words from the row such as its name), change a kind of document it has learned to read (edit_document_kind, with document_kind and any of name, recognise, senders and skipped), or forget one so the next is read as new (forget_document_kind). Name the step by the goals.items ref a lookup returned. A row or kind that does not match is refused with the ones there are.",
+      "Change the form on one of the person's steps that gathers information, or a collection serving a goal, when they ask: set the questions it asks (change set_questions, with questions as the whole list; a wording kept keeps its answer, and an empty list clears them), add a row with the values they give (add_record, with values by field label) or change one (edit_record, with record and the values that change), on a step's form by step_ref or on a list serving a goal by goal_ref and collection (its name, such as the spaces list), archive one of its rows or bring an archived one back (archive_record, restore_record, with record as words from the row such as its name), change a kind of document it has learned to read (edit_document_kind, with document_kind and any of name, recognise, senders and skipped), or forget one so the next is read as new (forget_document_kind). Name the step by the goals.items ref a lookup returned. A row or kind that does not match is refused with the ones there are.",
     input_schema: {
       type: 'object',
       properties: {
         change: { type: 'string', enum: [...FORM_CHANGES], description: 'What to change on the form.' },
         step_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the step.' },
+        goal_ref: { type: 'string', description: 'For add_record and edit_record on a collection serving a goal, in place of step_ref: the goals.items ref of the goal.' },
+        collection: { type: 'string', description: 'With goal_ref: the collection by its name, when more than one serves the goal.' },
+        values: {
+          type: 'object',
+          additionalProperties: { type: ['string', 'number', 'boolean', 'null'] },
+          description: 'For add_record and edit_record: the values by field label (or key), such as {"Width": 31}.',
+        },
         questions: { type: 'array', items: { type: 'string' }, description: 'For set_questions: every question the step should ask, in order.' },
-        record: { type: 'string', description: 'For archive_record and restore_record: words from the row, or its goals.records ref.' },
+        record: { type: 'string', description: 'For edit_record, archive_record and restore_record: words from the row, or its goals.records ref.' },
         document_kind: { type: 'string', description: 'For edit_document_kind and forget_document_kind: the kind by its name.' },
         name: { type: 'string', description: 'For edit_document_kind: its new name.' },
         recognise: { type: 'string', description: 'For edit_document_kind: how to tell a document of this kind.' },
         senders: { type: 'array', items: { type: 'string' }, description: 'For edit_document_kind: who sends it, each a name or address.' },
         skipped: { type: 'array', items: { type: 'string' }, description: 'For edit_document_kind: the labels on it that are left out.' },
       },
-      required: ['change', 'step_ref'],
+      required: ['change'],
       additionalProperties: false,
     },
     run: changeGoalForm,

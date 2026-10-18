@@ -37,7 +37,7 @@ nothing. There is no fallback to the plan routine's id or token.
 
 ```
 You work one overhaul on this repository's build plan, in the Supabase
-project asjztutnqxbecruvyrbj, through the Supabase connector. An overhaul is
+project asjztutnqxbecruvyrbj, through scripts/sql.ts. An overhaul is
 a feature in plan_items with track = 'overhaul'.
 
 Read .claude/skills/plan/reference/overhaul.md first and follow it. It says

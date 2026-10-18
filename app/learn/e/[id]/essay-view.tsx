@@ -5,6 +5,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight } from 'lucide-react';
 import { PageColumn } from '@/components/shell/page-width';
 import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
+import { TextSizeControl, useTextScale } from '@/components/learn/text-size';
 import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -634,6 +635,7 @@ export function EssayView({
   // Finish in this visit makes Publish available without a reload.
   const [finishedAt, setFinishedAt] = useState(essay.finishedAt);
   const [focusMode, setFocusMode] = useState(false);
+  const [textScale, stepTextScale] = useTextScale();
   const [brief, setBrief] = useState(essay.brief);
   const onBrief = useCallback((next: EssayBrief) => {
     setBrief(next);
@@ -848,7 +850,7 @@ export function EssayView({
 
   // The tabs on the left; on the right, what the draft's tab can do to its text.
   const tabs = (
-    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
+    <div className="mb-4 flex min-h-11 flex-wrap items-center justify-between gap-2 min-[375px]:flex-nowrap">
       <Segmented
         label="Prepare, notes or draft"
         value={mode}
@@ -859,7 +861,8 @@ export function EssayView({
           { value: 'draft', label: 'Draft' },
         ]}
       />
-      <div className={cn('flex items-center gap-1', !writing && 'hidden')}>
+      <div className={cn('ml-auto flex items-center gap-1 max-sm:gap-0', mode === 'prepare' && 'hidden')}>
+        <TextSizeControl scale={textScale} onStep={stepTextScale} />
         <DashAction
           paid="app/learn/e/[id]/actions.ts#rephraseEssaySelection"
           what="Cost of a rephrase"
@@ -873,6 +876,7 @@ export function EssayView({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => void askRephrase()}
           title={selected ? undefined : 'Select some text to have Dash reword it'}
+          wrapperClassName={cn(!writing && 'hidden')}
         >
           {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
         </DashAction>
@@ -882,7 +886,7 @@ export function EssayView({
           size="sm"
           aria-pressed={focusMode}
           onClick={() => setFocusMode((on) => !on)}
-          className="hidden lg:inline-flex"
+          className={cn('hidden', writing && 'lg:inline-flex')}
         >
           {focusMode ? 'Focus on' : 'Focus'}
         </Button>
@@ -1017,6 +1021,7 @@ export function EssayView({
           onSaveNow={onSaveNow}
           onSelect={onSelect}
           onCaret={studyApi.onCaret}
+          textScale={textScale}
         />
       </Card>
       {rephrase.kind === 'failed' && (
@@ -1054,6 +1059,7 @@ export function EssayView({
           api={planApi}
           handle={notesEditor}
           autoFocus={openedOn === 'notes'}
+          textScale={textScale}
         />
       </section>
       <section aria-label="Draft" hidden={!writing}>

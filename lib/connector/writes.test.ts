@@ -87,6 +87,7 @@ describe('runConnectorWrite', () => {
       'save_answer',
       'set_default_answer',
       'change_company',
+      'add_company',
       'merge_roles',
       'change_reminder',
       'change_waiting',
