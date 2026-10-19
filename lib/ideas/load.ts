@@ -109,13 +109,31 @@ export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
   };
 }
 
+/** How long a suggestion of Dash's stays on the page unanswered (note 350d47ae). */
+export const SUGGESTION_SHELF_DAYS = 30;
+
+/**
+ * A suggestion nobody took up within a month has had its chance. It leaves
+ * the page but stays in the table, so the duplicate check still sees it and
+ * the same thought is not suggested again. One you wrote under stays: you
+ * picked it up, and the age no longer says anything about it.
+ */
+function agedOut(idea: IdeaRow, asOf: Date): boolean {
+  if (idea.source !== 'claude' || idea.planItem || idea.dismissedAt) return false;
+  if (idea.thread.some((turn) => turn.author === 'me')) return false;
+  const age = asOf.getTime() - new Date(idea.createdAt).getTime();
+  return age > SUGGESTION_SHELF_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /**
  * Dismissed first, because a dismissed idea is out of the page whatever else
- * is true of it: that is what dismissing it was for.
+ * is true of it: that is what dismissing it was for. With `asOf`, suggestions
+ * older than SUGGESTION_SHELF_DAYS are left out of every pile.
  */
-export function ideaListFrom(rows: readonly IdeaRow[]): IdeaList {
-  const dismissed = rows.filter((idea) => idea.dismissedAt);
-  const live = rows.filter((idea) => !idea.dismissedAt);
+export function ideaListFrom(rows: readonly IdeaRow[], asOf?: Date): IdeaList {
+  const kept = asOf ? rows.filter((idea) => !agedOut(idea, asOf)) : rows;
+  const dismissed = kept.filter((idea) => idea.dismissedAt);
+  const live = kept.filter((idea) => !idea.dismissedAt);
   const open = live.filter((idea) => !idea.planItem);
 
   return {
@@ -219,5 +237,8 @@ export async function loadIdeas(supabase: SupabaseClient, userId: string): Promi
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
 
   // Each idea's thread, from the shared store (plan #1470).
-  return ideaListFrom((await withThreads(supabase, IDEAS_TABLE, rows, { userId })).map(ideaRowFrom));
+  return ideaListFrom(
+    (await withThreads(supabase, IDEAS_TABLE, rows, { userId })).map(ideaRowFrom),
+    new Date(),
+  );
 }

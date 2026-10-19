@@ -10,6 +10,7 @@ import {
   INSPIRATION_VIEWS,
   INSPIRATION_VIEW_LABEL,
   dayLabel,
+  nothingLeftIn,
   type InspirationPage,
   type InspirationVideo,
   type InspirationViewName,
@@ -152,6 +153,8 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
   }
 
   const read = page.videos.filter((video) => video.state.kind === 'read').length;
+  const looked = page.videos.filter(nothingLeftIn);
+  const toLook = page.videos.filter((video) => !nothingLeftIn(video));
 
   return (
     <div className="space-y-6">
@@ -165,9 +168,22 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
 
       {view === 'videos' ? (
         <div className="space-y-6">
-          {page.videos.map((video) => (
-            <VideoGroup key={video.id} video={video} />
-          ))}
+          {toLook.length > 0 ? (
+            toLook.map((video) => <VideoGroup key={video.id} video={video} />)
+          ) : (
+            <p className="text-small text-ink-muted">Every video has been read and has nothing left to look at.</p>
+          )}
+          {/* Videos with nothing left to act on (note 71b32f67), shut so the
+              ones still worth opening are what the page shows. */}
+          {looked.length > 0 && (
+            <SectionFold title="Nothing left to look at" count={looked.length} defaultOpen={false}>
+              <div className="space-y-6">
+                {looked.map((video) => (
+                  <VideoGroup key={video.id} video={video} />
+                ))}
+              </div>
+            </SectionFold>
+          )}
         </div>
       ) : page.list.length > 0 ? (
         <TakeawayList takeaways={page.list} />
