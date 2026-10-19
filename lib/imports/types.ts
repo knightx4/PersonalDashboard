@@ -16,7 +16,11 @@ export type ColumnType = 'text' | 'uuid' | 'timestamptz' | 'date' | 'number' | '
 
 /** A value that stands for the id of the row another record became. */
 export interface RowRef {
-  $ref: { kind: string; key: string };
+  /**
+   * `orNull` makes it null, rather than skipping the record, when that record
+   * made no row (a connection's employer the person does not track, #2432.5).
+   */
+  $ref: { kind: string; key: string; orNull?: boolean };
 }
 
 /** The values a record should give its row: column name to value or ref. */

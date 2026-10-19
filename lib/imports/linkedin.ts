@@ -5,6 +5,7 @@ import type { ImportMapper, ImportPlan, ImportStore } from './types';
 import { LINKEDIN_APPLICATION_MAPPERS } from './linkedin/applications';
 import { LINKEDIN_SAVED_MAPPERS } from './linkedin/saved';
 import { LINKEDIN_PURCHASE_MAPPERS } from './linkedin/purchases';
+import { LINKEDIN_CONNECTION_MAPPERS } from './linkedin/connections';
 
 // The LinkedIn export through the import engine (plan #2432.2), the one
 // pipeline the settings page and scripts/import-linkedin.ts both run.
@@ -20,6 +21,7 @@ export const LINKEDIN_MAPPERS: ImportMapper<LinkedInArchive>[] = [
   ...LINKEDIN_SAVED_MAPPERS,
   ...LINKEDIN_PURCHASE_MAPPERS,
   ...LINKEDIN_PROFILE_MAPPERS,
+  ...LINKEDIN_CONNECTION_MAPPERS,
 ];
 
 /**

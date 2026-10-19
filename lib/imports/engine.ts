@@ -44,9 +44,12 @@ export function emptyCounts(): Counts {
   return { added: 0, updated: 0, unchanged: 0, kept: 0, skipped: 0 };
 }
 
-/** A value standing for the id of the row the record `key` of `kind` became. */
-export function ref(kind: string, key: string): RowRef {
-  return { $ref: { kind, key } };
+/**
+ * A value standing for the id of the row the record `key` of `kind` became.
+ * With `orNull`, a record that made no row gives null instead of a skip.
+ */
+export function ref(kind: string, key: string, options: { orNull?: boolean } = {}): RowRef {
+  return options.orNull ? { $ref: { kind, key, orNull: true } } : { $ref: { kind, key } };
 }
 
 function isRef(value: unknown): value is RowRef {
@@ -70,8 +73,8 @@ function resolveRefs(values: IntendedValues, resolved: Resolved): { values: Inte
   for (const [column, value] of Object.entries(values)) {
     if (isRef(value)) {
       const id = resolved.get(value.$ref.kind)?.get(value.$ref.key);
-      if (!id) return { missing: value };
-      out[column] = id;
+      if (!id && !value.$ref.orNull) return { missing: value };
+      out[column] = id ?? null;
     } else {
       out[column] = value;
     }
