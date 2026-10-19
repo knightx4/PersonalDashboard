@@ -106,6 +106,25 @@ describe('the ideas list', () => {
     expect(row.source).toBe('me');
   });
 
+  it('leaves out a suggestion over a month old, unless you wrote under it (note 350d47ae)', () => {
+    const asOf = new Date('2026-10-19T09:00:00Z');
+    const rows = [
+      idea({ id: 'old-suggestion', source: 'claude' }),
+      idea({ id: 'old-mine' }),
+      { ...idea({ id: 'fresh-suggestion', source: 'claude' }), created_at: '2026-10-01T09:00:00Z' },
+    ].map(ideaRowFrom);
+    const answered = {
+      ...ideaRowFrom(idea({ id: 'old-answered', source: 'claude' })),
+      thread: [{ id: 't1', author: 'me' as const, body: 'Maybe', createdAt: '2026-09-13T09:00:00Z' }],
+    };
+
+    const list = ideaListFrom([...rows, answered], asOf);
+
+    expect(list.suggested.map((row) => row.id)).toEqual(['fresh-suggestion', 'old-answered']);
+    expect(list.mine.map((row) => row.id)).toEqual(['old-mine']);
+    expect(ideaListFrom(rows).suggested.map((row) => row.id)).toContain('old-suggestion');
+  });
+
   it('selects the dismissal, so the page can tell a live idea from a put-aside one', () => {
     expect(IDEA_COLUMNS).toContain('dismissed_at');
   });
