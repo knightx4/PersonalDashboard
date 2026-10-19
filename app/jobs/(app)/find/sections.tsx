@@ -228,7 +228,7 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
 
 /**
  * Events to go to: the people search's suggestions whose move is to turn up
- * somewhere (channel `event`), split from People to meet so a meetup does not
+ * somewhere or follow a calendar (channel `event`), split from People to meet so a meetup does not
  * sit among the people to write to. The same search finds both.
  */
 export function RecommendedEvents({ suggestions }: { suggestions: OpenSuggestion[] }) {
@@ -752,11 +752,14 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
   );
 }
 
-/** An event: who runs it, why it is worth the evening, what to do there, and its page. */
+/** An event or a calendar to follow: who runs it, why it is worth it, what to do, and its page. */
 function EventRow({ suggestion }: { suggestion: OpenSuggestion }) {
   const [busy, start] = useTransition();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
+  // The search also suggests Luma calendars to follow, headlined "Subscribe
+  // to … on Luma" (lib/jobs/suggest/model.ts).
+  const calendar = /^Subscribe to /.test(suggestion.headline);
 
   const act = (action: () => Promise<{ error: string | null }>) =>
     start(async () => {
@@ -796,7 +799,7 @@ function EventRow({ suggestion }: { suggestion: OpenSuggestion }) {
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
             <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-            Event page
+            {calendar ? 'Calendar' : 'Event page'}
           </a>
         )}
         <span className="ml-auto flex items-center gap-2">
@@ -807,7 +810,7 @@ function EventRow({ suggestion }: { suggestion: OpenSuggestion }) {
             pending={busy}
             onClick={() => act(() => markSuggestionSent(suggestion.id))}
           >
-            Going
+            {calendar ? 'Subscribed' : 'Going'}
           </Button>
         </span>
       </div>
