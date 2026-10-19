@@ -457,6 +457,13 @@ Each of those needs retrieval, which needs the pgvector decision. That decision
 is deferred deliberately and should be made when the first real consumer exists,
 not before.
 
+## Rules
+
+**R1.** When the tree response comes back `truncated: true`, sync completes the
+listing with a per-directory walk. It never acts on a partial listing, because
+that would delete notes that are still in the repository.
+Checked by: audit.
+
 ## Open questions
 
 - **Scope.** v1 syncs every `.md` in the repo. A folder allowlist or a
