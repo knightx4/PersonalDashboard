@@ -120,9 +120,17 @@ export interface ImportKey {
   hash: string;
 }
 
+/** A file of the export the import left out or read only in part, and why. */
+export interface SkippedFile {
+  path: string;
+  reason: string;
+}
+
 export interface RunMeta {
   archiveDate?: string | null;
   storagePath?: string | null;
+  /** Kept on the run, so its history can say what was left out (plan #2432.9). */
+  skippedFiles?: SkippedFile[];
 }
 
 /**

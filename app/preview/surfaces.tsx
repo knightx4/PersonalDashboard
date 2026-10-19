@@ -115,6 +115,7 @@ import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
+import { linkedInPlanFixture, linkedInRunsFixture } from './linkedin-import-fixtures';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
 import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
@@ -9925,6 +9926,69 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <JobsSettingsView {...settings} tab="career-goals" opensOn="career-goals" />,
+  },
+  {
+    id: 'jobs-settings-linkedin',
+    label: 'Jobs · Settings, the LinkedIn tab',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} linkedInRuns={linkedInRunsFixture} tab="linkedin" opensOn="linkedin" />,
+  },
+  {
+    id: 'jobs-settings-linkedin-preview',
+    label: 'Jobs · Settings, LinkedIn, what an export would do',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{ step: 'planned', plan: linkedInPlanFixture }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-applying',
+    label: 'Jobs · Settings, LinkedIn, importing',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{ step: 'applying', plan: linkedInPlanFixture }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-error',
+    label: 'Jobs · Settings, LinkedIn, a zip that is not an export',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{
+          step: 'error',
+          message:
+            "Holiday photos 2026.zip is a zip, but none of its files are ones LinkedIn's export holds. Choose the zip LinkedIn emailed you, named like Basic_LinkedInDataExport_10-19-2026.zip.",
+        }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-empty',
+    label: 'Jobs · Settings, LinkedIn, nothing imported yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} linkedInRuns={[]} tab="linkedin" opensOn="linkedin" />,
   },
   {
     id: 'jobs-onboarding',
