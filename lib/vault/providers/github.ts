@@ -47,11 +47,22 @@ type ContentsPutResponse = {
   commit?: { sha?: string };
 };
 
+type TreeNode = { path?: string; type?: string; sha?: string; size?: number };
+
 type TreeResponse = {
   sha: string;
   truncated?: boolean;
-  tree?: Array<{ path?: string; type?: string; sha?: string; size?: number }>;
+  tree?: TreeNode[];
 };
+
+/**
+ * How many folders a walk of a truncated tree lists at once, and in all. Four
+ * at a time keeps clear of GitHub's secondary rate limit; the ceiling keeps a
+ * repository of tens of thousands of folders from spending the hour's quota
+ * on one listing, and a walk that would pass it is reported as truncated.
+ */
+const WALK_CONCURRENCY = 4;
+const WALK_FOLDER_LIMIT = 2000;
 
 type CompareResponse = {
   files?: Array<{
@@ -203,12 +214,72 @@ export class GithubVaultSource implements VaultSource {
     return commit.sha;
   }
 
+  /**
+   * The commit's whole tree listed one folder at a time (plan #2454.1), for a
+   * repository whose recursive listing came back truncated. Each folder is one
+   * request, a few at once. The blobs come back with full repository paths,
+   * the same shape the recursive listing gives, or null when any folder could
+   * not be listed: a request that failed, a folder whose own listing was
+   * truncated, or more folders than the walk is allowed to visit. A rejected
+   * token and a rate limit still throw, since each has its own message.
+   */
+  private async walkTree(commitSha: string): Promise<TreeNode[] | null> {
+    const blobs: TreeNode[] = [];
+    const pending: Array<{ sha: string; prefix: string }> = [{ sha: commitSha, prefix: '' }];
+    let listed = 0;
+    let complete = true;
+
+    const listOne = async (folder: { sha: string; prefix: string }): Promise<void> => {
+      let tree: TreeResponse;
+      try {
+        tree = await this.request<TreeResponse>(`${this.base}/git/trees/${encodeURIComponent(folder.sha)}`);
+      } catch (error) {
+        if (error instanceof VaultAuthError) throw error;
+        if (error instanceof VaultSourceError && error.status === 403) throw error;
+        complete = false;
+        return;
+      }
+      if (tree.truncated) {
+        complete = false;
+        return;
+      }
+      for (const node of tree.tree ?? []) {
+        if (!node.path || !node.sha) continue;
+        const path = folder.prefix ? `${folder.prefix}/${node.path}` : node.path;
+        if (node.type === 'blob') blobs.push({ ...node, path });
+        else if (node.type === 'tree') pending.push({ sha: node.sha, prefix: path });
+      }
+    };
+
+    while (pending.length > 0 && complete) {
+      if (listed + pending.length > WALK_FOLDER_LIMIT) return null;
+      const wave = pending.splice(0, WALK_CONCURRENCY);
+      listed += wave.length;
+      await Promise.all(wave.map(listOne));
+    }
+
+    return complete ? blobs : null;
+  }
+
   async snapshot(commitSha: string): Promise<VaultSnapshot> {
     const tree = await this.request<TreeResponse>(
       `${this.base}/git/trees/${encodeURIComponent(commitSha)}?recursive=1`,
     );
 
-    const blobs = (tree.tree ?? []).filter((node) => node.type === 'blob' && node.path && node.sha);
+    // A recursive listing GitHub cut short is completed folder by folder. Only
+    // a walk that listed every folder stands in for it; anything less stays
+    // truncated, so the sync refuses rather than deleting what it missed.
+    let nodes: TreeNode[] = tree.tree ?? [];
+    let truncated = Boolean(tree.truncated);
+    if (truncated) {
+      const walked = await this.walkTree(commitSha);
+      if (walked) {
+        nodes = walked;
+        truncated = false;
+      }
+    }
+
+    const blobs = nodes.filter((node) => node.type === 'blob' && node.path && node.sha);
 
     // Notes and attachments come out of the same listing, so knowing what the
     // vault holds costs one request however many files it has. Everything
@@ -230,7 +301,7 @@ export class GithubVaultSource implements VaultSource {
 
     // A truncated tree is not a smaller vault, it is an unknown one. Acting on
     // it would delete every note it failed to mention.
-    return { entries, truncated: Boolean(tree.truncated), attachments };
+    return { entries, truncated, attachments };
   }
 
   async diff(fromCommitSha: string, toCommitSha: string): Promise<VaultDiff> {
