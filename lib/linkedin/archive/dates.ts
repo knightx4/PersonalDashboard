@@ -34,11 +34,11 @@ function iso(y: number, mo: number, d: number, h: number, mi: number, s: number)
   return date.toISOString();
 }
 
-/** "6/13/26, 11:26 PM" (Job Applications, Saved Jobs, Invitations). */
-const US_SHORT = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)$/i;
+/** "6/13/26, 11:26 PM" (Job Applications, Saved Jobs, Invitations), or "12/24/25 06:19 AM UTC" (Receipts). */
+const US_SHORT = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)(?:\s+UTC)?$/i;
 /** "Fri Aug 21 19:02:55 UTC 2026" (Company Follows). */
 const JAVA_DATE = /^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})\s+UTC\s+(\d{4})$/;
-/** "2026-08-21 15:14:57 UTC" (messages, Learning, Receipts); seconds optional. */
+/** "2026-08-21 15:14:57 UTC" (messages, Learning); seconds optional. */
 const SQL_UTC = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(?:UTC|Z|\+00:?00)?$/i;
 
 /**
