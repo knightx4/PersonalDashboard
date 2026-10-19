@@ -5,6 +5,7 @@ import { choosePursuitFor, pursuitsFromRoles } from '@/lib/jobs/inbox/pursuits';
 import { slugify } from '@/lib/jobs/slug';
 import { ref } from '../engine';
 import type { ImportMapper, ImportStore, MappedRecord, PendingRecord } from '../types';
+import { recentSavedJobs } from './saved-window';
 
 // LinkedIn's Easy Apply history into Jobs (plan #2432.4): the companies and
 // roles applied to, one submitted application each with the date it went in,
@@ -14,8 +15,11 @@ import type { ImportMapper, ImportStore, MappedRecord, PendingRecord } from '../
 //
 //   companies     one per employer, keyed by companyNameKey, joined to the
 //                 person's company by slug or by findSameCompany, the same
-//                 two questions findExistingCompany asks.
-//   roles         one per application, keyed like it. Joined to a role whose
+//                 two questions findExistingCompany asks. Recent saved jobs'
+//                 employers are added too, and followed companies are only
+//                 joined (#2432.6).
+//   roles         one per application, keyed like it, and one per recent
+//                 saved job not applied to (#2432.6). Joined to a role whose
 //                 ats_job_id or jd_url carries the LinkedIn job id, else to
 //                 the pursuit choosePursuitFor picks at that company.
 //   resumes       one resume version per resume name, joined by label, with
@@ -100,6 +104,35 @@ function usable(a: JobApplicationRecord): boolean {
 
 // ── companies ───────────────────────────────────────────────────────────────
 
+/**
+ * The person's companies these names are, as record key to company id: by
+ * slug, or by findSameCompany, the two questions findExistingCompany asks.
+ */
+export async function matchCompanies(
+  pending: { key: string; name: string; slug: string }[],
+  store: ImportStore,
+): Promise<Map<string, string>> {
+  if (pending.length === 0) return new Map();
+  // Every company the person has: priority is never null and takes one of these.
+  const mine = (await everyRow(
+    store,
+    'job_search.companies',
+    ['name', 'slug', 'domains', 'website', 'ats_type', 'ats_board_token'],
+    'priority',
+    ['target', 'interested', 'backup', 'passed'],
+  )) as unknown as (CompanyIdentity & { id: string; slug: string })[];
+  const bySlug = new Map(mine.map((c) => [c.slug, c.id]));
+  const out = new Map<string, string>();
+  for (const p of pending) {
+    const id = bySlug.get(p.slug) ?? findSameCompany({ name: p.name, domains: [] }, mine)?.company.id;
+    if (id) out.set(p.key, id);
+  }
+  return out;
+}
+
+/** Why a followed company is not added to the companies list. */
+export const FOLLOW_ONLY = 'You follow it on LinkedIn but do not track it, so it goes on your startup watchlist instead.';
+
 export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
   kind: 'companies',
   table: 'job_search.companies',
@@ -107,32 +140,26 @@ export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
   records(archive) {
     const out: MappedRecord[] = [];
     const seen = new Set<string>();
-    for (const a of archive.applications) {
-      const key = companyKey(a.companyName);
-      if (!key || seen.has(key)) continue;
+    const add = (raw: string | null, joinOnly?: string) => {
+      const key = companyKey(raw);
+      if (!key || seen.has(key)) return;
       seen.add(key);
-      const name = a.companyName!.trim();
-      out.push({ key, values: { name, slug: slugify(name) } });
-    }
+      const name = raw!.trim();
+      out.push({ key, values: { name, slug: slugify(name) }, joinOnly });
+    };
+    // Applied to, then saved recently (plan #2432.6): both may add a company.
+    for (const a of archive.applications) add(a.companyName);
+    for (const s of recentSavedJobs(archive)) add(s.companyName);
+    // Followed only: linked to the person's company when they track it, and
+    // otherwise left to the watchlist mapper (saved.ts), never added here.
+    for (const f of archive.companyFollows) add(f.organization, FOLLOW_ONLY);
     return out;
   },
   async match(pending, store) {
-    // Every company the person has: priority is never null and takes one of these.
-    const mine = (await everyRow(
+    return matchCompanies(
+      pending.map((p) => ({ key: p.key, name: String(p.values.name), slug: String(p.values.slug) })),
       store,
-      'job_search.companies',
-      ['name', 'slug', 'domains', 'website', 'ats_type', 'ats_board_token'],
-      'priority',
-      ['target', 'interested', 'backup', 'passed'],
-    )) as unknown as (CompanyIdentity & { id: string; slug: string })[];
-    const bySlug = new Map(mine.map((c) => [c.slug, c.id]));
-    const out = new Map<string, string>();
-    for (const p of pending) {
-      const name = String(p.values.name);
-      const id = bySlug.get(String(p.values.slug)) ?? findSameCompany({ name, domains: [] }, mine)?.company.id;
-      if (id) out.set(p.key, id);
-    }
-    return out;
+    );
   },
 };
 
@@ -143,7 +170,7 @@ export const linkedInRoles: ImportMapper<LinkedInArchive> = {
   table: 'job_search.roles',
   columns: { company_id: 'uuid', title: 'text', jd_url: 'text', ats_job_id: 'text', source: 'text' },
   records(archive) {
-    return archive.applications.map((a): MappedRecord => {
+    const applied = archive.applications.map((a): MappedRecord => {
       if (!usable(a)) return { key: a.key, skip: 'It names no company or no job title.' };
       return {
         key: a.key,
@@ -156,6 +183,21 @@ export const linkedInRoles: ImportMapper<LinkedInArchive> = {
         },
       };
     });
+    // A job saved recently and not applied to is a role too, for its lead
+    // (plan #2432.6); the leads mapper counts the ones left out.
+    const saved = recentSavedJobs(archive).map(
+      (s): MappedRecord => ({
+        key: s.key,
+        values: {
+          company_id: ref('companies', companyKey(s.companyName)!),
+          title: s.jobTitle!.trim(),
+          jd_url: s.jobUrl,
+          ats_job_id: s.jobId ?? linkedInJobId(s.jobUrl),
+          source: SOURCE,
+        },
+      }),
+    );
+    return [...applied, ...saved];
   },
   async match(pending, store) {
     const roles = await everyRow(

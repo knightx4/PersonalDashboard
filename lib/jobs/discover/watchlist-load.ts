@@ -6,6 +6,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { JobPreferences } from '@/lib/jobs/suggest/preferences';
 import { employerDomain, findSameCompany, type CompanyIdentity } from '@/lib/jobs/companies/same-company';
 import { postingPlaceFits } from './filter';
+import { discoverySource } from './roles';
 import { rankCompanies, type DiscoveredCompany, type DiscoveryRunView } from './watchlist-view';
 
 type Row = Record<string, unknown>;
@@ -85,7 +86,7 @@ export async function loadDiscoveredCompanies(
       id: row.id as string,
       name: row.name as string,
       website: (row.website as string | null) ?? null,
-      source: row.source === 'hn' ? 'hn' : 'yc',
+      source: discoverySource(row.source),
       description: (row.description as string | null) ?? null,
       reason: (row.reason as string | null) ?? null,
       score: (row.fit_score as number | null) ?? null,

@@ -24,13 +24,27 @@ export type IntendedValues = Record<string, unknown>;
 
 /** One record as a mapper hands it over: its key and the row it should be, or why it is skipped. */
 export type MappedRecord =
-  | { key: string; values: IntendedValues; skip?: undefined }
-  | { key: string; skip: string; values?: undefined };
+  | {
+      key: string;
+      values: IntendedValues;
+      skip?: undefined;
+      /**
+       * Set when the record may only join a row the person already has: with
+       * no match it is skipped, for this reason, rather than added.
+       */
+      joinOnly?: string;
+    }
+  | { key: string; skip: string; values?: undefined; joinOnly?: undefined };
 
 /** A record with no key yet, offered to a mapper's `match`. */
 export interface PendingRecord {
   key: string;
   values: IntendedValues;
+}
+
+/** A pending record `match` found should not be imported, and why. */
+export interface MatchSkip {
+  skip: string;
 }
 
 export interface ImportMapper<Input> {
@@ -49,9 +63,11 @@ export interface ImportMapper<Input> {
   /**
    * Rows the person already has that a record with no key should join rather
    * than add, returned as record key to row id (an application already
-   * tracked from mail, say). A joined row has only its empty columns filled.
+   * tracked from mail, say). A joined row has only its empty columns filled
+   * (null, or an empty array). A record mapped to `{ skip }` instead is
+   * skipped for that reason: it is already in the app another way.
    */
-  match?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string>>;
+  match?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string | MatchSkip>>;
 }
 
 export type Outcome = 'added' | 'updated' | 'unchanged' | 'kept' | 'skipped';
