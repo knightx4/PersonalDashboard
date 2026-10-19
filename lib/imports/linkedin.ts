@@ -1,5 +1,6 @@
 import { readLinkedInArchive, skippedArchiveFiles, type LinkedInArchive } from '@/lib/linkedin/archive';
 import { applyPlan, planImport } from './engine';
+import { LINKEDIN_PROFILE_MAPPERS } from './linkedin-profile';
 import type { ImportMapper, ImportPlan, ImportStore } from './types';
 import { LINKEDIN_APPLICATION_MAPPERS } from './linkedin/applications';
 import { LINKEDIN_SAVED_MAPPERS } from './linkedin/saved';
@@ -18,6 +19,7 @@ export const LINKEDIN_MAPPERS: ImportMapper<LinkedInArchive>[] = [
   ...LINKEDIN_APPLICATION_MAPPERS,
   ...LINKEDIN_SAVED_MAPPERS,
   ...LINKEDIN_PURCHASE_MAPPERS,
+  ...LINKEDIN_PROFILE_MAPPERS,
 ];
 
 /**

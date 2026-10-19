@@ -178,7 +178,14 @@ function ReadButton({ label, size }: { label: string; size?: 'sm' }) {
 function JobRow({ job, onEdit }: { job: Job; onEdit: () => void }) {
   const dates = jobDates(job);
   const heading = job.title ?? job.employer;
-  const mark = job.edited ? (job.resume_hash ? 'Edited' : 'Added by you') : null;
+  const mark = job.edited
+    ? job.resume_hash || job.source
+      ? 'Edited'
+      : 'Added by you'
+    : // Only a job the import added; a résumé row it filled in reads as it did.
+      job.source === 'linkedin' && !job.resume_hash
+      ? 'From LinkedIn'
+      : null;
   const under = [job.title ? job.employer : null, job.place, mark].filter(Boolean).join(' · ');
   return (
     <li id={jobAnchor(job.id)} className="flex scroll-mt-bar items-start gap-3 py-2.5 target:bg-accent-tint">
@@ -199,7 +206,7 @@ function JobRow({ job, onEdit }: { job: Job; onEdit: () => void }) {
             id: 'remove',
             label: 'Remove',
             destructive: true,
-            confirm: job.resume_hash && !job.edited
+            confirm: job.resume_hash && !job.edited && !job.source
               ? 'Remove this job? A later read of your résumé lists it again.'
               : 'Remove this job?',
             formAction: removeJobAction,

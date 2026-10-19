@@ -22,6 +22,8 @@ export type Job = {
   edited: boolean;
   resume_id: string | null;
   resume_hash: string | null;
+  /** Null for a job read from the résumé or added by hand; 'linkedin' for one the import wrote (plan #2432.7). */
+  source: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -159,7 +161,8 @@ export function sortJobs<T extends Pick<Job, 'started' | 'ended' | 'position'>>(
   });
 }
 
-const normal = (value: string | null) =>
+/** A name as two rows are compared by: lower case, no punctuation, no "Inc" or "LLC". */
+export const normal = (value: string | null) =>
   (value ?? '')
     .toLowerCase()
     .normalize('NFKD')
@@ -177,18 +180,19 @@ function sameJob(kept: Pick<Job, 'employer' | 'title' | 'started'>, read: DraftJ
 /**
  * What a new read of the résumé changes (plan #1991.4). Every row Dash wrote
  * and the person has not touched is replaced by the new read; every row they
- * edited or added stays as it is, and a job the read finds that matches one
+ * edited or added, and every row the LinkedIn import wrote, stays as it is, and a job the read finds that matches one
  * of those (same employer, and the same start year or the same title) is not
  * added a second time. Those kept rows are named in `confirmed`, so the read
  * can mark them as found on this résumé without changing what they say.
  */
 export function planRead(
-  existing: readonly Pick<Job, 'id' | 'employer' | 'title' | 'started' | 'edited'>[],
+  existing: readonly (Pick<Job, 'id' | 'employer' | 'title' | 'started' | 'edited'> & { source?: string | null })[],
   read: readonly DraftJob[],
 ): { remove: string[]; add: DraftJob[]; kept: number; confirmed: string[] } {
-  const kept = existing.filter((job) => job.edited);
+  // A row the LinkedIn import wrote or filled in is the person's too: a read never replaces it.
+  const kept = existing.filter((job) => job.edited || job.source != null);
   return {
-    remove: existing.filter((job) => !job.edited).map((job) => job.id),
+    remove: existing.filter((job) => !kept.includes(job)).map((job) => job.id),
     add: read.filter((job) => !kept.some((mine) => sameJob(mine, job))),
     kept: kept.length,
     confirmed: kept.filter((mine) => read.some((job) => sameJob(mine, job))).map((job) => job.id),

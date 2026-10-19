@@ -55,9 +55,9 @@ export async function readResumeIntoWorkHistory(input: {
 
   const { data: existing, error: loadError } = await you
     .from('work_history')
-    .select('id, employer, title, started, edited');
+    .select('id, employer, title, started, edited, source');
   if (loadError) return { ok: false, error: 'Your jobs could not be loaded. Try again.' };
-  const plan = planRead((existing ?? []) as Pick<Job, 'id' | 'employer' | 'title' | 'started' | 'edited'>[], read.jobs);
+  const plan = planRead((existing ?? []) as Pick<Job, 'id' | 'employer' | 'title' | 'started' | 'edited' | 'source'>[], read.jobs);
   const hash = resumeHash(text);
 
   // Add the new read before taking the old one out, so a failure leaves the list as it was.
@@ -80,7 +80,7 @@ export async function readResumeIntoWorkHistory(input: {
     firstAddedId = ((added ?? []) as { id: string }[])[0]?.id ?? null;
   }
   if (plan.remove.length > 0) {
-    await you.from('work_history').delete().in('id', plan.remove).eq('edited', false).eq('user_id', userId);
+    await you.from('work_history').delete().in('id', plan.remove).eq('edited', false).is('source', null).eq('user_id', userId);
   }
   if (plan.confirmed.length > 0) {
     // Their rows that this résumé also lists: marked as found on it, with what they say unchanged.

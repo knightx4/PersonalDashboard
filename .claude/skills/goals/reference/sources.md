@@ -577,7 +577,16 @@ The jobs they have held: employer, title, place and dates, read from their résu
 - Search: `employer`, `title`, `place`, `note`
 - Name a row by `employer`; link it by `id`
 - Opens at `/you/work#job-<id>`
-- started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.
+- started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read. source is linkedin for a job the LinkedIn import wrote or filled in.
+
+### `you.profile_entries` (You)
+
+The schools, certifications, honors, skills and courses on their LinkedIn profile.
+
+- Search: `name`, `detail`, `description`, `activities`
+- Name a row by `name`; link it by `id`
+- Opens at `/you/work#profile-<id>`
+- kind is school, certification, honor, skill or course. detail is a school's degree or a certification's authority; code is a certification's license number or a course's number. started and ended are "YYYY" or "YYYY-MM"; an honor's started is the day it was issued. Written by the LinkedIn import (plan #2432.7).
 
 ### `core.files` (Files)
 

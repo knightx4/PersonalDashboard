@@ -98,6 +98,15 @@ describe('planRead', () => {
     ]);
     expect(plan.add).toEqual([read('Acme', '2021', 'Manager')]);
   });
+
+  it('keeps the jobs the LinkedIn import wrote or filled in (plan #2432.7)', () => {
+    const plan = planRead(
+      [{ id: 'linkedin', employer: 'Hooli', title: 'PM', started: '2025-07', edited: false, source: 'linkedin' }],
+      [read('Hooli', '2025-07', 'PM')],
+    );
+    expect(plan.remove).toEqual([]);
+    expect(plan.add).toEqual([]);
+  });
 });
 
 describe('resumeChanged', () => {

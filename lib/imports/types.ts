@@ -68,6 +68,12 @@ export interface ImportMapper<Input> {
    * skipped for that reason: it is already in the app another way.
    */
   match?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string | MatchSkip>>;
+  /**
+   * Records with no key that are not imported because the person already
+   * keeps them elsewhere, as record key to the reason (a LinkedIn course that
+   * is already on one of their transcripts). They count as skipped.
+   */
+  exclude?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string>>;
 }
 
 export type Outcome = 'added' | 'updated' | 'unchanged' | 'kept' | 'skipped';

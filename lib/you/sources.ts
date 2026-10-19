@@ -1,6 +1,7 @@
 import { courseHref, transcriptHref } from '@/lib/you/education';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
+import { profileHref } from '@/lib/you/profile-entries';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
@@ -140,7 +141,24 @@ export const youSources: ModuleSources = {
       parent: parentBy('resume_id', 'job_search.resume_versions'),
       note:
         'started and ended are "YYYY" or "YYYY-MM"; ended is null for the job they hold now. ' +
-        'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read.',
+        'edited is true when they corrected the row or added it themselves, so it is what they said rather than what Dash read. ' +
+        'source is linkedin for a job the LinkedIn import wrote or filled in.',
+    },
+    {
+      table: 'you.profile_entries',
+      module: 'You',
+      holds: 'The schools, certifications, honors, skills and courses on their LinkedIn profile.',
+      weight: 'record',
+      search: ['name', 'detail', 'description', 'activities'],
+      title: 'name',
+      facts: ['kind', 'started', 'ended', 'code'],
+      newest: 'started',
+      href: profileHref,
+      section: WORK,
+      note:
+        'kind is school, certification, honor, skill or course. detail is a school\'s degree or a certification\'s authority; ' +
+        'code is a certification\'s license number or a course\'s number. started and ended are "YYYY" or "YYYY-MM"; ' +
+        'an honor\'s started is the day it was issued. Written by the LinkedIn import (plan #2432.7).',
     },
   ],
   notSources: [

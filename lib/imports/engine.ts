@@ -23,6 +23,7 @@ import type {
 // For each record, by its key in core.import_keys:
 //
 //   no key, no match      added: a new row, with an id chosen here.
+//   no key, excluded      skipped: the person keeps it elsewhere already.
 //   no key, a match       joined: the person's row gains the key, and only its
 //                         empty columns are filled (updated, or unchanged when
 //                         none were empty).
@@ -149,10 +150,12 @@ export async function planImport<Input>(
 
     // Records with no key may join a row the person already has, or be found
     // to be in the app another way.
-    const pending = ready.filter((r) => !known.has(r.key));
+    const unkeyed = ready.filter((r) => !known.has(r.key));
+    const excluded = mapper.exclude && unkeyed.length > 0 ? await mapper.exclude(unkeyed, store) : new Map<string, string>();
+    const pending = unkeyed.filter((r) => !excluded.has(r.key));
     const found = mapper.match && pending.length > 0 ? await mapper.match(pending, store) : new Map<string, string | MatchSkip>();
     const matched = new Map<string, string>();
-    const skipped = new Map<string, string>();
+    const skipped = new Map<string, string>(excluded);
     for (const [key, hit] of found) {
       if (typeof hit === 'string') matched.set(key, hit);
       else skipped.set(key, hit.skip);

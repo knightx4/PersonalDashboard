@@ -325,6 +325,8 @@ import {
   educationUploading,
 } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
+import { profileJobs, profileLists, profileListsEmpty } from './profile-entry-fixtures';
+import { ProfileSections } from '@/app/you/work/profile-sections';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
@@ -6212,6 +6214,38 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader title="Work & school" />
         <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* After a LinkedIn import (plan #2432.7): the jobs with two from LinkedIn,
+     * then the profile's schools (a course on no transcript under it),
+     * certifications, honors and skills. */
+    id: 'you-work-linkedin',
+    label: 'Work & school · Your LinkedIn profile',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={profileJobs} resume={workHistoryResume} changed={false} />
+        <ProfileSections lists={profileLists} />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* Before any LinkedIn import: each profile section says what fills it. */
+    id: 'you-work-linkedin-empty',
+    label: 'Work & school · No LinkedIn import yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} />
+        <ProfileSections lists={profileListsEmpty} />
         <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
       </>
     ),
