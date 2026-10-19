@@ -447,8 +447,24 @@ export default function PrivacyPage() {
           number or a home address.
         </li>
         <li>
-          Nothing is scraped. Contacts are typed in or pasted by you. The app does not read
-          LinkedIn, and does not fetch anything behind a login.
+          Nothing is scraped. The app does not log in to LinkedIn or fetch anything behind a
+          login. Contacts are typed in, pasted, or come from the data export LinkedIn lets you
+          download, which you upload yourself on the Jobs settings page.
+        </li>
+        <li>
+          From that export the app keeps, for each connection, the <strong>name, company, job
+          title and profile URL</strong>, and the email address for the few people whose address
+          LinkedIn includes. They are saved as contacts marked as LinkedIn connections, and you
+          can hide them from the Contacts list. It also keeps the invitations you sent and
+          received with their notes, and the text of messages in conversations you took part
+          in, as entries in that contact&rsquo;s history. One-way recruiter and sales InMail is
+          counted and not imported.
+        </li>
+        <li>
+          The same export also supplies your applications, the answers you gave on them, saved
+          jobs, followed companies, profile history, LinkedIn Learning courses and Premium
+          receipts, which are your own records. The zip file is stored in a private storage
+          bucket that only you can read, and it is deleted with your account.
         </li>
         <li>
           Names of interviewers may be extracted from a scheduling email, or read from the
