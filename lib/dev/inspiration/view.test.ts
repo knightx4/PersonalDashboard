@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  nothingLeftIn,
   buildInspirationPage,
   parseInspirationView,
   playlistUrl,
@@ -216,6 +217,23 @@ describe('buildInspirationPage', () => {
     ]);
     expect(page.videos[4]!.leftPlaylist).toBe(true);
     expect(page.videos[0]!.thumbnailUrl).toBe('https://i.ytimg.com/vi/aaaaaaaaaaa/mqdefault.jpg');
+  });
+
+  it('folds away a video with nothing left to look at, but not one waiting or failed (note 71b32f67)', () => {
+    const page = buildInspirationPage({
+      settings: null,
+      videos: [
+        video('waiting', 'aaaaaaaaaaa', { processed_at: null, transcript_state: 'queued', playlist_position: 0 }),
+        video('none', 'bbbbbbbbbbb', { transcript_state: 'none', processed_at: null, playlist_position: 1 }),
+        video('broke', 'ccccccccccc', { process_error: 'model refused', playlist_position: 2 }),
+        video('empty', 'ddddddddddd', { takeaway_count: 0, playlist_position: 3 }),
+      ],
+      takeaways: [],
+      links: [],
+      ...empty,
+    });
+
+    expect(page.videos.filter(nothingLeftIn).map((v) => v.id)).toEqual(['none', 'empty']);
   });
 });
 
