@@ -47,8 +47,15 @@ the posting, what they found out about the company, their own view of it
 from its Perspective tab, research prepared on it, their evidence bank,
 their résumé, answers they have sent before, their thinking about the search,
 their notes and how they write. After that come the answers already on this
-application, where they match the role best, anything they told you when you
-asked, and your previous draft if there is one.
+application, where they match the role best, their comments on the letter,
+anything they told you when you asked, and your previous draft if there is
+one.
+
+Their comments on the letter are what they want it to say, in their own rough
+words: make the points they make, in their voice, and follow any instruction
+about length, angle or what to leave out. What a comment says about them,
+their views or their interests is theirs to claim, and is not an unsupported
+claim.
 
 What a good letter does:
 - Opens on why this company and this role, using what the posting and their

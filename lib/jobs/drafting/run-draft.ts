@@ -8,7 +8,8 @@ import { runApplicationDraft } from './draft-application';
 import { fromStoredDraft } from './draft-application-payload';
 import { draftAndSaveCoverLetter } from './draft-cover-letter';
 import type { CoverLetterDraftView } from './draft-cover-letter-payload';
-import { VAULT_SOURCES } from './gather';
+import { loadThreads } from '@/lib/thread/store';
+import { VAULT_SOURCES, type ThreadReader } from './gather';
 import type { ApplicationDrafts, StoredAsk } from './store';
 
 /**
@@ -41,6 +42,11 @@ export type DraftApplicationResult = {
   error: string | null;
 };
 
+/** The person's comment threads, read through their core client. */
+function threadReader(core: Parameters<typeof loadThreads>[0], userId: string): ThreadReader {
+  return (refs) => loadThreads(core, refs, { userId });
+}
+
 /** How long the model calls may run inside the page's maxDuration of 300 seconds. */
 const DRAFT_DEADLINE_MS = 270_000;
 
@@ -61,6 +67,7 @@ export async function draftApplicationAs(
       jobs,
       core,
       vaultSources: moduleEnabled(settings, 'vault') ? VAULT_SOURCES : [],
+      threads: threadReader(core, userId),
       apiKey,
       onSpend: (report) => spend.push(report),
       deadline: started + DRAFT_DEADLINE_MS,
@@ -113,7 +120,7 @@ export async function draftCoverLetterFor(
 
   const spend: SpendReport[] = [];
   const result = await draftAndSaveCoverLetter(
-    { jobs, core, apiKey, onSpend: (report) => spend.push(report) },
+    { jobs, core, threads: threadReader(core, userId), apiKey, onSpend: (report) => spend.push(report) },
     { userId, applicationId: input.applicationId, replies: input.replies },
   );
   await recordSessionSpend(userId, { module: 'jobs', operation: 'draft-cover-letter' }, spend);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
 import type { MemoryRpcClient, QuestionEmbedder } from '@/lib/memory/search';
 import { BUDGETS, GATHER_BUDGET } from './budget';
-import { chooseResume, gather, roleRequirements, type GatherDeps, type JobsClient } from './gather';
+import { chooseResume, gather, roleRequirements, type GatherDeps, type JobsClient, type ThreadReader } from './gather';
 import { renderGathered, renderMaterial, renderQuestions } from './render';
 
 const ME = '11111111-1111-4111-8111-111111111111';
@@ -199,6 +199,54 @@ describe('gather', () => {
     expect(text).not.toContain('Email the CFO');
   });
 
+  it('puts their own comments on each question and on the letter, leaving out Dash’s replies', async () => {
+    const asked: string[][] = [];
+    const threads: ThreadReader = async (refs) => {
+      asked.push([...refs]);
+      return new Map([
+        [
+          'job_search.application_answers:aa1',
+          [
+            { author: 'me', body: 'Say AI should deliver what it promised.' },
+            { author: 'claude', body: 'Noted.' },
+            { author: 'me', body: 'And that I want to build better pipelines with it.' },
+          ],
+        ],
+        [`job_search.applications:${APP}`, [{ author: 'me', body: 'Keep the letter short.' }]],
+      ]);
+    };
+    const result = await gather(deps(fixture(), { threads }), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    const m = result.material;
+
+    expect(asked[0]).toEqual([
+      `job_search.applications:${APP}`,
+      'job_search.application_answers:aa1',
+      'job_search.application_answers:aa2',
+      'job_search.application_answers:aa3',
+    ]);
+    expect(m.questions.map((q) => q.comments)).toEqual([
+      ['Say AI should deliver what it promised.', 'And that I want to build better pipelines with it.'],
+      [],
+      [],
+    ]);
+    expect(m.letterComments).toEqual(['Keep the letter short.']);
+    const text = renderQuestions(m.questions);
+    expect(text).toContain(
+      'their comments on this question:\n- Say AI should deliver what it promised.\n- And that I want to build better pipelines with it.',
+    );
+    expect(text).not.toContain('Noted.');
+  });
+
+  it('drafts without comments when the threads cannot be read', async () => {
+    const threads: ThreadReader = async () => {
+      throw new Error('core is down');
+    };
+    const result = await gather(deps(fixture(), { threads }), { userId: ME, applicationId: APP });
+    expect(result.ok && result.material.questions.every((q) => q.comments.length === 0)).toBe(true);
+    expect(result.ok && result.material.letterComments).toEqual([]);
+  });
+
   it('leaves the Perspective and the write-up out when there are none', async () => {
     const result = await gather(deps(fixture()), { userId: ME, applicationId: APP });
     if (!result.ok) throw new Error(result.error);
@@ -254,7 +302,10 @@ describe('gather', () => {
     }
     const passages = Array.from({ length: 20 }, (_, i) => ({ source_table: 'obsidian.notes', source_ref: `vn${i}`, chunk_index: 0, author: 'me', body: `Note ${i}\n\n${long(600)}`, similarity: 0.9 - i / 100 }));
 
-    const result = await gather(deps(tables, { core: memory(passages), embed }), { userId: ME, applicationId: APP });
+    const threads: ThreadReader = async (refs) =>
+      new Map(refs.map((ref) => [ref, Array.from({ length: 5 }, () => ({ author: 'me' as const, body: long(400, 'comment') }))]));
+
+    const result = await gather(deps(tables, { core: memory(passages), embed, threads }), { userId: ME, applicationId: APP });
     if (!result.ok) throw new Error(result.error);
     const m = result.material;
 
@@ -273,6 +324,9 @@ describe('gather', () => {
     expect(m.role.researchWriteUp!.length).toBeLessThanOrEqual(BUDGETS.researchWriteUp);
     expect(m.vault.passages.length).toBeGreaterThan(0);
     expect(m.vault.passages.length).toBeLessThan(20);
+    const commentChars = [...m.letterComments, ...m.questions.flatMap((q) => q.comments)].join('').length;
+    expect(commentChars).toBeGreaterThan(0);
+    expect(commentChars).toBeLessThanOrEqual(BUDGETS.comments);
   });
 });
 

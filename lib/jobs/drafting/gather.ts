@@ -16,6 +16,10 @@
  * the same columns draftAnswerFromEvidence reads, in a shape a fixture can
  * stand in for.
  *
+ * The person's own comments under each question, and under the cover letter,
+ * come from the threads on those rows (note be3c6616) through `threads`. With
+ * no reader, or a failed read, drafting goes ahead without them.
+ *
  * Vault passages come from the same core.search_memory Ask Dash's recall
  * uses, asked about the role and company. With no core client, or no
  * embedding key on the deployment, they are skipped and the reason recorded;
@@ -35,6 +39,7 @@ import {
   type MemoryRpcClient,
   type QuestionEmbedder,
 } from '@/lib/memory/search';
+import { threadRef } from '@/lib/thread/subjects';
 import { BUDGETS, cutOptional, cutText, fitToBudget } from './budget';
 import { answerLimit } from './limits';
 import {
@@ -63,6 +68,12 @@ export type * from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type JobsClient = Pick<SupabaseClient<any, any, any>, 'from'>;
 
+/** A thread's turns as gather() needs them: who wrote each and what. */
+export type ThreadTurn = { author: 'me' | 'claude'; body: string };
+
+/** Reads the threads on the given refs, oldest turn first (loadThreads in lib/thread/store.ts). */
+export type ThreadReader = (refs: readonly string[]) => Promise<ReadonlyMap<string, readonly ThreadTurn[]>>;
+
 export type GatherDeps = {
   /** The person's job_search client (createClient in lib/jobs/auth/server). */
   jobs: JobsClient;
@@ -74,6 +85,8 @@ export type GatherDeps = {
   onSpend?: SpendSink;
   /** Which memory sources count as the vault. [] skips the search. */
   vaultSources?: readonly string[];
+  /** The comment threads under the answers and the letter. Absent: no comments. */
+  threads?: ThreadReader | null;
 };
 
 export type GatherInput = { userId: string; applicationId: string };
@@ -251,8 +264,47 @@ export function questionsFrom(
       // Read from the whole text, before it is cut.
       limit: answerLimit(row.word_limit as number | null, texts[i]),
       defaultAnswer: cutOptional(question?.canonical_answer as string | null, share),
+      comments: [],
     };
   });
+}
+
+/**
+ * The person's own comments on each thread, oldest first, cut to the comment
+ * budget across the application: the letter's first, then each question's in
+ * order. Dash's replies are left out, so a draft does not lean on its own
+ * earlier words. A failed read gives no comments rather than no draft.
+ */
+async function readComments(
+  deps: GatherDeps,
+  applicationId: string,
+  answerIds: readonly string[],
+): Promise<{ letter: string[]; byAnswer: Map<string, string[]> }> {
+  const none = { letter: [], byAnswer: new Map<string, string[]>() };
+  if (!deps.threads) return none;
+  const letterRef = threadRef('application', applicationId);
+  let threads: ReadonlyMap<string, readonly ThreadTurn[]>;
+  try {
+    threads = await deps.threads([letterRef, ...answerIds.map((id) => threadRef('answer', id))]);
+  } catch (error) {
+    console.error('drafting: reading the comment threads failed', error);
+    return none;
+  }
+  let room = BUDGETS.comments;
+  const take = (ref: string): string[] => {
+    const kept: string[] = [];
+    for (const turn of threads.get(ref) ?? []) {
+      if (turn.author !== 'me' || !turn.body.trim()) continue;
+      const body = cutText(turn.body, BUDGETS.comment);
+      if (body.length + 3 > room) break;
+      room -= body.length + 3;
+      kept.push(body);
+    }
+    return kept;
+  };
+  const letter = take(letterRef);
+  const byAnswer = new Map(answerIds.map((id) => [id, take(threadRef('answer', id))]));
+  return { letter, byAnswer };
 }
 
 async function vaultPassages(
@@ -472,6 +524,12 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
   );
 
   const banned = strings(profile.data?.banned_constructions);
+  const questions = questionsFrom(answerRows, known);
+  const comments = await readComments(
+    deps,
+    applicationId,
+    questions.map((question) => question.answerId),
+  );
 
   return {
     ok: true,
@@ -506,7 +564,11 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
         notes: cutOptional(profile.data?.writing_style_notes as string | null, BUDGETS.style),
         banned: banned.length > 0 ? banned : [...DEFAULT_BANNED_CONSTRUCTIONS],
       },
-      questions: questionsFrom(answerRows, known),
+      questions: questions.map((question) => ({
+        ...question,
+        comments: comments.byAnswer.get(question.answerId) ?? [],
+      })),
+      letterComments: comments.letter,
       vault,
     },
   };

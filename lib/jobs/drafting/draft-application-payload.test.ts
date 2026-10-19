@@ -39,6 +39,7 @@ function question(answerId: string, answer: string | null, extra: Partial<Gather
     status: answer ? 'draft' : null,
     limit: null,
     defaultAnswer: null,
+    comments: [],
     ...extra,
   };
 }

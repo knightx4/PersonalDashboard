@@ -77,6 +77,8 @@ export type GatheredQuestion = {
   limit: AnswerLimit | null;
   /** questions.canonical_answer: the answer reused for this question everywhere. */
   defaultAnswer: string | null;
+  /** The person's own comments under this answer, oldest first, cut to budget. */
+  comments: string[];
 };
 
 export type VaultPassage = {
@@ -105,6 +107,8 @@ export type GatheredMaterial = {
   style: { notes: string | null; banned: string[] };
   /** Every question on this application, in the order they were added. */
   questions: GatheredQuestion[];
+  /** The person's own comments under the cover letter, oldest first, cut to budget. */
+  letterComments: string[];
   vault: { passages: VaultPassage[]; skipped: VaultSkip | null };
 };
 

@@ -65,6 +65,8 @@ export function renderQuestion(question: GatheredQuestion): string {
       ? `current answer (${question.status ?? 'draft'}): ${question.answer}`
       : 'current answer: none',
     question.defaultAnswer && `their default answer to this question: ${question.defaultAnswer}`,
+    question.comments.length > 0 &&
+      `their comments on this question:\n${question.comments.map((comment) => `- ${comment}`).join('\n')}`,
   ]);
 }
 

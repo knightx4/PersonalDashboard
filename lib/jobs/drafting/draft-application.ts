@@ -36,7 +36,7 @@ import {
   type DraftAsk,
   type DraftedAnswer,
 } from './draft-application-payload';
-import { gather, type JobsClient } from './gather';
+import { gather, type JobsClient, type ThreadReader } from './gather';
 import { overLimit, type AnswerLimit } from './limits';
 import { renderMaterial } from './render';
 import { loadDrafts, saveDrafts, saveReplies, type ApplicationDrafts, type StoredAsk } from './store';
@@ -61,7 +61,8 @@ its Perspective tab, research prepared on it, their evidence bank (stories
 and results they wrote, each with an id), their résumé, answers they approved
 or sent before, what they have been thinking about the search, passages from
 their notes, and how they write. The message lists the questions to answer
-now, each with its answer id, kind, limit, current answer and default answer;
+now, each with its answer id, kind, limit, current answer, default answer
+and any comments they left on it;
 then the questions already answered on this application; then what they told
 you when you asked them before.
 
@@ -81,6 +82,7 @@ What a good answer does:
   the application so no two answers lean on the same item, unless one item is
   plainly the only fit for both. The answers already given on this
   application count.
+- Carries what their comments on the question say, when there are any.
 - Builds on what they already wrote. A current answer or a default answer is
   theirs: tailor and improve it for this role rather than throw it away.
 - Fits its limit. Stay under the limit given, aiming for about nine tenths of
@@ -116,6 +118,13 @@ What it never does:
 
 Their replies to your earlier questions are facts about them, as good as the
 evidence bank. Use them where they fit.
+
+Their comments on a question are what they want that answer to say, in their
+own rough words. Build the answer on them: make the points they make, in
+their voice, tightened and joined to their evidence, and follow any
+instruction about length, angle or what to leave out. What a comment says
+about them, their views or their interests is theirs to claim, as good as a
+reply. A comment on one question is about that question only.
 
 Asking them: where the material is too thin to answer a question well (no
 story that fits, a fact only they know such as why they are leaving, a
@@ -358,6 +367,8 @@ export type RunApplicationDraftDeps = {
   embed?: QuestionEmbedder;
   /** [] when the vault workspace is off. */
   vaultSources?: readonly string[];
+  /** The comment threads under the answers and the letter. */
+  threads?: ThreadReader | null;
   /** Ids for new asks; random UUIDs when absent. */
   newId?: () => string;
 } & ApplicationDraftOptions;
@@ -394,7 +405,14 @@ export async function runApplicationDraft(
   const { userId, applicationId } = input;
 
   const gathered = await gather(
-    { jobs: jobs as unknown as JobsClient, core: deps.core, embed: deps.embed, onSpend: deps.onSpend, vaultSources: deps.vaultSources },
+    {
+      jobs: jobs as unknown as JobsClient,
+      core: deps.core,
+      embed: deps.embed,
+      onSpend: deps.onSpend,
+      vaultSources: deps.vaultSources,
+      threads: deps.threads,
+    },
     { userId, applicationId },
   );
   if (!gathered.ok) return gathered;

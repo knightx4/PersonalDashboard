@@ -28,13 +28,15 @@ export const BUDGETS = {
   currentAnswer: 3_000,
   vault: 8_000,
   vaultPassage: 1_200,
+  comments: 6_000,
+  comment: 1_000,
 } as const;
 
 /**
- * The most the rendered material may run to: about 31,000 tokens, which
+ * The most the rendered material may run to: about 32,500 tokens, which
  * leaves the rest of a call for the instructions and every answer drafted.
  */
-export const GATHER_BUDGET = 124_000;
+export const GATHER_BUDGET = 130_000;
 
 /** The marker a cut text ends with. */
 export const CUT_MARK = ' […]';
