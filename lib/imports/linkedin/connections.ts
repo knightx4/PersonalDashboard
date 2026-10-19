@@ -264,20 +264,44 @@ async function matchTouches(pending: PendingRecord[], store: ImportStore): Promi
       ...(await store.rowsWhere(TOUCHES, ['contact_id', 'channel', 'direction', 'sent_at'], 'contact_id', ids.slice(i, i + 100))),
     );
   }
-  const slot = (t: Record<string, unknown>) => `${t.contact_id}|${t.channel}|${t.direction}|${day(t.sent_at)}`;
-  const free = new Map<string, string[]>();
+  // A touch logged by hand often names the other LinkedIn channel (a
+  // connection note logged as a message) or the next day (an evening message
+  // is the next day in UTC). Each record takes the closest free touch: the
+  // same channel on the same day first, then either LinkedIn channel a day
+  // either side. A touch on another channel, such as email, never joins.
+  const linkedIn = (channel: unknown) => channel === 'linkedin_dm' || channel === 'linkedin_connect';
+  const slot = (t: Record<string, unknown>, at: string | null) => `${t.contact_id}|${t.direction}|${at}`;
+  const free = new Map<string, Record<string, unknown>[]>();
   for (const t of logged) {
-    const k = slot(t);
+    if (!linkedIn(t.channel)) continue;
+    const k = slot(t, day(t.sent_at));
     if (!free.has(k)) free.set(k, []);
-    free.get(k)!.push(String(t.id));
+    free.get(k)!.push(t);
   }
+  const taken = new Set<string>();
+  const take = (k: string, sameChannel: unknown): string | null => {
+    const t = free.get(k)?.find((c) => !taken.has(String(c.id)) && (sameChannel === null || c.channel === sameChannel));
+    if (!t) return null;
+    taken.add(String(t.id));
+    return String(t.id);
+  };
   const out = new Map<string, string>();
-  for (const p of pending) {
-    const id = free.get(slot(p.values))?.shift();
-    if (id) out.set(p.key, id);
+  for (const pass of ['exact', 'near'] as const) {
+    for (const p of pending) {
+      if (out.has(p.key)) continue;
+      const on = day(p.values.sent_at);
+      if (!on) continue;
+      const id =
+        pass === 'exact'
+          ? take(slot(p.values, on), p.values.channel)
+          : [on, shiftDay(on, -1), shiftDay(on, 1)].reduce<string | null>((hit, d) => hit ?? take(slot(p.values, d), null), null);
+      if (id) out.set(p.key, id);
+    }
   }
   return out;
 }
+
+const shiftDay = (on: string, by: number): string => new Date(Date.parse(`${on}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
 
 const TOUCH_COLUMNS = {
   contact_id: 'uuid',

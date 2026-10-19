@@ -214,4 +214,30 @@ describe('importing connections, invitations and messages', () => {
       expect.objectContaining({ id: 't1', message: 'Enjoyed your talk.' }),
     ]);
   });
+
+  it('joins a connection note logged by hand as a message the next day', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'contacted' }],
+      [TOUCHES]: [{ id: 't1', contact_id: 'k3', channel: 'linkedin_dm', direction: 'outbound', sent_at: '2025-01-04T02:00:00.000Z', message: null }],
+    });
+    await run(store, archive());
+    expect(store.rows(TOUCHES).filter((t) => t.contact_id === 'k3')).toEqual([
+      expect.objectContaining({ id: 't1', channel: 'linkedin_dm', message: 'Enjoyed your talk.' }),
+    ]);
+  });
+
+  it('does not join a touch two days off, or one on another channel', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'contacted' }],
+      [TOUCHES]: [
+        { id: 't1', contact_id: 'k3', channel: 'linkedin_connect', direction: 'outbound', sent_at: '2025-01-05T12:00:00.000Z', message: null },
+        { id: 't2', contact_id: 'k3', channel: 'email', direction: 'outbound', sent_at: '2025-01-03T12:00:00.000Z', message: null },
+      ],
+    });
+    await run(store, archive());
+    const touches = store.rows(TOUCHES).filter((t) => t.contact_id === 'k3');
+    expect(touches).toHaveLength(3);
+    expect(touches.find((t) => t.id === 't1')!.message).toBeNull();
+    expect(touches.find((t) => t.id === 't2')!.message).toBeNull();
+  });
 });
