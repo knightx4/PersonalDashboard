@@ -551,7 +551,7 @@ Self-reported model confidence is logged, used to sort the review queue worst-fi
 
 ### Incremental sync
 
-Gmail `historyId` as cursor, `users.history.list` for deltas, poll every 15 minutes. Same as before. Consider a tighter interval only for accounts with an interview scheduled in the next 48 hours, since scheduling mail is the one class where 15 minutes of latency has a real cost.
+Gmail `historyId` as cursor, `users.history.list` for deltas, run once a day as the first stage of `/api/cron/daily`. The Vercel Hobby plan allows one cron a day (`docs/SETUP.md`), so the 15-minute poll this spec first asked for was not built. A tighter interval for accounts with an interview in the next 48 hours remains possible, and scheduling mail is the one class where a day of latency has a real cost.
 
 ### Testing
 
@@ -865,7 +865,7 @@ Done means all of these are true.
 17. The bookmarklet captures questions from an application form on at least three different ATS vendors.
 18. A question seen a second time surfaces its canonical answer.
 19. Contacts, notes, and attachments can be attached to a company, a role, an application, a contact, or an interview, and the check constraint rejects anything attached to two.
-20. Incremental sync picks up a new email within 15 minutes without duplicating anything.
+20. Incremental sync picks up a new email by the next daily run without duplicating anything.
 21. Re-running any sync produces zero duplicate rows or events.
 22. Deleting an account leaves zero rows anywhere, including storage objects.
 23. A user can use the app fully without ever connecting an inbox.
