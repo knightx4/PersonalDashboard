@@ -40,6 +40,7 @@
  * DATABASE_URL, and from `.preview-shots/checks/` without it.
  */
 import postgres from 'postgres';
+import { httpsSql, restTransport } from '../lib/db/https-sql';
 import {
   isScreenFile,
   uiAcceptSql,
@@ -62,6 +63,27 @@ function arg(flag: string): string | null {
   return i >= 0 ? (process.argv[i + 1] ?? null) : null;
 }
 
+/**
+ * A client for the database, or null where neither DATABASE_URL nor the
+ * service-role key is set. A cloud session's proxy carries HTTPS and not
+ * Postgres, so there each statement goes through the REST API, as
+ * scripts/plan.ts does.
+ */
+function reachableDatabase(): string | null {
+  const url = process.env.DATABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) return 'https';
+  return url ?? null;
+}
+
+function connect(target: string) {
+  if (target === 'https') {
+    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    return httpsSql(restTransport(rest, process.env.SUPABASE_SERVICE_ROLE_KEY as string)) as unknown as ReturnType<typeof postgres>;
+  }
+  return postgres(target, { max: 1, prepare: false, onnotice: () => {} });
+}
+
 function fail(message: string): never {
   console.error(message);
   process.exit(1);
@@ -73,7 +95,7 @@ function fail(message: string): never {
  * a database goes ahead unnamed by outline.
  */
 async function placeStep(written: string): Promise<{ step: number; outline: string | null }> {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = reachableDatabase();
   const isOutline = written.includes('.');
   if (!databaseUrl) {
     if (isOutline) {
@@ -84,7 +106,7 @@ async function placeStep(written: string): Promise<{ step: number; outline: stri
     }
     return { step: Number(written), outline: null };
   }
-  const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+  const sql = connect(databaseUrl);
   try {
     const rows = isOutline
       ? await sql<{ number: number; outline: string }[]>`
@@ -125,7 +147,7 @@ async function main(): Promise<void> {
   }
   console.log(`${name} serves: ${surfaces.join(', ')}`);
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = reachableDatabase();
   if (settle !== null) {
     // A surface the critic has not judged through three rounds is settled only
     // when its shots match main's (plan #2215.4).
@@ -145,7 +167,7 @@ async function main(): Promise<void> {
       console.log(statement);
       return;
     }
-    const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+    const sql = connect(databaseUrl);
     try {
       const rows = await sql.unsafe(statement);
       console.log(
@@ -166,7 +188,7 @@ async function main(): Promise<void> {
       console.log(statement);
       return;
     }
-    const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+    const sql = connect(databaseUrl);
     try {
       const rows = await sql.unsafe(statement);
       console.log(
@@ -194,7 +216,7 @@ async function main(): Promise<void> {
 
 /** The step's recorded rounds in ui_checks, under the account whose plan it is on. */
 async function stepRounds(databaseUrl: string, step: number): Promise<CheckRound[]> {
-  const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+  const sql = connect(databaseUrl);
   try {
     return await sql<CheckRound[]>`
       select c.surface, c.round, c.verdict from ui_checks c
