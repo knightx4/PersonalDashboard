@@ -236,6 +236,11 @@ export interface LinkedInArchive {
   files: ArchiveFile[];
   /** Paths of the files the reader does not read, sorted. */
   unread: string[];
+  /**
+   * The day the export was made, "YYYY-MM-DD", when the caller knows it (from
+   * the zip's file name). The reader never sets it.
+   */
+  exportedOn?: string | null;
 }
 
-export type ArchiveKind = Exclude<keyof LinkedInArchive, 'files' | 'unread'>;
+export type ArchiveKind = Exclude<keyof LinkedInArchive, 'files' | 'unread' | 'exportedOn'>;

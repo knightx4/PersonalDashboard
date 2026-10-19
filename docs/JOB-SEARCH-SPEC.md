@@ -131,6 +131,7 @@ The cost is one more join and the risk of the UI feeling bureaucratic. Neutraliz
 | column | type | notes |
 |---|---|---|
 | id | uuid | pk, references `auth.users(id)` on delete cascade |
+| user_id | uuid | generated, always `id`, so the import engine finds the profile like any other row |
 | display_name, avatar_url | text | |
 | timezone | text | interview times and "this week" depend on it |
 | target_titles | text[] | seeds relevance scoring in ingestion |
@@ -368,7 +369,7 @@ An expired row is kept and never counted as the person turning it down.
 One row per run of the roles or people search: `kind`, `trigger` (`button` or `daily`), `stage` (boards, searching, saving, postings, scoring, queued, then done or failed), `written`, `boards_read`, `candidates`, `error`. A search that runs out of request time waits in `queued` with its `batch_id` and `request` until the batch collector finishes it. Find reads the latest row to say how the last search went. Bookkeeping, not a source for Goals.
 
 ### `watchlist_startups`
-The startups discovery found, kept apart from `companies`. One row per company per person: `name`, `website`, `source` (`yc` or `hn`), `description`, `reason`, `stage`, `locations`, `fit_score` (Dash's 1 to 100), what the hiring post named (`posting_roles`, `posting_location`, `posting_url`), the board once found (`board_vendor`, `board_token`, `board_checked_at`), `last_read_at`, `empty_weeks`, and `company_id` once the person saves one of its roles. The person sees a startup only through its roles until then.
+The startups discovery found, kept apart from `companies`. One row per company per person: `name`, `website`, `source` (`yc` or `hn`, or `linkedin` for a company followed on LinkedIn that the LinkedIn import brought in and the person does not track), `description`, `reason`, `stage`, `locations`, `fit_score` (Dash's 1 to 100), what the hiring post named (`posting_roles`, `posting_location`, `posting_url`), the board once found (`board_vendor`, `board_token`, `board_checked_at`), `last_read_at`, `empty_weeks`, and `company_id` once the person saves one of its roles. The person sees a startup only through its roles until then.
 
 ### `discovery_runs`
 One row per person per week of discovery: `week_start`, `stage` (reading, shortlisting, boards, then done or failed), `shortlisted_at`, the counts offered, added and refreshed, the board counts checked, found and left, and `error`. A second call in the same week asks Dash nothing, and a week whose shortlist was written repeats only the boards step.
@@ -551,7 +552,7 @@ Self-reported model confidence is logged, used to sort the review queue worst-fi
 
 ### Incremental sync
 
-Gmail `historyId` as cursor, `users.history.list` for deltas, poll every 15 minutes. Same as before. Consider a tighter interval only for accounts with an interview scheduled in the next 48 hours, since scheduling mail is the one class where 15 minutes of latency has a real cost.
+Gmail `historyId` as cursor, `users.history.list` for deltas, run once a day as the first stage of `/api/cron/daily`. The Vercel Hobby plan allows one cron a day (`docs/SETUP.md`), so the 15-minute poll this spec first asked for was not built. A tighter interval for accounts with an interview in the next 48 hours remains possible, and scheduling mail is the one class where a day of latency has a real cost.
 
 ### Testing
 
@@ -865,7 +866,7 @@ Done means all of these are true.
 17. The bookmarklet captures questions from an application form on at least three different ATS vendors.
 18. A question seen a second time surfaces its canonical answer.
 19. Contacts, notes, and attachments can be attached to a company, a role, an application, a contact, or an interview, and the check constraint rejects anything attached to two.
-20. Incremental sync picks up a new email within 15 minutes without duplicating anything.
+20. Incremental sync picks up a new email by the next daily run without duplicating anything.
 21. Re-running any sync produces zero duplicate rows or events.
 22. Deleting an account leaves zero rows anywhere, including storage objects.
 23. A user can use the app fully without ever connecting an inbox.

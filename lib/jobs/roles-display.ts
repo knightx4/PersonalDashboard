@@ -181,3 +181,86 @@ export function companiesDisplay<T extends CompanyLike>(): ListDisplaySpec<T> {
     defaultGroup: NO_GROUP,
   };
 }
+
+/** What the contacts table offers. */
+export type ContactLike = {
+  fullName: string;
+  companyName: string | null;
+  relationship: string;
+  status: string;
+  lastTouchAt: string | null;
+};
+
+const CONTACT_STATUS_ORDER = ['to_contact', 'contacted', 'responded', 'met', 'dormant'];
+
+export function contactsDisplay<T extends ContactLike>(): ListDisplaySpec<T> {
+  const byName = (a: T, b: T) => a.fullName.localeCompare(b.fullName);
+  const statusRank = (status: string) => {
+    const index = CONTACT_STATUS_ORDER.indexOf(status);
+    return index === -1 ? CONTACT_STATUS_ORDER.length : index;
+  };
+
+  return {
+    pathname: '/jobs/contacts',
+    sorts: [
+      { id: 'name', label: 'Name A–Z', compare: byName },
+      {
+        id: 'company',
+        label: 'Company',
+        // People with no company go last, not first.
+        compare: (a, b) =>
+          (a.companyName ?? '￿').localeCompare(b.companyName ?? '￿') || byName(a, b),
+      },
+      {
+        id: 'relationship',
+        label: 'Relationship',
+        compare: (a, b) => a.relationship.localeCompare(b.relationship) || byName(a, b),
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        compare: (a, b) => statusRank(a.status) - statusRank(b.status) || byName(a, b),
+      },
+      {
+        id: 'touch',
+        label: 'Last touch',
+        compare: (a, b) => (b.lastTouchAt ?? '').localeCompare(a.lastTouchAt ?? '') || byName(a, b),
+      },
+    ],
+    groups: [
+      {
+        id: 'status',
+        label: 'Status',
+        bucket: (contact) => ({
+          key: contact.status,
+          label: contact.status.replace(/_/g, ' '),
+          rank: statusRank(contact.status),
+        }),
+      },
+      {
+        id: 'relationship',
+        label: 'Relationship',
+        bucket: (contact) => ({
+          key: contact.relationship,
+          label: contact.relationship.replace(/_/g, ' '),
+        }),
+      },
+      {
+        id: 'company',
+        label: 'Company',
+        bucket: (contact) =>
+          contact.companyName ? { key: contact.companyName, label: contact.companyName } : null,
+        emptyLabel: 'No company',
+      },
+    ],
+    properties: [
+      { id: 'name', label: 'Name', alwaysOn: true },
+      { id: 'company', label: 'Company' },
+      { id: 'relationship', label: 'Relationship' },
+      { id: 'status', label: 'Status' },
+      { id: 'touch', label: 'Last touch' },
+    ],
+    defaultSort: 'name',
+    defaultGroup: NO_GROUP,
+  };
+}

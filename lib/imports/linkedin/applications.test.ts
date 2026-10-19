@@ -13,6 +13,9 @@ import { LINKEDIN_APPLICATION_MAPPERS, linkedInJobId, resumeNameKey } from './ap
 
 const zip = new Uint8Array(readFileSync(join(__dirname, '../../linkedin/archive/fixtures/export.zip')));
 const mappers = LINKEDIN_APPLICATION_MAPPERS;
+// Long after the fixture's one saved job, so only the applications become
+// companies and roles here; saved.test.ts covers the saved job.
+const archiveDate = '2026-12-01';
 
 const COMPANIES = 'job_search.companies';
 const ROLES = 'job_search.roles';
@@ -42,7 +45,7 @@ describe('linkedInJobId', () => {
 describe('importing LinkedIn applications', () => {
   it('adds each application as a submitted pursuit with its resume and answers, and a rerun adds nothing', async () => {
     const store = memoryStore();
-    const once = await importLinkedIn(store, zip, { dryRun: false, mappers });
+    const once = await importLinkedIn(store, zip, { dryRun: false, mappers, archiveDate });
 
     expect(store.rows(COMPANIES).map((c) => c.name).sort()).toEqual(['Acme Robotics', 'Globex', 'Initech']);
     const roles = store.rows(ROLES);
@@ -83,7 +86,7 @@ describe('importing LinkedIn applications', () => {
 
     expect(once.plan.totals.skipped).toBe(0);
 
-    const twice = await importLinkedIn(store, zip, { dryRun: false, mappers });
+    const twice = await importLinkedIn(store, zip, { dryRun: false, mappers, archiveDate });
     expect(twice.plan.totals.added).toBe(0);
     expect(twice.plan.totals.updated).toBe(0);
     expect(store.rows(APPS)).toHaveLength(3);
@@ -130,7 +133,7 @@ describe('importing LinkedIn applications', () => {
       [RESUMES]: [resume],
       [QUESTIONS]: [sql, relocate],
     });
-    await importLinkedIn(store, zip, { dryRun: false, mappers });
+    await importLinkedIn(store, zip, { dryRun: false, mappers, archiveDate });
 
     // Only Initech is new.
     expect(store.rows(COMPANIES)).toHaveLength(3);
@@ -154,7 +157,7 @@ describe('importing LinkedIn applications', () => {
     expect(store.tables.get(QUESTIONS)!.get(sql.id)).toMatchObject({ canonical_answer: 'Ten years' });
     expect(store.tables.get(QUESTIONS)!.get(relocate.id)).toMatchObject({ canonical_answer: 'No' });
 
-    const again = await importLinkedIn(store, zip, { dryRun: false, mappers });
+    const again = await importLinkedIn(store, zip, { dryRun: false, mappers, archiveDate });
     expect(again.plan.totals.added).toBe(0);
   });
 });

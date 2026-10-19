@@ -189,7 +189,7 @@ describe('readingUpdates', () => {
 
 describe('labels and text', () => {
   it('says where each was found, and gives the shortlist reason as the why', () => {
-    expect(SOURCE_LABELS).toEqual({ yc: 'Found on YC', hn: 'Found on Hacker News' });
+    expect(SOURCE_LABELS).toEqual({ yc: 'Found on YC', hn: 'Found on Hacker News', linkedin: 'Followed on LinkedIn' });
     const s = startup('Ramp');
     expect(discoveredText(role(s, 'Strategic Finance Manager')).why).toBe(s.reason);
     expect(discoveredText(role(startup('Quiet', { reason: null, source: 'hn' }), 'X')).why).toContain('Hacker News');

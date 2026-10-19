@@ -2,6 +2,7 @@ import { readLinkedInArchive, type LinkedInArchive } from '@/lib/linkedin/archiv
 import { applyPlan, planImport } from './engine';
 import type { ImportMapper, ImportPlan, ImportStore } from './types';
 import { LINKEDIN_APPLICATION_MAPPERS } from './linkedin/applications';
+import { LINKEDIN_SAVED_MAPPERS } from './linkedin/saved';
 
 // The LinkedIn export through the import engine (plan #2432.2), the one
 // pipeline the settings page and scripts/import-linkedin.ts both run.
@@ -14,6 +15,7 @@ export const LINKEDIN_SOURCE = 'linkedin';
 
 export const LINKEDIN_MAPPERS: ImportMapper<LinkedInArchive>[] = [
   ...LINKEDIN_APPLICATION_MAPPERS,
+  ...LINKEDIN_SAVED_MAPPERS,
 ];
 
 /**
@@ -46,6 +48,8 @@ export async function importLinkedIn(
   },
 ): Promise<LinkedInImport> {
   const archive = readLinkedInArchive(bytes);
+  // Saved jobs are measured against the export's own day (plan #2432.6).
+  if (options.archiveDate) archive.exportedOn = options.archiveDate;
   const plan = await planImport(store, LINKEDIN_SOURCE, options.mappers ?? LINKEDIN_MAPPERS, archive);
   if (options.dryRun) return { archive, plan, runId: null };
   const runId = await applyPlan(store, plan, { archiveDate: options.archiveDate, storagePath: options.storagePath });

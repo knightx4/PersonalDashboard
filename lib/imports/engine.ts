@@ -9,6 +9,7 @@ import type {
   ImportWrite,
   IntendedValues,
   MappedRecord,
+  MatchSkip,
   PlannedKind,
   PlannedRecord,
   RowRef,
@@ -25,6 +26,8 @@ import type {
 //   no key, a match       joined: the person's row gains the key, and only its
 //                         empty columns are filled (updated, or unchanged when
 //                         none were empty).
+//   no key, joinOnly      skipped: the record may only join, and found no row.
+//   no key, match skip    skipped: match found it in the app another way.
 //   key, row gone         kept: the person deleted it, so it stays deleted.
 //   key, row differs      kept: the row no longer matches the hash of what the
 //   from the hash         import last wrote, so the person edited it.
@@ -75,6 +78,11 @@ function resolveRefs(values: IntendedValues, resolved: Resolved): { values: Inte
   return { values: out };
 }
 
+/** Null, or an array with nothing in it: a column a join may fill. */
+function isEmpty(value: unknown): boolean {
+  return value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+}
+
 function pick(columns: string[], values: IntendedValues): IntendedValues {
   const out: IntendedValues = {};
   for (const c of columns) out[c] = values[c] ?? null;
@@ -114,6 +122,7 @@ export async function planImport<Input>(
     // The records, once each, with their refs resolved.
     const seen = new Set<string>();
     const ready: { key: string; values: IntendedValues }[] = [];
+    const joinOnly = new Map<string, string>();
     for (const record of mapper.records(input) as MappedRecord[]) {
       if (seen.has(record.key)) {
         note({ key: record.key, outcome: 'skipped', rowId: null, reason: 'The export has this record twice.' });
@@ -135,11 +144,19 @@ export async function planImport<Input>(
         continue;
       }
       ready.push({ key: record.key, values: pick(columnNames, r.values) });
+      if (record.joinOnly) joinOnly.set(record.key, record.joinOnly);
     }
 
-    // Records with no key may join a row the person already has.
+    // Records with no key may join a row the person already has, or be found
+    // to be in the app another way.
     const pending = ready.filter((r) => !known.has(r.key));
-    const matched = mapper.match && pending.length > 0 ? await mapper.match(pending, store) : new Map<string, string>();
+    const found = mapper.match && pending.length > 0 ? await mapper.match(pending, store) : new Map<string, string | MatchSkip>();
+    const matched = new Map<string, string>();
+    const skipped = new Map<string, string>();
+    for (const [key, hit] of found) {
+      if (typeof hit === 'string') matched.set(key, hit);
+      else skipped.set(key, hit.skip);
+    }
 
     // The rows as they stand, for keyed and matched records alike.
     const liveIds = [
@@ -158,14 +175,24 @@ export async function planImport<Input>(
       const prior = known.get(key);
 
       if (!prior) {
+        const skip = skipped.get(key);
+        if (skip !== undefined) {
+          note({ key, outcome: 'skipped', rowId: null, reason: skip });
+          continue;
+        }
         const joinId = matched.get(key);
         const joined = joinId ? live.get(joinId) : undefined;
         if (joinId && joined) {
           const now = canonicalRow(mapper.columns, joined);
-          const fills = columnNames.filter((c) => now[c] === null && values[c] !== null && values[c] !== undefined);
+          const fills = columnNames.filter((c) => isEmpty(now[c]) && !isEmpty(values[c]));
           writes.push({ op: 'update', kind: mapper.kind, key, table: mapper.table, row_id: joinId, values: pick(fills, values), hash });
           ids.set(key, joinId);
           note({ key, outcome: fills.length ? 'updated' : 'unchanged', rowId: joinId, changed: fills.length ? fills : undefined });
+          continue;
+        }
+        const only = joinOnly.get(key);
+        if (only !== undefined) {
+          note({ key, outcome: 'skipped', rowId: null, reason: only });
           continue;
         }
         const id = randomUUID();

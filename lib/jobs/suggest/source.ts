@@ -65,7 +65,10 @@ export function openingSource(row: { origin: string | null; foundIn: string | nu
     row.origin === 'discovered'
       ? /hacker news/i.test(row.foundIn ?? '')
         ? 'hn'
-        : 'yc'
+        : // A startup followed on LinkedIn is a company they follow (plan #2432.6).
+          /linkedin/i.test(row.foundIn ?? '')
+          ? 'board'
+          : 'yc'
       : row.origin === 'board' || row.origin === 'search'
         ? row.origin
         : 'goal';
