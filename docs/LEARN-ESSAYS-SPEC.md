@@ -499,3 +499,7 @@ Checked by: audit.
 **R4.** A published essay contains no authorship block and no link to an
 unpublished note.
 Checked by: audit.
+
+**R5.** `lib/learn/essays/fixtures/recorded/` holds one saved response for each
+`essay_log` kind, and a test replays them through the parsers.
+Checked by: audit.
