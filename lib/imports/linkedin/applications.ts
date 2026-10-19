@@ -133,6 +133,9 @@ export async function matchCompanies(
 /** Why a followed company is not added to the companies list. */
 export const FOLLOW_ONLY = 'You follow it on LinkedIn but do not track it, so it goes on your startup watchlist instead.';
 
+/** Why a connection's employer is not added to the companies list (plan #2432.5). */
+export const CONNECTION_ONLY = 'A connection works there, but you do not track the company, so it is not added.';
+
 export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
   kind: 'companies',
   table: 'job_search.companies',
@@ -153,6 +156,9 @@ export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
     // Followed only: linked to the person's company when they track it, and
     // otherwise left to the watchlist mapper (saved.ts), never added here.
     for (const f of archive.companyFollows) add(f.organization, FOLLOW_ONLY);
+    // A connection's employer only links the contact to a company the person
+    // tracks (connections.ts); it never adds one.
+    for (const c of archive.connections) add(c.company, CONNECTION_ONLY);
     return out;
   },
   async match(pending, store) {
