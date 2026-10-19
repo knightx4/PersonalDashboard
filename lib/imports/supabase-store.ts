@@ -66,7 +66,13 @@ export function supabaseImportStore(client: SupabaseClient, userId: string): Imp
     async createRun(source, meta) {
       const { data, error } = await core
         .from('import_runs')
-        .insert({ user_id: userId, source, archive_date: meta.archiveDate ?? null, storage_path: meta.storagePath ?? null })
+        .insert({
+          user_id: userId,
+          source,
+          archive_date: meta.archiveDate ?? null,
+          storage_path: meta.storagePath ?? null,
+          skipped_files: meta.skippedFiles ?? [],
+        })
         .select('id')
         .single();
       if (error || !data) throw new Error(`Could not start the import: ${error?.message ?? 'no row'}`);

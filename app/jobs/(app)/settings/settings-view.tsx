@@ -2,7 +2,9 @@ import { SettingsPage } from '@/components/patterns/settings-page';
 import { Banner } from '@/components/ui/banner';
 import type { JobPreferences } from '@/lib/jobs/suggest/preferences';
 import type { TabAddress } from '@/lib/tabs';
+import type { LinkedInRunView } from '@/lib/jobs/linkedin-import';
 import { ThoughtList, type ThoughtView } from './career-goals';
+import { LinkedInImportSection, type LinkedInImportPhase } from './linkedin-import';
 import {
   BookmarkletSection,
   ExcludedSendersSection,
@@ -33,6 +35,10 @@ export type JobsSettingsProps = {
   excludedSenders: Array<{ id: string; domain: string }>;
   /** The career goals entries, newest first, which the searches read. */
   careerGoals: ThoughtView[];
+  /** The LinkedIn exports already imported, newest first (plan #2432.9). */
+  linkedInRuns?: LinkedInRunView[];
+  /** The gallery's: the phase the LinkedIn tab draws. */
+  linkedInPhase?: LinkedInImportPhase;
   /** `searchParams.tab`: the open tab. */
   tab?: string | string[];
   /** The gallery's: the tab the row marks when the address names none. */
@@ -40,8 +46,8 @@ export type JobsSettingsProps = {
 };
 
 /**
- * Job search settings on the settings page pattern (plan #1937.11): six
- * sections behind tabs. Links from before the tabs pointed at `#inboxes`,
+ * Job search settings on the settings page pattern (plan #1937.11): seven
+ * sections behind tabs, the last the LinkedIn export (plan #2432.9). Links from before the tabs pointed at `#inboxes`,
  * `#bookmarklet` and `#career-goals`, and the strip moves each onto its tab.
  * Coming back from Gmail's sign-in (`?inbox=`) opens Inboxes, where the
  * banner saying how it went is drawn.
@@ -54,6 +60,8 @@ export function JobsSettingsView({
   accounts,
   excludedSenders,
   careerGoals,
+  linkedInRuns = [],
+  linkedInPhase,
   tab,
   opensOn,
 }: JobsSettingsProps) {
@@ -114,6 +122,12 @@ export function JobsSettingsView({
           id: 'senders',
           title: 'Senders',
           content: () => <ExcludedSendersSection excludedSenders={excludedSenders} />,
+        },
+        {
+          id: 'linkedin',
+          title: 'LinkedIn',
+          hint: 'Bring in your LinkedIn data export: applications, answers, connections, messages, saved jobs, followed companies, profile and Learning. Importing the same or a newer export again adds nothing twice and keeps what you edited.',
+          content: () => <LinkedInImportSection runs={linkedInRuns} initial={linkedInPhase} />,
         },
       ]}
     />

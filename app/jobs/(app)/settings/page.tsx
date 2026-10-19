@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { formatDate } from '@/lib/jobs/applications/load';
+import { formatDate, formatDateInline } from '@/lib/jobs/applications/load';
+import { runView } from '@/lib/jobs/linkedin-import';
 import { readPreferences } from '@/lib/jobs/suggest/preferences';
 import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -8,6 +9,11 @@ import { publicEnv } from '@/lib/env';
 import { JobsSettingsView } from './settings-view';
 
 export const metadata = { title: 'Job search settings' };
+
+// Planning and applying a LinkedIn export runs as a server action of this page
+// (plan #2432.9); one with 392 applications and 600 messages takes well under
+// this.
+export const maxDuration = 300;
 
 function inboxBanner(
   code: string | undefined,
@@ -54,7 +60,7 @@ export default async function JobsSettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [{ data: profile }, { data: accounts }, { data: excludedSenders }, { data: thoughts }] =
+  const [{ data: profile }, { data: accounts }, { data: excludedSenders }, { data: thoughts }, { data: importRuns }] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -80,6 +86,13 @@ export default async function JobsSettingsPage({
         .select('id, body, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
+      core
+        .from('import_runs')
+        .select('id, created_at, archive_date, status, counts, error, skipped_files')
+        .eq('user_id', user.id)
+        .eq('source', 'linkedin')
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
 
   // The last first-scan attempt per mailbox. Without it the page cannot tell a
@@ -148,6 +161,13 @@ export default async function JobsSettingsPage({
         id: entry.id as string,
         domain: entry.domain as string,
       }))}
+      linkedInRuns={(importRuns ?? []).map((row) =>
+        runView(row as Parameters<typeof runView>[0], {
+          ran: (iso) => formatDateInline(iso, timezone),
+          // A day with no time: read in UTC so no timezone moves it.
+          exported: (day) => formatDateInline(day, 'UTC'),
+        }),
+      )}
       careerGoals={(thoughts ?? []).map((row) => ({
         id: row.id as string,
         body: row.body as string,

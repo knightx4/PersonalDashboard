@@ -1,4 +1,4 @@
-import { readLinkedInArchive, type LinkedInArchive } from '@/lib/linkedin/archive';
+import { readLinkedInArchive, skippedArchiveFiles, type LinkedInArchive } from '@/lib/linkedin/archive';
 import { applyPlan, planImport } from './engine';
 import type { ImportMapper, ImportPlan, ImportStore } from './types';
 
@@ -45,6 +45,10 @@ export async function importLinkedIn(
   const archive = readLinkedInArchive(bytes);
   const plan = await planImport(store, LINKEDIN_SOURCE, options.mappers ?? LINKEDIN_MAPPERS, archive);
   if (options.dryRun) return { archive, plan, runId: null };
-  const runId = await applyPlan(store, plan, { archiveDate: options.archiveDate, storagePath: options.storagePath });
+  const runId = await applyPlan(store, plan, {
+    archiveDate: options.archiveDate,
+    storagePath: options.storagePath,
+    skippedFiles: skippedArchiveFiles(archive),
+  });
   return { archive, plan, runId };
 }
