@@ -118,7 +118,9 @@ import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
 import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
-import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
+import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
+import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
+import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
@@ -1497,19 +1499,21 @@ const material: MaterialProps = {
   },
 };
 
-/** Nine people on file, in every state a send to somebody can be in. */
+/** Seven people on file, in every state a send to somebody can be in, four of them leads. */
 const contactRows: ContactListRow[] = [
   {
     id: 'c1',
     fullName: 'Dana Ruiz',
     title: 'Engineering Manager, Research Platform',
     relationship: 'interviewer',
-    status: 'replied',
+    status: 'responded',
     companyName: 'The Halloran-Achterberg group',
     companySlug: 'de-shaw',
+    companyPriority: 'target',
     lastTouchAt: '2026-08-21T08:30:00.000Z',
     pendingReplies: 0,
-    potentialLead: false,
+    hasOutbound: true,
+    potentialLead: true,
     foundByDash: false,
   },
   {
@@ -1520,8 +1524,10 @@ const contactRows: ContactListRow[] = [
     status: 'contacted',
     companyName: 'The Halloran-Achterberg group',
     companySlug: 'de-shaw',
+    companyPriority: 'target',
     lastTouchAt: '2026-09-02T11:00:00.000Z',
     pendingReplies: 1,
+    hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
   },
@@ -1529,25 +1535,29 @@ const contactRows: ContactListRow[] = [
     id: 'c3',
     fullName: 'Tom Beale',
     title: null,
-    relationship: 'warm_intro',
-    status: 'not_contacted',
+    relationship: 'former_colleague',
+    status: 'to_contact',
     companyName: 'Tallow',
     companySlug: 'tallow',
+    companyPriority: 'interested',
     lastTouchAt: null,
     pendingReplies: 0,
-    potentialLead: false,
-    foundByDash: false,
+    hasOutbound: false,
+    potentialLead: true,
+    foundByDash: true,
   },
   {
     id: 'c4',
     fullName: 'Aoife Ní Bhraonáin',
     title: 'Head of Engineering',
-    relationship: 'hiring_manager',
+    relationship: 'second_degree',
     status: 'contacted',
     companyName: 'Kestrel Bank',
     companySlug: 'kestrel-bank',
-    lastTouchAt: '2026-08-30T09:10:00.000Z',
+    companyPriority: 'backup',
+    lastTouchAt: '2026-09-10T09:10:00.000Z',
     pendingReplies: 2,
+    hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
   },
@@ -1556,14 +1566,54 @@ const contactRows: ContactListRow[] = [
     fullName: 'Sam Okonjo',
     title: 'Staff Engineer',
     relationship: 'friend',
-    status: 'replied',
+    status: 'met',
     companyName: null,
     companySlug: null,
+    companyPriority: null,
     lastTouchAt: '2026-07-19T20:00:00.000Z',
     pendingReplies: 0,
+    hasOutbound: true,
     potentialLead: false,
     foundByDash: false,
   },
+  {
+    id: 'c6',
+    fullName: 'Marguerite Oyelaran-Featherstonehaugh',
+    title: 'Director of Data Science and Analytics Platforms',
+    relationship: 'alum',
+    status: 'dormant',
+    companyName: 'Kestrel Bank',
+    companySlug: 'kestrel-bank',
+    companyPriority: 'backup',
+    lastTouchAt: '2026-05-02T10:00:00.000Z',
+    pendingReplies: 0,
+    hasOutbound: true,
+    potentialLead: false,
+    foundByDash: false,
+  },
+  {
+    id: 'c7',
+    fullName: 'Lee Park',
+    title: 'Talent Partner',
+    relationship: 'cold',
+    status: 'to_contact',
+    companyName: 'Tallow',
+    companySlug: 'tallow',
+    companyPriority: 'interested',
+    lastTouchAt: null,
+    pendingReplies: 0,
+    hasOutbound: false,
+    potentialLead: false,
+    foundByDash: true,
+  },
+];
+
+/** The day the gallery's contacts are drawn on, so "a week unanswered" holds still. */
+const contactsNow = new Date('2026-09-12T12:00:00.000Z');
+const contactCompanies = [
+  { id: 'co-1', name: 'The Halloran-Achterberg group' },
+  { id: 'co-2', name: 'Tallow' },
+  { id: 'co-3', name: 'Kestrel Bank' },
 ];
 
 const contact: ContactRow = {
@@ -5718,19 +5768,67 @@ export const SURFACES: readonly Surface[] = [
     render: () => <MaterialView {...material} part="voice" />,
   },
   {
+    /* The page as it opens, in Pipeline's order: leads to reach out to,
+     * leads waiting on a reply, then everyone else. */
     id: 'jobs-contacts',
-    label: 'Contacts · List and add',
+    label: 'Contacts · Focused',
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <ContactsView
+      <ContactsPage contacts={contactRows} companies={contactCompanies} params={{}} timezone="Europe/London" now={contactsNow} />
+    ),
+  },
+  {
+    /* Add someone pressed: the form above the sections. */
+    id: 'jobs-contacts-add',
+    label: 'Contacts · Add someone',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage contacts={contactRows} companies={contactCompanies} params={{ add: '1' }} timezone="Europe/London" now={contactsNow} />
+    ),
+  },
+  {
+    /* The table alone, every column a menu of filters from its header. */
+    id: 'jobs-contacts-table',
+    label: 'Contacts · Table',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage contacts={contactRows} companies={contactCompanies} params={{ view: 'table' }} timezone="Europe/London" now={contactsNow} />
+    ),
+  },
+  {
+    /* The Status menu open: the statuses, then whether you have reached out
+     * and whether a send is waiting on a reply. */
+    id: 'jobs-contacts-table-column-menu',
+    label: 'Contacts · Table · Column filter',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage
         contacts={contactRows}
-        companies={[
-          { id: 'co-1', name: 'The Halloran-Achterberg group' },
-          { id: 'co-2', name: 'Tallow' },
-          { id: 'co-3', name: 'Kestrel Bank' },
-        ]}
+        companies={contactCompanies}
+        params={{ view: 'table', relationship: 'recruiter' }}
         timezone="Europe/London"
+        now={contactsNow}
+        openColumn="status"
+      />
+    ),
+  },
+  {
+    /* Filtered to nothing: the headers stay so a filter can be loosened. */
+    id: 'jobs-contacts-table-empty',
+    label: 'Contacts · Table · No rows match',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage
+        contacts={contactRows}
+        companies={contactCompanies}
+        params={{ view: 'table', status: 'met', show: 'dash' }}
+        timezone="Europe/London"
+        now={contactsNow}
       />
     ),
   },
