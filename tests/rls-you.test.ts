@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'personality_results', 'places', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -571,6 +571,27 @@ describe('insight digest and saving one call', () => {
     ).rejects.toThrow();
     await expect(
       asUser(userA, (tx) => tx`select you.save_insight_run(${userA}, gen_random_uuid(), '[]'::jsonb, 'x', 'y')`),
+    ).rejects.toThrow();
+  });
+});
+
+describe('profile entries', () => {
+  // migrations-you/0015 (plan #2432.7): what the LinkedIn import wrote about
+  // schools, certifications, honors and skills.
+  it('are read and written by their owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into profile_entries (user_id, kind, name) values (${userA}, 'skill', 'Accounting')`,
+    );
+    const seenByB = await asUser(userB, (tx) => tx`select id from profile_entries`);
+    expect(seenByB).toEqual([]);
+    const seenByA = await asUser(userA, (tx) => tx`select name from profile_entries`);
+    expect(seenByA).toEqual([{ name: 'Accounting' }]);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into profile_entries (user_id, kind, name) values (${userA}, 'skill', 'Forged')`,
+      ),
     ).rejects.toThrow();
   });
 });
