@@ -695,7 +695,7 @@ and folding it in makes "waiting on you" a list that cannot be cleared.
 brief all put on a row, and it is not the `status` column. A question and a
 step share that column and do not mean the same things by it, "ready" is worked
 out from what a step waits on, and the reading of a claim comes off the run
-behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
+behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, fourteen of them:
 
 | | |
 |---|---|
@@ -708,16 +708,17 @@ behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
 | `abandoned` | Claimed, and the run ended without closing the step. Nobody is on it and it needs handing over again. The one claim reading that leaves the ladder, and it ranks with the stuck states rather than the underway ones. |
 | `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. A feature reads it too, when every open step beneath it is blocked and so nothing under it can be picked up. |
 | `waiting` | Waits on another step, which clears itself when that step closes. The tooltip names which steps. |
+| `setup` | An open setup step: a job of the person's outside the repository, closed when they say it is done, with no commit. No routine can pick it up, and it frees the work behind it when it closes. |
 | `ready` | Not started, with nothing in the way. What the Send button takes, `workOrder` lists and the overnight chooser fires. |
 | `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it dropped, proposed or blocked on something outside the plan. The right-hand end of the progress bar — work not reached. |
 | `done` | Closed against its done-when. The one state that carries a commit. |
 | `dropped` | Decided against, and out of the denominator with the proposals. |
 
-**Why thirteen.** #505 asked whether the set had outgrown what anybody reads:
+**Why fourteen.** #505 asked whether the set had outgrown what anybody reads:
 `not_started`, `ready` and `waiting` look like three shapes for "not started,
 and here is why". It was measured against one bar — a state stays only if some
 surface does something different with it, rather than merely wording it
-differently — and all thirteen cleared it. Four pairs were close enough to
+differently — and all fourteen cleared it. Four pairs were close enough to
 argue about. `ready` is what the Send button, the work order and the overnight
 chooser read, so merging it into `not_started` puts the one state that is an
 invitation to start behind a tooltip. `blocked` and `waiting` stopped being one
@@ -730,11 +731,11 @@ which is the dot the page used to draw on a step nobody was working. And
 `answered` is a closed row with a resolution and no commit, which `done` cannot
 say.
 
-The same bar applies to a fourteenth. Every `Record<PlanHealth, …>` is
+The same bar applies to a fifteenth. Every `Record<PlanHealth, …>` is
 exhaustive — the glyphs in `lib/status-glyphs.ts`, the words and tones on the
 page, the tally, `planState` in `lib/dev/words.ts` — so adding one fails the
 typecheck at each surface rather than drawing itself as a proposal, and
-`/dev/ui` lists all thirteen with their shapes.
+`/dev/ui` lists all fourteen with their shapes.
 
 ## The page
 
