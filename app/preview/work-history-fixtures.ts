@@ -20,6 +20,7 @@ const job = (fields: Partial<Job> & Pick<Job, 'id' | 'employer'>): Job => ({
   edited: false,
   resume_id: RESUME,
   resume_hash: OLD,
+  source: null,
   position: 0,
   created_at: '2026-10-12T09:00:00Z',
   updated_at: '2026-10-12T09:00:00Z',

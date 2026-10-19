@@ -183,6 +183,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-note-rename': ['/vault/n/[...path]'],
   'vault-note-attachments': ['/vault/n/[...path]'],
   'you-work-jobs': ['/you/work'],
+  'you-work-linkedin': ['/you/work'],
+  'you-work-linkedin-empty': ['/you/work'],
   'you-work-jobs-empty': ['/you/work'],
   'you-work-jobs-edit': ['/you/work'],
   'you-work-empty': ['/you/work'],

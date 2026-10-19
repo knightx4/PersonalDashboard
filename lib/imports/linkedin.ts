@@ -1,5 +1,6 @@
 import { readLinkedInArchive, type LinkedInArchive } from '@/lib/linkedin/archive';
 import { applyPlan, planImport } from './engine';
+import { LINKEDIN_PROFILE_MAPPERS } from './linkedin-profile';
 import type { ImportMapper, ImportPlan, ImportStore } from './types';
 
 // The LinkedIn export through the import engine (plan #2432.2), the one
@@ -11,7 +12,9 @@ import type { ImportMapper, ImportPlan, ImportStore } from './types';
 
 export const LINKEDIN_SOURCE = 'linkedin';
 
-export const LINKEDIN_MAPPERS: ImportMapper<LinkedInArchive>[] = [];
+export const LINKEDIN_MAPPERS: ImportMapper<LinkedInArchive>[] = [
+  ...LINKEDIN_PROFILE_MAPPERS,
+];
 
 /**
  * The day the export was made, from LinkedIn's file name

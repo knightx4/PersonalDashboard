@@ -52,6 +52,12 @@ export interface ImportMapper<Input> {
    * tracked from mail, say). A joined row has only its empty columns filled.
    */
   match?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string>>;
+  /**
+   * Records with no key that are not imported because the person already
+   * keeps them elsewhere, as record key to the reason (a LinkedIn course that
+   * is already on one of their transcripts). They count as skipped.
+   */
+  exclude?(pending: PendingRecord[], store: ImportStore): Promise<Map<string, string>>;
 }
 
 export type Outcome = 'added' | 'updated' | 'unchanged' | 'kept' | 'skipped';

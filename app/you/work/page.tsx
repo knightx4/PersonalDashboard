@@ -9,6 +9,8 @@ import { resumeHash } from '@/lib/you/resume-hash';
 import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
 import { EducationSection } from './education-section';
 import { JobsSection } from './jobs-section';
+import { ProfileSections } from './profile-sections';
+import { groupProfile, PROFILE_ENTRY_COLUMNS, type ProfileEntry } from '@/lib/you/profile-entries';
 import { sectionSubject } from '@/lib/core/section-path';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadCourseExplains } from '@/lib/learn/evidence/course-explain-store';
@@ -21,7 +23,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * You's Work & school tab: your jobs, read from your default résumé in Jobs
- * (plan #1991.4), above Education, which moved here from the Vault (plan
+ * (plan #1991.4), then the schools, certifications, honors and skills from
+ * your LinkedIn profile (plan #2432.7), above Education, which moved here from the Vault (plan
  * #1991.3): your transcripts and every course on them. Read on the session
  * client, so RLS keeps it to your own. The old /vault/education address
  * redirects here (next.config.ts), anchors and all.
@@ -30,7 +33,7 @@ export default async function Page() {
   const you = await createYouClient();
   const user = await requireUser();
   const jobsClient = await createJobsClient();
-  const [transcripts, courses, courseFiles, courseWeeks, overviews, jobs, resume] = await Promise.all([
+  const [transcripts, courses, courseFiles, courseWeeks, overviews, jobs, resume, profile] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -100,6 +103,16 @@ export default async function Page() {
         const row = data as { id: string; label: string; text_content: string | null } | null;
         return row?.text_content?.trim() ? { id: row.id, label: row.label, text: row.text_content } : null;
       }),
+    // The schools, certifications, honors, skills and courses the LinkedIn import wrote (plan #2432.7).
+    you
+      .from('profile_entries')
+      .select(PROFILE_ENTRY_COLUMNS)
+      .eq('user_id', user.id)
+      .order('position')
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Loading your LinkedIn profile failed: ${error.message}`);
+        return (data ?? []) as unknown as ProfileEntry[];
+      }),
   ]);
 
   // The explain prompt on each graded course named for its topics (plan
@@ -138,6 +151,7 @@ export default async function Page() {
         resume={resumeChoice ? { label: resumeChoice.label } : null}
         changed={resumeChanged(resumeChoice, jobs)}
       />
+      <ProfileSections lists={groupProfile(profile)} />
       <EducationSection
         groups={groupCourses(transcripts, courses)}
         courseCounts={courseCounts}
