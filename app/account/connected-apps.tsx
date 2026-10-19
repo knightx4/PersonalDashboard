@@ -56,6 +56,17 @@ export function ConnectedAppsSection({
           ))}
         </ul>
       )}
+
+      {/* Any agent that signs in over OAuth connects the same way (note
+          eb9ab8a5): the consent page lets a code go back to a loopback
+          address (lib/connector/redirect.ts), so nothing is pasted. */}
+      <p className="mt-3 text-small leading-snug text-ink-muted">
+        Another agent, such as Hermes or a command-line tool, connects the same way: add{' '}
+        <span className="[overflow-wrap:anywhere] text-ink">{connectorAddress}</span> to it as an
+        MCP server over HTTP. The first time it calls, it opens a page here in your browser; sign in
+        and choose Allow, and it keeps the token itself. An agent that can only take a pasted token,
+        with no browser sign-in, cannot connect.
+      </p>
     </section>
   );
 }
