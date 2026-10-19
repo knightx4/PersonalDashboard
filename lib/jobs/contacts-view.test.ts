@@ -25,6 +25,7 @@ function person(overrides: Partial<ContactListRow>): ContactListRow {
     hasOutbound: false,
     potentialLead: false,
     foundByDash: false,
+    linkedinConnection: false,
     ...overrides,
   };
 }
@@ -53,7 +54,7 @@ const rows = [
   }),
   person({ fullName: 'Flo', potentialLead: true, status: 'met', hasOutbound: true }),
   person({ fullName: 'Gus', relationship: 'recruiter', companySlug: 'acme', companyName: 'Acme' }),
-  person({ fullName: 'Hal', status: 'contacted', foundByDash: true }),
+  person({ fullName: 'Hal', status: 'contacted', foundByDash: true, linkedinConnection: true }),
 ];
 
 const names = (list: readonly ContactListRow[]) => list.map((row) => row.fullName);
@@ -94,6 +95,7 @@ describe('filterContacts', () => {
 
   it('narrows by each column', () => {
     expect(shown({ show: 'dash' })).toEqual(['Hal']);
+    expect(shown({ show: 'no_linkedin' })).toEqual(['Ada', 'Ben', 'Cy', 'Di', 'Ed', 'Flo', 'Gus']);
     expect(shown({ company: 'acme' })).toEqual(['Gus']);
     expect(shown({ company: 'none' })).toHaveLength(7);
     expect(shown({ relationship: 'recruiter' })).toEqual(['Gus']);
