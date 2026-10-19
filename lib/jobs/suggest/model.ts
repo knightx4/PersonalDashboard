@@ -198,7 +198,14 @@ Search the web for up to ${MAX_OUTREACH} of the best of these:
   that is growing or hiring for it now.
 - An event, meetup or professional community for their field where they would
   meet such people, in or near the place they live, happening soon. Only when
-  it is concrete: a named group or a dated event with a link.
+  it is concrete: a named group or a dated event with a link. Besides
+  wherever else you look, search Luma (lu.ma and luma.com) for these: many
+  tech and AI events are listed only there.
+- A Luma calendar worth subscribing to: a community or organiser whose
+  calendar keeps listing events like these in or near where they live, so
+  they hear of the next one without a search. Link the calendar page, not
+  one event, and say in why what kind of events it runs and how often.
+  Headline it "Subscribe to <name> on Luma"; channel is event.
 
 Mix them; do not return three of one kind unless the others are weak. Prefer
 reachable people (with a public profile or a way in) over famous ones.

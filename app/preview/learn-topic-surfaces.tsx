@@ -349,7 +349,7 @@ const THREAD: DevComment[] = [
   {
     id: 'm2',
     author: 'claude',
-    body: 'Added to level 9 would read: "Can walk from enterprise value to equity value through net debt." Reword it there and approve.',
+    body: 'Level 9 would read: "Can walk from enterprise value to equity value through net debt."',
     createdAt: '2026-10-15T09:21:00Z',
   },
 ];
@@ -364,7 +364,7 @@ export function LearnTopicDraftMatchPreview() {
   );
 }
 
-/* Every row cited or marked personal, so Approve is open; this draft's
+/* Every row cited or marked personal, so nothing holds the draft but its approval; this draft's
  * second call failed, so stability has nothing to compare. */
 const DCF_SETTLED: TopicDetail = {
   ...DCF,

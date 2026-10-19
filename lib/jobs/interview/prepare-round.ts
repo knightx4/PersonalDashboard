@@ -2,6 +2,8 @@ import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { PERSPECTIVE_COLUMNS, perspectiveOf, perspectiveText } from '@/lib/jobs/companies/perspective';
+import { researchFromRow, researchText } from '@/lib/jobs/companies/research';
 import { buildPrepContext } from '@/lib/jobs/interview/prep-context';
 import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
 import { writePrepNote } from '@/lib/jobs/interview/prep';
@@ -102,7 +104,8 @@ export async function prepareRound(
          roles!inner (
            id, title, seniority, location, work_mode, jd_text, jd_hash, requirements,
            requirement_matches,
-           companies!inner ( id, name, industry, stage, headcount_band, research, priority )
+           companies!inner ( id, name, industry, stage, headcount_band, research, priority,
+             ${PERSPECTIVE_COLUMNS} )
          )
        )`,
     )
@@ -133,7 +136,7 @@ export async function prepareRound(
         headcount_band: string | null;
         research: string | null;
         priority: string | null;
-      };
+      } & Record<string, unknown>;
     };
   };
   const role = application.roles;
@@ -161,6 +164,7 @@ export async function prepareRound(
     { data: priorRows },
     { data: bank, error: bankError },
     { data: profile },
+    { data: writeUps },
   ] = await Promise.all([
     groupId
       ? conversationQuery.eq('group_id', groupId)
@@ -195,6 +199,15 @@ export async function prepareRound(
       .select('target_titles, timezone, writing_style_notes, banned_constructions')
       .eq('id', user.id)
       .maybeSingle(),
+    // The newest finished research run on the company, if one has finished.
+    supabase
+      .from('company_research')
+      .select('summary, sections, finished_at')
+      .eq('company_id', company.id)
+      .eq('user_id', user.id)
+      .eq('status', 'ready')
+      .order('finished_at', { ascending: false })
+      .limit(1),
   ]);
 
   if (conversationError) return fail(conversationError.message);
@@ -259,6 +272,9 @@ export async function prepareRound(
       stage: company.stage,
       headcountBand: company.headcount_band,
       research: company.research,
+      // Every answer but the next move, a to-do of theirs; the unknowns are what to ask.
+      perspective: perspectiveText(perspectiveOf(company), ['business', 'whyNow', 'problem', 'whyMe', 'unknowns']),
+      researchWriteUp: writeUps?.[0] ? researchText(researchFromRow(writeUps[0])) : null,
       priority: company.priority,
     },
     priorRounds: ((priorRows ?? []) as unknown as PrepPriorJoin[]).map((row) => ({

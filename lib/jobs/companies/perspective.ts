@@ -68,3 +68,19 @@ export function perspectiveOf(row: Record<string, unknown>): Perspective {
 export function answeredCount(perspective: Perspective): number {
   return PERSPECTIVE_QUESTIONS.filter((question) => perspective[question.key].trim() !== '').length;
 }
+
+/**
+ * The answered questions as one "label: answer" paragraph each, in the tab's
+ * order, for a prompt. `keys` picks which questions count; blank answers are
+ * left out, and none answered gives an empty string.
+ */
+export function perspectiveText(
+  perspective: Perspective,
+  keys: readonly PerspectiveKey[] = PERSPECTIVE_QUESTIONS.map((question) => question.key),
+): string {
+  return PERSPECTIVE_QUESTIONS.filter((question) => keys.includes(question.key))
+    .map((question) => ({ label: question.label, answer: perspective[question.key].trim() }))
+    .filter((entry) => entry.answer)
+    .map((entry) => `${entry.label}: ${entry.answer}`)
+    .join('\n\n');
+}

@@ -61,6 +61,8 @@ export type DashActionProps = ButtonProps & {
   wrapperClassName?: string;
   /** The run this press started, followed until it ends. */
   run?: RunRef | null;
+  /** Start with the cost hint showing. For the preview gallery's shots. */
+  hintOpen?: boolean;
 };
 
 const SMALL = new Set(['xs', 'sm']);
@@ -79,6 +81,7 @@ export function DashAction({
   variant,
   size,
   run,
+  hintOpen,
   disabled,
   children,
   ...props
@@ -91,7 +94,7 @@ export function DashAction({
 
   let hint: React.ReactNode = null;
   if (paid) {
-    hint = <PaidHint action={paid} count={count} plus={plus} what={what} align={align} />;
+    hint = <PaidHint action={paid} count={count} plus={plus} what={what} align={align} defaultOpen={hintOpen} />;
   } else if (estimate || costText) {
     hint = (
       <CostHint
@@ -100,6 +103,7 @@ export function DashAction({
         count={count}
         what={what}
         align={align}
+        defaultOpen={hintOpen}
       />
     );
   }

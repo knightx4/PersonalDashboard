@@ -305,6 +305,16 @@ export function buildInspirationPage(input: {
   };
 }
 
+/**
+ * A video with nothing left in it to look at (note 71b32f67): read, or with no
+ * transcript to read, and no open takeaway under it. The by-video view folds
+ * these away so the videos still worth opening are the ones on the page. One
+ * that failed stays out, since a failure may want a second try.
+ */
+export function nothingLeftIn(video: InspirationVideo): boolean {
+  return (video.state.kind === 'read' || video.state.kind === 'no-transcript') && video.takeaways.length === 0;
+}
+
 /** The two arrangements, as the page's `view` search parameter. */
 export const INSPIRATION_VIEWS = ['videos', 'list'] as const;
 export type InspirationViewName = (typeof INSPIRATION_VIEWS)[number];

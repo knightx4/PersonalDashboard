@@ -8,7 +8,10 @@
   "fluid": true,
   "git": {
     "deploymentEnabled": {
-      "claude/**": false
+      "claude/**": false,
+      "plan/**": false,
+      "build/**": false,
+      "worktree-*": false
     }
   }
 }

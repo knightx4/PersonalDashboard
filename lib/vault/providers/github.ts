@@ -65,6 +65,21 @@ type CompareResponse = {
   total_commits?: number;
 };
 
+type CommitListResponse = Array<{
+  commit?: { author?: { date?: string }; committer?: { date?: string } };
+}>;
+
+/** The page number of a Link header's `last` relation, or null when there is none. */
+export function lastPage(link: string | null): number | null {
+  if (!link) return null;
+  for (const part of link.split(',')) {
+    if (!/rel="last"/.test(part)) continue;
+    const match = /[?&]page=(\d+)/.exec(part);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
 /**
  * Compare returns at most 300 files per response. Paginating it is possible,
  * but a diff that large is a vault reorganisation rather than an afternoon's
@@ -130,6 +145,13 @@ export class GithubVaultSource implements VaultSource {
   constructor(private readonly config: GithubVaultConfig) {}
 
   private async request<T>(path: string, accept = 'application/vnd.github+json'): Promise<T> {
+    return (await this.requestWithHeaders<T>(path, accept)).body;
+  }
+
+  private async requestWithHeaders<T>(
+    path: string,
+    accept = 'application/vnd.github+json',
+  ): Promise<{ body: T; headers: Headers }> {
     const res = await fetch(`${API}${path}`, {
       headers: {
         accept,
@@ -164,7 +186,7 @@ export class GithubVaultSource implements VaultSource {
       throw new VaultSourceError(`GitHub ${res.status} for ${path}`, res.status);
     }
 
-    return (await res.json()) as T;
+    return { body: (await res.json()) as T, headers: res.headers };
   }
 
   private get base(): string {
@@ -258,6 +280,29 @@ export class GithubVaultSource implements VaultSource {
     const headCommittedAt = commits[commits.length - 1]?.commit?.committer?.date ?? null;
 
     return { changes, complete: true, attachments, headCommittedAt };
+  }
+
+  /**
+   * When the first commit that added `vaultPath` was authored (plan #2413.2).
+   *
+   * The commits endpoint lists newest first, so a page of one tells how many
+   * pages there are through its `last` link, and that page holds the first
+   * commit: two requests for a note with history, one for a note with a
+   * single commit. GitHub does not follow renames here, so a moved file is
+   * dated by the move; the note's other evidence usually reaches further back.
+   * A path with no commits on the branch gives null.
+   */
+  async firstCommitAt(vaultPath: string): Promise<string | null> {
+    const repoPath = toRepoPath(vaultPath, this.config.subpath ?? '');
+    const query = (page: number) =>
+      `${this.base}/commits?sha=${encodeURIComponent(this.config.branch)}` +
+      `&path=${encodeURIComponent(repoPath)}&per_page=1&page=${page}`;
+
+    const first = await this.requestWithHeaders<CommitListResponse>(query(1));
+    const last = lastPage(first.headers.get('link'));
+    const page = last && last > 1 ? await this.request<CommitListResponse>(query(last)) : first.body;
+    const commit = page[page.length - 1]?.commit;
+    return commit?.author?.date ?? commit?.committer?.date ?? null;
   }
 
   async readBlob(blobSha: string): Promise<string> {

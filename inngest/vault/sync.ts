@@ -2,12 +2,14 @@ import 'server-only';
 
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
-import { decryptAccessToken, vaultPortsFor } from '@/lib/vault/db/ports';
-import { VaultAuthError } from '@/lib/vault/providers';
+import { decryptAccessToken, noteDatingPorts, vaultPortsFor } from '@/lib/vault/db/ports';
+import { dateNotes } from '@/lib/vault/sync/dating';
+import { VaultAuthError, type VaultSource } from '@/lib/vault/providers';
 import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
 import { activeRun } from '@/lib/vault/sync/manual';
 import { indexNoteBlocks } from '@/lib/vault/notes/block-index';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
+import { noteVoicePorts } from '@/lib/vault/notes/voice';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -170,6 +172,9 @@ export async function syncOneConnection(
 
     const result = await runVaultSync({ connection, ports });
 
+    const notesDated = await dateAfterSync(supabase, connection.id, ports.source);
+    await voicesByRuleAfterSync(supabase, connection.user_id);
+
     const a = result.attachments;
     if (a.copied || a.removed || a.pending || a.failed) {
       console.info(
@@ -188,6 +193,7 @@ export async function syncOneConnection(
         notes_written: result.notesWritten,
         notes_deleted: result.notesDeleted,
         notes_skipped: result.notesSkipped,
+        notes_dated: notesDated,
         finished_at: new Date().toISOString(),
       })
       .eq('id', runId);
@@ -218,6 +224,53 @@ export async function syncOneConnection(
     }
 
     throw err;
+  }
+}
+
+/**
+ * How long a sync may spend dating notes (plan #2413.2). A daily sync dates
+ * the handful it wrote in a second or two; the backfill, about two GitHub
+ * requests a note, takes a few runs at this length and resumes by itself.
+ */
+const DATING_AFTER_SYNC_MS = 45_000;
+
+/**
+ * Date the notes that are due, as far as the time allows. Never throws: a
+ * note left undated is still due, and the next sync dates it.
+ */
+async function dateAfterSync(
+  supabase: VaultSupabaseClient,
+  connectionId: string,
+  source: VaultSource,
+): Promise<number> {
+  try {
+    const result = await dateNotes({
+      ports: noteDatingPorts({ supabase, connectionId, source }),
+      deadline: Date.now() + DATING_AFTER_SYNC_MS,
+    });
+    if (!result.complete) {
+      console.info(
+        `vault: dated ${result.dated} notes, ${result.lookedUp} looked up on GitHub, ${result.failed} lookups failed; more to date next run`,
+      );
+    }
+    return result.dated;
+  } catch (err) {
+    console.error('[vault sync] note dating', err instanceof Error ? err.message : err);
+    return 0;
+  }
+}
+
+/**
+ * Tag the notes this sync wrote with their voice where a folder or credential
+ * rule decides it (plan #2413.3), so a note holding a password is secret
+ * before anything reads it. One statement and no model call; the map sweep's
+ * tick asks Haiku about the rest. Never throws: an untagged note stays due.
+ */
+async function voicesByRuleAfterSync(supabase: VaultSupabaseClient, userId: string): Promise<void> {
+  try {
+    await noteVoicePorts({ supabase, core: null, userId }).tagByRule();
+  } catch (err) {
+    console.error('[vault sync] note voices', err instanceof Error ? err.message : err);
   }
 }
 

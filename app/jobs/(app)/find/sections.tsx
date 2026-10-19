@@ -62,8 +62,8 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /**
- * Dash's recommendations, both on Find (plan #1589): the roles to apply for,
- * then the people to meet. The daily
+ * Dash's recommendations on Find (plan #1589): the roles to apply for, the
+ * people to meet and the events to go to. The daily
  * run fills them (lib/jobs/suggest), so they are there when the page opens;
  * the search button is for a list that has run dry.
  */
@@ -221,6 +221,30 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
     >
       {suggestions.map((suggestion) => (
         <PersonRow key={suggestion.id} suggestion={suggestion} />
+      ))}
+    </RecommendedSection>
+  );
+}
+
+/**
+ * Events to go to: the people search's suggestions whose move is to turn up
+ * somewhere or follow a calendar (channel `event`), split from People to meet so a meetup does not
+ * sit among the people to write to. The same search finds both.
+ */
+export function RecommendedEvents({ suggestions }: { suggestions: OpenSuggestion[] }) {
+  return (
+    <RecommendedSection
+      title="Events to go to"
+      empty="Dash looks for events when it looks for people to meet, every few days, from your career goals and CV."
+      button="Search now"
+      searching="Searching…"
+      paid="app/jobs/(app)/find/recommend-actions.ts#suggestPeople"
+      what="Cost of a search for people and events"
+      action={suggestPeople}
+      count={suggestions.length}
+    >
+      {suggestions.map((suggestion) => (
+        <EventRow key={suggestion.id} suggestion={suggestion} />
       ))}
     </RecommendedSection>
   );
@@ -720,6 +744,73 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
             onClick={() => act(() => markSuggestionSent(suggestion.id))}
           >
             Sent
+          </Button>
+        </span>
+      </div>
+      {error && <p className="text-small text-danger">{error}</p>}
+    </li>
+  );
+}
+
+/** An event or a calendar to follow: who runs it, why it is worth it, what to do, and its page. */
+function EventRow({ suggestion }: { suggestion: OpenSuggestion }) {
+  const [busy, start] = useTransition();
+  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
+  // The search also suggests Luma calendars to follow, headlined "Subscribe
+  // to … on Luma" (lib/jobs/suggest/model.ts).
+  const calendar = /^Subscribe to /.test(suggestion.headline);
+
+  const act = (action: () => Promise<{ error: string | null }>) =>
+    start(async () => {
+      const result = await action();
+      setError(result.error);
+    });
+  const decline = () =>
+    start(async () => {
+      const result = await dismissSuggestion(suggestion.id);
+      setError(result.error);
+      if (!result.error)
+        toast({
+          text: closedToast('declined', suggestion.headline),
+          undo: async () => void (await reopenSuggestion(suggestion.id)),
+        });
+    });
+
+  return (
+    <li className="row-pad space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-ui font-medium text-ink">{suggestion.headline}</span>
+        {suggestion.companyName && (
+          <span className="text-small text-ink-muted">{suggestion.companyName}</span>
+        )}
+      </div>
+      <p className="text-small text-ink-muted">{suggestion.why}</p>
+      {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}
+      <p className="whitespace-pre-line text-ui text-ink">
+        <LinkedText text={suggestion.move} />
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {suggestion.sourceUrl && (
+          <a
+            href={suggestion.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
+            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+            {calendar ? 'Calendar' : 'Event page'}
+          </a>
+        )}
+        <span className="ml-auto flex items-center gap-2">
+          <CloseButton lifecycle="declined" pending={busy} onClick={decline} />
+          <Button
+            type="button"
+            size="sm"
+            pending={busy}
+            onClick={() => act(() => markSuggestionSent(suggestion.id))}
+          >
+            {calendar ? 'Subscribed' : 'Going'}
           </Button>
         </span>
       </div>

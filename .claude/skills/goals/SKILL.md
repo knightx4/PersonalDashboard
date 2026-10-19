@@ -32,6 +32,13 @@ company research skill, for one, writes `job_search.company_research`), so
 write no `goals.runs` row and none of this skill's rules apply, beyond scoping
 every read and write to the `user_id` in the brief.
 
+The skills fired this way so far:
+
+- `company-research`: research on one company, into `job_search.company_research`.
+- `insights`: three to five deep insights about the person for the Insights
+  tab of You, into `you.insights` under the `you.insight_runs` row the brief
+  names (`insightsBrief` in `lib/you/insights.ts`).
+
 ## How you read and write
 
 Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through scripts/sql.ts"), not the Supabase connector, whose confirmations never reach
@@ -75,6 +82,12 @@ update goals.items set status = 'done', resolution = '…' where id = '<id>' and
 select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'close_step',
   $s$Dash closed "Send the form", since the council's reply came on 2 October.$s$);
 ```
+
+When the step you close is a Dash step, its text opens with one plain
+sentence of what Dash did or found, such as "Found three Saturday volunteer
+sessions in Brooklyn, and the earliest is on 4 November." The notification
+shows that sentence with the step's title (`reference/working-steps.md`,
+step 3).
 
 The arguments are the account, the row as `schema.table:id`, the op
 (`insert`, `update` or `delete`), what was done in snake_case (`add_step`,

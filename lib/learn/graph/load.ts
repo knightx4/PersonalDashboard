@@ -44,6 +44,8 @@ export type Subject = {
   name: string;
   note: string | null;
   createdAt: string;
+  /** When it was archived (plan #2355.2); null or absent while it is live. */
+  archivedAt?: string | null;
 };
 
 export type Goal = {
@@ -68,7 +70,11 @@ export async function loadSubjects(
     .select('id, name, note, created_at')
     // A survey subject holds questions about a theme you have no track for
     // (plan #838). It is not one of your tracks, so no list of them shows it.
-    .eq('survey', false);
+    .eq('survey', false)
+    // An archived subject is off every list you choose from (plan #2355.3):
+    // Now, the Subjects list, the offers. Its page still opens by link
+    // (`loadSubject`), and the Archived list reads it on its own.
+    .is('archived_at', null);
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query.order('name');
 
@@ -92,7 +98,7 @@ export async function loadSubject(
 ): Promise<Subject | null> {
   const { data, error } = await supabase
     .from('subjects')
-    .select('id, name, note, created_at')
+    .select('id, name, note, created_at, archived_at')
     .eq('id', id)
     .maybeSingle();
 
@@ -100,12 +106,21 @@ export async function loadSubject(
   if (error) throw fail('Reading that subject', error);
   if (!data) return null;
 
-  const subject = data as { id: string; name: string; note: string | null; created_at: string };
+  // An archived subject still opens by its link, with a banner to restore it
+  // (plan #2355.2), so this read does not filter on archived_at.
+  const subject = data as {
+    id: string;
+    name: string;
+    note: string | null;
+    created_at: string;
+    archived_at: string | null;
+  };
   return {
     id: subject.id,
     name: subject.name,
     note: subject.note,
     createdAt: subject.created_at,
+    archivedAt: subject.archived_at,
   };
 }
 

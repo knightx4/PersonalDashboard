@@ -65,6 +65,8 @@ export function renderQuestion(question: GatheredQuestion): string {
       ? `current answer (${question.status ?? 'draft'}): ${question.answer}`
       : 'current answer: none',
     question.defaultAnswer && `their default answer to this question: ${question.defaultAnswer}`,
+    question.comments.length > 0 &&
+      `their comments on this question:\n${question.comments.map((comment) => `- ${comment}`).join('\n')}`,
   ]);
 }
 
@@ -96,6 +98,8 @@ export function renderMaterial(material: GatheredMaterial): string {
       'What they have found out about the company',
       lines([role.research, ...role.notes.map((note) => `- ${note}`)]) || null,
     ),
+    section('Their own view of the company, in their words', role.perspective),
+    section('Research prepared on the company', role.researchWriteUp),
     section(
       'Their evidence bank',
       material.evidence.items.length > 0

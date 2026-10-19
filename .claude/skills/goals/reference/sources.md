@@ -37,7 +37,7 @@ Every note in their Obsidian vault: what they think, plan and want, in their own
 - Search: `title`, `body`, `path`
 - Name a row by `title`; link it by `path`
 - Opens at `/vault/n/<path>`
-- Search with full text: `search_tsv @@ websearch_to_tsquery('english', …)`. Rows with deleted_at set are gone from the vault. Find notes by meaning through the map as well: themes, then theme_notes.
+- Search with full text: `search_tsv @@ websearch_to_tsquery('english', …)`. Rows with deleted_at set are gone from the vault. Find notes by meaning through the map as well: themes, then theme_notes. voice says whose words a note is: private (their own thinking), audience (written for someone else, such as an application), clipped (someone else's words), reference (records kept to look things up). Never read a note with voice = 'secret': it holds credentials. obsidian.readable_notes is every live note but those.
 
 ### `obsidian.themes` (Vault)
 
@@ -54,7 +54,7 @@ Positions they hold, each a sentence drawn from their notes.
 
 - Search: `name`, `statement`
 - Name a row by `name`; link it by `id`
-- position_sources (position_id, quote) gives the sentence in the note each one came from.
+- position_sources (position_id, quote) gives the sentence in the note each one came from. obsidian.position_voices (position_id) counts its source notes by voice; only_for_audience is true when every one was written for someone else, so the position may be what they argued rather than what they believe.
 
 ### `obsidian.note_connections` (Vault)
 
@@ -524,6 +524,14 @@ The files they kept from a course: its syllabus, lecture slides, lecture notes a
 - Search: `title`, `file_name`, `kind`
 - Name a row by `title`; link it by `id`
 - course_id points at you.courses. kind is syllabus, slides, lecture_notes or reading. week is the week of the course, or null for a file that spans it. The file is in the private you-course-files bucket at storage_path; a course holds at most 20.
+
+### `you.course_weeks` (You)
+
+The weeks of a course they took and each week's topic, read from its syllabus and corrected by them.
+
+- Search: `title`
+- Name a row by `title`; link it by `id`
+- course_id points at you.courses. week is the week number; a file in you.course_files with the same course_id and week sits in it. title is null for a week the syllabus names without a topic. edited_at is set when they changed the title themselves; a row with removed_at is a week they removed, so leave it out.
 
 ### `you.transcripts` (You)
 

@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
+import { archivedAmong } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadGraph } from '@/lib/learn/graph/load';
 import { rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
@@ -688,7 +689,13 @@ export async function judgePendingChannels(
   const { data, error } = await learn.from('subject_channels').select('user_id, subject_id').is('decided', null);
   if (error) throw new Error(`Reading the channels waiting to be judged failed: ${error.message}`);
   const pairs = new Map<string, { user_id: string; subject_id: string }>();
-  for (const row of (data ?? []) as { user_id: string; subject_id: string }[]) pairs.set(`${row.user_id}:${row.subject_id}`, row);
+  // An archived subject's channels wait unjudged until it is restored (plan #2355.4).
+  const rows = (data ?? []) as { user_id: string; subject_id: string }[];
+  const archived = await archivedAmong(
+    learn,
+    rows.map((row) => row.subject_id),
+  );
+  for (const row of rows) if (!archived.has(row.subject_id)) pairs.set(`${row.user_id}:${row.subject_id}`, row);
 
   for (const { user_id: userId, subject_id: subjectId } of pairs.values()) {
     if (Date.now() >= options.deadline) {

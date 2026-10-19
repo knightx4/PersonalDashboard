@@ -1604,6 +1604,8 @@ describe('sweepQuietRuns', () => {
   it('writes back the runs of every account from the tick, with nobody on the page', async () => {
     // Before this the sweep ran only from the plan page's render, so a night
     // nobody watched kept every run `started` until morning.
+    // The clock judges only without a GitHub token, and a cloud session has one.
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
     const updates: Array<{ values: Record<string, unknown>; id: string }> = [];
     const run = (id: string, userId: string, createdAt: string) => ({
       id,
@@ -1663,6 +1665,7 @@ describe('sweepQuietRuns', () => {
     };
 
     const swept = await sweepQuietRuns({ supabase: supabase as never, now: MIDNIGHT });
+    vi.unstubAllEnvs();
 
     // No GitHub token here, so the clock judges: r1 has been quiet four hours,
     // r2 half an hour.

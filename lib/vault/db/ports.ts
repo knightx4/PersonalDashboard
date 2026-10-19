@@ -9,6 +9,7 @@ import type { CreateNotePorts, RemoveNotePorts } from '@/lib/vault/notes/create'
 import type { RenameNotePorts } from '@/lib/vault/notes/rename';
 import type { SaveNotePorts, SavableNote } from '@/lib/vault/notes/save';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
+import type { DatingPorts, DueNote, NoteDating } from '@/lib/vault/sync/dating';
 import type {
   NoteWrite,
   VaultAttachmentPorts,
@@ -311,6 +312,81 @@ export function vaultPortsFor(opts: {
         .update(patch)
         .eq('id', connection.id);
       if (error) throw new Error(`Saving sync progress failed: ${error.message}`);
+    },
+  };
+}
+
+/**
+ * The ports for the dating pass (plan #2413.2), over the service client, so
+ * every statement names the connection. The update sets only the dating
+ * columns, which notes_touch_updated_at does not fire on (vault 0037).
+ */
+export function noteDatingPorts(opts: {
+  supabase: VaultSupabaseClient;
+  connectionId: string;
+  source: VaultSource;
+}): DatingPorts {
+  const { supabase, connectionId, source } = opts;
+
+  return {
+    async loadDue(afterPath, limit) {
+      let query = supabase
+        .from('notes')
+        .select('id, path, body, frontmatter, blob_sha, git_first_commit_at, git_first_commit_checked_at')
+        .eq('connection_id', connectionId)
+        .is('deleted_at', null)
+        .eq('first_written_due', true)
+        .order('path')
+        .limit(limit);
+      if (afterPath !== null) query = query.gt('path', afterPath);
+      const { data, error } = await query;
+      if (error) throw new Error(`Reading notes to date failed: ${error.message}`);
+      return (
+        (data ?? []) as Array<{
+          id: string;
+          path: string;
+          body: string;
+          frontmatter: Record<string, unknown> | null;
+          blob_sha: string;
+          git_first_commit_at: string | null;
+          git_first_commit_checked_at: string | null;
+        }>
+      ).map(
+        (row): DueNote => ({
+          id: row.id,
+          path: row.path,
+          body: row.body,
+          frontmatter: row.frontmatter ?? {},
+          blobSha: row.blob_sha,
+          gitFirstCommitAt: row.git_first_commit_at,
+          gitFirstCommitCheckedAt: row.git_first_commit_checked_at,
+        }),
+      );
+    },
+
+    ...(source.firstCommitAt ? { firstCommitAt: (path: string) => source.firstCommitAt!(path) } : {}),
+
+    async save(rows: NoteDating[]) {
+      for (let i = 0; i < rows.length; i += 10) {
+        const results = await Promise.all(
+          rows.slice(i, i + 10).map((row) =>
+            supabase
+              .from('notes')
+              .update({
+                first_written_at: row.firstWrittenAt,
+                first_written_source: row.firstWrittenSource,
+                dated_entries: row.datedEntries,
+                git_first_commit_at: row.gitFirstCommitAt,
+                git_first_commit_checked_at: row.gitFirstCommitCheckedAt,
+                first_written_blob_sha: row.blobSha,
+              })
+              .eq('connection_id', connectionId)
+              .eq('id', row.id),
+          ),
+        );
+        const failed = results.find((result) => result.error);
+        if (failed?.error) throw new Error(`Dating notes failed: ${failed.error.message}`);
+      }
     },
   };
 }

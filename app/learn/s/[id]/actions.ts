@@ -484,3 +484,65 @@ export async function dismissDirection(_prev: DirectionPressState, formData: For
   revalidatePath(`/learn/s/${subjectId.data}`);
   return { done: 'dismissed' };
 }
+
+export type ArchiveState = { error?: string };
+
+/** The pages that list or read a subject, which an archive or a restore changes. */
+function revalidateArchive(subjectId: string): void {
+  revalidatePath(`/learn/s/${subjectId}`);
+  revalidatePath('/learn/know');
+  revalidatePath('/learn/know/archived');
+  revalidatePath('/learn/now');
+}
+
+/**
+ * Archive a subject from its page (plan #2355.2): sets archived_at on the
+ * owner's subject and nothing else, so its lessons and progress stay as they
+ * are. Asks for no confirmation, because Restore undoes it. The page stays
+ * open and shows the archived banner.
+ */
+// latency: pending
+export async function archiveSubject(_prev: ArchiveState, formData: FormData): Promise<ArchiveState> {
+  const user = await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase
+    .from('subjects')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', subjectId.data)
+    .eq('user_id', user.id)
+    .is('archived_at', null)
+    .select('id');
+  if (error) return { error: `Archiving failed: ${error.message}` };
+  if ((data ?? []).length === 0) return { error: 'That subject is gone or already archived.' };
+
+  revalidateArchive(subjectId.data);
+  return {};
+}
+
+/**
+ * Restore an archived subject (plan #2355.2), from its page or the Archived
+ * list: clears archived_at on the owner's subject, which puts it back on Now,
+ * the Subjects list and the hourly work with everything it had.
+ */
+// latency: pending
+export async function restoreSubject(_prev: ArchiveState, formData: FormData): Promise<ArchiveState> {
+  const user = await requireUser();
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
+
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase
+    .from('subjects')
+    .update({ archived_at: null })
+    .eq('id', subjectId.data)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) return { error: `Restoring failed: ${error.message}` };
+  if ((data ?? []).length === 0) return { error: 'That subject is gone.' };
+
+  revalidateArchive(subjectId.data);
+  return {};
+}

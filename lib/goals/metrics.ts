@@ -20,13 +20,23 @@ import { dayIn } from '@/lib/todo/time';
 export const METRIC_PERIODS = ['week', 'month'] as const;
 export type MetricPeriod = (typeof METRIC_PERIODS)[number];
 
+/**
+ * What a metric counts (plan #2397.1, migration goals 0085): the records of a
+ * list, the goal's closed steps, or the files Dash wrote under the goal. Only
+ * a list metric has a list and a date field; the others have null in both.
+ */
+export const METRIC_SOURCES = ['list', 'steps', 'files'] as const;
+export type MetricSource = (typeof METRIC_SOURCES)[number];
+
 export type Metric = {
   id: string;
   goalId: string;
   name: string;
-  collectionId: string;
-  /** The key of a date field of the list. */
-  dateField: string;
+  source: MetricSource;
+  /** The list counted, for a list metric; null otherwise. */
+  collectionId: string | null;
+  /** The key of a date field of the list, for a list metric; null otherwise. */
+  dateField: string | null;
   period: MetricPeriod;
   /** How many per period you are aiming for, or null. */
   target: number | null;
@@ -36,8 +46,11 @@ export type Metric = {
 /** What the form saves. */
 export type MetricInput = {
   name: string;
-  collectionId: string;
-  dateField: string;
+  source: MetricSource;
+  /** Read only for a list metric. */
+  collectionId: string | null;
+  /** Read only for a list metric. */
+  dateField: string | null;
   period: MetricPeriod;
   target: number | null;
 };
@@ -50,9 +63,14 @@ export function metricInputError(input: MetricInput): { field: keyof MetricInput
   const name = input.name.trim();
   if (!name) return { field: 'name', error: 'Give the metric a name.' };
   if (name.length > 200) return { field: 'name', error: 'Keep the name under 200 characters.' };
-  if (!input.collectionId) return { field: 'collectionId', error: 'Choose a list to count.' };
-  if (!/^[a-z][a-z0-9_]{0,39}$/.test(input.dateField)) {
-    return { field: 'dateField', error: 'Choose the date to count by.' };
+  if (!METRIC_SOURCES.includes(input.source)) {
+    return { field: 'source', error: 'Choose what to count.' };
+  }
+  if (input.source === 'list') {
+    if (!input.collectionId) return { field: 'collectionId', error: 'Choose a list to count.' };
+    if (!input.dateField || !/^[a-z][a-z0-9_]{0,39}$/.test(input.dateField)) {
+      return { field: 'dateField', error: 'Choose the date to count by.' };
+    }
   }
   if (!METRIC_PERIODS.includes(input.period)) {
     return { field: 'period', error: 'Count by week or by month.' };
@@ -113,11 +131,29 @@ export function countByPeriod(options: {
   now: Date;
   timeZone: string;
 }): PeriodCount[] {
+  const { records, dateField, ...rest } = options;
+  return countDaysByPeriod({
+    ...rest,
+    days: records
+      .map((record) => countedDay(record, dateField))
+      .filter((day): day is string => day !== null),
+  });
+}
+
+/**
+ * countByPeriod over calendar days already picked out, one per thing counted:
+ * what the step and file counts below feed it.
+ */
+export function countDaysByPeriod(options: {
+  days: string[];
+  period: MetricPeriod;
+  goalStartedAt: string | null;
+  now: Date;
+  timeZone: string;
+}): PeriodCount[] {
   const zone = safeTimeZone(options.timeZone);
   const today = todayIn(zone, options.now);
-  const days = options.records
-    .map((record) => countedDay(record, options.dateField))
-    .filter((day): day is string => day !== null);
+  const days = options.days.filter((day) => DAY.test(day));
 
   const starts = days.slice();
   if (options.goalStartedAt) starts.push(dayIn(options.goalStartedAt, zone));
@@ -138,4 +174,38 @@ export function countByPeriod(options: {
     if (at !== undefined) periods[at].count += 1;
   }
   return periods;
+}
+
+/** A step under the goal as a steps metric reads it (goals.items). */
+export type CountedStep = { status: string; closedAt: string | null };
+
+/** A file linked under the goal as a files metric reads it (core.files). */
+export type CountedFile = { id: string; madeBy: string; createdAt: string };
+
+/**
+ * The days a steps metric counts (plan #2397.2): each step closed as done, on
+ * the day of its closed_at in the account's zone. A dropped step is closed
+ * too and is left out, as is one still open.
+ */
+export function closedStepDays(steps: CountedStep[], timeZone: string): string[] {
+  const zone = safeTimeZone(timeZone);
+  return steps.flatMap((step) =>
+    step.status === 'done' && step.closedAt ? [dayIn(step.closedAt, zone)] : [],
+  );
+}
+
+/**
+ * The days a files metric counts (plan #2397.2): each file Dash wrote, once,
+ * on the day it was made in the account's zone. A file linked to the goal and
+ * to a step under it is one file, and a new version is the same file, so
+ * neither counts again. Files you wrote are left out.
+ */
+export function dashFileDays(files: CountedFile[], timeZone: string): string[] {
+  const zone = safeTimeZone(timeZone);
+  const seen = new Set<string>();
+  return files.flatMap((file) => {
+    if (file.madeBy !== 'claude' || seen.has(file.id)) return [];
+    seen.add(file.id);
+    return [dayIn(file.createdAt, zone)];
+  });
 }

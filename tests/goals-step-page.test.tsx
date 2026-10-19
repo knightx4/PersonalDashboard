@@ -49,6 +49,19 @@ const steps = [
   step('call', 'rates', { title: 'Call the card company', dueOn: '2026-10-03', position: 10 }),
   step('fees', 'rates', { title: 'Compare the transfer fees', position: 20 }),
   step('move', GOAL, { title: 'Move the balance', position: 20 }),
+  step('quotes', 'move', {
+    title: 'Find the 0% cards on offer',
+    kind: 'claude',
+    notifyOnDone: true,
+    position: 10,
+  }),
+  step('fee-list', 'move', { title: 'List the transfer fees', kind: 'claude', position: 20 }),
+  step('done-dash', 'move', {
+    title: 'Read the card terms',
+    kind: 'claude',
+    status: 'done',
+    position: 30,
+  }),
 ];
 
 const forest = buildForest([GOAL], steps);
@@ -87,10 +100,13 @@ describe('StepPage', () => {
     expect(text(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]!)).toBe('Get the rates lowered');
     expect(html).toContain(`href="/goals/${GOAL}"`);
     expect(text(html)).toContain('Call each lender.');
-    expect(text(html)).toContain('Call the card company');
-    expect(text(html)).toContain('Compare the transfer fees');
-    // The page's own step links to the page it is on once: the path's last part.
-    expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(2);
+    // The sub-steps are on their own tab (plan #2373.2), not under the panel.
+    expect(text(html)).not.toContain('Compare the transfer fees');
+    // The page links to itself twice: the path's last part, and the Overview
+    // tab, which is the plain address (plan #2373.1). The row does not.
+    expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(3);
+    expect(text(html)).toContain('Sub-steps');
+    expect(text(html)).toContain('Activity');
     expect(html).toMatch(new RegExp(`aria-current="page"[^>]*href="/goals/${GOAL}/s/rates"`));
     expect(text(html.match(/<nav aria-label="Breadcrumb"[\s\S]*?<\/nav>/)![0])).toBe(
       'Goals › … › Money › Pay off the credit cards › Get the rates lowered',
@@ -117,6 +133,96 @@ describe('StepPage', () => {
     expect(html).not.toContain('type="date"');
     // The values still go with the form, so saving one fact keeps the others.
     expect(html).toContain('name="dueOn" value="2026-10-03"');
+  });
+
+  it('puts every part of the panel on one tab (plan #2373.2)', () => {
+    const page = (stepId: string, tab: 'overview' | 'substeps' | 'activity') =>
+      text(renderToStaticMarkup(<StepPage map={map} stepId={stepId} todoOn={false} tab={tab} />));
+    const runs = {
+      rates: { runId: 'r1', running: null, error: null, summary: 'Wrote the call script.' },
+    };
+
+    // Overview: the detail, and neither the sub-steps, the thread nor the run.
+    const overview = page('rates', 'overview');
+    expect(overview).toContain('Call each lender.');
+    expect(overview).not.toContain('Call the card company');
+    expect(overview).not.toContain('Add a comment');
+
+    // Sub-steps: the open sub-steps under the goal page's columns, then the composer.
+    const substeps = page('rates', 'substeps');
+    expect(substeps).toContain('Call the card company');
+    expect(substeps).toContain('Compare the transfer fees');
+    expect(substeps).toContain('Add a sub-step');
+    expect(substeps).not.toContain('Call each lender.');
+    expect(substeps).not.toContain('Add a comment');
+
+    // A step with none says so, and offers to add the first.
+    const none = page('call', 'substeps');
+    expect(none).toContain('No sub-steps yet');
+    expect(none).toContain('Add a sub-step');
+
+    // Activity: the run and the thread, and not the panel.
+    const activity = text(
+      renderToStaticMarkup(
+        <StepPage map={map} stepId="rates" todoOn={false} tab="activity" runs={runs} />,
+      ),
+    );
+    expect(activity).toContain('Wrote the call script.');
+    expect(activity).toContain('Comment on this step');
+    expect(activity).not.toContain('Call each lender.');
+    expect(activity).not.toContain('Call the card company');
+    expect(page('rates', 'activity')).toContain('Dash has not run on this step yet.');
+
+    // The run line is on Activity alone.
+    expect(
+      text(
+        renderToStaticMarkup(
+          <StepPage map={map} stepId="rates" todoOn={false} tab="overview" runs={runs} />,
+        ),
+      ),
+    ).not.toContain('Wrote the call script.');
+  });
+
+  it('lists only the facts the step has, and its runs as the goal lists its own (plan #2373.3)', () => {
+    // Get the rates lowered has no due date and waits on nothing: neither is said as a dash.
+    const facts = text(renderToStaticMarkup(<StepPage map={map} stepId="rates" todoOn={false} />));
+    expect(facts).toContain('Progress');
+    expect(facts).not.toContain('—');
+    expect(facts).not.toContain('Waiting on');
+    // Call the card company has one, and says it.
+    expect(text(renderToStaticMarkup(<StepPage map={map} stepId="call" todoOn={false} />))).toContain(
+      'Due 3 Oct',
+    );
+
+    const history = {
+      runs: [
+        { id: 'r1', label: 'Sent a step', meta: 'Finished · took 4 min', failed: false, text: 'Wrote the call script.' },
+      ],
+      more: true,
+    };
+    const activity = renderToStaticMarkup(
+      <StepPage map={map} stepId="rates" todoOn={false} tab="activity" history={history} />,
+    );
+    expect(text(activity)).toContain('Sent a step · Finished · took 4 min');
+    expect(text(activity)).toContain('Wrote the call script.');
+    expect(activity).toContain('href="/goals/runs/r1"');
+    expect(text(activity)).toContain('All runs');
+  });
+
+  it('offers the phone notification on an open Dash step, as it was left (plan #2376.2)', () => {
+    const on = renderToStaticMarkup(<StepPage map={map} stepId="quotes" todoOn={false} />);
+    expect(text(on)).toContain('Notify my phone when Dash finishes this');
+    expect(on).toMatch(/role="switch"[^>]*checked=""/);
+    const off = renderToStaticMarkup(<StepPage map={map} stepId="fee-list" todoOn={false} />);
+    expect(text(off)).toContain('Notify my phone when Dash finishes this');
+    expect(off).not.toMatch(/role="switch"[^>]*checked=""/);
+  });
+
+  it('leaves the notification off your own steps and off closed ones', () => {
+    for (const id of ['rates', 'done-dash']) {
+      const html = renderToStaticMarkup(<StepPage map={map} stepId={id} todoOn={false} />);
+      expect(text(html)).not.toContain('Notify my phone');
+    }
   });
 
   it('draws nothing for a step the goal does not hold', () => {

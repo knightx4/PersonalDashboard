@@ -31,8 +31,8 @@ export const maxDuration = 300;
  * Dash found that fit it (plan #1589).
  *
  * The target titles and the industries never to suggest lead the page. The
- * recommended roles, the startups discovery found (feature #1679) and the
- * people to meet follow. Find holds only what helps find the next job: the
+ * recommended roles, the startups discovery found (feature #1679), the
+ * people to meet and the events to go to follow. Find holds only what helps find the next job: the
  * career goals entries the searches read are written on Settings, and the
  * learning tracks once suggested from them are no longer offered here.
  */
@@ -50,7 +50,7 @@ export default async function FindPage({
   const [
     pipeline,
     openings,
-    people,
+    reachOut,
     preferences,
     sourceStats,
     searchCost,
@@ -98,6 +98,10 @@ export default async function FindPage({
     preferences,
   );
 
+  // The people search suggests events too; they get a section of their own.
+  const people = reachOut.filter((suggestion) => suggestion.channel !== 'event');
+  const events = reachOut.filter((suggestion) => suggestion.channel === 'event');
+
   return (
     <PageColumn>
       <PageHeader title="Find" />
@@ -125,6 +129,7 @@ export default async function FindPage({
         }}
         companies={{ companies: discovered, status: describeDiscovery(discoveryRun) }}
         people={people}
+        events={events}
       />
     </PageColumn>
   );

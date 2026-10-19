@@ -72,7 +72,9 @@ export function useDashArrival(stepId: string, arrived: boolean) {
   useEffect(() => {
     if (!arrived) return;
     const mark = markRef.current;
-    const row = mark?.closest('li');
+    // The row the mark is on, or on a step's own page, where the mark sits
+    // beside the title, the page's header (plan #2373.1).
+    const row = mark?.closest('li, header');
     if (!mark || !row) return;
     const seen = readArrived();
     if (seen === null || seen.includes(stepId)) return;

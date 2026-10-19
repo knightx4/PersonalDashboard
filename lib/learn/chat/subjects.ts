@@ -186,10 +186,18 @@ export async function resolveChatSubjects(
 ): Promise<ChatSubject[]> {
   if (names.length === 0) return [];
 
-  const { data, error } = await learn.from('subjects').select('id, name').eq('user_id', userId).limit(2000);
+  const { data, error } = await learn
+    .from('subjects')
+    .select('id, name, archived_at')
+    .eq('user_id', userId)
+    .limit(2000);
   if (error) throw new Error(`Reading your subjects failed: ${error.message}`);
-  const existing = (data ?? []) as SubjectRow[];
-  const byName = new Map(existing.map((row) => [row.name.toLowerCase(), row]));
+  const rows = (data ?? []) as (SubjectRow & { archived_at?: string | null })[];
+  // An archived subject keeps its name, so a name that is exactly its own
+  // still files there; the model is not offered it as a near match, since you
+  // put it away (plan #2355.3).
+  const existing: SubjectRow[] = rows.filter((row) => !row.archived_at).map(({ id, name }) => ({ id, name }));
+  const byName = new Map(rows.map((row) => [row.name.toLowerCase(), { id: row.id, name: row.name }]));
 
   const exact = new Map<string, SubjectRow>();
   const rest: string[] = [];

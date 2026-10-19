@@ -4,6 +4,7 @@ import type { RequirementMatch } from '../evidence/match-payload';
 import type { Requirement } from '../jd/requirements';
 import {
   MAX_JD_EXCERPT_CHARS,
+  MAX_WRITE_UP_CHARS,
   MAX_PRIOR_QUESTIONS,
   MAX_PRIOR_ROUNDS,
   buildPrepContext,
@@ -192,6 +193,38 @@ describe('buildPrepContext', () => {
     );
     expect(context.company.research).toBeNull();
     expect(context.missing).toContain('company_research');
+  });
+
+  it('adds their Perspective answers and the research run to what they wrote, each capped', () => {
+    const context = buildPrepContext(
+      input({
+        company: {
+          name: 'Acme',
+          industry: null,
+          stage: null,
+          headcountBand: null,
+          research: 'Founded 2019.',
+          perspective: 'Why you: I built the model.',
+          researchWriteUp: 'x'.repeat(MAX_WRITE_UP_CHARS * 2),
+          priority: 'normal',
+        },
+      }),
+    );
+    const research = context.company.research!;
+    expect(research.startsWith('Founded 2019.\n\nYour own view of the company:\nWhy you: I built the model.')).toBe(true);
+    expect(research).toContain('Research prepared on the company:\n');
+    expect(research.length).toBeLessThan(MAX_WRITE_UP_CHARS + 200);
+    expect(context.missing).not.toContain('company_research');
+  });
+
+  it('counts a research run alone as company research', () => {
+    const context = buildPrepContext(
+      input({
+        company: { name: 'Acme', industry: null, stage: null, headcountBand: null, research: null, researchWriteUp: 'Profitable.', priority: 'normal' },
+      }),
+    );
+    expect(context.company.research).toBe('Research prepared on the company:\nProfitable.');
+    expect(context.missing).not.toContain('company_research');
   });
 
   it('reads a superday as one round of four conversations', () => {

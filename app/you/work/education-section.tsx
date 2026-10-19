@@ -3,7 +3,8 @@ import type { CourseExplain } from '@/lib/learn/evidence/course-explain';
 import type { SchoolGroup } from '@/lib/you/education';
 import { AddTranscript } from './add-transcript';
 import { SchoolCourses, type FilesOpen } from './course-list';
-import type { CourseFile } from '@/lib/you/transcripts';
+import type { CourseFile, CourseWeek } from '@/lib/you/transcripts';
+import type { CourseNote, CourseOverview } from '@/lib/you/course-overview';
 
 /**
  * Education on You's Work & school tab (plan #1991.3, moved from the Vault):
@@ -21,6 +22,9 @@ export function EducationSection({
   explains,
   explaining,
   files,
+  weeks,
+  overviews,
+  notes,
   filesOpen,
 }: {
   groups: SchoolGroup[];
@@ -33,6 +37,12 @@ export function EducationSection({
   explaining?: string;
   /** The files kept under each course, by course id (plan #2401.2). */
   files?: Record<string, CourseFile[]>;
+  /** The weeks laid out from each course's syllabus, by course id (plan #2401.6). */
+  weeks?: Record<string, CourseWeek[]>;
+  /** What each course was about, as Dash pulled it together, by course id (plan #2401.7). */
+  overviews?: Record<string, CourseOverview>;
+  /** The person's own notes naming each course, by course id (plan #2401.7). */
+  notes?: Record<string, CourseNote[]>;
   /** The gallery's way to draw one course with its files open. */
   filesOpen?: FilesOpen;
 }) {
@@ -57,6 +67,9 @@ export function EducationSection({
           explains={explains}
           explaining={explaining}
           files={files}
+          weeks={weeks}
+          overviews={overviews}
+          notes={notes}
           filesOpen={filesOpen}
         />
       ))}

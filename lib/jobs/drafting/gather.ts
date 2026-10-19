@@ -4,7 +4,9 @@
  * The single-question drafter (lib/jobs/evidence/draft.ts) is sent a few bank
  * items matched to one question. Drafting a whole application, or a cover
  * letter, wants all of the person's material at once: the role and what they
- * found out about the company, the whole bank, the résumé, what they have
+ * found out about the company (their own research, their answers on its
+ * Perspective tab and the newest research Dash prepared on it), the whole
+ * bank, the résumé, what they have
  * approved or sent before, what they have been thinking, their notes on the
  * company, how they write, and every question with its limit. gather() reads
  * all of it on the client it is handed, so RLS decides whose rows come back,
@@ -14,6 +16,10 @@
  * the same columns draftAnswerFromEvidence reads, in a shape a fixture can
  * stand in for.
  *
+ * The person's own comments under each question, and under the cover letter,
+ * come from the threads on those rows (note be3c6616) through `threads`. With
+ * no reader, or a failed read, drafting goes ahead without them.
+ *
  * Vault passages come from the same core.search_memory Ask Dash's recall
  * uses, asked about the role and company. With no core client, or no
  * embedding key on the deployment, they are skipped and the reason recorded;
@@ -21,6 +27,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SpendSink } from '@/lib/core/spend/pricing';
+import { PERSPECTIVE_COLUMNS, perspectiveOf, perspectiveText, type PerspectiveKey } from '@/lib/jobs/companies/perspective';
+import { researchFromRow, researchText } from '@/lib/jobs/companies/research';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
@@ -31,6 +39,7 @@ import {
   type MemoryRpcClient,
   type QuestionEmbedder,
 } from '@/lib/memory/search';
+import { threadRef } from '@/lib/thread/subjects';
 import { BUDGETS, cutOptional, cutText, fitToBudget } from './budget';
 import { answerLimit } from './limits';
 import {
@@ -59,6 +68,12 @@ export type * from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type JobsClient = Pick<SupabaseClient<any, any, any>, 'from'>;
 
+/** A thread's turns as gather() needs them: who wrote each and what. */
+export type ThreadTurn = { author: 'me' | 'claude'; body: string };
+
+/** Reads the threads on the given refs, oldest turn first (loadThreads in lib/thread/store.ts). */
+export type ThreadReader = (refs: readonly string[]) => Promise<ReadonlyMap<string, readonly ThreadTurn[]>>;
+
 export type GatherDeps = {
   /** The person's job_search client (createClient in lib/jobs/auth/server). */
   jobs: JobsClient;
@@ -70,9 +85,17 @@ export type GatherDeps = {
   onSpend?: SpendSink;
   /** Which memory sources count as the vault. [] skips the search. */
   vaultSources?: readonly string[];
+  /** The comment threads under the answers and the letter. Absent: no comments. */
+  threads?: ThreadReader | null;
 };
 
 export type GatherInput = { userId: string; applicationId: string };
+
+/**
+ * The Perspective answers a draft draws on. The unknowns and the next move are
+ * questions to ask and a to-do, not material for an answer.
+ */
+export const PERSPECTIVE_FOR_DRAFTS: readonly PerspectiveKey[] = ['business', 'whyNow', 'problem', 'whyMe'];
 
 /** The vault, by default: the Obsidian notes. */
 export const VAULT_SOURCES = ['obsidian.notes'] as const;
@@ -241,8 +264,47 @@ export function questionsFrom(
       // Read from the whole text, before it is cut.
       limit: answerLimit(row.word_limit as number | null, texts[i]),
       defaultAnswer: cutOptional(question?.canonical_answer as string | null, share),
+      comments: [],
     };
   });
+}
+
+/**
+ * The person's own comments on each thread, oldest first, cut to the comment
+ * budget across the application: the letter's first, then each question's in
+ * order. Dash's replies are left out, so a draft does not lean on its own
+ * earlier words. A failed read gives no comments rather than no draft.
+ */
+async function readComments(
+  deps: GatherDeps,
+  applicationId: string,
+  answerIds: readonly string[],
+): Promise<{ letter: string[]; byAnswer: Map<string, string[]> }> {
+  const none = { letter: [], byAnswer: new Map<string, string[]>() };
+  if (!deps.threads) return none;
+  const letterRef = threadRef('application', applicationId);
+  let threads: ReadonlyMap<string, readonly ThreadTurn[]>;
+  try {
+    threads = await deps.threads([letterRef, ...answerIds.map((id) => threadRef('answer', id))]);
+  } catch (error) {
+    console.error('drafting: reading the comment threads failed', error);
+    return none;
+  }
+  let room = BUDGETS.comments;
+  const take = (ref: string): string[] => {
+    const kept: string[] = [];
+    for (const turn of threads.get(ref) ?? []) {
+      if (turn.author !== 'me' || !turn.body.trim()) continue;
+      const body = cutText(turn.body, BUDGETS.comment);
+      if (body.length + 3 > room) break;
+      room -= body.length + 3;
+      kept.push(body);
+    }
+    return kept;
+  };
+  const letter = take(letterRef);
+  const byAnswer = new Map(answerIds.map((id) => [id, take(threadRef('answer', id))]));
+  return { letter, byAnswer };
 }
 
 async function vaultPassages(
@@ -323,10 +385,26 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
     .filter(Boolean)
     .join(',');
 
-  const [company, answers, bank, resumes, past, defaults, thoughts, notes, profile] = await Promise.all([
+  const [company, writeUps, answers, bank, resumes, past, defaults, thoughts, notes, profile] = await Promise.all([
     companyId
-      ? jobs.from('companies').select('id, name, industry, research').eq('id', companyId).eq('user_id', userId).maybeSingle()
+      ? jobs
+          .from('companies')
+          .select(`id, name, industry, research, ${PERSPECTIVE_COLUMNS}`)
+          .eq('id', companyId)
+          .eq('user_id', userId)
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    // The newest finished research run on the company, if one has finished.
+    companyId
+      ? jobs
+          .from('company_research')
+          .select('summary, sections, finished_at')
+          .eq('company_id', companyId)
+          .eq('user_id', userId)
+          .eq('status', 'ready')
+          .order('finished_at', { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: [], error: null }),
     jobs
       .from('application_answers')
       .select('id, question_id, answer, status, word_limit, created_at')
@@ -367,7 +445,7 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
     jobs.from('profiles').select('writing_style_notes, banned_constructions').eq('id', userId).maybeSingle(),
   ]);
 
-  for (const read of [company, answers, bank, resumes, past, defaults, thoughts, notes, profile]) {
+  for (const read of [company, writeUps, answers, bank, resumes, past, defaults, thoughts, notes, profile]) {
     if (read.error) return { ok: false, error: read.error.message };
   }
 
@@ -435,6 +513,7 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
   const fittedNotes = fitToBudget(noteBodies, (note) => note.length + 3, BUDGETS.notes).kept;
 
   const companyRow = company.data as Row | null;
+  const writeUp = ((writeUps.data ?? []) as Row[])[0];
   const companyName = str(companyRow?.name);
   const title = (role.title as string) ?? '';
 
@@ -445,6 +524,12 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
   );
 
   const banned = strings(profile.data?.banned_constructions);
+  const questions = questionsFrom(answerRows, known);
+  const comments = await readComments(
+    deps,
+    applicationId,
+    questions.map((question) => question.answerId),
+  );
 
   return {
     ok: true,
@@ -462,6 +547,10 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
           (role.requirements as Requirement[] | null) ?? null,
         ),
         research: cutOptional(companyRow?.research as string | null, BUDGETS.companyResearch),
+        perspective: companyRow
+          ? cutOptional(perspectiveText(perspectiveOf(companyRow), PERSPECTIVE_FOR_DRAFTS), BUDGETS.perspective)
+          : null,
+        researchWriteUp: writeUp ? cutOptional(researchText(researchFromRow(writeUp)), BUDGETS.researchWriteUp) : null,
         notes: fittedNotes,
       },
       evidence: evidenceFrom((bank.data ?? []) as Row[]),
@@ -475,7 +564,11 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
         notes: cutOptional(profile.data?.writing_style_notes as string | null, BUDGETS.style),
         banned: banned.length > 0 ? banned : [...DEFAULT_BANNED_CONSTRUCTIONS],
       },
-      questions: questionsFrom(answerRows, known),
+      questions: questions.map((question) => ({
+        ...question,
+        comments: comments.byAnswer.get(question.answerId) ?? [],
+      })),
+      letterComments: comments.letter,
       vault,
     },
   };

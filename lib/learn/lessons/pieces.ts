@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { loadGoals, loadGraph } from '@/lib/learn/graph/load';
@@ -228,8 +229,11 @@ export async function writeDuePieces(
   const summary: PiecesPassSummary = { written: 0, failed: [] };
   try {
     let calls = 0;
-    for (const due of await loadPiecesDue(learn, userId, DUE_READ)) {
+    // An archived subject's units get no pieces until it is restored (plan #2355.4).
+    const [dueAll, archived] = await Promise.all([loadPiecesDue(learn, userId, DUE_READ), archivedSubjectIds(learn, userId)]);
+    for (const due of dueAll) {
       if (calls >= MAX_PIECES_PER_RUN) break;
+      if (archived.has(due.subjectId)) continue;
       const result = await writeUnitPiecesRecorded(learn, core, userId, due, apiKey);
       if (result.outcome === 'written') summary.written += 1;
       else if (result.outcome === 'failed') summary.failed.push(result.detail);
