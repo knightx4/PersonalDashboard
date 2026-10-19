@@ -151,6 +151,7 @@ describe('renderLetterRequest', () => {
       { answerId: 'aa1', questionId: 'q1', text: 'Why Acme?', kind: null, answer: 'Runway.', status: 'draft', limit: null, defaultAnswer: null },
       { answerId: 'aa2', questionId: 'q2', text: 'Unanswered?', kind: null, answer: null, status: null, limit: null, defaultAnswer: null },
     ],
+    letterComments: [],
   } as unknown as GatheredMaterial;
 
   it('sends the answers, the best matches, the replies and the previous letter', () => {
@@ -168,6 +169,12 @@ describe('renderLetterRequest', () => {
     expect(text).toContain('Q: Why Acme?\nA: Their CFO.');
     expect(text).not.toContain('Unasked?');
     expect(text).toContain('Dear Acme, the old draft.');
+  });
+
+  it('sends their comments on the letter', () => {
+    const text = renderLetterRequest({ material: { ...material, letterComments: ['Keep it under 250 words.'] } as GatheredMaterial });
+    expect(text).toContain('## Their comments on the cover letter\n\n- Keep it under 250 words.');
+    expect(renderLetterRequest({ material })).not.toContain('Their comments');
   });
 
   it('says when there is nothing on file yet', () => {

@@ -28,6 +28,10 @@ export type GatheredRole = {
   requirements: GatheredRequirement[];
   /** companies.research, cut to its budget. */
   research: string | null;
+  /** Their answers on the company's Perspective tab, as "label: answer" paragraphs, cut to budget. */
+  perspective: string | null;
+  /** The newest finished job_search.company_research write-up: summary and sections, cut to budget. */
+  researchWriteUp: string | null;
   /** job_search.notes on the company, the role or this application, pinned first. */
   notes: string[];
 };
@@ -73,6 +77,8 @@ export type GatheredQuestion = {
   limit: AnswerLimit | null;
   /** questions.canonical_answer: the answer reused for this question everywhere. */
   defaultAnswer: string | null;
+  /** The person's own comments under this answer, oldest first, cut to budget. */
+  comments: string[];
 };
 
 export type VaultPassage = {
@@ -101,6 +107,8 @@ export type GatheredMaterial = {
   style: { notes: string | null; banned: string[] };
   /** Every question on this application, in the order they were added. */
   questions: GatheredQuestion[];
+  /** The person's own comments under the cover letter, oldest first, cut to budget. */
+  letterComments: string[];
   vault: { passages: VaultPassage[]; skipped: VaultSkip | null };
 };
 

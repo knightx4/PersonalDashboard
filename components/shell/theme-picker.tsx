@@ -667,8 +667,11 @@ function HueStrip({
     return `linear-gradient(to right, ${stops.join(', ')})`;
   }, [mode]);
 
+  // Flush with the swatches and buttons around it, and pulled up into the
+  // press box's empty lower half so the gap under the gradient is the
+  // panel's usual one rather than a band twice its size.
   return (
-    <div className="px-2 pb-1 pt-1.5">
+    <div className="-mb-2 pt-1.5">
       <input
         type="range"
         min={0}

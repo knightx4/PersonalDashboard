@@ -49,7 +49,8 @@ export async function listLenses(client: Client): Promise<LensRecord[]> {
   const [lenses, targets, hiddenSubjects] = await Promise.all([
     client.from('lenses').select(LENS_COLUMNS).order('name'),
     client.from('lens_targets').select('lens_id, topic_id, target_level, created_at'),
-    client.from('subjects').select('id').eq('survey', true),
+    // Survey subjects are not yours to see, and archived ones are put away (plan #2355.3).
+    client.from('subjects').select('id').or('survey.eq.true,archived_at.not.is.null'),
   ]);
   for (const read of [lenses, targets, hiddenSubjects]) {
     if (read.error) throw new Error(`Reading your lenses failed: ${read.error.message}`);

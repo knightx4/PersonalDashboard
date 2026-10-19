@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { sumByModel, type SpendReport } from '@/lib/core/spend/pricing';
 import { decideWithJev } from '@/lib/jev/decide';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { rootingFor } from '@/lib/learn/graph/rooting';
@@ -173,7 +174,9 @@ async function putBackRows(learn: LearnSupabaseClient, userIds: string[]): Promi
 
 /** What Learn knows about one person: tracks and where they are, open Goals, Learn now ideas. */
 export async function loadLearnerProfile(learn: LearnSupabaseClient, userId: string): Promise<LearnerProfile> {
-  const subjects = (await loadSubjects(learn, userId)).slice(0, MAX_TRACKS);
+  // An archived subject is no track to judge or cut videos for (plan #2355.4).
+  const [all, archived] = await Promise.all([loadSubjects(learn, userId), archivedSubjectIds(learn, userId)]);
+  const subjects = all.filter((subject) => !archived.has(subject.id)).slice(0, MAX_TRACKS);
   const tracks = await Promise.all(
     subjects.map(async (subject) => {
       const rooting = rootingFor(await loadGraph(learn, subject.id, userId), null);

@@ -25,6 +25,18 @@ function fakeClient(rows: Record<string, Row[]>): LearnSupabaseClient {
       neq: (col: string, value: unknown) => (narrow((r) => r[col] !== value), proxy),
       in: (col: string, values: unknown[]) => (narrow((r) => values.includes(r[col])), proxy),
       is: (col: string, value: unknown) => (narrow((r) => (r[col] ?? null) === value), proxy),
+      // Only `col.eq.true` and `col.not.is.null`, joined by commas, as listLenses writes them.
+      or: (filter: string) => {
+        const any = filter.split(',').map((part) => {
+          const [col, ...rest] = part.split('.');
+          const op = rest.join('.');
+          if (op === 'eq.true') return (r: Row) => r[col] === true;
+          if (op === 'not.is.null') return (r: Row) => (r[col] ?? null) !== null;
+          throw new Error(`or(${part}) is not faked`);
+        });
+        narrow((r) => any.some((keep) => keep(r)));
+        return proxy;
+      },
       range: (from: number, to: number) => {
         kept = kept.slice(from, to + 1);
         return proxy;

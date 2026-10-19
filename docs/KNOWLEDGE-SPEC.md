@@ -473,6 +473,13 @@ them in the map's evidence quotes.
 
 ---
 
+## Rules
+
+**R1.** A position whose every supporting quote has left the record is marked
+no longer grounded (`ungrounded_at` set), and is never deleted. Re-accepting a
+quote clears the mark.
+Checked by: audit.
+
 ## Open questions
 
 - **What a catalogue link should point at.** Stated in full above. A segment

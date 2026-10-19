@@ -36,6 +36,7 @@ export function PaidHint({
   plus,
   what,
   align,
+  defaultOpen,
   className,
 }: {
   /**
@@ -53,6 +54,8 @@ export function PaidHint({
   /** What the button does, for a screen reader: "Cost of reading the list". */
   what?: string;
   align?: 'start' | 'end';
+  /** Start with the figure showing. For the preview gallery's shots. */
+  defaultOpen?: boolean;
   className?: string;
 }) {
   const costs = useContext(PaidCostsContext);
@@ -67,5 +70,5 @@ export function PaidHint({
   const estimate = sumEstimates(plus ? [...priced, plus] : priced);
   if (!estimate) return null;
 
-  return <CostHint estimate={estimate} what={what} align={align} className={className} />;
+  return <CostHint estimate={estimate} what={what} align={align} defaultOpen={defaultOpen} className={className} />;
 }

@@ -40,6 +40,7 @@ import type { Tab } from '@/lib/tabs';
 export function TabbedDetail({
   subject,
   title,
+  lead,
   description,
   actions,
   glance,
@@ -53,6 +54,11 @@ export function TabbedDetail({
   /** What the page is about and the path down to it, as PageHeader takes it. */
   subject: Subject;
   title: React.ReactNode;
+  /**
+   * Drawn before the title on its line and outside the heading, so the
+   * heading names only the thing: a step's status you press (plan #2373.1).
+   */
+  lead?: React.ReactNode;
   /** One line under the title: what kind of thing this is, or its state. */
   description?: React.ReactNode;
   /** The action that belongs to the whole page, whatever tab is open. */
@@ -87,6 +93,11 @@ export function TabbedDetail({
               with the row free to wrap, a title wider than the space beside
               the actions pushed them onto a line of their own. */}
           <div className="flex items-start gap-3">
+            {/* The lead's control carries its own padding, so it is pulled in by
+                that much to sit as close to the title as a goal's hexagon. */}
+            {lead && (
+              <div className="-mx-1.5 flex shrink-0 items-center self-center">{lead}</div>
+            )}
             <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
               {title}
             </h1>

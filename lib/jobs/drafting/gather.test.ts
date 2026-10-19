@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
 import type { MemoryRpcClient, QuestionEmbedder } from '@/lib/memory/search';
 import { BUDGETS, GATHER_BUDGET } from './budget';
-import { chooseResume, gather, roleRequirements, type GatherDeps, type JobsClient } from './gather';
+import { chooseResume, gather, roleRequirements, type GatherDeps, type JobsClient, type ThreadReader } from './gather';
 import { renderGathered, renderMaterial, renderQuestions } from './render';
 
 const ME = '11111111-1111-4111-8111-111111111111';
@@ -164,6 +164,96 @@ describe('gather', () => {
     expect(renderQuestions(m.questions)).toContain('limit: 150 words');
   });
 
+  it('reads their Perspective answers and the newest finished research run on the company', async () => {
+    const tables = fixture();
+    Object.assign(tables['job_search.companies'][0], {
+      perspective_business: 'Payments rails for marketplaces.',
+      perspective_why_me: 'I built the model that got us to break-even.',
+      perspective_next_move: 'Email the CFO.',
+    });
+    tables['job_search.company_research'] = [
+      { id: 'cr-old', user_id: ME, company_id: COMPANY, status: 'ready', summary: 'Older run.', sections: [], finished_at: '2026-09-01T00:00:00Z' },
+      {
+        id: 'cr-new',
+        user_id: ME,
+        company_id: COMPANY,
+        status: 'ready',
+        summary: 'Profitable since spring.',
+        sections: [{ key: 'money', title: 'How it makes money', body: 'Take rate on volume.' }],
+        finished_at: '2026-10-01T00:00:00Z',
+      },
+      { id: 'cr-going', user_id: ME, company_id: COMPANY, status: 'researching', summary: 'Half done.', sections: [], finished_at: null },
+      { id: 'cr-theirs', user_id: THEM, company_id: COMPANY, status: 'ready', summary: 'Not mine.', sections: [], finished_at: '2026-10-10T00:00:00Z' },
+    ];
+    const result = await gather(deps(tables), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+
+    // The next move is a to-do, not material for an answer.
+    expect(result.material.role.perspective).toBe(
+      'What they do: Payments rails for marketplaces.\n\nWhy you: I built the model that got us to break-even.',
+    );
+    expect(result.material.role.researchWriteUp).toBe('Profitable since spring.\n\nHow it makes money\nTake rate on volume.');
+    const text = renderMaterial(result.material);
+    expect(text).toContain('## Their own view of the company, in their words');
+    expect(text).toContain('## Research prepared on the company');
+    expect(text).not.toContain('Email the CFO');
+  });
+
+  it('puts their own comments on each question and on the letter, leaving out Dash’s replies', async () => {
+    const asked: string[][] = [];
+    const threads: ThreadReader = async (refs) => {
+      asked.push([...refs]);
+      return new Map([
+        [
+          'job_search.application_answers:aa1',
+          [
+            { author: 'me', body: 'Say AI should deliver what it promised.' },
+            { author: 'claude', body: 'Noted.' },
+            { author: 'me', body: 'And that I want to build better pipelines with it.' },
+          ],
+        ],
+        [`job_search.applications:${APP}`, [{ author: 'me', body: 'Keep the letter short.' }]],
+      ]);
+    };
+    const result = await gather(deps(fixture(), { threads }), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    const m = result.material;
+
+    expect(asked[0]).toEqual([
+      `job_search.applications:${APP}`,
+      'job_search.application_answers:aa1',
+      'job_search.application_answers:aa2',
+      'job_search.application_answers:aa3',
+    ]);
+    expect(m.questions.map((q) => q.comments)).toEqual([
+      ['Say AI should deliver what it promised.', 'And that I want to build better pipelines with it.'],
+      [],
+      [],
+    ]);
+    expect(m.letterComments).toEqual(['Keep the letter short.']);
+    const text = renderQuestions(m.questions);
+    expect(text).toContain(
+      'their comments on this question:\n- Say AI should deliver what it promised.\n- And that I want to build better pipelines with it.',
+    );
+    expect(text).not.toContain('Noted.');
+  });
+
+  it('drafts without comments when the threads cannot be read', async () => {
+    const threads: ThreadReader = async () => {
+      throw new Error('core is down');
+    };
+    const result = await gather(deps(fixture(), { threads }), { userId: ME, applicationId: APP });
+    expect(result.ok && result.material.questions.every((q) => q.comments.length === 0)).toBe(true);
+    expect(result.ok && result.material.letterComments).toEqual([]);
+  });
+
+  it('leaves the Perspective and the write-up out when there are none', async () => {
+    const result = await gather(deps(fixture()), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.material.role).toMatchObject({ perspective: null, researchWriteUp: null });
+    expect(renderMaterial(result.material)).not.toContain('Research prepared on the company');
+  });
+
   it('skips vault passages quietly when no embedding key is set, and with no core client', async () => {
     const noKey: QuestionEmbedder = async () => ({ ok: false, reason: 'no-key', detail: 'EMBEDDING_API_KEY is not set' });
     const withoutKey = await gather(deps(fixture(), { core: memory([]), embed: noKey }), { userId: ME, applicationId: APP });
@@ -191,6 +281,10 @@ describe('gather', () => {
     tables['job_search.roles'][0].jd_text = long(10_000, 'posting');
     tables['job_search.roles'][0].requirements = Array.from({ length: 200 }, (_, i) => ({ kind: 'must_have', text: long(20, `req${i}`) }));
     tables['job_search.companies'][0].research = long(5_000, 'research');
+    tables['job_search.companies'][0].perspective_why_me = long(2_000, 'why');
+    tables['job_search.company_research'] = [
+      { id: 'cr', user_id: ME, company_id: COMPANY, status: 'ready', summary: long(2_000, 'summary'), sections: [{ title: 'More', body: long(5_000, 'section') }], finished_at: '2026-10-01' },
+    ];
     tables['job_search.evidence_items'] = Array.from({ length: 120 }, (_, i) => ({
       id: `ev${i}`, user_id: ME, title: `Story ${i}`, body: long(1_000), context: long(100), metrics: long(100), skills: ['a', 'b'], strength: i % 5, used_count: 0,
     }));
@@ -208,7 +302,10 @@ describe('gather', () => {
     }
     const passages = Array.from({ length: 20 }, (_, i) => ({ source_table: 'obsidian.notes', source_ref: `vn${i}`, chunk_index: 0, author: 'me', body: `Note ${i}\n\n${long(600)}`, similarity: 0.9 - i / 100 }));
 
-    const result = await gather(deps(tables, { core: memory(passages), embed }), { userId: ME, applicationId: APP });
+    const threads: ThreadReader = async (refs) =>
+      new Map(refs.map((ref) => [ref, Array.from({ length: 5 }, () => ({ author: 'me' as const, body: long(400, 'comment') }))]));
+
+    const result = await gather(deps(tables, { core: memory(passages), embed, threads }), { userId: ME, applicationId: APP });
     if (!result.ok) throw new Error(result.error);
     const m = result.material;
 
@@ -223,8 +320,13 @@ describe('gather', () => {
     expect(m.role.posting!.length).toBeLessThanOrEqual(BUDGETS.posting);
     expect(m.resume!.text.length).toBeLessThanOrEqual(BUDGETS.resume);
     expect(m.role.research!.length).toBeLessThanOrEqual(BUDGETS.companyResearch);
+    expect(m.role.perspective!.length).toBeLessThanOrEqual(BUDGETS.perspective);
+    expect(m.role.researchWriteUp!.length).toBeLessThanOrEqual(BUDGETS.researchWriteUp);
     expect(m.vault.passages.length).toBeGreaterThan(0);
     expect(m.vault.passages.length).toBeLessThan(20);
+    const commentChars = [...m.letterComments, ...m.questions.flatMap((q) => q.comments)].join('').length;
+    expect(commentChars).toBeGreaterThan(0);
+    expect(commentChars).toBeLessThanOrEqual(BUDGETS.comments);
   });
 });
 

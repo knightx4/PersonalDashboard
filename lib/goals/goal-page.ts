@@ -372,6 +372,18 @@ export const GOAL_TABS = [
 export type GoalTab = (typeof GOAL_TABS)[number]['id'];
 
 /**
+ * A step's own page's tabs (plan #2373.1), named and ordered as the goal's,
+ * with Sub-steps where the goal has Steps.
+ */
+export const STEP_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'substeps', label: 'Sub-steps' },
+  { id: 'activity', label: 'Activity' },
+] as const;
+
+export type StepTab = (typeof STEP_TABS)[number]['id'];
+
+/**
  * A link from elsewhere on the goal page to a step's row. The rows are on the
  * Steps tab, so the link opens that tab and scrolls to the row; from the
  * Steps tab itself it lands on the same row.

@@ -8,9 +8,13 @@ import { isOwner } from '@/lib/dev/owner';
 import type { LinkedFile } from '@/lib/files/files';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
+import { STEP_TABS, type StepTab } from '@/lib/goals/goal-page';
+import { tabFrom } from '@/lib/tabs';
 import { loadFilesOf } from '@/lib/goals/files-store';
 import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
+import { goalRunRows, type RunListing } from '@/lib/goals/runs';
+import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { stepRunViews, type GoalRun } from '@/lib/goals/shaping';
 import { loadStepRuns } from '@/lib/goals/shaping-store';
 import type { StepNode } from '@/lib/goals/steps';
@@ -47,6 +51,11 @@ function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
 }
 
+/** The step's latest runs for its Activity tab (plan #2373.3). Outside the component because it reads the clock. */
+function runHistory(history: { runs: RunListing[]; more: boolean }, timeZone: string) {
+  return { runs: goalRunRows(history.runs, Date.now(), timeZone), more: history.more };
+}
+
 /**
  * A step's own page (plan #1620): the step with its sub-steps, drawn as its
  * row on the goal page is, opened. Read the way the goal page reads its
@@ -58,10 +67,14 @@ function stepRunLines(runs: Record<string, GoalRun>) {
  */
 export default async function StepOwnPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ goalId: string; stepId: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const { goalId, stepId } = await params;
+  // The open tab is in the address, so a reload or a pasted link opens it (plan #2373.2).
+  const tab = tabFrom((await searchParams).tab, STEP_TABS) as StepTab;
   if (!UUID.test(goalId) || !UUID.test(stepId)) notFound();
 
   const user = await requireUser();
@@ -81,11 +94,12 @@ export default async function StepOwnPage({
   const done = steps.filter((node) => node.status === 'done').map((node) => node.id);
   const core = await createCoreClient();
   // A failed read leaves its part out rather than the page, as on the goal page.
-  const [runs, filesOf, entries, arrivals] = await Promise.all([
+  const [runs, filesOf, entries, arrivals, history] = await Promise.all([
     loadStepRuns(client, ids).catch((): Record<string, GoalRun> => ({})),
     loadFilesOf(client, core, ids).catch((): Record<string, LinkedFile[]> => ({})),
     loadProgressEntries(client, ids).catch((): ProgressEntry[] => []),
     loadDashArrivals(client, done).catch((): string[] => []),
+    loadGoalRuns(client, step.id).catch(() => ({ runs: [] as RunListing[], more: false })),
   ]);
 
   // Closing the step here grows the goal's close ring out of its glyph
@@ -105,6 +119,9 @@ export default async function StepOwnPage({
           progress={summariseProgress(entries)}
           arrivals={arrivals}
           canRun={owner}
+          timeZone={account.timezone}
+          tab={tab}
+          history={runHistory(history, account.timezone)}
         />
       </YourInitialProvider>
     </StepCloseRing>

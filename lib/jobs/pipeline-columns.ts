@@ -18,7 +18,7 @@ import { choiceColumn, columnFilters, commonValues, type ColumnFilter, type Filt
  * beside the sort it already had. Each choice is a link built the way the
  * filter chips build theirs, so a header and a chip set the same address.
  *
- * Role, last activity and comp have no filter, only their sort.
+ * Role and last activity have no filter, only their sort; comp has neither.
  *
  * The menus and their links are built by the shared table module
  * (lib/table-view.ts); what is here is which columns Pipeline's are.
@@ -134,6 +134,27 @@ export function pipelineColumnFilters(
             { value: 'high', label: CHANCE_BAND_LABELS.high },
           ],
         }),
+      // The same yes and no the Ready and Questions chips set.
+      choiceColumn({
+        id: 'ready',
+        param: 'ready',
+        current: state.ready === null ? null : state.ready ? 'yes' : 'no',
+        anyLabel: 'Ready or not',
+        choices: [
+          { value: 'yes', label: `Ready to apply · ${scoped.filter((row) => row.readyToApply).length}` },
+          { value: 'no', label: `Not ready · ${scoped.filter((row) => !row.readyToApply).length}` },
+        ],
+      }),
+      choiceColumn({
+        id: 'questions',
+        param: 'questions',
+        current: state.questions === null ? null : state.questions ? 'yes' : 'no',
+        anyLabel: 'Any questions',
+        choices: [
+          { value: 'yes', label: `All questions added · ${scoped.filter((row) => row.allQuestionsAdded).length}` },
+          { value: 'no', label: `Not all added · ${scoped.filter((row) => !row.allQuestionsAdded).length}` },
+        ],
+      }),
     ],
     href,
   );

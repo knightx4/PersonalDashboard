@@ -269,10 +269,10 @@ export function TaskRow({
   const shownMove = archive && whoseMove?.move.state === 'on_you' ? null : whoseMove;
   const due = task.dueAt ? dayIn(task.dueAt, timezone) : task.dueOn;
   const overdue = archive && task.status === 'open' && due !== null && due < todayIn(timezone);
-  // The title and the date pad their text by 4px for their hover ground; on
-  // All the rest of the row's lines take the same inset, so each starts on
-  // the title's left edge.
-  const inset = archive && 'px-1';
+  // The title and the date pad their text by 4px for their hover ground, and
+  // the rest of the row's lines take the same inset, so a line that wraps
+  // still starts on the title's left edge.
+  const inset = 'px-1';
 
   /**
    * Run one of the writes the row does not draw ahead of: a move, a place, a

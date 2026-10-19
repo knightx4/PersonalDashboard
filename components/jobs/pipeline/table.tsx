@@ -149,6 +149,16 @@ export function RolesTable({
               </Unsure>
             </TD>
             )}
+            {showing('ready') && (
+            <TD label="Ready" muted className={cn(cell, 'whitespace-nowrap')}>
+              {row.readyToApply ? 'Ready' : '—'}
+            </TD>
+            )}
+            {showing('questions') && (
+            <TD label="Questions" muted className={cn(cell, 'whitespace-nowrap')}>
+              {row.allQuestionsAdded ? 'All added' : '—'}
+            </TD>
+            )}
             {showing('comp') && (
             <TD label="Comp" num muted className={cell}>
               {formatCompBand(row.compMinCents, row.compMaxCents) ?? '—'}
@@ -179,6 +189,8 @@ function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: strin
     showing('excitement') && row.excitement ? '★'.repeat(row.excitement) : null,
     fit ? `${FIT_SCORE_LABEL} ${fit}` : null,
     chance ? `${chance} chance` : null,
+    showing('ready') && row.readyToApply ? 'Ready' : null,
+    showing('questions') && row.allQuestionsAdded ? 'Questions added' : null,
     comp,
   ].filter(Boolean);
 

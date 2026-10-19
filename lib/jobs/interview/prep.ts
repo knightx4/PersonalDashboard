@@ -206,7 +206,7 @@ function renderContext(context: PrepContext): string {
     ]
       .filter(Boolean)
       .join(' · ') || null,
-    company.research ? `What you have written about the company:\n${company.research}` : null,
+    company.research ? `What you know about the company:\n${company.research}` : null,
     role.jdExcerpt
       ? `Job description${role.jdTruncated ? ' (excerpt)' : ''}:\n${role.jdExcerpt}`
       : null,

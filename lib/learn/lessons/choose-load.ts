@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import { readAll } from '@/lib/learn/db/read-all';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
@@ -111,7 +112,7 @@ export async function loadLessonInput(
   now: Date = new Date(),
   only: string | null = null,
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards, checked, goalTracks, resting, outlined, weak, prepared] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks, resting, outlined, weak, prepared, archived] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -135,13 +136,17 @@ export async function loadLessonInput(
     loadOutlined(supabase, userId),
     loadWeak(supabase, userId),
     preparedSubjectIds(supabase, userId),
+    archivedSubjectIds(supabase, userId),
   ]);
 
   // One track's lessons when a subject's Now asks for them (plan #1699).
   const tracks = await Promise.all(
     // A prepared subject's preparation covers it, so no concept lessons are
   // chosen for it (plan #2297.4); its cards already written stay readable.
-  subjects.filter((subject) => !prepared.has(subject.id) && (!only || subject.id === only)).map(async (subject) => {
+  // An archived subject gets no lessons, units or holds either (plan #2355.4).
+  subjects
+    .filter((subject) => !prepared.has(subject.id) && !archived.has(subject.id) && (!only || subject.id === only))
+    .map(async (subject) => {
       const [graph, goals, units] = await Promise.all([
         loadGraph(supabase, subject.id, userId),
         loadGoals(supabase, subject.id, userId),

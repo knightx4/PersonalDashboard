@@ -9,7 +9,7 @@ import type { FactField, FactOriginRecord, RoleFactOrigins } from '@/lib/jobs/fa
  * The role page's facts, each of the role's own with where it came from
  * (plan #2343.3). A firsthand fact (the posting, or you) carries its source
  * in muted ink; a secondhand one, from a recruiter's email, in the caution
- * tone with the message linked; a guess is "Dash guess" with a dotted
+ * tone with the message linked and its value muted; a guess is "Dash guess" with a dotted
  * underline, and its value is muted too, so it never reads as confirmed. A
  * fact saved before origins were kept, and an empty one, carry no label.
  */
@@ -128,7 +128,7 @@ export function RoleFacts(props: RoleFactsProps) {
     return (
       <div className="min-w-0">
         <SectionLabel as="dt">{label}</SectionLabel>
-        <dd className={cn('tabular mt-0.5 truncate text-ui', record.certainty === 'guess' ? 'text-ink-muted' : 'text-ink')}>
+        <dd className={cn('tabular mt-0.5 break-words text-ui', record.certainty === 'firsthand' ? 'text-ink' : 'text-ink-muted')}>
           {value}
         </dd>
         <dd className="mt-0.5 truncate text-small">

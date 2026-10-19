@@ -15,8 +15,9 @@ import { TAG_MAX, tagName, tagSuggestions } from '@/lib/todo/tasks/tags';
  *
  * The chips sit on the title's line, after everything that says when and
  * what: they are a way of sorting the task, not part of reading it, so they
- * take the small neutral chip and no colour. A task with no tags draws
- * nothing here at all, so an untagged list reads as it did before tags.
+ * take the small neutral chip and no colour. With a pointer, a task with no
+ * tags draws nothing here until the row is pointed at, so an untagged list
+ * reads as it did before tags; a phone shows the plus alone.
  *
  * Removing is on the chip itself, an x that appears under the pointer or on
  * focus. A touch screen has no hover, so there the picker does both jobs:
@@ -47,9 +48,14 @@ export function TagChips({
 
   // What waits for the pointer: drawn on hover or focus in the row, and out of
   // the layout until then, so a row at rest is laid out as it was before tags.
-  // A phone has no hover, and adds a tag from the row's menu instead.
+  // A phone has no hover, so there the plus is always out, alone on a row
+  // with no tags.
   const atRest = !open && !revealed;
-  const untilPointed = 'hidden sm:group-focus-within:inline-flex sm:group-hover:inline-flex';
+  const untilPointed = 'sm:hidden sm:group-focus-within:inline-flex sm:group-hover:inline-flex';
+  // On a phone the chips keep to one line: the first two, then a count of the
+  // rest that opens the picker, where every tag on the task shows pressed.
+  const PHONE_SHOWN = 2;
+  const hiddenOnPhone = tags.length - PHONE_SHOWN;
 
   // On the date's line when they fit there, wrapping chip by chip when not.
   // The 4px in front lines a pill's edge up with the text column
@@ -62,18 +68,22 @@ export function TagChips({
         className,
       )}
     >
-      {tags.map((tag) => (
+      {tags.map((tag, index) => (
         <span
           key={tag}
           className={cn(
             chipVariants({ size: 'sm' }),
             'group/tag gap-0',
-            // A long tag that does not fit moves to the next line whole, and
-            // ends in an ellipsis only when it is wider than the row.
+            index >= PHONE_SHOWN && 'max-sm:hidden',
+            // A long tag is cut to about twelve characters on the row, so
+            // the row's tags and its plus stay on one line at 390; the whole
+            // name is in the tooltip and on the filter row.
             'min-w-0 max-w-full shrink',
           )}
         >
-          <span className="min-w-0 truncate">{tag}</span>
+          <span className="min-w-0 max-w-24 truncate" title={tag}>
+            {tag}
+          </span>
           {editable && (
             <Tooltip label={`Remove ${tag}`}>
               <button
@@ -93,6 +103,21 @@ export function TagChips({
           )}
         </span>
       ))}
+
+      {hiddenOnPhone > 0 &&
+        (editable ? (
+          <button
+            type="button"
+            aria-label={`${hiddenOnPhone} more ${hiddenOnPhone === 1 ? 'tag' : 'tags'}`}
+            aria-expanded={open}
+            onClick={onToggle}
+            className={cn(chipVariants({ size: 'sm' }), 'press hover:text-ink sm:hidden')}
+          >
+            +{hiddenOnPhone}
+          </button>
+        ) : (
+          <span className={cn(chipVariants({ size: 'sm' }), 'sm:hidden')}>+{hiddenOnPhone}</span>
+        ))}
 
       {editable && (
         <Tooltip

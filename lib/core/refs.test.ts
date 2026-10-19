@@ -63,6 +63,19 @@ describe('refHref', () => {
     expect(refHref(`obsidian.notes:${ID}`)).toMatch(/^\/open\//);
   });
 
+  it("opens Dash's company research on its company's Perspective tab", async () => {
+    const ref = `job_search.company_research:${ID}`;
+    expect(refHref(ref)).toBe(`/open/${encodeURIComponent(ref)}`);
+    const out = await refTitles([ref], async (_t, _c, ids) =>
+      ids.map((id) => ({ id, summary: 'Tribe AI embeds engineers.', company_id: 'c1' })),
+    );
+    expect(out.get(ref)).toMatchObject({
+      missing: false,
+      href: `/open/${encodeURIComponent('job_search.companies:c1')}?tab=perspective`,
+      parent: 'job_search.companies:c1',
+    });
+  });
+
   it('is null for a table with no page or a malformed ref', () => {
     expect(refHref(`public.merchants:${ID}`)).toBeNull();
     expect(refHref('nothing')).toBeNull();

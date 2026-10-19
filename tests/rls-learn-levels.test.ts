@@ -252,6 +252,18 @@ describe('approving a draft (plan #2138.11)', () => {
     expect(row.status).toBe('approved');
   });
 
+  it('approves a draft whose uncited rows Dash marked personal on the service role (plan #2356.6)', async () => {
+    const topic = await seedTopic(userA, 'Unlevered beta');
+    const one = await seedCell(userA, topic, 1);
+    await admin`update topics set ceiling = 1 where id = ${topic}`;
+
+    await admin`update topics set canonicality = 'personal' where id = ${topic} and source is null`;
+    await admin`update topic_cells set canonicality = 'personal' where id = ${one} and source is null`;
+    await admin`update topics set status = 'approved', approved_at = now() where id = ${topic}`;
+    const [row] = await admin<{ status: string }[]>`select status from topics where id = ${topic}`;
+    expect(row.status).toBe('approved');
+  });
+
   it('keeps what the drafting checks were as an object', async () => {
     const topic = await seedTopic(userA, 'Terminal value');
     await expect(admin`update topics set drafting = '[]'::jsonb where id = ${topic}`).rejects.toThrow(

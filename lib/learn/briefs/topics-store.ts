@@ -4,6 +4,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { readDrafting } from '@/lib/learn/levels/draft-sources';
 import { runTopicDraft, type DraftRunResult } from '@/lib/learn/levels/draft-run';
 import { goalLensId } from '@/lib/learn/levels/lens-store';
+import { approveDrafts } from '@/lib/learn/levels/store';
 import { goalTargetLevel } from '@/lib/learn/levels/lenses';
 import { FOUND_KIND_LABELS, readSections, type FoundKind } from './model';
 import { briefDraftSources, goalPerformances, readDraftedFromBrief, type BriefGoalOption, type BriefGoalPanel } from './topics';
@@ -13,10 +14,10 @@ import { briefDraftSources, goalPerformances, readDraftedFromBrief, type BriefGo
  * #2184.1); lib/learn/briefs/topics.ts says what the sources are.
  *
  * Drafting runs the topic compiler on the brief's pages under the goal the
- * person chose, and the draft lands on its own page to be read and approved
- * like any other. Approving one (`settleBriefTopic`) puts it on the goal's
- * lens at the goal's depth and records the goal on the brief, after which the
- * brief's cards are written for that goal.
+ * person chose, and the draft is approved as soon as it is kept, like any
+ * other (plan #2356.2). Approving one (`settleBriefTopic`) puts it on the
+ * goal's lens at the goal's depth and records the goal on the brief, after
+ * which the brief's cards are written for that goal.
  *
  * Every read and write goes through the person's own client.
  */
@@ -150,4 +151,27 @@ export async function settleBriefTopic(
     .eq('id', from.id);
   if (briefError) throw new Error(`Putting the research under the goal failed: ${briefError.message}`);
   return { briefId: from.id, aimId: from.aimId };
+}
+
+/** What approving a topic as it is drafted did. */
+export type DraftedApproval = {
+  /** False only when the topic was no longer a draft. */
+  approved: boolean;
+  /** Rows that cited nothing and were marked personal before approving. */
+  personal: number;
+  /** The brief the topic was drafted from, settled under its goal; null for any other topic. */
+  brief: { briefId: string; aimId: string } | null;
+};
+
+/**
+ * Approve a topic the moment its draft is kept (plan #2356.2), on the
+ * person's own client, with its checks as drafted and any row that cites
+ * nothing marked personal (plan #2356.6). When a research brief drafted it,
+ * the brief is settled the way approving it by hand settles it
+ * (`settleBriefTopic`); the caller then writes the brief's cards.
+ */
+export async function approveDraftedTopic(client: Client, userId: string, topicId: string): Promise<DraftedApproval> {
+  const [approved] = await approveDrafts(client, [topicId]);
+  if (!approved) return { approved: false, personal: 0, brief: null };
+  return { approved: true, personal: approved.personal, brief: await settleBriefTopic(client, userId, topicId) };
 }

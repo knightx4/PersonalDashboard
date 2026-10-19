@@ -20,6 +20,8 @@ import { runPreparationsDaily } from '@/inngest/learn/prepare';
 import { runFigureNeedStepsDaily } from '@/inngest/learn/figure-need-steps';
 import { runFigureBackfillDaily } from '@/inngest/learn/figure-backfill';
 import { runXReadsForAll } from '@/inngest/x/read';
+import { runInsightSignals } from '@/inngest/you/insight-signals';
+import { runInsightsTick } from '@/inngest/you/insights-tick';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -86,6 +88,13 @@ export async function GET(request: NextRequest) {
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
+    // The numbers insights start from are counted here in SQL with no model
+    // call, after the goals stages have closed the morning's steps (plan
+    // #2413.7). The insights stage after it queues the one model call only
+    // when the last ready run is over 30 days old, and starts it in a
+    // function of its own (plan #2413.10).
+    { name: 'insight-signals', run: () => runInsightSignals() },
+    { name: 'insights-monthly', run: () => runInsightsTick(origin) },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },

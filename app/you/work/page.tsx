@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { groupCourses } from '@/lib/you/education';
-import type { Course, CourseFile, Transcript } from '@/lib/you/transcripts';
+import type { Course, CourseFile, CourseWeek, Transcript } from '@/lib/you/transcripts';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { resumeHash } from '@/lib/you/resume-hash';
 import { resumeChanged, sortJobs, type Job, type ResumeChoice } from '@/lib/you/work-history';
@@ -12,6 +12,8 @@ import { JobsSection } from './jobs-section';
 import { sectionSubject } from '@/lib/core/section-path';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadCourseExplains } from '@/lib/learn/evidence/course-explain-store';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadCourseNotes, loadCourseOverviews } from '@/lib/you/course-overview-store';
 
 export const metadata = { title: 'Work & school' };
 
@@ -28,7 +30,7 @@ export default async function Page() {
   const you = await createYouClient();
   const user = await requireUser();
   const jobsClient = await createJobsClient();
-  const [transcripts, courses, courseFiles, jobs, resume] = await Promise.all([
+  const [transcripts, courses, courseFiles, courseWeeks, overviews, jobs, resume] = await Promise.all([
     you
       .from('transcripts')
       .select('*')
@@ -50,15 +52,33 @@ export default async function Page() {
         }));
       }),
     // The files kept under each course (plan #2401.2).
+    // Each with Dash's summary when Summarise has been pressed on it (plan #2401.4).
     you
       .from('course_files')
-      .select('*')
+      .select('*, summary:course_file_summaries(summary, points, model, read_at)')
       .eq('user_id', user.id)
       .order('position')
       .then(({ data, error }) => {
         if (error) throw new Error(`Loading course files failed: ${error.message}`);
-        return ((data ?? []) as CourseFile[]).map((file) => ({ ...file, size_bytes: Number(file.size_bytes) }));
+        // The summary's key is the file's, so PostgREST embeds it as one object; an array is taken too.
+        return ((data ?? []) as Array<CourseFile & { summary: unknown }>).map((file) => ({
+          ...file,
+          size_bytes: Number(file.size_bytes),
+          summary: (Array.isArray(file.summary) ? file.summary[0] : file.summary) ?? null,
+        })) as CourseFile[];
       }),
+    // The weeks laid out from each course's syllabus (plan #2401.6), removed ones too, so the list can leave them out.
+    you
+      .from('course_weeks')
+      .select('id, course_id, week, title, edited_at, removed_at')
+      .eq('user_id', user.id)
+      .order('week')
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Loading course weeks failed: ${error.message}`);
+        return (data ?? []) as CourseWeek[];
+      }),
+    // What each course was about, as Dash pulled it together (plan #2401.7).
+    loadCourseOverviews(you, user.id),
     you
       .from('work_history')
       .select('*')
@@ -95,6 +115,19 @@ export default async function Page() {
   const filesByCourse: Record<string, CourseFile[]> = {};
   for (const file of courseFiles) (filesByCourse[file.course_id] ??= []).push(file);
 
+  const weeksByCourse: Record<string, CourseWeek[]> = {};
+  for (const week of courseWeeks) (weeksByCourse[week.course_id] ??= []).push(week);
+
+  // The person's own notes naming each course that has files kept (plan
+  // #2401.7). A failed search leaves the block without them rather than the tab blank.
+  const notes = await loadCourseNotes(
+    await createVaultClient(),
+    courses.filter((course) => filesByCourse[course.id]?.length),
+  ).catch((error: unknown) => {
+    console.error('[you work] course notes', error instanceof Error ? error.message : error);
+    return {};
+  });
+
   const resumeChoice: ResumeChoice | null = resume ? { id: resume.id, label: resume.label, hash: resumeHash(resume.text) } : null;
 
   return (
@@ -112,6 +145,9 @@ export default async function Page() {
         courses={courses.length}
         explains={explains}
         files={filesByCourse}
+        weeks={weeksByCourse}
+        overviews={overviews}
+        notes={notes}
       />
     </PageColumn>
   );

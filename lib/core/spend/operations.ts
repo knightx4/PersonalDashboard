@@ -248,6 +248,25 @@ export const SPEND_OPERATIONS = {
     // Personality tab asks for a fresh read. The notes are found with the
     // cached trait sentences, under 'embed-note-match'.
     'read-personality',
+    // Dash's summary and key points for one file kept under a course (plan
+    // #2401.4). One Haiku call per press of Summarise on the Work & school
+    // tab, reading the whole file: a PDF or photo as itself, a deck or Word
+    // file as its text.
+    'summarise-course-file',
+    // A course's weeks and their topics, read from its syllabus on a press of
+    // "Lay out the weeks" (plan #2401.6). One Haiku call reading the whole
+    // syllabus.
+    'read-syllabus-weeks',
+    // What a course was about and the ideas that recurred, pulled together
+    // from its file summaries on a press (plan #2401.7). One Haiku call
+    // reading the stored summaries and key points, not the files.
+    'collect-course-overview',
+    // A set of insights about the person (plan #2413.9): one Opus call at
+    // high effort reading the stored digest, the note extracts, the nightly
+    // signals, every earlier insight with its verdict and a few key notes,
+    // from Look again or the monthly run. A run estimated over two dollars
+    // is refused before it is sent.
+    'write-insights',
   ],
 } as const;
 

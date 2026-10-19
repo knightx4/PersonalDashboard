@@ -9,6 +9,7 @@ import { preparedSubjectIds } from '@/lib/learn/prepare/store';
 import { AIM_COLUMNS, cardDepthForAim, toAim, type AimRow } from '@/lib/learn/aims';
 import { loadAimAreaNames } from '@/lib/learn/aims-store';
 import { loadAreas } from '@/lib/learn/areas/load';
+import { archivedSubjectIds } from '@/lib/learn/archived-subjects';
 import { goalsOnlyOrDefault } from '@/lib/learn/goals-only-setting';
 import { storeArticleOverRest } from '@/lib/learn/catalogue/store-rest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
@@ -134,9 +135,10 @@ async function loadGoals(
   if (error) throw new Error(`Reading your goals failed: ${error.message}`);
   // A goal whose subject has a finished preparation is covered by it: no
   // section cards are drawn for it (plan #2297.4).
-  const prepared = await preparedSubjectIds(learn, userId);
+  // Nor for a goal whose subject is archived (plan #2355.4).
+  const [prepared, archived] = await Promise.all([preparedSubjectIds(learn, userId), archivedSubjectIds(learn, userId)]);
   const all = ((data ?? []) as (AimRow & { subject_id: string | null })[])
-    .filter((row) => !row.subject_id || !prepared.has(row.subject_id))
+    .filter((row) => !row.subject_id || (!prepared.has(row.subject_id) && !archived.has(row.subject_id)))
     .map(toAim);
   const listed = all.filter((aim) => aim.listSource);
   const open = all.filter((aim) => !aim.listSource);

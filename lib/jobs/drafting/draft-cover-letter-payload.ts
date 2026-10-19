@@ -215,6 +215,9 @@ export function renderLetterRequest(request: LetterRequest): string {
     matches.length > 0
       ? `## Where they match the role best\n\n${matches.map(renderMatch).join('\n')}`
       : '## Where they match the role best\n\nThe requirements have not been matched against their evidence yet; judge the fit from the material.',
+    material.letterComments.length > 0
+      ? `## Their comments on the cover letter\n\n${material.letterComments.map((comment) => `- ${comment}`).join('\n')}`
+      : null,
     replies.length > 0
       ? `## What they told you when you asked\n\n${replies.map((ask) => `Q: ${ask.question}\nA: ${ask.reply}`).join('\n\n')}`
       : null,
