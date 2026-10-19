@@ -1518,6 +1518,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c2',
@@ -1533,6 +1534,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c3',
@@ -1548,6 +1550,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: false,
     potentialLead: true,
     foundByDash: true,
+    linkedinConnection: false,
   },
   {
     id: 'c4',
@@ -1563,6 +1566,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: true,
   },
   {
     id: 'c5',
@@ -1578,6 +1582,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: false,
     foundByDash: false,
+    linkedinConnection: true,
   },
   {
     id: 'c6',
@@ -1593,6 +1598,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: false,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c7',
@@ -1608,6 +1614,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: false,
     potentialLead: false,
     foundByDash: true,
+    linkedinConnection: false,
   },
 ];
 
@@ -5830,6 +5837,22 @@ export const SURFACES: readonly Surface[] = [
         contacts={contactRows}
         companies={contactCompanies}
         params={{ view: 'table', status: 'met', show: 'dash' }}
+        timezone="Europe/London"
+        now={contactsNow}
+      />
+    ),
+  },
+  {
+    /* The Show choice that leaves out the people made from LinkedIn connections. */
+    id: 'jobs-contacts-table-no-linkedin',
+    label: 'Contacts · Table · Without LinkedIn connections',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage
+        contacts={contactRows}
+        companies={contactCompanies}
+        params={{ view: 'table', show: 'no_linkedin' }}
         timezone="Europe/London"
         now={contactsNow}
       />

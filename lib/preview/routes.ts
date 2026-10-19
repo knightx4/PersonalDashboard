@@ -162,6 +162,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-contacts-table': ['/jobs/contacts'],
   'jobs-contacts-table-column-menu': ['/jobs/contacts'],
   'jobs-contacts-table-empty': ['/jobs/contacts'],
+  'jobs-contacts-table-no-linkedin': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
