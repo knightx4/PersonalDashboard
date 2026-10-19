@@ -18,8 +18,10 @@ import type { ImportMapper, ImportStore, MappedRecord, MatchSkip, PendingRecord 
 //   correspondents  the other person in a conversation you wrote in who is
 //                   not a connection, so the touches have a contact. Never
 //                   marked linkedin_connection, and only joined by URL.
-//   invitations     an outgoing invitation to a connection: a touch on
-//                   linkedin_connect, outbound, with the note sent.
+//   invitations     an outgoing invitation to a connection that carried a
+//                   note: a touch on linkedin_connect, outbound, with the
+//                   note. A bare connection request is not outreach and is
+//                   skipped.
 //   messages        one touch on linkedin_dm per message of a one-to-one
 //                   conversation you wrote in or held with a connection.
 //                   The rest (one-way recruiter and sales InMail, mostly)
@@ -39,6 +41,7 @@ export const GROUP = 'A group conversation: touches are kept for one-to-one conv
 export const NOT_YOU = 'The export does not say which side of the conversation is you.';
 export const NOT_CONNECTED = 'They are not one of your connections, so there is no contact to put it on.';
 export const INCOMING = 'An invitation they sent you: it sets how you connected on their contact, not a touch.';
+export const NO_NOTE = 'A connection request with no note, which is not outreach.';
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 
@@ -321,6 +324,7 @@ export const linkedInInvitations: ImportMapper<LinkedInArchive> = {
       if (inv.direction !== 'OUTGOING') return { key: inv.key, skip: INCOMING };
       const slug = inv.inviteeProfileSlug;
       if (!slug || !connected.has(slug)) return { key: inv.key, skip: NOT_CONNECTED };
+      if (!str(inv.message)) return { key: inv.key, skip: NO_NOTE };
       if (!inv.sentAt) return { key: inv.key, skip: 'It has no date.' };
       return {
         key: inv.key,

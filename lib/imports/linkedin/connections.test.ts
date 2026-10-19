@@ -6,7 +6,7 @@ import { applyPlan, planImport } from '../engine';
 import { LINKEDIN_MAPPERS, LINKEDIN_SOURCE } from '../linkedin';
 import { memoryStore, type MemoryStore } from '../memory-store';
 import { CONNECTION_ONLY } from './applications';
-import { INCOMING, ONE_WAY, ownSlug } from './connections';
+import { INCOMING, NO_NOTE, ONE_WAY, ownSlug } from './connections';
 
 // The fixture export (lib/linkedin/archive/fixtures/build-export.ts) is Sam
 // Taylor's. Two connections: Jordan Lee, a recruiter at Acme Robotics, and
@@ -239,5 +239,14 @@ describe('importing connections, invitations and messages', () => {
     expect(touches).toHaveLength(3);
     expect(touches.find((t) => t.id === 't1')!.message).toBeNull();
     expect(touches.find((t) => t.id === 't2')!.message).toBeNull();
+  });
+
+  it('leaves out a connection request sent with no note', async () => {
+    const store = seeded();
+    const input = archive();
+    input.invitations = input.invitations.map((inv) => ({ ...inv, message: null }));
+    const plan = await run(store, input);
+    expect(store.rows(TOUCHES).filter((t) => t.channel === 'linkedin_connect')).toEqual([]);
+    expect(kind(plan, 'invitations').records.filter((r) => r.reason === NO_NOTE)).toHaveLength(1);
   });
 });
