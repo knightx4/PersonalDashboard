@@ -3714,6 +3714,46 @@ const recommendedPeople: OpenSuggestion[] = [
   }),
 ];
 
+/** Events to go to: one with a page to open, one without. */
+const recommendedEvents: OpenSuggestion[] = [
+  recommendedOpening({
+    id: 'ev-1',
+    kind: 'reach_out',
+    headline: 'Go to the applied AI meetup in DUMBO on 22 October',
+    why: 'A no-slides evening for people shipping applied AI in New York, with a fintech table.',
+    move: '1. RSVP on the listing. 2. Find the two finance people on the attendee list and say hello.',
+    channel: 'event',
+    message: null,
+    url: null,
+    location: null,
+    companyName: 'Forward Pass',
+    personName: null,
+    personTitle: null,
+    sourceUrl: 'https://example.com/forward-pass',
+    foundIn: null,
+    scores: null,
+    scoreNote: null,
+    origin: 'search',
+  }),
+  recommendedOpening({
+    id: 'ev-2',
+    kind: 'reach_out',
+    headline: 'Go to the FP&A breakfast at the Harvard Club on 4 November',
+    why: 'Heads of FP&A from Series B to D companies, several of them hiring into strategic finance.',
+    move: 'Ask the organiser for a ticket, then bring the cash forecasting project to talk about.',
+    channel: 'event',
+    message: null,
+    url: null,
+    location: null,
+    personName: null,
+    personTitle: null,
+    foundIn: 'From the step "Go to two finance events" on your career goal',
+    scores: null,
+    scoreNote: null,
+    origin: 'goal',
+  }),
+];
+
 /** Find for somebody a month in: three career goals entries, one track started and two suggested. */
 const discoveredCompanies: DiscoveredCompany[] = [
   {
@@ -3791,6 +3831,7 @@ const findView = {
     },
   },
   people: recommendedPeople,
+  events: recommendedEvents,
 };
 
 /** Jobs' Now drawn from the sample rows. */

@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
-import { RecommendedPeople, RecommendedRoles } from './sections';
+import { RecommendedEvents, RecommendedPeople, RecommendedRoles } from './sections';
 import { SearchAim } from './aim';
 import { DiscoveredCompanies } from './companies';
 
@@ -9,20 +9,23 @@ import { DiscoveredCompanies } from './companies';
  * gallery can draw it from fixtures (surface `jobs-find`).
  *
  * In reading order: what the search aims at, the roles Dash found against
- * it, the startups behind some of them, and the people to meet. Every panel takes the page's full
- * width, so their right edges line up (law 18). The anchors are where the phone
- * notification for a search opens (lib/jobs/suggest/notify.ts).
+ * it, the startups behind some of them, the people to meet and the events to
+ * go to. Every panel takes the page's full width, so their right edges line
+ * up (law 18). The anchors are where the phone notification for a search
+ * opens (lib/jobs/suggest/notify.ts).
  */
 export function FindView({
   aim,
   roles,
   companies,
   people,
+  events,
 }: {
   aim: ComponentProps<typeof SearchAim>;
   roles: ComponentProps<typeof RecommendedRoles>;
   companies: ComponentProps<typeof DiscoveredCompanies>;
   people: OpenSuggestion[];
+  events: OpenSuggestion[];
 }) {
   return (
     <div className="space-y-6">
@@ -38,6 +41,10 @@ export function FindView({
 
       <div id="people" className="scroll-mt-4">
         <RecommendedPeople suggestions={people} />
+      </div>
+
+      <div id="events" className="scroll-mt-4">
+        <RecommendedEvents suggestions={events} />
       </div>
     </div>
   );
