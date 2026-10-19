@@ -37,12 +37,19 @@ export const EMPTY_WEEKS_LIMIT = 4;
 /** A read counts as a new week's this long after the last one, with half a day of slack for the cron. */
 const WEEK_MS = 6.5 * 24 * 60 * 60 * 1000;
 
-export type DiscoverySource = 'yc' | 'hn';
+export type DiscoverySource = 'yc' | 'hn' | 'linkedin';
+
+/** A watchlist row's source as the code knows it; anything unknown reads as YC, the first list. */
+export function discoverySource(value: unknown): DiscoverySource {
+  return value === 'hn' || value === 'linkedin' ? value : 'yc';
+}
 
 /** How each discovered role says where it was found, in its found_in line. */
 export const SOURCE_LABELS: Record<DiscoverySource, string> = {
   yc: 'Found on YC',
   hn: 'Found on Hacker News',
+  // A company followed on LinkedIn, brought in by the LinkedIn import (plan #2432.6).
+  linkedin: 'Followed on LinkedIn',
 };
 
 export type WatchedStartup = {
@@ -226,7 +233,9 @@ export function discoveredText(posting: DiscoveredPosting): { why: string; move:
   const where =
     startup.source === 'yc'
       ? `${startup.name} is on YC's list of companies that are hiring.`
-      : `${startup.name} posted in this month's Hacker News "Who is hiring?" thread.`;
+      : startup.source === 'linkedin'
+        ? `You follow ${startup.name} on LinkedIn.`
+        : `${startup.name} posted in this month's Hacker News "Who is hiring?" thread.`;
   const why = startup.reason?.trim() ? startup.reason.trim() : where;
   const move = [
     '1. Read the posting at the link.',

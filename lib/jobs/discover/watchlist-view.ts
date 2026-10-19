@@ -6,12 +6,13 @@
  */
 import { agoText } from '@/lib/jobs/suggest/search-runs';
 import { formatNumber } from '@/lib/money';
+import type { DiscoverySource } from './roles';
 
 export type DiscoveredCompany = {
   id: string;
   name: string;
   website: string | null;
-  source: 'yc' | 'hn';
+  source: DiscoverySource;
   /** What the company does, in the source's own words. */
   description: string | null;
   /** Why Dash shortlisted it, written to the person. */
@@ -44,6 +45,7 @@ export type DiscoveryRunView = {
 export const DISCOVERY_SOURCE_LABELS: Record<DiscoveredCompany['source'], string> = {
   yc: 'YC',
   hn: 'Hacker News',
+  linkedin: 'LinkedIn',
 };
 
 const VENDOR_LABELS: Record<string, string> = {
@@ -74,7 +76,7 @@ export function companyFacts(company: DiscoveredCompany): string[] {
   const facts: string[] = [];
   if (company.stage) facts.push(`${company.stage} stage`);
   if (company.locations.length > 0) facts.push(company.locations.slice(0, 3).join('; '));
-  facts.push(`Found on ${DISCOVERY_SOURCE_LABELS[company.source]}`);
+  facts.push(company.source === 'linkedin' ? 'You follow it on LinkedIn' : `Found on ${DISCOVERY_SOURCE_LABELS[company.source]}`);
   if (company.board) facts.push(`Jobs on ${vendorLabel(company.board.vendor)}`);
   else if (company.noBoard) facts.push('No job board Dash can read');
   return facts;
