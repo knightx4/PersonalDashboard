@@ -14,6 +14,7 @@ import { COURSE_FILES_BUCKET, TRANSCRIPTS_BUCKET } from '@/lib/you/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
+import { IMPORTS_BUCKET } from '@/lib/jobs/linkedin-import';
 
 export const maxDuration = 60;
 
@@ -148,6 +149,14 @@ export async function POST(request: NextRequest) {
   //    of their own with one folder per account.
   try {
     await removeAttachmentFolder(admin, user.id, TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the exports uploaded for import from Jobs settings (plan #2432.9),
+  //    one folder per account.
+  try {
+    await removeAttachmentFolder(admin, user.id, IMPORTS_BUCKET);
   } catch {
     // As above.
   }

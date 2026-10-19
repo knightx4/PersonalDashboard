@@ -65,6 +65,10 @@ export const jobsActions: ModuleActions = {
     savePreference: none('setting'),
     saveShowNudges: none('setting'),
   },
+  'app/jobs/(app)/settings/linkedin-actions.ts': {
+    planLinkedInImport: none('session', 'scripts/import-linkedin.ts <export.zip> --dry-run.'),
+    applyLinkedInImport: none('session', 'scripts/import-linkedin.ts <export.zip> --apply.'),
+  },
   'app/jobs/(app)/settings/sender-actions.ts': {
     addExcludedSender: none('setting'),
     removeExcludedSender: none('setting'),

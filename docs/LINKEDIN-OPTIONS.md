@@ -195,9 +195,11 @@ use is a link, a stored URL or a rule about LinkedIn email.
   (`lib/jobs/contacts/from-mail.ts`), and the person can mark the domain as
   noise (`settings/sender-actions.ts`).
 - **The stated rule.** [JOB-SEARCH-SPEC.md](JOB-SEARCH-SPEC.md) says "no
-  LinkedIn scraping", and the privacy page says "The app does not read
-  LinkedIn". Any option above that reads from LinkedIn changes that sentence on
-  `app/(legal)/privacy/page.tsx` and needs a spec change.
+  LinkedIn scraping or LinkedIn login", and the privacy page says the app does
+  not log in to LinkedIn and lists what the uploaded export keeps about other
+  people. The export import (plan #2432) is built. Any other option above that
+  reads from LinkedIn changes those sentences on `app/(legal)/privacy/page.tsx`
+  and needs a spec change.
 
 Where an option overlaps with this:
 

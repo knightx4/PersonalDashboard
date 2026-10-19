@@ -115,6 +115,7 @@ import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
+import { linkedInPlanFixture, linkedInRunsFixture } from './linkedin-import-fixtures';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
 import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
@@ -324,6 +325,8 @@ import {
   educationUploading,
 } from './education-fixtures';
 import { workHistoryJobs, workHistoryResume } from './work-history-fixtures';
+import { profileJobs, profileLists, profileListsEmpty } from './profile-entry-fixtures';
+import { ProfileSections } from '@/app/you/work/profile-sections';
 import { JobsSection } from '@/app/you/work/jobs-section';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
@@ -1515,6 +1518,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c2',
@@ -1530,6 +1534,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c3',
@@ -1545,6 +1550,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: false,
     potentialLead: true,
     foundByDash: true,
+    linkedinConnection: false,
   },
   {
     id: 'c4',
@@ -1560,6 +1566,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: true,
     foundByDash: false,
+    linkedinConnection: true,
   },
   {
     id: 'c5',
@@ -1575,6 +1582,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: false,
     foundByDash: false,
+    linkedinConnection: true,
   },
   {
     id: 'c6',
@@ -1590,6 +1598,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: true,
     potentialLead: false,
     foundByDash: false,
+    linkedinConnection: false,
   },
   {
     id: 'c7',
@@ -1605,6 +1614,7 @@ const contactRows: ContactListRow[] = [
     hasOutbound: false,
     potentialLead: false,
     foundByDash: true,
+    linkedinConnection: false,
   },
 ];
 
@@ -5833,6 +5843,22 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Show choice that leaves out the people made from LinkedIn connections. */
+    id: 'jobs-contacts-table-no-linkedin',
+    label: 'Contacts · Table · Without LinkedIn connections',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ContactsPage
+        contacts={contactRows}
+        companies={contactCompanies}
+        params={{ view: 'table', show: 'no_linkedin' }}
+        timezone="Europe/London"
+        now={contactsNow}
+      />
+    ),
+  },
+  {
     id: 'jobs-contact',
     label: 'Contact · One person',
     module: 'jobs',
@@ -6211,6 +6237,38 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader title="Work & school" />
         <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* After a LinkedIn import (plan #2432.7): the jobs with two from LinkedIn,
+     * then the profile's schools (a course on no transcript under it),
+     * certifications, honors and skills. */
+    id: 'you-work-linkedin',
+    label: 'Work & school · Your LinkedIn profile',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={profileJobs} resume={workHistoryResume} changed={false} />
+        <ProfileSections lists={profileLists} />
+        <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
+      </>
+    ),
+  },
+  {
+    /* Before any LinkedIn import: each profile section says what fills it. */
+    id: 'you-work-linkedin-empty',
+    label: 'Work & school · No LinkedIn import yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <>
+        <PageHeader title="Work & school" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} />
+        <ProfileSections lists={profileListsEmpty} />
         <EducationSection groups={educationGroups} courseCounts={educationCounts} transcripts={2} courses={9} />
       </>
     ),
@@ -9925,6 +9983,69 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <JobsSettingsView {...settings} tab="career-goals" opensOn="career-goals" />,
+  },
+  {
+    id: 'jobs-settings-linkedin',
+    label: 'Jobs · Settings, the LinkedIn tab',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} linkedInRuns={linkedInRunsFixture} tab="linkedin" opensOn="linkedin" />,
+  },
+  {
+    id: 'jobs-settings-linkedin-preview',
+    label: 'Jobs · Settings, LinkedIn, what an export would do',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{ step: 'planned', plan: linkedInPlanFixture }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-applying',
+    label: 'Jobs · Settings, LinkedIn, importing',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{ step: 'applying', plan: linkedInPlanFixture }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-error',
+    label: 'Jobs · Settings, LinkedIn, a zip that is not an export',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsSettingsView
+        {...settings}
+        linkedInRuns={linkedInRunsFixture}
+        linkedInPhase={{
+          step: 'error',
+          message:
+            "Holiday photos 2026.zip is a zip, but none of its files are ones LinkedIn's export holds. Choose the zip LinkedIn emailed you, named like Basic_LinkedInDataExport_10-19-2026.zip.",
+        }}
+        tab="linkedin"
+        opensOn="linkedin"
+      />
+    ),
+  },
+  {
+    id: 'jobs-settings-linkedin-empty',
+    label: 'Jobs · Settings, LinkedIn, nothing imported yet',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsSettingsView {...settings} linkedInRuns={[]} tab="linkedin" opensOn="linkedin" />,
   },
   {
     id: 'jobs-onboarding',

@@ -27,7 +27,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
       supabase
         .from('contacts')
         .select(
-          'id, full_name, title, relationship, status, potential_lead, found_by_dash, company_id, companies ( name, slug, priority )',
+          'id, full_name, title, relationship, status, potential_lead, found_by_dash, linkedin_connection, company_id, companies ( name, slug, priority )',
         )
         .eq('user_id', user.id)
         .order('full_name'),
@@ -77,6 +77,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         status: string;
         potential_lead: boolean;
         found_by_dash: boolean;
+        linkedin_connection: boolean;
         companies: { name: string; slug: string; priority: string } | null;
       }>).map((contact) => ({
         id: contact.id,
@@ -92,6 +93,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         hasOutbound: outboundContacts.has(contact.id),
         potentialLead: contact.potential_lead ?? false,
         foundByDash: contact.found_by_dash ?? false,
+        linkedinConnection: contact.linkedin_connection ?? false,
       }))}
     />
   );

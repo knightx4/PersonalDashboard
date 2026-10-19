@@ -46,6 +46,7 @@ export const CONTACT_RELATIONSHIPS = [
 export const CONTACT_SHOWS = [
   { value: 'leads', label: 'Potential leads' },
   { value: 'dash', label: 'Found by Dash' },
+  { value: 'no_linkedin', label: 'Without LinkedIn connections' },
 ] as const;
 
 /** One person as the page loads them. */
@@ -68,6 +69,8 @@ export type ContactListRow = {
   potentialLead: boolean;
   /** Found by Dash or an agent searching for people, not added by the person. */
   foundByDash: boolean;
+  /** Made from a LinkedIn connection by the import; stays true once set. */
+  linkedinConnection: boolean;
 };
 
 /** The search params the page reads. Sort, group and hide are the Display panel's. */
@@ -96,7 +99,7 @@ export type ContactsParams = {
 
 export type ContactsState = {
   view: ContactsViewName;
-  show: 'leads' | 'dash' | null;
+  show: (typeof CONTACT_SHOWS)[number]['value'] | null;
   terms: string[];
   nameTerms: string[];
   company: string | null;
@@ -156,6 +159,7 @@ export function hasColumnFilters(state: ContactsState): boolean {
 function matchesShow(row: ContactListRow, show: ContactsState['show']): boolean {
   if (show === 'leads') return row.potentialLead;
   if (show === 'dash') return row.foundByDash;
+  if (show === 'no_linkedin') return !row.linkedinConnection;
   return true;
 }
 
@@ -299,7 +303,7 @@ export function contactColumnFilters(
     anyLabel: 'Everyone',
     choices: CONTACT_SHOWS.map(({ value, label }) => ({
       value,
-      label: `${label} · ${count((c) => (value === 'leads' ? c.potentialLead : c.foundByDash))}`,
+      label: `${label} · ${count((c) => matchesShow(c, value))}`,
     })),
   });
   const name: FilterColumn<ContactsParams> = {

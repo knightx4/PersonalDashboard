@@ -24,6 +24,7 @@ import {
   SOURCE_LABELS,
   boardPosting,
   discoveredText,
+  discoverySource,
   passScored,
   pickDiscovered,
   postRoles,
@@ -49,7 +50,7 @@ function startupFrom(row: Row): WatchedStartup {
   return {
     id: row.id as string,
     name: row.name as string,
-    source: row.source === 'hn' ? 'hn' : 'yc',
+    source: discoverySource(row.source),
     description: (row.description as string | null) ?? null,
     reason: (row.reason as string | null) ?? null,
     boardVendor: board?.vendor ?? null,
