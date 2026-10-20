@@ -13,7 +13,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
-vi.mock('@/app/vault/n/[...path]/actions', () => ({ saveNoteEdit: async () => ({}) }));
+vi.mock('@/app/vault/n/[...path]/actions', () => ({
+  saveNoteEdit: async () => ({}),
+  saveNoteDraft: async () => ({ ok: true }),
+  sendNoteDraft: async () => ({}),
+  dropNoteDraft: async () => ({}),
+}));
 
 const { NoteEdit, EditForm, SaveError, SaveStatusText } = await import('@/app/vault/n/[...path]/note-edit');
 
@@ -45,7 +50,6 @@ describe('the editor', () => {
     <EditForm
       notePath="Work/Close.md"
       body="The close took six hours."
-      blobSha="abc"
       onDone={nothing}
       onReload={nothing}
     />,

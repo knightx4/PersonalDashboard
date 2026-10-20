@@ -282,6 +282,7 @@ describe('RLS coverage', () => {
       'maya_threads',
       'note_blocks',
       'note_connections',
+      'note_drafts',
       'note_embeddings',
       'notes',
       'position_edges',

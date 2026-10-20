@@ -20,6 +20,8 @@ import { noteRenamePorts, noteSavePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { RENAME_ERRORS, renameNote, type RenameNoteFailure } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
+import { commitDraftPorts, draftPorts, loadNoteDraft, rebaseNoteDraft } from '@/lib/vault/db/draft-ports';
+import { commitDraft, saveDraft } from '@/lib/vault/notes/drafts';
 import { mayaThreadHref, noteHref } from '@/lib/vault/paths';
 
 /**
@@ -305,6 +307,110 @@ export async function saveNoteEdit(
   revalidatePath(noteHref(input.data.notePath));
   revalidatePath('/vault');
   return { savedBlobSha: result.blobSha };
+}
+
+export type DraftSaveState =
+  | { ok: true }
+  | { ok: false; reason: 'changed' | 'not-found' | 'error'; error: string };
+
+/**
+ * Keep the editor's text as the note's draft (note of 20 October 2026). No
+ * commit: the note-drafts tick commits it after ten quiet minutes, so a
+ * sitting of writing is one commit. `from` is the text the editor last saved
+ * or opened with, and the save is refused when the note holds something else.
+ *
+ * Nothing is revalidated, since nothing on the page changes while the editor
+ * is open; the editor refreshes the page when it closes.
+ */
+// latency: pending
+export async function saveNoteDraft(input: {
+  notePath: string;
+  text: string;
+  from: string;
+}): Promise<DraftSaveState> {
+  await requireUser();
+  const parsed = z
+    .object({ notePath, text: SaveInput.shape.text, from: z.string().max(1_000_000) })
+    .safeParse(input);
+  if (!parsed.success)
+    return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? SAVE_ERRORS.error };
+
+  try {
+    const result = await saveDraft(draftPorts(await createVaultClient()), {
+      path: parsed.data.notePath,
+      text: parsed.data.text,
+      from: parsed.data.from,
+    });
+    if (result.ok) return result;
+    return { ok: false, reason: result.reason, error: SAVE_ERRORS[result.reason] };
+  } catch (error) {
+    console.error('[vault draft]', error instanceof Error ? error.message : error);
+    return { ok: false, reason: 'error', error: SAVE_ERRORS.error };
+  }
+}
+
+/**
+ * Send a note's draft to the vault now, from the note's page after a refused
+ * commit. With `overwrite` the draft is first restarted from the note as it
+ * is now, so it replaces what changed in Obsidian; without, it is tried again
+ * as it stands, for a token that has been fixed since.
+ */
+// latency: pending
+export async function sendNoteDraft(input: {
+  notePath: string;
+  overwrite: boolean;
+}): Promise<SaveNoteState> {
+  const user = await requireUser();
+  const path = notePath.safeParse(input.notePath);
+  if (!path.success) return { reason: 'error', error: SAVE_ERRORS.error };
+
+  const vault = await createVaultClient();
+  try {
+    const note = await loadNote(vault, path.data);
+    if (!note) return { reason: 'not-found', error: SAVE_ERRORS['not-found'] };
+    let draft = await loadNoteDraft(vault, note.id);
+    if (!draft) return {};
+    if (input.overwrite) {
+      await rebaseNoteDraft(vault, note.id, note.blobSha);
+      draft = { ...draft, baseBlobSha: note.blobSha };
+    }
+    const result = await commitDraft(
+      commitDraftPorts(vault, { serviceRole: false, afterSave: () => () => {} }),
+      {
+        noteId: note.id,
+        userId: user.id,
+        path: note.path,
+        body: draft.body,
+        baseBlobSha: draft.baseBlobSha,
+        updatedAt: draft.updatedAt,
+      },
+    );
+    revalidatePath(noteHref(path.data));
+    if (!result.ok) return { reason: result.reason, error: SAVE_ERRORS[result.reason] };
+    return {};
+  } catch (error) {
+    console.error('[vault draft send]', error instanceof Error ? error.message : error);
+    return { reason: 'error', error: SAVE_ERRORS.error };
+  }
+}
+
+/** Throw away a note's draft and keep the note as the vault has it. */
+// latency: pending
+export async function dropNoteDraft(input: { notePath: string }): Promise<{ error?: string }> {
+  await requireUser();
+  const path = notePath.safeParse(input.notePath);
+  if (!path.success) return { error: SAVE_ERRORS.error };
+  const vault = await createVaultClient();
+  const note = await loadNote(vault, path.data);
+  if (!note) return { error: SAVE_ERRORS['not-found'] };
+  try {
+    await draftPorts(vault).deleteDraft(note.id);
+  } catch (error) {
+    console.error('[vault draft drop]', error instanceof Error ? error.message : error);
+    return { error: 'The draft could not be thrown away. Try again in a moment.' };
+  }
+  revalidatePath(noteHref(path.data));
+  return {};
 }
 
 export type RenameNoteState = {

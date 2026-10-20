@@ -1,6 +1,6 @@
 'use client';
 
-import { EditForm, RenameForm, SaveError } from '@/app/vault/n/[...path]/note-edit';
+import { DraftNotice, EditForm, RenameForm, SaveError } from '@/app/vault/n/[...path]/note-edit';
 
 /**
  * The note editor open, and the two refusals that come with a way forward
@@ -14,11 +14,12 @@ export function NoteEditingPreview({ body }: { body: string }) {
       <EditForm
         notePath="Work/Nightly close.md"
         body={body}
-        blobSha="preview"
         linkPaths={['Work/Nightly close.md']}
         onDone={nothing}
         onReload={nothing}
       />
+      <DraftNotice notePath="Work/Nightly close.md" failure={null} />
+      <DraftNotice notePath="Work/Nightly close.md" failure="changed" />
       <SaveError
         state={{ reason: 'changed', error: 'This note changed since you opened it.' }}
         onReload={nothing}

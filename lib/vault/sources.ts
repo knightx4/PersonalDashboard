@@ -103,6 +103,10 @@ export const vaultSources: ModuleSources = {
   ],
   notSources: [
     {
+      table: 'obsidian.note_drafts',
+      reason: 'Edits made in the app waiting a few minutes to be committed; the note itself is the source.',
+    },
+    {
       table: 'obsidian.attachments',
       reason: 'Sync bookkeeping: which images, PDFs and audio files are in the vault and where their copies are kept.',
     },
