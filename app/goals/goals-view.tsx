@@ -14,7 +14,6 @@ import { CloseButton } from '@/components/inbox/close-button';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { closedToast, LIFECYCLE_GLYPH, type Lifecycle } from '@/lib/core/lifecycle';
 import { Card, cardVariants } from '@/components/ui/card';
-import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EmptyState } from '@/components/ui/empty-state';
 import { InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -174,7 +173,6 @@ export function GoalsView({
   rhythms = {},
   canRun,
   areaId,
-  planCost = null,
   select,
 }: {
   areas: AreaWithGoals[];
@@ -191,8 +189,6 @@ export function GoalsView({
   canRun: boolean;
   /** Draw this one area as its own page (plan #1619) rather than every area. */
   areaId?: string;
-  /** The usual cost of one Plan this area run, for the hint beside its button; none draws no hint. */
-  planCost?: CostEstimate | null;
   /** The gallery's way in: Select already on, with these goals ticked. */
   select?: { selecting?: boolean; ticked?: string[] };
 }) {
@@ -237,7 +233,6 @@ export function GoalsView({
           run={areaRuns[area.id] ?? null}
           rhythms={rhythms[area.id] ?? []}
           canRun={canRun}
-          planCost={planCost}
           places={places}
           page={{
             chips,
@@ -273,7 +268,6 @@ export function GoalsView({
               run={areaRuns[area.id] ?? null}
               rhythms={rhythms[area.id] ?? []}
               canRun={canRun}
-              planCost={planCost}
               places={places}
               view={view}
             />
@@ -299,7 +293,6 @@ function AreaSection({
   run,
   rhythms,
   canRun,
-  planCost,
   places,
   view = 'open',
   page,
@@ -311,7 +304,6 @@ function AreaSection({
   run: AreaRunView | null;
   rhythms: AreaRhythm[];
   canRun: boolean;
-  planCost: CostEstimate | null;
   places: Place[];
   /** The view All goals is on, which the area's link keeps. */
   view?: AllGoalsView;
@@ -470,7 +462,6 @@ function AreaSection({
               hasGoals={liveCount > 0}
               run={run}
               canRun={canRun}
-              cost={planCost}
             />
           )}
         </div>
@@ -507,7 +498,6 @@ function AreaSection({
             hasGoals={liveCount > 0}
             run={run}
             canRun={canRun}
-            cost={planCost}
           />
         )}
         <GoalComposer areaId={area.id} areaName={area.name} />
