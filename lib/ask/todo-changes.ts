@@ -20,7 +20,16 @@ import { isModelChangeKind, type ModelChangeKind } from './model-changes';
  */
 
 /** The Todo write tools, by name, which is the kind each change is kept under. */
-export const TODO_CHANGE_KINDS = ['edit_todo', 'add_todo_item', 'link_todo', 'add_event', 'change_event', 'change_agenda_row'] as const;
+export const TODO_CHANGE_KINDS = [
+  'edit_todo',
+  'add_todo_item',
+  'link_todo',
+  'add_event',
+  'change_event',
+  'change_agenda_row',
+  // One todo for each row of a set (plan #2472.4); its Undo takes out the ones still untouched.
+  'add_todos',
+] as const;
 
 export type TodoChangeKind = (typeof TODO_CHANGE_KINDS)[number];
 

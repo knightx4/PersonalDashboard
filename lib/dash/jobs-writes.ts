@@ -2829,6 +2829,7 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       if (!written) throw new Error('Changing the touch failed: no row');
       touch = written;
     } else {
+      if (before.draft === true) throw new JobsRefused('That touch is a draft that has not been sent, so nothing can have answered it.');
       if (before.responded_at) throw new JobsRefused('That touch is marked answered already.');
       const summary = given(args, 'response') ? clearable(args, 'response', MESSAGE_MAX) : null;
       const written = await changeKept(env, undo, 'contact_touches', before, { responded_at: new Date().toISOString(), response_summary: summary });

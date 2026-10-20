@@ -73,6 +73,7 @@ export default async function CompanyDetailPage({
         .select('id, channel, direction, sent_at, responded_at, message, contacts!inner ( id, full_name, company_id )')
         .eq('user_id', user.id)
         .eq('contacts.company_id', company.id)
+        .eq('draft', false)
         .order('sent_at', { ascending: false })
         .limit(50),
       supabase

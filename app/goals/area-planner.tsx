@@ -6,7 +6,6 @@ import { LiveDot } from '@/components/ui/live-dot';
 import { DashAction } from '@/components/ui/dash-action';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { cn } from '@/lib/cn';
-import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import { planAreaAction, type GoalsActionState } from './actions';
 
@@ -27,15 +26,12 @@ export function AreaPlanner({
   hasGoals,
   run,
   canRun,
-  cost = null,
 }: {
   areaId: string;
   hasGoals: boolean;
   run: AreaRunView | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
-  /** The usual cost of one area plan, shown beside the button; none draws no hint. */
-  cost?: CostEstimate | null;
 }) {
   const running = run?.running ?? null;
   useRunRefresh(Boolean(running));
@@ -82,8 +78,8 @@ export function AreaPlanner({
               pending={starting}
               disabled={running !== null}
               run={running !== null && run ? { table: 'goals.runs', id: run.runId, going: true } : null}
-              estimate={cost}
-              what="Cost of planning this area"
+              routine="goals"
+              what="Planning this area"
               align="end"
             >
               {hasGoals ? 'Plan what is missing' : 'Plan this area'}

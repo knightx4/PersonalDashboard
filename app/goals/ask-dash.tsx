@@ -147,7 +147,8 @@ export function AskDash({
             </ChipSelect>
           )}
           {/* An ask on a goal is a reply from Dash; a new errand or goal starts a
-              run, which is not metered here, unless a Learn goal is placed. */}
+              run on the Goals routine, which is not priced per press, unless a Learn goal
+              is placed. */}
           <DashAction
             type="submit"
             size="sm"
@@ -155,14 +156,20 @@ export function AskDash({
             wrapperClassName="ml-auto"
             hintFirst
             align="end"
-            paid={
+            {...(handing && !learnGoal
+              ? { routine: 'goals' as const }
+              : {
+                  paid: !handing
+                    ? ('app/goals/home-actions.ts#askDashAction' as const)
+                    : ('app/goals/home-actions.ts#askDashAction:new-goal' as const),
+                })}
+            what={
               !handing
-                ? 'app/goals/home-actions.ts#askDashAction'
+                ? "Cost of Dash's reply"
                 : learnGoal
-                  ? 'app/goals/home-actions.ts#askDashAction:new-goal'
-                  : undefined
+                  ? 'Cost of placing the goal'
+                  : 'Starting the run that plans it'
             }
-            what={!handing ? "Cost of Dash's reply" : 'Cost of placing the goal and writing its plan'}
           >
             {asking
               ? handing

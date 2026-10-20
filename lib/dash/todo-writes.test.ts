@@ -40,8 +40,8 @@ const task = (fields: Record<string, unknown> = {}) => ({
 });
 
 describe('the Todo writes', () => {
-  it('are the kinds Ask keeps them under, in order', () => {
-    expect(TODO_WRITES.map((entry) => entry.name)).toEqual([...TODO_CHANGE_KINDS]);
+  it('are the kinds Ask keeps them under, in order, with add_todos after them (Ask only, plan #2472.4)', () => {
+    expect([...TODO_WRITES.map((entry) => entry.name), 'add_todos']).toEqual([...TODO_CHANGE_KINDS]);
   });
 
   it('writes notes and pins a todo, keeping the row as it was', async () => {

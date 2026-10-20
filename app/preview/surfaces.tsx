@@ -123,6 +123,8 @@ import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
+import { ToastProvider } from '@/components/ui/toast';
+import { ToastOnShow } from './toast-on-show';
 import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
@@ -377,6 +379,8 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { ROUTINE_KEYS, ROUTINE_LABELS } from '@/lib/feedback/routine-names';
 import { Tooltip } from '@/components/ui/tooltip';
 import { IconButton } from '@/components/ui/icon-button';
 import { Chip } from '@/components/ui/chip';
@@ -1649,6 +1653,7 @@ const contact: ContactRow = {
       sentAt: '2026-08-30T09:10:00.000Z',
       respondedAt: null,
       message: 'Asked whether the platform role is still open after the reorg.',
+      draft: false,
     },
     {
       id: 't2',
@@ -1657,6 +1662,7 @@ const contact: ContactRow = {
       sentAt: '2026-08-12T18:00:00.000Z',
       respondedAt: null,
       message: 'Sent the write-up she asked for at the meetup.',
+      draft: false,
     },
     {
       id: 't3',
@@ -1665,6 +1671,27 @@ const contact: ContactRow = {
       sentAt: '2026-03-04T19:30:00.000Z',
       respondedAt: '2026-03-04T19:30:00.000Z',
       message: 'Met at the London Systems meetup.',
+      draft: false,
+    },
+    {
+      /* A kept draft as long as an email gets, saved after the last send. */
+      id: 'd1',
+      channel: 'email',
+      direction: 'outbound',
+      sentAt: '2026-09-10T16:45:00.000Z',
+      respondedAt: null,
+      message:
+        "Subject: Following up on the platform role\n\nHi Aoife, thanks again for the chat at the meetup. I saw the platform group is hiring again after the reorg and wondered whether the senior role is still open, and whether a short call next week would be useful. I've attached the write-up on the migration we discussed.",
+      draft: true,
+    },
+    {
+      id: 'd2',
+      channel: 'linkedin_dm',
+      direction: 'outbound',
+      sentAt: '2026-09-11T08:20:00.000Z',
+      respondedAt: null,
+      message: 'Congratulations on the new role. Would you have ten minutes for a call?',
+      draft: true,
     },
   ],
 };
@@ -3498,6 +3525,33 @@ function CostHintRows() {
         <Button variant="secondary">Grade 12 readings</Button>
         <CostHint estimate={perReading} count={12} what="Cost of grading" align="end" defaultOpen />
       </div>
+    </div>
+  );
+}
+
+/* A button that hands work to a routine (plan #2459.1), one per routine, each
+ * with its $ open on the routine's name. Alternate rows hang the hint from the
+ * right edge, as a button at a row's end does. */
+function RoutineHintRows() {
+  return (
+    <div className="space-y-20 pb-20">
+      {ROUTINE_KEYS.map((routine, index) => {
+        const end = index % 2 === 1;
+        return (
+          <div key={routine} className={cn('flex items-center', end && 'justify-end')}>
+            <DashAction
+              routine={routine}
+              variant="secondary"
+              size="sm"
+              align={end ? 'end' : 'start'}
+              what={`Send to the ${ROUTINE_LABELS[routine]} routine`}
+              hintOpen
+            >
+              Send to Dash
+            </DashAction>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -5865,6 +5919,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'narrow',
     render: () => <ContactDetail contact={contact} timezone="Europe/London" />,
+  },
+  {
+    /* Dash's draft open above the log, with Save as draft beside Log as
+     * sent (plan #2457.3). */
+    id: 'jobs-contact-compose',
+    label: 'Contact · A message being written',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ContactDetail
+        contact={contact}
+        timezone="Europe/London"
+        preview={{
+          compose: {
+            by: 'dash',
+            message:
+              "Hi Aoife, I saw the platform group is hiring again after the reorg. Is the senior role still open? I'd value ten minutes next week if you have them.",
+          },
+        }}
+      />
+    ),
+  },
+  {
+    /* A draft's Mark sent and Delete held showing, as hover and focus show
+     * them on a laptop and a touch screen always does. */
+    id: 'jobs-contact-draft-hover',
+    label: 'Contact · A draft hovered',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => <ContactDetail contact={contact} timezone="Europe/London" preview={{ revealDraftId: 'd1' }} />,
+  },
+  {
+    /* Marking a draft sent failed: the draft stays, and says why under it. */
+    id: 'jobs-contact-draft-error',
+    label: 'Contact · A draft that would not mark sent',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ContactDetail
+        contact={contact}
+        timezone="Europe/London"
+        preview={{
+          revealDraftId: 'd1',
+          draftError: { id: 'd1', text: 'Not marked sent: the connection dropped. Try again.' },
+        }}
+      />
+    ),
+  },
+  {
+    /* The only draft just deleted, asked nothing: the list of drafts is
+     * gone and Undo is in the toast. */
+    id: 'jobs-contact-draft-undo',
+    label: 'Contact · A draft deleted, with undo',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ToastProvider>
+        <ToastOnShow text="Draft deleted" />
+        <ContactDetail
+          contact={{ ...contact, touches: contact.touches.filter((t) => !t.draft) }}
+          timezone="Europe/London"
+        />
+      </ToastProvider>
+    ),
   },
   {
     id: 'jobs-find',
@@ -8698,6 +8816,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-insights-reread',
+    label: 'You · Insights, full re-read hint open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ reread: true }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-evidence',
     label: 'You · Insights, evidence open',
     module: 'you',
@@ -9216,6 +9345,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CostHintRows />,
+  },
+  {
+    /* The same $ beside a button that hands work to a routine (plan #2459.1),
+     * once for each routine, open so the shot shows the name. In the app it
+     * opens on hover or focus as a peek and on a press as pinned, as the
+     * priced hint does. */
+    id: 'core-routine-hint',
+    label: 'Spend · The $ hint beside a routine button',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <RoutineHintRows />,
   },
   {
     /* The shared Tooltip on an icon button, a badge with a long tip and an

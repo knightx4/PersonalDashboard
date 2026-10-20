@@ -36,6 +36,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         .from('contact_touches')
         .select('contact_id, direction, sent_at, responded_at')
         .eq('user_id', user.id)
+        .eq('draft', false)
         .order('sent_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle(),
     ]);

@@ -9,6 +9,7 @@ import { statusLabel } from '@/lib/jobs/status-label';
 import type { DashChangeInput } from '@/lib/talk/changes';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult } from './registry';
+import { rowsOfSet } from './sets';
 
 /**
  * Dash moving many job roles at once (plan #1657, feature #1653): the
@@ -140,11 +141,19 @@ export async function moveRoles(ctx: DashWriteContext, args: Record<string, unkn
       `stage must be one of ${ROLE_STAGES.join(', ')}. Ghosted is worked out from silence and cannot be set, and deleting roles is done on the pipeline, not by Dash.`,
     );
   }
-  const roleRefs = refList(args.role_refs);
-  const applicationRefs = refList(args.application_refs);
+  let roleRefs = refList(args.role_refs);
+  let applicationRefs = refList(args.application_refs);
   if (!roleRefs || !applicationRefs) return refuse('role_refs and application_refs are lists of refs.');
+  // A lookup's set stands in for the refs (plan #2472.3): its rows join the
+  // list of their table, and go through the same checks below.
+  if (args.set !== undefined) {
+    const found = rowsOfSet(ctx.seen, args.set, [ROLES, APPLICATIONS]);
+    if (!found.ok) return refuse(found.error);
+    if (found.table === ROLES) roleRefs = [...new Set([...roleRefs, ...found.ids])];
+    else applicationRefs = [...new Set([...applicationRefs, ...found.ids])];
+  }
   if (roleRefs.length + applicationRefs.length === 0) {
-    return refuse('Name the roles by role_refs or application_refs.');
+    return refuse('Name the roles by a lookup\'s set, role_refs or application_refs.');
   }
   if (roleRefs.length + applicationRefs.length > BULK_MAX) {
     return refuse(`At most ${BULK_MAX} roles can be moved at once. Ask them to narrow it down.`);

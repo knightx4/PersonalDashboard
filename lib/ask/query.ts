@@ -1,5 +1,5 @@
 import type { Source } from '@/lib/sources/types';
-import { AskInputError, clip, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
+import { AskInputError, clip, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
 import { asText, fallbackHref, LISTABLE, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
 import { listableShapes, type TableColumn, type TableShape } from './table-info';
 
@@ -357,6 +357,9 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
     return query;
   };
   const what = describe(conditions);
+  // Every matched row's ref, for the set a write can name (plan #2472.1).
+  const refColumn = source.ref ?? 'id';
+  const allRefs: RefsPage = () => scoped(refColumn).order(refColumn).range(0, MATCHED_SET_CAP - 1);
 
   if (countOnly) {
     const { count, error } = await scoped(owner, { count: 'exact', head: true });
@@ -367,6 +370,7 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
       rows: [],
       totals: { matched, shown: 0 },
       note: `Counted ${what} in ${table}: ${matched} matched, listing none (count_only).`,
+      matchedSet: await setOf(table, refColumn, matched, null, allRefs),
     };
   }
 
@@ -382,12 +386,42 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
     );
   }
 
-  return listed(table, source, columns, input, what, (select, order, ascending, limit) =>
-    scoped(select, { count: 'exact' }).order(order, { ascending, nullsFirst: false }).range(0, limit - 1),
+  return listed(
+    table,
+    source,
+    columns,
+    input,
+    what,
+    (select, order, ascending, limit) =>
+      scoped(select, { count: 'exact' }).order(order, { ascending, nullsFirst: false }).range(0, limit - 1),
+    allRefs,
   );
 }
 
 type Page = PromiseLike<{ data: unknown; error: { message: string } | null; count?: number | null }>;
+/** The refs of the rows that match, up to MATCHED_SET_CAP. */
+type RefsPage = () => Page;
+
+/**
+ * Every row that matched, as the set runDash names: the refs already read
+ * when the listing holds them all, otherwise read once more, and none when
+ * more than MATCHED_SET_CAP matched, since a change could not take them.
+ */
+async function setOf(
+  table: string,
+  refColumn: string,
+  matched: number,
+  listed: string[] | null,
+  refs: RefsPage,
+): Promise<{ table: string; refs: string[]; matched: number }> {
+  if (matched === 0 || matched > MATCHED_SET_CAP) return { table, refs: [], matched };
+  if (listed && listed.length >= matched) return { table, refs: listed, matched };
+  const { data, error } = await refs();
+  if (error) throw new AskInputError(`${table} refused the query: ${error.message}`);
+  const read = ((data ?? []) as Record<string, unknown>[]).map((row) => String(row[refColumn] ?? ''));
+  // Rows added or removed between the count and this read: the read is the set.
+  return { table, refs: read, matched: read.length < MATCHED_SET_CAP ? read.length : matched };
+}
 
 /** The rows counted by the values of one column, most common first, read a page at a time. */
 async function groupedCount(
@@ -433,6 +467,7 @@ async function listed(
   input: Record<string, unknown>,
   what: string,
   page: (select: string, order: string, ascending: boolean, limit: number) => Page,
+  refs: RefsPage,
 ): Promise<AskToolResult> {
   const limit = limitOf(input);
   const refColumn = source.ref ?? 'id';
@@ -476,5 +511,12 @@ async function listed(
     `Read ${what} in ${table}, by ${order}: ${matchedNote(matched, rows.length)}.`,
     source.note ? `About this table: ${source.note}` : null,
   ].filter(Boolean);
-  return { ok: true, rows, totals: { matched, shown: rows.length }, note: notes.join(' ') };
+  const listedRefs = found.map((row) => String(row[refColumn] ?? row.id ?? ''));
+  return {
+    ok: true,
+    rows,
+    totals: { matched, shown: rows.length },
+    note: notes.join(' '),
+    matchedSet: await setOf(table, refColumn, matched, listedRefs, refs),
+  };
 }

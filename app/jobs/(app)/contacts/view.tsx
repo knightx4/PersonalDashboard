@@ -31,5 +31,7 @@ export interface ContactRow {
     sentAt: string;
     respondedAt: string | null;
     message: string | null;
+    /** Written and kept, not sent; `sentAt` is when it was saved. */
+    draft: boolean;
   }>;
 }
