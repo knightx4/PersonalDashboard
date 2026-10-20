@@ -75,7 +75,7 @@ export async function createContact(
 }
 
 const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
-const STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'] as const;
+const STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'] as const;
 
 const contactPatchSchema = z
   .object({
@@ -246,7 +246,7 @@ export async function logTouch(input: {
       .update({ status: 'contacted' })
       .eq('id', input.contactId)
       .eq('user_id', user.id)
-      .eq('status', 'to_contact');
+      .in('status', ['to_contact', 'connected']);
   }
 
   revalidatePath('/jobs/contacts');

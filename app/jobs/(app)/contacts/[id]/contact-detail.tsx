@@ -4,6 +4,7 @@ import { ExternalLink, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { DashAction } from '@/components/ui/dash-action';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ChipSelect, InlineInput, InlineTextarea, Switch, Textarea } from '@/components/ui/field';
@@ -24,7 +25,7 @@ import { RELATIONSHIPS, type ContactRow } from '../view';
 
 const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
 type Channel = (typeof CHANNELS)[number];
-const STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'] as const;
+const STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'] as const;
 const DRAFT_MESSAGE = 'app/jobs/(app)/contacts/actions.ts#draftContactMessage';
 
 const words = (value: string) => value.replace(/_/g, ' ');
@@ -214,14 +215,19 @@ function ContactDetails({
         <ValueRow
           label="LinkedIn"
           value={
-            <DetailInput
-              label="LinkedIn"
-              type="url"
-              value={contact.linkedinUrl}
-              placeholder="Add their LinkedIn page"
-              href={contact.linkedinUrl}
-              onSave={(linkedinUrl) => save({ linkedinUrl }, { linkedinUrl: linkedinUrl || null })}
-            />
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <DetailInput
+                  label="LinkedIn"
+                  type="url"
+                  value={contact.linkedinUrl}
+                  placeholder="Add their LinkedIn page"
+                  href={contact.linkedinUrl}
+                  onSave={(linkedinUrl) => save({ linkedinUrl }, { linkedinUrl: linkedinUrl || null })}
+                />
+              </div>
+              {contact.linkedinConnection && <Chip>Connected</Chip>}
+            </div>
           }
         />
         <ValueRow
@@ -382,7 +388,7 @@ function Outreach({
       if (!message) setFreshId(touch.id);
       setContact((current) => ({
         ...current,
-        status: current.status === 'to_contact' ? 'contacted' : current.status,
+        status: current.status === 'to_contact' || current.status === 'connected' ? 'contacted' : current.status,
         touches: [touch, ...current.touches],
       }));
       after?.();

@@ -264,7 +264,7 @@ People at companies, or people generally.
 | linkedin_url, email | text | |
 | relationship | enum | `cold`, `alum`, `second_degree`, `former_colleague`, `friend`, `recruiter`, `interviewer` |
 | how_we_connect | text | the specific tie, if any |
-| status | enum | `to_contact`, `contacted`, `responded`, `met`, `dormant` |
+| status | enum | `to_contact`, `connected` (a LinkedIn connection you have not written to), `contacted`, `responded`, `met`, `dormant` |
 | notes | text | |
 
 **Store the minimum about other people.** Name, title, public professional URL, work email. No personal phone numbers, no personal addresses, nothing scraped. This is other people's data sitting in your database, it has no product value beyond contacting them, and it is the part of this app most worth being careful with.

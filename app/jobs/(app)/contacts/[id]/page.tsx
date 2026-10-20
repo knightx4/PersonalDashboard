@@ -19,7 +19,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     supabase
       .from('contacts')
       .select(
-        'id, full_name, title, relationship, status, linkedin_url, email, how_we_connect, notes, potential_lead, found_by_dash, company_id, companies ( name, slug )',
+        'id, full_name, title, relationship, status, linkedin_url, email, how_we_connect, notes, potential_lead, found_by_dash, linkedin_connection, company_id, companies ( name, slug )',
       )
       .eq('id', id)
       .eq('user_id', user.id)
@@ -49,6 +49,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     notes: string | null;
     potential_lead: boolean;
     found_by_dash: boolean;
+    linkedin_connection: boolean;
     company_id: string | null;
     companies: { name: string; slug: string } | null;
   };
@@ -85,6 +86,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           notes: row.notes,
           potentialLead: row.potential_lead ?? false,
           foundByDash: row.found_by_dash ?? false,
+          linkedinConnection: row.linkedin_connection ?? false,
           companyName: row.companies?.name ?? null,
           companySlug: row.companies?.slug ?? null,
           touches: (touches ?? []).map((touch) => ({

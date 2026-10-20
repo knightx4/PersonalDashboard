@@ -249,4 +249,31 @@ describe('importing connections, invitations and messages', () => {
     expect(store.rows(TOUCHES).filter((t) => t.channel === 'linkedin_connect')).toEqual([]);
     expect(kind(plan, 'invitations').records.filter((r) => r.reason === NO_NOTE)).toHaveLength(1);
   });
+
+  it('starts each added contact where the history puts it, and never moves it again', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'met' }],
+    });
+    const input = archive();
+    await run(store, input);
+    const jordan = store.rows(CONTACTS).find((c) => c.full_name === 'Jordan Lee')!;
+    // Jordan and Sam traded messages; Renée was already a contact and keeps hers.
+    expect(jordan.status).toBe('responded');
+    expect(store.rows(CONTACTS).find((c) => c.id === 'k3')!.status).toBe('met');
+
+    jordan.status = 'dormant';
+    const again = await run(store, input);
+    expect(kind(again, 'connections').counts.added).toBe(0);
+    expect(store.rows(CONTACTS).find((c) => c.full_name === 'Jordan Lee')!.status).toBe('dormant');
+  });
+
+  it('starts a connection you never wrote to as connected, not to contact', async () => {
+    const store = seeded();
+    const input = archive();
+    input.messages = [];
+    input.invitations = [];
+    await run(store, input);
+    expect(store.rows(CONTACTS).map((c) => c.status)).toEqual(['connected', 'connected']);
+  });
 });
+

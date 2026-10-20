@@ -37,8 +37,15 @@ export type MappedRecord =
        * no match it is skipped, for this reason, rather than added.
        */
       joinOnly?: string;
+      /**
+       * Values written only when the record adds a new row, such as where a
+       * contact starts. They are not hashed or compared, so the person can
+       * change them and a later run never touches them, and a joined row
+       * keeps its own.
+       */
+      onInsert?: IntendedValues;
     }
-  | { key: string; skip: string; values?: undefined; joinOnly?: undefined };
+  | { key: string; skip: string; values?: undefined; joinOnly?: undefined; onInsert?: undefined };
 
 /** A record with no key yet, offered to a mapper's `match`. */
 export interface PendingRecord {

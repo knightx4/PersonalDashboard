@@ -33,7 +33,7 @@ import type { ImportMapper, ImportStore, MappedRecord, MatchSkip, PendingRecord 
 
 const CONTACTS = 'job_search.contacts';
 const TOUCHES = 'job_search.contact_touches';
-const CONTACT_STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'];
+const CONTACT_STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'];
 
 export const ONE_WAY =
   'A one-way message, mostly recruiter or sales InMail: you never wrote in the conversation and they are not a connection.';
@@ -122,6 +122,29 @@ export function conversations(archive: LinkedInArchive, self: string | null): Co
   });
 }
 
+/**
+ * Where a contact the import adds starts, from the export's history with them:
+ * responded when you wrote and they wrote too, contacted when only you wrote
+ * (a message, or a connection request with a note), and connected otherwise.
+ * Never To contact: a connection is someone you know, not someone queued.
+ */
+export function startingStatuses(archive: LinkedInArchive): Map<string, 'responded' | 'contacted'> {
+  const self = ownSlug(archive);
+  const wrote = new Set<string>();
+  const heard = new Set<string>();
+  for (const inv of archive.invitations) {
+    if (inv.direction === 'OUTGOING' && inv.inviteeProfileSlug && str(inv.message)) wrote.add(inv.inviteeProfileSlug);
+  }
+  for (const conv of conversations(archive, self)) {
+    if (!conv.other || conv.others > 1) continue;
+    if (conv.wrote) wrote.add(conv.other);
+    if (conv.messages.some((m) => m.senderProfileSlug === conv.other)) heard.add(conv.other);
+  }
+  const out = new Map<string, 'responded' | 'contacted'>();
+  for (const slug of wrote) out.set(slug, heard.has(slug) ? 'responded' : 'contacted');
+  return out;
+}
+
 /** Every contact the person has, for matching. */
 async function everyContact(store: ImportStore): Promise<Record<string, unknown>[]> {
   return store.rowsWhere(CONTACTS, ['full_name', 'linkedin_url', 'email', 'company_id'], 'status', CONTACT_STATUSES);
@@ -152,6 +175,7 @@ export const linkedInConnections: ImportMapper<LinkedInArchive> = {
       const note = str(inv.message);
       invitedBy.set(inv.inviterProfileSlug, note ? `They invited you to connect on LinkedIn: "${note}"` : 'They invited you to connect on LinkedIn.');
     }
+    const started = startingStatuses(archive);
     return archive.connections.map((c): MappedRecord => {
       const name = fullName(c);
       if (!name) return { key: c.key, skip: 'It has no name.' };
@@ -167,6 +191,7 @@ export const linkedInConnections: ImportMapper<LinkedInArchive> = {
           how_we_connect: (c.profileSlug && invitedBy.get(c.profileSlug)) ?? null,
           linkedin_connection: true,
         },
+        onInsert: { status: (c.profileSlug && started.get(c.profileSlug)) ?? 'connected' },
       };
     });
   },
@@ -220,6 +245,7 @@ export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
   columns: { full_name: 'text', linkedin_url: 'text' },
   records(archive) {
     const connected = new Set(archive.connections.map((c) => c.profileSlug).filter(Boolean));
+    const started = startingStatuses(archive);
     const out: MappedRecord[] = [];
     const seen = new Set<string>();
     for (const conv of conversations(archive, ownSlug(archive))) {
@@ -227,7 +253,11 @@ export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
       seen.add(conv.other);
       out.push(
         conv.name
-          ? { key: conv.other, values: { full_name: conv.name, linkedin_url: conv.url } }
+          ? {
+              key: conv.other,
+              values: { full_name: conv.name, linkedin_url: conv.url },
+              onInsert: { status: started.get(conv.other) ?? 'contacted' },
+            }
           : { key: conv.other, skip: 'The conversation does not give their name.' },
       );
     }
