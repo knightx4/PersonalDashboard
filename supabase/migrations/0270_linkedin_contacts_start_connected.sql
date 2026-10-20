@@ -1,4 +1,6 @@
 -- Move the contacts the LinkedIn import added off To contact (plan #2432.5).
+-- It needs job_search 0064 (the Connected status) and core 0262 (the import
+-- keys), so it lives here, after both.
 --
 -- The import now starts each contact it adds where the export's history puts
 -- it. This does the same for the ones the first run added, from the touches
