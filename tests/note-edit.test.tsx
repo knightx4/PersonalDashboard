@@ -36,7 +36,7 @@ describe('the note at rest', () => {
     expect(html).toContain('<p>rendered note</p>');
     expect(html).toContain('<dl>props</dl>');
     expect(html).toMatch(/<button[^>]*>.*Edit<\/button>/);
-    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('name="text"');
   });
 });
 
@@ -52,7 +52,8 @@ describe('the editor', () => {
   );
 
   it('holds the note body and posts the fields the save action reads', () => {
-    expect(html).toMatch(/<textarea[^>]*name="text"[^>]*>The close took six hours\.<\/textarea>/);
+    // The live-preview editor draws in the browser; the text it holds is posted from this field.
+    expect(html).toContain('name="text" value="The close took six hours."');
     expect(html).toContain('name="notePath" value="Work/Close.md"');
     expect(html).toContain('name="blobSha" value="abc"');
   });

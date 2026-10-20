@@ -6,8 +6,8 @@ describe('statusLabel', () => {
     expect(statusLabel('withdrawn', true)).toBe('Withdrawn');
   });
 
-  it('reads "Turned down" for a lead or draft withdrawn before ever applying', () => {
-    expect(statusLabel('withdrawn', false)).toBe('Turned down');
+  it('reads "Dropped" for a lead or draft withdrawn before ever applying', () => {
+    expect(statusLabel('withdrawn', false)).toBe('Dropped');
   });
 
   it('defaults to "Withdrawn" when submission status is not given', () => {

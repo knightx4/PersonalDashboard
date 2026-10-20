@@ -4489,7 +4489,7 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The page as it opens: the targets, then the rail beside the table. */
+    /* The page as it opens: the rail beside the search, the targets and the table. */
     id: 'jobs-companies-focus',
     label: 'Companies · Focused',
     module: 'jobs',
