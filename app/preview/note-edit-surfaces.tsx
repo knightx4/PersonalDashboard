@@ -15,6 +15,7 @@ export function NoteEditingPreview({ body }: { body: string }) {
         notePath="Work/Nightly close.md"
         body={body}
         blobSha="preview"
+        linkPaths={['Work/Nightly close.md']}
         onDone={nothing}
         onReload={nothing}
       />

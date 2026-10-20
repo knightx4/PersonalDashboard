@@ -6281,7 +6281,11 @@ export const SURFACES: readonly Surface[] = [
     label: 'Note · Editing, and a refused save',
     module: 'vault',
     width: 'narrow',
-    render: () => <NoteEditingPreview body={noteMarkdown} />,
+    render: () => (
+      <NoteEditingPreview
+        body={`Written after the [[Nightly close]] went from six hours to forty minutes. See [[Postgres vacuum|vacuum notes]] and [[Not a note yet]].\n\n${noteMarkdown}`}
+      />
+    ),
   },
   {
     /* Renaming a note (note 69c302f1): the file's name in a box where the

@@ -171,13 +171,14 @@ export default async function NotePage({
             )}
           </div>
 
-          {/* Edit swaps the rendered body for a text box in the same place
-              (#1425); the title and properties stay, since a save keeps the
-              frontmatter it opened with. */}
+          {/* Edit swaps the rendered body for a live-preview editor in the same
+              place (#1425), which saves as you write; the title and properties
+              stay, since a save keeps the frontmatter it opened with. */}
           <NoteEdit
             notePath={note.path}
             body={note.body}
             blobSha={note.blobSha}
+            linkPaths={targets.map((target) => target.path)}
             heading={
               <header>
                 <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
