@@ -5,6 +5,7 @@ import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
 import { MANY_ROW_KINDS, readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
+import { undoAddedTodos } from '@/lib/dash/todo-writes';
 import { undoShoppingChange } from '@/lib/dash/shopping-writes';
 import { JOBS_ROWS_KINDS } from './jobs-changes';
 import { isShoppingChangeKind } from './shopping-changes';
@@ -1053,6 +1054,8 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: ChangeSu
   if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
   if (isShoppingChangeKind(change.kind)) return undoMany(deps, change, surface, undoShoppingChange);
   if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
+  // A todo for each row of a set: the ones still untouched come out (plan #2472.4).
+  if (change.kind === 'add_todos') return undoMany(deps, change, surface, undoAddedTodos);
   // A startup added from Find takes its company out again while nothing holds it (plan #1894.6.7).
   if (change.kind === 'add_discovered_company') return undoMany(deps, change, surface, undoDiscoveredCompany);
   // So does a company added from scratch.
