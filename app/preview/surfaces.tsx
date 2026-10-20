@@ -7788,6 +7788,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet
+     * and Opus, each with a line on speed and cost, Sonnet ticked. */
+    id: 'ask-dash-new-models',
+    label: 'Ask Dash · Choosing the model',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="open">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* A pick the save refused: the old model back on the chip and a short
+     * line beside it saying so. */
+    id: 'ask-dash-new-model-failed',
+    label: 'Ask Dash · A model choice not saved',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="failed">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* The same list open on the Dash page, in an open chat's docked box. */
+    id: 'ask-page-models',
+    label: 'Dash · Choosing the model in a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} modelStart="open" />,
+  },
+  {
     /* The list searched for "Catan" (plan #1899.6): two chats found by what
      * was said in them, one only in Dash's answer, each with the words
      * around it. On a phone the list is the page. */

@@ -47,7 +47,6 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
-import type { DashChoiceId } from '@/lib/core/models';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
   type OpenedAsk,
@@ -64,6 +63,9 @@ import {
   undoDashChange,
 } from '@/app/ask/actions';
 import { Tooltip } from '@/components/ui/tooltip';
+import { ModelChip, modelLabel } from '@/components/talk/model-chip';
+import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
+import type { DashChoiceId } from '@/lib/core/models';
 
 /**
  * Ask Dash, from any page (plan #1090).
@@ -122,6 +124,13 @@ export type AskSource = ChangePresses & {
   save: typeof saveDashAnswer;
   /** A thumbs up or down on an answer, or null to take it back (plan #2285.2). */
   rate: typeof rateDashAnswer;
+  /**
+   * Save the model Dash answers with (plan #2458.3). The gallery's fixtures
+   * leave it out, and a pick there is kept on the page alone.
+   */
+  setModel?: (model: DashChoiceId) => Promise<SetDashModelResult>;
+  /** Read the saved model again, after Dash changed it in an answer (plan #2458.4). */
+  getModel?: () => Promise<DashChoiceId>;
 };
 
 /**
@@ -222,6 +231,8 @@ const ACTIONS: AskSource = {
   label: askDashPageLabel,
   save: saveDashAnswer,
   rate: rateDashAnswer,
+  setModel: setDashModel,
+  getModel: getDashModel,
   confirm: confirmDashChange,
   decline: declineDashChange,
   reopen: reopenDashChange,
@@ -243,8 +254,20 @@ type AskDashHandle = {
   searchHits?: readonly SearchHit[];
   /** For the gallery: the words the sheet's box opens with, unsent (plan #1899.8). */
   draft?: string;
-  /** The model the account's questions are answered with (plan #2458.2); absent, Sonnet. */
+  /**
+   * The model the next question is answered with (plan #2458.3), held here so
+   * a pick in the popup shows on the Dash page and the reverse, and each box
+   * prices its answers for it (plan #2458.2). The shell seeds it from
+   * core.account_settings.dash_model; absent, Sonnet.
+   */
   model?: DashChoiceId;
+  /** Read the saved model again: called when an answer says Dash changed it. */
+  refreshModel?: () => void;
+  /** Pick a model: shown at once, saved, and put back with `modelFailed` said if the save fails. */
+  chooseModel?: (model: DashChoiceId) => void;
+  modelFailed?: string | null;
+  /** For the gallery: the model list drawn open. */
+  modelOpen?: boolean;
 };
 
 const AskDashContext = createContext<AskDashHandle | null>(null);
@@ -267,7 +290,10 @@ type Session = { key: number; ask?: string; rows?: AskRows };
  * can wrap the whole shell in one fed with fixtures and the shell's own
  * provider leaves the job to it.
  */
-type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft' | 'model'>;
+type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft' | 'model'> & {
+  /** For the gallery: the box drawn with the model list open, or after a pick that could not be saved. */
+  modelStart?: 'open' | 'failed';
+};
 
 export function AskDashProvider({
   source,
@@ -297,13 +323,58 @@ function AskDashRoot({
   workspaces,
   searchHits,
   draft,
-  model,
+  model: initialModel,
+  modelStart,
 }: AskDashBox & {
   source: AskSource;
   page?: string;
   children: React.ReactNode;
 }) {
   const [session, setSession] = useState<Session | null>(null);
+  // Seeded by the shell, kept here once the person picks: a later render of
+  // the shell with the old value does not undo a pick.
+  const [model, setModel] = useState<DashChoiceId>(initialModel ?? (DASH_MODELS.ask as DashChoiceId));
+  const [modelFailed, setModelFailed] = useState<string | null>(() =>
+    modelStart === 'failed' ? `Not saved. Still ${modelLabel(initialModel ?? (DASH_MODELS.ask as DashChoiceId))}.` : null,
+  );
+  const saving = useRef(0);
+  // Dash switched the model in an answer: read what was saved, unless a pick
+  // made meanwhile has taken over.
+  const refreshModel = useCallback(() => {
+    if (!source.getModel) return;
+    const turn = saving.current;
+    void source
+      .getModel()
+      .then((saved) => {
+        if (turn === saving.current) setModel(saved);
+      })
+      .catch(() => undefined);
+  }, [source]);
+  const chooseModel = useCallback(
+    (next: DashChoiceId) => {
+      const before = model;
+      const turn = ++saving.current;
+      setModel(next);
+      setModelFailed(null);
+      if (!source.setModel) return;
+      void source
+        .setModel(next)
+        .catch((): SetDashModelResult => ({ ok: false, error: 'Could not save that choice.' }))
+        .then((result) => {
+          // A later pick has taken over; its own save decides what shows.
+          if (result.ok || turn !== saving.current) return;
+          setModel(before);
+          setModelFailed(`Not saved. Still ${modelLabel(before)}.`);
+        });
+    },
+    [model, source],
+  );
+  // The failure line goes after a while, as a toast would.
+  useEffect(() => {
+    if (!modelFailed || modelStart === 'failed') return;
+    const timer = setTimeout(() => setModelFailed(null), 6000);
+    return () => clearTimeout(timer);
+  }, [modelFailed, modelStart]);
   const opened = useRef(0);
   const open = useCallback((question?: string, rows?: AskRows) => {
     opened.current += 1;
@@ -312,8 +383,20 @@ function AskDashRoot({
   }, []);
   const close = useCallback(() => setSession(null), []);
   const handle = useMemo<AskDashHandle>(
-    () => ({ open, source, account, workspaces, searchHits, draft, model }),
-    [open, source, account, workspaces, searchHits, draft, model],
+    () => ({
+      open,
+      source,
+      account,
+      workspaces,
+      searchHits,
+      draft,
+      model,
+      chooseModel,
+      refreshModel,
+      modelFailed,
+      modelOpen: modelStart === 'open',
+    }),
+    [open, source, account, workspaces, searchHits, draft, model, chooseModel, refreshModel, modelFailed, modelStart],
   );
 
   // A link in an answer goes somewhere else in the app, and the sheet should
@@ -469,6 +552,7 @@ export function AskThread({
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
   const model = handle?.model ?? (DASH_MODELS.ask as DashChoiceId);
+  const refreshModel = handle?.refreshModel;
   const cost = useMemo(() => askCost(model), [model]);
   // The question on its way, which Stop ends (plan #1899.5).
   const running = useRef<AbortController | null>(null);
@@ -496,7 +580,11 @@ export function AskThread({
       setRef(next);
       onConversation?.(next);
     },
-    (added) => setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
+    (added) => {
+      setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]);
+      // Dash switched the model when asked (plan #2458.4): the chip reads it again.
+      if (added.some((c) => c.kind === 'set_dash_model' && c.status === 'done')) refreshModel?.();
+    },
     (count) => setOpen((current) => current + count),
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
@@ -504,8 +592,12 @@ export function AskThread({
     () => ({ ...box.take(), signal: running.current?.signal }),
   );
   const onChanged = useCallback(
-    (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
-    [],
+    (next: DashChange) => {
+      setChanges((current) => current.map((c) => (c.id === next.id ? next : c)));
+      // Undoing Dash's switch of the model puts the old one back on the chip.
+      if (next.kind === 'set_dash_model') refreshModel?.();
+    },
+    [refreshModel],
   );
   const [today] = useState(localToday);
 
@@ -547,6 +639,34 @@ export function AskThread({
       }}
       onStop={() => running.current?.abort()}
       {...box.thread}
+      // A model pick that could not be saved: said in the box, above the words,
+      // where the foot has no room for it (plan #2458.3).
+      attached={
+        handle?.modelFailed ? (
+          <>
+            {box.thread.attached}
+            <p role="status" className="pb-1 text-small text-danger">
+              {handle.modelFailed}
+            </p>
+          </>
+        ) : (
+          box.thread.attached
+        )
+      }
+      boxStart={
+        handle?.model && handle.chooseModel ? (
+          <>
+            {box.thread.boxStart}
+            <ModelChip
+              model={handle.model}
+              onModel={handle.chooseModel}
+              initialOpen={handle.modelOpen}
+            />
+          </>
+        ) : (
+          box.thread.boxStart
+        )
+      }
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}
