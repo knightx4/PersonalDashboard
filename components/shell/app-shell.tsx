@@ -23,6 +23,7 @@ import { SearchMark } from '@/components/ui/search-mark';
 import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
+import type { DashChoiceId } from '@/lib/core/models';
 import { KeyHintsProvider } from '@/components/shell/key-hints';
 import { Kbd } from '@/components/ui/kbd';
 import { IconButton } from '@/components/ui/icon-button';
@@ -105,6 +106,7 @@ export function AppShell({
   brief,
   activity = [],
   mainCheck = null,
+  dashModel,
   pathname: pathnameOverride,
   children,
 }: {
@@ -141,6 +143,8 @@ export function AppShell({
    * own rather than a reason to draw nothing.
    */
   mainCheck?: MainCheck | null;
+  /** The model Ask Dash answers this account with (plan #2458.2); absent, Sonnet. */
+  dashModel?: DashChoiceId;
   /**
    * The path to light in the column, in place of the browser's. Only the
    * preview gallery passes it: a page photographed there is served from
@@ -638,7 +642,7 @@ export function AppShell({
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
-      <AskDashProvider account={account} workspaces={workspaces}>
+      <AskDashProvider account={account} workspaces={workspaces} model={dashModel}>
         <div
           className={cn(
             // The ground, not a container: the sidebar and the page pane are both

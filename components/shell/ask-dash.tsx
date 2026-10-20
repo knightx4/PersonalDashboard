@@ -47,6 +47,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
+import type { DashChoiceId } from '@/lib/core/models';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
   type OpenedAsk,
@@ -242,6 +243,8 @@ type AskDashHandle = {
   searchHits?: readonly SearchHit[];
   /** For the gallery: the words the sheet's box opens with, unsent (plan #1899.8). */
   draft?: string;
+  /** The model the account's questions are answered with (plan #2458.2); absent, Sonnet. */
+  model?: DashChoiceId;
 };
 
 const AskDashContext = createContext<AskDashHandle | null>(null);
@@ -264,7 +267,7 @@ type Session = { key: number; ask?: string; rows?: AskRows };
  * can wrap the whole shell in one fed with fixtures and the shell's own
  * provider leaves the job to it.
  */
-type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft'>;
+type AskDashBox = Pick<AskDashHandle, 'account' | 'workspaces' | 'searchHits' | 'draft' | 'model'>;
 
 export function AskDashProvider({
   source,
@@ -294,6 +297,7 @@ function AskDashRoot({
   workspaces,
   searchHits,
   draft,
+  model,
 }: AskDashBox & {
   source: AskSource;
   page?: string;
@@ -308,8 +312,8 @@ function AskDashRoot({
   }, []);
   const close = useCallback(() => setSession(null), []);
   const handle = useMemo<AskDashHandle>(
-    () => ({ open, source, account, workspaces, searchHits, draft }),
-    [open, source, account, workspaces, searchHits, draft],
+    () => ({ open, source, account, workspaces, searchHits, draft, model }),
+    [open, source, account, workspaces, searchHits, draft, model],
   );
 
   // A link in an answer goes somewhere else in the app, and the sheet should
@@ -464,6 +468,8 @@ export function AskThread({
 }) {
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
+  const model = handle?.model ?? (DASH_MODELS.ask as DashChoiceId);
+  const cost = useMemo(() => askCost(model), [model]);
   // The question on its way, which Stop ends (plan #1899.5).
   const running = useRef<AbortController | null>(null);
   // @ rows, / commands and the scope chip in the box (plan #1899.5).
@@ -517,7 +523,7 @@ export function AskThread({
       id={id}
       turns={turns}
       withFiles
-      cost={ASK_COST}
+      cost={cost}
       // Heard as the question is sent, outside the transition that waits for
       // the answer, so what it changes (the sheet's opening message going)
       // happens with the press rather than when the answer lands (plan #1899.8).
@@ -623,13 +629,16 @@ function useHandoffReplies(
 
 /**
  * What each answer costs, priced by the thread beside the button that opens
- * the box and beside its send arrow, with reading any files added on top.
+ * the box and beside its send arrow, with reading any files added on top,
+ * priced for the model the person chose (plan #2458.2).
  */
-const ASK_COST: ThreadCost = {
-  action: ACTION,
-  what: 'Cost of each answer from Dash',
-  plus: (files: readonly UploadedAttachment[]) => filesEstimate(files, DASH_MODELS.ask),
-};
+function askCost(model: DashChoiceId): ThreadCost {
+  return {
+    action: ACTION,
+    what: 'Cost of each answer from Dash',
+    plus: (files: readonly UploadedAttachment[]) => filesEstimate(files, model),
+  };
+}
 
 /** What Dash says while it looks: long enough that the wait needs a reason. */
 export const ASK_WAITING = 'Dash is looking it up. A question that needs several lookups can take up to a minute.';
