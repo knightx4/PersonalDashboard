@@ -5,7 +5,7 @@ import { createServiceSupabase as createJobsServiceSupabase } from '@/inngest/jo
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { catalogueSql } from '@/lib/learn/catalogue/connection';
-import { areaProblem, type Territory } from '@/lib/learn/levels/territory';
+import { areaProblem, areaTerritory, type Territory } from '@/lib/learn/levels/territory';
 import { loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { TERRITORIES } from '@/lib/learn/levels/territories';
 import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
@@ -31,7 +31,9 @@ function catalogueOrNone() {
  * Drafts a territory from its sources (plan #2172.6), for the owner, the
  * account the dev tooling runs as. `?territory=saas-metrics` drafts the
  * hand-written fixture, and `&area=<area>` drafts only that area's topics not
- * yet drafted (plan #2483.1); `?subject=<id>` drafts the territory that subject's
+ * yet drafted (plan #2483.1), or, for an area listed as a territory of its
+ * own, that territory (`?territory=business&area=saas` drafts saas-metrics,
+ * plan #2483.3); `?subject=<id>` drafts the territory that subject's
  * preparation compiled from its stored documents (plan #2276.4). Call it until
  * `remaining` is zero; each call picks up the topics not yet drafted. Every
  * topic lands as a draft with its five checks, for the person to approve on
@@ -53,8 +55,15 @@ async function tick(request: NextRequest) {
   const key = request.nextUrl.searchParams.get('territory') ?? '';
   const subject = subjectParam === null ? null : subjectSchema.safeParse(subjectParam);
   if (subject && !subject.success) return NextResponse.json({ error: 'subject must be an id' }, { status: 400 });
-  const area = request.nextUrl.searchParams.get('area') || undefined;
-  const fixture = Object.hasOwn(TERRITORIES, key) ? TERRITORIES[key] : undefined;
+  let area = request.nextUrl.searchParams.get('area') || undefined;
+  let fixture = Object.hasOwn(TERRITORIES, key) ? TERRITORIES[key] : undefined;
+  // An area that is a territory of its own, such as the business pack's
+  // saas area, drafts that territory whole (plan #2483.3).
+  const linked = fixture && area !== undefined ? areaTerritory(fixture, area) : null;
+  if (linked) {
+    fixture = Object.hasOwn(TERRITORIES, linked) ? TERRITORIES[linked] : undefined;
+    area = undefined;
+  }
   if (!subject && !fixture) return NextResponse.json({ error: `no territory "${key}"` }, { status: 404 });
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY is not set' }, { status: 500 });
