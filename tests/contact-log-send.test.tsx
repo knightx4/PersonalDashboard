@@ -21,6 +21,7 @@ const contact = {
   notes: null,
   potentialLead: false,
   foundByDash: false,
+  linkedinConnection: false,
   companyName: null,
   companySlug: null,
   touches: [

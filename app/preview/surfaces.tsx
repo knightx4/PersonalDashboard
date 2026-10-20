@@ -1638,6 +1638,7 @@ const contact: ContactRow = {
   notes: 'Owns the platform group. Prefers a short note to a long one.',
   potentialLead: true,
   foundByDash: false,
+  linkedinConnection: true,
   companyName: 'Kestrel Bank',
   companySlug: 'kestrel-bank',
   touches: [
