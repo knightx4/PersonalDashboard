@@ -10,6 +10,7 @@ import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
 import { whenDate, whenWeekday } from '@/lib/core/when';
+import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -339,8 +340,7 @@ export type DashLookupEvent =
   | { phase: 'started'; id: string; index: number; name: string; input: unknown }
   | { phase: 'finished'; id: string; index: number; name: string; input: unknown; ok: boolean; result: unknown };
 
-/** Whether Dash has seen a row: a lookup returned it, or for some calls, the page shows it. */
-export type DashSeen = (table: string, ref: string) => boolean;
+export type { DashSeen } from './sets';
 
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type DashExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
@@ -823,18 +823,48 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // answers in this conversation cited, which tools returned then.
   const known = new Map<string, TalkCitation>();
   for (const turn of input.turns) for (const c of turn.citations ?? []) known.set(citationKey(c), c);
-  const seenByLookup: DashSeen = (table, ref) => known.has(citationKey({ table, ref }));
+  // The rows each query_rows lookup matched, kept for this answer under the
+  // name the model is told (plan #2472.1), and every row they hold, which
+  // counts as seen though most were never listed.
+  const sets = new Map<string, RowSet>();
+  const inSets = new Set<string>();
+  const seenByLookup: DashSeen = Object.assign(
+    (table: string, ref: string) => known.has(citationKey({ table, ref })) || inSets.has(citationKey({ table, ref })),
+    { sets },
+  );
+  /** Names the set a lookup matched, and tells the model its name; any other result is returned as it is. */
+  const named = (result: AskToolResult): AskToolResult => {
+    if (!result.ok || !result.matchedSet) return result;
+    const { table, refs, matched } = result.matchedSet;
+    const name = setName(sets.size + 1);
+    sets.set(name, { name, table, refs, size: matched });
+    for (const ref of refs) inSets.add(citationKey({ table, ref }));
+    const said =
+      matched === 0
+        ? `This lookup is kept as ${name}, which is empty.`
+        : refs.length >= matched
+          ? `All ${matched} matched rows, listed or not, are kept as ${name}: a change that takes a set can name it instead of listing them.`
+          : `The ${matched} matched rows are kept as ${name}, but a change takes at most ${SET_CAP}, so narrow the lookup before changing them.`;
+    return {
+      ...result,
+      totals: { ...(result.totals ?? {}), set: name },
+      note: result.note ? `${result.note} ${said}` : said,
+    };
+  };
   // A hand-off or a write may also name the row the page shows, or the row
   // the thread hangs from (plan #1465).
   const row = context.page?.row;
   const subject = context.subject ? parseRef(context.subject.ref) : null;
   const sent = context.page?.list;
   const sentRefs = new Set(sent ? sent.rows.map((r) => r.ref) : []);
-  const seenOrShown: DashSeen = (table, ref) =>
-    seenByLookup(table, ref) ||
-    (sent?.table === table && sentRefs.has(ref)) ||
-    (row?.table === table && row.ref === ref) ||
-    (subject?.table === table && subject.id === ref);
+  const seenOrShown: DashSeen = Object.assign(
+    (table: string, ref: string) =>
+      seenByLookup(table, ref) ||
+      (sent?.table === table && sentRefs.has(ref)) ||
+      (row?.table === table && row.ref === ref) ||
+      (subject?.table === table && subject.id === ref),
+    { sets },
+  );
 
   const now = input.now ?? Date.now;
   const started = now();
@@ -1133,7 +1163,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       }),
     );
     const blocks: Anthropic.ToolResultBlockParam[] = uses.map((use, i) => {
-      const result = results[i];
+      const result = named(results[i]);
       const kept = keptResult(result);
       toolCalls.push({ name: use.name, input: use.input, result: kept });
       hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
