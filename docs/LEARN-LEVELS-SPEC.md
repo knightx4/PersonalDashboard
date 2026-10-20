@@ -464,7 +464,9 @@ drafting call takes. Without `&area`, a call drafts the first area that has
 topics left (plan #2483.2). The business pack is the `business` territory,
 with corporate finance, accounting, banking, strategy and operations as its
 areas; its SaaS area is the `saas-metrics` territory, kept under its own key
-with its own sources, since part of it is already drafted.
+with its own sources, since part of it is already drafted. The pack lists it
+in `areaTerritories`, so `?territory=business&area=saas` drafts that
+territory (plan #2483.3).
 
 A territory also reads the structure store of syllabi, calendars and tables
 of contents (plan #2247.10). Its goal and performances are embedded as

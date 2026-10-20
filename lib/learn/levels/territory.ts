@@ -62,6 +62,13 @@ export type Territory = {
    * its area in `area`. A territory with no areas drafts as one.
    */
   areas?: string[];
+  /**
+   * Areas of the pack that are territories of their own, by area name and
+   * that territory's key, such as the business pack's `saas` area, which is
+   * the `saas-metrics` territory (plan #2483.3). Such an area holds no topics
+   * here and is not in `areas`; `&area=<name>` drafts the other territory.
+   */
+  areaTerritories?: Readonly<Record<string, string>>;
   /** Phrases naming roles in job_search whose requirement lines join the sources. */
   roles: string[];
   texts: TerritoryText[];
@@ -116,6 +123,12 @@ export function areaProblem(territory: Territory, area: string): string | null {
   if (!territory.areas || territory.areas.length === 0) return `territory "${territory.key}" has no areas`;
   if (!territory.areas.includes(area)) return `no area "${area}" in "${territory.key}"; areas are ${territory.areas.join(', ')}`;
   return null;
+}
+
+/** The key of the territory an area is drafted as, when the pack lists it as a territory of its own (plan #2483.3). */
+export function areaTerritory(territory: Territory, area: string): string | null {
+  const linked = territory.areaTerritories ?? {};
+  return Object.hasOwn(linked, area) ? linked[area] : null;
 }
 
 /** Topics that name an area the territory does not declare, or none when it declares areas. */

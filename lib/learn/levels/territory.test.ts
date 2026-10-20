@@ -4,6 +4,7 @@ import { TERRITORIES } from '@/lib/learn/levels/territories';
 import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
 import {
   areaProblem,
+  areaTerritory,
   offAreaFrom,
   strayAreas,
   strayTextAreas,
@@ -109,6 +110,23 @@ describe('the business territory (plan #2483.2)', () => {
     expect(area('accounting').length).toBeGreaterThanOrEqual(60);
     expect(BUSINESS.topics.every((t) => t.target >= 3 && t.target <= 6)).toBe(true);
     expect(new Set(BUSINESS.topics.map((t) => t.ask.trim().toLowerCase())).size).toBe(BUSINESS.topics.length);
+  });
+
+  it('has about 150 banking, strategy and operations topics (plan #2483.3)', () => {
+    const written = [...area('banking'), ...area('strategy'), ...area('operations')];
+    expect(written.length).toBeGreaterThanOrEqual(140);
+    expect(written.length).toBeLessThanOrEqual(170);
+    for (const name of ['banking', 'strategy', 'operations']) expect(area(name).length).toBeGreaterThanOrEqual(45);
+  });
+
+  it('lists the SaaS metrics territory as its SaaS area, outside its own areas (plan #2483.3)', () => {
+    expect(areaTerritory(BUSINESS, 'saas')).toBe(SAAS_METRICS.key);
+    expect(areaTerritory(BUSINESS, 'banking')).toBeNull();
+    expect(areaTerritory(SAAS_METRICS, 'saas')).toBeNull();
+    for (const [name, key] of Object.entries(BUSINESS.areaTerritories ?? {})) {
+      expect(TERRITORIES[key]).toBeDefined();
+      expect(BUSINESS.areas).not.toContain(name);
+    }
   });
 
   it('shares no ask with the SaaS metrics territory', () => {
