@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ComposeBody, ComposeBox, FieldError, InlineInput } from '@/components/ui/field';
+import { ComposeBox, FieldError, InlineInput } from '@/components/ui/field';
+import { MarkdownEditor } from '@/components/learn/markdown-editor';
 import { basenameOf, noteHref } from '@/lib/vault/paths';
 import { renameNoteAction, saveNoteEdit, type RenameNoteState, type SaveNoteState } from './actions';
 
@@ -13,8 +14,9 @@ import { renameNoteAction, saveNoteEdit, type RenameNoteState, type SaveNoteStat
  * Editing a note in place on its page (plan #1425).
  *
  * At rest this is the note as the page renders it, with an Edit button beside
- * the title. Edit swaps the rendered body for a markdown text box holding the
- * note's text, in the same place, with Save and Cancel under it; the title and
+ * the title. Edit, or a click into the note itself (note 469f3771), swaps the
+ * rendered body for the essay editor's live preview holding the note's text,
+ * in the same place, with Save and Cancel under it; the title and
  * the properties stay as they are, because the save keeps the frontmatter it
  * opened with and only the body is edited.
  *
@@ -106,7 +108,21 @@ export function NoteEdit({
               .
             </p>
           )}
-          {children}
+          {/* A click into the note edits it, as the essay editor does, but a
+              click on a link or a control inside it still does what that
+              does, and so does selecting text to copy. Keyboard and screen
+              reader users have the Edit button above. */}
+          <div
+            className="cursor-text"
+            onClick={(event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('a, button, input, select, textarea, summary, label, video, audio')) return;
+              if (window.getSelection()?.toString()) return;
+              setEditing(true);
+            }}
+          >
+            {children}
+          </div>
         </>
       )}
     </>
@@ -205,31 +221,35 @@ export function EditForm({
     <form ref={form} action={save}>
       <input type="hidden" name="notePath" value={notePath} />
       <input type="hidden" name="blobSha" value={blobSha} />
-      <ComposeBox>
-        <ComposeBody
-          name="text"
-          autoFocus
-          aria-label="Note text, in markdown"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              form.current?.requestSubmit();
-            } else if (event.key === 'Escape' && !dirty) {
-              // Only an untouched box closes on Escape: a stray key must not
-              // throw away a paragraph.
-              event.preventDefault();
-              onDone();
-            }
-          }}
-          spellCheck
-          // The box lights up around it, which already says where the typing goes.
-          data-focus-ring="none"
-          // Short enough that Save is on screen when the editor opens, at both widths.
-          className="max-h-[60dvh] min-h-48 font-mono"
-        />
-      </ComposeBox>
+      <input type="hidden" name="text" value={draft} />
+      {/* The essay editor's live preview (note 469f3771): the markdown reads
+          as it renders, with the marks shown only on the line being typed. */}
+      <div
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            form.current?.requestSubmit();
+          } else if (event.key === 'Escape' && !dirty) {
+            // Only an untouched note closes on Escape: a stray key must not
+            // throw away a paragraph.
+            event.preventDefault();
+            onDone();
+          }
+        }}
+      >
+        <ComposeBox>
+          {/* Short enough that Save is on screen when the editor opens, at both widths. */}
+          <div className="max-h-[60dvh] min-h-48 overflow-y-auto">
+            <MarkdownEditor
+              initialDoc={body}
+              label="Note text, in markdown"
+              autoFocus
+              onChange={(doc) => setDraft(doc)}
+              onSaveNow={() => form.current?.requestSubmit()}
+            />
+          </div>
+        </ComposeBox>
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={pending}>
