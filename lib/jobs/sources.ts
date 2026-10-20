@@ -147,7 +147,7 @@ export const jobsSources: ModuleSources = {
     {
       table: 'job_search.contact_touches',
       module: 'Job search',
-      holds: 'Each time they reached out to a contact, and what came back.',
+      holds: 'Each time they reached out to a contact, and what came back. A row with draft true is a message written and not yet sent; its sent_at is when the draft was made.',
       weight: 'record',
       search: ['message', 'response_summary'],
       title: 'message',

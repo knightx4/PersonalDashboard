@@ -294,7 +294,7 @@ async function matchTouches(pending: PendingRecord[], store: ImportStore): Promi
   const logged: Record<string, unknown>[] = [];
   for (let i = 0; i < ids.length; i += 100) {
     logged.push(
-      ...(await store.rowsWhere(TOUCHES, ['contact_id', 'channel', 'direction', 'sent_at'], 'contact_id', ids.slice(i, i + 100))),
+      ...(await store.rowsWhere(TOUCHES, ['contact_id', 'channel', 'direction', 'sent_at', 'draft'], 'contact_id', ids.slice(i, i + 100))),
     );
   }
   // A touch logged by hand often names the other LinkedIn channel (a
@@ -306,7 +306,7 @@ async function matchTouches(pending: PendingRecord[], store: ImportStore): Promi
   const slot = (t: Record<string, unknown>, at: string | null) => `${t.contact_id}|${t.direction}|${at}`;
   const free = new Map<string, Record<string, unknown>[]>();
   for (const t of logged) {
-    if (!linkedIn(t.channel)) continue;
+    if (!linkedIn(t.channel) || t.draft === true) continue;
     const k = slot(t, day(t.sent_at));
     if (!free.has(k)) free.set(k, []);
     free.get(k)!.push(t);

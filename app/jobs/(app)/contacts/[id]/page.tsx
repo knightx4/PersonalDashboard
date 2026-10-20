@@ -29,6 +29,8 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
       .select('id, channel, direction, sent_at, responded_at, message')
       .eq('contact_id', id)
       .eq('user_id', user.id)
+      // Drafts are not sends: #2457.3 shows them apart, then drops this filter.
+      .eq('draft', false)
       .order('sent_at', { ascending: false }),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
   ]);

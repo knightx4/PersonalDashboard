@@ -360,10 +360,12 @@ export async function markTouchAnswered(
     .update({ responded_at: new Date().toISOString(), response_summary: summary || null })
     .eq('id', touchId)
     .eq('user_id', user.id)
+    .eq('draft', false)
     .select('contact_id')
-    .single();
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!data) return { error: 'A draft has not been sent, so nothing can have answered it.' };
 
   await supabase
     .from('contacts')
