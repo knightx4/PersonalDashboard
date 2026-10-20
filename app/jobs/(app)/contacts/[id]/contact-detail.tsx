@@ -1,18 +1,20 @@
 'use client';
 
-import { ExternalLink, Plus } from 'lucide-react';
+import { ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ChipSelect, InlineInput, InlineTextarea, Switch, Textarea } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
 import { Note } from '@/components/ui/note';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CopyText } from '../../roles/[id]/copy-text';
 import {
   deleteContact,
+  deleteTouch,
   draftContactMessage,
   logTouch,
   markTouchAnswered,
@@ -551,6 +553,22 @@ function Outreach({
                   They replied
                 </Button>
               ) : null}
+              <RemoveSend
+                disabled={pending}
+                onRemove={() =>
+                  startTransition(async () => {
+                    const result = await deleteTouch(touch.id);
+                    if (result.error) {
+                      setNote(result.error);
+                      return;
+                    }
+                    setContact((current) => ({
+                      ...current,
+                      touches: current.touches.filter((t) => t.id !== touch.id),
+                    }));
+                  })
+                }
+              />
               <SendWords
                 message={touch.message}
                 startEditing={touch.id === freshId}
@@ -571,6 +589,44 @@ function Outreach({
         <p className="mt-2 text-ui text-ink-muted">Nothing logged yet.</p>
       )}
     </CardSection>
+  );
+}
+
+/**
+ * Taking a send out of the log, at the end of its first line (note 0e5c4181).
+ * The bin asks first, on the same line, since a send logged by mistake is
+ * one press away from one logged on purpose.
+ */
+function RemoveSend({ disabled, onRemove }: { disabled: boolean; onRemove: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <IconButton label="Remove this send" size="sm" className="ml-auto" disabled={disabled} onClick={() => setConfirming(true)}>
+        <Trash2 strokeWidth={1.75} aria-hidden />
+      </IconButton>
+    );
+  }
+
+  return (
+    <span className="ml-auto flex items-center gap-1">
+      <span className="text-small text-ink-muted">Remove it?</span>
+      <Button
+        type="button"
+        variant="danger"
+        size="xs"
+        pending={disabled}
+        onClick={() => {
+          setConfirming(false);
+          onRemove();
+        }}
+      >
+        Remove
+      </Button>
+      <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming(false)}>
+        Cancel
+      </Button>
+    </span>
   );
 }
 

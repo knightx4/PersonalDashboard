@@ -324,3 +324,28 @@ export async function markTouchAnswered(
   revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };
 }
+
+/**
+ * Take a send out of the log, one logged by mistake (note 0e5c4181). The row
+ * asks first. The contact's status is left as it is, since a status set by
+ * hand often stands for sends made outside the app.
+ */
+// latency: optimistic -- the line leaves the log at once
+export async function deleteTouch(touchId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(touchId);
+  if (!parsed.success) return { error: 'That is not a send.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('contact_touches')
+    .delete()
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
+  return { error: null };
+}
