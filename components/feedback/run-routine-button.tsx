@@ -34,8 +34,9 @@ import { notesLastRunLine, type NotesLastRun } from '@/lib/feedback/last-worked'
  *
  * A way through to the whole queue belongs on that same row, for the same
  * reason: "12 open issues" is the sentence that makes someone want to look at
- * them. It is passed in rather than assumed, because the feedback page renders
- * this too and has no use for a link back to itself.
+ * them, so with `allHref` the count itself is the link. It is passed in rather
+ * than assumed, because the feedback page renders this too and has no use for
+ * a link back to itself.
  */
 /**
  * How long it has been going, in the largest unit that is still true.
@@ -167,12 +168,24 @@ export function RunRoutineButton({
         <DashAction type="submit" size="sm" variant="secondary" pending={pending} routine="notes">
           {pending ? 'Starting…' : running ? 'Run it again anyway' : 'Run Feature Routine'}
         </DashAction>
-        {openCount != null && (
+        {/* With a way through to the queue, the count is the link: "12 open
+            issues" names what it opens, and a separate See all wrapped onto a
+            line of its own at 390 once the routine's $ sat beside the button
+            (critic, plan #2459). */}
+        {openCount != null && allHref ? (
+          <Link
+            href={allHref}
+            onClick={onNavigate}
+            className={cn('press-area text-ui', linkVariants())}
+          >
+            {openCount} open issue{openCount === 1 ? '' : 's'}
+          </Link>
+        ) : openCount != null ? (
           <span className="text-ui text-ink-muted">
             {openCount} open issue{openCount === 1 ? '' : 's'}
           </span>
-        )}
-        {allHref && (
+        ) : null}
+        {allHref && openCount == null && (
           <Link
             href={allHref}
             onClick={onNavigate}

@@ -99,7 +99,11 @@ export function ResearchPanel({
             what="Where the research runs"
             align="end"
           >
-            {pending ? 'Starting…' : shown ? 'Refresh research' : 'Research this company'}
+            {/* "Refresh", not "Refresh research": the card is titled Research,
+                and with Dash's mark and the routine's $ beside it the longer
+                label pushed the button off the title's line at 390 (critic,
+                plan #2459). */}
+            {pending ? 'Starting…' : shown ? 'Refresh' : 'Research this company'}
           </DashAction>
         )
       }
