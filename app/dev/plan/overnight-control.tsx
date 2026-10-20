@@ -17,7 +17,7 @@ import { StateLabel } from '@/components/dev/state-label';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { FieldError, Input, Select } from '@/components/ui/field';
+import { FieldError, Input, PressLabel, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import {
@@ -509,11 +509,11 @@ export function OvernightControl({
       aria-label="The overnight runner"
       className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
-      {/* With a mark, the label and the mark under it are a column of their
-          own, and the rest of the row starts on one edge beside them. */}
+      {/* With a mark, the mark sits beside the label on the heading line
+          (plan #2457.7), and the rest of the row follows them. */}
       <div className="flex items-start gap-3 max-sm:flex-wrap max-sm:items-center max-sm:gap-y-2">
         {mark && (
-          <span className="flex shrink-0 flex-col items-start gap-1.5 max-sm:contents">
+          <span className="flex shrink-0 items-center gap-2 max-sm:contents">
             {labelText}
             {mark}
           </span>
@@ -558,6 +558,9 @@ export function OvernightControl({
                   variant={autoApprove ? 'primary' : 'secondary'}
                   aria-pressed={autoApprove}
                   pending={flipping}
+                  // Bare, on a phone, as tall as the select in the same row
+                  // (critic, #2457.7 round 1).
+                  className={cn(bare && 'max-sm:h-(--control-h)')}
                   title={
                     autoApprove
                       ? 'On: every feature and step a session proposes is approved as it is written. Press to turn it off.'
@@ -641,21 +644,28 @@ export function OvernightControl({
                   </>
                 )}
                 {keepGoing && <span className="text-small text-ink-muted max-sm:sr-only">Run</span>}
-                <Select
-                  name="hours"
-                  value={hours}
-                  onChange={(event) => setHours(Number(event.target.value))}
-                  aria-label="How long it may run for"
-                  className="min-h-11 w-auto max-sm:pl-2 sm:min-h-0"
-                >
-                  {/* First, because it is the default and the ordinary press. */}
-                  <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
-                  {OVERNIGHT_HOUR_CHOICES.map((choice) => (
-                    <option key={choice} value={choice}>
-                      {choice === 1 ? '1 hour' : `${choice} hours`}
-                    </option>
-                  ))}
-                </Select>
+                {/* Bare, as on dev settings, the select keeps the ordinary
+                    control height and a press label gives it the 44px a
+                    thumb needs (plan #2457.7); on the plan card it still grows. */}
+                <span className={cn(bare && 'relative inline-flex')}>
+                  {bare && <PressLabel htmlFor="overnight-hours" />}
+                  <Select
+                    id="overnight-hours"
+                    name="hours"
+                    value={hours}
+                    onChange={(event) => setHours(Number(event.target.value))}
+                    aria-label="How long it may run for"
+                    className={cn('w-auto', bare ? 'relative' : 'min-h-11 max-sm:pl-2 sm:min-h-0')}
+                  >
+                    {/* First, because it is the default and the ordinary press. */}
+                    <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
+                    {OVERNIGHT_HOUR_CHOICES.map((choice) => (
+                      <option key={choice} value={choice}>
+                        {choice === 1 ? '1 hour' : `${choice} hours`}
+                      </option>
+                    ))}
+                  </Select>
+                </span>
                 {/* On a phone the select beside it has to stay 44px with 16px
                     text (a smaller one fails the press check, and iOS zooms on
                     focus), so Start grows to match rather than sitting short
@@ -665,7 +675,11 @@ export function OvernightControl({
                   size="sm"
                   pending={starting}
                   disabled={!canSend}
-                  className="max-sm:min-h-11 max-sm:px-4 max-sm:text-body"
+                  className={cn(
+                    bare
+                      ? 'max-sm:h-(--control-h)'
+                      : 'max-sm:min-h-11 max-sm:px-4 max-sm:text-body',
+                  )}
                 >
                   {starting ? 'Starting…' : 'Start'}
                 </Button>
@@ -680,6 +694,7 @@ export function OvernightControl({
           idle while the runner is off. */}
       <RunnerCrew
         slots={slots}
+        plain={bare}
         held={standing === 'paused'}
         progress={Object.fromEntries(
           on.flatMap((line) => (line.progress ? [[line.ref, line.progress]] : [])),

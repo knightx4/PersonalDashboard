@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { DashMark, type DashRunner } from '@/components/ui/dash-mark';
+import { cn } from '@/lib/cn';
 import type { FeatureProgress, FeatureStep } from '@/lib/digest/night';
 import { Meter } from '@/components/ui/meter';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -71,7 +72,13 @@ function stepsOn(steps: readonly FeatureStep[]): FeatureStep[] {
  * only how far along. Before the session claims a step it says how many are
  * done; a goals run says what it is doing.
  */
-function WorkingLine({ slot, progress }: { slot: RunnerSlot & { state: 'working' }; progress: FeatureProgress | null }) {
+function WorkingLine({
+  slot,
+  progress,
+}: {
+  slot: RunnerSlot & { state: 'working' };
+  progress: FeatureProgress | null;
+}) {
   const { work } = slot;
   const on = stepsOn(work.steps);
   const feature = work.ref ?? '';
@@ -81,7 +88,9 @@ function WorkingLine({ slot, progress }: { slot: RunnerSlot & { state: 'working'
     said = (
       <>
         <span className="sr-only">On step </span>
-        <span className="tabular text-ink-ghost">{first.ref.startsWith(feature) ? first.ref.slice(feature.length) : first.ref}</span>{' '}
+        <span className="tabular text-ink-ghost">
+          {first.ref.startsWith(feature) ? first.ref.slice(feature.length) : first.ref}
+        </span>{' '}
         <span>{first.title}</span>
         {on.length > 1 && <span className="tabular text-ink-ghost"> +{on.length - 1}</span>}
       </>
@@ -118,7 +127,13 @@ const MOST_SEGMENTS = 16;
  * filled when done and pulsing while a builder is on it, so "two done, one
  * going, one to go" is read without a number.
  */
-function StepBar({ slot, progress }: { slot: RunnerSlot & { state: 'working' }; progress: FeatureProgress | null }) {
+function StepBar({
+  slot,
+  progress,
+}: {
+  slot: RunnerSlot & { state: 'working' };
+  progress: FeatureProgress | null;
+}) {
   const { steps, ref } = slot.work;
   const done = steps.filter((step) => step.status === 'done').length;
   if (steps.length > 0 && steps.length <= MOST_SEGMENTS) {
@@ -173,7 +188,11 @@ const CAPSULE_HUES: Record<ModuleId, string> = {
 function ModuleCapsule({ name }: { name: string }) {
   const workspace = MODULES.find((m) => m.label === name || m.id === name.toLowerCase());
   const hue = workspace ? CAPSULE_HUES[workspace.id] : 'bg-canvas text-ink-muted';
-  return <span className={`inline-block shrink-0 rounded-full px-1.5 text-micro font-medium ${hue}`}>{name}</span>;
+  return (
+    <span className={`inline-block shrink-0 rounded-full px-1.5 text-micro font-medium ${hue}`}>
+      {name}
+    </span>
+  );
 }
 
 /**
@@ -208,8 +227,10 @@ function Pill({
   open,
   panel,
   onPress,
+  plain,
 }: {
   slot: RunnerSlot;
+  plain: boolean;
   held: boolean;
   newest: RunActivity | null;
   progress: FeatureProgress | null;
@@ -226,9 +247,15 @@ function Pill({
       aria-expanded={open}
       aria-controls={panel}
       onClick={onPress}
-      className={`flex w-full min-w-0 items-center gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors ${
-        open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
-      }`}
+      className={cn(
+        'flex w-full min-w-0 items-center gap-2.5 rounded-control border px-3 py-2.5 text-left transition-colors' /* ui-ok: a pressable pill whose border shows it open, as it was before plan #2457.7 moved it into cn */,
+        open
+          ? 'border-accent bg-accent-tint'
+          : 'border-border bg-sunken hover:border-border-strong',
+        // Plain, inside a card on a phone, the pill is a row rather than a box
+        // in the box (plan #2457.7).
+        plain && 'max-sm:border-transparent max-sm:bg-transparent max-sm:px-0 max-sm:py-1.5',
+      )}
     >
       <DashMark
         state={working ? pose.state : slot.state}
@@ -273,12 +300,14 @@ function Focus({
   held,
   progress,
   newest,
+  plain,
 }: {
   id: string;
   slot: RunnerSlot;
   held: boolean;
   progress: FeatureProgress | null;
   newest: RunActivity | null;
+  plain: boolean;
 }) {
   if (slot.state !== 'working') {
     const said =
@@ -290,7 +319,13 @@ function Focus({
           ? 'The runner is held: what was building carries on, and nothing new starts.'
           : 'The runner is off.';
     return (
-      <div id={id} className="rounded-control bg-sunken px-4 py-3 text-ui text-ink-muted">
+      <div
+        id={id}
+        className={cn(
+          'rounded-control bg-sunken px-4 py-3 text-ui text-ink-muted',
+          plain && 'max-sm:bg-transparent max-sm:p-0',
+        )}
+      >
         {said}
       </div>
     );
@@ -323,7 +358,9 @@ function Focus({
           answer={answerPlanRunAction}
           // A feature session's lines fold under the feature's steps, and
           // what it wrote about other features is left out.
-          feature={work.ref && work.steps.length > 0 ? { ref: work.ref, steps: work.steps } : undefined}
+          feature={
+            work.ref && work.steps.length > 0 ? { ref: work.ref, steps: work.steps } : undefined
+          }
         />
       ) : (
         <p className="text-small text-ink-muted">This run left no record to follow.</p>
@@ -336,8 +373,11 @@ export function RunnerCrew({
   slots,
   held = false,
   progress = {},
+  plain = false,
 }: {
   slots: readonly RunnerSlot[];
+  /** Inside a card, as on dev settings: on a phone the pills drop their boxes. */
+  plain?: boolean;
   /** How far through its feature each session is, by the feature's "#n". */
   progress?: Readonly<Record<string, FeatureProgress>>;
   /** The runner is held: an idle slot says so rather than "Not running". */
@@ -377,6 +417,7 @@ export function RunnerCrew({
               progress={progressOf(slot)}
               open={open === slot.slot}
               panel={panel}
+              plain={plain}
               onPress={() => setOpen((was) => (was === slot.slot ? null : slot.slot))}
             />
           </li>
@@ -389,6 +430,7 @@ export function RunnerCrew({
           held={held}
           progress={progressOf(focused)}
           newest={newestOf(focused)}
+          plain={plain}
         />
       )}
     </div>
