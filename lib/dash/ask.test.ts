@@ -3,10 +3,14 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, type AskLookupEvent, type AskStores } from './ask';
+import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, scopedVoice, type AskLookupEvent, type AskStores } from './ask';
+import { DASH_CHOICES, HAIKU, OPUS, SONNET } from '@/lib/core/models';
+import { filesEstimate } from './file-cost';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
+  answerFromWrites,
+  madeSummary,
   FALLBACK_ROWS,
   limitNote,
   MAX_LOOKUPS,
@@ -459,6 +463,59 @@ const GOAL_ROWS: Row[] = [
   { id: GOAL_ID, user_id: ME, title: 'Find a new job', level: 'goal', status: 'open', archived_at: null },
   { id: THEIR_GOAL_ID, user_id: THEM, title: 'Their goal', level: 'goal', status: 'open', archived_at: null },
 ];
+
+describe('the model the person chose (plan #2458.2)', () => {
+  const replies = [
+    reply([use('u1', 'search', { query: 'ebay' })]),
+    reply([use('u2', 'answer', { answer: 'One order, from eBay.', cited: [{ table: 'public.orders', ref: 'o-1' }] })]),
+  ];
+  const lookupThenAnswer = () => stubClient(structuredClone(replies));
+
+  it.each(DASH_CHOICES.map((c) => [c.label, c.id] as const))(
+    'sends every call to %s and records the spend under it',
+    async (_label, model) => {
+      const { client, sent } = lookupThenAnswer();
+      const { execute } = stubExecute();
+      const { stores, spend } = memoryStores();
+      const result = await askDash(
+        { question: 'What did I buy on eBay?', today: '2026-10-20', execute, anthropicApiKey: 'k', client, model },
+        stores,
+      );
+      expect(result.error).toBeUndefined();
+      expect(sent).toHaveLength(2);
+      expect(sent.every((s) => s.model === model)).toBe(true);
+      expect(spend).toHaveLength(2);
+      expect(spend.every((report) => report.model === model)).toBe(true);
+    },
+  );
+
+  it('answers with Sonnet when nothing is saved', async () => {
+    const { client, sent } = lookupThenAnswer();
+    const { execute } = stubExecute();
+    const { stores, spend } = memoryStores();
+    await askDash({ question: 'What did I buy on eBay?', today: '2026-10-20', execute, anthropicApiKey: 'k', client }, stores);
+    expect(ASK_MODEL).toBe(SONNET);
+    expect(sent.every((s) => s.model === SONNET)).toBe(true);
+    expect(spend.every((report) => report.model === SONNET)).toBe(true);
+  });
+
+  it('keeps a scoped question to its workspace on the chosen model', () => {
+    const voice = scopedVoice('shopping', HAIKU);
+    expect(voice.model).toBe(HAIKU);
+    expect(voice.tools.length).toBe(scopedVoice('shopping').tools.length);
+    expect(scopedVoice(null).model).toBe(SONNET);
+    expect(scopedVoice(null, SONNET)).toBe(ASK_VOICE);
+    // The default voice itself is never changed by a choice.
+    expect(ASK_VOICE.model).toBe(SONNET);
+  });
+
+  it('prices reading a file for the chosen model', () => {
+    const file = [{ contentType: 'image/png', size: 2_000_000 }];
+    const [haiku, sonnet, opus] = [HAIKU, SONNET, OPUS].map((m) => filesEstimate(file, m)!.medianMicros);
+    expect(haiku).toBeLessThan(sonnet);
+    expect(sonnet).toBeLessThan(opus);
+  });
+});
 
 describe('askDash proposals', () => {
   function goalExecute() {
@@ -1023,6 +1080,20 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(built?.body).toContain('- Order 0\n- Order 1\n');
     expect(built?.body).not.toContain('more');
     expect(answerFromLookups('why', [])).toBeNull();
+  });
+
+  it('says what a made change did when the model stops after making it (note 11a68203)', () => {
+    const summary = madeSummary(
+      'Done: Dash added "Dinner with Sam" to the calendar on 2026-11-01. It shows under your answer with an Undo. Say what you did, and cite the row this returned.',
+    );
+    expect(summary).toBe('Dash added "Dinner with Sam" to the calendar on 2026-11-01.');
+    expect(madeSummary('Done: Dash moved it. They can undo it from Home. Say what you did.')).toBe('Dash moved it.');
+    expect(madeSummary('Found 3 rows.')).toBeNull();
+    const row = { table: 'todo.events', ref: 'e-1', title: 'Dinner with Sam', href: '/todo/calendar' };
+    const built = answerFromWrites([summary!], [row]);
+    expect(built?.body).toBe('I added "Dinner with Sam" to the calendar on 2026-11-01.');
+    expect(built?.citations).toEqual([row]);
+    expect(answerFromWrites([], [row])).toBeNull();
   });
 
   it('names the cause and lists only the last lookup when the model stops, and logs the reason', async () => {

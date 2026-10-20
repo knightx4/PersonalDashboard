@@ -191,7 +191,7 @@ export type ContactLike = {
   lastTouchAt: string | null;
 };
 
-const CONTACT_STATUS_ORDER = ['to_contact', 'contacted', 'responded', 'met', 'dormant'];
+const CONTACT_STATUS_ORDER = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'];
 
 export function contactsDisplay<T extends ContactLike>(): ListDisplaySpec<T> {
   const byName = (a: T, b: T) => a.fullName.localeCompare(b.fullName);

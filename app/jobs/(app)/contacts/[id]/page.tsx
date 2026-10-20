@@ -19,14 +19,16 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     supabase
       .from('contacts')
       .select(
-        'id, full_name, title, relationship, status, linkedin_url, email, how_we_connect, notes, potential_lead, found_by_dash, company_id, companies ( name, slug )',
+        'id, full_name, title, relationship, status, linkedin_url, email, how_we_connect, notes, potential_lead, found_by_dash, linkedin_connection, company_id, companies ( name, slug )',
       )
       .eq('id', id)
       .eq('user_id', user.id)
       .maybeSingle(),
     supabase
       .from('contact_touches')
-      .select('id, channel, direction, sent_at, responded_at, message')
+      // Drafts come too: the page shows them apart from the sends and leaves
+      // them out of every count of what was sent.
+      .select('id, channel, direction, sent_at, responded_at, message, draft')
       .eq('contact_id', id)
       .eq('user_id', user.id)
       .order('sent_at', { ascending: false }),
@@ -49,6 +51,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     notes: string | null;
     potential_lead: boolean;
     found_by_dash: boolean;
+    linkedin_connection: boolean;
     company_id: string | null;
     companies: { name: string; slug: string } | null;
   };
@@ -85,6 +88,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           notes: row.notes,
           potentialLead: row.potential_lead ?? false,
           foundByDash: row.found_by_dash ?? false,
+          linkedinConnection: row.linkedin_connection ?? false,
           companyName: row.companies?.name ?? null,
           companySlug: row.companies?.slug ?? null,
           touches: (touches ?? []).map((touch) => ({
@@ -94,6 +98,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
             sentAt: touch.sent_at as string,
             respondedAt: (touch.responded_at as string) ?? null,
             message: (touch.message as string) ?? null,
+            draft: touch.draft === true,
           })),
         }}
       />

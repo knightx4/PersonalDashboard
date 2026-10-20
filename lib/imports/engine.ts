@@ -127,6 +127,7 @@ export async function planImport<Input>(
     const seen = new Set<string>();
     const ready: { key: string; values: IntendedValues }[] = [];
     const joinOnly = new Map<string, string>();
+    const onInsert = new Map<string, IntendedValues>();
     for (const record of mapper.records(input) as MappedRecord[]) {
       if (seen.has(record.key)) {
         note({ key: record.key, outcome: 'skipped', rowId: null, reason: 'The export has this record twice.' });
@@ -149,6 +150,7 @@ export async function planImport<Input>(
       }
       ready.push({ key: record.key, values: pick(columnNames, r.values) });
       if (record.joinOnly) joinOnly.set(record.key, record.joinOnly);
+      if (record.onInsert) onInsert.set(record.key, record.onInsert);
     }
 
     // Records with no key may join a row the person already has, or be found
@@ -202,7 +204,7 @@ export async function planImport<Input>(
           continue;
         }
         const id = randomUUID();
-        writes.push({ op: 'insert', kind: mapper.kind, key, table: mapper.table, row_id: id, values, hash });
+        writes.push({ op: 'insert', kind: mapper.kind, key, table: mapper.table, row_id: id, values: { ...onInsert.get(key), ...values }, hash });
         ids.set(key, id);
         note({ key, outcome: 'added', rowId: id });
         continue;

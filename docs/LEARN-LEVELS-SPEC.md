@@ -455,7 +455,18 @@ and its target. `/api/cron/territory-draft?territory=<key>` drafts the topics
 not yet drafted, a few a call, each with the same two-draft call and checks
 as above, then sets the frame topic and adds the target to the subject's
 lens. It is fired by hand, since every call spends, and each topic it drafts
-is approved as drafted, as above.
+is approved as drafted, as above. A territory may declare `areas`, each topic
+naming its `area`; adding `&area=<area>` drafts only that area's topics not yet
+drafted (plan #2483.1), so one area can be paid for without the others.
+A text may name the `areas` it serves; an area's topics are drafted from its
+own texts and those naming none, so each area stays within the sources one
+drafting call takes. Without `&area`, a call drafts the first area that has
+topics left (plan #2483.2). The business pack is the `business` territory,
+with corporate finance, accounting, banking, strategy and operations as its
+areas; its SaaS area is the `saas-metrics` territory, kept under its own key
+with its own sources, since part of it is already drafted. The pack lists it
+in `areaTerritories`, so `?territory=business&area=saas` drafts that
+territory (plan #2483.3).
 
 A territory also reads the structure store of syllabi, calendars and tables
 of contents (plan #2247.10). Its goal and performances are embedded as

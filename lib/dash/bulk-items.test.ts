@@ -7,6 +7,7 @@ import { insertMadeChange, type DashChange, type MadeDashChange } from '@/lib/ta
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult } from './registry';
+import type { RowSet } from './sets';
 import { WRITE_TOOLS } from './writes';
 
 /**
@@ -29,6 +30,15 @@ const THEIRS = '00000000-0000-4000-8000-00000000f005';
 
 let tables: FakeTables;
 let seen: Set<string>;
+/** The sets lookups in this answer named; their rows count as seen, as runDash has it. */
+let sets: Map<string, RowSet>;
+
+function addSet(table: string, refs: string[], size = refs.length): string {
+  const name = `set ${sets.size + 1}`;
+  sets.set(name, { name, table, refs, size });
+  for (const ref of refs) seen.add(`${table}:${ref}`);
+  return name;
+}
 
 function item(id: string, name: string, extra: Record<string, unknown> = {}) {
   return {
@@ -56,7 +66,7 @@ function context(enabled: DashWriteContext['enabledModules'] = ['shopping']): Da
     enabledModules: enabled,
     db: async (schema) => client(schema),
     searchSources: [],
-    seen: (table, ref) => seen.has(`${table}:${ref}`),
+    seen: Object.assign((table: string, ref: string) => seen.has(`${table}:${ref}`), { sets }),
     goals: async () => client('goals') as unknown as GoalsSupabaseClient,
     createTask: async () => ({ id: null, error: 'unused' }),
   };
@@ -98,6 +108,7 @@ const itemRow = (id: string) => tables['public.inventory_items'].find((row) => r
 
 beforeEach(() => {
   seen = new Set();
+  sets = new Map();
   tables = {
     'core.dash_actions': [],
     'public.orders': [{ id: ORDER, user_id: ME, deleted_at: null }],
@@ -144,6 +155,49 @@ describe('change_items', () => {
     const undone = await undoChange(deps(), kept.id);
     expect(undone).toMatchObject({ ok: true, change: { status: 'undone' } });
     expect([KINDLE, LAMP, MUG].map((id) => itemRow(id).for_sale)).toEqual([false, false, false]);
+  });
+
+  it("changes exactly the items a lookup's set matched, as one record with one Undo (plan #2472.2)", async () => {
+    const name = addSet('public.inventory_items', [KINDLE, MUG]);
+    const result = ok(await apply({ change: 'for_sale', set: name }));
+
+    expect([KINDLE, LAMP, MUG].map((id) => itemRow(id).for_sale)).toEqual([true, false, true]);
+    expect(result.summary).toBe('Dash marked 2 items for sale: Kindle Paperwhite and Blue mug.');
+    const kept = await keep(result);
+    expect(tables['core.dash_actions']).toHaveLength(1);
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect([KINDLE, MUG].map((id) => itemRow(id).for_sale)).toEqual([false, false]);
+  });
+
+  it("takes a set of orders as every item from them, and the model's other spellings of its name", async () => {
+    addSet('public.orders', [ORDER]);
+    const result = ok(await apply({ change: 'to_return', set: 'Set 1' }));
+    expect([KINDLE, LAMP, MUG].map((id) => itemRow(id).return_planned)).toEqual([true, true, true]);
+    expect(result.input).toMatchObject({ count: 3 });
+  });
+
+  it('merges a set with item_refs, counting a row named twice once', async () => {
+    const name = addSet('public.inventory_items', [KINDLE, LAMP]);
+    seen.add(`public.inventory_items:${MUG}`);
+    const result = ok(await apply({ change: 'for_sale', set: name, item_refs: [LAMP, MUG] }));
+    expect(result.input).toMatchObject({ count: 3, left: 0 });
+    expect([KINDLE, LAMP, MUG].map((id) => itemRow(id).for_sale)).toEqual([true, true, true]);
+  });
+
+  it('refuses a set of another table, one no lookup made, and one over the cap, changing nothing', async () => {
+    const roles = addSet('job_search.roles', ['00000000-0000-4000-8000-0000000000a1']);
+    const wrong = await apply({ change: 'for_sale', set: roles, item_refs: [] });
+    expect(!wrong.ok && wrong.error).toContain('holds rows of job_search.roles');
+
+    const missing = await apply({ change: 'for_sale', set: 'set 9' });
+    expect(!missing.ok && missing.error).toContain('There is no set 9');
+
+    const big = addSet('public.inventory_items', [], BULK_MAX + 1);
+    const over = await apply({ change: 'for_sale', set: big });
+    expect(!over.ok && over.error).toContain(`more than the ${BULK_MAX}`);
+
+    expect(tables['public.inventory_items'].some((row) => row.for_sale)).toBe(false);
+    expect(tables['core.dash_actions']).toHaveLength(0);
   });
 
   it('leaves alone on Undo an item changed by hand since, and puts the rest back', async () => {

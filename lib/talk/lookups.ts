@@ -11,6 +11,7 @@ import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
+import { MODEL_CHANGE_KINDS } from '@/lib/ask/model-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -91,6 +92,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
   ...POST_CHANGE_KINDS,
+  ...MODEL_CHANGE_KINDS,
 ];
 
 /**
@@ -208,6 +210,8 @@ export function lookupLabel(name: string, input: unknown): string {
     }
     case 'post_pictures':
       return 'Looking at the post pictures';
+    case 'dash_model':
+      return 'Checking which model Dash is using';
     case 'search_mail': {
       const from = quoted(field(input, 'from'));
       const words = quoted(field(input, 'words'));

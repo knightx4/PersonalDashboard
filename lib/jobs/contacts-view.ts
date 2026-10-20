@@ -30,7 +30,7 @@ export const CONTACT_VIEWS = ['table', 'focus'] as const;
 export type ContactsViewName = (typeof CONTACT_VIEWS)[number];
 
 /** job_search.contact_status, in the order a conversation moves through it. */
-export const CONTACT_STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'] as const;
+export const CONTACT_STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'] as const;
 
 export const CONTACT_RELATIONSHIPS = [
   'cold',
@@ -189,11 +189,11 @@ export function filterContacts<T extends ContactListRow>(
 
 /**
  * Whether you have reached out to them: a send is on record, or their status
- * has moved past To contact, since a send made outside the app is often only
- * marked by the status.
+ * has moved past To contact or Connected, since a send made outside the app is
+ * often only marked by the status.
  */
 export function reachedOut(row: Pick<ContactListRow, 'status' | 'hasOutbound'>): boolean {
-  return row.hasOutbound || row.status !== 'to_contact';
+  return row.hasOutbound || (row.status !== 'to_contact' && row.status !== 'connected');
 }
 
 /** Days since the last touch after which a send with no answer wants a nudge. */

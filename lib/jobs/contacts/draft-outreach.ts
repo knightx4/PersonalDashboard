@@ -140,6 +140,7 @@ async function loadContact(
       .select('channel, direction, sent_at, responded_at, message')
       .eq('contact_id', contactId)
       .eq('user_id', userId)
+      .eq('draft', false)
       .order('sent_at', { ascending: false })
       .limit(TOUCHES_READ),
     contact.company_id

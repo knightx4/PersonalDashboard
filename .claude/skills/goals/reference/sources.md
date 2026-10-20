@@ -259,7 +259,7 @@ People in their network for the search and how they know them.
 
 ### `job_search.contact_touches` (Job search)
 
-Each time they reached out to a contact, and what came back.
+Each time they reached out to a contact, and what came back. A row with draft true is a message written and not yet sent; its sent_at is when the draft was made.
 
 - Search: `message`, `response_summary`
 - Name a row by `message`; link it by `id`

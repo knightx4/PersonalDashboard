@@ -40,8 +40,8 @@ const task = (fields: Record<string, unknown> = {}) => ({
 });
 
 describe('the Todo writes', () => {
-  it('are the kinds Ask keeps them under, in order', () => {
-    expect(TODO_WRITES.map((entry) => entry.name)).toEqual([...TODO_CHANGE_KINDS]);
+  it('are the kinds Ask keeps them under, in order, with add_todos after them (Ask only, plan #2472.4)', () => {
+    expect([...TODO_WRITES.map((entry) => entry.name), 'add_todos']).toEqual([...TODO_CHANGE_KINDS]);
   });
 
   it('writes notes and pins a todo, keeping the row as it was', async () => {
@@ -151,6 +151,20 @@ describe('the Todo writes', () => {
       ok: false,
       error: 'Give it a start and an end time, or mark it all day.',
     });
+  });
+
+  it('names an evening event by its own day, not the UTC one (note 11a68203)', async () => {
+    const tables: FakeTables = { 'todo.events': [] };
+    const result = await runTodoWrite(write('add_event'), { ...env(tables), timezone: 'America/New_York' }, {
+      title: 'Dinner with Sam',
+      start_day: '2026-11-01',
+      start_time: '20:30',
+      end_time: '22:30',
+    });
+    if ('ok' in result) throw new Error(result.error);
+    expect(result.after).toMatchObject({ starts_at: '2026-11-02T01:30:00.000Z' });
+    expect(result.summary).toBe('Dash added "Dinner with Sam" to the calendar on 2026-11-01.');
+    expect(result.row.href).toBe('/todo/calendar?view=day&date=2026-11-01');
   });
 
   it('moves an event and clears its place', async () => {

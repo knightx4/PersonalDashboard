@@ -75,7 +75,7 @@ export async function createContact(
 }
 
 const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
-const STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'] as const;
+const STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'] as const;
 
 const contactPatchSchema = z
   .object({
@@ -210,6 +210,8 @@ export interface LoggedTouch {
   sentAt: string;
   respondedAt: string | null;
   message: string | null;
+  /** Written and kept, not sent: left out of every count and date of sends. */
+  draft: boolean;
 }
 
 // latency: pending
@@ -219,6 +221,8 @@ export async function logTouch(input: {
   direction: 'outbound' | 'inbound';
   message?: string;
   applicationId?: string;
+  /** Keep it as a draft: stored, but the contact is not moved to contacted. */
+  draft?: boolean;
 }): Promise<{ error: string | null; touch?: LoggedTouch }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -233,20 +237,16 @@ export async function logTouch(input: {
       direction: input.direction,
       message: input.message?.trim() || null,
       sent_at: new Date().toISOString(),
+      draft: input.draft === true,
     })
-    .select('id, channel, direction, sent_at, responded_at, message')
+    .select('id, channel, direction, sent_at, responded_at, message, draft')
     .single();
 
   if (error) return { error: error.message };
 
   // A send moves the contact along; the status is what the list view sorts by.
-  if (input.direction === 'outbound') {
-    await supabase
-      .from('contacts')
-      .update({ status: 'contacted' })
-      .eq('id', input.contactId)
-      .eq('user_id', user.id)
-      .eq('status', 'to_contact');
+  if (input.direction === 'outbound' && input.draft !== true) {
+    await markContacted(supabase, user.id, input.contactId);
   }
 
   revalidatePath('/jobs/contacts');
@@ -260,8 +260,59 @@ export async function logTouch(input: {
       sentAt: data.sent_at as string,
       respondedAt: (data.responded_at as string | null) ?? null,
       message: (data.message as string | null) ?? null,
+      draft: data.draft === true,
     },
   };
+}
+
+async function markContacted(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  contactId: string,
+) {
+  await supabase
+    .from('contacts')
+    .update({ status: 'contacted' })
+    .eq('id', contactId)
+    .eq('user_id', userId)
+    .in('status', ['to_contact', 'connected']);
+}
+
+/**
+ * Mark a draft as sent: it takes the time it is marked as its sent time, stops
+ * being a draft, and moves the contact to contacted as logging a send does.
+ * Only a draft can be marked, so a send already logged keeps its time.
+ */
+// latency: optimistic -- the line leaves Drafts and joins the sends at once
+export async function markTouchSent(
+  touchId: string,
+): Promise<{ error: string | null; sentAt?: string }> {
+  const parsed = z.string().uuid().safeParse(touchId);
+  if (!parsed.success) return { error: 'That is not a draft.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const sentAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('contact_touches')
+    .update({ sent_at: sentAt, draft: false })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('draft', true)
+    .select('contact_id, direction')
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) return { error: 'That draft is already sent or gone.' };
+
+  if (data.direction === 'outbound') {
+    await markContacted(supabase, user.id, data.contact_id as string);
+  }
+
+  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
+  return { error: null, sentAt };
 }
 
 /**
@@ -309,10 +360,12 @@ export async function markTouchAnswered(
     .update({ responded_at: new Date().toISOString(), response_summary: summary || null })
     .eq('id', touchId)
     .eq('user_id', user.id)
+    .eq('draft', false)
     .select('contact_id')
-    .single();
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!data) return { error: 'A draft has not been sent, so nothing can have answered it.' };
 
   await supabase
     .from('contacts')
@@ -320,6 +373,31 @@ export async function markTouchAnswered(
     .eq('id', data.contact_id)
     .eq('user_id', user.id);
 
+  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
+  return { error: null };
+}
+
+/**
+ * Take a send out of the log, one logged by mistake (note 0e5c4181). The row
+ * asks first. The contact's status is left as it is, since a status set by
+ * hand often stands for sends made outside the app.
+ */
+// latency: optimistic -- the line leaves the log at once
+export async function deleteTouch(touchId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(touchId);
+  if (!parsed.success) return { error: 'That is not a send.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('contact_touches')
+    .delete()
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
   revalidatePath('/jobs/contacts');
   revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };

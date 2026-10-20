@@ -25,6 +25,8 @@ import type { SearchHit } from '@/lib/search/sources';
 import type { ModuleId } from '@/lib/modules';
 import type { AskBoxStart } from '@/components/talk/ask-box';
 import { stoppedBody } from '@/lib/talk/talk';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -34,6 +36,19 @@ import { stoppedBody } from '@/lib/talk/talk';
  */
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/** What an answer costs, as the sheet reads it and the Dash page's shell provides it. */
+const ASK_COSTS: PaidCosts = {
+  'app/api/ask/route.ts#POST': {
+    lowMicros: 20_000,
+    medianMicros: 45_000,
+    highMicros: 110_000,
+    runs: 0,
+    basis: 'guess',
+    per: 'run',
+    models: [SONNET],
+  },
+};
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
 const RECENT: ConversationSummary[] = [
@@ -355,17 +370,7 @@ const FIXTURES: AskSource = {
   confirm: pressed('done'),
   decline: pressed('declined'),
   undo: pressed('undone'),
-  costs: async () => ({
-    'app/api/ask/route.ts#POST': {
-      lowMicros: 20_000,
-      medianMicros: 45_000,
-      highMicros: 110_000,
-      runs: 0,
-      basis: 'guess',
-      per: 'run',
-      models: [SONNET],
-    },
-  }),
+  costs: async () => ASK_COSTS,
 };
 
 /** Opens the sheet as the page arrives, sending `question` when given. */
@@ -389,8 +394,11 @@ export function AskDashSurface({
   draft,
   rows,
   page = '/jobs',
+  modelStart,
   children,
 }: {
+  /** The model chip's list open, or a pick that could not be saved (plan #2458.3). */
+  modelStart?: 'open' | 'failed';
   open?: boolean;
   question?: string;
   /** Words in the sheet's box, unsent, for a strip that presses Send (plan #1899.8). */
@@ -402,7 +410,15 @@ export function AskDashSurface({
   children: React.ReactNode;
 }) {
   return (
-    <AskDashProvider source={FIXTURES} page={page} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS} draft={draft}>
+    <AskDashProvider
+      source={FIXTURES}
+      page={page}
+      account="preview"
+      workspaces={BOX_WORKSPACES}
+      searchHits={BOX_HITS}
+      draft={draft}
+      modelStart={modelStart}
+    >
       {children}
       {open && <OpenOnArrival question={question} rows={rows} />}
     </AskDashProvider>
@@ -789,7 +805,10 @@ export function DashPageSurface({
   sheetOpen = false,
   list,
   draft,
+  modelStart,
 }: {
+  /** The model chip's list open, or a pick that could not be saved (plan #2458.3). */
+  modelStart?: 'open' | 'failed';
   chat?: 'open' | 'new' | 'archived';
   /** Words in the open chat's box, unsent, for a strip that presses Send (plan #1899.8). */
   draft?: string;
@@ -816,7 +835,9 @@ export function DashPageSurface({
       : dashPageTurns(open.title ?? '');
   const opened = chat !== 'new';
   return (
-    <AskDashProvider source={FIXTURES}>
+    // The shell's cost hints, as app/ask/layout.tsx reads them for the box.
+    <PaidCostsProvider costs={ASK_COSTS}>
+    <AskDashProvider source={FIXTURES} modelStart={modelStart}>
       <AppShell
         account="preview"
         module={null}
@@ -894,6 +915,7 @@ export function DashPageSurface({
         </Conversation>
       </AppShell>
     </AskDashProvider>
+    </PaidCostsProvider>
   );
 }
 

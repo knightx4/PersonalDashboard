@@ -116,6 +116,89 @@ describe('snapshot', () => {
     const snapshot = await new GithubVaultSource(config).snapshot('head');
     expect(snapshot.truncated).toBe(true);
   });
+
+  /** A repository listed folder by folder: each tree SHA maps to its own non-recursive listing. */
+  function stubWalk(folders: Record<string, StubResponse>) {
+    return stubFetch((url) => {
+      if (url.includes('?recursive=1')) {
+        return { body: { sha: 'head', truncated: true, tree: [{ path: 'Partial.md', type: 'blob', sha: 'sha-partial', size: 1 }] } };
+      }
+      const sha = decodeURIComponent(url.split('/git/trees/')[1]);
+      return folders[sha] ?? { status: 404 };
+    });
+  }
+
+  const walkFolders: Record<string, StubResponse> = {
+    head: {
+      body: {
+        sha: 'root',
+        tree: [
+          { path: 'Ideas.md', type: 'blob', sha: 'sha-ideas', size: 120 },
+          { path: 'Daily', type: 'tree', sha: 'tree-daily' },
+          { path: 'Attachments', type: 'tree', sha: 'tree-att' },
+          { path: 'vendored', type: 'commit', sha: 'sha-submodule' },
+        ],
+      },
+    },
+    'tree-daily': {
+      body: {
+        sha: 'tree-daily',
+        tree: [
+          { path: '2024-01-01.md', type: 'blob', sha: 'sha-daily', size: 80 },
+          { path: '2024', type: 'tree', sha: 'tree-2024' },
+        ],
+      },
+    },
+    'tree-2024': {
+      body: { sha: 'tree-2024', tree: [{ path: '03-02.md', type: 'blob', sha: 'sha-march', size: 60 }] },
+    },
+    'tree-att': {
+      body: { sha: 'tree-att', tree: [{ path: 'diagram.png', type: 'blob', sha: 'sha-png', size: 20_000 }] },
+    },
+  };
+
+  it('completes a truncated listing by walking every folder', async () => {
+    const calls = stubWalk(walkFolders);
+    const snapshot = await new GithubVaultSource(config).snapshot('head');
+
+    expect(snapshot.truncated).toBe(false);
+    expect(snapshot.entries).toEqual(
+      expect.arrayContaining([
+        { path: 'Ideas.md', blobSha: 'sha-ideas', sizeBytes: 120 },
+        { path: 'Daily/2024-01-01.md', blobSha: 'sha-daily', sizeBytes: 80 },
+        { path: 'Daily/2024/03-02.md', blobSha: 'sha-march', sizeBytes: 60 },
+      ]),
+    );
+    // The truncated response's own entries are not mixed in.
+    expect(snapshot.entries).toHaveLength(3);
+    expect(snapshot.attachments).toEqual([
+      { path: 'Attachments/diagram.png', blobSha: 'sha-png', sizeBytes: 20_000, mimeType: 'image/png', tooLarge: false },
+    ]);
+    // One recursive request, then one per folder; a submodule is not descended into.
+    expect(calls).toHaveLength(5);
+    expect(calls.slice(1).every((url) => !url.includes('recursive'))).toBe(true);
+    expect(calls.join(' ')).not.toContain('sha-submodule');
+  });
+
+  it('stays truncated when a nested folder is itself truncated', async () => {
+    stubWalk({
+      ...walkFolders,
+      'tree-2024': { body: { sha: 'tree-2024', truncated: true, tree: [] } },
+    });
+    const snapshot = await new GithubVaultSource(config).snapshot('head');
+    expect(snapshot.truncated).toBe(true);
+  });
+
+  it('stays truncated when a folder cannot be listed', async () => {
+    stubWalk({ ...walkFolders, 'tree-att': { status: 502 } });
+    const snapshot = await new GithubVaultSource(config).snapshot('head');
+    expect(snapshot.truncated).toBe(true);
+  });
+
+  it('still reports a rate limit hit during the walk as one', async () => {
+    stubWalk({ ...walkFolders, 'tree-daily': { status: 403, headers: { 'x-ratelimit-remaining': '0' } } });
+    await expect(new GithubVaultSource(config).snapshot('head')).rejects.toThrow(/rate limit/);
+  });
 });
 
 describe('diff', () => {

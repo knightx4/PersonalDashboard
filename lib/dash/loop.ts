@@ -10,6 +10,7 @@ import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
 import { whenDate, whenWeekday } from '@/lib/core/when';
+import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -48,8 +49,13 @@ import { whenDate, whenWeekday } from '@/lib/core/when';
  * calls; without it each call is one request.
  */
 
-/** The most lookups and proposals one answer may make. */
-export const MAX_LOOKUPS = 8;
+/**
+ * The most lookups and proposals one answer may make. Eight ran out on a
+ * question asked across the person's own notes (note e61dc888), which takes
+ * a search per kind of source and then opening the notes it found; the time
+ * and token budgets below still bound the answer.
+ */
+export const MAX_LOOKUPS = 12;
 /** Input tokens across the calls of one answer, cached and not, before it must answer. */
 export const INPUT_BUDGET = 150_000;
 /**
@@ -334,8 +340,7 @@ export type DashLookupEvent =
   | { phase: 'started'; id: string; index: number; name: string; input: unknown }
   | { phase: 'finished'; id: string; index: number; name: string; input: unknown; ok: boolean; result: unknown };
 
-/** Whether Dash has seen a row: a lookup returned it, or for some calls, the page shows it. */
-export type DashSeen = (table: string, ref: string) => boolean;
+export type { DashSeen } from './sets';
 
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type DashExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
@@ -472,6 +477,28 @@ export function answerFromLookups(
     lines.join('\n'),
   ].join('\n\n');
   return { body: body.slice(0, MAX_TURN), citations: listed };
+}
+
+/** The summary a made change's note carries ("Done: <summary> It shows under…"), or null. */
+export function madeSummary(note: string | undefined): string | null {
+  const match = note?.match(/^Done: ([\s\S]+?) (?:It shows under|They can undo|Its Undo)/);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * The answer given when the model could not finish after it had already made
+ * a change (note 11a68203): "Add to my calendar as dinner with Sam" added the
+ * event and then answered "I could not finish this answer", which read as if
+ * nothing was done. The change says what happened, in Dash's own voice, and
+ * the rows it returned are cited.
+ */
+export function answerFromWrites(
+  made: readonly string[],
+  rows: readonly TalkCitation[],
+): { body: string; citations: TalkCitation[] } | null {
+  if (made.length === 0) return null;
+  const said = made.map((summary) => summary.replace(/^Dash /, 'I ')).join(' ');
+  return { body: said.slice(0, MAX_TURN), citations: rows.slice(0, FALLBACK_ROWS) };
 }
 
 /** A stopped reply, in words for the person. */
@@ -769,9 +796,14 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       }
     : undefined;
+  // What the changes made in this answer did, for an answer the model did not finish.
+  const made: string[] = [];
+  const madeRows: TalkCitation[] = [];
   const fail = (detail: string, plain: string = detail): DashAnswer => {
     const cause = lastError ? `${plain} A lookup also failed: ${lastError}` : plain;
     console.error('ask answer did not finish', detail, lastError ? `(last lookup error: ${lastError})` : '');
+    const wrote = answerFromWrites(made, madeRows);
+    if (wrote) return { ok: true, body: wrote.body, toolCalls, citations: wrote.citations, stop: 'answered' };
     const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
@@ -791,18 +823,48 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // answers in this conversation cited, which tools returned then.
   const known = new Map<string, TalkCitation>();
   for (const turn of input.turns) for (const c of turn.citations ?? []) known.set(citationKey(c), c);
-  const seenByLookup: DashSeen = (table, ref) => known.has(citationKey({ table, ref }));
+  // The rows each query_rows lookup matched, kept for this answer under the
+  // name the model is told (plan #2472.1), and every row they hold, which
+  // counts as seen though most were never listed.
+  const sets = new Map<string, RowSet>();
+  const inSets = new Set<string>();
+  const seenByLookup: DashSeen = Object.assign(
+    (table: string, ref: string) => known.has(citationKey({ table, ref })) || inSets.has(citationKey({ table, ref })),
+    { sets },
+  );
+  /** Names the set a lookup matched, and tells the model its name; any other result is returned as it is. */
+  const named = (result: AskToolResult): AskToolResult => {
+    if (!result.ok || !result.matchedSet) return result;
+    const { table, refs, matched } = result.matchedSet;
+    const name = setName(sets.size + 1);
+    sets.set(name, { name, table, refs, size: matched });
+    for (const ref of refs) inSets.add(citationKey({ table, ref }));
+    const said =
+      matched === 0
+        ? `This lookup is kept as ${name}, which is empty.`
+        : refs.length >= matched
+          ? `All ${matched} matched rows, listed or not, are kept as ${name}: a change that takes a set can name it instead of listing them.`
+          : `The ${matched} matched rows are kept as ${name}, but a change takes at most ${SET_CAP}, so narrow the lookup before changing them.`;
+    return {
+      ...result,
+      totals: { ...(result.totals ?? {}), set: name },
+      note: result.note ? `${result.note} ${said}` : said,
+    };
+  };
   // A hand-off or a write may also name the row the page shows, or the row
   // the thread hangs from (plan #1465).
   const row = context.page?.row;
   const subject = context.subject ? parseRef(context.subject.ref) : null;
   const sent = context.page?.list;
   const sentRefs = new Set(sent ? sent.rows.map((r) => r.ref) : []);
-  const seenOrShown: DashSeen = (table, ref) =>
-    seenByLookup(table, ref) ||
-    (sent?.table === table && sentRefs.has(ref)) ||
-    (row?.table === table && row.ref === ref) ||
-    (subject?.table === table && subject.id === ref);
+  const seenOrShown: DashSeen = Object.assign(
+    (table: string, ref: string) =>
+      seenByLookup(table, ref) ||
+      (sent?.table === table && sentRefs.has(ref)) ||
+      (row?.table === table && row.ref === ref) ||
+      (subject?.table === table && subject.id === ref),
+    { sets },
+  );
 
   const now = input.now ?? Date.now;
   const started = now();
@@ -824,7 +886,14 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     if (tool?.kind === 'write') {
       if (!input.write) return Promise.resolve({ ok: false, error: NO_WRITES });
-      return input.write(tool, args, seenOrShown);
+      return input.write(tool, args, seenOrShown).then((result) => {
+        const summary = result.ok ? madeSummary(result.note) : null;
+        if (summary && result.ok) {
+          made.push(summary);
+          madeRows.push(...citationsOf(result));
+        }
+        return result;
+      });
     }
     if (tool?.kind === 'paid') {
       if (!input.queue) return Promise.resolve({ ok: false, error: NO_QUEUE });
@@ -1094,7 +1163,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       }),
     );
     const blocks: Anthropic.ToolResultBlockParam[] = uses.map((use, i) => {
-      const result = results[i];
+      const result = named(results[i]);
       const kept = keptResult(result);
       toolCalls.push({ name: use.name, input: use.input, result: kept });
       hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });

@@ -2810,7 +2810,7 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     });
     if (direction === 'outbound') {
       try {
-        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact'] });
+        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'connected'] });
       } catch (error) {
         return backOutContact(env, undo, error, 'change_touch');
       }
@@ -2829,6 +2829,7 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       if (!written) throw new Error('Changing the touch failed: no row');
       touch = written;
     } else {
+      if (before.draft === true) throw new JobsRefused('That touch is a draft that has not been sent, so nothing can have answered it.');
       if (before.responded_at) throw new JobsRefused('That touch is marked answered already.');
       const summary = given(args, 'response') ? clearable(args, 'response', MESSAGE_MAX) : null;
       const written = await changeKept(env, undo, 'contact_touches', before, { responded_at: new Date().toISOString(), response_summary: summary });
@@ -2937,8 +2938,8 @@ async function markSuggestionSent(env: JobsWriteEnv, args: Args): Promise<JobsMa
         message: suggestion.message ?? null,
         sent_at: new Date().toISOString(),
       });
-      if (contact.status === 'to_contact' || contact.status === 'dormant') {
-        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'dormant'] });
+      if (contact.status === 'to_contact' || contact.status === 'connected' || contact.status === 'dormant') {
+        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'connected', 'dormant'] });
       }
     }
     const closed: Row = { status: 'done', acted_at: new Date().toISOString() };
