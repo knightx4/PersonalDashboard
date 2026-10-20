@@ -32,6 +32,7 @@ const contact = {
       sentAt: '2026-09-30T10:00:00Z',
       respondedAt: null,
       message: 'Asked about the team',
+      draft: false,
     },
   ],
 };

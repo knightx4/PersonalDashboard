@@ -26,11 +26,11 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
       .maybeSingle(),
     supabase
       .from('contact_touches')
-      .select('id, channel, direction, sent_at, responded_at, message')
+      // Drafts come too: the page shows them apart from the sends and leaves
+      // them out of every count of what was sent.
+      .select('id, channel, direction, sent_at, responded_at, message, draft')
       .eq('contact_id', id)
       .eq('user_id', user.id)
-      // Drafts are not sends: #2457.3 shows them apart, then drops this filter.
-      .eq('draft', false)
       .order('sent_at', { ascending: false }),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
   ]);
@@ -98,6 +98,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
             sentAt: touch.sent_at as string,
             respondedAt: (touch.responded_at as string) ?? null,
             message: (touch.message as string) ?? null,
+            draft: touch.draft === true,
           })),
         }}
       />

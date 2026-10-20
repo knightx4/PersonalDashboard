@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { PenLine, Pencil, Plus, Send, Trash2, X } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -11,7 +11,9 @@ import { ChipSelect, InlineInput, InlineTextarea, Switch, Textarea } from '@/com
 import { IconButton } from '@/components/ui/icon-button';
 import { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
+import { useToast } from '@/components/ui/toast';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CopyText } from '../../roles/[id]/copy-text';
 import {
@@ -20,6 +22,7 @@ import {
   draftContactMessage,
   logTouch,
   markTouchAnswered,
+  markTouchSent,
   updateContact,
   updateTouch,
   type ContactPatch,
@@ -42,7 +45,16 @@ const words = (value: string) => value.replace(/_/g, ' ');
  * over the whole card. Now each value is its own input set like the text it
  * stands for (law 12), and leaving it saves.
  */
-export function ContactDetail({ contact: initial, timezone }: { contact: ContactRow; timezone: string }) {
+export function ContactDetail({
+  contact: initial,
+  timezone,
+  preview,
+}: {
+  contact: ContactRow;
+  timezone: string;
+  /** The gallery's way to draw the outreach with a hidden part showing. */
+  preview?: OutreachPreview;
+}) {
   const [contact, setContact] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -64,7 +76,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
   return (
     <div className="space-y-4">
       <ContactDetails contact={contact} save={save} error={error} />
-      <Outreach contact={contact} setContact={setContact} timezone={timezone} />
+      <Outreach contact={contact} setContact={setContact} timezone={timezone} preview={preview} />
       <CardSection title="Notes">
         <EditableProse
           value={contact.notes ?? ''}
@@ -240,6 +252,7 @@ function ContactDetails({
               label="How you connect"
               value={contact.howWeConnect}
               placeholder="Same university, a friend's colleague…"
+              wrap
               onSave={(howWeConnect) => save({ howWeConnect }, { howWeConnect: howWeConnect || null })}
             />
           }
@@ -277,12 +290,15 @@ function DetailInput({
   placeholder,
   type = 'text',
   href,
+  wrap = false,
   onSave,
 }: {
   label: string;
   value: string | null;
   placeholder?: string;
   type?: 'text' | 'email' | 'url';
+  /** A sentence rather than a name: at rest it wraps as text, and pressing it opens the input (law 14). */
+  wrap?: boolean;
   /** Where the value goes, opened when it is pressed. */
   href?: string | null;
   onSave: (next: string) => void;
@@ -304,6 +320,19 @@ function DetailInput({
           <Pencil strokeWidth={1.75} aria-hidden />
         </IconButton>
       </span>
+    );
+  }
+
+  if (wrap && value && !editing) {
+    return (
+      <button
+        type="button"
+        title={`Edit ${label}`}
+        onClick={() => setEditing(true)}
+        className="-ml-1 w-full rounded-control px-1 py-0.5 text-left text-body text-ink transition-colors duration-quick hover:bg-sunken max-sm:min-h-11 sm:text-ui"
+      >
+        {value}
+      </button>
     );
   }
 
@@ -339,26 +368,58 @@ function linkText(value: string): string {
 }
 
 /**
- * Drafting a message and the log of what was sent. Dash's draft sits above
- * the log until it is logged as sent, which writes it into the log with its
- * words, or put away. A send made some other way is logged with one press and
- * described on its own line afterwards.
+ * How the gallery holds a part of the outreach open that a person only sees
+ * after doing something: the composer, a draft's controls as hover shows
+ * them, and the line a failed draft action leaves under it.
+ */
+export interface OutreachPreview {
+  compose?: { by: Composer['by']; subject?: string; message: string };
+  revealDraftId?: string;
+  draftError?: { id: string; text: string };
+}
+
+/** The message being written: Dash's draft, or one typed from blank. */
+interface Composer {
+  by: 'dash' | 'you';
+  subject: string;
+  message: string;
+}
+
+type Touch = ContactRow['touches'][number];
+
+/** Newest first, the order the log has always read in. */
+const newestFirst = (a: Touch, b: Touch) => b.sentAt.localeCompare(a.sentAt);
+
+/**
+ * Drafting a message, the drafts kept for later and the log of what was sent.
+ * A message, Dash's or typed, sits above the log until it is logged as sent,
+ * which writes it into the log with its words, kept as a draft, or put away.
+ * Drafts sit in their own list above the log and count for nothing until
+ * they are marked sent. A send made some other way is logged with one press
+ * and described on its own line afterwards.
  */
 function Outreach({
   contact,
   setContact,
   timezone,
+  preview,
 }: {
   contact: ContactRow;
   setContact: React.Dispatch<React.SetStateAction<ContactRow>>;
   timezone: string;
+  preview?: OutreachPreview;
 }) {
   // The send just logged, whose words are where the caret goes next.
   const [freshId, setFreshId] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
-  const outbound = contact.touches.filter((t) => t.direction === 'outbound');
+  // Drafts are not sends: they are listed apart and left out of the count
+  // in the heading, the unanswered count and the channel the next send takes.
+  const drafts = contact.touches.filter((t) => t.draft).sort(newestFirst);
+  const sends = contact.touches.filter((t) => !t.draft).sort(newestFirst);
+  const outbound = sends.filter((t) => t.direction === 'outbound');
   const pendingReply = outbound.filter((t) => t.respondedAt === null);
   // A new send goes out the way the last one did: email when there is only
   // an address, LinkedIn otherwise.
@@ -372,9 +433,13 @@ function Outreach({
   const [aim, setAim] = useState('');
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ subject: string; message: string } | null>(null);
+  const [composer, setComposer] = useState<Composer | null>(
+    preview?.compose ? { subject: '', ...preview.compose } : null,
+  );
+  // What went wrong on one draft, said under it.
+  const [rowError, setRowError] = useState<{ id: string; text: string } | null>(preview?.draftError ?? null);
 
-  function patchTouch(id: string, patch: Partial<ContactRow['touches'][number]>) {
+  function patchTouch(id: string, patch: Partial<Touch>) {
     setContact((current) => ({
       ...current,
       touches: current.touches.map((touch) => (touch.id === id ? { ...touch, ...patch } : touch)),
@@ -390,7 +455,7 @@ function Outreach({
         setDraftError(result.error ?? 'Nothing came back.');
         return;
       }
-      setDraft({ subject: result.draft.subject ?? '', message: result.draft.message });
+      setComposer({ by: 'dash', subject: result.draft.subject ?? '', message: result.draft.message });
     } catch {
       setDraftError('Drafting stopped before it finished. Try again.');
     } finally {
@@ -398,30 +463,91 @@ function Outreach({
     }
   }
 
-  /** Logs a send now on `on`, with its words when there are any. */
-  function log(on: Channel, message?: string, after?: () => void) {
+  /**
+   * Logs a send now on `on`, with its words when there are any, or keeps
+   * them as a draft when `asDraft` is set.
+   */
+  function log(on: Channel, message?: string, after?: () => void, asDraft = false) {
     startTransition(async () => {
       setNote(null);
-      const result = await logTouch({ contactId: contact.id, channel: on, direction: 'outbound', message });
+      const result = await logTouch({ contactId: contact.id, channel: on, direction: 'outbound', message, draft: asDraft });
       if (result.error || !result.touch) {
-        setNote(result.error ?? 'Could not log that send.');
+        setNote(result.error ?? (asDraft ? 'Could not save that draft.' : 'Could not log that send.'));
         return;
       }
       const touch = result.touch;
-      if (!message) setFreshId(touch.id);
+      if (!message && !asDraft) setFreshId(touch.id);
       setContact((current) => ({
         ...current,
-        status: current.status === 'to_contact' || current.status === 'connected' ? 'contacted' : current.status,
+        status:
+          !asDraft && (current.status === 'to_contact' || current.status === 'connected')
+            ? 'contacted'
+            : current.status,
         touches: [touch, ...current.touches],
       }));
       after?.();
     });
   }
 
-  const draftText = draft
-    ? draft.subject.trim()
-      ? `Subject: ${draft.subject.trim()}\n\n${draft.message}`
-      : draft.message
+  /** The draft becomes a send, at the time it is marked; put back if that fails. */
+  function markSent(draft: Touch) {
+    const before = contact;
+    setRowError(null);
+    setContact((current) => ({
+      ...current,
+      status: current.status === 'to_contact' || current.status === 'connected' ? 'contacted' : current.status,
+      touches: current.touches.map((t) =>
+        t.id === draft.id ? { ...t, draft: false, sentAt: new Date().toISOString() } : t,
+      ),
+    }));
+    startTransition(async () => {
+      const result = await markTouchSent(draft.id);
+      if (result.error) {
+        setContact(before);
+        setRowError({ id: draft.id, text: `Not marked sent: ${result.error}` });
+        return;
+      }
+      if (result.sentAt) patchTouch(draft.id, { sentAt: result.sentAt });
+    });
+  }
+
+  /**
+   * A draft goes without asking, since Undo brings it back: the same words
+   * on the same channel, saved again as a draft.
+   */
+  function removeDraft(draft: Touch) {
+    setRowError(null);
+    setContact((current) => ({ ...current, touches: current.touches.filter((t) => t.id !== draft.id) }));
+    startTransition(async () => {
+      const result = await deleteTouch(draft.id);
+      if (result.error) {
+        setContact((current) => ({ ...current, touches: [draft, ...current.touches] }));
+        setRowError({ id: draft.id, text: `Not deleted: ${result.error}` });
+        return;
+      }
+      toast({
+        text: 'Draft deleted',
+        undone: 'Draft back',
+        undo: async () => {
+          const back = await logTouch({
+            contactId: contact.id,
+            channel: draft.channel as Channel,
+            direction: 'outbound',
+            message: draft.message ?? undefined,
+            draft: true,
+          });
+          if (back.error || !back.touch) throw new Error(back.error ?? 'Not saved');
+          const restored = back.touch;
+          setContact((current) => ({ ...current, touches: [restored, ...current.touches] }));
+        },
+      });
+    });
+  }
+
+  const composed = composer
+    ? composer.subject.trim()
+      ? `Subject: ${composer.subject.trim()}\n\n${composer.message}`
+      : composer.message
     : '';
 
   return (
@@ -467,7 +593,7 @@ function Outreach({
           what="Cost of drafting the message"
           onClick={() => void runDraft()}
         >
-          {drafting ? 'Drafting…' : draft ? 'Draft again' : 'Draft a message'}
+          {drafting ? 'Drafting…' : composer?.by === 'dash' ? 'Draft again' : 'Draft a message'}
         </DashAction>
       </div>
 
@@ -477,29 +603,33 @@ function Outreach({
         </p>
       )}
 
-      {draft && (
+      {composer && (
         <Note tone="accent" glyph={false} className="mt-3 space-y-2 px-3 py-2">
           <p className="text-small text-ink-muted">
-            Dash&apos;s draft, as {words(channel)}. Edit it here, send it yourself, then log it.
+            {composer.by === 'dash'
+              ? `Dash's draft, as ${words(channel)}. Edit it here, send it yourself, then log it, or keep it as a draft for later.`
+              : `Your message, as ${words(channel)}. Log it once you have sent it, or keep it as a draft for later.`}
           </p>
           {channel === 'email' && (
             <InlineInput
               aria-label="Subject"
-              value={draft.subject}
+              value={composer.subject}
               placeholder="Subject"
-              onChange={(event) => setDraft({ ...draft, subject: event.target.value })}
+              onChange={(event) => setComposer({ ...composer, subject: event.target.value })}
               className="font-medium"
             />
           )}
           <Textarea
-            aria-label="The drafted message"
+            aria-label="The message"
             rows={6}
-            value={draft.message}
-            onChange={(event) => setDraft({ ...draft, message: event.target.value })}
+            value={composer.message}
+            placeholder="What you want to say"
+            autoFocus={composer.by === 'you' && !preview}
+            onChange={(event) => setComposer({ ...composer, message: event.target.value })}
           />
           {channel === 'linkedin_connect' && (
             <p className="tabular text-small text-ink-muted">
-              {draft.message.length} of 300 characters
+              {composer.message.length} of 300 characters
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -507,52 +637,113 @@ function Outreach({
               type="button"
               size="sm"
               pending={pending}
-              onClick={() => log(channel, draftText, () => setDraft(null))}
+              disabled={!composed.trim()}
+              onClick={() => log(channel, composed, () => setComposer(null))}
             >
               Log as sent
             </Button>
-            <CopyText text={draftText} what="message" />
-            <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(null)}>
-              Put away
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending || !composed.trim()}
+              onClick={() => log(channel, composed, () => setComposer(null), true)}
+            >
+              Save as draft
             </Button>
+            <CopyText text={composed} what="message" />
+            <IconButton label="Put away" size="sm" onClick={() => setComposer(null)}>
+              <X strokeWidth={1.75} aria-hidden />
+            </IconButton>
           </div>
         </Note>
       )}
 
+      {drafts.length > 0 && (
+        <section aria-label="Drafts" className="mt-3">
+          <h3 className="text-small font-medium text-ink-muted">
+            Not sent yet
+          </h3>
+          <ul className="mt-1 divide-y divide-border border-t border-border">
+            {drafts.map((draft) => (
+              <DraftRow
+                key={draft.id}
+                draft={draft}
+                timezone={timezone}
+                disabled={pending}
+                revealed={preview?.revealDraftId === draft.id}
+                error={rowError?.id === draft.id ? rowError.text : null}
+                onChannel={(next) => {
+                  patchTouch(draft.id, { channel: next });
+                  startTransition(async () => {
+                    const result = await updateTouch(draft.id, { channel: next });
+                    if (result.error) setRowError({ id: draft.id, text: result.error });
+                  });
+                }}
+                onWords={(message) => {
+                  if (message === (draft.message ?? '')) return;
+                  patchTouch(draft.id, { message: message || null });
+                  startTransition(async () => {
+                    const result = await updateTouch(draft.id, { message });
+                    if (result.error) setRowError({ id: draft.id, text: result.error });
+                  });
+                }}
+                onMarkSent={() => markSent(draft)}
+                onDelete={() => removeDraft(draft)}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Logging a send made some other way is one press: it records the
           send now, on the channel the last one went out on, and the new line
-          in the log is where its channel and words are filled in (law 12). */}
+          in the log is where its channel and words are filled in (law 12).
+          Writing one to keep opens the same box Dash's draft does, empty. */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <Button type="button" size="sm" variant="ghost" pending={pending} onClick={() => log(lastChannel)}>
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Log a send
         </Button>
+        {!composer && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setComposer({ by: 'you', subject: '', message: '' })}
+          >
+            <PenLine className="size-4" strokeWidth={1.75} aria-hidden />
+            Write a message
+          </Button>
+        )}
         {note && <span className="text-small text-ink-muted">{note}</span>}
       </div>
 
-      {contact.touches.length > 0 ? (
+      {sends.length > 0 ? (
         <ul className="mt-2 divide-y divide-border border-t border-border">
-          {contact.touches.map((touch) => (
+          {sends.map((touch) => (
             <li key={touch.id} className="row-pad flex flex-wrap items-center gap-2 text-ui">
               <span className="tabular w-24 text-ink-muted">{formatDate(touch.sentAt, timezone)}</span>
-              <ChipSelect
-                aria-label="How it went out"
-                value={touch.channel}
-                onChange={(event) => {
-                  const next = event.target.value as Channel;
-                  patchTouch(touch.id, { channel: next });
-                  startTransition(async () => {
-                    const result = await updateTouch(touch.id, { channel: next });
-                    if (result.error) setNote(result.error);
-                  });
-                }}
-              >
-                {CHANNELS.map((entry) => (
-                  <option key={entry} value={entry}>
-                    {words(entry)}
-                  </option>
-                ))}
-              </ChipSelect>
+              <PressRoom>
+                <ChipSelect
+                  aria-label="How it went out"
+                  value={touch.channel}
+                  onChange={(event) => {
+                    const next = event.target.value as Channel;
+                    patchTouch(touch.id, { channel: next });
+                    startTransition(async () => {
+                      const result = await updateTouch(touch.id, { channel: next });
+                      if (result.error) setNote(result.error);
+                    });
+                  }}
+                >
+                  {CHANNELS.map((entry) => (
+                    <option key={entry} value={entry}>
+                      {words(entry)}
+                    </option>
+                  ))}
+                </ChipSelect>
+              </PressRoom>
               <span className="text-ink-muted">{touch.direction}</span>
               {/* The answer stays on the first line with the date and the
                   channel, and the words take the line below, so every send
@@ -620,6 +811,89 @@ function Outreach({
 }
 
 /**
+ * One kept draft: labelled a draft with the day it was saved, its channel and
+ * words edited where they are read as a send's are, and Mark sent and Delete
+ * at the end of its first line. Those two show on hover or focus with a
+ * mouse, and always on a touch screen, which has no hover.
+ */
+function DraftRow({
+  draft,
+  timezone,
+  disabled,
+  revealed,
+  error,
+  onChannel,
+  onWords,
+  onMarkSent,
+  onDelete,
+}: {
+  draft: Touch;
+  timezone: string;
+  disabled: boolean;
+  /** Held showing, as hover shows it (the gallery). */
+  revealed: boolean;
+  error: string | null;
+  onChannel: (next: Channel) => void;
+  onWords: (message: string) => void;
+  onMarkSent: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <li className="group/draft row-pad flex flex-wrap items-center gap-2 text-ui">
+      {/* Drawn in ink with a pencil, since a draft is a state and not a
+          colour (law 4); the day is when it was saved. */}
+      <span className="tabular inline-flex items-center gap-1 text-ink-muted">
+        <PenLine className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <span className="font-medium text-ink">Draft</span>
+        <span aria-hidden>·</span>
+        <span>{formatDate(draft.sentAt, timezone)}</span>
+      </span>
+      <PressRoom>
+        <ChipSelect
+          aria-label="How it will go out"
+          value={draft.channel}
+          onChange={(event) => onChannel(event.target.value as Channel)}
+        >
+          {CHANNELS.map((entry) => (
+            <option key={entry} value={entry}>
+              {words(entry)}
+            </option>
+          ))}
+        </ChipSelect>
+      </PressRoom>
+      <span
+        className={cn(
+          'ml-auto flex items-center gap-1 transition-opacity duration-quick',
+          // A phone is a touch screen, whose shots have no coarse pointer to
+          // say so: below the phone break they show as on touch.
+          'group-hover/draft:opacity-100 group-focus-within/draft:opacity-100 pointer-coarse:opacity-100 max-sm:opacity-100',
+          revealed ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        {/* On a phone the line has room for the send glyph alone, so the
+            draft stays two lines: its label and its words. */}
+        <Button type="button" size="sm" variant="ghost" className="max-sm:hidden" disabled={disabled} onClick={onMarkSent}>
+          <Send className="size-4" strokeWidth={1.75} aria-hidden />
+          Mark sent
+        </Button>
+        <IconButton label="Mark sent" size="sm" className="sm:hidden" disabled={disabled} onClick={onMarkSent}>
+          <Send strokeWidth={1.75} aria-hidden />
+        </IconButton>
+        <IconButton label="Delete this draft" size="sm" disabled={disabled} onClick={onDelete}>
+          <Trash2 strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </span>
+      <SendWords message={draft.message} startEditing={false} placeholder="The message, when you write it" onSave={onWords} />
+      {error && (
+        <p role="alert" className="basis-full text-small text-danger">
+          {error}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/**
  * Taking a send out of the log, at the end of its first line (note 0e5c4181).
  * The bin asks first, on the same line, since a send logged by mistake is
  * one press away from one logged on purpose.
@@ -668,10 +942,12 @@ function RemoveSend({ disabled, onRemove }: { disabled: boolean; onRemove: () =>
 function SendWords({
   message,
   startEditing,
+  placeholder = 'What you said, roughly',
   onSave,
 }: {
   message: string | null;
   startEditing: boolean;
+  placeholder?: string;
   onSave: (message: string) => void;
 }) {
   const [editing, setEditing] = useState(startEditing);
@@ -683,9 +959,10 @@ function SendWords({
         type="button"
         onClick={() => setEditing(true)}
         title="Edit what you said"
-        className={`${box} rounded-control px-1 py-0.5 text-left text-ui transition-colors duration-quick hover:bg-sunken ${message ? 'text-ink-muted' : 'text-ink-ghost'}`}
+        /* ui-ok: the words are the button that opens their editor, so a link inside would nest one press in another */
+        className={`${box} whitespace-pre-line rounded-control px-1 py-0.5 text-left text-ui transition-colors duration-quick hover:bg-sunken ${message ? 'text-ink-muted' : 'text-ink-ghost'}`}
       >
-        {message || 'What you said, roughly'}
+        {message || placeholder}
       </button>
     );
   }
@@ -694,7 +971,7 @@ function SendWords({
     <InlineTextarea
       aria-label="What you said"
       defaultValue={message ?? ''}
-      placeholder="What you said, roughly"
+      placeholder={placeholder}
       autoFocus
       className={`${box} text-ink-muted`}
       onBlur={(event) => {
