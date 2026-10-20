@@ -458,6 +458,13 @@ lens. It is fired by hand, since every call spends, and each topic it drafts
 is approved as drafted, as above. A territory may declare `areas`, each topic
 naming its `area`; adding `&area=<area>` drafts only that area's topics not yet
 drafted (plan #2483.1), so one area can be paid for without the others.
+A text may name the `areas` it serves; an area's topics are drafted from its
+own texts and those naming none, so each area stays within the sources one
+drafting call takes. Without `&area`, a call drafts the first area that has
+topics left (plan #2483.2). The business pack is the `business` territory,
+with corporate finance, accounting, banking, strategy and operations as its
+areas; its SaaS area is the `saas-metrics` territory, kept under its own key
+with its own sources, since part of it is already drafted.
 
 A territory also reads the structure store of syllabi, calendars and tables
 of contents (plan #2247.10). Its goal and performances are embedded as

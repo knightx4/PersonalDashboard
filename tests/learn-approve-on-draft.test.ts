@@ -235,7 +235,7 @@ describe('a topic drafted in a territory tick', () => {
     expect(levels(uncited).find((c) => c.level === 2)).toMatchObject({ canonicality: 'personal' });
   });
 
-  it('drafts only the named area, and every area when none is named (plan #2483.1)', async () => {
+  it('drafts only the named area, and the first area with topics left when none is named (plans #2483.1, #2483.2)', async () => {
     const areaTerritory: Territory = {
       ...territory,
       areas: ['accounting', 'banking'],
