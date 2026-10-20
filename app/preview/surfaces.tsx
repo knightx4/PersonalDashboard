@@ -8782,6 +8782,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-insights-reread',
+    label: 'You · Insights, full re-read hint open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ reread: true }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-evidence',
     label: 'You · Insights, evidence open',
     module: 'you',
