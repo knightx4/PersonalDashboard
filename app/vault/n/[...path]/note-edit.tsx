@@ -4,6 +4,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { ComposeBox, FieldError, InlineInput } from '@/components/ui/field';
 import { MarkdownEditor } from '@/components/learn/markdown-editor';
@@ -270,8 +271,9 @@ export function SaveError({ state, onReload }: { state: SaveNoteState; onReload:
 
   if (state.reason === 'changed') {
     return (
-      <div role="alert" className="mt-3 space-y-2">
-        <p className="text-ui text-danger">
+      <Banner tone="bad" role="alert" className="mt-3">
+        <div className="space-y-2">
+        <p className="text-ui">
           This note changed in Obsidian since you opened it, so your edit was not saved.
           Reloading shows that version and drops what you typed here, so copy anything you want
           to keep first.
@@ -279,14 +281,16 @@ export function SaveError({ state, onReload }: { state: SaveNoteState; onReload:
         <Button type="button" size="sm" variant="secondary" onClick={onReload}>
           Reload the note
         </Button>
-      </div>
+        </div>
+      </Banner>
     );
   }
 
   if (state.reason === 'read-only' || state.reason === 'reconnect') {
     return (
-      <div role="alert" className="mt-3 space-y-1">
-        <p className="text-ui text-danger">
+      <Banner tone="bad" role="alert" className="mt-3">
+        <div className="space-y-1">
+        <p className="text-ui">
           {state.reason === 'read-only'
             ? 'The vault token can read notes but not save them, so your edit was not saved. Add a token that can write in vault settings.'
             : 'The vault needs reconnecting before notes can be saved, so your edit was not saved.'}
@@ -298,7 +302,8 @@ export function SaveError({ state, onReload }: { state: SaveNoteState; onReload:
           Open vault settings
           <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
         </Link>
-      </div>
+        </div>
+      </Banner>
     );
   }
 
