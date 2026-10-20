@@ -98,6 +98,8 @@ import { CriticStop } from './critic-stop';
 import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
+import { projectById } from '@/lib/plan/projects';
+import type { RoutineKey } from '@/lib/feedback/routine-names';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
 import { PlanPictures } from '@/components/dev/plan-pictures';
@@ -255,6 +257,15 @@ function SetupJob({
 }
 
 /**
+ * The routine Send and Build all hand a row to (plan #2459.5): a project's
+ * own routine for a row filed under a project, the plan routine otherwise
+ * (`builderFor` in lib/plan/handover.ts).
+ */
+function sendsTo(node: PlanNode): RoutineKey {
+  return projectById(node.module) ? 'project' : 'plan';
+}
+
+/**
  * What pressing Send actually sends, said before it is pressed.
  *
  * The brief carries the step's whole subtree under "## Steps", so Send on a
@@ -371,6 +382,7 @@ function SendToClaude({
         // raises the question on the row, and answering it is what sends --
         // one question in one place, however Send was reached.
         <DashAction
+          routine={sendsTo(node)}
           type="button"
           size="sm"
           variant="secondary"
@@ -384,6 +396,7 @@ function SendToClaude({
         <form action={action}>
           <input type="hidden" name="id" value={node.id} />
           <DashAction
+            routine={sendsTo(node)}
             type="submit"
             size="sm"
             variant="secondary"
@@ -403,6 +416,7 @@ function SendToClaude({
         <form action={overhaulAction}>
           <input type="hidden" name="id" value={node.id} />
           <DashAction
+            routine="overhaul"
             type="submit"
             size="sm"
             variant="secondary"
@@ -424,6 +438,7 @@ function SendToClaude({
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
           <DashAction
+            routine={sendsTo(node)}
             type="submit"
             size="sm"
             variant="ghost"
@@ -445,6 +460,7 @@ function SendToClaude({
         <form action={reshapeAction}>
           <input type="hidden" name="id" value={node.id} />
           <DashAction
+            routine="plan"
             type="submit"
             size="sm"
             variant="ghost"
@@ -1471,6 +1487,7 @@ export function usePlanRow({
     closed || node.track === 'overhaul' ? null : quietAsk ? (
       <Tooltip label={quietAsk} align="end">
         <DashAction
+          routine={sendsTo(node)}
           type="button"
           size="sm"
           variant="secondary"
@@ -1486,6 +1503,7 @@ export function usePlanRow({
         <input type="hidden" name="id" value={node.id} />
         <Tooltip label={sendTip(node)} align="end">
           <DashAction
+            routine={sendsTo(node)}
             type="submit"
             size="sm"
             variant="secondary"

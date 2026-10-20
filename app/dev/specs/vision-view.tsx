@@ -6,6 +6,7 @@ import { Pencil } from 'lucide-react';
 import { saveModuleVision, type VisionActionState } from './actions';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
 import { FieldError, FieldHint, Textarea } from '@/components/ui/field';
 import { commentWhen } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -75,6 +76,8 @@ export function ModuleVisionPanel({
           <Button type="submit" size="sm" pending={pending}>
             {pending ? 'Saving…' : 'Save the vision'}
           </Button>
+          {/* Saving re-reads the workspace's open features against the new vision (plan #1137). */}
+          <CostHint routine="plan" what="Where the re-read goes" />
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
             Cancel
           </Button>
