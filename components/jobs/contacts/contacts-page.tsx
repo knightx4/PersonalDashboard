@@ -427,7 +427,7 @@ function ReachedChips({
           className={toggleChipClass(reached === chip.value)}
         >
           {chip.label}
-          <span className="tabular opacity-70">{chip.count}</span>
+          <span className="tabular">{chip.count}</span>
         </Link>
       ))}
     </div>
