@@ -55,6 +55,6 @@ describe('closedSummary', () => {
         closedOn: null,
         interviewCount: 0,
       }),
-    ).toBe('Turned down, before an application went in.');
+    ).toBe('Dropped, before an application went in.');
   });
 });

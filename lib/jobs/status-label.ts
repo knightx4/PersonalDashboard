@@ -25,11 +25,13 @@ const LABELS: Record<ApplicationStatus, string> = {
 
 /**
  * `withdrawn` covers two different things you did: pulled an application
- * already in flight, or turned down a lead before ever applying to it. The
+ * already in flight, or dropped a lead before ever applying to it. The
  * status and the event underneath are the same either way -- only the label
- * changes, based on whether it was ever actually submitted.
+ * changes, based on whether it was ever actually submitted. "Dropped" is the
+ * person's own word for no longer pursuing a role (note f616666c); it read
+ * "Turned down" before, which they did not recognise as that status.
  */
 export function statusLabel(status: ApplicationStatus, everSubmitted = true): string {
-  if (status === 'withdrawn' && !everSubmitted) return 'Turned down';
+  if (status === 'withdrawn' && !everSubmitted) return 'Dropped';
   return LABELS[status] ?? status;
 }
