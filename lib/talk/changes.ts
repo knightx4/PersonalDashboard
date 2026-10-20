@@ -20,6 +20,7 @@ import {
   type InterviewChangeKind,
 } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS, type PostChangeInput, type PostChangeKind } from '@/lib/ask/post-changes';
+import { MODEL_CHANGE_KINDS, type ModelChangeInput, type ModelChangeKind } from '@/lib/ask/model-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PaidActionInput } from '@/lib/dash/paid-input';
 import type { DeleteRowsInput } from '@/lib/ask/delete-rows';
@@ -86,6 +87,8 @@ export const DASH_CHANGE_KINDS = [
   ...INTERVIEW_CHANGE_KINDS,
   // A post draft's text rewritten, in the same shape (lib/ask/post-changes.ts, plan #2202.1).
   ...POST_CHANGE_KINDS,
+  // The model Dash answers with, switched when asked (lib/ask/model-changes.ts, plan #2458.4).
+  ...MODEL_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -229,7 +232,8 @@ export type DashChangeInput = {
   Record<VaultChangeKind, VaultChangeInput> &
   Record<JobsChangeKind, JobsChangeInput> &
   Record<InterviewChangeKind, InterviewChangeInput> &
-  Record<PostChangeKind, PostChangeInput>;
+  Record<PostChangeKind, PostChangeInput> &
+  Record<ModelChangeKind, ModelChangeInput>;
 
 /**
  * The kinds Dash proposes for a Confirm: the four from before plan #1440,
