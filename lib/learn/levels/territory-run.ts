@@ -131,7 +131,14 @@ export async function draftTerritoryTick(
   clients: { learn: LearnSupabaseClient; jobs: AppSupabaseClient },
   owner: string,
   territory: Territory,
-  input: { anthropicApiKey: string; budgetMs: number; now?: () => number; catalogue?: postgres.Sql },
+  input: {
+    anthropicApiKey: string;
+    budgetMs: number;
+    now?: () => number;
+    catalogue?: postgres.Sql;
+    /** Draft only this area's remaining topics (plan #2483.1); every area when absent. */
+    area?: string;
+  },
 ): Promise<TerritoryTick> {
   const now = input.now ?? Date.now;
   const started = now();
@@ -142,7 +149,10 @@ export async function draftTerritoryTick(
 
   const { data: had, error } = await learn.from('topics').select('asked').eq('user_id', owner);
   if (error) throw new Error(`Reading the topics already drafted failed: ${error.message}`);
-  const left = topicsLeft(territory, ((had ?? []) as { asked: string | null }[]).map((t) => t.asked));
+  const askedBefore = ((had ?? []) as { asked: string | null }[]).map((t) => t.asked);
+  const left = topicsLeft(territory, askedBefore, input.area);
+  // The first tick of the territory, whichever area it is drafted for: nothing of it is drafted yet.
+  const firstTick = topicsLeft(territory, askedBefore).length === territory.topics.length;
 
   const [frames, lens] = await Promise.all([
     learn.from('area_check_articles').select('id, title').eq('level', 4).in('title', [...new Set(left.map((t) => t.frame))]),
@@ -166,7 +176,7 @@ export async function draftTerritoryTick(
   const goal = territory.goal ?? { name: territory.name, about: null };
   const catalogue = input.catalogue;
   const read = catalogue
-    ? await withTerritoryStore(territory, given, left.length === territory.topics.length, {
+    ? await withTerritoryStore(territory, given, firstTick, {
         find: async () => {
           const spent: SpendReport[] = [];
           const found = await findStoredUnits(liveStoredUnitPorts(catalogue), goal, territory.performances, (r) =>

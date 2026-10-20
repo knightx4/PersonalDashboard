@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
-import { territorySources, topicsLeft, unsourcedFrom } from '@/lib/learn/levels/territory';
+import { areaProblem, strayAreas, territorySources, topicsLeft, unsourcedFrom } from '@/lib/learn/levels/territory';
 import { MAX_ITEMS_PER_SOURCE, MAX_PERFORMANCES, MAX_SOURCES } from '@/lib/learn/levels/draft-sources';
 
 describe('the SaaS metrics territory (plan #2172.6)', () => {
@@ -41,5 +41,32 @@ describe('topicsLeft', () => {
     const left = topicsLeft(SAAS_METRICS, [first.toUpperCase(), null, 'Something else']);
     expect(left).toHaveLength(SAAS_METRICS.topics.length - 1);
     expect(left[0]).toBe(SAAS_METRICS.topics[1]);
+  });
+});
+
+describe('a territory with areas (plan #2483.1)', () => {
+  const topic = (ask: string, area?: string) => ({ ask, scope: '', frame: 'F', target: 3, from: [], area });
+  const packed = {
+    ...SAAS_METRICS,
+    areas: ['accounting', 'banking'],
+    topics: [topic('Accruals', 'accounting'), topic('Leases', 'accounting'), topic('Liquidity', 'banking')],
+  };
+
+  it('leaves only the named area, minus what is drafted', () => {
+    expect(topicsLeft(packed, ['accruals'], 'accounting').map((t) => t.ask)).toEqual(['Leases']);
+    expect(topicsLeft(packed, [], 'banking').map((t) => t.ask)).toEqual(['Liquidity']);
+    expect(topicsLeft(packed, []).map((t) => t.ask)).toEqual(['Accruals', 'Leases', 'Liquidity']);
+  });
+
+  it('refuses an area the territory does not declare, and any area on one with none', () => {
+    expect(areaProblem(packed, 'accounting')).toBeNull();
+    expect(areaProblem(packed, 'strategy')).toMatch(/no area "strategy"/);
+    expect(areaProblem(SAAS_METRICS, 'accounting')).toMatch(/has no areas/);
+  });
+
+  it('flags a topic whose area is not declared', () => {
+    expect(strayAreas(packed)).toEqual([]);
+    expect(strayAreas({ ...packed, topics: [topic('Orphan'), topic('Odd', 'tax')] })).toEqual(['Orphan', 'Odd']);
+    expect(strayAreas(SAAS_METRICS)).toEqual([]);
   });
 });

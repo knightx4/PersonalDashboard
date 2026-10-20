@@ -38,6 +38,8 @@ export type TerritoryTopic = {
   target: number;
   /** The source lines that put it on the list, as `<text key>: <line>`. */
   from: string[];
+  /** The area it belongs to, one of the territory's `areas`; absent in a territory with no areas. */
+  area?: string;
   /** Set by the count of independent documents its lines come from; absent on a hand-written territory. */
   canonicality?: TerritoryCanonicality;
 };
@@ -48,6 +50,12 @@ export type Territory = {
   /** Name of the subject lens the topics join; the goal lens takes them in through learn 0137. */
   subjectLens: string;
   performances: string[];
+  /**
+   * Optional areas the topics are grouped into, such as `accounting`, so a
+   * pack can be drafted one area at a time (plan #2483.1). Each topic names
+   * its area in `area`. A territory with no areas drafts as one.
+   */
+  areas?: string[];
   /** Phrases naming roles in job_search whose requirement lines join the sources. */
   roles: string[];
   texts: TerritoryText[];
@@ -81,10 +89,26 @@ export function unsourcedFrom(territory: Territory): string[] {
   return territory.topics.flatMap((t) => t.from.filter((f) => !lines.has(f)));
 }
 
-/** The topics still to draft, in order: those whose ask is not yet on any topic. */
-export function topicsLeft(territory: Territory, asked: readonly (string | null)[]): TerritoryTopic[] {
+/**
+ * The topics still to draft, in order: those whose ask is not yet on any
+ * topic. Given an area, only that area's topics (plan #2483.1).
+ */
+export function topicsLeft(territory: Territory, asked: readonly (string | null)[], area?: string): TerritoryTopic[] {
   const done = new Set(asked.filter((a): a is string => a !== null).map((a) => a.trim().toLowerCase()));
-  return territory.topics.filter((t) => !done.has(t.ask.trim().toLowerCase()));
+  return territory.topics.filter((t) => !done.has(t.ask.trim().toLowerCase()) && (area === undefined || t.area === area));
+}
+
+/** Why an area cannot be drafted from this territory, or null when it can. */
+export function areaProblem(territory: Territory, area: string): string | null {
+  if (!territory.areas || territory.areas.length === 0) return `territory "${territory.key}" has no areas`;
+  if (!territory.areas.includes(area)) return `no area "${area}" in "${territory.key}"; areas are ${territory.areas.join(', ')}`;
+  return null;
+}
+
+/** Topics that name an area the territory does not declare, or none when it declares areas. */
+export function strayAreas(territory: Territory): string[] {
+  const areas = territory.areas ?? [];
+  return territory.topics.filter((t) => (areas.length === 0 ? t.area !== undefined : !t.area || !areas.includes(t.area))).map((t) => t.ask);
 }
 
 /**

@@ -455,7 +455,9 @@ and its target. `/api/cron/territory-draft?territory=<key>` drafts the topics
 not yet drafted, a few a call, each with the same two-draft call and checks
 as above, then sets the frame topic and adds the target to the subject's
 lens. It is fired by hand, since every call spends, and each topic it drafts
-is approved as drafted, as above.
+is approved as drafted, as above. A territory may declare `areas`, each topic
+naming its `area`; adding `&area=<area>` drafts only that area's topics not yet
+drafted (plan #2483.1), so one area can be paid for without the others.
 
 A territory also reads the structure store of syllabi, calendars and tables
 of contents (plan #2247.10). Its goal and performances are embedded as
