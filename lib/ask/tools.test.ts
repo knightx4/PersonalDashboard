@@ -1318,6 +1318,36 @@ describe('query_rows (plan #2109.4)', () => {
     expect(result.ok && result.note).toContain('5 matched, showing 2');
   });
 
+  it('hands back every matched row as a set, listed or not (plan #2472.1)', async () => {
+    const ids = (ns: number[]) => ns.map((n) => app(n, ME, '').id as string);
+    const cut = await run({ limit: 2 });
+    expect(cut.ok && cut.matchedSet?.table).toBe('job_search.applications');
+    expect(cut.ok && [...(cut.matchedSet?.refs ?? [])].sort()).toEqual(ids([1, 2, 3, 4, 5]));
+    expect(cut.ok && cut.matchedSet?.matched).toBe(5);
+
+    const counted = await run({ where: [{ column: 'status', op: 'equals', value: 'to_apply' }], count_only: true });
+    expect(counted.ok && [...(counted.matchedSet?.refs ?? [])].sort()).toEqual(ids([4, 5]));
+
+    const none = await run({ where: [{ column: 'status', op: 'equals', value: 'rejected' }] });
+    expect(none.ok && none.matchedSet).toEqual({ table: 'job_search.applications', refs: [], matched: 0 });
+
+    const grouped = await run({ group_by: 'status' });
+    expect(grouped.ok && grouped.matchedSet).toBeUndefined();
+  });
+
+  it('hands back no refs when more rows matched than a set holds (plan #2472.1)', async () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({
+      ...app(1, ME, 'lead'),
+      id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    }));
+    const result = await executeAskTool(
+      'query_rows',
+      { table: 'job_search.applications', count_only: true },
+      context({ ...tables, 'job_search.applications': many }),
+    );
+    expect(result.ok && result.matchedSet).toEqual({ table: 'job_search.applications', refs: [], matched: 120 });
+  });
+
   it('refuses a column the table does not have, wherever it is named', async () => {
     for (const input of [
       { where: [{ column: 'company_name', op: 'equals', value: 'Acme' }] },

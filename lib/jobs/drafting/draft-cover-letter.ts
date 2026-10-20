@@ -10,6 +10,10 @@
  * (lib/jobs/evidence/draft.ts), whose voice and no-invented-facts rules this
  * follows.
  *
+ * The letter follows one template (docs/JOB-SEARCH-SPEC.md, Cover letters):
+ * who they are, two paragraphs of what building with AI has shown them, taken
+ * from their vault notes, and one line of ask. The résumé carries the stories.
+ *
  * The model can ask the person things back. Their replies are stored on the
  * same row and sent with the next call, so pressing Redraft uses them.
  */
@@ -31,9 +35,16 @@ import {
   type CoverLetterResult,
   type LetterRequest,
 } from './draft-cover-letter-payload';
-import { gather, type GatherDeps } from './gather';
+import { gather, vaultPassages, type GatherDeps } from './gather';
 import { renderMaterial } from './render';
 import { LETTER_KEY, loadDrafts, saveDrafts, saveReplies } from './store';
+
+/**
+ * Asked of their vault for what they have noticed building with AI: the
+ * letter's two AI paragraphs are built from these, and the role's own vault
+ * passages rarely reach them.
+ */
+const AI_NOTES_QUESTION = 'What I have noticed and learned building things with AI, agents and automation';
 
 /** Writing a letter in someone's voice from their own material. Judgment. */
 const MODEL = MODELS.jobsCoverLetterDraft;
@@ -47,9 +58,9 @@ the posting, what they found out about the company, their own view of it
 from its Perspective tab, research prepared on it, their evidence bank,
 their résumé, answers they have sent before, their thinking about the search,
 their notes and how they write. After that come the answers already on this
-application, where they match the role best, their comments on the letter,
-anything they told you when you asked, and your previous draft if there is
-one.
+application, where they match the role best, their notes on building with AI,
+their comments on the letter, anything they told you when you asked, and your
+previous draft if there is one.
 
 Their comments on the letter are what they want it to say, in their own rough
 words: make the points they make, in their voice, and follow any instruction
@@ -57,44 +68,71 @@ about length, angle or what to leave out. What a comment says about them,
 their views or their interests is theirs to claim, and is not an unsupported
 claim.
 
-What a good letter does:
-- Opens on why this company and this role, using what the posting and their
-  research say, in the first sentence or two. No greeting line about applying.
-- Says why they fit, through one or two of their own stories told concretely,
-  aimed at the requirements they match best. Prefer stories the answers on
-  this application do not already tell; the letter and the answers are read
-  together, so it adds to them rather than repeating them.
-- Agrees with those answers: the same facts, dates, reasons and motivations.
-  Nothing in the letter may contradict them.
-- Sounds like a capable person talking plainly: first person, short
-  sentences, concrete nouns, no corporate filler. Follow how they write.
-- Runs about 250 to 350 words unless the posting asks for another length.
-- Ends plainly, once the point is made.
+The résumé goes with the letter, so the letter does not retell its stories.
+It says what they think about building with AI, in the way they write in
+their own notes. Every letter follows this template: four short paragraphs,
+about 180 to 250 words, after "Dear [team] Hiring Team:" (or the person
+their material says they are writing to).
 
-What it never does:
+1. One sentence on who they are and the role, with credentials from the
+   résumé: "I'm a CPA and Yale MBA with three years at EY, applying for the
+   Finance Associate role on Strategic Finance in New York." Nothing more
+   about the company than its name and the team.
+2. The first AI paragraph. Open on one thing the posting says about AI,
+   automation, tooling or how the work gets done, in plain words. Then
+   something building with AI has shown them, from their notes on building
+   with AI. Then which way they lean and why, in one sentence. Then one thing
+   they built, named in passing.
+3. The second AI paragraph. A different observation from their notes, tied
+   to a concrete detail of something they built: what it does, what it
+   checks, what it produces. When the posting says nothing about AI, tie it
+   to the work the posting describes instead.
+4. One line asking to talk about something specific to this team, such as
+   how it uses AI today, then "Thank you," and their full name on the next
+   line.
+
+This paragraph is from a letter they approved; match its register:
+
+"The posting also asks how AI can improve every workflow. Building with AI
+has made me ask why each step of a process exists, when before I'd have just
+done it. I've noticed a real tradeoff between moving fast and building a
+system that holds up. For finance models I lean toward the system, because
+the numbers get reused long after the first answer. I build my own tools
+this way, including the dashboard I run my job search from."
+
+It reads like their own notes: first person, what they noticed, which way
+they lean, short plain sentences, nothing performed.
+
+What the letter never does:
+- Retell a story from the résumé or the evidence bank. An employer, a deal or
+  a result can appear in a clause at most.
+- Analyse the company's business for them, guess at its problems, or say
+  what the team's work "really" is.
+- Set up a point with a colon, or use stock lines such as "most companies
+  skip", "the question I keep coming back to", "the part I'd most want to
+  own", "the kind of work I want to spend my time on" or "I'd bring X to Y".
+- Say how much they want the job, that they are excited or passionate, or
+  call the role an opportunity.
+- Contradict the answers already on this application: the same facts, dates,
+  reasons and motivations.
 - Invent facts about them. A number, a scale, a timeline, a job title, an
-  employer or a result about the person comes from their material or is not
-  stated. If you do state something about them their material does not carry,
-  report it verbatim in unsupported_claims. What you say about the company or
-  the role from the posting or their research is not a claim about them.
-  Their own view of the company is in their words: what it says about them
-  (why they fit) is theirs to claim, and the research prepared on the company
-  says nothing about them at all.
-- Open by restating the role title, call the role an exciting opportunity, or
-  close with a paragraph of enthusiasm.
+  employer, a result, a thing they built or a view about AI comes from their
+  material or is not stated. If you do state something about them their
+  material does not carry, report it verbatim in unsupported_claims. What you
+  say about the role from the posting is not a claim about them.
 - Use any construction their style list says never to use.
 
 Report through ${TOOL_NAME}:
-- letter: the letter itself, plain paragraphs, no subject line, no address
-  block, signed with nothing but their first name if their material gives it.
+- letter: the letter itself, the greeting, plain paragraphs and the sign-off.
+  No subject line, no date, no address block.
 - evidence_item_ids: every evidence bank item the letter draws on, copied
   exactly from its "id:" line. Empty when it draws on none.
 - unsupported_claims: as above.
 - asks: up to ${MAX_ASKS} short questions for them whose answers would make the
-  letter better, such as why they want this company in particular, someone
-  they know there, or a fact the letter needed and their material lacks. Ask
-  only what their material and earlier replies do not already answer. Empty
-  when nothing is missing.`;
+  letter better, such as an observation about building with AI when their
+  notes hold fewer than two that fit, what the posting means by a line about
+  AI, or who they are writing to. Ask only what their material and earlier
+  replies do not already answer. Empty when nothing is missing.`;
 
 export type LetterOptions = {
   apiKey: string;
@@ -209,11 +247,13 @@ export async function draftAndSaveCoverLetter(
   const { drafts: previous, error: loadError } = await loadDrafts(store, applicationId, 'cover_letter');
   if (loadError) return { ok: false, error: loadError };
   const earlierAsks = previous?.asks ?? [];
+  const aiNotes = await vaultPassages(deps, userId, AI_NOTES_QUESTION);
 
   const result = await writeCoverLetter(deps, {
     material,
     previousLetter: previous?.drafts[LETTER_KEY]?.answer ?? null,
     asks: earlierAsks,
+    aiNotes: aiNotes.passages,
   });
   if (!result.ok) return result;
 

@@ -234,4 +234,29 @@ describe('a topic drafted in a territory tick', () => {
     expect(topic(uncited)).toMatchObject({ status: 'approved' });
     expect(levels(uncited).find((c) => c.level === 2)).toMatchObject({ canonicality: 'personal' });
   });
+
+  it('drafts only the named area, and the first area with topics left when none is named (plans #2483.1, #2483.2)', async () => {
+    const areaTerritory: Territory = {
+      ...territory,
+      areas: ['accounting', 'banking'],
+      topics: [
+        { ...territory.topics[0], area: 'accounting' },
+        { ...territory.topics[1], area: 'banking' },
+      ],
+    };
+    state.tables.area_check_articles = [];
+    state.tables.lenses = [{ id: 'subject-lens', user_id: ME, origin: 'subject', name: 'Valuation' }];
+    state.tables.lens_targets = [];
+    const discounting = prepare('Discounting');
+    const multiples = prepare('Multiples');
+    const clients = { learn: fakeLearnClient(state.tables), jobs: {} as never };
+    const input = { anthropicApiKey: 'test-key', budgetMs: 600_000 };
+
+    const banking = await draftTerritoryTick(clients, ME, areaTerritory, { ...input, area: 'banking' });
+    expect(banking.drafted.map((d) => d.id)).toEqual([multiples]);
+    expect(banking.remaining).toBe(0);
+
+    const rest = await draftTerritoryTick(clients, ME, areaTerritory, input);
+    expect(rest.drafted.map((d) => d.id)).toEqual([discounting]);
+  });
 });
