@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { isUuid, type AskDb, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import { loadAgendaItems, verbsOf } from '@/lib/ask/agenda';
 import type { TodoChangeInput, TodoChangeKind } from '@/lib/ask/todo-changes';
 import { toRef } from '@/lib/core/refs';
@@ -17,6 +17,11 @@ import { dayIn } from '@/lib/todo/time';
 import { TAGS_ADDED } from '@/lib/core/dash-actions';
 import { LATER_REFUSED, LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { zoneDay } from '@/lib/core/when';
+import { readSubject } from '@/lib/core/dash-actions';
+import { namedItems } from '@/lib/ask/change-view';
+import { asText, LISTABLE, listableSource, ownerColumn, viaTitle } from '@/lib/ask/list-rows';
+import { rowsOfSet, SET_CAP } from './sets';
 
 /**
  * The Todo changes an agent makes when asked (plan #1894.9.1, feature #1894),
@@ -426,9 +431,15 @@ function optional(args: Args, key: string, max: number, what: string): string | 
   return value || null;
 }
 
-function eventDay(row: Row): string {
-  const day = (row.starts_on as string | null) ?? (typeof row.starts_at === 'string' ? row.starts_at.slice(0, 10) : null);
-  return day ?? '';
+/**
+ * The day an event is on, in the person's zone. A timed event's start is
+ * stored in UTC, so 8:30 pm in New York read as its first ten characters
+ * was the next day ("Dinner with Sam" on 1 November was said to be on the
+ * 2nd, and its link opened the 2nd).
+ */
+function eventDay(row: Row, timezone: string): string {
+  if (typeof row.starts_on === 'string') return row.starts_on;
+  return typeof row.starts_at === 'string' ? zoneDay(row.starts_at, timezone) : '';
 }
 
 function calendarHref(day: string): string {
@@ -457,7 +468,7 @@ async function addEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     'event',
   );
   const id = after.id as string;
-  const day = eventDay(after);
+  const day = eventDay(after, env.timezone);
   const href = calendarHref(day);
   const name = named(title, title);
   return {
@@ -503,7 +514,7 @@ async function changeEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
 
   const after = await updated(env, 'events', id, patch, 'event');
   const name = named(before.title, 'the event');
-  const href = calendarHref(eventDay(after));
+  const href = calendarHref(eventDay(after, env.timezone));
   return {
     kind: 'change_event',
     input: { verb: 'Changed', what: name, rest: `: ${listed(said)}`, href, where: 'Open the calendar', paths: ['/todo/calendar', '/todo'] },
@@ -777,11 +788,302 @@ export async function runTodoWrite(
   }
 }
 
+// ---------------------------------------------------------------------------
+// add_todos (plan #2472.4)
+// ---------------------------------------------------------------------------
+
+/** What add_todos fills with each row's name, and with a role's company. */
+const ROW_NAME = /\{title\}/gi;
+const COMPANY_NAME = /\{company\}/gi;
+
+/** The link target each table's rows take, for the tables a todo can be about. */
+const TARGET_OF_TABLE: Readonly<Record<string, Exclude<LinkTarget, 'appointment'>>> = {
+  'job_search.applications': 'application',
+  'job_search.roles': 'role',
+  'job_search.companies': 'company',
+  'job_search.contacts': 'contact',
+  'job_search.interviews': 'interview',
+  'obsidian.notes': 'note',
+  'public.orders': 'order',
+  'public.inventory_items': 'inventory',
+  'public.saved_items': 'saved',
+  'learn.readings': 'reading',
+  'learn.tracks': 'track',
+  'learn.subjects': 'subject',
+  'goals.items': 'goal',
+  'news.saved_stories': 'story',
+};
+
+/** One todo add_todos made, as its record keeps it for Undo to tell whether it was touched since. */
+export type AddedTodo = { id: string; title: string; due_on: string | null; tags: string[]; link_id: string | null };
+
+/** What the record keeps in `undo` for add_todos. */
+export type AddedTodosUndo = { rows: AddedTodo[] };
+
+/** A row of the set: its id, the name {title} takes, and for a role the company {company} takes. */
+type SetRow = { id: string; name: string; company: string | null };
+
+/** The tables whose rows have a company to name: a role, and an application by its role. */
+const ROLE_TABLES = ['job_search.roles', 'job_search.applications'];
+
+/**
+ * The name each row in the set goes by, by its ref, read under the person's
+ * id. An application is named by its role, since its own title column is its
+ * next action, and a role or an application also carries its company.
+ */
+async function rowNames(ctx: DashWriteContext, table: string, refs: string[]): Promise<Map<string, SetRow>> {
+  const source = listableSource(table);
+  const owner = source ? ownerColumn(source) : null;
+  if (!source || !owner) throw new TodoRefused(`${table} is not a table Dash can read.`);
+  const refColumn = source.ref ?? 'id';
+  const roleColumn = table === 'job_search.applications' ? ['role_id'] : table === 'job_search.roles' ? ['company_id'] : [];
+  const plain = [...new Set([refColumn, 'id', source.title, ...roleColumn])];
+  const select = source.titleVia ? [...plain, `${source.titleVia.embed}(${source.titleVia.column})`] : plain;
+  const [schema, name] = table.split('.') as [AskSchema, string];
+  const { data, error } = await (await ctx.db(schema)).from(name).select(select.join(', ')).eq(owner, ctx.userId).in(refColumn, refs);
+  if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
+  const found = (data ?? []) as unknown as Row[];
+
+  // A role's title and company, for a set of roles or of applications.
+  const roles = new Map<string, { title: string | null; company: string | null }>();
+  if (ROLE_TABLES.includes(table)) {
+    const jobs = await ctx.db('job_search');
+    const roleRows =
+      table === 'job_search.roles'
+        ? found
+        : await readOwn(jobs, 'roles', 'id, title, company_id', ctx.userId, found.map((row) => row.role_id as string).filter(Boolean));
+    const companies = await readOwn(jobs, 'companies', 'id, name', ctx.userId, roleRows.map((row) => row.company_id as string).filter(Boolean));
+    const companyName = new Map(companies.map((row) => [row.id as string, asText(row.name)]));
+    for (const role of roleRows) {
+      roles.set(role.id as string, { title: asText(role.title), company: companyName.get(role.company_id as string) ?? null });
+    }
+  }
+
+  const names = new Map<string, SetRow>();
+  for (const row of found) {
+    const ref = String(row[refColumn] ?? '');
+    const role = roles.get((table === 'job_search.applications' ? row.role_id : row.id) as string);
+    const title = role?.title ?? (source.titleVia ? viaTitle(row, source.titleVia) : null) ?? asText(row[source.title]);
+    names.set(ref, { id: String(row.id ?? ref), name: named(title, 'that row'), company: role?.company ? named(role.company, role.company) : null });
+  }
+  return names;
+}
+
+async function readOwn(client: SchemaClient, table: string, select: string, userId: string, ids: string[]): Promise<Row[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await client.from(table).select(select).eq('user_id', userId).in('id', [...new Set(ids)]);
+  if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
+  return (data ?? []) as Row[];
+}
+
+/** The title with each row's name, and its company where it has one, filled in. */
+function filled(template: string, row: SetRow): string {
+  return template.replace(ROW_NAME, row.name).replace(COMPANY_NAME, row.company ?? row.name);
+}
+
+/**
+ * One todo for each row a lookup matched (plan #2472.4, feature #2472): the
+ * set names the rows, and the title can name each one ("Follow up with
+ * {title}"). Every todo takes the checks add_todo's do, the same date and
+ * tags, and is about its row where a todo can point at that table. All or
+ * nothing: a todo that fails takes the ones already made back out.
+ */
+async function addTodos(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  if (!ctx.enabledModules.includes('todo')) {
+    return { ok: false, error: 'The Todo workspace is switched off, so nothing can be changed there.' };
+  }
+  const set = rowsOfSet(ctx.seen, args.set, LISTABLE.map((source) => source.table));
+  if (!set.ok) return set;
+  const template = text(args, 'title');
+  if (!template) throw new TodoRefused('title is missing: the todo as they would write it, with {title} where each row\'s name goes.');
+  const target = TARGET_OF_TABLE[set.table] ?? null;
+  if (template.search(COMPANY_NAME) >= 0 && !ROLE_TABLES.includes(set.table)) {
+    throw new TodoRefused(`{company} names a role's company, and ${set.name} holds rows of ${set.table}. Use {title} for each row's name.`);
+  }
+  const naming = template.search(ROW_NAME) >= 0 || template.search(COMPANY_NAME) >= 0;
+  if (!naming && !target && set.ids.length > 1) {
+    throw new TodoRefused(`A todo cannot point at a row of ${set.table}, so put {title} in the title where each row's name goes, or they get ${set.ids.length} todos that read the same.`);
+  }
+  const dueOn = text(args, 'due_on') || null;
+  if (dueOn) {
+    const day = taskInput.shape.dueOn.safeParse(dueOn);
+    if (!day.success || Number.isNaN(Date.parse(dueOn))) throw new TodoRefused('due_on is not a date.');
+  }
+  // Every todo Dash adds arrives tagged (plan #2340.4), all of these alike.
+  const tagged = dashTags(args.tags, dueOn, ctx.today);
+  if (!tagged.ok) throw new TodoRefused(tagged.error);
+
+  const names = await rowNames(ctx, set.table, set.ids);
+  const gone = set.ids.filter((ref) => !names.has(ref));
+  if (gone.length > 0) {
+    throw new TodoRefused(`${gone.length} of the rows in ${set.name} are not theirs or are not there any more, so no todos were added. Look them up again.`);
+  }
+  const planned = set.ids.map((ref) => {
+    const row = names.get(ref)!;
+    const parsed = taskInput.shape.title.safeParse(filled(template, row));
+    if (!parsed.success) throw new TodoRefused(parsed.error.issues[0].message);
+    return { row, title: parsed.data };
+  });
+
+  const todo = await ctx.db('todo');
+  const made: AddedTodo[] = [];
+  try {
+    for (const each of planned) {
+      const { id, error } = await ctx.createTask(
+        ctx.userId,
+        { title: each.title, body: null, dueOn, dueTime: null, pinned: false, tags: tagged.tags },
+        ctx.timezone ?? 'UTC',
+      );
+      if (error || !id) throw new Error(`Adding the todo failed: ${error ?? 'no row'}`);
+      const added: AddedTodo = { id, title: each.title, due_on: dueOn, tags: tagged.tags, link_id: null };
+      made.push(added);
+      if (target) {
+        const { data, error: linkError } = await todo
+          .from('task_links')
+          .insert({ task_id: id, relation: 'about', [TARGET_COLUMNS[target]]: each.row.id })
+          .select('id')
+          .single();
+        if (linkError || !data) throw new Error(`Linking the todo failed: ${linkError?.message ?? 'no row'}`);
+        added.link_id = (data as { id: string }).id;
+      }
+    }
+  } catch (error) {
+    if (made.length > 0) {
+      const { error: cleanup } = await todo.from('tasks').delete().eq('user_id', ctx.userId).in('id', made.map((row) => row.id));
+      if (cleanup) console.error('add_todos: the todos made before the failure were kept', cleanup.message);
+    }
+    throw error;
+  }
+
+  const count = made.length;
+  const titles = made.slice(0, 3).map((row) => `"${named(row.title, row.title)}"`);
+  const firstRef = toRef('todo.tasks', made[0].id);
+  const after = await readSubject(ctx.db, firstRef);
+  const due = dueOn ? `, due ${dueOn}` : '';
+  const tags = tagged.tags.length > 0 ? `, tagged ${listed(tagged.tags)}` : '';
+  const href = '/todo/all';
+  const undo: AddedTodosUndo = { rows: made };
+  return {
+    ok: true,
+    kind: 'add_todos',
+    input: {
+      verb: 'Added',
+      what: `${count} ${count === 1 ? 'todo' : 'todos'}`,
+      rest: `${due}${tags}: ${namedItems(titles, count)}`,
+      href,
+      where: 'Open in Todo',
+      paths: TODO_PATHS,
+    } satisfies TodoChangeInput as unknown as Record<string, unknown>,
+    subjectRef: firstRef,
+    op: 'insert',
+    before: null,
+    after,
+    undo: undo as unknown as Record<string, unknown>,
+    summary: `Dash added ${count} ${count === 1 ? 'todo' : 'todos'}, one for each row of ${set.name}${due}${tags}: ${namedItems(titles, count)}.`,
+    row: { table: 'todo.tasks', ref: made[0].id, title: `${count} ${count === 1 ? 'todo' : 'todos'}`, href },
+  };
+}
+
+function addedUndo(value: Record<string, unknown> | null): AddedTodosUndo | null {
+  const rows = value?.rows;
+  if (!Array.isArray(rows)) return null;
+  const ok = rows.every((r) => r && typeof r === 'object' && typeof r.id === 'string' && typeof r.title === 'string' && Array.isArray(r.tags));
+  return ok ? { rows: rows as AddedTodo[] } : null;
+}
+
+const sameTags = (a: readonly string[], b: readonly string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+
+/**
+ * Take out every todo an add_todos record made that is still as Dash left
+ * it: open, not renamed, moved, written in, pinned, put off, retagged, given
+ * items or linked to anything else. The ones they have touched since stay.
+ * Refused only when none is left to take out.
+ */
+export async function undoAddedTodos(
+  deps: { userId: string; db: AskDb },
+  recorded: Record<string, unknown> | null,
+): Promise<{ ok: true; restored: number; ids: string[] } | { ok: false; error: string }> {
+  const undo = addedUndo(recorded);
+  if (!undo || undo.rows.length === 0) return { ok: false, error: 'Dash did not keep what this added, so it cannot be undone.' };
+  const todo = await deps.db('todo');
+  const ids = undo.rows.map((row) => row.id);
+  const [tasks, items, links, tags] = await Promise.all([
+    todo.from('tasks').select('id, title, body, status, due_on, due_at, pinned, snoozed_until').eq('user_id', deps.userId).in('id', ids),
+    todo.from('tasks').select('parent_id').eq('user_id', deps.userId).in('parent_id', ids),
+    todo.from('task_links').select('id, task_id').in('task_id', ids),
+    todo.from('task_tags').select('task_id, tag').in('task_id', ids),
+  ]);
+  for (const read of [tasks, items, links, tags]) if (read.error) throw new Error(`Reading the todos failed: ${read.error.message}`);
+  const byId = new Map(((tasks.data ?? []) as Row[]).map((row) => [row.id as string, row]));
+  const withItems = new Set(((items.data ?? []) as Row[]).map((row) => row.parent_id as string));
+  const linksOf = (id: string) => ((links.data ?? []) as Row[]).filter((row) => row.task_id === id).map((row) => row.id as string);
+  const tagsOf = (id: string) => ((tags.data ?? []) as Row[]).filter((row) => row.task_id === id).map((row) => row.tag as string);
+
+  const untouched = undo.rows.filter((made) => {
+    const task = byId.get(made.id);
+    if (!task || task.status !== 'open' || withItems.has(made.id)) return false;
+    if (task.title !== made.title || (task.body ?? null) !== null || (task.due_on ?? null) !== made.due_on) return false;
+    if ((task.due_at ?? null) !== null || task.pinned !== false || (task.snoozed_until ?? null) !== null) return false;
+    const linked = linksOf(made.id);
+    if (linked.length !== (made.link_id ? 1 : 0) || (made.link_id && linked[0] !== made.link_id)) return false;
+    return sameTags(tagsOf(made.id), made.tags);
+  });
+  if (untouched.length === 0) {
+    return { ok: false, error: 'Every one of those todos has been ticked off, edited or deleted since, so Dash left them as they are.' };
+  }
+  const { data, error } = await todo
+    .from('tasks')
+    .delete()
+    .eq('user_id', deps.userId)
+    .eq('status', 'open')
+    .in('id', untouched.map((row) => row.id))
+    .select('id');
+  if (error) throw new Error(`Taking the todos out failed: ${error.message}`);
+  const removed = ((data ?? []) as { id: string }[]).map((row) => row.id);
+  if (removed.length === 0) return { ok: false, error: 'Those todos have changed since, so Dash left them as they are.' };
+  return { ok: true, restored: removed.length, ids: removed };
+}
+
+/** How add_todos' tags are chosen, as add_todo says it. */
+const ADD_TODOS_TAGS =
+  'each is tagged now when due today or before, eventually when it has no date or one more than two weeks off; send tags only for more, from the ones they already use';
+
 const ASK_NOTE =
   'It is done: it shows under your answer with an Undo. Say in your answer what you did, and cite the row this returned.';
 
-/** The Todo writes as Ask's write tools, run on the person's own todo client. */
-export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = TODO_WRITES.map((write) => ({
+const ADD_TODOS_TOOL: DashWriteTool<DashWriteResult> = {
+  name: 'add_todos',
+  kind: 'write',
+  definition: {
+    name: 'add_todos',
+    description: `Add one todo for each row a lookup matched, when they ask for a todo per row ("add a todo to follow up on each of those leads"). Find the rows with query_rows first and pass the set it named; at most ${SET_CAP} rows. Write title as the todo would read, with {title} where each row's name goes ("Follow up with {title}"); for roles and applications, {company} is the role's company and {title} the role's title ("Email the recruiter at {company}"). Each todo is about its row, so it shows on that row's page, where a todo can point at the table; elsewhere {title} is needed. due_on and tags apply to every one, as on add_todo: ${ADD_TODOS_TAGS}. One Undo takes back every one they have not touched since. Say how many it added. Never call add_todo once per row for this. ${ASK_NOTE}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        set: { type: 'string', description: 'The name query_rows gave the rows it matched in this answer, such as "set 1".' },
+        title: { type: 'string', description: 'The todo in a short line, with {title} where each row\'s name goes.' },
+        due_on: { ...DAY, description: 'The day every one is due, YYYY-MM-DD, only when they named one.' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags beyond the one the date gives: lowercase, from the ones they already use.' },
+      },
+      required: ['set', 'title'],
+      additionalProperties: false,
+    },
+  },
+  apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
+    const args = input && typeof input === 'object' ? (input as Args) : {};
+    try {
+      return await addTodos(ctx, args);
+    } catch (error) {
+      if (error instanceof TodoRefused) return { ok: false, error: error.message };
+      console.error('todo write add_todos failed', error);
+      return { ok: false, error: 'Those todos could not be added. Tell them nothing was changed.' };
+    }
+  },
+};
+
+/** The Todo writes as Ask's write tools, run on the person's own todo client, and add_todos after them. */
+export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
+  ...TODO_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
@@ -794,4 +1096,6 @@ export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = TODO_
     if ('ok' in made) return made;
     return { ok: true, ...made, input: made.input as unknown as Record<string, unknown>, undo: made.undo ?? null };
   },
-}));
+  })),
+  ADD_TODOS_TOOL,
+];

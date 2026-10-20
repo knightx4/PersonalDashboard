@@ -264,7 +264,7 @@ People at companies, or people generally.
 | linkedin_url, email | text | |
 | relationship | enum | `cold`, `alum`, `second_degree`, `former_colleague`, `friend`, `recruiter`, `interviewer` |
 | how_we_connect | text | the specific tie, if any |
-| status | enum | `to_contact`, `contacted`, `responded`, `met`, `dormant` |
+| status | enum | `to_contact`, `connected` (a LinkedIn connection you have not written to), `contacted`, `responded`, `met`, `dormant` |
 | notes | text | |
 
 **Store the minimum about other people.** Name, title, public professional URL, work email. No personal phone numbers, no personal addresses, nothing scraped. This is other people's data sitting in your database, it has no product value beyond contacting them, and it is the part of this app most worth being careful with.
@@ -655,7 +655,16 @@ After twenty applications the common questions are answered and the work per app
 
 ### Cover letters
 
-Same machinery, longer output, plus a structure derived from the requirement map: the two or three strongest matches become the body paragraphs. Store per application. Track which resume version accompanied it.
+Same machinery, a fixed template (`lib/jobs/drafting/draft-cover-letter.ts`). Store per application. Track which resume version accompanied it.
+
+The résumé goes with the letter, so the letter does not retell its stories. It is four short paragraphs, about 180 to 250 words, written the way the person writes in their own notes:
+
+1. One sentence on who they are and the role.
+2. A line from the posting about AI, automation or how the work gets done; something building with AI has shown them; which way they lean and why; one thing they built, named in passing.
+3. A second observation about AI, tied to a concrete detail of something they built.
+4. One line asking to talk about something specific, then "Thank you," and their name.
+
+The observations come from their vault notes about building with AI, which the drafter searches for separately from the role's own passages. An observation the notes do not hold is reported as an unsupported claim. The letter does not analyse the company's business or guess at its problems, and a list of stock phrases (`LETTER_BANNED`) is checked on top of the person's banned constructions.
 
 ---
 

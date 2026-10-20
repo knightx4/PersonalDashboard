@@ -6,6 +6,11 @@ import { requireUser } from '@/lib/auth/server';
 import { fileVaultNote } from '@/lib/capture/vault';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteHref } from '@/lib/vault/paths';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { zoneDay } from '@/lib/core/when';
+import { createCapturedNote } from '@/lib/vault/notes/create';
+import { findDailyNote } from '@/lib/vault/notes/daily';
+import { noteCreatePorts } from '@/lib/vault/db/ports';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,4 +71,33 @@ export async function addQuickNote(text: string): Promise<{ error: string | null
   revalidatePath('/vault');
   revalidatePath('/vault/triage');
   return { error: null };
+}
+
+export type DailyNoteState = { error: string | null };
+
+/**
+ * Today's daily note, opened from the vault page (note a268529a): the note
+ * named for today's date in the person's zone, wherever it is filed, or a
+ * new empty one written at the top of the vault when there is none.
+ */
+// latency: pending
+export async function openDailyNote(): Promise<DailyNoteState> {
+  const user = await requireUser();
+  const { timezone } = await loadAccountSettings(user.id);
+  const day = zoneDay(new Date(), timezone);
+  const supabase = await createVaultClient();
+  const { data, error } = await supabase
+    .from('notes')
+    .select('path')
+    .is('deleted_at', null)
+    .like('path', `%${day}.md`);
+  if (error) return { error: 'Your notes could not be read. Try again.' };
+  const found = findDailyNote((data ?? []).map((row) => row.path as string), day);
+  if (found) redirect(noteHref(found));
+
+  // One name only: a numbered "2026-10-20 2.md" would not be the daily note.
+  const result = await createCapturedNote(noteCreatePorts({ supabase, afterSave: () => {} }), '', day, '', 1);
+  if (!result.ok) return { error: result.error };
+  revalidatePath('/vault');
+  redirect(noteHref(result.path));
 }

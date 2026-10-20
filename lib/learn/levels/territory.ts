@@ -19,6 +19,12 @@ export type TerritoryText = {
   url?: string;
   /** Documents with one key count once towards canonicality: two terms of one course are one view. */
   independence?: string;
+  /**
+   * The areas whose topics are drafted from this text, in a territory with
+   * areas; every area when absent. A text read only for some areas keeps
+   * the others' drafting calls within MAX_SOURCES (plan #2483.2).
+   */
+  areas?: string[];
 };
 
 /**
@@ -38,6 +44,8 @@ export type TerritoryTopic = {
   target: number;
   /** The source lines that put it on the list, as `<text key>: <line>`. */
   from: string[];
+  /** The area it belongs to, one of the territory's `areas`; absent in a territory with no areas. */
+  area?: string;
   /** Set by the count of independent documents its lines come from; absent on a hand-written territory. */
   canonicality?: TerritoryCanonicality;
 };
@@ -48,6 +56,19 @@ export type Territory = {
   /** Name of the subject lens the topics join; the goal lens takes them in through learn 0137. */
   subjectLens: string;
   performances: string[];
+  /**
+   * Optional areas the topics are grouped into, such as `accounting`, so a
+   * pack can be drafted one area at a time (plan #2483.1). Each topic names
+   * its area in `area`. A territory with no areas drafts as one.
+   */
+  areas?: string[];
+  /**
+   * Areas of the pack that are territories of their own, by area name and
+   * that territory's key, such as the business pack's `saas` area, which is
+   * the `saas-metrics` territory (plan #2483.3). Such an area holds no topics
+   * here and is not in `areas`; `&area=<name>` drafts the other territory.
+   */
+  areaTerritories?: Readonly<Record<string, string>>;
   /** Phrases naming roles in job_search whose requirement lines join the sources. */
   roles: string[];
   texts: TerritoryText[];
@@ -61,17 +82,24 @@ export type Territory = {
   kind?: GoalKind | null;
 };
 
+/** The texts an area's topics are drafted from: those naming that area, and those naming none. */
+export function textsFor(territory: Territory, area?: string): TerritoryText[] {
+  if (area === undefined) return territory.texts;
+  return territory.texts.filter((t) => !t.areas || t.areas.includes(area));
+}
+
 /**
  * The sources as the drafting call reads them: the roles first, then the
  * texts in order, numbered S1 onwards. A role phrase that matched nothing is
- * left out.
+ * left out. Given an area, only the texts that area is drafted from.
  */
 export function territorySources(
   territory: Territory,
   roleSources: readonly (Omit<DraftSource, 'id'> | null)[],
+  area?: string,
 ): DraftSources {
   const roles = roleSources.filter((s): s is Omit<DraftSource, 'id'> => s !== null);
-  const texts = territory.texts.map((t) => ({ label: t.label, items: t.items }));
+  const texts = textsFor(territory, area).map((t) => ({ label: t.label, items: t.items }));
   return { sources: numbered([...roles, ...texts]), performances: territory.performances };
 }
 
@@ -81,10 +109,49 @@ export function unsourcedFrom(territory: Territory): string[] {
   return territory.topics.flatMap((t) => t.from.filter((f) => !lines.has(f)));
 }
 
-/** The topics still to draft, in order: those whose ask is not yet on any topic. */
-export function topicsLeft(territory: Territory, asked: readonly (string | null)[]): TerritoryTopic[] {
+/**
+ * The topics still to draft, in order: those whose ask is not yet on any
+ * topic. Given an area, only that area's topics (plan #2483.1).
+ */
+export function topicsLeft(territory: Territory, asked: readonly (string | null)[], area?: string): TerritoryTopic[] {
   const done = new Set(asked.filter((a): a is string => a !== null).map((a) => a.trim().toLowerCase()));
-  return territory.topics.filter((t) => !done.has(t.ask.trim().toLowerCase()));
+  return territory.topics.filter((t) => !done.has(t.ask.trim().toLowerCase()) && (area === undefined || t.area === area));
+}
+
+/** Why an area cannot be drafted from this territory, or null when it can. */
+export function areaProblem(territory: Territory, area: string): string | null {
+  if (!territory.areas || territory.areas.length === 0) return `territory "${territory.key}" has no areas`;
+  if (!territory.areas.includes(area)) return `no area "${area}" in "${territory.key}"; areas are ${territory.areas.join(', ')}`;
+  return null;
+}
+
+/** The key of the territory an area is drafted as, when the pack lists it as a territory of its own (plan #2483.3). */
+export function areaTerritory(territory: Territory, area: string): string | null {
+  const linked = territory.areaTerritories ?? {};
+  return Object.hasOwn(linked, area) ? linked[area] : null;
+}
+
+/** Topics that name an area the territory does not declare, or none when it declares areas. */
+export function strayAreas(territory: Territory): string[] {
+  const areas = territory.areas ?? [];
+  return territory.topics.filter((t) => (areas.length === 0 ? t.area !== undefined : !t.area || !areas.includes(t.area))).map((t) => t.ask);
+}
+
+/** Areas a text names that the territory does not declare, as `<text key>: <area>`. */
+export function strayTextAreas(territory: Territory): string[] {
+  const areas = new Set(territory.areas ?? []);
+  return territory.texts.flatMap((t) => (t.areas ?? []).filter((a) => !areas.has(a)).map((a) => `${t.key}: ${a}`));
+}
+
+/**
+ * `from` lines citing a text the topic's area is not drafted from, so the
+ * drafting call would never see the line that put the topic on the list.
+ */
+export function offAreaFrom(territory: Territory): string[] {
+  return territory.topics.flatMap((topic) => {
+    const keys = new Set(textsFor(territory, topic.area).map((t) => t.key));
+    return topic.from.filter((f) => !keys.has(f.slice(0, f.indexOf(':'))));
+  });
 }
 
 /**

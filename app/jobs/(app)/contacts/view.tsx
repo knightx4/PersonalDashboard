@@ -20,6 +20,8 @@ export interface ContactRow {
   notes: string | null;
   potentialLead: boolean;
   foundByDash: boolean;
+  /** Came from a LinkedIn connection, so you are connected there. */
+  linkedinConnection: boolean;
   companyName: string | null;
   companySlug: string | null;
   touches: Array<{
@@ -29,5 +31,7 @@ export interface ContactRow {
     sentAt: string;
     respondedAt: string | null;
     message: string | null;
+    /** Written and kept, not sent; `sentAt` is when it was saved. */
+    draft: boolean;
   }>;
 }

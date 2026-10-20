@@ -6,6 +6,8 @@ export const vaultActions: ModuleActions = {
     dismissNoteConnection: none('theirs'),
     newVaultNote: tool('write_vault_note'),
     addQuickNote: tool('add_quick_note'),
+    // Today's daily note: Dash writes a note named for the day the same way.
+    openDailyNote: tool('write_vault_note'),
   },
   'app/vault/triage/actions.ts': {
     fileQuickNoteAction: tool('file_quick_note'),

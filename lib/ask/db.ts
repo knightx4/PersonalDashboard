@@ -113,8 +113,18 @@ export type AskToolResult =
        * is not a row: a company's open roles (lib/ask/job-board.ts).
        */
       found?: unknown[];
+      /**
+       * Every row the lookup matched, not only those listed, for runDash to
+       * keep as a named set a write can take (lib/dash/sets.ts, plan
+       * #2472.1). `refs` is empty when more than MATCHED_SET_CAP matched.
+       * Never sent to the model or kept with the turn.
+       */
+      matchedSet?: { table: string; refs: string[]; matched: number };
     }
   | { ok: false; error: string };
+
+/** The most rows a lookup hands back as a set (AskToolResult.matchedSet). */
+export const MATCHED_SET_CAP = 100;
 
 /** A lookup's rows as the citations a turn may carry (lib/talk/talk.ts). */
 /**
@@ -136,7 +146,7 @@ export function citationsOf(result: AskToolResult): TalkCitation[] {
 export function toolResultText(result: AskToolResult): string {
   if (!result.ok) return JSON.stringify(result);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { kept, ...sent } = result;
+  const { kept, matchedSet, ...sent } = result;
   return JSON.stringify(sent);
 }
 

@@ -18,8 +18,10 @@ import type { ImportMapper, ImportStore, MappedRecord, MatchSkip, PendingRecord 
 //   correspondents  the other person in a conversation you wrote in who is
 //                   not a connection, so the touches have a contact. Never
 //                   marked linkedin_connection, and only joined by URL.
-//   invitations     an outgoing invitation to a connection: a touch on
-//                   linkedin_connect, outbound, with the note sent.
+//   invitations     an outgoing invitation to a connection that carried a
+//                   note: a touch on linkedin_connect, outbound, with the
+//                   note. A bare connection request is not outreach and is
+//                   skipped.
 //   messages        one touch on linkedin_dm per message of a one-to-one
 //                   conversation you wrote in or held with a connection.
 //                   The rest (one-way recruiter and sales InMail, mostly)
@@ -31,7 +33,7 @@ import type { ImportMapper, ImportStore, MappedRecord, MatchSkip, PendingRecord 
 
 const CONTACTS = 'job_search.contacts';
 const TOUCHES = 'job_search.contact_touches';
-const CONTACT_STATUSES = ['to_contact', 'contacted', 'responded', 'met', 'dormant'];
+const CONTACT_STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'];
 
 export const ONE_WAY =
   'A one-way message, mostly recruiter or sales InMail: you never wrote in the conversation and they are not a connection.';
@@ -39,6 +41,7 @@ export const GROUP = 'A group conversation: touches are kept for one-to-one conv
 export const NOT_YOU = 'The export does not say which side of the conversation is you.';
 export const NOT_CONNECTED = 'They are not one of your connections, so there is no contact to put it on.';
 export const INCOMING = 'An invitation they sent you: it sets how you connected on their contact, not a touch.';
+export const NO_NOTE = 'A connection request with no note, which is not outreach.';
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 
@@ -119,6 +122,29 @@ export function conversations(archive: LinkedInArchive, self: string | null): Co
   });
 }
 
+/**
+ * Where a contact the import adds starts, from the export's history with them:
+ * responded when you wrote and they wrote too, contacted when only you wrote
+ * (a message, or a connection request with a note), and connected otherwise.
+ * Never To contact: a connection is someone you know, not someone queued.
+ */
+export function startingStatuses(archive: LinkedInArchive): Map<string, 'responded' | 'contacted'> {
+  const self = ownSlug(archive);
+  const wrote = new Set<string>();
+  const heard = new Set<string>();
+  for (const inv of archive.invitations) {
+    if (inv.direction === 'OUTGOING' && inv.inviteeProfileSlug && str(inv.message)) wrote.add(inv.inviteeProfileSlug);
+  }
+  for (const conv of conversations(archive, self)) {
+    if (!conv.other || conv.others > 1) continue;
+    if (conv.wrote) wrote.add(conv.other);
+    if (conv.messages.some((m) => m.senderProfileSlug === conv.other)) heard.add(conv.other);
+  }
+  const out = new Map<string, 'responded' | 'contacted'>();
+  for (const slug of wrote) out.set(slug, heard.has(slug) ? 'responded' : 'contacted');
+  return out;
+}
+
 /** Every contact the person has, for matching. */
 async function everyContact(store: ImportStore): Promise<Record<string, unknown>[]> {
   return store.rowsWhere(CONTACTS, ['full_name', 'linkedin_url', 'email', 'company_id'], 'status', CONTACT_STATUSES);
@@ -149,6 +175,7 @@ export const linkedInConnections: ImportMapper<LinkedInArchive> = {
       const note = str(inv.message);
       invitedBy.set(inv.inviterProfileSlug, note ? `They invited you to connect on LinkedIn: "${note}"` : 'They invited you to connect on LinkedIn.');
     }
+    const started = startingStatuses(archive);
     return archive.connections.map((c): MappedRecord => {
       const name = fullName(c);
       if (!name) return { key: c.key, skip: 'It has no name.' };
@@ -164,6 +191,7 @@ export const linkedInConnections: ImportMapper<LinkedInArchive> = {
           how_we_connect: (c.profileSlug && invitedBy.get(c.profileSlug)) ?? null,
           linkedin_connection: true,
         },
+        onInsert: { status: (c.profileSlug && started.get(c.profileSlug)) ?? 'connected' },
       };
     });
   },
@@ -217,6 +245,7 @@ export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
   columns: { full_name: 'text', linkedin_url: 'text' },
   records(archive) {
     const connected = new Set(archive.connections.map((c) => c.profileSlug).filter(Boolean));
+    const started = startingStatuses(archive);
     const out: MappedRecord[] = [];
     const seen = new Set<string>();
     for (const conv of conversations(archive, ownSlug(archive))) {
@@ -224,7 +253,11 @@ export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
       seen.add(conv.other);
       out.push(
         conv.name
-          ? { key: conv.other, values: { full_name: conv.name, linkedin_url: conv.url } }
+          ? {
+              key: conv.other,
+              values: { full_name: conv.name, linkedin_url: conv.url },
+              onInsert: { status: started.get(conv.other) ?? 'contacted' },
+            }
           : { key: conv.other, skip: 'The conversation does not give their name.' },
       );
     }
@@ -261,23 +294,47 @@ async function matchTouches(pending: PendingRecord[], store: ImportStore): Promi
   const logged: Record<string, unknown>[] = [];
   for (let i = 0; i < ids.length; i += 100) {
     logged.push(
-      ...(await store.rowsWhere(TOUCHES, ['contact_id', 'channel', 'direction', 'sent_at'], 'contact_id', ids.slice(i, i + 100))),
+      ...(await store.rowsWhere(TOUCHES, ['contact_id', 'channel', 'direction', 'sent_at', 'draft'], 'contact_id', ids.slice(i, i + 100))),
     );
   }
-  const slot = (t: Record<string, unknown>) => `${t.contact_id}|${t.channel}|${t.direction}|${day(t.sent_at)}`;
-  const free = new Map<string, string[]>();
+  // A touch logged by hand often names the other LinkedIn channel (a
+  // connection note logged as a message) or the next day (an evening message
+  // is the next day in UTC). Each record takes the closest free touch: the
+  // same channel on the same day first, then either LinkedIn channel a day
+  // either side. A touch on another channel, such as email, never joins.
+  const linkedIn = (channel: unknown) => channel === 'linkedin_dm' || channel === 'linkedin_connect';
+  const slot = (t: Record<string, unknown>, at: string | null) => `${t.contact_id}|${t.direction}|${at}`;
+  const free = new Map<string, Record<string, unknown>[]>();
   for (const t of logged) {
-    const k = slot(t);
+    if (!linkedIn(t.channel) || t.draft === true) continue;
+    const k = slot(t, day(t.sent_at));
     if (!free.has(k)) free.set(k, []);
-    free.get(k)!.push(String(t.id));
+    free.get(k)!.push(t);
   }
+  const taken = new Set<string>();
+  const take = (k: string, sameChannel: unknown): string | null => {
+    const t = free.get(k)?.find((c) => !taken.has(String(c.id)) && (sameChannel === null || c.channel === sameChannel));
+    if (!t) return null;
+    taken.add(String(t.id));
+    return String(t.id);
+  };
   const out = new Map<string, string>();
-  for (const p of pending) {
-    const id = free.get(slot(p.values))?.shift();
-    if (id) out.set(p.key, id);
+  for (const pass of ['exact', 'near'] as const) {
+    for (const p of pending) {
+      if (out.has(p.key)) continue;
+      const on = day(p.values.sent_at);
+      if (!on) continue;
+      const id =
+        pass === 'exact'
+          ? take(slot(p.values, on), p.values.channel)
+          : [on, shiftDay(on, -1), shiftDay(on, 1)].reduce<string | null>((hit, d) => hit ?? take(slot(p.values, d), null), null);
+      if (id) out.set(p.key, id);
+    }
   }
   return out;
 }
+
+const shiftDay = (on: string, by: number): string => new Date(Date.parse(`${on}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
 
 const TOUCH_COLUMNS = {
   contact_id: 'uuid',
@@ -297,6 +354,7 @@ export const linkedInInvitations: ImportMapper<LinkedInArchive> = {
       if (inv.direction !== 'OUTGOING') return { key: inv.key, skip: INCOMING };
       const slug = inv.inviteeProfileSlug;
       if (!slug || !connected.has(slug)) return { key: inv.key, skip: NOT_CONNECTED };
+      if (!str(inv.message)) return { key: inv.key, skip: NO_NOTE };
       if (!inv.sentAt) return { key: inv.key, skip: 'It has no date.' };
       return {
         key: inv.key,

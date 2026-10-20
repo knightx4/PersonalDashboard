@@ -17,6 +17,7 @@ describe('dates', () => {
     expect(parseInstant('6/13/26, 11:26 PM')).toBe('2026-06-13T23:26:00.000Z');
     expect(parseInstant('1/2/26, 12:05 AM')).toBe('2026-01-02T00:05:00.000Z');
     expect(parseInstant('12/1/25, 12:40 PM')).toBe('2025-12-01T12:40:00.000Z');
+    expect(parseInstant('12/24/25 06:19 AM UTC')).toBe('2025-12-24T06:19:00.000Z');
     expect(parseInstant('Fri Aug 21 19:02:55 UTC 2026')).toBe('2026-08-21T19:02:55.000Z');
     expect(parseInstant('2026-08-21 15:14:57 UTC')).toBe('2026-08-21T15:14:57.000Z');
     expect(parseInstant('2026-07-02 18:40 UTC')).toBe('2026-07-02T18:40:00.000Z');

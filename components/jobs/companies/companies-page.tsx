@@ -138,11 +138,12 @@ export function CompaniesPage({
   const count = companiesCount(state, filtered.length, companies.length, params.q);
   const searchedOut = filtered.length === 0 && state.terms.length > 0 && !narrowed;
 
-  const list = (
+  const searchBar = (
     <>
-      {/* Directly above the table it narrows, like every other list in the
-          app. Every filter, the sort and the page are on the URL and the
-          field carries them, so searching a narrowed table stays narrowed. */}
+      {/* At the top of the lists it narrows, above Targets as well as the
+          table (note e226fab1). Every filter, the sort and the page are on
+          the URL and the field carries them, so searching a narrowed table
+          stays narrowed. */}
       <div className="mb-4 flex items-start gap-1">
         <div className="min-w-0 flex-1">
           <SearchField placeholder="Search companies" />
@@ -152,7 +153,85 @@ export function CompaniesPage({
             icon is the one the Filters button above it carries. */}
         <DisplayMenu menu={menu} className="sm:hidden" />
       </div>
+    </>
+  );
 
+  const targetsSection = showTargets && (
+    <section className="mb-6" aria-label="Targets">
+      <SectionHeading title="Targets" count={targets.length} className="mb-2" />
+      {targets.length === 0 ? (
+        <p className="text-ui text-ink-muted">
+          No targets yet. Open a company you most want and mark it Target on its Perspective
+          tab.
+        </p>
+      ) : (
+        <Card className="overflow-hidden">
+          {/* A phone gets two lines a target, as the list below does. */}
+          <ul className="divide-y divide-border md:hidden">
+            {targets.map(({ company, answered, nextMove }) => (
+              <li key={company.id}>
+                <RowLink
+                  href={`/jobs/companies/${company.slug}?tab=perspective`}
+                  className="group block row-pad px-4 hover:bg-sunken"
+                >
+                  <span className="block text-ui font-medium text-ink group-hover:text-accent">
+                    <CompanyName company={company} />
+                  </span>
+                  <span className="tabular mt-1 block truncate pl-7 text-small text-ink-muted">
+                    {answered} of {PERSPECTIVE_QUESTIONS.length} answered ·{' '}
+                    {nextMove.trim() || 'no next move yet'}
+                  </span>
+                </RowLink>
+              </li>
+            ))}
+          </ul>
+          <div className="max-md:hidden">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Company</TH>
+                  <TH>Your view</TH>
+                  <TH>Next move</TH>
+                  <TH>Updated</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {targets.map(({ company, answered, nextMove }) => (
+                  <TR key={company.id} href={`/jobs/companies/${company.slug}?tab=perspective`}>
+                    <TD primary>
+                      <CompanyName company={company} />
+                    </TD>
+                    <TD label="Your view" muted>
+                      <span className="tabular">
+                        {answered} of {PERSPECTIVE_QUESTIONS.length}
+                      </span>
+                    </TD>
+                    <TD label="Next move" muted>
+                      {nextMove.trim() ? (
+                        <span className="line-clamp-2">{nextMove}</span>
+                      ) : (
+                        'None yet'
+                      )}
+                    </TD>
+                    <TD label="Updated" muted>
+                      <span className="tabular">
+                        {company.perspective_updated_at
+                          ? formatDate(company.perspective_updated_at, timezone)
+                          : 'Never'}
+                      </span>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+    </section>
+  );
+
+  const list = (
+    <>
       {/* The rail sets this one and no column header does, so the table
           names it with the way back. */}
       {!focus && state.activeOnly && (
@@ -262,80 +341,6 @@ export function CompaniesPage({
         }
       />
 
-      {showTargets && (
-        <section className="mb-6" aria-label="Targets">
-          <SectionHeading title="Targets" count={targets.length} className="mb-2" />
-          {targets.length === 0 ? (
-            <p className="text-ui text-ink-muted">
-              No targets yet. Open a company you most want and mark it Target on its Perspective
-              tab.
-            </p>
-          ) : (
-            <Card className="overflow-hidden">
-              {/* A phone gets two lines a target, as the list below does. */}
-              <ul className="divide-y divide-border md:hidden">
-                {targets.map(({ company, answered, nextMove }) => (
-                  <li key={company.id}>
-                    <RowLink
-                      href={`/jobs/companies/${company.slug}?tab=perspective`}
-                      className="group block row-pad px-4 hover:bg-sunken"
-                    >
-                      <span className="block text-ui font-medium text-ink group-hover:text-accent">
-                        <CompanyName company={company} />
-                      </span>
-                      <span className="tabular mt-1 block truncate pl-7 text-small text-ink-muted">
-                        {answered} of {PERSPECTIVE_QUESTIONS.length} answered ·{' '}
-                        {nextMove.trim() || 'no next move yet'}
-                      </span>
-                    </RowLink>
-                  </li>
-                ))}
-              </ul>
-              <div className="max-md:hidden">
-                <Table>
-                  <THead>
-                    <TR>
-                      <TH>Company</TH>
-                      <TH>Your view</TH>
-                      <TH>Next move</TH>
-                      <TH>Updated</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
-                    {targets.map(({ company, answered, nextMove }) => (
-                      <TR key={company.id} href={`/jobs/companies/${company.slug}?tab=perspective`}>
-                        <TD primary>
-                          <CompanyName company={company} />
-                        </TD>
-                        <TD label="Your view" muted>
-                          <span className="tabular">
-                            {answered} of {PERSPECTIVE_QUESTIONS.length}
-                          </span>
-                        </TD>
-                        <TD label="Next move" muted>
-                          {nextMove.trim() ? (
-                            <span className="line-clamp-2">{nextMove}</span>
-                          ) : (
-                            'None yet'
-                          )}
-                        </TD>
-                        <TD label="Updated" muted>
-                          <span className="tabular">
-                            {company.perspective_updated_at
-                              ? formatDate(company.perspective_updated_at, timezone)
-                              : 'Never'}
-                          </span>
-                        </TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              </div>
-            </Card>
-          )}
-        </section>
-      )}
-
       {focus ? (
         <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
           <LeftRail active={filterNames(state).length}>
@@ -367,7 +372,10 @@ export function CompaniesPage({
             </RailGroup>
           </LeftRail>
 
+          {/* The rail sits beside the whole of the page's lists, Targets
+              included, and the search heads them (note e226fab1). */}
           <div className="min-w-0 flex-1">
+            {searchBar}
             {duplicates.length > 0 && (
               <Banner tone="warn" className="mb-4">
                 <div className="space-y-1">
@@ -398,11 +406,15 @@ export function CompaniesPage({
               </Banner>
             )}
 
+            {targetsSection}
             {list}
           </div>
         </div>
       ) : (
-        list
+        <>
+          {searchBar}
+          {list}
+        </>
       )}
     </PageWide>
   );

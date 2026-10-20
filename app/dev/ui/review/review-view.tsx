@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import Link, { linkVariants } from '@/components/ui/link';
 import { toggleChipClass } from '@/components/ui/chip';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Play } from 'lucide-react';
+import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
@@ -60,10 +60,9 @@ function StartReview({ scope }: { scope: UiScope }) {
   return (
     <form action={action} className="space-y-1">
       <input type="hidden" name="module" value={scope} />
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
+      <DashAction type="submit" size="sm" variant="secondary" pending={pending} routine="review">
         Review it
-      </Button>
+      </DashAction>
       {/* Said out loud, both ways. A pass that could not start looks exactly
           like one that started and found nothing. */}
       {state.message && <p className="text-small text-ink-muted">{state.message}</p>}

@@ -425,6 +425,7 @@ function AnswerBlocked({ row, onClose }: { row: WaitingRow; onClose: () => void 
       onAnswer={setAnswer}
       autoFocus
       error={state.error}
+      routine="plan"
       onCancel={() => {
         setAnswer('');
         onClose();

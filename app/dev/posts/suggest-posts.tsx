@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, ComposeBox } from '@/components/ui/field';
 import { MAX_POST_ASK, type PostsRunState } from '@/lib/dev/posts';
@@ -32,9 +33,9 @@ export function SuggestPosts({ runState }: { runState: PostsRunState }) {
   const busy = pending || going;
   return (
     <form action={action} className="flex flex-col items-end gap-1">
-      <Button type="submit" variant="secondary" pending={busy}>
+      <DashAction type="submit" variant="secondary" pending={busy} routine="plan">
         {pending ? 'Sending…' : going ? 'Dash is drafting…' : 'Suggest posts'}
-      </Button>
+      </DashAction>
       {state.error && (
         <p role="alert" className="text-small text-danger">
           {state.error}
@@ -82,9 +83,9 @@ export function AskForPost({ runState }: { runState: PostsRunState }) {
           <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" pending={pending || going}>
+          <DashAction type="submit" size="sm" pending={pending || going} routine="plan">
             {pending ? 'Sending…' : 'Draft it'}
-          </Button>
+          </DashAction>
         </div>
       </ComposeBox>
       {state.error && (

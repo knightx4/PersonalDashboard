@@ -87,6 +87,17 @@ function requirement(text: string, verdict: GatheredRequirement['verdict'], kind
   return { text, kind, verdict, evidenceItemId: verdict ? 'e1' : null, why: null };
 }
 
+describe('letter bans', () => {
+  it('checks the stock lines on top of their own list', () => {
+    const result = parseCoverLetterPayload(
+      payload({ letter: "Most companies skip this. I'd bring rigor, and I leverage models." }),
+      OFFERED,
+      ['leverage'],
+    );
+    expect(result.ok && result.draft.bannedFound).toEqual(['leverage', 'most companies', "I'd bring"]);
+  });
+});
+
 describe('strongestMatches', () => {
   it('takes strong matches before partial ones, three at most, never gaps', () => {
     const picked = strongestMatches([
@@ -175,6 +186,18 @@ describe('renderLetterRequest', () => {
     const text = renderLetterRequest({ material: { ...material, letterComments: ['Keep it under 250 words.'] } as GatheredMaterial });
     expect(text).toContain('## Their comments on the cover letter\n\n- Keep it under 250 words.');
     expect(renderLetterRequest({ material })).not.toContain('Their comments');
+  });
+
+  it('sends their notes on building with AI, or says there are none', () => {
+    const text = renderLetterRequest({
+      material,
+      aiNotes: [
+        { sourceTable: 'obsidian.notes', sourceRef: 'n1', title: 'speed vs system', text: 'Real tradeoff between speed and a good system.', similarity: 0.8 },
+      ],
+    });
+    expect(text).toContain('## Their notes on building with AI');
+    expect(text).toContain('From "speed vs system":\nReal tradeoff between speed and a good system.');
+    expect(renderLetterRequest({ material })).toContain('None found.');
   });
 
   it('says when there is nothing on file yet', () => {

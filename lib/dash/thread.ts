@@ -63,7 +63,7 @@ add_job_lead, add_interview_round, link_round_email, write_prep_note, add_idea, 
 move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note, change_video,
 add_to_brief and attach_vault_note, and in
-Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
+Todo edit_todo, add_todo_item, link_todo, add_event, change_event, change_agenda_row and add_todos, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
@@ -77,7 +77,9 @@ draft and suggest_post to save a new one. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is
-on, by the table and ref the message gives. When you cannot tell which row
+on, by the table and ref the message gives. When a query_rows lookup names
+the rows it matched as a set ("set 1"), pass that set to change_items rather
+than copying its refs. When you cannot tell which row
 they mean, ask rather than guess. Never change something they only asked
 about.
 

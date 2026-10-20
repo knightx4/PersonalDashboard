@@ -103,7 +103,10 @@ export type ConnectorSession = Extract<ConnectorAccess, { ok: true }> & {
 
 /** A lookup's result with each link made absolute, so it opens from wherever the client shows it. */
 function withAbsoluteLinks(result: Extract<AskToolResult, { ok: true }>, origin: string) {
-  return { ...result, rows: result.rows.map((row) => ({ ...row, href: `${origin}${row.href}` })) };
+  // A lookup's matched set is for Dash's own writes (lib/dash/sets.ts), which the connector has no use for.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { matchedSet, ...shown } = result;
+  return { ...shown, rows: result.rows.map((row) => ({ ...row, href: `${origin}${row.href}` })) };
 }
 
 function text(value: string, isError = false): CallToolResult {

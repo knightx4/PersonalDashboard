@@ -6,7 +6,7 @@ import { applyPlan, planImport } from '../engine';
 import { LINKEDIN_MAPPERS, LINKEDIN_SOURCE } from '../linkedin';
 import { memoryStore, type MemoryStore } from '../memory-store';
 import { CONNECTION_ONLY } from './applications';
-import { INCOMING, ONE_WAY, ownSlug } from './connections';
+import { INCOMING, NO_NOTE, ONE_WAY, ownSlug } from './connections';
 
 // The fixture export (lib/linkedin/archive/fixtures/build-export.ts) is Sam
 // Taylor's. Two connections: Jordan Lee, a recruiter at Acme Robotics, and
@@ -214,4 +214,66 @@ describe('importing connections, invitations and messages', () => {
       expect.objectContaining({ id: 't1', message: 'Enjoyed your talk.' }),
     ]);
   });
+
+  it('joins a connection note logged by hand as a message the next day', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'contacted' }],
+      [TOUCHES]: [{ id: 't1', contact_id: 'k3', channel: 'linkedin_dm', direction: 'outbound', sent_at: '2025-01-04T02:00:00.000Z', message: null }],
+    });
+    await run(store, archive());
+    expect(store.rows(TOUCHES).filter((t) => t.contact_id === 'k3')).toEqual([
+      expect.objectContaining({ id: 't1', channel: 'linkedin_dm', message: 'Enjoyed your talk.' }),
+    ]);
+  });
+
+  it('does not join a touch two days off, or one on another channel', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'contacted' }],
+      [TOUCHES]: [
+        { id: 't1', contact_id: 'k3', channel: 'linkedin_connect', direction: 'outbound', sent_at: '2025-01-05T12:00:00.000Z', message: null },
+        { id: 't2', contact_id: 'k3', channel: 'email', direction: 'outbound', sent_at: '2025-01-03T12:00:00.000Z', message: null },
+      ],
+    });
+    await run(store, archive());
+    const touches = store.rows(TOUCHES).filter((t) => t.contact_id === 'k3');
+    expect(touches).toHaveLength(3);
+    expect(touches.find((t) => t.id === 't1')!.message).toBeNull();
+    expect(touches.find((t) => t.id === 't2')!.message).toBeNull();
+  });
+
+  it('leaves out a connection request sent with no note', async () => {
+    const store = seeded();
+    const input = archive();
+    input.invitations = input.invitations.map((inv) => ({ ...inv, message: null }));
+    const plan = await run(store, input);
+    expect(store.rows(TOUCHES).filter((t) => t.channel === 'linkedin_connect')).toEqual([]);
+    expect(kind(plan, 'invitations').records.filter((r) => r.reason === NO_NOTE)).toHaveLength(1);
+  });
+
+  it('starts each added contact where the history puts it, and never moves it again', async () => {
+    const store = seeded({
+      [CONTACTS]: [{ id: 'k3', full_name: 'Renée Dubois', linkedin_url: 'https://www.linkedin.com/in/renée-dubois', status: 'met' }],
+    });
+    const input = archive();
+    await run(store, input);
+    const jordan = store.rows(CONTACTS).find((c) => c.full_name === 'Jordan Lee')!;
+    // Jordan and Sam traded messages; Renée was already a contact and keeps hers.
+    expect(jordan.status).toBe('responded');
+    expect(store.rows(CONTACTS).find((c) => c.id === 'k3')!.status).toBe('met');
+
+    jordan.status = 'dormant';
+    const again = await run(store, input);
+    expect(kind(again, 'connections').counts.added).toBe(0);
+    expect(store.rows(CONTACTS).find((c) => c.full_name === 'Jordan Lee')!.status).toBe('dormant');
+  });
+
+  it('starts a connection you never wrote to as connected, not to contact', async () => {
+    const store = seeded();
+    const input = archive();
+    input.messages = [];
+    input.invitations = [];
+    await run(store, input);
+    expect(store.rows(CONTACTS).map((c) => c.status)).toEqual(['connected', 'connected']);
+  });
 });
+
