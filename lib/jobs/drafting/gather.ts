@@ -307,7 +307,8 @@ async function readComments(
   return { letter, byAnswer };
 }
 
-async function vaultPassages(
+/** The vault passages closest to a question, one per note, cut to the vault budget. */
+export async function vaultPassages(
   deps: GatherDeps,
   userId: string,
   question: string,
