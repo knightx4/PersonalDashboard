@@ -48,8 +48,13 @@ import { whenDate, whenWeekday } from '@/lib/core/when';
  * calls; without it each call is one request.
  */
 
-/** The most lookups and proposals one answer may make. */
-export const MAX_LOOKUPS = 8;
+/**
+ * The most lookups and proposals one answer may make. Eight ran out on a
+ * question asked across the person's own notes (note e61dc888), which takes
+ * a search per kind of source and then opening the notes it found; the time
+ * and token budgets below still bound the answer.
+ */
+export const MAX_LOOKUPS = 12;
 /** Input tokens across the calls of one answer, cached and not, before it must answer. */
 export const INPUT_BUDGET = 150_000;
 /**
