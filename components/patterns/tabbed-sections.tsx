@@ -31,6 +31,7 @@ export function TabbedSections({
   label,
   address,
   shallow,
+  compact,
   children,
   className,
 }: {
@@ -40,13 +41,15 @@ export function TabbedSections({
   address?: TabAddress;
   /** For a page drawn in the browser that holds every tab's data (components/ui/tabs.tsx). */
   shallow?: boolean;
+  /** For a row of more tabs than a phone holds (components/ui/tabs.tsx). */
+  compact?: boolean;
   /** The open tab's content, and only that tab's. */
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={className}>
-      <Tabs tabs={tabs} label={label} address={address} shallow={shallow} className="mb-5" />
+      <Tabs tabs={tabs} label={label} address={address} shallow={shallow} compact={compact} className="mb-5" />
       {children}
     </div>
   );
