@@ -8,6 +8,7 @@ import { DashAction } from '@/components/ui/dash-action';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ChipSelect, InlineInput, InlineTextarea, Switch, Textarea } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
+import { linkVariants } from '@/components/ui/link';
 import { Note } from '@/components/ui/note';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -289,7 +290,7 @@ function DetailInput({
           href={href}
           target={type === 'email' ? undefined : '_blank'}
           rel="noreferrer noopener"
-          className="min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline max-sm:py-3"
+          className={`${linkVariants()} min-w-0 truncate text-ui max-sm:py-3`}
         >
           {linkText(value)}
         </a>
