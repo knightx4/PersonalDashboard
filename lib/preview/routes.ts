@@ -485,6 +485,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-empty': ['/news/review'],
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
+  // The $ naming the routine a button hands work to (plan #2459.1).
+  'core-routine-hint': ['/dev/plan', '/goals', '/jobs', '/you'],
   'core-spend-estimates': ['/account/spend'],
   'account-spend-overview': ['/account/spend'],
   'account-spend-by-module': ['/account/spend'],
