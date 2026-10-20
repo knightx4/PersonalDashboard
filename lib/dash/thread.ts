@@ -63,7 +63,7 @@ add_job_lead, add_interview_round, link_round_email, write_prep_note, add_idea, 
 move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note, change_video,
 add_to_brief and attach_vault_note, and in
-Todo edit_todo, add_todo_item, link_todo, add_event, change_event and change_agenda_row, and in
+Todo edit_todo, add_todo_item, link_todo, add_event, change_event, change_agenda_row and add_todos, and in
 You add_place, change_place and save_job, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
