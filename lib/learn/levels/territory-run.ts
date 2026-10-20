@@ -131,18 +131,31 @@ export async function draftTerritoryTick(
   clients: { learn: LearnSupabaseClient; jobs: AppSupabaseClient },
   owner: string,
   territory: Territory,
-  input: { anthropicApiKey: string; budgetMs: number; now?: () => number; catalogue?: postgres.Sql },
+  input: {
+    anthropicApiKey: string;
+    budgetMs: number;
+    now?: () => number;
+    catalogue?: postgres.Sql;
+    /** Draft only this area's remaining topics (plan #2483.1); the first area with topics left when absent. */
+    area?: string;
+  },
 ): Promise<TerritoryTick> {
   const now = input.now ?? Date.now;
   const started = now();
   const { learn, jobs } = clients;
 
-  const roleSources = await Promise.all(territory.roles.map((phrase) => roleRequirementSourceFrom(jobs, phrase, owner)));
-  const given = territorySources(territory, roleSources);
-
   const { data: had, error } = await learn.from('topics').select('asked').eq('user_id', owner);
   if (error) throw new Error(`Reading the topics already drafted failed: ${error.message}`);
-  const left = topicsLeft(territory, ((had ?? []) as { asked: string | null }[]).map((t) => t.asked));
+  const askedBefore = ((had ?? []) as { asked: string | null }[]).map((t) => t.asked);
+  // A territory with areas drafts one area a tick, from that area's texts
+  // (plan #2483.2): the one asked for, or else the first with topics left.
+  const area = input.area ?? (territory.areas?.length ? topicsLeft(territory, askedBefore)[0]?.area : undefined);
+  const left = topicsLeft(territory, askedBefore, area);
+
+  const roleSources = await Promise.all(territory.roles.map((phrase) => roleRequirementSourceFrom(jobs, phrase, owner)));
+  const given = territorySources(territory, roleSources, area);
+  // The first tick of the territory, whichever area it is drafted for: nothing of it is drafted yet.
+  const firstTick = topicsLeft(territory, askedBefore).length === territory.topics.length;
 
   const [frames, lens] = await Promise.all([
     learn.from('area_check_articles').select('id, title').eq('level', 4).in('title', [...new Set(left.map((t) => t.frame))]),
@@ -166,7 +179,7 @@ export async function draftTerritoryTick(
   const goal = territory.goal ?? { name: territory.name, about: null };
   const catalogue = input.catalogue;
   const read = catalogue
-    ? await withTerritoryStore(territory, given, left.length === territory.topics.length, {
+    ? await withTerritoryStore(territory, given, firstTick, {
         find: async () => {
           const spent: SpendReport[] = [];
           const found = await findStoredUnits(liveStoredUnitPorts(catalogue), goal, territory.performances, (r) =>
