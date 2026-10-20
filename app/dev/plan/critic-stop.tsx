@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { acceptCriticStop, answerBlockedStep, type PlanActionState } from './actions';
+import { DashAction } from '@/components/ui/dash-action';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
@@ -125,9 +126,9 @@ export function CriticStop({ id, view }: { id: string; view: CriticStopView }) {
               placeholder="What the screen should do instead. The next session builds against it."
             />
             <div className="flex flex-wrap items-center gap-1">
-              <Button type="submit" size="sm" pending={redirectPending}>
+              <DashAction type="submit" size="sm" pending={redirectPending} routine="plan">
                 Send it back
-              </Button>
+              </DashAction>
               <Button type="button" size="sm" variant="ghost" onClick={() => setRedirecting(false)}>
                 Cancel
               </Button>
@@ -138,14 +139,15 @@ export function CriticStop({ id, view }: { id: string; view: CriticStopView }) {
           <div className="flex flex-wrap items-center gap-2">
             <form action={acceptAction}>
               <input type="hidden" name="id" value={id} />
-              <Button
+              <DashAction
                 type="submit"
                 size="sm"
                 pending={acceptPending}
                 disabled={view.surfaces.length === 0}
+                routine="plan"
               >
                 Accept as it is
-              </Button>
+              </DashAction>
             </form>
             <Button type="button" size="sm" variant="secondary" onClick={() => setRedirecting(true)}>
               Say what to change

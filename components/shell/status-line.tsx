@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Popover } from '@/components/ui/popover';
 import { sendCiFixToDash, type CiFixState } from '@/app/dev/ci-fix-action';
 import { usePopover } from '@/lib/use-popover';
@@ -360,15 +360,16 @@ function FixWithDash() {
 
   return (
     <div className="mt-3">
-      <Button
+      <DashAction
         size="sm"
         variant="secondary"
         pending={pending}
         disabled={pending || Boolean(state.message)}
         onClick={() => start(async () => setState(await sendCiFixToDash()))}
+        routine="plan"
       >
         Fix with Dash
-      </Button>
+      </DashAction>
       {(state.message ?? state.error) && (
         <p className={cn('mt-2 text-caption', state.error ? 'text-danger' : 'text-ink-muted')}>
           {state.message ?? state.error}

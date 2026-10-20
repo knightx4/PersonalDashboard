@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CostHint } from '@/components/ui/cost-hint';
+import type { RoutineKey } from '@/lib/feedback/routine-names';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
@@ -217,6 +219,7 @@ export function AnswerBox({
   hint = false,
   error,
   extra,
+  routine,
 }: {
   id: string;
   detail: string | null;
@@ -235,6 +238,8 @@ export function AnswerBox({
    * question's id from the hidden field above.
    */
   extra?: React.ReactNode;
+  /** The routine the answer is then handed to, named in a $ beside the button (plan #2459.5). */
+  routine?: RoutineKey;
 }) {
   const field = `answer-${id}`;
   const options = planOptions(detail);
@@ -262,6 +267,7 @@ export function AnswerBox({
         <Button type="submit" size="sm" pending={pending}>
           {resolution ? 'Record the new answer' : 'Answer'}
         </Button>
+        {routine && <CostHint routine={routine} what="Where the answer goes" />}
         {onCancel && (
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
             Cancel
