@@ -32,6 +32,7 @@ import { VAULT_WRITE_TOOLS } from './vault-writes';
 import { JOBS_WRITE_TOOLS } from './jobs-writes';
 import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 import { POST_WRITE_TOOLS } from './post-writes';
+import { MODEL_WRITE_TOOLS } from './model-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -102,6 +103,9 @@ import { POST_WRITE_TOOLS } from './post-writes';
  *                    an email in Jobs review (plan #1894.6.4.3).
  *   add_interview_round  a round on a role, with its first interview
  *                    (lib/dash/interview-writes.ts, plan #2044.1).
+ *   set_dash_model   the model Dash answers with switched to Haiku, Sonnet or
+ *                    Opus, through the picker's own save (lib/dash/model-writes.ts,
+ *                    plan #2458.4).
  *   rewrite_post     the text of a post draft on the Posts tab in Dev
  *                    rewritten (lib/dash/post-writes.ts, plan #2202.1).
  *   suggest_post     a new post draft saved to the Posts tab, with an
@@ -1244,6 +1248,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...INTERVIEW_WRITE_TOOLS,
   // A post draft's text (plan #2202.1).
   ...POST_WRITE_TOOLS,
+  ...MODEL_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

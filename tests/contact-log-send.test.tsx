@@ -54,4 +54,15 @@ describe('ContactDetail', () => {
     // editor where they are (law 14).
     expect(html).toMatch(/<button[^>]*title="Edit what you said"[^>]*>Asked about the team<\/button>/);
   });
+
+  // Plan #2457.5: Outreach opens on the channel and Draft a message, and the
+  // line saying what the message is for waits for that press (law 14).
+  it('keeps the brief box shut until Draft a message is pressed', () => {
+    expect(html).toMatch(/<button[^>]*>Draft a message<\/button>/);
+    expect(html).not.toMatch(/aria-label="What the message is for"/);
+    const open = renderToStaticMarkup(
+      <ContactDetail contact={contact} timezone="Europe/London" preview={{ brief: true }} />,
+    );
+    expect(open).toMatch(/<input[^>]*aria-label="What the message is for"/);
+  });
 });

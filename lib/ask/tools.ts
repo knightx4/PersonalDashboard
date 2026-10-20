@@ -29,6 +29,7 @@ import { QUERY_OPS, QUERY_ROWS_MAX, queryRowsLookup } from './query';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { postPicturesLookup } from '@/lib/dash/post-pictures';
+import { dashModelLookup } from '@/lib/dash/model-lookup';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
@@ -71,6 +72,7 @@ export const ASK_TOOL_NAMES = [
   'read_dev_row',
   'find_dev_text',
   'post_pictures',
+  'dash_model',
   'search_mail',
   'read_mail',
   'read_job_board',
@@ -82,8 +84,10 @@ export const ASK_TOOL_NAMES = [
  * and read in Gmail as the person, which a connector token cannot do, and
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
+ * The model Dash answers with is the app's own setting (plan #2458.4), and a
+ * connector client is not Dash.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart', 'dash_model'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -512,6 +516,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'dash_model',
+    description:
+      'Say which model Dash is answering with: Haiku, Sonnet or Opus, as they last picked it on the Dash page or asked you to set it, or the default (Sonnet) when they never chose. Use it for "which model are you using?" or "what am I on?" and read the answer from here; do not guess from what you know about yourself. To change it, call set_dash_model.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'search_mail',
     description:
       'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
@@ -595,6 +605,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   read_dev_row: { run: readDevRowLookup, module: null },
   find_dev_text: { run: findDevTextLookup, module: null },
   post_pictures: { run: postPicturesLookup, module: null },
+  // Reads the account's own setting; no workspace has to be on.
+  dash_model: { run: dashModelLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
