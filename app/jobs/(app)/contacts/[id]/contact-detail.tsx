@@ -38,8 +38,9 @@ const words = (value: string) => value.replace(/_/g, ' ');
 
 /**
  * Everything about one person, in three sections: their details, each value
- * edited where it is read; the outreach, where Dash drafts a message and the
- * sends are logged; and the notes, read as writing until they are pressed.
+ * edited where it is read; the notes, read as writing until they are
+ * pressed; and the outreach, where Dash drafts a message and the sends are
+ * logged.
  *
  * The details used to sit behind one pencil that opened a six-field form
  * over the whole card. Now each value is its own input set like the text it
@@ -76,7 +77,8 @@ export function ContactDetail({
   return (
     <div className="space-y-4">
       <ContactDetails contact={contact} save={save} error={error} />
-      <Outreach contact={contact} setContact={setContact} timezone={timezone} preview={preview} />
+      {/* The long text straight after the facts, then the outreach (the
+          item page of the list-and-detail pattern). */}
       <CardSection title="Notes">
         <EditableProse
           value={contact.notes ?? ''}
@@ -90,6 +92,7 @@ export function ContactDetail({
           }}
         />
       </CardSection>
+      <Outreach contact={contact} setContact={setContact} timezone={timezone} preview={preview} />
       <DeleteContact contactId={contact.id} name={contact.fullName} />
     </div>
   );
@@ -183,7 +186,9 @@ function ContactDetails({
             ))}
           </ChipSelect>
         </PressRoom>
-        <label className="ml-auto flex cursor-pointer items-center gap-2 text-ui text-ink">
+        {/* The two flags read as settings beside the chips, quieter than the
+            facts below them, so the name is what the eye takes first. */}
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-small text-ink-muted">
           <Switch
             checked={contact.potentialLead}
             onChange={(event) => {
@@ -193,7 +198,7 @@ function ContactDetails({
           />
           Potential lead
         </label>
-        <label className="flex cursor-pointer items-center gap-2 text-ui text-ink">
+        <label className="flex cursor-pointer items-center gap-2 text-small text-ink-muted">
           <Switch
             checked={contact.foundByDash}
             onChange={(event) => {
@@ -208,7 +213,7 @@ function ContactDetails({
       <ValueList className="mt-3">
         <ValueRow
           label="Name"
-          value={<DetailInput label="Name" value={contact.fullName} onSave={(fullName) => fullName && save({ fullName }, { fullName })} />}
+          value={<DetailInput label="Name" value={contact.fullName} className="font-semibold sm:text-body" onSave={(fullName) => fullName && save({ fullName }, { fullName })} />}
         />
         <ValueRow
           label="Title"
@@ -291,6 +296,7 @@ function DetailInput({
   type = 'text',
   href,
   wrap = false,
+  className,
   onSave,
 }: {
   label: string;
@@ -301,6 +307,8 @@ function DetailInput({
   wrap?: boolean;
   /** Where the value goes, opened when it is pressed. */
   href?: string | null;
+  /** Added to the input, for the one fact set heavier than the rest: the name. */
+  className?: string;
   onSave: (next: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -345,7 +353,7 @@ function DetailInput({
       defaultValue={value ?? ''}
       placeholder={placeholder}
       autoFocus={editing}
-      className="-ml-1 max-sm:min-h-11"
+      className={cn('-ml-1 max-sm:min-h-11', className)}
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();
         if (event.key === 'Escape') {
@@ -374,6 +382,8 @@ function linkText(value: string): string {
  */
 export interface OutreachPreview {
   compose?: { by: Composer['by']; subject?: string; message: string };
+  /** The line saying what the message is for, open as a press of Draft a message leaves it. */
+  brief?: boolean;
   revealDraftId?: string;
   draftError?: { id: string; text: string };
 }
@@ -431,6 +441,10 @@ function Outreach({
 
   const [channel, setChannel] = useState<Channel>(lastChannel);
   const [aim, setAim] = useState('');
+  // The line saying what the message is for opens with the first press of
+  // Draft a message, so the section opens on two controls and no empty box
+  // (law 14). It stays open while Dash's draft is showing, for Draft again.
+  const [briefOpen, setBriefOpen] = useState(preview?.brief ?? false);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [composer, setComposer] = useState<Composer | null>(
@@ -544,6 +558,8 @@ function Outreach({
     });
   }
 
+  const showBrief = briefOpen || composer?.by === 'dash';
+
   const composed = composer
     ? composer.subject.trim()
       ? `Subject: ${composer.subject.trim()}\n\n${composer.message}`
@@ -561,7 +577,8 @@ function Outreach({
             : undefined
       }
     >
-      {/* Drafting: the channel, what it is for in a line, and the press. */}
+      {/* Drafting: the channel and the press; once pressed, what it is for
+          in a line, and the press that drafts. */}
       <div className="flex flex-wrap items-center gap-2">
         <PressRoom>
           <ChipSelect
@@ -576,25 +593,42 @@ function Outreach({
             ))}
           </ChipSelect>
         </PressRoom>
-        <InlineInput
-          aria-label="What the message is for"
-          value={aim}
-          onChange={(event) => setAim(event.target.value)}
-          placeholder="What it's for, if you want to say: ask about the role, follow up…"
-          className="min-w-48 flex-1 max-sm:min-h-11"
-        />
-        <DashAction
-          type="button"
-          size="sm"
-          variant="secondary"
-          pending={drafting}
-          disabled={drafting}
-          paid={DRAFT_MESSAGE}
-          what="Cost of drafting the message"
-          onClick={() => void runDraft()}
-        >
-          {drafting ? 'Drafting…' : composer?.by === 'dash' ? 'Draft again' : 'Draft a message'}
-        </DashAction>
+        {showBrief ? (
+          <>
+            <InlineInput
+              aria-label="What the message is for"
+              value={aim}
+              autoFocus={!preview && !composer}
+              onChange={(event) => setAim(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !drafting) void runDraft();
+              }}
+              placeholder="What it's for, if you want to say: ask about the role, follow up…"
+              className="min-w-48 flex-1 max-sm:min-h-11"
+            />
+            <DashAction
+              type="button"
+              size="sm"
+              variant="secondary"
+              pending={drafting}
+              disabled={drafting}
+              paid={DRAFT_MESSAGE}
+              what="Cost of drafting the message"
+              onClick={() => void runDraft()}
+            >
+              {drafting ? 'Drafting…' : composer?.by === 'dash' ? 'Draft again' : 'Draft it'}
+            </DashAction>
+            {!composer && !drafting && (
+              <IconButton label="Close" size="sm" onClick={() => setBriefOpen(false)}>
+                <X strokeWidth={1.75} aria-hidden />
+              </IconButton>
+            )}
+          </>
+        ) : (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setBriefOpen(true)}>
+            Draft a message
+          </Button>
+        )}
       </div>
 
       {draftError && !drafting && (
@@ -723,7 +757,10 @@ function Outreach({
         <ul className="mt-2 divide-y divide-border border-t border-border">
           {sends.map((touch) => (
             <li key={touch.id} className="row-pad flex flex-wrap items-center gap-2 text-ui">
-              <span className="tabular w-24 text-ink-muted">{formatDate(touch.sentAt, timezone)}</span>
+              {/* The date's column is narrower on a phone, and the word
+                  outbound goes there (most sends are), so the date, channel,
+                  reply state and bin keep to one line at 390. */}
+              <span className="tabular w-24 text-ink-muted max-sm:w-12">{formatDate(touch.sentAt, timezone)}</span>
               <PressRoom>
                 <ChipSelect
                   aria-label="How it went out"
@@ -744,7 +781,9 @@ function Outreach({
                   ))}
                 </ChipSelect>
               </PressRoom>
-              <span className="text-ink-muted">{touch.direction}</span>
+              <span className={cn('text-ink-muted', touch.direction === 'outbound' && 'max-sm:sr-only')}>
+                {touch.direction}
+              </span>
               {/* The answer stays on the first line with the date and the
                   channel, and the words take the line below, so every send
                   row has the same shape at every width. */}
@@ -844,8 +883,10 @@ function DraftRow({
           colour (law 4); the day is when it was saved. */}
       <span className="tabular inline-flex items-center gap-1 text-ink-muted">
         <PenLine className="size-3.5" strokeWidth={1.75} aria-hidden />
-        <span className="font-medium text-ink">Draft</span>
-        <span aria-hidden>·</span>
+        {/* On a phone the pencil and the list's heading say draft, which
+            leaves the line room for Mark sent in words. */}
+        <span className="font-medium text-ink max-sm:sr-only">Draft</span>
+        <span aria-hidden className="max-sm:hidden">·</span>
         <span>{formatDate(draft.sentAt, timezone)}</span>
       </span>
       <PressRoom>
@@ -870,15 +911,12 @@ function DraftRow({
           revealed ? 'opacity-100' : 'opacity-0',
         )}
       >
-        {/* On a phone the line has room for the send glyph alone, so the
-            draft stays two lines: its label and its words. */}
-        <Button type="button" size="sm" variant="ghost" className="max-sm:hidden" disabled={disabled} onClick={onMarkSent}>
+        {/* Mark sent in words at every width (spec R20), so the draft
+            stays two lines: its label and its words. */}
+        <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={onMarkSent}>
           <Send className="size-4" strokeWidth={1.75} aria-hidden />
           Mark sent
         </Button>
-        <IconButton label="Mark sent" size="sm" className="sm:hidden" disabled={disabled} onClick={onMarkSent}>
-          <Send strokeWidth={1.75} aria-hidden />
-        </IconButton>
         <IconButton label="Delete this draft" size="sm" disabled={disabled} onClick={onDelete}>
           <Trash2 strokeWidth={1.75} aria-hidden />
         </IconButton>

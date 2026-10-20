@@ -5,6 +5,7 @@ import Link from '@/components/ui/link';
 import { Briefcase, GitMerge } from 'lucide-react';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { Button } from '@/components/ui/button';
+import { CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Checkbox, FieldError, Label, Select } from '@/components/ui/field';
 import { formatDate, formatDateInline } from '@/lib/jobs/applications/load';
@@ -24,6 +25,8 @@ export interface CompanyRoleRow {
     outcome: string | null;
   }>;
 }
+
+const TITLE = 'Roles here, across cycles';
 
 /**
  * The same role posted twice — a placeholder the linker made before it
@@ -47,8 +50,9 @@ export function RolesList({
   const [pending, startTransition] = useTransition();
 
   if (roles.length === 0) {
-    // Already inside the section's card, so the placeholder border comes off.
+    // Inside the section's card, so the placeholder border comes off.
     return (
+      <CardSection title={TITLE}>
       <EmptyState
         icon={Briefcase}
         title="No roles saved at this company yet"
@@ -56,6 +60,7 @@ export function RolesList({
         action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
         className="border-0 py-8"
       />
+      </CardSection>
     );
   }
 
@@ -91,26 +96,28 @@ export function RolesList({
   }
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-small text-ink-muted">
-          {picking
-            ? 'Pick the roles that are really the same posting, then which one to keep.'
-            : null}
-        </p>
-        {roles.length > 1 && (
+    <CardSection
+      title={TITLE}
+      // On the heading's line, where Tasks puts its Add.
+      action={
+        roles.length > 1 ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => (picking ? cancel() : setPicking(true))}
-            className="ml-auto shrink-0"
           >
             <GitMerge className="size-3.5" strokeWidth={1.75} aria-hidden />
             {picking ? 'Cancel' : 'Merge roles'}
           </Button>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
+      {picking && (
+        <p className="mb-2 text-small text-ink-muted">
+          Pick the roles that are really the same posting, then which one to keep.
+        </p>
+      )}
 
       <ul className="divide-y divide-border">
         {roles.map((role) => (
@@ -196,6 +203,6 @@ export function RolesList({
       )}
 
       <FieldError>{error}</FieldError>
-    </div>
+    </CardSection>
   );
 }
