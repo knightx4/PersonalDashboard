@@ -67,6 +67,8 @@ export type InsightsOpen = {
   earlier?: boolean;
   /** The evidence under a card brought back by a tripwire. */
   fired?: boolean;
+  /** The hint on the Full re-read button, naming the routine. */
+  reread?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -104,9 +106,6 @@ const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
  * been priced yet, so the figure is a guess and says so (law 16).
  */
 const LOOK_AGAIN_COST = 'Up to about $2, uncertain';
-
-/** A full re-read is a session on the person's Claude plan, with readers beside it, for half an hour or so. */
-const FULL_REREAD_COST = 'Uses your Claude plan for half an hour or so; about $2 to $5 at API prices, uncertain';
 
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
@@ -405,8 +404,9 @@ export function InsightsView({
             variant="link"
             pending={starting}
             onClick={fullReread}
-            costText={FULL_REREAD_COST}
+            routine="goals"
             what="Cost of a full re-read"
+            hintOpen={open.reread}
           >
             Full re-read
           </DashAction>
