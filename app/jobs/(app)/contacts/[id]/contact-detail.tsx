@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
@@ -256,7 +256,14 @@ function PressRoom({ children }: { children: React.ReactNode }) {
   return <label className="inline-flex items-center max-sm:min-h-11 max-sm:min-w-11">{children}</label>;
 }
 
-/** One value, as an input set like the text it stands for; leaving it saves. */
+/**
+ * One value, as an input set like the text it stands for; leaving it saves.
+ *
+ * A value that goes somewhere, a LinkedIn page or an email address, is the
+ * link itself at rest, with a pencil beside it that turns it into the input
+ * (note 954cc18d). It used to be an input with a small open-link icon at its
+ * side, so the address could be edited in place but not pressed.
+ */
 function DetailInput({
   label,
   value,
@@ -269,46 +276,59 @@ function DetailInput({
   value: string | null;
   placeholder?: string;
   type?: 'text' | 'email' | 'url';
-  /** Where the value goes, opened beside it. */
+  /** Where the value goes, opened when it is pressed. */
   href?: string | null;
   onSave: (next: string) => void;
 }) {
-  return (
-    <span className="flex items-center gap-1">
-      <InlineInput
-        // A new value from the server resets what the input shows.
-        key={value ?? ''}
-        aria-label={label}
-        type={type}
-        defaultValue={value ?? ''}
-        placeholder={placeholder}
-        className="-ml-1 max-sm:min-h-11"
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-          if (event.key === 'Escape') {
-            event.currentTarget.value = value ?? '';
-            event.currentTarget.blur();
-          }
-        }}
-        onBlur={(event) => {
-          const next = event.currentTarget.value.trim();
-          if (next !== (value ?? '')) onSave(next);
-        }}
-      />
-      {href && (
+  const [editing, setEditing] = useState(false);
+
+  if (href && value && !editing) {
+    return (
+      <span className="flex min-w-0 items-center gap-1">
         <a
           href={href}
-          target="_blank"
+          target={type === 'email' ? undefined : '_blank'}
           rel="noreferrer noopener"
-          title={`Open ${label}`}
-          aria-label={`Open ${label}`}
-          className="press-area shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
+          className="min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline max-sm:py-3"
         >
-          <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+          {linkText(value)}
         </a>
-      )}
-    </span>
+        <IconButton label={`Edit ${label}`} size="sm" onClick={() => setEditing(true)}>
+          <Pencil strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      </span>
+    );
+  }
+
+  return (
+    <InlineInput
+      // A new value from the server resets what the input shows.
+      key={value ?? ''}
+      aria-label={label}
+      type={type}
+      defaultValue={value ?? ''}
+      placeholder={placeholder}
+      autoFocus={editing}
+      className="-ml-1 max-sm:min-h-11"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') {
+          event.currentTarget.value = value ?? '';
+          event.currentTarget.blur();
+        }
+      }}
+      onBlur={(event) => {
+        setEditing(false);
+        const next = event.currentTarget.value.trim();
+        if (next !== (value ?? '')) onSave(next);
+      }}
+    />
   );
+}
+
+/** A link as it reads: "linkedin.com/in/someone", without the scheme or the www. */
+function linkText(value: string): string {
+  return value.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 }
 
 /**
