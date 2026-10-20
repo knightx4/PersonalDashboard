@@ -1178,11 +1178,16 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'move_roles',
-    `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). Name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
+    `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). When a query_rows lookup of job_search.roles or job_search.applications matched exactly the roles to move, pass the set it named as set instead of listing them. Otherwise name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
     {
       type: 'object',
       properties: {
         stage: { type: 'string', enum: [...ROLE_STAGES], description: 'The stage to move every role to, or archive.' },
+        set: {
+          type: 'string',
+          description:
+            'The set a query_rows lookup of job_search.roles or job_search.applications named, such as "set 1": every row it matched is moved.',
+        },
         application_refs: {
           type: 'array',
           items: { type: 'string' },
