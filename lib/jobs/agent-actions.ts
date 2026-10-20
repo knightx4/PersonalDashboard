@@ -58,6 +58,7 @@ export const jobsActions: ModuleActions = {
     updateTouch: tool('change_touch'),
     markTouchAnswered: tool('change_touch'),
     deleteContact: none('deletes'),
+    deleteTouch: none('deletes'),
   },
   'app/jobs/(app)/settings/actions.ts': {
     saveProfileField: none('setting'),

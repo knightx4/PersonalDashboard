@@ -17,6 +17,7 @@ import { dayIn } from '@/lib/todo/time';
 import { TAGS_ADDED } from '@/lib/core/dash-actions';
 import { LATER_REFUSED, LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { zoneDay } from '@/lib/core/when';
 
 /**
  * The Todo changes an agent makes when asked (plan #1894.9.1, feature #1894),
@@ -426,9 +427,15 @@ function optional(args: Args, key: string, max: number, what: string): string | 
   return value || null;
 }
 
-function eventDay(row: Row): string {
-  const day = (row.starts_on as string | null) ?? (typeof row.starts_at === 'string' ? row.starts_at.slice(0, 10) : null);
-  return day ?? '';
+/**
+ * The day an event is on, in the person's zone. A timed event's start is
+ * stored in UTC, so 8:30 pm in New York read as its first ten characters
+ * was the next day ("Dinner with Sam" on 1 November was said to be on the
+ * 2nd, and its link opened the 2nd).
+ */
+function eventDay(row: Row, timezone: string): string {
+  if (typeof row.starts_on === 'string') return row.starts_on;
+  return typeof row.starts_at === 'string' ? zoneDay(row.starts_at, timezone) : '';
 }
 
 function calendarHref(day: string): string {
@@ -457,7 +464,7 @@ async function addEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     'event',
   );
   const id = after.id as string;
-  const day = eventDay(after);
+  const day = eventDay(after, env.timezone);
   const href = calendarHref(day);
   const name = named(title, title);
   return {
@@ -503,7 +510,7 @@ async function changeEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
 
   const after = await updated(env, 'events', id, patch, 'event');
   const name = named(before.title, 'the event');
-  const href = calendarHref(eventDay(after));
+  const href = calendarHref(eventDay(after, env.timezone));
   return {
     kind: 'change_event',
     input: { verb: 'Changed', what: name, rest: `: ${listed(said)}`, href, where: 'Open the calendar', paths: ['/todo/calendar', '/todo'] },

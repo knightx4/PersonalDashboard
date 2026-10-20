@@ -1,6 +1,7 @@
 import { ListChecks, Plus, Table2, Users } from 'lucide-react';
 import { ViewSwitch } from '@/components/shell/view-switch';
 import { AddContact } from '@/app/jobs/(app)/contacts/add-contact';
+import { LeadToggle } from './lead-toggle';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -12,7 +13,7 @@ import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageWide } from '@/components/shell/page-width';
 import { Card, CardSection } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
+import { Chip, toggleChipClass } from '@/components/ui/chip';
 import { buttonVariants } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -130,6 +131,13 @@ export function ContactsPage({
   const count = contactsCount(state, filtered.length, contacts.length, params.q);
   const searchedOut = filtered.length === 0 && state.terms.length > 0 && !narrowed;
   const rowHref = (contact: ContactListRow) => `/jobs/contacts/${contact.id}`;
+  const reachedChips = (
+    <ReachedChips
+      reached={state.reached}
+      counts={{ yes: contacts.filter(reachedOut).length, no: contacts.filter((c) => !reachedOut(c)).length }}
+      href={(reached) => href({ reached })}
+    />
+  );
 
   const list = (
     <>
@@ -142,6 +150,9 @@ export function ContactsPage({
         </div>
         <DisplayMenu menu={menu} className="sm:hidden" />
       </div>
+      {/* A phone has no column headers to filter from, so the one filter
+          asked for most sits under the search there (note aa7a6d58). */}
+      <div className="mb-3 md:hidden">{reachedChips}</div>
 
       {/* The rail sets this one and no column header does, so the table
           names it with the way back. */}
@@ -266,6 +277,7 @@ export function ContactsPage({
           timezone={timezone}
           searchedOut={searchedOut}
           query={params.q ?? ''}
+          quickFilters={reachedChips}
           filtersLine={
             narrowed ? (
               <p className="text-small text-ink-muted">
@@ -274,7 +286,6 @@ export function ContactsPage({
               </p>
             ) : null
           }
-          tableHref={href({ view: 'table' })}
         />
       ) : (
         list
@@ -294,16 +305,17 @@ function ContactsFocus({
   timezone,
   searchedOut,
   query,
+  quickFilters,
   filtersLine,
-  tableHref,
 }: {
   rows: readonly ContactListRow[];
   now: Date;
   timezone: string;
   searchedOut: boolean;
   query: string;
+  /** Whether you have reached out, as two chips under the search. */
+  quickFilters: React.ReactNode;
   filtersLine: React.ReactNode;
-  tableHref: string;
 }) {
   const { toReach, waiting, quiet, rest } = focusSections(rows, now);
   const leads = toReach.length + waiting.length + quiet.length;
@@ -312,6 +324,7 @@ function ContactsFocus({
     <div className="space-y-6">
       <div className="space-y-2">
         <SearchField placeholder="Search people" />
+        {quickFilters}
         {filtersLine}
       </div>
 
@@ -381,14 +394,42 @@ function ContactsFocus({
             </FocusSection>
           )}
 
-          {rows.length > 0 && (
-            <p className="px-2 text-small text-ink-muted">
-              <Link href={tableHref}>Open the table</Link> to filter by company, relationship,
-              status or whether you have reached out.
-            </p>
-          )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Reached out, or not yet, as two chips that are addresses: pressing the one
+ * that is on turns it off. The table's Status menu sets the same param.
+ */
+function ReachedChips({
+  reached,
+  counts,
+  href,
+}: {
+  reached: 'yes' | 'no' | null;
+  counts: { yes: number; no: number };
+  href: (reached: string | undefined) => string;
+}) {
+  const chips = [
+    { value: 'yes', label: 'Reached out', count: counts.yes },
+    { value: 'no', label: 'Not reached out', count: counts.no },
+  ] as const;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Whether you have reached out">
+      {chips.map((chip) => (
+        <Link
+          key={chip.value}
+          href={href(reached === chip.value ? undefined : chip.value)}
+          aria-current={reached === chip.value ? 'true' : undefined}
+          className={toggleChipClass(reached === chip.value)}
+        >
+          {chip.label}
+          <span className="tabular">{chip.count}</span>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -426,8 +467,9 @@ function FocusSection({
 
 /**
  * One person, one line: the name and company, where it stands, and how long
- * since the last touch. The detail drops below `sm`, where the name needs the
- * width more.
+ * since the last touch, then the button that adds them as a lead or takes
+ * the mark off. The detail drops below `sm`, where the name needs the width
+ * more.
  */
 function FocusLine({
   contact,
@@ -445,12 +487,12 @@ function FocusLine({
   stale?: boolean;
 }) {
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <RowLink
         href={`/jobs/contacts/${contact.id}`}
         // ui-ok: fixed-control-height -- a row, not a control: 44px on a
         // phone for a thumb, 40 above it, as Pipeline's focus rows are.
-        className="flex min-h-11 items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-quick hover:bg-shell-hover sm:min-h-10"
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-quick hover:bg-shell-hover sm:min-h-10"
       >
         <span className="min-w-28 flex-1 truncate text-ui text-ink">
           {contact.fullName}
@@ -477,6 +519,8 @@ function FocusLine({
           {contact.lastTouchAt ? ageSince(contact.lastTouchAt, now) : '—'}
         </span>
       </RowLink>
+      {/* Beside the link, not in it, so pressing it does not open the page. */}
+      <LeadToggle contactId={contact.id} lead={contact.potentialLead} name={contact.fullName} />
     </li>
   );
 }
