@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CostHint } from '@/components/ui/cost-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import type { RoutineKey } from '@/lib/feedback/routine-names';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
@@ -264,10 +264,15 @@ export function AnswerBox({
       />
       {hint && <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>}
       <div className="flex flex-wrap items-center gap-1">
-        <Button type="submit" size="sm" pending={pending}>
-          {resolution ? 'Record the new answer' : 'Answer'}
-        </Button>
-        {routine && <CostHint routine={routine} what="Where the answer goes" />}
+        {routine ? (
+          <DashAction type="submit" size="sm" pending={pending} routine={routine} what="Where the answer goes">
+            {resolution ? 'Record the new answer' : 'Answer'}
+          </DashAction>
+        ) : (
+          <Button type="submit" size="sm" pending={pending}>
+            {resolution ? 'Record the new answer' : 'Answer'}
+          </Button>
+        )}
         {onCancel && (
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
             Cancel
