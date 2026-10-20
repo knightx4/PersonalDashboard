@@ -13,7 +13,7 @@ import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageWide } from '@/components/shell/page-width';
 import { Card, CardSection } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
+import { Chip, toggleChipClass } from '@/components/ui/chip';
 import { buttonVariants } from '@/components/ui/button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -131,6 +131,13 @@ export function ContactsPage({
   const count = contactsCount(state, filtered.length, contacts.length, params.q);
   const searchedOut = filtered.length === 0 && state.terms.length > 0 && !narrowed;
   const rowHref = (contact: ContactListRow) => `/jobs/contacts/${contact.id}`;
+  const reachedChips = (
+    <ReachedChips
+      reached={state.reached}
+      counts={{ yes: contacts.filter(reachedOut).length, no: contacts.filter((c) => !reachedOut(c)).length }}
+      href={(reached) => href({ reached })}
+    />
+  );
 
   const list = (
     <>
@@ -143,6 +150,9 @@ export function ContactsPage({
         </div>
         <DisplayMenu menu={menu} className="sm:hidden" />
       </div>
+      {/* A phone has no column headers to filter from, so the one filter
+          asked for most sits under the search there (note aa7a6d58). */}
+      <div className="mb-3 md:hidden">{reachedChips}</div>
 
       {/* The rail sets this one and no column header does, so the table
           names it with the way back. */}
@@ -267,6 +277,7 @@ export function ContactsPage({
           timezone={timezone}
           searchedOut={searchedOut}
           query={params.q ?? ''}
+          quickFilters={reachedChips}
           filtersLine={
             narrowed ? (
               <p className="text-small text-ink-muted">
@@ -295,6 +306,7 @@ function ContactsFocus({
   timezone,
   searchedOut,
   query,
+  quickFilters,
   filtersLine,
   tableHref,
 }: {
@@ -303,6 +315,8 @@ function ContactsFocus({
   timezone: string;
   searchedOut: boolean;
   query: string;
+  /** Whether you have reached out, as two chips under the search. */
+  quickFilters: React.ReactNode;
   filtersLine: React.ReactNode;
   tableHref: string;
 }) {
@@ -313,6 +327,7 @@ function ContactsFocus({
     <div className="space-y-6">
       <div className="space-y-2">
         <SearchField placeholder="Search people" />
+        {quickFilters}
         {filtersLine}
       </div>
 
@@ -384,12 +399,46 @@ function ContactsFocus({
 
           {rows.length > 0 && (
             <p className="px-2 text-small text-ink-muted">
-              <Link href={tableHref}>Open the table</Link> to filter by company, relationship,
-              status or whether you have reached out.
+              <Link href={tableHref}>Open the table</Link> to filter by company, relationship
+              or status.
             </p>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Reached out, or not yet, as two chips that are addresses: pressing the one
+ * that is on turns it off. The table's Status menu sets the same param.
+ */
+function ReachedChips({
+  reached,
+  counts,
+  href,
+}: {
+  reached: 'yes' | 'no' | null;
+  counts: { yes: number; no: number };
+  href: (reached: string | undefined) => string;
+}) {
+  const chips = [
+    { value: 'yes', label: 'Reached out', count: counts.yes },
+    { value: 'no', label: 'Not reached out', count: counts.no },
+  ] as const;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Whether you have reached out">
+      {chips.map((chip) => (
+        <Link
+          key={chip.value}
+          href={href(reached === chip.value ? undefined : chip.value)}
+          aria-current={reached === chip.value ? 'true' : undefined}
+          className={toggleChipClass(reached === chip.value)}
+        >
+          {chip.label}
+          <span className="tabular opacity-70">{chip.count}</span>
+        </Link>
+      ))}
     </div>
   );
 }
