@@ -42,6 +42,7 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
 import {
   attachProposals,
@@ -116,6 +117,8 @@ export async function askDashInRequest(input: {
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
+  // The model the person chose for their questions (plan #2458.2); Sonnet when none.
+  const choosing = dashModelFor(core, user.id);
   const today = todayInTimezone(settings.timezone);
   const ctx = askContext(user.id, settings);
 
@@ -163,6 +166,7 @@ export async function askDashInRequest(input: {
       signal: input.signal,
       mentions: mentionCitations(input.mentions ?? []),
       scope,
+      model: await choosing,
     },
     {
       start: (question) => startAsk(core, user.id, question),

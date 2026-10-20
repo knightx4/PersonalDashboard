@@ -5,6 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
+import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -236,17 +237,20 @@ points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
-/** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
+/** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 
 /**
  * Ask's voice for a question kept to one workspace (plan #1899.5): every
  * tool but the lookups outside it (lookupInScope). Writes stay, since a
- * change the person asks for is not a lookup.
+ * change the person asks for is not a lookup. `model` is the one the person
+ * chose to be answered with (plan #2458.2, lib/dash/model-choice.ts);
+ * absent, Sonnet.
  */
-export function scopedVoice(scope: ModuleId | null | undefined): DashVoice {
-  if (!scope) return ASK_VOICE;
-  return { ...ASK_VOICE, tools: ASK_VOICE.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+export function scopedVoice(scope: ModuleId | null | undefined, model: string = ASK_MODEL): DashVoice {
+  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model };
+  if (!scope) return voice;
+  return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
 }
 
 export type AskStop = DashStop;
@@ -293,11 +297,13 @@ export async function answerQuestion(input: {
   signal?: AbortSignal;
   /** The workspace the question is kept to (plan #1899.5); null or absent for every one. */
   scope?: ModuleId | null;
+  /** The model the person chose to be answered with (plan #2458.2); absent, Sonnet. */
+  model?: DashChoiceId;
 }): Promise<AskAnswer> {
-  const { page, scope, ...rest } = input;
+  const { page, scope, model, ...rest } = input;
   return runDash({
     ...rest,
-    voice: scopedVoice(scope),
+    voice: scopedVoice(scope, model),
     context: {
       surface: 'ask',
       subject: null,
@@ -449,6 +455,11 @@ export async function askDash(
     mentions?: readonly TalkCitation[];
     /** The workspace the question is kept to (plan #1899.5). */
     scope?: ModuleId | null;
+    /**
+     * The model the person chose (plan #2458.2, dashModelFor); absent,
+     * Sonnet. The spend is recorded under the model that answered.
+     */
+    model?: DashChoiceId;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -612,6 +623,7 @@ export async function askDash(
     onText: input.onText,
     signal: input.signal,
     scope: input.scope,
+    model: input.model,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);
