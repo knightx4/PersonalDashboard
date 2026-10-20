@@ -474,6 +474,28 @@ export function answerFromLookups(
   return { body: body.slice(0, MAX_TURN), citations: listed };
 }
 
+/** The summary a made change's note carries ("Done: <summary> It shows under…"), or null. */
+export function madeSummary(note: string | undefined): string | null {
+  const match = note?.match(/^Done: ([\s\S]+?) (?:It shows under|They can undo|Its Undo)/);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * The answer given when the model could not finish after it had already made
+ * a change (note 11a68203): "Add to my calendar as dinner with Sam" added the
+ * event and then answered "I could not finish this answer", which read as if
+ * nothing was done. The change says what happened, in Dash's own voice, and
+ * the rows it returned are cited.
+ */
+export function answerFromWrites(
+  made: readonly string[],
+  rows: readonly TalkCitation[],
+): { body: string; citations: TalkCitation[] } | null {
+  if (made.length === 0) return null;
+  const said = made.map((summary) => summary.replace(/^Dash /, 'I ')).join(' ');
+  return { body: said.slice(0, MAX_TURN), citations: rows.slice(0, FALLBACK_ROWS) };
+}
+
 /** A stopped reply, in words for the person. */
 function stoppedInWords(reply: { stop_reason?: string | null }): string {
   switch (reply.stop_reason) {
@@ -769,9 +791,14 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       }
     : undefined;
+  // What the changes made in this answer did, for an answer the model did not finish.
+  const made: string[] = [];
+  const madeRows: TalkCitation[] = [];
   const fail = (detail: string, plain: string = detail): DashAnswer => {
     const cause = lastError ? `${plain} A lookup also failed: ${lastError}` : plain;
     console.error('ask answer did not finish', detail, lastError ? `(last lookup error: ${lastError})` : '');
+    const wrote = answerFromWrites(made, madeRows);
+    if (wrote) return { ok: true, body: wrote.body, toolCalls, citations: wrote.citations, stop: 'answered' };
     const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
@@ -824,7 +851,14 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     if (tool?.kind === 'write') {
       if (!input.write) return Promise.resolve({ ok: false, error: NO_WRITES });
-      return input.write(tool, args, seenOrShown);
+      return input.write(tool, args, seenOrShown).then((result) => {
+        const summary = result.ok ? madeSummary(result.note) : null;
+        if (summary && result.ok) {
+          made.push(summary);
+          madeRows.push(...citationsOf(result));
+        }
+        return result;
+      });
     }
     if (tool?.kind === 'paid') {
       if (!input.queue) return Promise.resolve({ ok: false, error: NO_QUEUE });

@@ -7,6 +7,8 @@ import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, type AskLookupE
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
+  answerFromWrites,
+  madeSummary,
   FALLBACK_ROWS,
   limitNote,
   MAX_LOOKUPS,
@@ -1023,6 +1025,20 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(built?.body).toContain('- Order 0\n- Order 1\n');
     expect(built?.body).not.toContain('more');
     expect(answerFromLookups('why', [])).toBeNull();
+  });
+
+  it('says what a made change did when the model stops after making it (note 11a68203)', () => {
+    const summary = madeSummary(
+      'Done: Dash added "Dinner with Sam" to the calendar on 2026-11-01. It shows under your answer with an Undo. Say what you did, and cite the row this returned.',
+    );
+    expect(summary).toBe('Dash added "Dinner with Sam" to the calendar on 2026-11-01.');
+    expect(madeSummary('Done: Dash moved it. They can undo it from Home. Say what you did.')).toBe('Dash moved it.');
+    expect(madeSummary('Found 3 rows.')).toBeNull();
+    const row = { table: 'todo.events', ref: 'e-1', title: 'Dinner with Sam', href: '/todo/calendar' };
+    const built = answerFromWrites([summary!], [row]);
+    expect(built?.body).toBe('I added "Dinner with Sam" to the calendar on 2026-11-01.');
+    expect(built?.citations).toEqual([row]);
+    expect(answerFromWrites([], [row])).toBeNull();
   });
 
   it('names the cause and lists only the last lookup when the model stops, and logs the reason', async () => {
