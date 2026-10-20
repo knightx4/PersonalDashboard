@@ -7,6 +7,7 @@ import { insertMadeChange, type DashChange, type MadeDashChange } from '@/lib/ta
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult } from './registry';
+import type { RowSet } from './sets';
 import { WRITE_TOOLS } from './writes';
 
 /**
@@ -35,6 +36,7 @@ const THEIRS = '00000000-0000-4000-8000-00000000b006';
 
 let tables: FakeTables;
 let seen: Set<string>;
+let sets: Map<string, RowSet>;
 
 function application(id: string, roleId: string, status: string, extra: Record<string, unknown> = {}) {
   return {
@@ -58,10 +60,16 @@ function context(enabled: DashWriteContext['enabledModules'] = ['jobs']): DashWr
     enabledModules: enabled,
     db: async (schema) => client(schema),
     searchSources: [],
-    seen: (table, ref) => seen.has(`${table}:${ref}`),
+    seen: Object.assign((table: string, ref: string) => seen.has(`${table}:${ref}`), { sets }),
     goals: async () => client('goals') as unknown as GoalsSupabaseClient,
     createTask: async () => ({ id: null, error: 'unused' }),
   };
+}
+
+/** A set a query_rows lookup made, as runDash keeps it: its rows count as seen. */
+function lookupSet(name: string, table: string, refs: string[]) {
+  for (const ref of refs) seen.add(`${table}:${ref}`);
+  sets.set(name, { name, table, refs, size: refs.length });
 }
 
 function apply(input: unknown, ctx = context()): Promise<DashWriteResult> {
@@ -100,6 +108,7 @@ const events = () => tables['job_search.application_events'];
 
 beforeEach(() => {
   seen = new Set();
+  sets = new Map();
   tables = {
     'core.dash_actions': [],
     'job_search.companies': [{ id: ACME, user_id: ME, name: 'Acme' }],
@@ -239,6 +248,52 @@ describe('move_roles', () => {
     for (const id of many) seen.add(`job_search.applications:${id}`);
     const result = await apply({ stage: 'archive', application_refs: many });
     expect(!result.ok && result.error).toContain(`At most ${BULK_MAX} roles`);
+  });
+
+  it('archives a set of applications a lookup matched, with one Undo', async () => {
+    lookupSet('set 1', 'job_search.applications', [ANALYST_2, PLANNER, GHOSTED]);
+    const result = ok(await apply({ stage: 'archive', set: 'set 1' }));
+    expect([ANALYST_2, PLANNER].map((id) => app(id).status_manual_override)).toEqual(['withdrawn', 'withdrawn']);
+    expect(app(GHOSTED).status_manual_override).toBeNull();
+    expect(app(CONTROLLER).status_manual_override).toBeNull();
+    expect(result.input).toMatchObject({ count: 2, left: 1 });
+    expect(result.summary).toBe('Dash archived 2 roles: Analyst at Acme and Planner at Acme. 1 was left as it was, already closed.');
+
+    const kept = await keep(result);
+    expect(tables['core.dash_actions']).toHaveLength(1);
+    expect((await undoChange(deps(), kept.id)).ok).toBe(true);
+    expect(app(ANALYST_2).status_manual_override).toBeNull();
+    expect(app(PLANNER).status_manual_override).toBe('submitted');
+    expect(events()).toHaveLength(0);
+  });
+
+  it('moves a set of roles by each one\'s latest application', async () => {
+    lookupSet('set 2', 'job_search.roles', [R_ANALYST, R_PLANNER]);
+    const result = ok(await apply({ stage: 'rejected', set: 'Set 2' }));
+    expect(app(ANALYST_2).status_manual_override).toBe('rejected');
+    expect(app(ANALYST_1).status_manual_override).toBeNull();
+    expect(app(PLANNER).status_manual_override).toBe('rejected');
+    expect(app(CONTROLLER).status_manual_override).toBeNull();
+    expect(result.input).toMatchObject({ count: 2, left: 0 });
+  });
+
+  it('refuses a set of another table, and a set no lookup made, changing nothing', async () => {
+    lookupSet('set 1', 'todo.tasks', ['00000000-0000-4000-8000-00000000f001']);
+    const wrong = await apply({ stage: 'archive', set: 'set 1' });
+    expect(!wrong.ok && wrong.error).toBe(
+      'set 1 holds rows of todo.tasks, and this change works on job_search.roles or job_search.applications.',
+    );
+    const unknown = await apply({ stage: 'archive', set: 'set 3' });
+    expect(!unknown.ok && unknown.error).toContain('There is no set 3 in this answer');
+    expect(events()).toHaveLength(0);
+  });
+
+  it('refuses a set holding a role that is not the person\'s, as it refuses refs', async () => {
+    lookupSet('set 1', 'job_search.applications', [PLANNER, THEIRS]);
+    const result = await apply({ stage: 'archive', set: 'set 1' });
+    expect(!result.ok && result.error).toContain('not a role of theirs');
+    expect(app(PLANNER).status_manual_override).toBe('submitted');
+    expect(events()).toHaveLength(0);
   });
 
   it('refuses while Jobs is switched off', async () => {

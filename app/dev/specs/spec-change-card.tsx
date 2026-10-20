@@ -12,7 +12,7 @@ import {
 import { CloseButton } from '@/components/inbox/close-button';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -166,9 +166,9 @@ export function SpecChangeCard({
       {proposed ? (
         <form className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={change.id} />
-          <Button type="submit" size="sm" formAction={approve} pending={pending}>
+          <DashAction type="submit" size="sm" formAction={approve} pending={pending} routine="plan">
             {approving ? 'Approving…' : 'Approve'}
-          </Button>
+          </DashAction>
           <CloseButton lifecycle="declined" type="submit" formAction={decline} pending={pending} />
           <FieldError>{approved.error ?? declined.error}</FieldError>
         </form>

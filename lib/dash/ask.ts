@@ -5,6 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
+import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -149,7 +150,9 @@ write a todo's notes, pin it, put it off or bring it back, drop or reopen it,
 add an item to its list, say what it is about, or add or change an event on
 their calendar, call edit_todo, add_todo_item, link_todo, add_event or
 change_event. To finish, put off or dismiss a row another workspace put on
-their agenda, find it with agenda and call change_agenda_row. In News, when they ask to mark a newsletter unread, save or
+their agenda, find it with agenda and call change_agenda_row. For a todo on each
+row a lookup found ("add a todo for each of those leads"), call add_todos once
+with the set query_rows named. In News, when they ask to mark a newsletter unread, save or
 unsave a story, send one to Learn or make a todo from one, call
 mark_issue_unread, save_story, send_story_to_learn or make_todo_from_story;
 when they ask to stop a price watch, call stop_watch. In Goals, when they ask
@@ -179,7 +182,9 @@ and call suggest_post with the angle, the posts and the picture where one
 fits; it saves the draft to the Posts tab and never posts it. Never hand_off a request for a post. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
-one change_items or move_roles call, never one call per row. The
+one change_items or move_roles call, never one call per row. When a
+query_rows lookup names the rows it matched as a set ("set 1"), pass that set
+to change_items rather than copying its refs. The
 change is made when you call it, and shows as a card under your answer with
 an Undo. A todo, a goal, a step, an item or a role is named by the ref a
 lookup returned for it, so look it up first; an area is named by its name.
@@ -236,17 +241,20 @@ points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
-/** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
+/** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 
 /**
  * Ask's voice for a question kept to one workspace (plan #1899.5): every
  * tool but the lookups outside it (lookupInScope). Writes stay, since a
- * change the person asks for is not a lookup.
+ * change the person asks for is not a lookup. `model` is the one the person
+ * chose to be answered with (plan #2458.2, lib/dash/model-choice.ts);
+ * absent, Sonnet.
  */
-export function scopedVoice(scope: ModuleId | null | undefined): DashVoice {
-  if (!scope) return ASK_VOICE;
-  return { ...ASK_VOICE, tools: ASK_VOICE.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+export function scopedVoice(scope: ModuleId | null | undefined, model: string = ASK_MODEL): DashVoice {
+  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model };
+  if (!scope) return voice;
+  return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
 }
 
 export type AskStop = DashStop;
@@ -293,11 +301,13 @@ export async function answerQuestion(input: {
   signal?: AbortSignal;
   /** The workspace the question is kept to (plan #1899.5); null or absent for every one. */
   scope?: ModuleId | null;
+  /** The model the person chose to be answered with (plan #2458.2); absent, Sonnet. */
+  model?: DashChoiceId;
 }): Promise<AskAnswer> {
-  const { page, scope, ...rest } = input;
+  const { page, scope, model, ...rest } = input;
   return runDash({
     ...rest,
-    voice: scopedVoice(scope),
+    voice: scopedVoice(scope, model),
     context: {
       surface: 'ask',
       subject: null,
@@ -449,6 +459,11 @@ export async function askDash(
     mentions?: readonly TalkCitation[];
     /** The workspace the question is kept to (plan #1899.5). */
     scope?: ModuleId | null;
+    /**
+     * The model the person chose (plan #2458.2, dashModelFor); absent,
+     * Sonnet. The spend is recorded under the model that answered.
+     */
+    model?: DashChoiceId;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -612,6 +627,7 @@ export async function askDash(
     onText: input.onText,
     signal: input.signal,
     scope: input.scope,
+    model: input.model,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);

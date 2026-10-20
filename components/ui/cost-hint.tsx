@@ -6,6 +6,7 @@ import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { cn } from '@/lib/cn';
 import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spend/estimate-types';
+import { ROUTINE_NOT_PRICED, routineRunsOn, type RoutineKey } from '@/lib/feedback/routine-names';
 
 /**
  * The $ beside a button that costs money to press.
@@ -18,7 +19,10 @@ import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spen
  *
  * It takes the estimate already worked out (lib/core/spend/estimate-types.ts)
  * or, for a price that is fixed rather than estimated (X's per-post rate),
- * the sentence itself as `text`. It fetches nothing, so a page that has several paid buttons asks for all
+ * the sentence itself as `text`. A press that hands work to a routine passes
+ * the routine as `routine` instead (plan #2459.1): the same $ opens on "Runs
+ * on the Goals routine. Not priced per press.", since a routine is not
+ * metered per press and a figure would be made up. It fetches nothing, so a page that has several paid buttons asks for all
  * their estimates once rather than once per hint.
  *
  * -- Two ways open --
@@ -35,6 +39,7 @@ import { costHintModels, costHintText, type CostEstimate } from '@/lib/core/spen
 export function CostHint({
   estimate,
   text: fixed,
+  routine,
   count,
   what,
   align = 'start',
@@ -44,6 +49,8 @@ export function CostHint({
   estimate?: CostEstimate;
   /** A fixed price, said as it is ("Posting costs $0.015"), in place of an estimate. */
   text?: string;
+  /** The routine the press hands work to, named in place of a figure. */
+  routine?: RoutineKey;
   /** How many items the press works on, for an estimate that is per unit. */
   count?: number;
   /** What the button does, for a screen reader: "Cost of drafting the letter". */
@@ -91,10 +98,12 @@ export function CostHint({
     if (shift !== 0) panel.style.translate = `${shift}px 0`;
   }, [mode]);
 
-  const text = fixed ?? (estimate ? costHintText(estimate, count) : '');
-  const models = estimate ? costHintModels(estimate) : '';
-  const spoken = models ? `${text}. ${models}` : text;
-  const label = what ? `${what}: ${spoken}` : `Expected cost: ${spoken}`;
+  const text = routine
+    ? routineRunsOn(routine)
+    : (fixed ?? (estimate ? costHintText(estimate, count) : ''));
+  const second = routine ? ROUTINE_NOT_PRICED : estimate ? costHintModels(estimate) : '';
+  const spoken = second ? `${text.replace(/\.$/, '')}. ${second}` : text;
+  const label = what ? `${what}: ${spoken}` : routine ? spoken : `Expected cost: ${spoken}`;
 
   function peek() {
     if (mode === 'closed') setMode('peek');
@@ -147,7 +156,7 @@ export function CostHint({
           className="w-max max-w-64 px-3 py-2 text-small text-ink outline-none"
         >
           <span className="block">{text}</span>
-          {models && <span className="block text-ink-muted">{models}</span>}
+          {second && <span className="block text-ink-muted">{second}</span>}
         </Popover>
       )}
     </span>

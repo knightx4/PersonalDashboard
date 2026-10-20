@@ -14,6 +14,24 @@ export const OPUS = 'claude-opus-5-5';
 export const SONNET = 'claude-sonnet-5-5';
 export const HAIKU = 'claude-haiku-5-5';
 
+/**
+ * The three models a person can choose for Dash to answer with (plan #2458),
+ * cheapest first. Both the picker and the check on
+ * core.account_settings.dash_model (migration 0271) list exactly these.
+ */
+export const DASH_CHOICES = [
+  { id: HAIKU, label: 'Haiku' },
+  { id: SONNET, label: 'Sonnet' },
+  { id: OPUS, label: 'Opus' },
+] as const;
+
+export type DashChoiceId = (typeof DASH_CHOICES)[number]['id'];
+
+/** True for one of the three ids a person can choose. */
+export function isDashChoice(value: unknown): value is DashChoiceId {
+  return DASH_CHOICES.some((c) => c.id === value);
+}
+
 /** Retired: the models the ledger recorded before the move to the 5.5 models. */
 export const OPUS_5 = 'claude-opus-5';
 export const SONNET_5 = 'claude-sonnet-5';

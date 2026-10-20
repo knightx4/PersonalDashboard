@@ -10,6 +10,7 @@ import { MOVE_TITLE, MOVE_WORD } from '@/lib/core/move';
 import type { RunRef } from '@/lib/core/run-going';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
+import type { RoutineKey } from '@/lib/feedback/routine-names';
 
 /**
  * A button that hands work to Dash (docs/ONE-INTERFACE-SPEC.md, Part 7).
@@ -22,10 +23,13 @@ import type { PaidAction } from '@/lib/core/spend/paid-actions';
  * The cost comes one of three ways. `paid` names the server action, and the
  * hint finds its figure in the layout's PaidCostsProvider, as PaidHint does.
  * `estimate` passes a figure worked out already, and `costText` a fixed
- * price. With none of them, or with no figure for the action, nothing is
- * drawn beside the button: a run that is not metered per press, such as a
- * routine, has no price to show, and a missing hint is better than a made-up
- * one.
+ * price. A press that hands work to a routine passes `routine` instead
+ * (plan #2459.1): a routine is not metered per press, so the same $ opens on
+ * which routine the work goes to and says the press is not priced, rather
+ * than a figure that would be made up. A press is priced or goes to a
+ * routine, never both, so `routine` with any of the other three is a type
+ * error. With none of the four, or with no figure for the action, nothing is
+ * drawn beside the button.
  *
  * While `pending`, the mark turns to working, so the press shows Dash on it
  * as well as the label saying so.
@@ -40,7 +44,7 @@ import type { PaidAction } from '@/lib/core/spend/paid-actions';
  * `hintFirst` puts the $ before the button, for a button at a row's right
  * edge whose hint would otherwise hang off it.
  */
-export type DashActionProps = ButtonProps & {
+type PricedPress = {
   /** The server action the press calls, for its cost hint. */
   paid?: PaidAction | readonly PaidAction[];
   /** How many items the press works on, for a per-unit estimate. */
@@ -51,6 +55,21 @@ export type DashActionProps = ButtonProps & {
   estimate?: CostEstimate | null;
   /** A fixed price said as it is, in place of an estimate. */
   costText?: string;
+  routine?: never;
+};
+
+type RoutinePress = {
+  /** The routine the press hands work to, named in the hint in place of a price. */
+  routine: RoutineKey;
+  paid?: never;
+  count?: never;
+  plus?: never;
+  estimate?: never;
+  costText?: never;
+};
+
+export type DashActionProps = ButtonProps &
+  (PricedPress | RoutinePress) & {
   /** What the press does, for a screen reader: "Cost of the summary". */
   what?: string;
   /** Which edge of the $ its popup hangs from. */
@@ -73,6 +92,7 @@ export function DashAction({
   plus,
   estimate,
   costText,
+  routine,
   what,
   align,
   hintFirst = false,
@@ -93,7 +113,9 @@ export function DashAction({
   );
 
   let hint: React.ReactNode = null;
-  if (paid) {
+  if (routine) {
+    hint = <CostHint routine={routine} what={what} align={align} defaultOpen={hintOpen} />;
+  } else if (paid) {
     hint = <PaidHint action={paid} count={count} plus={plus} what={what} align={align} defaultOpen={hintOpen} />;
   } else if (estimate || costText) {
     hint = (

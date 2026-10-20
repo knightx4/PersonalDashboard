@@ -37,9 +37,11 @@ export const CONVERSATION_LIST_KEY = 'pt_conversation_list';
 /**
  * A pane's height when the panes fill the window (`fill`): the window less the
  * shell's top bar and the page's own padding, the same room the sticky list
- * has always measured.
+ * has always measured. From lg the status line is held over the foot of the
+ * page as well, so the pane stops above it and the box docked at its foot is
+ * not drawn under it (plan #2458.3).
  */
-const PANE_H = 'min-[720px]:h-[calc(100dvh-6rem)]';
+const PANE_H = 'min-[720px]:h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-8rem)]';
 
 /** Where the glance column's open or folded state is kept, per device. */
 export const CONVERSATION_GLANCE_KEY = 'pt_conversation_glance';
@@ -334,10 +336,10 @@ export function ConversationChat({
       {beside && (
         <aside
           aria-label={glance.label}
-          className="hidden min-w-0 @min-[48rem]/chat:sticky @min-[48rem]/chat:top-16 @min-[48rem]/chat:block @min-[48rem]/chat:max-h-[calc(100dvh-6rem)] @min-[48rem]/chat:self-start @min-[48rem]/chat:overflow-y-auto"
+          className="hidden min-w-0 @min-[48rem]/chat:sticky @min-[48rem]/chat:top-16 @min-[48rem]/chat:block @min-[48rem]/chat:max-h-[calc(100dvh-6rem)] lg:@min-[48rem]/chat:max-h-[calc(100dvh-8rem)] @min-[48rem]/chat:self-start @min-[48rem]/chat:overflow-y-auto"
         >
           {/* On a card of its own, as the chat is; its heading a label, so the chat's title is the one title. */}
-          <Card padding="standard" className={cn(fill && 'min-h-[calc(100dvh-6rem)]')}>
+          <Card padding="standard" className={cn(fill && 'min-h-[calc(100dvh-6rem)] lg:min-h-[calc(100dvh-8rem)]')}>
             <h2 className="text-ui font-semibold text-ink">{glance.label}</h2>
             <div className="mt-3">{glance.content}</div>
           </Card>

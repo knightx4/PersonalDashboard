@@ -51,8 +51,9 @@ export default async function AskLayout({ children }: { children: React.ReactNod
     module: null,
     narrow: false,
     sections: ({ settings, owner }) => workspaceSections(settings.enabledModules, owner),
-    // The box on a chat is a paid press.
-    paidActions: paidActionsUnder('app/ask/'),
+    // The box on a chat is a paid press: asking goes through the API route,
+    // which is not under app/ask/, so it is named too (plan #2458.3).
+    paidActions: [...paidActionsUnder('app/ask/'), 'app/api/ask/route.ts#POST'],
     children: async ({ settings }) => {
       const [chats, made] = await Promise.all([
         listAskChatsInRequest(settings.timezone).then(

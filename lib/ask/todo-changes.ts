@@ -7,6 +7,7 @@ import { isJobsChangeKind, type JobsChangeKind } from './jobs-changes';
 import { isYouChangeKind, type YouChangeKind } from './you-changes';
 import { isInterviewChangeKind, type InterviewChangeKind } from './interview-changes';
 import { isPostChangeKind, type PostChangeKind } from './post-changes';
+import { isModelChangeKind, type ModelChangeKind } from './model-changes';
 
 /**
  * The Todo changes Dash makes straight away (plan #1894.9.1), beyond add,
@@ -19,7 +20,16 @@ import { isPostChangeKind, type PostChangeKind } from './post-changes';
  */
 
 /** The Todo write tools, by name, which is the kind each change is kept under. */
-export const TODO_CHANGE_KINDS = ['edit_todo', 'add_todo_item', 'link_todo', 'add_event', 'change_event', 'change_agenda_row'] as const;
+export const TODO_CHANGE_KINDS = [
+  'edit_todo',
+  'add_todo_item',
+  'link_todo',
+  'add_event',
+  'change_event',
+  'change_agenda_row',
+  // One todo for each row of a set (plan #2472.4); its Undo takes out the ones still untouched.
+  'add_todos',
+] as const;
 
 export type TodoChangeKind = (typeof TODO_CHANGE_KINDS)[number];
 
@@ -31,11 +41,11 @@ export function isTodoChangeKind(kind: string): kind is TodoChangeKind {
 }
 
 /** The kinds whose card reads back the sentence its tool wrote: Learn's, Todo's and You's. */
-export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind | JobsChangeKind | InterviewChangeKind | PostChangeKind;
+export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind | JobsChangeKind | InterviewChangeKind | PostChangeKind | ModelChangeKind;
 
 /** Whether a kept change is one whose card reads back what its tool wrote. */
 export function isWrittenCard<C extends { kind: string; input: unknown }>(
   change: C,
 ): change is Extract<C, { kind: WrittenCardKind }> {
-  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind) || isJobsChangeKind(change.kind) || isInterviewChangeKind(change.kind) || isPostChangeKind(change.kind);
+  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind) || isJobsChangeKind(change.kind) || isInterviewChangeKind(change.kind) || isPostChangeKind(change.kind) || isModelChangeKind(change.kind);
 }

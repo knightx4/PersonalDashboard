@@ -379,6 +379,8 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { ROUTINE_KEYS, ROUTINE_LABELS } from '@/lib/feedback/routine-names';
 import { Tooltip } from '@/components/ui/tooltip';
 import { IconButton } from '@/components/ui/icon-button';
 import { Chip } from '@/components/ui/chip';
@@ -3523,6 +3525,33 @@ function CostHintRows() {
         <Button variant="secondary">Grade 12 readings</Button>
         <CostHint estimate={perReading} count={12} what="Cost of grading" align="end" defaultOpen />
       </div>
+    </div>
+  );
+}
+
+/* A button that hands work to a routine (plan #2459.1), one per routine, each
+ * with its $ open on the routine's name. Alternate rows hang the hint from the
+ * right edge, as a button at a row's end does. */
+function RoutineHintRows() {
+  return (
+    <div className="space-y-20 pb-20">
+      {ROUTINE_KEYS.map((routine, index) => {
+        const end = index % 2 === 1;
+        return (
+          <div key={routine} className={cn('flex items-center', end && 'justify-end')}>
+            <DashAction
+              routine={routine}
+              variant="secondary"
+              size="sm"
+              align={end ? 'end' : 'start'}
+              what={`Send to the ${ROUTINE_LABELS[routine]} routine`}
+              hintOpen
+            >
+              Send to Dash
+            </DashAction>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -7877,6 +7906,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet
+     * and Opus, each with a line on speed and cost, Sonnet ticked. */
+    id: 'ask-dash-new-models',
+    label: 'Ask Dash · Choosing the model',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="open">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* A pick the save refused: the old model back on the chip and a short
+     * line beside it saying so. */
+    id: 'ask-dash-new-model-failed',
+    label: 'Ask Dash · A model choice not saved',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="failed">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* The same list open on the Dash page, in an open chat's docked box. */
+    id: 'ask-page-models',
+    label: 'Dash · Choosing the model in a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} modelStart="open" />,
+  },
+  {
     /* The list searched for "Catan" (plan #1899.6): two chats found by what
      * was said in them, one only in Dash's answer, each with the words
      * around it. On a phone the list is the page. */
@@ -8753,6 +8816,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-insights-reread',
+    label: 'You · Insights, full re-read hint open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ reread: true }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-evidence',
     label: 'You · Insights, evidence open',
     module: 'you',
@@ -9271,6 +9345,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CostHintRows />,
+  },
+  {
+    /* The same $ beside a button that hands work to a routine (plan #2459.1),
+     * once for each routine, open so the shot shows the name. In the app it
+     * opens on hover or focus as a peek and on a press as pinned, as the
+     * priced hint does. */
+    id: 'core-routine-hint',
+    label: 'Spend · The $ hint beside a routine button',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <RoutineHintRows />,
   },
   {
     /* The shared Tooltip on an icon button, a badge with a long tip and an

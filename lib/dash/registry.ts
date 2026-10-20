@@ -13,6 +13,7 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import type { ModuleId } from '@/lib/modules';
 import { PAID_TOOLS } from './paid-tools';
+import type { DashSeen } from './sets';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -93,8 +94,12 @@ export type DashHandoffTool = DashToolBase & { kind: 'handoff' };
 
 /** What a write is run with: the person's clients and workspaces, and the rows Dash has seen. */
 export type DashWriteContext = AskContext & {
-  /** Whether a lookup in this conversation returned the row, or the page shows it. */
-  seen: (table: string, ref: string) => boolean;
+  /**
+   * Whether a lookup in this conversation returned the row, or the page
+   * shows it. Carries the answer's sets, which rowsOfSet (./sets) turns
+   * into rows.
+   */
+  seen: DashSeen;
   /**
    * A goals client on the person's session, recording its writes in
    * goals.history as `actor` (createGoalsClient). `{ actor: 'claude' }`
@@ -194,7 +199,7 @@ export type DashWriteTool<R = DashWriteResult | DashRecordedWrite> = DashToolBas
 
 /** What a paid tool's check is given: the person's context and the rows Dash has seen. */
 export type DashPaidCheckContext = AskContext & {
-  seen: (table: string, ref: string) => boolean;
+  seen: DashSeen;
 };
 
 /** A paid press checked and ready to queue, or the sentence saying why not. */
