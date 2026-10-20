@@ -9,6 +9,7 @@ import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load
 import { VaultStatusBanner } from '@/components/vault/status-banner';
 import { NoteConnections } from '@/components/vault/note-connections';
 import { NewVaultNote } from '@/components/vault/new-note';
+import { DailyNoteButton } from '@/components/vault/daily-note';
 import { QuickNoteRow } from '@/components/vault/quick-note';
 import { requireUser } from '@/lib/auth/server';
 import { vaultWritable } from '@/lib/capture/vault';
@@ -78,9 +79,12 @@ export default async function VaultPage({
         title="Vault"
         description={`${connection.repoOwner}/${connection.repoName} · ${connection.branch}`}
         actions={
-          <Link href="/vault?new=1" className={buttonVariants({ size: 'sm' })}>
-            New note
-          </Link>
+          <>
+            <DailyNoteButton />
+            <Link href="/vault?new=1" className={buttonVariants({ size: 'sm' })}>
+              New note
+            </Link>
+          </>
         }
       />
 
