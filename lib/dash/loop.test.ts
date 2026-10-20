@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import { answerSoFar, dateLine, LOOK_FIRST, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
+import { rowsOfSet, type DashSeen } from './sets';
 
 /**
  * The shared loop's routing by kind (plan #1463). Ask's own behaviour on it
@@ -116,6 +117,82 @@ describe('runDash', () => {
     expect(execute).not.toHaveBeenCalled();
     expect(answer).toMatchObject({ ok: true, body: 'Added it.', stop: 'answered' });
     expect(answer.ok && answer.toolCalls.map((c) => c.name)).toEqual(['add_goal']);
+  });
+});
+
+describe('sets of matched rows (plan #2472.1)', () => {
+  const APPS = 'job_search.applications';
+  const ref = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+  it('names each lookup that matched rows as a set, counts its rows as seen, and lets a write turn the name into the rows', async () => {
+    const { client: stub, sent } = client([
+      {
+        content: [
+          { type: 'tool_use', id: 'q1', name: 'query_rows', input: { table: APPS, limit: 1 } },
+          { type: 'tool_use', id: 'q2', name: 'query_rows', input: { table: APPS, count_only: true } },
+          { type: 'tool_use', id: 'q3', name: 'query_rows', input: { table: APPS, where: [] } },
+        ],
+        stop_reason: 'tool_use',
+        usage: USAGE,
+      },
+      {
+        content: [
+          { type: 'tool_use', id: 'w1', name: 'add_goal', input: { set: 'set 1' } },
+          { type: 'tool_use', id: 'w2', name: 'add_goal', input: { set: 'Set 2' } },
+          { type: 'tool_use', id: 'w3', name: 'add_goal', input: { set: 3 } },
+          { type: 'tool_use', id: 'w4', name: 'add_goal', input: { set: 'set 9' } },
+          { type: 'tool_use', id: 'w5', name: 'add_goal', input: { set: 'set 1', table: 'shopping.items' } },
+        ],
+        stop_reason: 'tool_use',
+        usage: USAGE,
+      },
+      call('a1', 'answer', { answer: 'Done.', cited: [] }),
+    ]);
+    const results = [
+      // Three matched, one listed: the set holds all three.
+      {
+        ok: true as const,
+        rows: [{ table: APPS, ref: ref(1), title: 'One', href: '/jobs' }],
+        totals: { matched: 3, shown: 1 },
+        note: 'Read rows: 3 matched, showing 1.',
+        matchedSet: { table: APPS, refs: [ref(1), ref(2), ref(3)], matched: 3 },
+      },
+      // More than a set holds.
+      { ok: true as const, rows: [], totals: { matched: 240, shown: 0 }, matchedSet: { table: APPS, refs: [], matched: 240 } },
+      // Nothing matched.
+      { ok: true as const, rows: [], totals: { matched: 0, shown: 0 }, matchedSet: { table: APPS, refs: [], matched: 0 } },
+    ];
+    const execute = vi.fn(async () => results.shift()!);
+    const seenAtWrite: boolean[] = [];
+    const write = vi.fn(async (_tool: DashWriteTool, input: unknown, seen: DashSeen) => {
+      const args = input as { set: unknown; table?: string };
+      seenAtWrite.push(seen(APPS, ref(2)));
+      const found = rowsOfSet(seen, args.set, args.table ?? APPS);
+      return found.ok ? { ok: true as const, rows: [], note: `Rows ${found.ids.join(',')}` } : found;
+    });
+    const answer = await runDash({ voice, context, turns, today: '2026-10-20', execute, write, anthropicApiKey: 'k', client: stub });
+
+    // The model is told each set's name, and never the refs of rows it was not shown.
+    const messages = (sent[1] as unknown as { messages: Anthropic.MessageParam[] }).messages;
+    const told = messages[messages.length - 1].content as Anthropic.ToolResultBlockParam[];
+    expect(told.map((b) => JSON.parse(b.content as string).totals.set)).toEqual(['set 1', 'set 2', 'set 3']);
+    expect(told[0].content).toContain('All 3 matched rows');
+    expect(told[0].content).not.toContain(ref(2));
+    expect(told[1].content).toContain('at most 100');
+
+    // The row the lookup matched but did not list counts as seen.
+    expect(seenAtWrite[0]).toBe(true);
+    const made = answer.ok ? answer.toolCalls.filter((c) => c.name === 'add_goal').map((c) => c.result) : [];
+    expect(made[0]).toMatchObject({ ok: true, rows: [] });
+    await expect(write.mock.results[0].value).resolves.toMatchObject({ note: `Rows ${ref(1)},${ref(2)},${ref(3)}` });
+    expect(made[1]).toEqual({ ok: false, error: expect.stringContaining('set 2 holds 240 rows, more than the 100') });
+    expect(made[2]).toEqual({ ok: false, error: expect.stringContaining('set 3 is empty') });
+    expect(made[3]).toEqual({ ok: false, error: expect.stringContaining('There is no set 9 in this answer. ') });
+    expect(made[4]).toEqual({ ok: false, error: `set 1 holds rows of ${APPS}, and this change works on shopping.items.` });
+
+    // The kept lookup keeps the set's name for a reopened answer, and no refs.
+    expect(answer.ok && answer.toolCalls[0].result).toMatchObject({ totals: { set: 'set 1' } });
+    expect(JSON.stringify(answer.ok && answer.toolCalls[0].result)).not.toContain(ref(2));
   });
 });
 

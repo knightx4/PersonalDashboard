@@ -8,6 +8,7 @@ import { DISPOSAL_METHODS, inventoryStatusForDisposal, type DisposalMethod } fro
 import { parseDollarsToCents } from '@/lib/money';
 import type { DashChangeInput } from '@/lib/talk/changes';
 import type { DashWriteContext, DashWriteResult } from './registry';
+import { rowsOfSet } from './sets';
 
 /**
  * Dash changing many shopping items at once (plan #1656, feature #1653): the
@@ -33,6 +34,10 @@ import type { DashWriteContext, DashWriteResult } from './registry';
  * group of its own, as the item page's Separate does). Ungrouping by hand
  * deletes the group; Dash empties it and clears the key it claimed instead,
  * so nothing draws the copies back in and Undo can put them back.
+ *
+ * Plan #2472.2 let the change name a lookup's set ("set 1") in place of the
+ * refs: a set of items or of orders, merged into item_refs or order_refs and
+ * held to the same checks and cap.
  */
 
 /** The most items one change may touch. */
@@ -227,8 +232,14 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
   const itemRefs = refList(args, 'item_refs');
   const orderRefs = refList(args, 'order_refs');
   if (!itemRefs || !orderRefs) return refuse('item_refs and order_refs are lists of refs.');
+  if (args.set !== undefined && args.set !== null) {
+    const found = rowsOfSet(ctx.seen, args.set, [ITEMS, ORDERS]);
+    if (!found.ok) return refuse(found.error);
+    const into = found.table === ORDERS ? orderRefs : itemRefs;
+    for (const id of found.ids) if (!into.includes(id)) into.push(id);
+  }
   if (itemRefs.length === 0 && orderRefs.length === 0) {
-    return refuse('Name the items by item_refs, or whole orders by order_refs.');
+    return refuse('Name the items by a lookup\'s set, by item_refs, or whole orders by order_refs.');
   }
   if (itemRefs.length > BULK_MAX) return refuse(`At most ${BULK_MAX} items can be changed at once. Ask them to narrow it down.`);
   const unseen = [
