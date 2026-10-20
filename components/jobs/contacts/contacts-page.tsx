@@ -286,7 +286,6 @@ export function ContactsPage({
               </p>
             ) : null
           }
-          tableHref={href({ view: 'table' })}
         />
       ) : (
         list
@@ -308,7 +307,6 @@ function ContactsFocus({
   query,
   quickFilters,
   filtersLine,
-  tableHref,
 }: {
   rows: readonly ContactListRow[];
   now: Date;
@@ -318,7 +316,6 @@ function ContactsFocus({
   /** Whether you have reached out, as two chips under the search. */
   quickFilters: React.ReactNode;
   filtersLine: React.ReactNode;
-  tableHref: string;
 }) {
   const { toReach, waiting, quiet, rest } = focusSections(rows, now);
   const leads = toReach.length + waiting.length + quiet.length;
@@ -397,12 +394,6 @@ function ContactsFocus({
             </FocusSection>
           )}
 
-          {rows.length > 0 && (
-            <p className="px-2 text-small text-ink-muted">
-              <Link href={tableHref}>Open the table</Link> to filter by company, relationship
-              or status.
-            </p>
-          )}
         </>
       )}
     </div>
