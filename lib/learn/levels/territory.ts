@@ -19,6 +19,12 @@ export type TerritoryText = {
   url?: string;
   /** Documents with one key count once towards canonicality: two terms of one course are one view. */
   independence?: string;
+  /**
+   * The areas whose topics are drafted from this text, in a territory with
+   * areas; every area when absent. A text read only for some areas keeps
+   * the others' drafting calls within MAX_SOURCES (plan #2483.2).
+   */
+  areas?: string[];
 };
 
 /**
@@ -69,17 +75,24 @@ export type Territory = {
   kind?: GoalKind | null;
 };
 
+/** The texts an area's topics are drafted from: those naming that area, and those naming none. */
+export function textsFor(territory: Territory, area?: string): TerritoryText[] {
+  if (area === undefined) return territory.texts;
+  return territory.texts.filter((t) => !t.areas || t.areas.includes(area));
+}
+
 /**
  * The sources as the drafting call reads them: the roles first, then the
  * texts in order, numbered S1 onwards. A role phrase that matched nothing is
- * left out.
+ * left out. Given an area, only the texts that area is drafted from.
  */
 export function territorySources(
   territory: Territory,
   roleSources: readonly (Omit<DraftSource, 'id'> | null)[],
+  area?: string,
 ): DraftSources {
   const roles = roleSources.filter((s): s is Omit<DraftSource, 'id'> => s !== null);
-  const texts = territory.texts.map((t) => ({ label: t.label, items: t.items }));
+  const texts = textsFor(territory, area).map((t) => ({ label: t.label, items: t.items }));
   return { sources: numbered([...roles, ...texts]), performances: territory.performances };
 }
 
@@ -109,6 +122,23 @@ export function areaProblem(territory: Territory, area: string): string | null {
 export function strayAreas(territory: Territory): string[] {
   const areas = territory.areas ?? [];
   return territory.topics.filter((t) => (areas.length === 0 ? t.area !== undefined : !t.area || !areas.includes(t.area))).map((t) => t.ask);
+}
+
+/** Areas a text names that the territory does not declare, as `<text key>: <area>`. */
+export function strayTextAreas(territory: Territory): string[] {
+  const areas = new Set(territory.areas ?? []);
+  return territory.texts.flatMap((t) => (t.areas ?? []).filter((a) => !areas.has(a)).map((a) => `${t.key}: ${a}`));
+}
+
+/**
+ * `from` lines citing a text the topic's area is not drafted from, so the
+ * drafting call would never see the line that put the topic on the list.
+ */
+export function offAreaFrom(territory: Territory): string[] {
+  return territory.topics.flatMap((topic) => {
+    const keys = new Set(textsFor(territory, topic.area).map((t) => t.key));
+    return topic.from.filter((f) => !keys.has(f.slice(0, f.indexOf(':'))));
+  });
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { Territory } from '@/lib/learn/levels/territory';
+import { BUSINESS } from '@/lib/learn/levels/territories/business';
 import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
 
 /**
@@ -7,4 +8,5 @@ import { SAAS_METRICS } from '@/lib/learn/levels/territories/saas-metrics';
  */
 export const TERRITORIES: Readonly<Record<string, Territory>> = {
   [SAAS_METRICS.key]: SAAS_METRICS,
+  [BUSINESS.key]: BUSINESS,
 };
