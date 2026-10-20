@@ -123,6 +123,8 @@ import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
+import { ToastProvider } from '@/components/ui/toast';
+import { ToastOnShow } from './toast-on-show';
 import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
@@ -1649,6 +1651,7 @@ const contact: ContactRow = {
       sentAt: '2026-08-30T09:10:00.000Z',
       respondedAt: null,
       message: 'Asked whether the platform role is still open after the reorg.',
+      draft: false,
     },
     {
       id: 't2',
@@ -1657,6 +1660,7 @@ const contact: ContactRow = {
       sentAt: '2026-08-12T18:00:00.000Z',
       respondedAt: null,
       message: 'Sent the write-up she asked for at the meetup.',
+      draft: false,
     },
     {
       id: 't3',
@@ -1665,6 +1669,27 @@ const contact: ContactRow = {
       sentAt: '2026-03-04T19:30:00.000Z',
       respondedAt: '2026-03-04T19:30:00.000Z',
       message: 'Met at the London Systems meetup.',
+      draft: false,
+    },
+    {
+      /* A kept draft as long as an email gets, saved after the last send. */
+      id: 'd1',
+      channel: 'email',
+      direction: 'outbound',
+      sentAt: '2026-09-10T16:45:00.000Z',
+      respondedAt: null,
+      message:
+        "Subject: Following up on the platform role\n\nHi Aoife, thanks again for the chat at the meetup. I saw the platform group is hiring again after the reorg and wondered whether the senior role is still open, and whether a short call next week would be useful. I've attached the write-up on the migration we discussed.",
+      draft: true,
+    },
+    {
+      id: 'd2',
+      channel: 'linkedin_dm',
+      direction: 'outbound',
+      sentAt: '2026-09-11T08:20:00.000Z',
+      respondedAt: null,
+      message: 'Congratulations on the new role. Would you have ten minutes for a call?',
+      draft: true,
     },
   ],
 };
@@ -5865,6 +5890,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'narrow',
     render: () => <ContactDetail contact={contact} timezone="Europe/London" />,
+  },
+  {
+    /* Dash's draft open above the log, with Save as draft beside Log as
+     * sent (plan #2457.3). */
+    id: 'jobs-contact-compose',
+    label: 'Contact · A message being written',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ContactDetail
+        contact={contact}
+        timezone="Europe/London"
+        preview={{
+          compose: {
+            by: 'dash',
+            message:
+              "Hi Aoife, I saw the platform group is hiring again after the reorg. Is the senior role still open? I'd value ten minutes next week if you have them.",
+          },
+        }}
+      />
+    ),
+  },
+  {
+    /* A draft's Mark sent and Delete held showing, as hover and focus show
+     * them on a laptop and a touch screen always does. */
+    id: 'jobs-contact-draft-hover',
+    label: 'Contact · A draft hovered',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => <ContactDetail contact={contact} timezone="Europe/London" preview={{ revealDraftId: 'd1' }} />,
+  },
+  {
+    /* Marking a draft sent failed: the draft stays, and says why under it. */
+    id: 'jobs-contact-draft-error',
+    label: 'Contact · A draft that would not mark sent',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ContactDetail
+        contact={contact}
+        timezone="Europe/London"
+        preview={{
+          revealDraftId: 'd1',
+          draftError: { id: 'd1', text: 'Not marked sent: the connection dropped. Try again.' },
+        }}
+      />
+    ),
+  },
+  {
+    /* The only draft just deleted, asked nothing: the list of drafts is
+     * gone and Undo is in the toast. */
+    id: 'jobs-contact-draft-undo',
+    label: 'Contact · A draft deleted, with undo',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <ToastProvider>
+        <ToastOnShow text="Draft deleted" />
+        <ContactDetail
+          contact={{ ...contact, touches: contact.touches.filter((t) => !t.draft) }}
+          timezone="Europe/London"
+        />
+      </ToastProvider>
+    ),
   },
   {
     id: 'jobs-find',
