@@ -7,6 +7,7 @@ import { MoveLabel } from '@/components/ui/move-label';
 import { Tooltip } from '@/components/ui/tooltip';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { DropLead } from '@/components/jobs/pipeline/drop-lead';
 import { ScoreCircles } from '@/components/jobs/ui/score-figures';
 import { applicationMove } from '@/lib/jobs/move';
 import { rowRef, withRun } from '@/lib/core/move';
@@ -132,6 +133,7 @@ export function PipelineFocus({
               key={row.applicationId}
               row={row}
               detail={row.status === 'drafting' ? 'Drafting' : null}
+              drop
             />
           ))}
         </FocusSection>
@@ -192,6 +194,7 @@ function FocusLine({
   status = false,
   move = null,
   highlight = false,
+  drop = false,
 }: {
   row: PipelineRow;
   detail?: string | null;
@@ -199,16 +202,20 @@ function FocusLine({
   status?: boolean;
   move?: ReturnType<typeof moveFor>;
   highlight?: boolean;
+  /** Offer Drop beside the line, for a role not yet applied to. */
+  drop?: boolean;
 }) {
   const stale = (row.daysSinceActivity ?? 0) > QUIET_DAYS;
 
   return (
-    <li>
+    // Drop sits beside the link rather than inside it, since a button
+    // inside a link is pressed as the link.
+    <li className={cn(drop && 'flex items-center gap-1')}>
       <RowLink
         href={`/jobs/roles/${row.roleId}`}
         // ui-ok: fixed-control-height -- a row, not a control: 44px on a
         // phone for a thumb, 40 above it so a screen holds what is open.
-        className="flex min-h-11 items-center sm:min-h-10 gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-quick hover:bg-shell-hover"
+        className="flex min-h-11 min-w-0 flex-1 items-center sm:min-h-10 gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-quick hover:bg-shell-hover"
       >
         <CompanyAvatar
           company={{
@@ -282,6 +289,13 @@ function FocusLine({
           </span>
         </Tooltip>
       </RowLink>
+      {drop && (
+        <DropLead
+          applicationId={row.applicationId}
+          status={row.status}
+          title={`${row.roleTitle} at ${row.companyName}`}
+        />
+      )}
     </li>
   );
 }
