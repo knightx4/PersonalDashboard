@@ -112,6 +112,22 @@ describe('ready and cover letter filters', () => {
     expect(shown({}).filter((r) => r.hasCoverLetter === null)).toHaveLength(2);
   });
 
+  it('filters by questions added or a cover letter, either one counting (note 732901e4)', () => {
+    const started = [
+      row('lead', { hasQuestions: true, hasCoverLetter: null }),
+      row('lead', { hasQuestions: false, hasCoverLetter: true }),
+      row('lead', { hasQuestions: false, hasCoverLetter: false }),
+      row('lead', { hasQuestions: false, hasCoverLetter: null }),
+    ];
+    const by = (params: Parameters<typeof parsePipeline>[0]) =>
+      filterPipeline(started, parsePipeline(params)).filtered;
+    expect(parsePipeline({ material: 'yes' }).material).toBe(true);
+    expect(parsePipeline({}).material).toBeNull();
+    expect(by({ material: 'yes' })).toEqual(started.slice(0, 2));
+    expect(by({ material: 'no' })).toEqual(started.slice(2));
+    expect(by({})).toHaveLength(4);
+  });
+
   it('combines with each other and keeps both in the link', () => {
     expect(shown({ ready: 'yes', letter: 'no' })).toHaveLength(0);
     expect(shown({ ready: 'yes', letter: 'yes' })).toHaveLength(1);

@@ -71,6 +71,7 @@ const pursuit = (over: Partial<PipelineRow>): PipelineRow => ({
   readyToApply: false,
   allQuestionsAdded: false,
   hasCoverLetter: null,
+  hasQuestions: false,
   createdBy: 'user',
   submittedAt: '2026-09-01T00:00:00Z',
   confirmationReceivedAt: null,

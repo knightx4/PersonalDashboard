@@ -24,7 +24,7 @@ export type AskRows = AskListFilter & { label: string };
 /** The params that narrow each list. Sort, grouping, view and page do not. */
 const FILTER_KEYS: Record<AskListId, readonly string[]> = {
   inventory: ['q', 'category', 'merchant', 'list', 'range', 'person', 'attr'],
-  pipeline: ['status', 'source', 'excitement', 'minfit', 'minchance', 'ready', 'questions', 'letter', 'company', 'q'],
+  pipeline: ['status', 'source', 'excitement', 'minfit', 'minchance', 'ready', 'questions', 'letter', 'material', 'company', 'q'],
 };
 
 export type ListParams = Record<string, string | string[] | undefined>;

@@ -4,6 +4,7 @@ import {
   escapeLike,
   contactHit,
   embedded,
+  ilikeAnyFilter,
   inventoryHit,
   orderHit,
   roleHit,
@@ -175,5 +176,12 @@ describe('refs', () => {
       'public.saved_items:s1',
     ]);
     for (const hit of hits) expect(parseRef(hit.ref!)).toMatchObject({ id: hit.id });
+  });
+});
+
+describe('ilikeAnyFilter', () => {
+  it('matches any of the columns, with the query quoted (note ecbb3524)', () => {
+    expect(ilikeAnyFilter(['title', 'kind'], 'accelerator')).toBe('title.ilike."%accelerator%",kind.ilike."%accelerator%"');
+    expect(ilikeAnyFilter(['name'], 'a,b"c_')).toBe('name.ilike."%a,b\\"c\\\\_%"');
   });
 });
