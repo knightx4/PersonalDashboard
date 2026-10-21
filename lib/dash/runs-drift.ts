@@ -42,11 +42,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   change_video: ['app/learn/videos/actions.ts#setWatchedAction'],
   change_place: ['app/you/places/actions.ts#savePlace'],
   save_job: ['app/you/work/job-actions.ts#saveJobAction'],
-  change_goal_area: ['app/goals/actions.ts#moveAreaAction'],
-  change_goal_step: [
-    'app/goals/[goalId]/actions.ts#moveStepAction',
-    'app/goals/[goalId]/block-actions.ts#blockGoalStep',
-  ],
   write_vault_note: ['app/vault/actions.ts#newVaultNote'],
   edit_vault_note: ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote'],
   rename_theme: ['app/vault/map/actions.ts#renameTheme'],
@@ -158,7 +153,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/dev/plan/actions.ts#addPlanItem',
     'app/dev/plan/actions.ts#sendPlanItemToClaude',
   ],
-  move_goal_step: ['app/goals/[goalId]/actions.ts#moveStepAction'],
   write_cover_letter: ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter'],
 };
 

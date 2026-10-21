@@ -8,6 +8,7 @@ import { DUE_PRECISIONS } from '@/lib/goals/due-precision';
 import {
   archiveArea,
   insertArea,
+  moveArea,
   moveGoal,
   renameArea,
   insertGoal,
@@ -37,13 +38,14 @@ import {
   deleteDependency,
   insertDependency,
   linkStep,
+  moveStep,
   setStepArchived,
   setStepQuestions,
   setStepStatus,
   unlinkStep,
   updateStep,
 } from '@/lib/goals/steps-store';
-import { parseAreaName, parseAreaNote, parseGoalFields, reorder } from '@/lib/goals/tree';
+import { parseAreaName, parseAreaNote, parseGoalFields } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CHANGE_GOAL_LIST } from './goal-lists-writes';
 import { GoalsRefused } from './goals-refused';
@@ -201,37 +203,6 @@ async function findArea(env: GoalsWriteEnv, wanted: string, { archived = false }
   );
 }
 
-/** One place up or down among the person's live areas, positions re-dealt in tens as the page does. */
-async function moveOwnArea(env: GoalsWriteEnv, id: string, direction: 'up' | 'down'): Promise<boolean> {
-  const { data, error } = await env.goals
-    .from('areas')
-    .select('id')
-    .eq('user_id', env.userId)
-    .is('archived_at', null)
-    .order('position', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(`Reading the areas failed: ${error.message}`);
-  const order = reorder(
-    ((data ?? []) as Row[]).map((row) => row.id as string),
-    id,
-    direction,
-  );
-  if (!order) return false;
-  const client = await env.write({});
-  const results = await Promise.all(
-    order.map((areaId, i) =>
-      client
-        .from('areas')
-        .update({ position: (i + 1) * 10 })
-        .eq('id', areaId)
-        .eq('user_id', env.userId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  return true;
-}
-
 // ---------------------------------------------------------------------------
 // change_goal_area
 // ---------------------------------------------------------------------------
@@ -305,7 +276,7 @@ async function changeGoalArea(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'move_up':
     case 'move_down': {
       const direction = change === 'move_up' ? 'up' : 'down';
-      if (!(await moveOwnArea(env, id, direction))) {
+      if (!(await moveArea(await client(), env.userId, id, direction))) {
         throw new GoalsRefused(`That area is ${direction === 'up' ? 'first' : 'last'} already.`);
       }
       return changed('Moved', ` ${direction}`, `Dash moved the area ${title} ${direction} in Goals.`, MOVE_AREA_UNDO);
@@ -546,40 +517,6 @@ async function goalAbove(env: GoalsWriteEnv, step: Row): Promise<Row> {
   throw new GoalsRefused('Dash could not find the goal that step sits under.');
 }
 
-/** One place up or down among the step's live siblings, every write narrowed to the person's rows. */
-async function moveOwnStep(env: GoalsWriteEnv, step: Row, direction: 'up' | 'down'): Promise<boolean> {
-  const { data, error } = await env.goals
-    .from('items')
-    .select('id, position, created_at')
-    .eq('user_id', env.userId)
-    .eq('parent_id', step.parent_id as string)
-    .is('archived_at', null)
-    .order('position', { ascending: true });
-  if (error) throw new Error(`Reading the steps failed: ${error.message}`);
-  const siblings = ((data ?? []) as Row[]).sort(
-    (a, b) => Number(a.position) - Number(b.position) || String(a.created_at).localeCompare(String(b.created_at)),
-  );
-  const order = reorder(
-    siblings.map((row) => row.id as string),
-    step.id as string,
-    direction,
-  );
-  if (!order) return false;
-  const client = await env.write({});
-  const results = await Promise.all(
-    order.map((stepId, i) =>
-      client
-        .from('items')
-        .update({ position: (i + 1) * 10 })
-        .eq('id', stepId)
-        .eq('user_id', env.userId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  return true;
-}
-
 /** The database's refusal as the sentence the model reads, for a write a trigger or check can turn down. */
 async function guarded<T>(what: string, write: () => Promise<T>): Promise<T> {
   try {
@@ -642,7 +579,7 @@ async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'move_up':
     case 'move_down': {
       const direction = change === 'move_up' ? 'up' : 'down';
-      if (!(await moveOwnStep(env, before, direction))) {
+      if (!(await moveStep(await client(), env.userId, id, direction))) {
         throw new GoalsRefused(`That step is ${direction === 'up' ? 'first' : 'last'} among its siblings already.`);
       }
       return changed('Moved', ` ${direction}`, `Dash moved the step "${title}" ${direction} under its parent.`, MOVE_STEP_UNDO);
@@ -1893,7 +1830,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       ['app/goals/[goalId]/actions.ts#linkStepAction', 'lib/goals/steps-store.ts#linkStep'],
       ['app/goals/[goalId]/actions.ts#unlinkStepAction', 'lib/goals/steps-store.ts#unlinkStep'],
       ['app/goals/[goalId]/block-actions.ts#setGoalStepStatus', 'lib/goals/steps-store.ts#setStepStatus'],
-      ['app/goals/[goalId]/block-actions.ts#blockGoalStep', 'app/goals/[goalId]/block-actions.ts#blockGoalStep'],
+      ['app/goals/[goalId]/block-actions.ts#blockGoalStep', 'lib/goals/steps-store.ts#blockStep'],
       ['app/goals/[goalId]/block-actions.ts#addGoalStepDependency', 'lib/goals/steps-store.ts#insertDependency'],
       ['app/goals/[goalId]/block-actions.ts#removeGoalStepDependency', 'lib/goals/steps-store.ts#deleteDependency'],
       ['app/goals/home-actions.ts#setAsideAction', 'lib/core/snooze-days.ts#snoozeDay'],

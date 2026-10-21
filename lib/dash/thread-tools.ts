@@ -248,10 +248,7 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'move_goal_step',
-    sameAsVia(
-      'lib/goals/thread-acts.ts#moveGoalStep',
-      ['app/goals/[goalId]/actions.ts#moveStepAction', 'lib/goals/steps-store.ts#moveStep'],
-    ),
+    noButton('No Goals page moves a step to another goal: the arrows move it among its siblings (change_goal_step); only a comment on the step asks for this.'),
     [GOAL_THREAD_TABLE],
     'Move the step the comment is on, with its sub-steps, to the end of another of their open goals, when the comment says it belongs there. When the comment names no listed goal, or its words fit more than one, ask which instead of calling this.',
     {
