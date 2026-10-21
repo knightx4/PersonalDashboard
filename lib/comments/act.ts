@@ -54,6 +54,9 @@ import { SPLIT_ACTION, splitPieces, stallRunIds } from '@/lib/plan/stall';
 import { numberFromRef, refFor, type OutlineIndex } from '@/lib/plan/ref';
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
+import { insertFeedbackItem } from '@/lib/feedback/insert';
+import { insertIdea } from '@/lib/ideas/insert';
+import { insertPlanItem } from '@/lib/plan/insert-item';
 import { TARGET_PATH, type CommentTarget } from './load';
 import type { DashAction } from './reply-payload';
 
@@ -277,20 +280,17 @@ async function fileIdea(input: ActInput): Promise<ActOutcome> {
 
   // Named `scope` rather than `module`, which Next reserves.
   const scope = scopeOf(input.action);
-  const { data, error } = await input.supabase
-    .from('ideas')
-    .insert({
-      user_id: input.userId,
-      body,
-      module: scope,
-      source: 'claude',
-      // Only a plan step is a row `ideas.from_plan_item_id` can point at.
-      from_plan_item_id: input.target === 'step' ? input.id : null,
-    })
-    .select('id')
-    .maybeSingle();
-  if (error) return { ok: false, why: `I could not file that idea: ${error.message}` };
-  await recordAdded(input, 'file_idea', 'ideas', (data as { id: string } | null)?.id, `Filed an idea: ${body}`);
+  // The ideas page's own write. Only a plan step is a row
+  // `ideas.from_plan_item_id` can point at.
+  const { id, error } = await insertIdea(input.supabase, {
+    userId: input.userId,
+    body,
+    module: scope,
+    source: 'claude',
+    fromPlanItemId: input.target === 'step' ? input.id : null,
+  });
+  if (error) return { ok: false, why: `I could not file that idea: ${error}` };
+  await recordAdded(input, 'file_idea', 'ideas', id ?? undefined, `Filed an idea: ${body}`);
 
   return {
     ok: true,
@@ -333,20 +333,17 @@ async function fileNote(input: ActInput): Promise<ActOutcome> {
   }
 
   const kind = input.action.kind?.trim().toLowerCase() === 'feature' ? 'feature' : 'bug';
-  const { data, error } = await input.supabase
-    .from('feedback_items')
-    .insert({
-      user_id: input.userId,
-      kind,
-      body,
-      page_path: TARGET_PATH[input.target],
-    })
-    .select('id')
-    .maybeSingle();
-  if (error) return { ok: false, why: `I could not file that note: ${error.message}` };
+  // The notes page's own write.
+  const { id, error } = await insertFeedbackItem(input.supabase, {
+    userId: input.userId,
+    kind,
+    body,
+    pagePath: TARGET_PATH[input.target],
+  });
+  if (error) return { ok: false, why: `I could not file that note: ${error}` };
 
   const what = kind === 'bug' ? 'a bug' : 'a feature request';
-  await recordAdded(input, 'file_note', 'feedback_items', (data as { id: string } | null)?.id, `Filed ${what}: ${body}`);
+  await recordAdded(input, 'file_note', 'feedback_items', id ?? undefined, `Filed ${what}: ${body}`);
   return {
     ok: true,
     said: `Filed on the notes queue as ${what}, open:\n\n${body}`,
@@ -453,22 +450,19 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
   if (!planned.ok) return planned;
   const row = planned.row;
 
-  const { data, error } = await input.supabase
-    .from('plan_items')
-    .insert({
-      user_id: input.userId,
-      module: row.scope,
-      parent_id: row.parentId,
-      title: row.title,
-      detail: row.detail,
-      status: 'proposed',
-      kind: 'build',
-      position: row.position,
-    })
-    .select('id')
-    .maybeSingle();
-  if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
-  await recordAdded(input, 'add_step', 'plan_items', (data as { id: string } | null)?.id, `Proposed a step: ${row.title}`);
+  // The plan page's own write.
+  const written = await insertPlanItem(input.supabase, {
+    userId: input.userId,
+    module: row.scope,
+    parentId: row.parentId,
+    title: row.title,
+    detail: row.detail,
+    status: 'proposed',
+    kind: 'build',
+    position: row.position,
+  });
+  if ('error' in written) return { ok: false, why: `I could not add that step: ${written.error}` };
+  await recordAdded(input, 'add_step', 'plan_items', written.id, `Proposed a step: ${row.title}`);
 
   return {
     ok: true,
@@ -829,24 +823,18 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
   // action. `assignee` is left empty, which is the only thing a step written
   // here could say: the column marks what you kept for yourself, and nobody
   // has kept a step that has just been written.
-  const { data, error } = await input.supabase
-    .from('plan_items')
-    .insert({
-      user_id: input.userId,
-      module: row.scope,
-      parent_id: row.parentId,
-      title: row.title,
-      detail: row.detail,
-      status: 'not_started',
-      kind: 'build',
-      position: row.position,
-    })
-    .select('id, number')
-    .maybeSingle();
-  if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
-
-  const written = data as { id: string; number: number } | null;
-  if (!written) return { ok: false, why: 'I could not add that step, so nothing was started.' };
+  const inserted = await insertPlanItem(input.supabase, {
+    userId: input.userId,
+    module: row.scope,
+    parentId: row.parentId,
+    title: row.title,
+    detail: row.detail,
+    status: 'not_started',
+    kind: 'build',
+    position: row.position,
+  });
+  if ('error' in inserted) return { ok: false, why: `I could not add that step: ${inserted.error}` };
+  const written = inserted;
   // Recorded before the hand-over, as written: once a session takes it the
   // row has moved on, and the record rightly will not take it back.
   const outlines = await outlinesOf(input);

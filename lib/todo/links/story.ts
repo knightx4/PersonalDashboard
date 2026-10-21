@@ -3,7 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { linkTask } from '@/lib/todo/links/write';
-import { createTask, setTaskStatus, taskInput } from '@/lib/todo/tasks/write';
+import { insertTask, taskInput, updateTaskFields } from '@/lib/todo/tasks/write';
 
 /**
  * A todo made from a newsletter story (plan #1369).
@@ -71,7 +71,10 @@ export async function findOpenStoryTasks(
 }
 
 /**
- * Make the todo, or return the open one the story already has.
+ * Make the todo, or return the open one the story already has. The News
+ * page's button and Dash's make_todo_from_story both call it (plan #2473.5),
+ * on the client they were given: the person's session or the connector's
+ * service role.
  *
  * The task and its link are two writes, in the order addLinkedTask makes
  * them, and a link the database refuses drops the task rather than leaving
@@ -94,12 +97,12 @@ export async function makeStoryTask(
     pinned: false,
   });
 
-  const { id, error } = await createTask(userId, input, timezone);
+  const { id, error } = await insertTask(supabase, userId, input, timezone);
   if (error || !id) throw new Error(`Making that story a todo failed: ${error ?? 'no row'}`);
 
-  const link = await linkTask(id, 'story', story.id);
+  const link = await linkTask(id, 'story', story.id, 'about', supabase);
   if (link.error) {
-    await setTaskStatus(userId, id, 'dropped');
+    await updateTaskFields(userId, id, { status: 'dropped' }, timezone, supabase);
     throw new Error(`Making that story a todo failed: ${link.error}`);
   }
   return { taskId: id, created: true };

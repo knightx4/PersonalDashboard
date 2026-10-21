@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getUser, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { stopRunningWatch } from '@/lib/core/watches';
 import { isDay, isPickKey } from '@/lib/day-brief/opens';
 import { requestDashDeps } from '@/lib/ask/clients';
 import { changePaths } from '@/lib/ask/changes';
@@ -56,17 +57,10 @@ export async function stopWatch(formData: FormData): Promise<StopWatchResult> {
   const id = formData.get('id');
   if (typeof id !== 'string' || !UUID.test(id)) return { ok: false, error: 'Could not tell which watch that was.' };
   const user = await requireUser();
-  const core = await createCoreClient();
-  const { data, error } = await core
-    .from('watches')
-    .update({ status: 'stopped' })
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .eq('status', 'running')
-    .select('id');
+  const { row, error } = await stopRunningWatch(await createCoreClient(), user.id, id);
   if (error) return { ok: false, error: 'The watch could not be stopped. Try again.' };
   revalidatePath('/home');
-  if ((data ?? []).length === 0) return { ok: false, error: 'That watch is not running any more.' };
+  if (!row) return { ok: false, error: 'That watch is not running any more.' };
   return { ok: true };
 }
 

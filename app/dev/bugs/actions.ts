@@ -5,6 +5,7 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
+import { insertFeedbackItem } from '@/lib/feedback/insert';
 import { notesRoutine, runUrlFrom } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
@@ -98,18 +99,15 @@ export async function submitFeedback(
     return { error: 'Write a sentence or two describing it.' };
   }
 
-  const { data, error } = await supabase
-    .from('feedback_items')
-    .insert({
-      user_id: user.id,
-      kind: parsed.data.kind,
-      body: parsed.data.body,
-      page_path: parsed.data.pagePath,
-      user_agent: String(formData.get('user_agent') ?? '').slice(0, 500) || null,
-    })
-    .select('id')
-    .single();
-  if (error) return { error: error.message };
+  const { id, error } = await insertFeedbackItem(supabase, {
+    userId: user.id,
+    kind: parsed.data.kind,
+    body: parsed.data.body,
+    pagePath: parsed.data.pagePath,
+    userAgent: String(formData.get('user_agent') ?? '').slice(0, 500) || null,
+  });
+  if (error) return { error };
+  const data = id ? { id } : null;
 
   // The files added with "Add a file" (plan #1713), already in your folder of
   // the bucket, recorded against the note now that it has an id. The note is

@@ -23,6 +23,8 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { insertIdea } from '@/lib/ideas/insert';
+import { createCapturedNote } from '@/lib/vault/notes/create';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
@@ -858,10 +860,11 @@ async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
     throw new Refused(`"${workspace}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
   }
 
-  const idea = await one<{ id: string }>(
-    (await ctx.db('public')).from('ideas').insert({ user_id: ctx.userId, body, module: workspace }).select('id'),
-  );
-  if (!idea) throw new Error('The idea was not saved.');
+  // The ideas page's own write.
+  const filed = await insertIdea(await ctx.db('public'), { userId: ctx.userId, body, module: workspace });
+  if (filed.error) throw new Error(filed.error);
+  if (!filed.id) throw new Error('The idea was not saved.');
+  const idea = { id: filed.id };
   const ref = toRef(TABLE.idea, idea.id);
   const line = body.split('\n')[0].trim();
   const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
@@ -899,9 +902,11 @@ async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWrit
   const body = text(args, 'text');
   if (body.length < 2) throw new Refused('text is missing: write the thought as they said it.');
   if (body.length > QUICK_NOTE_MAX) throw new Refused(`Keep the note under ${QUICK_NOTE_MAX} characters.`);
-  if (!ctx.fileQuickNote) throw new Refused('Quick notes cannot be saved from here.');
+  if (!ctx.quickNotePorts) throw new Refused('Quick notes cannot be saved from here.');
 
-  const filed = await ctx.fileQuickNote(body);
+  // The Vault page's own write (addQuickNote through fileVaultNote): the note
+  // in the Inbox, named from its text.
+  const filed = await createCapturedNote(await ctx.quickNotePorts(), body);
   if (!filed.ok) throw new Refused(filed.error);
   const ref = toRef(TABLE.note, filed.noteId);
   const line = body.split('\n')[0].trim();
@@ -1023,7 +1028,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal',
-    sameAs(['app/learn/know/level3-actions.ts#addLevel3Goal', 'lib/learn/aims-store.ts#insertLevel3Aim']),
+    noButton(
+      'No Goals page adds a goal by hand: goals come in through capture, and the Level 3 goal on Subjects is an offer the person accepts.',
+    ),
     'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it. When none of their areas fits the goal, make one: pass new_area true with a short name for it ("Music"), rather than asking. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
     {
       type: 'object',
@@ -1141,8 +1148,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_idea',
     sameAs(
-      ['app/dev/ideas/actions.ts#addIdea', 'app/dev/ideas/actions.ts#addIdea'],
-      ['app/dev/ideas/actions.ts#submitIdea', 'app/dev/ideas/actions.ts#submitIdea'],
+      ['app/dev/ideas/actions.ts#addIdea', 'lib/ideas/insert.ts#insertIdea'],
+      ['app/dev/ideas/actions.ts#submitIdea', 'lib/ideas/insert.ts#insertIdea'],
     ),
     'File an idea on the ideas page in Dev, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas.',
     {
@@ -1242,7 +1249,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_quick_note',
-    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/capture/vault.ts#fileVaultNote']),
+    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/vault/notes/create.ts#createCapturedNote']),
     'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in the vault\'s Inbox, where Quick note triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
     {
       type: 'object',

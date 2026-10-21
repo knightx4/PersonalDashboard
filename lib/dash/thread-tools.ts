@@ -78,8 +78,8 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'file_idea',
     sameAsVia(
       'lib/comments/act.ts#fileIdea',
-      ['app/dev/ideas/actions.ts#addIdea', 'app/dev/ideas/actions.ts#addIdea'],
-      ['app/dev/ideas/actions.ts#submitIdea', 'app/dev/ideas/actions.ts#submitIdea'],
+      ['app/dev/ideas/actions.ts#addIdea', 'lib/ideas/insert.ts#insertIdea'],
+      ['app/dev/ideas/actions.ts#submitIdea', 'lib/ideas/insert.ts#insertIdea'],
     ),
     DEV,
     'File a new idea on the ideas page, marked as your suggestion, when the comment tells you to ("file that as its own idea").',
@@ -97,8 +97,8 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'file_note',
     sameAsVia(
       'lib/comments/act.ts#fileNote',
-      ['app/dev/bugs/actions.ts#submitFeedback', 'app/dev/bugs/actions.ts#submitFeedback'],
-      ['app/dev/surfaces/actions.ts#noteOnSurface', 'app/dev/surfaces/actions.ts#noteOnSurface'],
+      ['app/dev/bugs/actions.ts#submitFeedback', 'lib/feedback/insert.ts#insertFeedbackItem'],
+      ['app/dev/surfaces/actions.ts#noteOnSurface', 'lib/feedback/insert.ts#insertFeedbackItem'],
     ),
     DEV,
     'Write a bug report or a feature request into the notes queue, filed open, when the comment says to write something up.',
@@ -116,7 +116,7 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'add_step',
     sameAsVia(
       'lib/comments/act.ts#addStep',
-      ['app/dev/plan/actions.ts#addPlanItem', 'app/dev/plan/actions.ts#addPlanItem'],
+      ['app/dev/plan/actions.ts#addPlanItem', 'lib/plan/insert-item.ts#insertPlanItem'],
     ),
     NOT_A_CHANGE,
     'Add a row to the build plan as a proposal for them to approve. On a plan step it goes beneath that step; anywhere else it is a feature at the top of the workspace named.',
@@ -164,8 +164,8 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'build_step',
     sameAsVia(
       'lib/comments/act.ts#buildStep',
-      ['app/dev/plan/actions.ts#addPlanItem', 'app/dev/plan/actions.ts#addPlanItem'],
-      ['app/dev/plan/actions.ts#sendPlanItemToClaude', 'app/dev/plan/actions.ts#sendPlanItemToClaude'],
+      ['app/dev/plan/actions.ts#addPlanItem', 'lib/plan/insert-item.ts#insertPlanItem'],
+      ['app/dev/plan/actions.ts#sendPlanItemToClaude', 'lib/plan/handover.ts#handStepToClaude'],
     ),
     NOT_A_CHANGE,
     'Write a new plan step ready to be worked and start a session building it now, when the comment tells you to do the work ("do it", "go ahead"). Use add_step instead when they are putting something on the plan for later.',
@@ -248,10 +248,7 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'move_goal_step',
-    sameAsVia(
-      'lib/goals/thread-acts.ts#moveGoalStep',
-      ['app/goals/[goalId]/actions.ts#moveStepAction', 'lib/goals/steps-store.ts#moveStep'],
-    ),
+    noButton('No Goals page moves a step to another goal: the arrows move it among its siblings (change_goal_step); only a comment on the step asks for this.'),
     [GOAL_THREAD_TABLE],
     'Move the step the comment is on, with its sub-steps, to the end of another of their open goals, when the comment says it belongs there. When the comment names no listed goal, or its words fit more than one, ask which instead of calling this.',
     {

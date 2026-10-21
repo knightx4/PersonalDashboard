@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
+import { insertPlanItem } from '@/lib/plan/insert-item';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import {
@@ -243,24 +244,23 @@ export async function addPlanItem(
 
   const position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
 
-  const { error } = await supabase.from('plan_items').insert({
-    user_id: user.id,
+  // A step written straight into blocked takes the default kind of block,
+  // since the form does not ask (insertPlanItem).
+  const written = await insertPlanItem(supabase, {
+    userId: user.id,
     module: scope,
-    parent_id: parsed.data.parent,
+    parentId: parsed.data.parent,
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
     status: parsed.data.status,
     kind: parsed.data.kind,
-    // A step written straight into blocked still has to say which kind of
-    // block it is; the form does not ask, so it takes the default.
-    ...blockPatch(parsed.data.status),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
     position,
   });
-  if (error) return { error: error.message };
+  if ('error' in written) return { error: written.error };
 
   revalidatePlan();
   return { message: 'Added.' };

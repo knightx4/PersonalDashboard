@@ -3,7 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { safeFetch } from '@/lib/jobs/ats/ssrf';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { createTrack, upsertSource } from '@/lib/learn/tracks/save';
+import { addManualReading, createTrack, upsertSource } from '@/lib/learn/tracks/save';
 import { readLinkMeta, titleFromUrl, type LinkMeta } from './link-meta';
 
 /** The reading list a saved link goes on. */
@@ -42,12 +42,13 @@ export async function saveLink(
   userId: string,
   input: { url: string; meta: LinkMeta },
 ): Promise<SavedLink> {
-  const existing = await findSaved(supabase, input.url);
+  const existing = await findReadingForLink(supabase, userId, input.url);
   if (existing) return { ...existing, created: false };
 
   const { data: found, error: findError } = await supabase
     .from('tracks')
     .select('id')
+    .eq('user_id', userId)
     .eq('title', SAVED_LINKS)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -83,43 +84,31 @@ export async function saveLink(
     not_found: false,
   });
 
-  const { data: last } = await supabase
-    .from('readings')
-    .select('position')
-    .eq('track_id', trackId)
-    .order('position', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const position = ((last as { position: number } | null)?.position ?? 0) + 10;
-
-  const { data, error } = await supabase
-    .from('readings')
-    .insert({
-      user_id: userId,
-      track_id: trackId,
-      source_id: sourceId,
-      title,
-      position,
-      locator_kind: 'whole',
-      open_url: input.url,
-      locator_confidence: 'unverified',
-      locator_basis: basis,
-    })
-    .select('id')
-    .single();
-  assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error || !data) throw new Error(`Saving that link failed: ${error?.message ?? 'no row'}`);
-  return { trackId, readingId: (data as { id: string }).id, title, created: true };
+  // At the end of the list, through the write a list's own Add makes and
+  // Dash's add_track_reading makes with a link (plan #2473.5).
+  const readingId = await addManualReading(supabase, userId, {
+    trackId,
+    title,
+    why: null,
+    basis,
+    link: { sourceId, url: input.url },
+  });
+  return { trackId, readingId, title, created: true };
 }
 
-/** The reading that already opens this URL, on any list. */
-async function findSaved(
+/**
+ * The reading of theirs that already opens this URL, on any list: a link is
+ * kept once, so saving it again, by the box or by Dash, finds this one.
+ */
+export async function findReadingForLink(
   supabase: LearnSupabaseClient,
+  userId: string,
   url: string,
 ): Promise<{ trackId: string; readingId: string; title: string } | null> {
   const { data, error } = await supabase
     .from('readings')
     .select('id, track_id, title')
+    .eq('user_id', userId)
     .eq('open_url', url)
     .neq('status', 'abandoned')
     .order('created_at', { ascending: true })

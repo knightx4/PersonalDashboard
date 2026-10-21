@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
+import { fakeVaultNotes } from '../../tests/stubs/fake-vault-notes';
 import { CONNECTOR_WRITE_TOOLS, runConnectorWrite, type ConnectorWriteContext } from './writes';
 
 /**
@@ -133,7 +134,7 @@ describe('runConnectorWrite', () => {
  */
 describe('the writes shared with Ask Dash', () => {
   const ME = '00000000-0000-4000-8000-0000000000cc';
-  const NOTE = '00000000-0000-4000-8000-000000000d01';
+  const NOTE = '00000000-0000-4000-8000-000000000100';
 
   async function shared(account: ConnectorWriteContext['account'] = { enabledModules: ['vault', 'dev', 'jobs'], today: '2026-10-13' }) {
     const { fakeSchemaDb } = await import('../../tests/stubs/fake-schema-db');
@@ -148,10 +149,7 @@ describe('the writes shared with Ask Dash', () => {
       userId: ME,
       core: client('core'),
       db: async (schema) => client(schema),
-      fileQuickNote: async (text) => {
-        tables['obsidian.notes'].push({ id: NOTE, user_id: ME, path: 'Inbox/A thought.md', title: 'A thought', body: text });
-        return { ok: true, noteId: NOTE, path: 'Inbox/A thought.md', title: 'A thought', blobSha: 'sha-1' };
-      },
+      quickNotePorts: async () => fakeVaultNotes(tables['obsidian.notes'], ME).ports.create,
       account,
     };
     return { tables, context };
@@ -169,7 +167,7 @@ describe('the writes shared with Ask Dash', () => {
         status: 'done',
         subject_ref: `obsidian.notes:${NOTE}`,
         op: 'insert',
-        undo: { vault_blob_sha: 'sha-1' },
+        undo: { vault_blob_sha: 'n1' },
       }),
     ]);
   });
