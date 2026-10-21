@@ -1,4 +1,5 @@
 import { sameAs, type DashWriteRuns } from './runs';
+import { ROLE_KINDS } from '@/lib/jobs/role-kind';
 import type Anthropic from '@anthropic-ai/sdk';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
@@ -385,6 +386,10 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (given(args, 'seniority')) {
     update.seniority = clearable(args, 'seniority', FIELD_MAX);
     changed.push('the seniority');
+  }
+  if (given(args, 'kind')) {
+    update.kind = oneOf(args, 'kind', ROLE_KINDS, false);
+    changed.push('the kind');
   }
   if (given(args, 'posting_status')) {
     update.posting_status = oneOf(args, 'posting_status', POSTING_STATUSES, false);
@@ -3014,7 +3019,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
     ),
     description:
-      "Change a role in their Jobs workspace when they ask: its title, location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
+      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
       type: 'object',
       properties: {
@@ -3022,6 +3027,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         application_ref: APPLICATION_REF,
         title: { type: 'string', description: 'The new title.' },
         location: { type: 'string', description: `Where the role is, such as "London" or "Remote, US". ${CLEARABLE}` },
+        kind: { type: 'string', enum: [...ROLE_KINDS], description: 'What kind of opening it is: job, or accelerator, fellowship, grant or other.' },
         work_mode: { type: 'string', description: `One of ${WORK_MODES.join(', ')}. ${CLEARABLE}` },
         seniority: { type: 'string', description: `Such as "Senior" or "Staff". ${CLEARABLE}` },
         posting_status: { type: 'string', enum: [...POSTING_STATUSES], description: 'Whether the posting is open, closed or unknown.' },

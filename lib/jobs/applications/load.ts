@@ -1,4 +1,5 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { isRoleKind, type RoleKind } from '@/lib/jobs/role-kind';
 import {
   highWaterFromRejectionStage,
   requirementCoverage,
@@ -35,6 +36,8 @@ export interface PipelineRow {
   companyDomains: string[];
   companyWebsite: string | null;
   roleTitle: string;
+  /** What kind of opening it is: a job, or an accelerator, fellowship or grant. */
+  roleKind: RoleKind;
   location: string | null;
   workMode: string | null;
   status: ApplicationStatus;
@@ -97,7 +100,7 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
+    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
   interviews ( kind, scheduled_at, time_known ),
@@ -128,6 +131,7 @@ type RawRow = {
   roles: {
     id: string;
     title: string;
+    kind: string | null;
     location: string | null;
     work_mode: string | null;
     comp_min_cents: number | null;
@@ -187,6 +191,7 @@ export async function loadPipeline(
     companyDomains: row.roles.companies.domains ?? [],
     companyWebsite: row.roles.companies.website,
     roleTitle: row.roles.title,
+    roleKind: isRoleKind(row.roles.kind) ? row.roles.kind : 'job',
     location: row.roles.location,
     workMode: row.roles.work_mode,
     status: row.status,

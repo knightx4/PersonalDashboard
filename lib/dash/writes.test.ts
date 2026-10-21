@@ -321,6 +321,17 @@ describe('add_job_lead', () => {
     expect(tables['job_search.companies']).toEqual([expect.objectContaining({ priority: 'target' })]);
   });
 
+  it('saves an accelerator they apply to as a founder with its kind', async () => {
+    ok(await apply('add_job_lead', { title: 'Founder', company: 'Antler', kind: 'accelerator' }));
+    expect(tables['job_search.roles']).toContainEqual(expect.objectContaining({ title: 'Founder', kind: 'accelerator' }));
+  });
+
+  it('refuses a kind that is not one, and saves nothing', async () => {
+    const result = await apply('add_job_lead', { title: 'Founder', company: 'Antler', kind: 'club' });
+    expect(!result.ok && result.error).toContain('kind must be one of');
+    expect(tables['job_search.roles'].some((r) => r.title === 'Founder')).toBe(false);
+  });
+
   it('refuses a priority that is not one, and saves nothing', async () => {
     const result = await apply('add_job_lead', { title: 'Data analyst', company: 'Acme', company_priority: 'dream' });
     expect(!result.ok && result.error).toContain('company_priority must be one of');

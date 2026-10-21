@@ -1,5 +1,6 @@
 'use client';
 
+import { roleKindLabel } from '@/lib/jobs/role-kind';
 import { RowLink } from '@/components/shell/back-link';
 import { useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from 'react';
 import { AlertTriangle, GripVertical, X } from 'lucide-react';
@@ -587,6 +588,7 @@ function PipelineCard({
           <div className="flex items-baseline justify-between gap-2">
             <p className="truncate text-small text-ink-muted">
               {row.companyName}
+              {roleKindLabel(row.roleKind) && <span className="ml-1 text-ink-muted">· {roleKindLabel(row.roleKind)}</span>}
               {row.attempt > 1 && (
                 <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
               )}

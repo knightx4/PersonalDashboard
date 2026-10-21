@@ -8,6 +8,7 @@ import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLook
 import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { countEvidenceUse, saveAnswerEdit, setCanonicalAnswer } from '@/lib/jobs/answers/edit';
 import { recordHandEditOrigins } from '@/lib/jobs/fact-origins';
+import { isRoleKind } from '@/lib/jobs/role-kind';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import {
@@ -32,6 +33,7 @@ export async function updateRole(
     compMinCents?: number | null;
     compMaxCents?: number | null;
     compSource?: 'posted' | 'recruiter' | 'estimate' | null;
+    kind?: string;
   },
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
@@ -49,6 +51,10 @@ export async function updateRole(
   if (patch.compMinCents !== undefined) update.comp_min_cents = patch.compMinCents;
   if (patch.compMaxCents !== undefined) update.comp_max_cents = patch.compMaxCents;
   if (patch.compSource !== undefined) update.comp_source = patch.compSource;
+  if (patch.kind !== undefined) {
+    if (!isRoleKind(patch.kind)) return { error: 'That is not a kind of role.' };
+    update.kind = patch.kind;
+  }
   if (patch.jdText !== undefined) {
     const read = descriptionUpdate(patch.jdText, patch.compMinCents !== undefined || patch.compMaxCents !== undefined);
     Object.assign(update, read.update);
