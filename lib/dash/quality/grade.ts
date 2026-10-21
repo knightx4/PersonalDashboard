@@ -104,8 +104,12 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   if (body.startsWith(UNFINISHED_OPENING)) failures.push('Dash fell back to "I could not finish this answer".');
   if (outcome.stop !== 'answered') failures.push(`The answer stopped as "${outcome.stop}", not answered.`);
   if (LIMIT_MARKS.some((mark) => body.includes(mark))) failures.push('A limit cut the answer short.');
+  // A row's own title may carry the word (a reading about Claude Code); only
+  // Dash naming itself is wrong, so a word its lookups returned is let pass.
+  const looked = JSON.stringify(outcome.toolCalls.map((call) => call.result));
   for (const word of NEVER_SAID) {
-    if (new RegExp(`\\b${word}\\b`).test(body)) failures.push(`The answer says "${word}".`);
+    const said = new RegExp(`\\b${word}\\b`);
+    if (said.test(body) && !said.test(looked)) failures.push(`The answer says "${word}".`);
   }
 
   if (!expect.allow_failed_lookups) {

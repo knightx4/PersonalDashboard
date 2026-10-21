@@ -38,12 +38,31 @@ const OPERATION: CoreOperation = 'check-dash-quality';
 /** How many rows of a day's turns or spend are read; a day has far fewer. */
 const DAY_ROWS = 2000;
 
-function serviceAskDb(): AskDb {
+/**
+ * The lookups' clients, service-role, for the owner. `public.is_owner()`
+ * reads the signed-in session, which a cron run has none of, so it would say
+ * no and every Dev lookup would fail here though it works for them in the
+ * app. The run only ever asks as the account `app_owner()` named, so that one
+ * call is answered yes; every other call goes to the database.
+ */
+function ownerAskDb(): AskDb {
   const made = new Map<AskSchema, SchemaClient>();
   return async (schema) => {
     let client = made.get(schema);
     if (!client) {
-      client = createServiceSchemaSupabase(schema);
+      const service = createServiceSchemaSupabase(schema);
+      client =
+        schema === 'public'
+          ? (new Proxy(service, {
+              get(target, key, receiver) {
+                if (key !== 'rpc') return Reflect.get(target, key, receiver);
+                return (fn: string, ...rest: unknown[]) =>
+                  fn === 'is_owner'
+                    ? Promise.resolve({ data: true, error: null })
+                    : (target.rpc as (...args: unknown[]) => unknown).call(target, fn, ...rest);
+              },
+            }) as SchemaClient)
+          : service;
       made.set(schema, client);
     }
     return client;
@@ -87,7 +106,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         today,
         timezone: settings.timezone,
         enabledModules: settings.enabledModules,
-        db: serviceAskDb(),
+        db: ownerAskDb(),
         searchSources: allSearchSources(),
         searchMail: (search) => searchMail(core, userId, search),
         readMail: (message) => readMail(core, userId, message),

@@ -47,6 +47,13 @@ describe('grading an answer', () => {
     expect(failures).toContain('It took 1 lookup, more than 0.');
   });
 
+  it('lets the vendor name through when it is in a row the lookups returned', () => {
+    const outcome = answered('Your list has "Claude Code in practice".', {
+      toolCalls: [{ name: 'reading_list', input: {}, result: { ok: true, rows: [{ title: 'Claude Code in practice' }] } }],
+    });
+    expect(gradeAnswer(parseExpect({}), outcome)).toEqual([]);
+  });
+
   it('fails a run with no answer, and ignores fields it does not know', () => {
     expect(gradeAnswer(parseExpect({ nonsense: 1 }), { ok: false, detail: 'There is no question.', toolCalls: [], seconds: 0 })).toEqual([
       'No answer: There is no question.',
