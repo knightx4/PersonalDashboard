@@ -124,6 +124,17 @@ export function WaitingCard({
         </span>
       </div>
 
+      {/* What the row is part of, so a question says what it relates to
+          before its text is read (note f11b600a). */}
+      {row.feature && (
+        <p className="text-small text-ink-muted">
+          Part of{' '}
+          <Link href={planRefHref(row.feature.number)} className="hover:underline">
+            #{row.feature.number} {row.feature.title}
+          </Link>
+        </p>
+      )}
+
       {/* The title above is the one-line summary and this is what you have to
           actually go and do -- #599 asked for both, and on a setup row the two
           are the whole of the errand, so the instructions keep their line

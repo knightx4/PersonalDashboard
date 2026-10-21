@@ -104,6 +104,7 @@ import { httpsSql, restTransport } from '../lib/db/https-sql';
 import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
+import { ideaDetailShortfall } from '../lib/ideas/body';
 import { isModuleId } from '../lib/modules';
 import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
@@ -821,10 +822,17 @@ async function main(): Promise<void> {
 
       const refusals: string[] = [];
       const capped: string[] = [];
+      const thin: string[] = [];
       let written = 0;
       for (const idea of ideas) {
         if (idea.body.length > 4000)
           fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
+        // Checked before the cap, so a thin idea does not use up a filing.
+        const shortfall = ideaDetailShortfall(idea.body);
+        if (shortfall) {
+          thin.push(shortfall);
+          continue;
+        }
         // Re-read each time round, so one --file of ten stops at the cap too.
         if (!ideaAllowance(filedAt, Date.now()).allowed) {
           capped.push(ideaFirstLine(idea.body));
@@ -856,6 +864,10 @@ async function main(): Promise<void> {
         console.error(`\n${refusals.length} not filed; an idea this close is already there:`);
         for (const line of refusals) console.error(`  ${line}`);
         console.error('Add what is different to the idea that is already there, or leave it.');
+      }
+      if (thin.length > 0) {
+        console.error(`\n${thin.length} not filed; the person has to be able to tell what it is about:`);
+        for (const line of thin) console.error(`  ${line}`);
       }
       if (capped.length > 0) {
         console.error(
