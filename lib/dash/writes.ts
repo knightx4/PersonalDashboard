@@ -1,3 +1,4 @@
+import { COMMENT_MAX } from '@/lib/goals/comments';
 import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { writeChange, type ChangeDeps } from '@/lib/ask/changes';
@@ -601,8 +602,8 @@ async function setGoalDoneWhen(ctx: DashWriteContext, args: Args): Promise<DashW
 // Jobs
 // ---------------------------------------------------------------------------
 
-/** Longest note Dash writes on a role. */
-export const ROLE_NOTE_MAX = 5000;
+/** Longest note Dash writes on a role: the role page's comment box takes no more. */
+export const ROLE_NOTE_MAX = COMMENT_MAX;
 
 async function addRoleNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
@@ -1124,7 +1125,12 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_role_note',
-    sameAs(['app/jobs/(app)/roles/[id]/actions.ts#addNote', 'app/jobs/(app)/roles/[id]/actions.ts#addNote']),
+    // The role page's notes are its thread (lib/thread/store.ts). addNote, which the catalogue
+    // still pairs with this tool, now files only the company page's notes in job_search.notes.
+    sameAs(
+      ['app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment', 'lib/thread/store.ts#addThreadTurn'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#addNote', 'app/jobs/(app)/roles/[id]/actions.ts#addNote'],
+    ),
     'Add a note to one of their roles in Jobs, when they ask you to note something on it ("note on the Stripe role that the recruiter is Sam"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref applications returned; look it up first. Write the note in their words.',
     {
       type: 'object',
@@ -1230,7 +1236,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'move_roles',
     sameAs(
-      ['app/jobs/(app)/pipeline/actions.ts#moveApplication', 'app/jobs/(app)/pipeline/actions.ts#moveApplication'],
+      ['app/jobs/(app)/pipeline/actions.ts#moveApplication', 'lib/jobs/applications/stage.ts#moveApplicationsTo'],
     ),
     `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). When a query_rows lookup of job_search.roles or job_search.applications matched exactly the roles to move, pass the set it named as set instead of listing them. Otherwise name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
     {

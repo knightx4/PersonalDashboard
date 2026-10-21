@@ -40,7 +40,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/shopping/returns/actions.ts#toggleReturnPlannedForm',
     'app/shopping/returns/actions.ts#setItemsReturnPlanned',
   ],
-  move_roles: ['app/jobs/(app)/pipeline/actions.ts#moveApplication'],
   add_quick_note: ['app/vault/actions.ts#addQuickNote'],
   change_reading: [
     'app/learn/r/[id]/actions.ts#attachSource',
@@ -151,92 +150,8 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   rename_maya_question: ['app/vault/maya/actions.ts#renameMayaQuestion'],
   change_course: ['app/you/work/actions.ts#updateCourseAction'],
   save_transcript: ['app/you/work/actions.ts#saveTranscriptAction'],
-  change_role: [
-    'app/jobs/(app)/roles/actions.ts#updateRole',
-    'app/jobs/(app)/roles/[id]/actions.ts#renameRole',
-    'app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany',
-  ],
-  change_application: [
-    'app/jobs/(app)/pipeline/actions.ts#setExcitement',
-    'app/jobs/(app)/pipeline/actions.ts#setChannel',
-    'app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks',
-  ],
-  save_answer: [
-    'app/jobs/(app)/roles/actions.ts#saveAnswer',
-    'app/jobs/(app)/roles/actions.ts#saveDraftedAnswer',
-  ],
-  set_default_answer: ['app/jobs/(app)/roles/actions.ts#promoteToCanonical'],
-  change_company: [
-    'app/jobs/(app)/companies/actions.ts#updateCompany',
-    'app/jobs/(app)/companies/actions.ts#renameCompany',
-  ],
-  add_company: ['app/jobs/(app)/companies/actions.ts#addCompany'],
   merge_roles: ['app/jobs/(app)/companies/actions.ts#mergeRoles'],
-  change_reminder: [
-    'app/jobs/(app)/_home/actions.ts#completeReminder',
-    'app/jobs/(app)/_home/actions.ts#snoozeReminder',
-    'app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder',
-    'app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage',
-  ],
-  change_waiting: [
-    'app/jobs/(app)/_home/actions.ts#completeWaiting',
-    'app/jobs/(app)/_home/actions.ts#snoozeWaiting',
-  ],
-  change_role_email: [
-    'app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage',
-    'app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage',
-    'app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage',
-  ],
-  review_application: [
-    'app/jobs/(app)/review/actions.ts#confirmApplication',
-    'app/jobs/(app)/review/actions.ts#reopenApplication',
-  ],
-  review_events: [
-    'app/jobs/(app)/review/actions.ts#acknowledgeEvent',
-    'app/jobs/(app)/review/actions.ts#acknowledgeEvents',
-    'app/jobs/(app)/review/actions.ts#unacknowledgeEvents',
-  ],
-  review_emails: [
-    'app/jobs/(app)/review/actions.ts#dismissMessage',
-    'app/jobs/(app)/review/actions.ts#dismissMessages',
-    'app/jobs/(app)/review/actions.ts#restoreDismissedMessages',
-  ],
-  change_contact: [
-    'app/jobs/(app)/contacts/actions.ts#createContact',
-    'app/jobs/(app)/contacts/actions.ts#updateContact',
-  ],
-  change_touch: [
-    'app/jobs/(app)/contacts/actions.ts#logTouch',
-    'app/jobs/(app)/contacts/actions.ts#updateTouch',
-    'app/jobs/(app)/contacts/actions.ts#markTouchSent',
-    'app/jobs/(app)/contacts/actions.ts#markTouchAnswered',
-  ],
-  mark_suggestion_sent: ['app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent'],
-  add_role_from_email: ['app/jobs/(app)/review/actions.ts#createRoleFromMessage'],
-  add_evidence: ['app/jobs/(app)/material/evidence-actions.ts#addEvidence'],
-  add_resume_version: ['app/jobs/(app)/material/evidence-actions.ts#addResumeVersion'],
-  attach_resume_pdf: ['app/jobs/(app)/material/evidence-actions.ts#attachResumePdf'],
-  change_career_thought: [
-    'app/jobs/(app)/settings/career-goal-actions.ts#addThought',
-    'app/jobs/(app)/settings/career-goal-actions.ts#updateThought',
-  ],
-  add_discovered_company: [
-    'app/jobs/(app)/companies/actions.ts#addCompany',
-    'app/jobs/(app)/find/actions.ts#addDiscoveredCompany',
-  ],
-  change_interview: ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterview'],
-  change_interviewer: [
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewer',
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewerByName',
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#removeInterviewer',
-  ],
-  change_interview_round: [
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews',
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterviewGroup',
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#unlinkRoundMessage',
-    'app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview',
-  ],
-  link_round_email: ['app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage'],
+  change_interview_round: ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews'],
   rewrite_post: ['app/dev/posts/actions.ts#editPostBody'],
   suggest_post: ['app/dev/posts/actions.ts#suggestPostAbout'],
   file_idea: [
@@ -259,7 +174,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/dev/plan/actions.ts#sendPlanItemToClaude',
   ],
   move_goal_step: ['app/goals/[goalId]/actions.ts#moveStepAction'],
-  write_cover_letter: ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter'],
 };
 
 /** Every listed pair, as `tool file#export`. */

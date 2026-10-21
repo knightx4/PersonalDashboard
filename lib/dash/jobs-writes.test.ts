@@ -636,7 +636,7 @@ describe('contacts, touches and suggestions (plan #1894.6.6)', () => {
   it('marks a touch answered, then corrects it, each undone', async () => {
     const t = people();
     t['job_search.contact_touches'] = [
-      { id: TOUCH, user_id: ME, contact_id: CONTACT, channel: 'linkedin_dm', direction: 'outbound', message: 'Hi', responded_at: null, response_summary: null },
+      { id: TOUCH, user_id: ME, contact_id: CONTACT, channel: 'linkedin_dm', direction: 'outbound', message: 'Hi', draft: false, responded_at: null, response_summary: null },
     ];
     const answered = await made('change_touch', t, { action: 'answered', touch_ref: TOUCH, response: 'Happy to chat' });
     expect(t['job_search.contact_touches'][0]).toMatchObject({ response_summary: 'Happy to chat', responded_at: expect.any(String) });

@@ -23,6 +23,7 @@ import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
 import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } from '@/lib/jobs/companies/edit';
 import {
   enrichmentStageSource,
   loadCompanyFactOrigins,
@@ -112,10 +113,7 @@ export async function updateCompany(
   if (parsed.data.domains !== undefined) {
     // Domains drive email linking, so they are normalised rather than trusted:
     // a stray "https://" here means mail from that company never links.
-    patch.domains = parsed.data.domains
-      .split(/[\s,]+/)
-      .map((entry) => entry.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))
-      .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(entry));
+    patch.domains = normalisedDomains(parsed.data.domains.split(/[\s,]+/));
   }
 
   // The stage before the save, so only a stage that moved gets a new origin.
@@ -132,11 +130,7 @@ export async function updateCompany(
     stageBefore = (before.stage as string | null) ?? null;
   }
 
-  const { error } = await supabase
-    .from('companies')
-    .update(patch)
-    .eq('id', parsed.data.companyId)
-    .eq('user_id', user.id);
+  const { error } = await saveCompanyEdit(supabase, user.id, parsed.data.companyId, patch);
 
   if (error) return { error: error.message };
   if ('stage' in patch) {
@@ -149,7 +143,7 @@ export async function updateCompany(
 
 const renameSchema = z.object({
   companyId: z.string().uuid(),
-  name: z.string().trim().min(1, 'A company needs a name.').max(120),
+  name: z.string().trim().min(1, 'A company needs a name.').max(COMPANY_NAME_MAX),
 });
 
 /**
@@ -176,24 +170,11 @@ export async function renameCompany(
 
   const user = await requireUser();
   const supabase = await createClient();
-  const slug = slugify(parsed.data.name);
+  const rename = await renameUpdate(supabase, user.id, parsed.data.companyId, parsed.data.name);
+  if (rename.error !== null) return { error: rename.error, slug: null };
+  const { slug } = rename.update;
 
-  const { data: clash } = await supabase
-    .from('companies')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .eq('slug', slug)
-    .neq('id', parsed.data.companyId)
-    .maybeSingle();
-
-  if (clash) return { error: `You already have a company called ${clash.name}.`, slug: null };
-
-  const { error } = await supabase
-    .from('companies')
-    .update({ name: parsed.data.name, slug })
-    .eq('id', parsed.data.companyId)
-    .eq('user_id', user.id);
-
+  const { error } = await saveCompanyEdit(supabase, user.id, parsed.data.companyId, rename.update);
   if (error) return { error: error.message, slug: null };
 
   revalidatePath('/jobs/companies');

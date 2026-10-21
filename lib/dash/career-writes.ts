@@ -8,7 +8,9 @@ import { APP_STORAGE_BUCKET, type AppSupabaseClient } from '@/lib/jobs/db/schema
 import { normalizeSkills } from '@/lib/jobs/evidence/propose-payload';
 import { RESUME_MAX_BYTES, resumePath } from '@/lib/jobs/resume-file';
 import { slugify } from '@/lib/jobs/slug';
-import { THOUGHT_MAX } from '@/lib/jobs/thoughts';
+import { addThoughtRow, saveThoughtEdit, THOUGHT_MAX } from '@/lib/jobs/thoughts';
+import { addEvidenceItems } from '@/lib/jobs/evidence/bank';
+import { addResumeRow, pointResumeAt, SAME_LABEL } from '@/lib/jobs/resume-versions';
 import { JobsRefused } from './jobs-refused';
 import type { JobsMade, JobsWrite, JobsWriteEnv } from './jobs-writes';
 
@@ -98,6 +100,8 @@ function quoted(value: unknown, fallback: string, max = 80): string {
 // add_evidence
 // ---------------------------------------------------------------------------
 
+const jobsDb = (env: JobsWriteEnv) => env.jobs as unknown as AppSupabaseClient;
+
 function skillsOf(args: Args): string[] {
   const value = args.skills;
   if (value === undefined || value === null || value === '') return [];
@@ -121,18 +125,19 @@ async function addEvidence(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     }
     strength = args.strength;
   }
-  const values = {
-    user_id: env.userId,
-    title,
-    body,
-    context: capped(args, 'context', EVIDENCE_LINE_MAX),
-    metrics: capped(args, 'metrics', EVIDENCE_LINE_MAX),
-    strength,
-    skills: skillsOf(args),
-  };
-  const { data, error } = await env.jobs.from('evidence_items').insert(values).select('*').single();
-  if (error || !data) throw new Error(`Adding the evidence failed: ${error?.message ?? 'no row'}`);
-  const row = data as Row;
+  // The same insert as the Material page's form.
+  const added = await addEvidenceItems(jobsDb(env), env.userId, [
+    {
+      title,
+      body,
+      context: capped(args, 'context', EVIDENCE_LINE_MAX),
+      metrics: capped(args, 'metrics', EVIDENCE_LINE_MAX),
+      strength,
+      skills: skillsOf(args),
+    },
+  ]);
+  if (!added.ok || added.ids.length !== 1) throw new Error(`Adding the evidence failed: ${added.ok ? 'no row' : added.error}`);
+  const row = await ownRow(env, 'evidence_items', added.ids[0], 'evidence item');
   const name = quoted(row.title, 'a story');
   return {
     kind: 'add_evidence',
@@ -211,17 +216,14 @@ async function addResumeVersion(env: JobsWriteEnv, args: Args): Promise<JobsMade
 
   const file = withFile ? await sentPdf(env, args) : null;
   const storagePath = file ? await copyPdf(env, file) : null;
-  const { data, error } = await env.jobs
-    .from('resume_versions')
-    .insert({ user_id: env.userId, label, notes, text_content: textContent, storage_path: storagePath })
-    .select('*')
-    .single();
+  // The same insert as the Material page's form.
+  const { row: data, error } = await addResumeRow(jobsDb(env), env.userId, { label, notes, text_content: textContent, storage_path: storagePath });
   if (error || !data) {
     if (storagePath) await dropCopy(env, storagePath);
-    if (error && /resume_versions_user_label_key/.test(error.message)) throw new JobsRefused(`They already have a version labelled "${label}".`);
-    throw new Error(`Adding the resume version failed: ${error?.message ?? 'no row'}`);
+    if (error === SAME_LABEL) throw new JobsRefused(`They already have a version labelled "${label}".`);
+    throw new Error(`Adding the resume version failed: ${error ?? 'no row'}`);
   }
-  const row = data as Row;
+  const row = data;
   const name = quoted(row.label, 'a resume version');
   const how = file ? `, with ${file.name}` : '';
   return {
@@ -258,16 +260,11 @@ async function attachResumePdf(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   const before = await namedResume(env, args);
   const file = await sentPdf(env, args);
   const storagePath = await copyPdf(env, file);
-  const { data, error } = await env.jobs
-    .from('resume_versions')
-    .update({ storage_path: storagePath })
-    .eq('id', before.id as string)
-    .eq('user_id', env.userId)
-    .select('*');
-  const after = ((data ?? []) as Row[])[0];
+  // The same write as the Material page's attach. The file it had stays, so Undo can point back at it.
+  const { row: after, error } = await pointResumeAt(jobsDb(env), env.userId, before.id as string, storagePath);
   if (error || !after) {
     await dropCopy(env, storagePath);
-    throw new Error(`Attaching the PDF failed: ${error?.message ?? 'no row'}`);
+    throw new Error(`Attaching the PDF failed: ${error ?? 'no row'}`);
   }
   const name = quoted(after.label, 'the resume version');
   const replaced = before.storage_path ? ', in place of the PDF it had' : '';
@@ -300,11 +297,11 @@ async function changeCareerThought(env: JobsWriteEnv, args: Args): Promise<JobsM
   const before = ref ? await ownRow(env, 'thoughts', idOf(ref, 'career goals entry'), 'career goals entry') : null;
   if (before && before.body === body) throw new JobsRefused('That entry says that already.');
 
-  const { data, error } = before
-    ? await env.jobs.from('thoughts').update({ body }).eq('id', before.id as string).eq('user_id', env.userId).select('*')
-    : await env.jobs.from('thoughts').insert({ user_id: env.userId, body }).select('*');
-  const row = ((data ?? []) as Row[])[0];
-  if (error || !row) throw new Error(`${before ? 'Changing' : 'Adding'} the entry failed: ${error?.message ?? 'no row'}`);
+  // The same writes as Settings' career goals.
+  const { row, error } = before
+    ? await saveThoughtEdit(jobsDb(env), env.userId, before.id as string, body)
+    : await addThoughtRow(jobsDb(env), env.userId, body);
+  if (error || !row) throw new Error(`${before ? 'Changing' : 'Adding'} the entry failed: ${error ?? 'no row'}`);
   const words = quoted(row.body, 'an entry', 60);
   return {
     kind: 'change_career_thought',
@@ -492,7 +489,7 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'add_evidence',
     runs: sameAs(
-      ['app/jobs/(app)/material/evidence-actions.ts#addEvidence', 'app/jobs/(app)/material/evidence-actions.ts#addEvidence'],
+      ['app/jobs/(app)/material/evidence-actions.ts#addEvidence', 'lib/jobs/evidence/bank.ts#addEvidenceItems'],
     ),
     description:
       "Add a story to their evidence bank on Material when they ask: a piece of their own work and its result, which applications and drafts draw on. Write it in their words; do not invent results they did not give.",
@@ -514,7 +511,7 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'add_resume_version',
     runs: sameAs(
-      ['app/jobs/(app)/material/evidence-actions.ts#addResumeVersion', 'app/jobs/(app)/material/evidence-actions.ts#addResumeVersion'],
+      ['app/jobs/(app)/material/evidence-actions.ts#addResumeVersion', 'lib/jobs/resume-versions.ts#addResumeRow'],
     ),
     description:
       'Add a resume version on Material when they ask: a label, the resume as text, notes, and the PDF if they sent you one (by file_name). A label they already use is refused; to give an existing version a PDF, call attach_resume_pdf.',
@@ -535,7 +532,7 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'attach_resume_pdf',
     runs: sameAs(
-      ['app/jobs/(app)/material/evidence-actions.ts#attachResumePdf', 'app/jobs/(app)/material/evidence-actions.ts#attachResumePdf'],
+      ['app/jobs/(app)/material/evidence-actions.ts#attachResumePdf', 'lib/jobs/resume-versions.ts#pointResumeAt'],
     ),
     description:
       "Keep a PDF they sent you as an existing resume version's file, replacing the one it had, when they ask. Name the version by resume_ref (list_rows on job_search.resume_versions) or by its label, and the PDF by file_name.",
@@ -554,8 +551,8 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_career_thought',
     runs: sameAs(
-      ['app/jobs/(app)/settings/career-goal-actions.ts#addThought', 'app/jobs/(app)/settings/career-goal-actions.ts#addThought'],
-      ['app/jobs/(app)/settings/career-goal-actions.ts#updateThought', 'app/jobs/(app)/settings/career-goal-actions.ts#updateThought'],
+      ['app/jobs/(app)/settings/career-goal-actions.ts#addThought', 'lib/jobs/thoughts.ts#addThoughtRow'],
+      ['app/jobs/(app)/settings/career-goal-actions.ts#updateThought', 'lib/jobs/thoughts.ts#saveThoughtEdit'],
     ),
     description:
       'Write a career goals entry on Jobs Settings when they ask (what they want from the next job, where they are now), or reword one of theirs by thought_ref (list_rows on job_search.thoughts). A new entry is dated today and older ones stay as they were. The roles and people searches read them.',
@@ -573,8 +570,8 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'add_discovered_company',
     runs: sameAs(
-      ['app/jobs/(app)/companies/actions.ts#addCompany', 'app/jobs/(app)/companies/actions.ts#addCompany'],
-      ['app/jobs/(app)/find/actions.ts#addDiscoveredCompany', 'app/jobs/(app)/find/actions.ts#addDiscoveredCompany'],
+      ['app/jobs/(app)/companies/actions.ts#addCompany', 'lib/jobs/companies/ensure.ts#ensureCompany'],
+      ['app/jobs/(app)/find/actions.ts#addDiscoveredCompany', 'lib/jobs/companies/ensure.ts#ensureCompany'],
     ),
     description:
       "Add a startup Find discovered to their companies when they ask, as Find's \"Add to my companies\" does: it becomes a company with its website and job board, so the roles search reads that board every day. Name it by its name as Find shows it, or startup_ref.",

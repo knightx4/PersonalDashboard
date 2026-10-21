@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { COVER_LETTER_MAX, saveApplicationEdit, saveCoverLetterText, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
@@ -100,7 +102,7 @@ export async function saveCoverLetter(input: {
     .object({
       applicationId: z.string().uuid(),
       roleId: z.string().uuid(),
-      body: z.string().trim().max(20_000, 'A cover letter is at most 20,000 characters.'),
+      body: z.string().trim().max(COVER_LETTER_MAX, 'A cover letter is at most 20,000 characters.'),
       fromDraft: z.boolean().optional(),
     })
     .safeParse(input);
@@ -110,17 +112,8 @@ export async function saveCoverLetter(input: {
   const supabase = await createClient();
 
   const marking = Boolean(parsed.data.fromDraft && parsed.data.body);
-  const patch: { cover_letter: string | null; has_cover_letter?: boolean } = {
-    cover_letter: parsed.data.body || null,
-  };
-  if (marking) patch.has_cover_letter = true;
-
-  const { error } = await supabase
-    .from('applications')
-    .update(patch)
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveCoverLetterText(supabase, user.id, parsed.data.applicationId, parsed.data.body, marking);
+  if (error) return { error };
 
   // Best effort: the letter is saved, and a draft left behind only offers
   // itself again on the next visit.
@@ -236,21 +229,13 @@ export async function saveApplicationMarks(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const patch: {
-    ready_to_apply?: boolean;
-    all_questions_added?: boolean;
-    has_cover_letter?: boolean | null;
-  } = {};
+  const patch: ApplicationEdit = {};
   if (parsed.data.readyToApply !== undefined) patch.ready_to_apply = parsed.data.readyToApply;
   if (parsed.data.allQuestionsAdded !== undefined) patch.all_questions_added = parsed.data.allQuestionsAdded;
   if (parsed.data.hasCoverLetter !== undefined) patch.has_cover_letter = parsed.data.hasCoverLetter;
 
-  const { error } = await supabase
-    .from('applications')
-    .update(patch)
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveApplicationEdit(supabase, user.id, parsed.data.applicationId, patch);
+  if (error) return { error };
 
   revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
   revalidatePath('/jobs');
@@ -275,11 +260,7 @@ export async function renameRole(roleId: string, title: string): Promise<{ error
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('roles')
-    .update({ title: parsed.data.title })
-    .eq('id', parsed.data.roleId)
-    .eq('user_id', user.id);
+  const { error } = await saveRoleEdit(supabase, user.id, parsed.data.roleId, { title: parsed.data.title });
 
   if (error) return { error: error.message };
 
@@ -321,23 +302,10 @@ export async function moveRoleToCompany(
   const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
   if (company.error) return { error: company.error, slug: null };
 
-  const { error } = await supabase
-    .from('roles')
-    .update({ company_id: company.id })
-    .eq('id', parsed.data.roleId)
-    .eq('user_id', user.id);
-
-  if (error) {
-    // (user_id, company_id, jd_hash) is unique: the same posting is already
-    // filed under the company being moved to.
-    return {
-      error:
-        error.code === '23505'
-          ? 'That company already has this same posting. Merge the two from the company page instead.'
-          : error.message,
-      slug: null,
-    };
-  }
+  // (user_id, company_id, jd_hash) is unique: the same posting already filed
+  // under the company being moved to comes back as SAME_POSTING.
+  const { error } = await saveRoleEdit(supabase, user.id, parsed.data.roleId, { company_id: company.id });
+  if (error) return { error: error.message, slug: null };
 
   const { data: moved } = await supabase
     .from('companies')

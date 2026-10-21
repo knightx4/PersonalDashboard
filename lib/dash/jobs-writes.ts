@@ -6,11 +6,43 @@ import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { channelForMessage } from '@/lib/jobs/applications/channel';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { CLASSIFICATIONS, eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
-import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
-import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
+import {
+  addContact,
+  addTouch,
+  answerTouch,
+  BEFORE_CONTACTED_AGAIN,
+  CONTACT_RELATIONSHIPS,
+  markContacted,
+  markDraftSent,
+  saveContactEdit,
+  saveTouchEdit,
+  suggestedContact,
+  TOUCH_CHANNELS,
+} from '@/lib/jobs/contacts/edit';
+import { ANSWER_STATUSES, countEvidenceUse, saveAnswerEdit, setCanonicalAnswer, type AnswerEdit } from '@/lib/jobs/answers/edit';
+import { saveReminderEdit, type ReminderEdit } from '@/lib/jobs/today/reminders';
+import { setWaitingDismissal } from '@/lib/jobs/today/waiting';
+import {
+  acknowledgeEventRows,
+  confirmApplicationRow,
+  dismissMessageRows,
+  reopenApplicationRows,
+  restoreMessageRow,
+  unacknowledgeEventRows,
+} from '@/lib/jobs/review/verdicts';
+import {
+  addPursuitFromMail,
+  declineMessageForApplication,
+  linkMessageToApplication,
+  LINKED_BY_HAND,
+  unlinkMessageFromApplication,
+  UNLINKED_BY_HAND,
+} from '@/lib/jobs/inbox/role-mail';
+import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } from '@/lib/jobs/companies/edit';
+import { CLASSIFICATIONS, type MessageClassification } from '@/lib/jobs/email/classify';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
+import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { channelEdit, excitementError, saveApplicationEdit, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import {
   changedRoleFacts,
   factWrites,
@@ -370,24 +402,9 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (payGiven) changed.push('the pay');
 
   if (given(args, 'description')) {
-    // As the role page saves a pasted description: its hash, its source, the
-    // requirements read from it, and the pay band when it names one and this
-    // call sets none by hand.
+    // As the role page saves a pasted description (lib/jobs/roles/edit.ts).
     const description = clearable(args, 'description', DESCRIPTION_MAX);
-    update.jd_text = description;
-    update.jd_hash = description ? jdHash(description) : null;
-    update.jd_source = description ? 'manual' : null;
-    update.jd_lookup_note = null;
-    update.requirements = description ? extractRequirements(description) : null;
-    update.requirements_extracted_at = description ? new Date().toISOString() : null;
-    if (description && !given(args, 'pay_min') && !given(args, 'pay_max')) {
-      const band = extractCompBand(description);
-      if (band) {
-        update.comp_min_cents = band.minCents;
-        update.comp_max_cents = band.maxCents;
-        update.comp_source = 'posted';
-      }
-    }
+    Object.assign(update, descriptionUpdate(description, given(args, 'pay_min') || given(args, 'pay_max')).update);
     changed.push('the description');
   }
 
@@ -428,16 +445,9 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       );
     }
 
-    const { data, error } = await env.jobs
-      .from('roles')
-      .update(update)
-      .eq('id', id)
-      .eq('user_id', env.userId)
-      .select('*')
-      .single();
-    if (error?.code === '23505') {
-      throw new JobsRefused('That company already has this same posting. The two can be merged from the company page.');
-    }
+    // The same write as the role page's edit, rename and move.
+    const { row: data, error } = await saveRoleEdit(factsDb, env.userId, id, update);
+    if (error?.code === '23505') throw new JobsRefused(error.message);
     if (error || !data) throw new Error(`Changing the role failed: ${error?.message ?? 'no row'}`);
 
     try {
@@ -500,12 +510,12 @@ async function namedApplication(env: JobsWriteEnv, args: Args): Promise<Row> {
 async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = await namedApplication(env, args);
   const id = before.id as string;
-  const update: Row = {};
+  const update: ApplicationEdit = {};
   const changed: string[] = [];
 
   if (given(args, 'excitement')) {
     const value = args.excitement === 0 ? null : args.excitement;
-    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 5)) {
+    if (value !== null && (typeof value !== 'number' || excitementError(value))) {
       throw new JobsRefused('excitement runs from 1 to 5, or 0 to clear it.');
     }
     update.excitement = value;
@@ -520,8 +530,7 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
       referral = contact.id as string;
     }
     // As the page sets it: any channel but a referral clears who referred them.
-    update.source = channel;
-    update.referral_contact_id = referral;
+    Object.assign(update, channelEdit(channel, referral));
     changed.push(`set how they applied to ${SOURCE_LABELS[channel]}`);
   } else if (given(args, 'referral_contact_ref')) {
     throw new JobsRefused('referral_contact_ref goes with channel "referral".');
@@ -558,14 +567,10 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     throw new JobsRefused('Nothing to change: give excitement, channel, ready_to_apply, all_questions_added or has_cover_letter.');
   }
 
-  const { data, error } = await env.jobs
-    .from('applications')
-    .update(update)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Changing the application failed: ${error?.message ?? 'no row'}`);
+  // The same write as the pipeline's pickers and the role page's marks.
+  const saved = await saveApplicationEdit(env.jobs as unknown as AppSupabaseClient, env.userId, id, update);
+  if (saved.error) throw new Error(`Changing the application failed: ${saved.error}`);
+  const data = await ownRow(env.jobs, 'applications', id, env.userId, 'application');
 
   const roleId = before.role_id as string;
   const role = await ownRow(env.jobs, 'roles', roleId, env.userId, 'role');
@@ -592,7 +597,7 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
 const QUESTIONS = 'job_search.questions';
 const ANSWERS = 'job_search.application_answers';
 const MATERIAL_HREF = '/jobs/material';
-const ANSWER_STATUSES = ['draft', 'approved', 'submitted'] as const;
+const CONSIDERATIONS_MAX = 10;
 const QUESTIONS_MAX = 30;
 const QUESTION_MAX = 2000;
 const ANSWER_MAX = 20_000;
@@ -766,7 +771,7 @@ async function ownEvidence(env: JobsWriteEnv, value: unknown): Promise<string[]>
 async function saveAnswer(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = await namedAnswer(env, args);
   const id = before.id as string;
-  const update: Row = {};
+  const update: AnswerEdit = {};
 
   if (given(args, 'answer')) {
     const answer = clearable(args, 'answer', ANSWER_MAX);
@@ -790,30 +795,29 @@ async function saveAnswer(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     if (claims.length > CLAIMS_MAX) throw new JobsRefused(`Up to ${CLAIMS_MAX} unsupported claims.`);
     update.unsupported_claims = claims;
   }
-  if (Object.keys(update).length === 0) throw new JobsRefused('Nothing to change: give answer, status, evidence_refs or unsupported_claims.');
+  if (given(args, 'considerations')) {
+    // How to approach the question, re-read before submitting, as a kept draft has.
+    const notes = Array.isArray(args.considerations)
+      ? args.considerations.map((note) => (typeof note === 'string' ? note.trim() : '')).filter(Boolean)
+      : null;
+    if (!notes) throw new JobsRefused('considerations must be a list of short notes on how to approach the question.');
+    if (notes.length > CONSIDERATIONS_MAX) throw new JobsRefused(`Up to ${CONSIDERATIONS_MAX} considerations.`);
+    update.considerations = notes;
+  }
+  if (Object.keys(update).length === 0) {
+    throw new JobsRefused('Nothing to change: give answer, status, evidence_refs, unsupported_claims or considerations.');
+  }
   if (update.answer === undefined && (typeof before.answer !== 'string' || !before.answer.trim()) && status && status !== 'draft') {
     throw new JobsRefused('That question has no answer yet, so it cannot be approved or submitted. Give the answer too.');
   }
 
-  const { data, error } = await env.jobs
-    .from('application_answers')
-    .update(update)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Saving the answer failed: ${error?.message ?? 'no row'}`);
+  // The same write as the role page's Save and Keep this draft.
+  const { row: data, error } = await saveAnswerEdit(jobsDb(env), env.userId, id, update);
+  if (error || !data) throw new Error(`Saving the answer failed: ${error ?? 'no row'}`);
 
-  // Best effort, as the page's: a use count that did not tick is no reason to lose the answer.
+  // Only the evidence newly cited counts as used again, so saving twice does not wear a story out.
   const added = evidence.filter((item) => !(Array.isArray(before.evidence_item_ids) && before.evidence_item_ids.includes(item)));
-  if (added.length > 0) {
-    try {
-      const { error: bumpError } = await env.jobs.rpc('bump_evidence_use', { item_ids: added });
-      if (bumpError) console.error('save_answer: counting the evidence used failed', bumpError);
-    } catch (bumpError) {
-      console.error('save_answer: counting the evidence used failed', bumpError);
-    }
-  }
+  await countEvidenceUse(jobsDb(env), added);
 
   const question = await ownRow(env.jobs, 'questions', before.question_id as string, env.userId, 'question');
   const application = await ownRow(env.jobs, 'applications', before.application_id as string, env.userId, 'application');
@@ -859,14 +863,8 @@ async function setDefaultAnswer(env: JobsWriteEnv, args: Args): Promise<JobsMade
   if (!answer) throw new JobsRefused(answerRef && !given(args, 'answer') ? 'That answer is empty, so there is nothing to reuse. Give the words in answer.' : 'Give the answer\'s words.');
 
   const id = question.id as string;
-  const { data, error } = await env.jobs
-    .from('questions')
-    .update({ canonical_answer: answer, canonical_answer_updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Setting the default answer failed: ${error?.message ?? 'no row'}`);
+  const { row: data, error } = await setCanonicalAnswer(jobsDb(env), env.userId, id, answer);
+  if (error || !data) throw new Error(`Setting the default answer failed: ${error ?? 'no row'}`);
 
   const line = `"${questionLine(question.text)}"`;
   return {
@@ -959,7 +957,6 @@ export async function undoApplicationQuestions(
 
 const COMPANIES = 'job_search.companies';
 const PRIORITIES = ['target', 'interested', 'backup', 'passed'] as const;
-const COMPANY_NAME_MAX = 120;
 const RESEARCH_MAX = 20_000;
 const LINK_MAX = 2000;
 
@@ -990,14 +987,7 @@ async function namedCompany(env: JobsWriteEnv, args: Args): Promise<Row> {
 function domainsOf(value: unknown): string[] {
   const entries = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[\s,]+/) : null;
   if (entries === null && value !== null) throw new JobsRefused('domains must be text or a list of domains, such as "acme.com".');
-  return [
-    ...new Set(
-      (entries ?? [])
-        .filter((entry): entry is string => typeof entry === 'string')
-        .map((entry) => entry.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))
-        .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(entry)),
-    ),
-  ];
+  return normalisedDomains((entries ?? []).filter((entry): entry is string => typeof entry === 'string'));
 }
 
 /** The fields change_company sets, by argument, with the column and the words for each. */
@@ -1030,19 +1020,10 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     const name = text(args, 'name');
     if (!name) throw new JobsRefused('A company needs a name: give the new one, or leave name out.');
     if (name.length > COMPANY_NAME_MAX) throw new JobsRefused(`Keep the name under ${COMPANY_NAME_MAX} characters.`);
-    const slug = slugify(name);
-    const { data: clash, error } = await env.jobs
-      .from('companies')
-      .select('id, name')
-      .eq('user_id', env.userId)
-      .eq('slug', slug)
-      .neq('id', id)
-      .maybeSingle();
-    if (error) throw new Error(`Checking the name failed: ${error.message}`);
-    if (clash) throw new JobsRefused(`They already have a company called ${(clash as Row).name as string}.`);
+    const rename = await renameUpdate(env.jobs as unknown as AppSupabaseClient, env.userId, id, name);
+    if (rename.error !== null) throw new JobsRefused(rename.error.replace(/^You already have/, 'They already have'));
     if (name !== before.name) {
-      update.name = name;
-      update.slug = slug;
+      Object.assign(update, rename.update);
       changed.push(`the name, to ${name}`);
     }
   }
@@ -1063,13 +1044,8 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 
   if (Object.keys(update).length === 0) throw new JobsRefused('Nothing to change: give at least one field with its new value.');
 
-  const { data, error } = await env.jobs
-    .from('companies')
-    .update(update)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
+  // The same write as the company page's fields and its rename.
+  const { row: data, error } = await saveCompanyEdit(env.jobs as unknown as AppSupabaseClient, env.userId, id, update);
   if (error?.code === '23505') throw new JobsRefused('They already have a company by that name.');
   if (error || !data) throw new Error(`Changing the company failed: ${error?.message ?? 'no row'}`);
 
@@ -1610,7 +1586,7 @@ async function namedEmail(env: JobsWriteEnv, ref: string): Promise<Row> {
 async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = await ownRow(env.jobs, 'reminders', idOf(text(args, 'reminder_ref'), 'reminder'), env.userId, 'reminder');
   const id = before.id as string;
-  const update: Row = {};
+  const update: ReminderEdit = {};
   const changed: string[] = [];
 
   if (args.finish === true && given(args, 'put_off')) throw new JobsRefused('Finish it or put it off, not both.');
@@ -1646,7 +1622,7 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
       changed.push('unlinked from its email');
     } else {
       const email = await namedEmail(env, ref);
-      update.ingested_message_id = email.id;
+      update.ingested_message_id = email.id as string;
       changed.push(`linked to the email ${quotedBody(email.subject, 'with no subject')}`);
     }
   }
@@ -1655,16 +1631,10 @@ async function changeReminder(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
     throw new JobsRefused('Nothing to change: give finish, put_off, body, due or email_ref.');
   }
 
-  const { data, error } = await env.jobs
-    .from('reminders')
-    .update(update)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Changing the reminder failed: ${error?.message ?? 'no row'}`);
+  // The same write as Jobs Today's Done and Later and the timeline's edit and link.
+  const { row: after, error } = await saveReminderEdit(jobsDb(env), env.userId, id, update);
+  if (error || !after) throw new Error(`Changing the reminder failed: ${error ?? 'no row'}`);
 
-  const after = data as Row;
   const role = await applicationRole(env, before.application_id);
   const was = quotedBody(before.body, 'reminder');
   const said = listed(changed);
@@ -1722,20 +1692,16 @@ async function changeWaiting(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 
   const later = verb === 'finish' ? null : putOffUntil(env, args.until, 'until');
   const until = later?.at ?? null;
-  const { data, error } = before
-    ? await env.jobs
-        .from('waiting_dismissals')
-        .update({ dismissed_until: until })
-        .eq('id', before.id as string)
-        .eq('user_id', env.userId)
-        .select('*')
-        .single()
-    : await env.jobs
-        .from('waiting_dismissals')
-        .insert({ user_id: env.userId, application_event_id: eventId, dismissed_until: until })
-        .select('*')
-        .single();
-  if (error || !data) throw new Error(`Changing the waiting row failed: ${error?.message ?? 'no row'}`);
+  // The same write as Jobs Today's Done and Later on the row.
+  const { error } = await setWaitingDismissal(jobsDb(env), env.userId, eventId, until);
+  if (error) throw new Error(`Changing the waiting row failed: ${error}`);
+  const { data, error: afterError } = await env.jobs
+    .from('waiting_dismissals')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('application_event_id', eventId)
+    .maybeSingle();
+  if (afterError || !data) throw new Error(`Reading the waiting row failed: ${afterError?.message ?? 'no row'}`);
 
   const after = data as Row;
   const role = await applicationRole(env, event.application_id);
@@ -1829,14 +1795,11 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
       },
     );
 
+  // The same writes as the role page's mail tab and the review queue's link (lib/jobs/inbox/role-mail.ts).
   const markDeclined = async () => {
-    const { data, error } = await env.jobs
-      .from('message_link_dismissals')
-      .upsert({ user_id: env.userId, application_id: applicationId, message_id: messageId }, { onConflict: 'application_id,message_id' })
-      .select('id')
-      .single();
-    if (error || !data) throw new Error(`Remembering the decline failed: ${error?.message ?? 'no row'}`);
-    return (data as Row).id as string;
+    const { id, error } = await declineMessageForApplication(jobsDb(env), env.userId, applicationId, messageId);
+    if (error || !id) throw new Error(`Remembering the decline failed: ${error ?? 'no row'}`);
+    return id;
   };
 
   let summary: string;
@@ -1862,80 +1825,30 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
       throw new JobsRefused('That email is linked to another role. Unlink it from there first, then link it here.');
     }
     undo.message_before = pickLink(message);
-    const linked = {
-      resulting_application_id: applicationId,
-      parse_status: 'parsed',
-      link_method: 'manual',
-      link_confidence: 1,
-      error: null,
-    };
-    const { error } = await env.jobs.from('ingested_messages').update(linked).eq('id', messageId);
-    if (error) throw new Error(`Linking the email failed: ${error.message}`);
-    undo.message_after = linked;
-    try {
-      const kind = eventKindFor(email.classification as MessageClassification);
-      if (kind) {
-        const conflict = handLinkedEventNeedsReview(application.status as ApplicationStatus, kind);
-        const { data: event, error: eventError } = await env.jobs
-          .from('application_events')
-          .insert({
-            user_id: env.userId,
-            application_id: applicationId,
-            kind,
-            occurred_at: typeof email.received_at === 'string' ? email.received_at : new Date().toISOString(),
-            source: 'email',
-            ingested_message_id: messageId,
-            summary: typeof email.subject === 'string' && email.subject ? email.subject : 'Linked by hand',
-            needs_review: conflict,
-          })
-          .select('id')
-          .single();
-        if (eventError || !event) throw new Error(`Filing the email on the timeline failed: ${eventError?.message ?? 'no row'}`);
-        undo.events_added.push((event as Row).id as string);
-        if (kind === 'interview_scheduled') {
-          const round = await ensureInterviewRound(env.jobs as unknown as AppSupabaseClient, { userId: env.userId, applicationId, kind: null });
-          if (round) undo.interview_added = { interview_id: round.interviewId, group_id: round.groupCreated ? round.groupId : null };
-        }
-      }
-    } catch (error) {
-      return backOut(error, 'link');
-    }
+    const linked = await linkMessageToApplication(jobsDb(env), env.userId, {
+      id: messageId,
+      classification: email.classification,
+      received_at: email.received_at,
+      subject: email.subject,
+    }, { id: applicationId, status: application.status });
+    if (!linked.linked) throw new Error(`Linking the email failed: ${linked.error}`);
+    undo.message_after = { resulting_application_id: applicationId, ...LINKED_BY_HAND };
+    if (linked.eventId) undo.events_added.push(linked.eventId);
+    if (linked.round) undo.interview_added = { interview_id: linked.round.interviewId, group_id: linked.round.groupCreated ? linked.round.groupId : null };
+    if (linked.error) return backOut(new Error(linked.error), 'link');
     summary = `Dash linked ${subject} to the role${onRole}.`;
     verb = 'Linked';
     rest = onRole;
   } else {
     if (message.resulting_application_id !== applicationId) throw new JobsRefused('That email is not linked to this role, so there is nothing to unlink.');
     undo.message_before = pickLink(message);
-    const { data: events, error: eventsError } = await env.jobs
-      .from('application_events')
-      .select('*')
-      .eq('ingested_message_id', messageId)
-      .eq('application_id', applicationId)
-      .eq('user_id', env.userId);
-    if (eventsError) throw new Error(`Reading the timeline failed: ${eventsError.message}`);
     // Events first, as the page does: a failure leaves the link whole.
-    const { error: deleteError } = await env.jobs
-      .from('application_events')
-      .delete()
-      .eq('ingested_message_id', messageId)
-      .eq('application_id', applicationId)
-      .eq('user_id', env.userId);
-    if (deleteError) throw new Error(`Taking the email off the timeline failed: ${deleteError.message}`);
-    undo.events_removed = (events ?? []) as Row[];
-    const unlinked = {
-      resulting_application_id: null,
-      parse_status: 'needs_review',
-      link_method: null,
-      link_confidence: null,
-      error: 'Unlinked by hand from the role page.',
-    };
-    try {
-      const { error } = await env.jobs.from('ingested_messages').update(unlinked).eq('id', messageId);
-      if (error) throw new Error(`Unlinking the email failed: ${error.message}`);
-      undo.message_after = unlinked;
-      undo.dismissal_added = await markDeclined();
-    } catch (error) {
-      return backOut(error, 'unlink');
+    const unlinked = await unlinkMessageFromApplication(jobsDb(env), env.userId, applicationId, messageId);
+    undo.events_removed = unlinked.eventsRemoved;
+    if (unlinked.unlinked) undo.message_after = { ...UNLINKED_BY_HAND };
+    undo.dismissal_added = unlinked.dismissalId;
+    if (unlinked.error || !unlinked.dismissalId) {
+      return backOut(new Error(`Unlinking the email failed: ${unlinked.error ?? 'the decline was not kept'}`), 'unlink');
     }
     summary = `Dash took ${subject} off the role${onRole}; it is back in the review queue.`;
     verb = 'Unlinked';
@@ -2091,8 +2004,9 @@ async function reviewApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
   if (verb === 'confirm') {
     if (given(args, 'status')) throw new JobsRefused('status goes with reopen.');
     if (before.needs_review !== true) throw new JobsRefused('That application is not waiting to be confirmed.');
-    const { error } = await env.jobs.from('applications').update({ needs_review: false }).eq('id', id).eq('user_id', env.userId);
-    if (error) throw new Error(`Confirming the application failed: ${error.message}`);
+    // The same write as the review queue's Confirm.
+    const { error } = await confirmApplicationRow(jobsDb(env), env.userId, id);
+    if (error) throw new Error(`Confirming the application failed: ${error}`);
     undo.updated.push({ table: APPLICATIONS, id, before: { needs_review: true }, after: { needs_review: false } });
   } else {
     const status = oneOf(args, 'status', REOPEN_STATUSES, false) as (typeof REOPEN_STATUSES)[number];
@@ -2101,26 +2015,9 @@ async function reviewApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
     }
     label = status.replace(/_/g, ' ');
     // As the page reopens one: the event says so on the timeline, and the override sets the stage.
-    const { data: event, error: eventError } = await env.jobs
-      .from('application_events')
-      .insert({
-        user_id: env.userId,
-        application_id: id,
-        kind: 'status_override',
-        occurred_at: new Date().toISOString(),
-        source: 'manual',
-        summary: `Reopened by hand as ${label}`,
-        payload: { status },
-      })
-      .select('id')
-      .single();
-    if (eventError || !event) throw new Error(`Recording the reopen failed: ${eventError?.message ?? 'no row'}`);
-    undo.inserted.push({ table: 'job_search.application_events', id: (event as Row).id as string });
-    const { error } = await env.jobs.from('applications').update({ status_manual_override: status }).eq('id', id).eq('user_id', env.userId);
-    if (error) {
-      await env.jobs.from('application_events').delete().eq('id', (event as Row).id as string).eq('user_id', env.userId);
-      throw new Error(`Reopening the application failed: ${error.message}`);
-    }
+    const { eventId, error } = await reopenApplicationRows(jobsDb(env), env.userId, id, status);
+    if (error || !eventId) throw new Error(`Reopening the application failed: ${error ?? 'no event'}`);
+    undo.inserted.push({ table: 'job_search.application_events', id: eventId });
     undo.updated.push({
       table: APPLICATIONS,
       id,
@@ -2173,15 +2070,11 @@ async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   }
 
   const changed = events.map((row) => row.id as string);
-  const set = verb === 'acknowledge' ? { needs_review: false, acknowledged_at: new Date().toISOString() } : { needs_review: true, acknowledged_at: null };
-  const { data: written, error } = await env.jobs
-    .from('application_events')
-    .update(set)
-    .in('id', changed)
-    .eq('user_id', env.userId)
-    .select('*');
-  if (error) throw new Error(`Changing the events failed: ${error.message}`);
-  const afterById = new Map(((written ?? []) as Row[]).map((row) => [row.id as string, row]));
+  // The same writes as the review queue's acknowledge and its Undo.
+  const { rows: written, error } =
+    verb === 'acknowledge' ? await acknowledgeEventRows(jobsDb(env), env.userId, changed) : await unacknowledgeEventRows(jobsDb(env), env.userId, changed);
+  if (error) throw new Error(`Changing the events failed: ${error}`);
+  const afterById = new Map(written.map((row) => [row.id as string, row]));
 
   // Matched on acknowledged_at alone: the sync trigger may re-derive the flag, and the stamp is what this wrote.
   const undo: RowsUndo = {
@@ -2189,7 +2082,7 @@ async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       table: 'job_search.application_events',
       id: row.id as string,
       before: { needs_review: row.needs_review, acknowledged_at: row.acknowledged_at ?? null },
-      after: { acknowledged_at: afterById.get(row.id as string)?.acknowledged_at ?? set.acknowledged_at },
+      after: { acknowledged_at: afterById.get(row.id as string)?.acknowledged_at ?? null },
     })),
     inserted: [],
   };
@@ -2237,7 +2130,6 @@ async function reviewEvents(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
  * job_search.inbox_messages, which carries it, as change_role_email does.
  */
 const MESSAGE_COLUMNS = ['classification', 'parse_status', 'resulting_application_id', 'link_method', 'link_confidence', 'error'] as const;
-const DISMISSED = { classification: 'not_relevant', parse_status: 'skipped', resulting_application_id: null, link_method: null, link_confidence: null, error: null };
 const EMAILS_MAX = 50;
 const pickMessage = (row: Row): Row => Object.fromEntries(MESSAGE_COLUMNS.map((column) => [column, row[column] ?? null]));
 
@@ -2284,10 +2176,12 @@ async function reviewEmails(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const undo: RowsUndo = { updated: [], inserted: [] };
   let firstAfter: Row | null = null;
   for (const row of emails) {
-    const set: Row = verb === 'dismiss' ? DISMISSED : { parse_status: 'needs_review', ...(classification ? { classification } : {}) };
-    const { data, error } = await env.jobs.from('ingested_messages').update(set).eq('id', row.id as string).select('*');
-    if (error) throw new Error(`Changing the email failed: ${error.message}`);
-    const after = ((data ?? []) as Row[])[0];
+    // The same writes as the review queue's d key, bulk bar and its Undo.
+    const set: Row = { parse_status: 'needs_review', ...(classification ? { classification } : {}) };
+    const { rows: written, error } =
+      verb === 'dismiss' ? await dismissMessageRows(jobsDb(env), [row.id as string]) : await restoreMessageRow(jobsDb(env), row.id as string, set);
+    if (error) throw new Error(`Changing the email failed: ${error}`);
+    const after = written[0];
     if (!after) continue;
     firstAfter ??= after;
     undo.updated.push({ table: MESSAGES, id: row.id as string, before: pickMessage(row), after: pickMessage(after) });
@@ -2400,27 +2294,12 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
 
   // Recruiter inbound only when the recruiter wrote first, as the page decides.
   const channel = channelForMessage(email.classification as string | null);
-  let role: Row;
-  try {
-    const { data: madeRole, error: roleError } = await env.jobs
-      .from('roles')
-      .insert({ user_id: env.userId, company_id: companyId, title, source: channel })
-      .select('*')
-      .single();
-    if (roleError || !madeRole) throw new Error(`Adding the role failed: ${roleError?.message ?? 'no row'}`);
-    role = madeRole as Row;
-    undo.role_id = role.id as string;
-    const { data: application, error: applicationError } = await env.jobs
-      .from('applications')
-      // A person read the email and said this is a real pursuit, so it is not an inferred one.
-      .insert({ user_id: env.userId, role_id: role.id as string, source: channel, created_by: 'manual' })
-      .select('id')
-      .single();
-    if (applicationError || !application) throw new Error(`Adding the application failed: ${applicationError?.message ?? 'no row'}`);
-    undo.application_id = (application as Row).id as string;
-  } catch (error) {
-    return backOut(error);
-  }
+  // The same pursuit as the review queue's "new role" makes; it takes its own role back when the application fails.
+  const made = await addPursuitFromMail(jobsDb(env), env.userId, { companyId, title, channel });
+  if (made.error || !made.role || !made.applicationId) return backOut(new Error(`Adding the role failed: ${made.error ?? 'no row'}`));
+  const role = made.role;
+  undo.role_id = role.id as string;
+  undo.application_id = made.applicationId;
 
   const linked = await runJobsWrite(changeRoleEmailWrite(), env, { action: 'link', application_ref: undo.application_id, email_ref: messageId });
   if ('ok' in linked) return backOut(new Error(`Linking the email failed: ${linked.error}`));
@@ -2616,8 +2495,7 @@ const CONTACTS = 'job_search.contacts';
 const TOUCHES = 'job_search.contact_touches';
 const SUGGESTIONS = 'job_search.suggestions';
 
-const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
-const TOUCH_CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+const RELATIONSHIPS = CONTACT_RELATIONSHIPS;
 const DIRECTIONS = ['outbound', 'inbound'] as const;
 const NAME_MAX = 200;
 const NOTES_MAX = 20_000;
@@ -2689,11 +2567,12 @@ async function changeContact(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     if (Object.keys(update).length === 0) {
       throw new JobsRefused('Nothing to change: give full_name, title, company, linkedin_url, email, relationship, how_we_connect, notes, potential_lead or found_by_dash, with a new value.');
     }
-    const written = await changeKept(env, undo, 'contacts', before, update);
+    // The same writes as the contact page's fields and the Add contact form.
+    const written = await changedBy(undo, 'contacts', before, update, saveContactEdit(jobsDb(env), env.userId, before.id as string, update));
     if (!written) throw new Error('Changing the contact failed: no row');
     after = written;
   } else {
-    after = await addKept(env, undo, 'contacts', { relationship: 'cold', ...values });
+    after = await addedBy(undo, 'contacts', addContact(jobsDb(env), env.userId, values));
   }
 
   const id = after.id as string;
@@ -2752,12 +2631,35 @@ async function changeKept(env: JobsWriteEnv, undo: ContactRowsUndo, table: strin
   return written;
 }
 
-async function addKept(env: JobsWriteEnv, undo: ContactRowsUndo, table: string, values: Row): Promise<Row> {
-  const { data, error } = await env.jobs.from(table).insert({ user_id: env.userId, ...values }).select('*').single();
-  if (error || !data) throw new Error(`Adding to ${table} failed: ${error?.message ?? 'no row'}`);
-  undo.added.push({ table, id: (data as Row).id as string });
-  return data as Row;
+/** A row a shared write changed, kept with the columns it wrote before and after. */
+async function changedBy(
+  undo: ContactRowsUndo,
+  table: string,
+  row: Row,
+  update: Row,
+  write: Promise<{ row: Row | null; error: string | null }>,
+): Promise<Row | null> {
+  const { row: written, error } = await write;
+  if (error) throw new Error(`Changing ${table} failed: ${error}`);
+  if (!written) return null;
+  undo.changed.push({
+    table,
+    id: row.id as string,
+    before: Object.fromEntries(Object.keys(update).map((column) => [column, row[column] ?? null])),
+    after: Object.fromEntries(Object.keys(update).map((column) => [column, written[column] ?? null])),
+  });
+  return written;
 }
+
+/** A row a shared write added, kept so the Undo takes it out. */
+async function addedBy(undo: ContactRowsUndo, table: string, write: Promise<{ row: Row | null; error: string | null }>): Promise<Row> {
+  const { row, error } = await write;
+  if (error || !row) throw new Error(`Adding to ${table} failed: ${error ?? 'no row'}`);
+  undo.added.push({ table, id: row.id as string });
+  return row;
+}
+
+const jobsDb = (env: JobsWriteEnv) => env.jobs as unknown as AppSupabaseClient;
 
 /** A failed write of several rows puts back what it had done, then fails. */
 async function backOutContact(env: JobsWriteEnv, undo: ContactRowsUndo, error: unknown, kind: string): Promise<never> {
@@ -2787,7 +2689,9 @@ const CHANNEL_WORDS: Record<string, string> = {
  */
 async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const action = text(args, 'action');
-  if (action !== 'log' && action !== 'edit' && action !== 'answered') throw new JobsRefused('action must be log, edit or answered.');
+  if (action !== 'log' && action !== 'edit' && action !== 'sent' && action !== 'answered') {
+    throw new JobsRefused('action must be log, edit, sent or answered.');
+  }
   const undo: ContactRowsUndo = { added: [], changed: [] };
 
   let touch: Row;
@@ -2798,22 +2702,23 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     const channel = given(args, 'channel') ? oneOf(args, 'channel', TOUCH_CHANNELS, false) : 'other';
     const direction = given(args, 'direction') ? oneOf(args, 'direction', DIRECTIONS, false) : 'outbound';
     const message = given(args, 'message') ? clearable(args, 'message', MESSAGE_MAX) : null;
+    if (given(args, 'draft') && typeof args.draft !== 'boolean') throw new JobsRefused('draft is true or false.');
+    const draft = args.draft === true;
     let applicationId: string | null = null;
     if (text(args, 'application_ref')) {
       const application = await ownRow(env.jobs, 'applications', idOf(text(args, 'application_ref'), 'application'), env.userId, 'application');
       applicationId = application.id as string;
     }
-    touch = await addKept(env, undo, 'contact_touches', {
-      contact_id: contact.id,
-      application_id: applicationId,
-      channel,
-      direction,
-      message,
-      sent_at: new Date().toISOString(),
-    });
-    if (direction === 'outbound') {
+    // The same writes as the log's Log a send.
+    touch = await addedBy(
+      undo,
+      'contact_touches',
+      addTouch(jobsDb(env), env.userId, { contact_id: contact.id as string, application_id: applicationId, channel: channel as string, direction: direction as 'outbound' | 'inbound', message, draft }),
+    );
+    // A draft is no send, so it moves nobody along.
+    if (direction === 'outbound' && !draft) {
       try {
-        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'connected'] });
+        await changedBy(undo, 'contacts', contact, { status: 'contacted' }, markContacted(jobsDb(env), env.userId, contact.id as string));
       } catch (error) {
         return backOutContact(env, undo, error, 'change_touch');
       }
@@ -2828,18 +2733,35 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       if (given(args, 'message')) update.message = clearable(args, 'message', MESSAGE_MAX);
       const changed = Object.fromEntries(Object.entries(update).filter(([key, value]) => before[key] !== value));
       if (Object.keys(changed).length === 0) throw new JobsRefused('Nothing to change: give a new channel or message.');
-      const written = await changeKept(env, undo, 'contact_touches', before, changed);
+      const written = await changedBy(undo, 'contact_touches', before, changed, saveTouchEdit(jobsDb(env), env.userId, before.id as string, changed));
       if (!written) throw new Error('Changing the touch failed: no row');
       touch = written;
+    } else if (action === 'sent') {
+      // As the log's Mark sent on a draft: it takes now as its sent time.
+      if (before.draft !== true) throw new JobsRefused('That touch is sent already; only a draft can be marked sent.');
+      const update = { sent_at: new Date().toISOString(), draft: false };
+      const written = await changedBy(undo, 'contact_touches', before, update, markDraftSent(jobsDb(env), env.userId, before.id as string));
+      if (!written) throw new JobsRefused('That draft was sent or taken out while this ran.');
+      touch = written;
+      if (written.direction === 'outbound') {
+        try {
+          await changedBy(undo, 'contacts', contact, { status: 'contacted' }, markContacted(jobsDb(env), env.userId, contact.id as string));
+        } catch (error) {
+          return backOutContact(env, undo, error, 'change_touch');
+        }
+      }
     } else {
       if (before.draft === true) throw new JobsRefused('That touch is a draft that has not been sent, so nothing can have answered it.');
       if (before.responded_at) throw new JobsRefused('That touch is marked answered already.');
       const summary = given(args, 'response') ? clearable(args, 'response', MESSAGE_MAX) : null;
-      const written = await changeKept(env, undo, 'contact_touches', before, { responded_at: new Date().toISOString(), response_summary: summary });
+      const answered = { responded_at: new Date().toISOString(), response_summary: summary };
+      const written = await changedBy(undo, 'contact_touches', before, answered, answerTouch(jobsDb(env), env.userId, before.id as string, summary));
       if (!written) throw new Error('Marking the touch answered failed: no row');
       touch = written;
       try {
-        if (contact.status !== 'responded') await changeKept(env, undo, 'contacts', contact, { status: 'responded' });
+        if (contact.status !== 'responded') {
+          await changedBy(undo, 'contacts', contact, { status: 'responded' }, saveContactEdit(jobsDb(env), env.userId, contact.id as string, { status: 'responded' }));
+        }
       } catch (error) {
         return backOutContact(env, undo, error, 'change_touch');
       }
@@ -2856,13 +2778,15 @@ async function changeTouch(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
         : `logged ${how} to ${name}`
       : action === 'edit'
         ? `corrected a logged touch with ${name}`
-        : `marked ${name}'s reply to ${how} answered`;
+        : action === 'sent'
+          ? `marked the draft of ${how} to ${name} sent`
+          : `marked ${name}'s reply to ${how} answered`;
   return {
     kind: 'change_touch',
     input: {
-      verb: action === 'log' ? 'Logged' : action === 'edit' ? 'Corrected' : 'Answered',
+      verb: action === 'log' ? 'Logged' : action === 'edit' ? 'Corrected' : action === 'sent' ? 'Marked sent' : 'Answered',
       what: how,
-      rest: action === 'log' ? ` ${touch.direction === 'inbound' ? 'from' : 'to'} ${name}` : ` with ${name}`,
+      rest: action === 'log' || action === 'sent' ? ` ${touch.direction === 'inbound' ? 'from' : 'to'} ${name}` : ` with ${name}`,
       href: contactHref(contactId),
       where: 'Open the contact',
       paths: contactPaths(contactId),
@@ -2922,27 +2846,28 @@ async function markSuggestionSent(env: JobsWriteEnv, args: Args): Promise<JobsMa
             return company.id;
           })
         : null;
-      const source = typeof suggestion.source_url === 'string' ? suggestion.source_url : null;
-      contact = await addKept(env, undo, 'contacts', {
-        company_id: companyId,
-        full_name: suggestion.person_name.trim(),
-        title: suggestion.person_title ?? null,
-        linkedin_url: source && /linkedin\.com\/in\//.test(source) ? source : null,
-        relationship: 'cold',
-        status: 'contacted',
-        notes: source ? `Found by Dash: ${source}` : 'Found by Dash.',
-      });
+      // The same writes as Find's Sent press.
+      contact = await addedBy(undo, 'contacts', addContact(jobsDb(env), env.userId, suggestedContact(suggestion, companyId)));
     }
     if (contact) {
-      await addKept(env, undo, 'contact_touches', {
-        contact_id: contact.id,
-        channel: suggestion.channel ?? 'other',
-        direction: 'outbound',
-        message: suggestion.message ?? null,
-        sent_at: new Date().toISOString(),
-      });
-      if (contact.status === 'to_contact' || contact.status === 'connected' || contact.status === 'dormant') {
-        await changeKept(env, undo, 'contacts', contact, { status: 'contacted' }, { column: 'status', values: ['to_contact', 'connected', 'dormant'] });
+      await addedBy(
+        undo,
+        'contact_touches',
+        addTouch(jobsDb(env), env.userId, {
+          contact_id: contact.id as string,
+          channel: (suggestion.channel as string | null) ?? 'other',
+          direction: 'outbound',
+          message: (suggestion.message as string | null) ?? null,
+        }),
+      );
+      if ((BEFORE_CONTACTED_AGAIN as readonly unknown[]).includes(contact.status)) {
+        await changedBy(
+          undo,
+          'contacts',
+          contact,
+          { status: 'contacted' },
+          markContacted(jobsDb(env), env.userId, contact.id as string, BEFORE_CONTACTED_AGAIN),
+        );
       }
     }
     const closed: Row = { status: 'done', acted_at: new Date().toISOString() };
@@ -3076,9 +3001,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_role',
     runs: sameAs(
-      ['app/jobs/(app)/roles/actions.ts#updateRole', 'app/jobs/(app)/roles/actions.ts#updateRole'],
-      ['app/jobs/(app)/roles/[id]/actions.ts#renameRole', 'app/jobs/(app)/roles/[id]/actions.ts#renameRole'],
-      ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany'],
+      ['app/jobs/(app)/roles/actions.ts#updateRole', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#renameRole', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
     ),
     description:
       "Change a role in their Jobs workspace when they ask: its title, location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
@@ -3118,9 +3043,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_application',
     runs: sameAs(
-      ['app/jobs/(app)/pipeline/actions.ts#setExcitement', 'app/jobs/(app)/pipeline/actions.ts#setExcitement'],
-      ['app/jobs/(app)/pipeline/actions.ts#setChannel', 'app/jobs/(app)/pipeline/actions.ts#setChannel'],
-      ['app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks', 'app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks'],
+      ['app/jobs/(app)/pipeline/actions.ts#setExcitement', 'lib/jobs/applications/edit.ts#saveApplicationEdit'],
+      ['app/jobs/(app)/pipeline/actions.ts#setChannel', 'lib/jobs/applications/edit.ts#saveApplicationEdit'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks', 'lib/jobs/applications/edit.ts#saveApplicationEdit'],
     ),
     description:
       'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, whether all its questions are added, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
@@ -3162,8 +3087,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'save_answer',
     runs: sameAs(
-      ['app/jobs/(app)/roles/actions.ts#saveAnswer', 'app/jobs/(app)/roles/actions.ts#saveAnswer'],
-      ['app/jobs/(app)/roles/actions.ts#saveDraftedAnswer', 'app/jobs/(app)/roles/actions.ts#saveDraftedAnswer'],
+      ['app/jobs/(app)/roles/actions.ts#saveAnswer', 'lib/jobs/answers/edit.ts#saveAnswerEdit'],
+      ['app/jobs/(app)/roles/actions.ts#saveDraftedAnswer', 'lib/jobs/answers/edit.ts#saveAnswerEdit'],
     ),
     description:
       "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. When they ask you to write or rewrite answers, do it in one pass without asking for the words: read the answers and their questions with application_answers (role_ref or application_ref), read their evidence bank with list_rows on job_search.evidence_items and the role's description with open_row on job_search.roles, write each new version, and save each with its own save_answer call in the same reply, passing the ref from application_answers as answer_ref, with the evidence_refs it rests on and any unsupported_claims it makes. Writing rules for a rewrite: plain first-person language in their own voice; shorter than the old version; an answer to \"why this company\" says why the company and why they fit before any story; facts only from the evidence bank, their résumé and the job description, and every claim nothing there backs goes in unsupported_claims. Leave status as draft unless they say otherwise; never mark an answer approved or submitted on your own. Finish by telling them which answers you changed, naming each question. Give only what to change. A single answer can also be named by question with application_ref or role_ref. Nothing is sent to the employer.",
@@ -3178,6 +3103,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         status: { type: 'string', enum: [...ANSWER_STATUSES], description: 'draft, approved when they are happy with it, or submitted once it went in.' },
         evidence_refs: { type: 'array', items: { type: 'string' }, description: 'The job_search.evidence_items refs the answer rests on, replacing those kept.' },
         unsupported_claims: { type: 'array', items: { type: 'string' }, description: 'Claims in the answer nothing on file backs, to check before submitting.' },
+        considerations: { type: 'array', items: { type: 'string' }, description: 'How to approach the question, in short notes they re-read before submitting.' },
       },
       additionalProperties: false,
     },
@@ -3186,7 +3112,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'set_default_answer',
     runs: sameAs(
-      ['app/jobs/(app)/roles/actions.ts#promoteToCanonical', 'app/jobs/(app)/roles/actions.ts#promoteToCanonical'],
+      ['app/jobs/(app)/roles/actions.ts#promoteToCanonical', 'lib/jobs/answers/edit.ts#setCanonicalAnswer'],
     ),
     description:
       "Make an answer the one reused for a question on every application, when they ask, as the role page's Make this my default answer does. Name the question by question_ref (list_rows on job_search.questions), or by answer_ref to reuse that answer's words; answer gives the words instead.",
@@ -3204,8 +3130,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_company',
     runs: sameAs(
-      ['app/jobs/(app)/companies/actions.ts#updateCompany', 'app/jobs/(app)/companies/actions.ts#updateCompany'],
-      ['app/jobs/(app)/companies/actions.ts#renameCompany', 'app/jobs/(app)/companies/actions.ts#renameCompany'],
+      ['app/jobs/(app)/companies/actions.ts#updateCompany', 'lib/jobs/companies/edit.ts#saveCompanyEdit'],
+      ['app/jobs/(app)/companies/actions.ts#renameCompany', 'lib/jobs/companies/edit.ts#saveCompanyEdit'],
     ),
     description:
       "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company. To mark the company of a job already saved as a target, look up the role and pass its company here with priority target.",
@@ -3239,7 +3165,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_company',
-    runs: sameAs(['app/jobs/(app)/companies/actions.ts#addCompany', 'app/jobs/(app)/companies/actions.ts#addCompany']),
+    runs: sameAs(['app/jobs/(app)/companies/actions.ts#addCompany', 'lib/jobs/companies/ensure.ts#ensureCompany']),
     description:
       "Add a company to their Jobs workspace from scratch when they ask, as the companies page's Add company does: by name, with how much they want to work there (priority, interested when they do not say) and any details they gave. A company already on file under that name, domain or job board is refused with its ref; change it with change_company. One company per call. A role at it is add_job_lead, a person there is change_contact.",
     input_schema: {
@@ -3282,10 +3208,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_reminder',
     runs: sameAs(
-      ['app/jobs/(app)/_home/actions.ts#completeReminder', 'app/jobs/(app)/_home/actions.ts#completeReminder'],
-      ['app/jobs/(app)/_home/actions.ts#snoozeReminder', 'app/jobs/(app)/_home/actions.ts#snoozeReminder'],
-      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder', 'app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder'],
-      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage', 'app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage'],
+      ['app/jobs/(app)/_home/actions.ts#completeReminder', 'lib/jobs/today/reminders.ts#saveReminderEdit'],
+      ['app/jobs/(app)/_home/actions.ts#snoozeReminder', 'lib/jobs/today/reminders.ts#saveReminderEdit'],
+      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder', 'lib/jobs/today/reminders.ts#saveReminderEdit'],
+      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage', 'lib/jobs/today/reminders.ts#saveReminderEdit'],
     ),
     description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off to a day as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
     input_schema: {
@@ -3309,8 +3235,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_waiting',
     runs: sameAs(
-      ['app/jobs/(app)/_home/actions.ts#completeWaiting', 'app/jobs/(app)/_home/actions.ts#completeWaiting'],
-      ['app/jobs/(app)/_home/actions.ts#snoozeWaiting', 'app/jobs/(app)/_home/actions.ts#snoozeWaiting'],
+      ['app/jobs/(app)/_home/actions.ts#completeWaiting', 'lib/jobs/today/waiting.ts#setWaitingDismissal'],
+      ['app/jobs/(app)/_home/actions.ts#snoozeWaiting', 'lib/jobs/today/waiting.ts#setWaitingDismissal'],
     ),
     description: `Finish or put off to a day a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
     input_schema: {
@@ -3328,10 +3254,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_role_email',
     runs: sameAs(
-      ['app/jobs/(app)/review/actions.ts#linkMessage', 'lib/jobs/interview/ensure-round.ts#ensureInterviewRound'],
-      ['app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage'],
-      ['app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage'],
-      ['app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage'],
+      ['app/jobs/(app)/review/actions.ts#linkMessage', 'lib/jobs/inbox/role-mail.ts#linkMessageToApplication'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage', 'lib/jobs/inbox/role-mail.ts#unlinkMessageFromApplication'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage', 'lib/jobs/inbox/role-mail.ts#linkMessageToApplication'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage', 'lib/jobs/inbox/role-mail.ts#declineMessageForApplication'],
     ),
     description:
       "Link an email to a role, turn a suggested email down, or take an email off a role it was wrongly linked to, when they ask. link files the email on the role's timeline as the review queue does (an email linked to another role must be unlinked first); decline remembers that the email is not this role's, so it is not suggested again, and leaves the email alone; unlink takes the email and the events it wrote off the role and returns it to the review queue. Name the role by application_ref or role_ref and the email by email_ref.",
@@ -3354,8 +3280,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'review_application',
     runs: sameAs(
-      ['app/jobs/(app)/review/actions.ts#confirmApplication', 'app/jobs/(app)/review/actions.ts#confirmApplication'],
-      ['app/jobs/(app)/review/actions.ts#reopenApplication', 'app/jobs/(app)/review/actions.ts#reopenApplication'],
+      ['app/jobs/(app)/review/actions.ts#confirmApplication', 'lib/jobs/review/verdicts.ts#confirmApplicationRow'],
+      ['app/jobs/(app)/review/actions.ts#reopenApplication', 'lib/jobs/review/verdicts.ts#reopenApplicationRows'],
     ),
     description:
       'Work an application in Jobs review when they ask: confirm one the inbox found as a real pursuit, or reopen a closed one (rejected, withdrawn or gone quiet) as in process or final round, as when a recruiter comes back. Name it by application_ref, or role_ref for the role\'s latest application.',
@@ -3375,9 +3301,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'review_events',
     runs: sameAs(
-      ['app/jobs/(app)/review/actions.ts#acknowledgeEvent', 'app/jobs/(app)/review/actions.ts#acknowledgeEvent'],
-      ['app/jobs/(app)/review/actions.ts#acknowledgeEvents', 'app/jobs/(app)/review/actions.ts#acknowledgeEvents'],
-      ['app/jobs/(app)/review/actions.ts#unacknowledgeEvents', 'app/jobs/(app)/review/actions.ts#unacknowledgeEvents'],
+      ['app/jobs/(app)/review/actions.ts#acknowledgeEvent', 'lib/jobs/review/verdicts.ts#acknowledgeEventRows'],
+      ['app/jobs/(app)/review/actions.ts#acknowledgeEvents', 'lib/jobs/review/verdicts.ts#acknowledgeEventRows'],
+      ['app/jobs/(app)/review/actions.ts#unacknowledgeEvents', 'lib/jobs/review/verdicts.ts#unacknowledgeEventRows'],
     ),
     description: `Acknowledge events flagged in Jobs review when they ask (mail that conflicts with where a pursuit stands, such as an invite after a rejection): each stays on the timeline and the flag clears. take_back flags them again. Up to ${EVENTS_MAX} at a time, named by their job_search.application_events refs, which list_rows on job_search.application_events returns.`,
     input_schema: {
@@ -3394,9 +3320,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'review_emails',
     runs: sameAs(
-      ['app/jobs/(app)/review/actions.ts#dismissMessage', 'app/jobs/(app)/review/actions.ts#dismissMessage'],
-      ['app/jobs/(app)/review/actions.ts#dismissMessages', 'app/jobs/(app)/review/actions.ts#dismissMessages'],
-      ['app/jobs/(app)/review/actions.ts#restoreDismissedMessages', 'app/jobs/(app)/review/actions.ts#restoreDismissedMessages'],
+      ['app/jobs/(app)/review/actions.ts#dismissMessage', 'lib/jobs/review/verdicts.ts#dismissMessageRows'],
+      ['app/jobs/(app)/review/actions.ts#dismissMessages', 'lib/jobs/review/verdicts.ts#dismissMessageRows'],
+      ['app/jobs/(app)/review/actions.ts#restoreDismissedMessages', 'lib/jobs/review/verdicts.ts#restoreMessageRow'],
     ),
     description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
     input_schema: {
@@ -3418,8 +3344,8 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_contact',
     runs: sameAs(
-      ['app/jobs/(app)/contacts/actions.ts#createContact', 'app/jobs/(app)/contacts/actions.ts#createContact'],
-      ['app/jobs/(app)/contacts/actions.ts#updateContact', 'app/jobs/(app)/contacts/actions.ts#updateContact'],
+      ['app/jobs/(app)/contacts/actions.ts#createContact', 'lib/jobs/contacts/edit.ts#addContact'],
+      ['app/jobs/(app)/contacts/actions.ts#updateContact', 'lib/jobs/contacts/edit.ts#saveContactEdit'],
     ),
     description:
       "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words), notes, and whether they are a potential lead. An agent that finds people for them marks each one found_by_dash, marks it potential_lead when it could lead to a job, and says in notes why it picked them. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
@@ -3445,19 +3371,20 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_touch',
     runs: sameAs(
-      ['app/jobs/(app)/contacts/actions.ts#logTouch', 'app/jobs/(app)/contacts/actions.ts#logTouch'],
-      ['app/jobs/(app)/contacts/actions.ts#updateTouch', 'app/jobs/(app)/contacts/actions.ts#updateTouch'],
-      ['app/jobs/(app)/contacts/actions.ts#markTouchSent', 'app/jobs/(app)/contacts/actions.ts#markTouchSent'],
-      ['app/jobs/(app)/contacts/actions.ts#markTouchAnswered', 'app/jobs/(app)/contacts/actions.ts#markTouchAnswered'],
+      ['app/jobs/(app)/contacts/actions.ts#logTouch', 'lib/jobs/contacts/edit.ts#addTouch'],
+      ['app/jobs/(app)/contacts/actions.ts#updateTouch', 'lib/jobs/contacts/edit.ts#saveTouchEdit'],
+      ['app/jobs/(app)/contacts/actions.ts#markTouchSent', 'lib/jobs/contacts/edit.ts#markDraftSent'],
+      ['app/jobs/(app)/contacts/actions.ts#markTouchAnswered', 'lib/jobs/contacts/edit.ts#answerTouch'],
     ),
     description:
-      "Keep the outreach log on a contact when they ask: log that they reached out to someone or heard from them (log; a message they sent moves the contact from to-contact to contacted), correct a logged touch's channel or words (edit), or mark one answered with what came back (answered; the contact moves to responded). This records what they did; nothing is sent. Touches are listed by list_rows on job_search.contact_touches.",
+      "Keep the outreach log on a contact when they ask: log that they reached out to someone or heard from them (log; a message they sent moves the contact from to-contact to contacted; with draft true it is kept as a draft and moves nothing), correct a logged touch's channel or words (edit), mark a draft sent now (sent), or mark one answered with what came back (answered; the contact moves to responded). This records what they did; nothing is sent. Touches are listed by list_rows on job_search.contact_touches.",
     input_schema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['log', 'edit', 'answered'], description: 'log a new touch, edit one, or mark one answered.' },
+        action: { type: 'string', enum: ['log', 'edit', 'sent', 'answered'], description: 'log a new touch, edit one, mark a draft sent, or mark one answered.' },
         contact_ref: { type: 'string', description: 'With log: the job_search.contacts ref of who it was with.' },
-        touch_ref: { type: 'string', description: 'With edit or answered: the job_search.contact_touches ref.' },
+        touch_ref: { type: 'string', description: 'With edit, sent or answered: the job_search.contact_touches ref.' },
+        draft: { type: 'boolean', description: 'With log, optionally: true keeps it as a draft, written but not sent.' },
         channel: { type: 'string', enum: [...TOUCH_CHANNELS], description: 'How it went: a LinkedIn message or connection request, email, an introduction, an event, or other.' },
         direction: { type: 'string', enum: [...DIRECTIONS], description: 'With log: outbound when they reached out (the default), inbound when the contact did.' },
         message: { type: 'string', description: `What was said. With edit, ${CLEARABLE.toLowerCase()}` },
@@ -3472,7 +3399,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'mark_suggestion_sent',
     runs: sameAs(
-      ['app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent', 'app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent'],
+      ['app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent', 'lib/jobs/contacts/edit.ts#addTouch'],
     ),
     description:
       "Mark a person Dash suggested on Find as messaged, when they say they sent it, as Find's Sent press does: they are added as a contact if they are not one, the suggested message is logged as sent in the outreach log, and the suggestion is closed. Nothing is sent from here. Name it by suggestion_ref, or by person for who it suggested (a name or words from its line); an unclear name is refused with the open ones listed.",
@@ -3489,7 +3416,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'add_role_from_email',
     runs: sameAs(
-      ['app/jobs/(app)/review/actions.ts#createRoleFromMessage', 'app/jobs/(app)/review/actions.ts#createRoleFromMessage'],
+      ['app/jobs/(app)/review/actions.ts#createRoleFromMessage', 'lib/jobs/inbox/role-mail.ts#addPursuitFromMail'],
     ),
     description:
       "Make a new role from an email in Jobs review when they say it is about a pursuit with nothing on file, as the review page's new role option does: the company (found by name, or added), the role and its application are made, and the email is linked to it, filing the event its classification implies, such as a rejection or an interview invite. Refused when the company already has a role of that title; link the email to a role on file with change_role_email.",
