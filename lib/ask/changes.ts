@@ -3,6 +3,8 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
+import { insertTask } from '@/lib/todo/tasks/write';
 import { MANY_ROW_KINDS, readSubject, undoDashAction, type DashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
 import { undoAddedTodos } from '@/lib/dash/todo-writes';
@@ -90,8 +92,13 @@ export type ChangeDeps = {
   db: AskDb;
   /** A goals client recording its writes as `actor`, undoing the history row `undoes`. */
   goals: (history: { actor?: GoalsActor; undoes?: number }) => Promise<GoalsSupabaseClient>;
-  /** createTask from lib/todo/tasks/write.ts. */
-  createTask: (userId: string, input: TaskInput, timezone: string) => Promise<{ id: string | null; error: string | null }>;
+  /**
+   * createTask from lib/todo/tasks/write.ts. Not read here since plan
+   * #2473.3: add_todo writes through insertTask on `db('todo')`, the function
+   * the add bar reaches, so Dash's todo and the page's cannot drift. Kept
+   * optional while callers still pass it.
+   */
+  createTask?: (userId: string, input: TaskInput, timezone: string) => Promise<{ id: string | null; error: string | null }>;
   /** Now, as an ISO timestamp. */
   now?: () => string;
   /**
@@ -318,7 +325,9 @@ type Written = { ref: string; undo: Record<string, unknown> | null };
 
 async function writeTodo(deps: ChangeDeps, change: Extract<DashChange, { kind: 'add_todo' }>): Promise<Written> {
   const input = change.input;
-  const { id, error } = await deps.createTask(
+  const todo = (await deps.db('todo')) as unknown as TodoSupabaseClient;
+  const { id, error } = await insertTask(
+    todo,
     deps.userId,
     { title: input.title, body: input.body, dueOn: input.dueOn, dueTime: input.dueTime, pinned: input.pinned, tags: input.tags ?? [] },
     deps.timezone,

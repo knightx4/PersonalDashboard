@@ -490,10 +490,13 @@ describe('add_todo', () => {
     const someday = ok(await apply('add_todo', { title: 'Learn the banjo', tags: ['music'] }));
     expect(someday.input).toMatchObject({ tags: ['eventually', 'music'] });
     expect(someday.summary).toBe('Dash added the todo "Learn the banjo", tagged eventually and music.');
-    expect(tables['todo.tasks'].map((t) => [t.title, t.tags]).slice(-2)).toEqual([
-      ['Call the bank', ['now']],
-      ['Learn the banjo', ['eventually', 'music']],
-    ]);
+    // Written by insertTask, as the add bar writes them (plan #2473.3).
+    const tagsOf = (title: string) => {
+      const task = tables['todo.tasks'].find((t) => t.title === title);
+      return (tables['todo.task_tags'] ?? []).filter((tag) => tag.task_id === task?.id).map((tag) => tag.tag);
+    };
+    expect(tagsOf('Call the bank')).toEqual(['now']);
+    expect(tagsOf('Learn the banjo')).toEqual(['eventually', 'music']);
   });
 });
 
