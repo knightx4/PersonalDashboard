@@ -1,4 +1,5 @@
 import type { AskSchema, SchemaClient } from '@/lib/ask/db';
+import { APPLICATION_CHILDREN, ROLE_CHILDREN } from '@/lib/dash/jobs-writes';
 
 /**
  * An in-memory stand-in for the person's Supabase clients, one per schema,
@@ -19,6 +20,13 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  * core.conversation_turns (a thread's turns carry `ref` and `author`), `like`
  * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn,
  * starting the row's conversation in core.conversations when it has none.
+ *
+ * `rpc('merge_roles', ...)` on job_search folds roles as the function in
+ * migration 0058 does: the rows on each other application, then on each
+ * merged role, move onto the ones kept by the foreign keys the lists in
+ * lib/dash/jobs-writes.ts record (tests/merge-children-jobs.test.ts holds
+ * those to the database), a row whose twin is already there under a unique
+ * key is taken out, and the merged applications and roles are deleted.
  */
 
 type Row = Record<string, unknown>;
@@ -59,6 +67,7 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           turn.acknowledged_at ??= now;
           return Promise.resolve({ data: turn.acknowledged_at, error: null });
         }
+        if (schema === 'job_search' && name === 'merge_roles') return Promise.resolve(mergeRoles(tables, args));
         if (schema !== 'core' || name !== 'add_thread_turn') {
           return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
         }
@@ -203,6 +212,75 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
       },
     } as unknown as SchemaClient;
   };
+}
+
+type Key = { table: string; column: string; unique: string | null };
+
+/** job_search.move_children: repoint rows from one parent to another, taking out a row whose twin is there. */
+function moveChildren(tables: FakeTables, keys: readonly Key[], from: string, to: string): number {
+  let moved = 0;
+  for (const key of keys) {
+    const rows = tables[key.table] ?? [];
+    for (const row of rows.filter((r) => r[key.column] === from)) {
+      const value = key.unique ? row[key.unique] : null;
+      const twin =
+        key.unique !== null &&
+        value !== null &&
+        value !== undefined &&
+        rows.some((r) => r !== row && r[key.column] === to && r[key.unique as string] === value);
+      if (twin) rows.splice(rows.indexOf(row), 1);
+      else {
+        row[key.column] = to;
+        moved += 1;
+      }
+    }
+  }
+  return moved;
+}
+
+/** job_search.merge_roles, as migration 0058 writes it. */
+function mergeRoles(tables: FakeTables, args: Row): { data: unknown; error: { message: string; code: string } | null } {
+  const refuse = (message: string, code = '22023') => ({ data: null, error: { message, code } });
+  const keep = args.p_keep_role as string;
+  const merged = [...new Set(((args.p_merge_roles as string[] | null) ?? []).filter(Boolean))];
+  if (merged.length === 0) return refuse('Pick the roles to merge in.');
+  if (merged.includes(keep)) return refuse('Pick a different role to merge into.');
+  const roles = (tables['job_search.roles'] ??= []);
+  const kept = roles.find((r) => r.id === keep);
+  if (!kept || roles.filter((r) => merged.includes(r.id as string)).length !== merged.length) {
+    return refuse('One of those roles no longer exists.', 'P0002');
+  }
+  if (roles.some((r) => merged.includes(r.id as string) && (r.company_id !== kept.company_id || r.user_id !== kept.user_id))) {
+    return refuse('Roles can only be merged within the same company.');
+  }
+  const refs = merged.map((id) => `job_search.roles:${id}`);
+  if ((tables['core.conversation_turns'] ?? []).some((t) => refs.includes(t.ref as string))) {
+    return refuse('One of those roles has comments in its thread, which a merge would leave behind. Keep that role instead.');
+  }
+
+  let moved = 0;
+  const apps = (tables['job_search.applications'] ??= []);
+  const all = [...merged, keep];
+  if (apps.some((a) => all.includes(a.role_id as string))) {
+    const target = apps.find((a) => a.id === args.p_keep_application && all.includes(a.role_id as string));
+    if (!target) return refuse("Name the application to keep, one of those roles'.");
+    let override: unknown = null;
+    for (const app of apps.filter((a) => all.includes(a.role_id as string) && a !== target)) {
+      moved += moveChildren(tables, APPLICATION_CHILDREN, app.id as string, target.id as string);
+      if ((target.status_manual_override ?? null) === null && override === null) override = app.status_manual_override ?? null;
+      apps.splice(apps.indexOf(app), 1);
+    }
+    target.role_id = keep;
+    target.attempt = 1;
+    target.status_manual_override = target.status_manual_override ?? override;
+  }
+  // Every key to a role but the applications', the old thread notes' included.
+  const roleKeys: Key[] = [...ROLE_CHILDREN, { table: 'job_search.notes', column: 'role_id', unique: null }];
+  for (const id of merged) {
+    moved += moveChildren(tables, roleKeys, id, keep);
+    roles.splice(roles.findIndex((r) => r.id === id), 1);
+  }
+  return { data: { kept: keep, merged: merged.length, moved }, error: null };
 }
 
 /** The deps recordDashAction and undoDashAction take, over the same tables. */

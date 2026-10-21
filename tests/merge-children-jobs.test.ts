@@ -1,11 +1,12 @@
 /**
  * What a role merge moves, against what the database says hangs off a role.
  *
- * Dash's merge_roles moves rows by two lists in lib/dash/jobs-writes.ts, so
- * it can record each move for its Undo. A list like that is right when it is
- * written and wrong after the next table with a foreign key to applications
- * or roles: the company page's merge listed eight of fourteen, and merging
- * deleted the rest. This reads the foreign keys from the migrated database
+ * Dash's merge_roles reads rows by two lists in lib/dash/jobs-writes.ts
+ * before and after job_search.merge_roles moves them, so it can record each
+ * move for its Undo, and the in-memory database moves rows by them. A list
+ * like that is right when it is written and wrong after the next table with
+ * a foreign key to applications or roles: the company page's merge listed
+ * eight of fourteen, and merging deleted the rest. This reads the foreign keys from the migrated database
  * and fails when a list misses one.
  *
  * job_search.merge_roles reads the keys itself; the second half checks it
@@ -36,13 +37,7 @@ describe('Dash merge_roles lists', () => {
 
   it('moves every table that points at a role, but for the ones it handles apart', async () => {
     // Applications are folded on their own; old thread notes refuse the merge.
-    // Origins are one row per role and field, and the role kept keeps its
-    // facts, so a merged role's origins go with it when it is deleted.
-    const apart = [
-      'job_search.applications.role_id',
-      'job_search.fact_origins.role_id',
-      'job_search.notes.role_id',
-    ];
+    const apart = ['job_search.applications.role_id', 'job_search.notes.role_id'];
     const listed = [...ROLE_CHILDREN.map((child) => `${child.table}.${child.column}`), ...apart].sort();
     expect(listed).toEqual(await childrenOf('job_search.roles'));
   });

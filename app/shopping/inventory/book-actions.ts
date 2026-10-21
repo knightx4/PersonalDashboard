@@ -9,6 +9,8 @@ import type { ProviderFailure } from '@/lib/books/providers/http';
 import { normalizeIsbn } from '@/lib/books/isbn';
 import type { BookEditionCandidate, CanonicalBook } from '@/lib/books/types';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { insertOwned, ownedBookRows } from '@/lib/inventory/add-owned';
+import { EDITION_CONFIRMED, writeItemDetails } from '@/lib/inventory/item-writes';
 import { serverEnv } from '@/lib/env';
 import { todayInTimezone } from '@/lib/money';
 
@@ -203,46 +205,9 @@ export async function saveOwnedBook(
     forceConfirmed,
   });
 
-  const { error: invError } = await supabase.from('inventory_items').insert({
-    id: bundle.inventory.id,
-    user_id: bundle.inventory.userId,
-    order_item_id: null,
-    category_id: bundle.inventory.categoryId,
-    name: bundle.inventory.name,
-    short_name: bundle.inventory.shortName,
-    variant: bundle.inventory.variant,
-    image_url: bundle.inventory.imageUrl,
-    fingerprint_loose: bundle.inventory.fingerprintLoose,
-    acquired_at: bundle.inventory.acquiredAt,
-    cost_cents: bundle.inventory.costCents,
-    search_tags: bundle.inventory.searchTags,
-    source: bundle.inventory.source,
-    status: bundle.inventory.status,
-  });
-  if (invError) return { error: invError.message };
-
-  const { error: bookError } = await supabase.from('book_details').insert({
-    id: bundle.bookDetails.id,
-    inventory_item_id: bundle.bookDetails.inventoryItemId,
-    isbn_13: bundle.bookDetails.isbn13,
-    isbn_10: bundle.bookDetails.isbn10,
-    authors: bundle.bookDetails.authors,
-    edition: bundle.bookDetails.edition,
-    publisher: bundle.bookDetails.publisher,
-    published_year: bundle.bookDetails.publishedYear,
-    weight_grams: bundle.bookDetails.weightGrams,
-    condition: bundle.bookDetails.condition,
-    resolution_source: bundle.bookDetails.resolutionSource,
-    match_confidence: bundle.bookDetails.matchConfidence,
-    needs_confirmation: bundle.bookDetails.needsConfirmation,
-    candidates: bundle.bookDetails.candidates,
-    confirmation_reason: bundle.bookDetails.confirmationReason,
-    auto_imported: false,
-  });
-  if (bookError) {
-    await supabase.from('inventory_items').delete().eq('id', bundle.inventory.id);
-    return { error: bookError.message };
-  }
+  const rows = ownedBookRows(bundle);
+  const saved = await insertOwned(supabase, { userId: user.id, items: [rows.item], books: [rows.details] });
+  if (!saved.ok) return { error: saved.error };
 
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/sell');
@@ -273,15 +238,8 @@ export async function confirmBookEdition(
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const { error } = await supabase
-    .from('book_details')
-    .update({
-      needs_confirmation: false,
-      candidates: [],
-      confirmation_reason: null,
-    })
-    .eq('inventory_item_id', item.id);
-  if (error) return { error: error.message };
+  const confirmed = await writeItemDetails(supabase, { itemId: item.id, table: 'book_details', values: { ...EDITION_CONFIRMED } });
+  if (!confirmed.ok) return { error: confirmed.error };
 
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${item.id}`);
@@ -314,11 +272,8 @@ export async function updateBookCondition(
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const { error } = await supabase
-    .from('book_details')
-    .update({ condition: condition.data })
-    .eq('inventory_item_id', item.id);
-  if (error) return { error: error.message };
+  const saved = await writeItemDetails(supabase, { itemId: item.id, table: 'book_details', values: { condition: condition.data } });
+  if (!saved.ok) return { error: saved.error };
 
   revalidatePath(`/shopping/inventory/${item.id}`);
   revalidatePath('/shopping/sell');

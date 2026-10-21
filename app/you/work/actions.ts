@@ -8,6 +8,7 @@ import { answerCourseExplain } from '@/lib/learn/evidence/course-explain-store';
 import type { TopicResult } from '@/lib/learn/evidence/course-explain';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createYouClient } from '@/lib/you/auth/server';
+import { saveTranscriptWithCourses, updateCourse } from '@/lib/you/transcript-store';
 import {
   EDUCATION_HREF,
   isTranscriptSize,
@@ -171,40 +172,16 @@ export async function saveTranscriptAction(
   const courses = parseCourseRows(get, parseRowList(get('rows')), school.data);
   if (!courses.ok) return { error: courses.error, row: courses.row, field: courses.field };
 
-  const you = await createYouClient();
-  const { data: transcript, error } = await you
-    .from('transcripts')
-    .insert({
-      user_id: user.id,
-      school: school.data,
-      file_name: fileName,
-      storage_path: path,
-      mime_type: mimeType,
-      size_bytes: sizeBytes,
-    })
-    .select('id')
-    .single();
-  if (error || !transcript) {
-    return {
-      error:
-        error?.code === '23505'
-          ? 'That transcript is already saved.'
-          : 'The transcript was not saved. Try again.',
-    };
-  }
-
-  const { error: coursesError } = await you.from('courses').insert(
-    courses.courses.map((course, position) => ({
-      ...course,
-      user_id: user.id,
-      transcript_id: transcript.id,
-      position,
-    })),
+  const saved = await saveTranscriptWithCourses(
+    await createYouClient(),
+    user.id,
+    { school: school.data, fileName, storagePath: path, mimeType, sizeBytes },
+    courses.courses,
   );
-  if (coursesError) {
-    // Take the transcript back out, so a retry does not meet a half-saved copy.
-    await you.from('transcripts').delete().eq('id', transcript.id).eq('user_id', user.id);
-    return { error: 'The courses were not saved. Try again.' };
+  if (!saved.ok) {
+    if (saved.failed === 'duplicate') return { error: 'That transcript is already saved.' };
+    if (saved.failed === 'courses') return { error: 'The courses were not saved. Try again.' };
+    return { error: 'The transcript was not saved. Try again.' };
   }
 
   revalidatePath(EDUCATION_HREF);
@@ -247,12 +224,11 @@ export async function updateCourseAction(_prev: CourseEditState, form: FormData)
   }, (current as { school: string }).school);
   if (!read.ok) return { error: read.error, field: read.field };
 
-  const { error } = await you
-    .from('courses')
-    .update(read.course)
-    .eq('id', courseId.data)
-    .eq('user_id', user.id);
-  if (error) return { error: 'The course was not saved. Try again.' };
+  try {
+    if (!(await updateCourse(you, user.id, courseId.data, read.course))) return { error: 'That course could not be found.' };
+  } catch {
+    return { error: 'The course was not saved. Try again.' };
+  }
 
   revalidatePath(EDUCATION_HREF);
   return { saved: true };

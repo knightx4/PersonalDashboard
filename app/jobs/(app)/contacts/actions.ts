@@ -7,6 +7,18 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { draftOutreach, type OutreachDraft } from '@/lib/jobs/contacts/draft-outreach';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
+import {
+  addContact,
+  addTouch,
+  answerTouch,
+  CONTACT_RELATIONSHIPS,
+  markContacted,
+  markDraftSent,
+  saveContactEdit,
+  saveTouchEdit,
+  TOUCH_CHANNELS,
+  type TouchChannel,
+} from '@/lib/jobs/contacts/edit';
 
 /**
  * Contacts hold other people's data.
@@ -21,9 +33,7 @@ const contactSchema = z.object({
   companyId: z.string().uuid().optional().or(z.literal('')),
   linkedinUrl: z.string().trim().url().optional().or(z.literal('')),
   email: z.string().trim().email().optional().or(z.literal('')),
-  relationship: z
-    .enum(['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'])
-    .default('cold'),
+  relationship: z.enum(CONTACT_RELATIONSHIPS).default('cold'),
   howWeConnect: z.string().trim().optional(),
   notes: z.string().trim().optional(),
   potentialLead: z.boolean().default(false),
@@ -53,8 +63,7 @@ export async function createContact(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('contacts').insert({
-    user_id: user.id,
+  const { error } = await addContact(supabase, user.id, {
     company_id: parsed.data.companyId || null,
     full_name: parsed.data.fullName,
     title: parsed.data.title || null,
@@ -67,14 +76,13 @@ export async function createContact(
     found_by_dash: parsed.data.foundByDash,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/contacts');
   // Added from a company's People card (note 4323ee10), so it lists there too.
   if (parsed.data.companyId) revalidatePath('/jobs/companies/[slug]', 'page');
   return { message: 'Added.' };
 }
 
-const RELATIONSHIPS = ['cold', 'alum', 'second_degree', 'former_colleague', 'friend', 'recruiter', 'interviewer'] as const;
 const STATUSES = ['to_contact', 'connected', 'contacted', 'responded', 'met', 'dormant'] as const;
 
 const contactPatchSchema = z
@@ -85,7 +93,7 @@ const contactPatchSchema = z
     email: z.string().trim().email('That is not an email address.').or(z.literal('')),
     howWeConnect: z.string().trim(),
     notes: z.string().trim(),
-    relationship: z.enum(RELATIONSHIPS),
+    relationship: z.enum(CONTACT_RELATIONSHIPS),
     status: z.enum(STATUSES),
     potentialLead: z.boolean(),
     foundByDash: z.boolean(),
@@ -131,13 +139,9 @@ export async function updateContact(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('contacts')
-    .update(update)
-    .eq('id', contactId)
-    .eq('user_id', user.id);
+  const { error } = await saveContactEdit(supabase, user.id, contactId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/contacts');
   revalidatePath('/jobs/contacts/[id]', 'page');
   revalidatePath('/jobs/companies/[slug]', 'page');
@@ -199,8 +203,8 @@ export async function draftContactMessage(input: {
   return result.ok ? { error: null, draft: result.draft } : { error: result.error };
 }
 
-const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
-type Channel = (typeof CHANNELS)[number];
+const CHANNELS = TOUCH_CHANNELS;
+type Channel = TouchChannel;
 
 /** A send as the contact page lists it. */
 export interface LoggedTouch {
@@ -227,22 +231,16 @@ export async function logTouch(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from('contact_touches')
-    .insert({
-      user_id: user.id,
-      contact_id: input.contactId,
-      application_id: input.applicationId ?? null,
-      channel: input.channel,
-      direction: input.direction,
-      message: input.message?.trim() || null,
-      sent_at: new Date().toISOString(),
-      draft: input.draft === true,
-    })
-    .select('id, channel, direction, sent_at, responded_at, message, draft')
-    .single();
+  const { row: data, error } = await addTouch(supabase, user.id, {
+    contact_id: input.contactId,
+    application_id: input.applicationId ?? null,
+    channel: input.channel,
+    direction: input.direction,
+    message: input.message?.trim() || null,
+    draft: input.draft === true,
+  });
 
-  if (error) return { error: error.message };
+  if (error || !data) return { error: error ?? 'The send was not kept.' };
 
   // A send moves the contact along; the status is what the list view sorts by.
   if (input.direction === 'outbound' && input.draft !== true) {
@@ -265,19 +263,6 @@ export async function logTouch(input: {
   };
 }
 
-async function markContacted(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  contactId: string,
-) {
-  await supabase
-    .from('contacts')
-    .update({ status: 'contacted' })
-    .eq('id', contactId)
-    .eq('user_id', userId)
-    .in('status', ['to_contact', 'connected']);
-}
-
 /**
  * Mark a draft as sent: it takes the time it is marked as its sent time, stops
  * being a draft, and moves the contact to contacted as logging a send does.
@@ -293,18 +278,11 @@ export async function markTouchSent(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const sentAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('contact_touches')
-    .update({ sent_at: sentAt, draft: false })
-    .eq('id', parsed.data)
-    .eq('user_id', user.id)
-    .eq('draft', true)
-    .select('contact_id, direction')
-    .maybeSingle();
+  const { row: data, error } = await markDraftSent(supabase, user.id, parsed.data);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   if (!data) return { error: 'That draft is already sent or gone.' };
+  const sentAt = data.sent_at as string;
 
   if (data.direction === 'outbound') {
     await markContacted(supabase, user.id, data.contact_id as string);
@@ -336,13 +314,9 @@ export async function updateTouch(
   if (patch.message !== undefined) update.message = patch.message.trim() || null;
   if (Object.keys(update).length === 0) return { error: null };
 
-  const { error } = await supabase
-    .from('contact_touches')
-    .update(update)
-    .eq('id', touchId)
-    .eq('user_id', user.id);
+  const { error } = await saveTouchEdit(supabase, user.id, touchId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };
 }
@@ -355,23 +329,12 @@ export async function markTouchAnswered(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from('contact_touches')
-    .update({ responded_at: new Date().toISOString(), response_summary: summary || null })
-    .eq('id', touchId)
-    .eq('user_id', user.id)
-    .eq('draft', false)
-    .select('contact_id')
-    .maybeSingle();
+  const { row: data, error } = await answerTouch(supabase, user.id, touchId, summary);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   if (!data) return { error: 'A draft has not been sent, so nothing can have answered it.' };
 
-  await supabase
-    .from('contacts')
-    .update({ status: 'responded' })
-    .eq('id', data.contact_id)
-    .eq('user_id', user.id);
+  await saveContactEdit(supabase, user.id, data.contact_id as string, { status: 'responded' });
 
   revalidatePath('/jobs/contacts');
   revalidatePath('/jobs/contacts/[id]', 'page');

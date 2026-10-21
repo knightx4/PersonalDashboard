@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { VaultChangeInput, VaultChangeKind } from '@/lib/ask/vault-changes';
@@ -10,8 +11,11 @@ import { fileQuickNote, isInInbox } from '@/lib/vault/notes/file';
 import { renameNote } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { vaultUndoRecord, type VaultUndo, type VaultUndoPorts } from '@/lib/vault/notes/undo';
+import { renameThemeRow, themeNameProblem } from '@/lib/vault/map/rename-theme';
+import { renameQuestion } from '@/lib/vault/maya/store';
 import { basenameOf, isTriageNotePath, mayaThreadHref, noteHref } from '@/lib/vault/paths';
 import { COURSE_FIELD_NAMES, EDUCATION_HREF, parseCourse, schoolField } from '@/lib/you/education';
+import { saveTranscriptWithCourses, updateCourse } from '@/lib/you/transcript-store';
 import { TRANSCRIPTS_BUCKET, transcriptStoragePath } from '@/lib/you/transcripts';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -75,6 +79,8 @@ export type VaultMade = {
 
 export type VaultWrite = {
   name: VaultChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** The workspaces that must be switched on for the change. */
   modules: readonly ModuleId[];
   /** Without the line each surface adds on where the change shows. */
@@ -324,8 +330,8 @@ const THEME_COLUMNS = 'id, user_id, name, about, created_at, updated_at';
 
 async function renameTheme(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
   const name = text(args, 'name');
-  if (!name) throw new VaultRefused('A theme needs a name.');
-  if (name.length > 200) throw new VaultRefused('Keep the name under 200 characters.');
+  const problem = themeNameProblem(name);
+  if (problem) throw new VaultRefused(problem);
 
   let before: Row;
   if (text(args, 'theme_ref')) {
@@ -342,15 +348,13 @@ async function renameTheme(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
   if (before.name === name) throw new VaultRefused('That is its name already.');
 
   const id = before.id as string;
-  const { data, error } = await env.vault
-    .from('themes')
-    .update({ name })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select(THEME_COLUMNS)
-    .single();
-  if (error?.code === '23505') throw new VaultRefused('Another theme already has that name.');
-  if (error || !data) throw new Error(`Renaming the theme failed: ${error?.message ?? 'no row'}`);
+  const renamed = await renameThemeRow(env.vault, env.userId, id, name, THEME_COLUMNS);
+  if (!renamed.ok) {
+    if (renamed.reason === 'taken') throw new VaultRefused('Another theme already has that name.');
+    if (renamed.reason === 'missing') throw new VaultRefused('That theme is no longer in the map.');
+    throw new Error(`Renaming the theme failed: ${renamed.message}`);
+  }
+  const data = renamed.row;
 
   const href = `/vault/map/${id}`;
   const from = named(before.name, 'the theme');
@@ -392,15 +396,8 @@ async function renameMayaQuestion(env: VaultWriteEnv, args: Args): Promise<Vault
   if (before.title === question) throw new VaultRefused('The thread is about that already.');
 
   const id = before.id as string;
-  const { data, error } = await env.core
-    .from('conversations')
-    .update({ title: question })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .eq('voice', 'maya')
-    .select(THREAD_COLUMNS)
-    .single();
-  if (error || !data) throw new Error(`Rewriting the question failed: ${error?.message ?? 'no row'}`);
+  const data = await renameQuestion(env.core, env.userId, id, question, THREAD_COLUMNS);
+  if (!data) throw new VaultRefused('That thread with Maya is not there any more.');
 
   const href = mayaThreadHref(id);
   return {
@@ -433,14 +430,8 @@ async function changeCourse(env: VaultWriteEnv, args: Args): Promise<VaultMade> 
   const read = parseCourse(field, before.school as string);
   if (!read.ok) throw new VaultRefused(read.field ? `${read.field}: ${read.error}` : read.error);
 
-  const { data, error } = await env.you
-    .from('courses')
-    .update(read.course)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Correcting the course failed: ${error?.message ?? 'no row'}`);
+  const data = await updateCourse(env.you, env.userId, id, read.course);
+  if (!data) throw new VaultRefused('That course is not there any more. Nothing was changed.');
 
   const title = named(read.course.title, 'the course');
   return {
@@ -501,24 +492,19 @@ async function saveTranscript(env: VaultWriteEnv, args: Args): Promise<VaultMade
     .upload(path, bytes, { contentType: 'text/plain', upsert: false });
   if (uploadError) throw new Error(`Keeping the transcript's text failed: ${uploadError.message}`);
 
-  const { data: transcript, error } = await env.you
-    .from('transcripts')
-    .insert({ id, user_id: env.userId, school: school.data, file_name: fileName, storage_path: path, mime_type: 'text/plain', size_bytes: bytes.byteLength })
-    .select('*')
-    .single();
-  if (error || !transcript) {
+  // The page's own write: the transcript, then its courses, and a refused
+  // course list takes the transcript back out. The file is ours to remove.
+  const saved = await saveTranscriptWithCourses(
+    env.you,
+    env.userId,
+    { id, school: school.data, fileName, storagePath: path, mimeType: 'text/plain', sizeBytes: bytes.byteLength },
+    courses,
+  );
+  if (!saved.ok) {
     await env.you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
-    throw new Error(`Saving the transcript failed: ${error?.message ?? 'no row'}`);
+    throw new Error(`Saving the ${saved.failed === 'courses' ? 'courses' : 'transcript'} failed: ${saved.message}`);
   }
-  const { error: coursesError } = await env.you
-    .from('courses')
-    .insert(courses.map((course, position) => ({ ...course, user_id: env.userId, transcript_id: id, position })));
-  if (coursesError) {
-    // Take the transcript back out, as the page does, so nothing half-saved is left.
-    await env.you.from('transcripts').delete().eq('id', id).eq('user_id', env.userId);
-    await env.you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
-    throw new Error(`Saving the courses failed: ${coursesError.message}`);
-  }
+  const transcript = saved.transcript;
 
   const count = `${courses.length} ${courses.length === 1 ? 'course' : 'courses'}`;
   return {
@@ -544,6 +530,10 @@ const COURSE_TEXT = (what: string) => ({ type: 'string', description: `${what}. 
 export const VAULT_WRITES: readonly VaultWrite[] = [
   {
     name: 'write_vault_note',
+    runs: sameAs(
+      ['app/vault/actions.ts#newVaultNote', 'lib/vault/notes/create.ts#createCapturedNote'],
+      ['app/vault/actions.ts#openDailyNote', 'lib/vault/notes/create.ts#createCapturedNote'],
+    ),
     modules: ['vault'],
     description:
       'Write a new note in their vault, when they ask for a note with a title or more than a quick thought. It goes into the Inbox folder, named by its title, and reaches Obsidian on its next pull. A quick thought to sort later is add_quick_note.',
@@ -559,6 +549,10 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'edit_vault_note',
+    runs: sameAs(
+      ['app/vault/n/[...path]/actions.ts#saveNoteEdit', 'lib/vault/notes/save.ts#saveNote'],
+      ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote', 'lib/vault/notes/save.ts#saveNote'],
+    ),
     modules: ['vault'],
     description:
       'Change the text of one of their vault notes, when they ask. Give append to add text at the note\'s foot, or body to replace the whole text (without the frontmatter, which is kept as it is). Name the note by the obsidian.notes ref a lookup returned. A note changed in Obsidian since the last sync is refused.',
@@ -576,6 +570,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_vault_note',
+    runs: sameAs(['app/vault/n/[...path]/actions.ts#renameNoteAction', 'lib/vault/notes/rename.ts#renameNote']),
     modules: ['vault'],
     description:
       'Rename one of their vault notes, when they ask. Its file moves to the new name in the same folder; links to the old name in other notes are left as they are. Name the note by the obsidian.notes ref a lookup returned.',
@@ -592,6 +587,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'file_quick_note',
+    runs: sameAs(['app/vault/triage/actions.ts#fileQuickNoteAction', 'lib/vault/notes/file.ts#fileQuickNote']),
     modules: ['vault'],
     description:
       'File one of their quick notes out of the Inbox, when they ask: into another note, where its text is added at the foot under the day\'s date, or as a note of its own at the top of the vault when into_note_ref is left out. Name both by the obsidian.notes refs a lookup returned.',
@@ -608,6 +604,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_theme',
+    runs: sameAs(['app/vault/map/actions.ts#renameTheme', 'lib/vault/map/rename-theme.ts#renameThemeRow']),
     modules: ['vault'],
     description:
       'Rename a theme on their vault map, when they ask. Name it by theme_ref, or by theme with its name as it is now. Names are unique on the map, ignoring case.',
@@ -625,6 +622,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_maya_question',
+    runs: sameAs(['app/vault/maya/actions.ts#renameMayaQuestion', 'lib/vault/maya/store.ts#renameQuestion']),
     modules: ['vault'],
     description: `Rewrite the question a thread with Maya is about, when they ask. Name the thread by thread_ref, or by note_ref for the note it is about. At most ${QUESTION_MAX} characters.`,
     input_schema: {
@@ -641,6 +639,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'change_course',
+    runs: sameAs(['app/you/work/actions.ts#updateCourseAction', 'lib/you/transcript-store.ts#updateCourse']),
     modules: ['you'],
     description:
       'Correct a saved course on their Work & school tab, when they ask. Name it by the you.courses ref the courses lookup returned, and give only the fields that change.',
@@ -663,6 +662,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'save_transcript',
+    runs: sameAs(['app/you/work/actions.ts#saveTranscriptAction', 'lib/you/transcript-store.ts#saveTranscriptWithCourses']),
     modules: ['you'],
     description:
       'Keep an academic transcript on their Work & school tab from its text, when they give you one and ask to save it. Pass the school, the transcript\'s text as they gave it (kept as its original), and every course on it, each with its title and whatever of code, term, year, credits and grade it shows. A course from another school names its own.',
@@ -726,6 +726,7 @@ const ASK_NOTE =
 export const VAULT_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = VAULT_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     const off = vaultSwitchedOff(write, ctx.enabledModules);

@@ -3,7 +3,8 @@ import { isUuid } from '@/lib/ask/db';
 import { namedItems } from '@/lib/ask/change-view';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
-import { stageMoveEvent } from '@/lib/jobs/move';
+import { moveApplicationsTo } from '@/lib/jobs/applications/stage';
+import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { statusLabel } from '@/lib/jobs/status-label';
 import type { DashChangeInput } from '@/lib/talk/changes';
@@ -217,22 +218,18 @@ export async function moveRoles(ctx: DashWriteContext, args: Record<string, unkn
   }
 
   // The board's move, for each: the event, then the override column.
-  const at = new Date().toISOString();
-  const { data: events, error: eventError } = await jobs
-    .from('application_events')
-    .insert(moving.map((row) => stageMoveEvent(ctx.userId, row.id, status, 'Dash', at)))
-    .select('id, application_id');
-  if (eventError) throw new Error(`application_events: ${eventError.message}`);
-  const eventOf = new Map(((events ?? []) as { id: string; application_id: string }[]).map((e) => [e.application_id, e.id]));
-
-  const { data: updated, error: writeError } = await jobs
-    .from('applications')
-    .update({ status_manual_override: status })
-    .eq('user_id', ctx.userId)
-    .in('id', moving.map((row) => row.id))
-    .select('id');
-  if (writeError) throw new Error(`applications: ${writeError.message}`);
-  const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+  const {
+    events: eventOf,
+    moved: written,
+    error: moveError,
+  } = await moveApplicationsTo(
+    jobs as unknown as AppSupabaseClient,
+    ctx.userId,
+    moving.map((row) => row.id),
+    status,
+    'Dash',
+  );
+  if (moveError) throw new Error(`Moving the roles failed: ${moveError}`);
 
   const rows: MovedRole[] = moving
     .filter((row) => written.has(row.id) && eventOf.has(row.id))

@@ -4,7 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { AskInputError, type AskDb, type AskRow, type AskToolResult, type SchemaClient } from '@/lib/ask/db';
 import { recordDashAction } from '@/lib/core/dash-actions';
-import type { DashWriteContext, QuickNoteFiled } from '@/lib/dash/registry';
+import type { DashWriteContext } from '@/lib/dash/registry';
 import { WRITE_TOOLS } from '@/lib/dash/writes';
 import type { ModuleId } from '@/lib/modules';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
@@ -81,8 +81,8 @@ export type ConnectorWriteContext = {
    * are refused.
    */
   goals?: DashWriteContext['goals'];
-  /** Writes a quick note into the person's vault Inbox. Absent: add_quick_note is refused. */
-  fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
+  /** The note-create ports on the person's vault, for add_quick_note. Absent: it is refused. */
+  quickNotePorts?: DashWriteContext['quickNotePorts'];
   /**
    * The person's workspaces and day, from the token's lookup context
    * (connectorAccess): a write into a workspace that is off is refused.
@@ -766,7 +766,7 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         // Only the goal writes reach this; none of the others writes a goal or a todo.
         goals: goals && WRITES_GOALS.has(name) ? goals : async () => refuse(),
         createTask: async () => refuse(),
-        fileQuickNote: ctx.fileQuickNote,
+        quickNotePorts: ctx.quickNotePorts,
       } satisfies DashWriteContext;
       const result = await dash.apply(write, input);
       if (!result.ok) return { ok: false, error: result.error };

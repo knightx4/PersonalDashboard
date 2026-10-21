@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { undoMapMerge } from '@/lib/vault/map/merge-apply';
+import { renameThemeRow, themeNameProblem } from '@/lib/vault/map/rename-theme';
 import { undoRefusal } from '@/lib/vault/map/merge-log';
 
 /**
@@ -80,23 +81,18 @@ export async function undoMerge(mergeId: string): Promise<MergeLogActionResult> 
  */
 // latency: pending
 export async function renameTheme(themeId: string, name: string): Promise<MergeLogActionResult> {
-  await requireUser();
+  const user = await requireUser();
   const trimmed = name.trim();
   if (!UUID.test(themeId)) return { error: 'That theme is not in the map.' };
-  if (!trimmed) return { error: 'A theme needs a name.' };
-  if (trimmed.length > 200) return { error: 'Keep the name under 200 characters.' };
+  const problem = themeNameProblem(trimmed);
+  if (problem) return { error: problem };
 
-  const supabase = await createVaultClient();
-  const { data, error } = await supabase
-    .from('themes')
-    .update({ name: trimmed })
-    .eq('id', themeId)
-    .select('id');
-  if (error) {
-    if (error.code === '23505') return { error: 'Another theme already has that name.' };
-    return { error: `The rename failed: ${error.message}` };
+  const renamed = await renameThemeRow(await createVaultClient(), user.id, themeId, trimmed, 'id');
+  if (!renamed.ok) {
+    if (renamed.reason === 'taken') return { error: 'Another theme already has that name.' };
+    if (renamed.reason === 'missing') return { error: 'That theme is no longer in the map.' };
+    return { error: `The rename failed: ${renamed.message}` };
   }
-  if (!data || data.length === 0) return { error: 'That theme is no longer in the map.' };
   revalidatePath('/vault/map');
   revalidatePath(`/vault/map/${themeId}`);
   return { error: null };

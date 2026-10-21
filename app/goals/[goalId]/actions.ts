@@ -170,12 +170,12 @@ export async function countRhythmAction(form: FormData): Promise<StepActionState
 
 // latency: optimistic -- the step row swaps with its neighbour at once and goes back, with the reason in a toast, if refused
 export async function moveStepAction(form: FormData): Promise<StepActionState> {
-  await requireUser();
+  const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
   const direction = Direction.safeParse(form.get('direction'));
   if (!id.success || !direction.success) return { error: 'Could not tell which step to move.' };
   try {
-    await moveStep(await createGoalsClient(), id.data, direction.data);
+    await moveStep(await createGoalsClient(), user.id, id.data, direction.data);
   } catch {
     return { error: 'The step could not be moved. Try again.' };
   }

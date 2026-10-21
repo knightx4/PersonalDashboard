@@ -6,6 +6,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
 import { buildOwnedGameRows } from '@/lib/games/create-owned-game';
 import { resolveGameDetailed } from '@/lib/games/resolve';
+import { insertOwned, ownedGameRows } from '@/lib/inventory/add-owned';
+import { EDITION_CONFIRMED, writeItemDetails } from '@/lib/inventory/item-writes';
 import type { CanonicalGame, GameEditionCandidate } from '@/lib/games/types';
 import { serverEnv } from '@/lib/env';
 import { todayInTimezone } from '@/lib/money';
@@ -113,47 +115,9 @@ async function persistGame(
     autoImported: opts.autoImported,
   });
 
-  const { error: invError } = await supabase.from('inventory_items').insert({
-    id: bundle.inventory.id,
-    user_id: bundle.inventory.userId,
-    order_item_id: null,
-    category_id: bundle.inventory.categoryId,
-    name: bundle.inventory.name,
-    short_name: bundle.inventory.shortName,
-    variant: bundle.inventory.variant,
-    image_url: bundle.inventory.imageUrl,
-    fingerprint_loose: bundle.inventory.fingerprintLoose,
-    acquired_at: bundle.inventory.acquiredAt,
-    cost_cents: bundle.inventory.costCents,
-    search_tags: bundle.inventory.searchTags,
-    source: bundle.inventory.source,
-    status: bundle.inventory.status,
-  });
-  if (invError) return { error: invError.message };
-
-  const { error: gameError } = await supabase.from('game_details').insert({
-    id: bundle.gameDetails.id,
-    inventory_item_id: bundle.gameDetails.inventoryItemId,
-    bgg_id: bundle.gameDetails.bggId,
-    wikidata_id: bundle.gameDetails.wikidataId,
-    barcode: bundle.gameDetails.barcode,
-    year_published: bundle.gameDetails.yearPublished,
-    publisher: bundle.gameDetails.publisher,
-    min_players: bundle.gameDetails.minPlayers,
-    max_players: bundle.gameDetails.maxPlayers,
-    playing_time_minutes: bundle.gameDetails.playingTimeMinutes,
-    condition: null,
-    resolution_source: bundle.gameDetails.resolutionSource,
-    match_confidence: bundle.gameDetails.matchConfidence,
-    needs_confirmation: bundle.gameDetails.needsConfirmation,
-    candidates: bundle.gameDetails.candidates,
-    confirmation_reason: bundle.gameDetails.confirmationReason,
-    auto_imported: bundle.gameDetails.autoImported,
-  });
-  if (gameError) {
-    await supabase.from('inventory_items').delete().eq('id', bundle.inventory.id);
-    return { error: gameError.message };
-  }
+  const rows = ownedGameRows(bundle);
+  const saved = await insertOwned(supabase, { userId: opts.userId, items: [rows.item], games: [rows.details] });
+  if (!saved.ok) return { error: saved.error };
 
   return { id: bundle.inventory.id };
 }
@@ -267,11 +231,8 @@ export async function confirmGameEdition(
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const { error } = await supabase
-    .from('game_details')
-    .update({ needs_confirmation: false, candidates: [], confirmation_reason: null })
-    .eq('inventory_item_id', item.id);
-  if (error) return { error: error.message };
+  const confirmed = await writeItemDetails(supabase, { itemId: item.id, table: 'game_details', values: { ...EDITION_CONFIRMED } });
+  if (!confirmed.ok) return { error: confirmed.error };
 
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${item.id}`);

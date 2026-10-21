@@ -10,7 +10,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { pickCategoryColor, slugifyCategoryName } from '@/lib/categories/slugify';
-import { pickListGradient } from '@/lib/lists/gradients';
+import { makeItemList, renameList } from '@/lib/lists/write';
 
 export type CategoryActionState = {
   error?: string;
@@ -400,31 +400,9 @@ export async function createItemList(
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
   }
 
-  const slug = slugifyCategoryName(parsed.data.name);
-  if (!slug) return { error: 'Use letters or numbers in the list name.' };
-
   const supabase = await createClient();
-  const { data: conflict } = await supabase
-    .from('item_lists')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('slug', slug)
-    .maybeSingle();
-  if (conflict) return { error: 'That list name is already used. Try another.' };
-
-  const { data: existing } = await supabase
-    .from('item_lists')
-    .select('color')
-    .eq('user_id', user.id);
-  const color = pickListGradient((existing ?? []).map((row) => row.color));
-
-  const { error } = await supabase.from('item_lists').insert({
-    user_id: user.id,
-    name: parsed.data.name,
-    slug,
-    color,
-  });
-  if (error) return { error: error.message };
+  const made = await makeItemList(supabase, { userId: user.id, name: parsed.data.name });
+  if (made.error !== undefined) return { error: made.error };
 
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');
@@ -451,12 +429,8 @@ export async function renameItemList(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('item_lists')
-    .update({ name: parsed.data.name })
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const renamed = await renameList(supabase, { userId: user.id, id: parsed.data.id, name: parsed.data.name });
+  if (renamed.error !== undefined) return { error: renamed.error };
 
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');

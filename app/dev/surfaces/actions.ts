@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
+import { insertFeedbackItem } from '@/lib/feedback/insert';
 import { surfacePath } from '@/lib/feedback/surfaces';
 
 /**
@@ -44,15 +45,15 @@ export async function noteOnSurface(
   });
   if (!parsed.success) return { error: 'Write a sentence about what is wrong.' };
 
-  const { error } = await supabase.from('feedback_items').insert({
-    user_id: user.id,
+  const { error } = await insertFeedbackItem(supabase, {
+    userId: user.id,
     // A note about how a surface reads is a request for a change, not a report
     // that something is broken. `bug` is reserved for things that do not work.
     kind: 'feature',
     body: parsed.data.body,
-    page_path: surfacePath(parsed.data.surface),
+    pagePath: surfacePath(parsed.data.surface),
   });
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/dev/surfaces');
   revalidatePath('/dev/bugs');

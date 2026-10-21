@@ -207,12 +207,12 @@ export async function approveAreaAction(
 
 // latency: pending
 export async function moveAreaAction(form: FormData): Promise<GoalsActionState> {
-  await requireUser();
+  const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
   const direction = Direction.safeParse(form.get('direction'));
   if (!id.success || !direction.success) return { error: 'Could not tell which area to move.' };
   try {
-    await moveArea(await createGoalsClient(), id.data, direction.data);
+    await moveArea(await createGoalsClient(), user.id, id.data, direction.data);
   } catch {
     return { error: 'The area could not be moved. Try again.' };
   }

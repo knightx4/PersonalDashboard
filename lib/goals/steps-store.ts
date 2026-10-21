@@ -555,9 +555,15 @@ export async function moveStepToGoal(
   return { unlinked: (unlinked ?? []).length > 0 };
 }
 
-/** One place up or down among its siblings. False when already at that end. */
+/**
+ * One place up or down among its live siblings. The goal page's arrows and
+ * Dash's change_goal_step both call it (plan #2473.5), so every read and
+ * write is narrowed to the user, as the connector's service role needs.
+ * False when already at that end, or when it is no live step of theirs.
+ */
 export async function moveStep(
   client: GoalsSupabaseClient,
+  userId: string,
   id: string,
   direction: 'up' | 'down',
 ): Promise<boolean> {
@@ -565,6 +571,7 @@ export async function moveStep(
     .from('items')
     .select('parent_id')
     .eq('id', id)
+    .eq('user_id', userId)
     .eq('level', 'step')
     .is('archived_at', null)
     .maybeSingle();
@@ -574,6 +581,7 @@ export async function moveStep(
   const { data: siblings, error } = await client
     .from('items')
     .select('id')
+    .eq('user_id', userId)
     .eq('parent_id', step.parent_id as string)
     .is('archived_at', null)
     .order('position')
@@ -591,7 +599,8 @@ export async function moveStep(
       client
         .from('items')
         .update({ position: (i + 1) * 10 })
-        .eq('id', sid),
+        .eq('id', sid)
+        .eq('user_id', userId),
     ),
   );
   const failed = results.find((result) => result.error);

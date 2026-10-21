@@ -17,12 +17,13 @@ import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
 import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
 import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { mergeRolesInto, type MergeApplication } from '@/lib/jobs/companies/merge-roles';
+import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } from '@/lib/jobs/companies/edit';
 import {
   enrichmentStageSource,
   loadCompanyFactOrigins,
@@ -112,10 +113,7 @@ export async function updateCompany(
   if (parsed.data.domains !== undefined) {
     // Domains drive email linking, so they are normalised rather than trusted:
     // a stray "https://" here means mail from that company never links.
-    patch.domains = parsed.data.domains
-      .split(/[\s,]+/)
-      .map((entry) => entry.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))
-      .filter((entry) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(entry));
+    patch.domains = normalisedDomains(parsed.data.domains.split(/[\s,]+/));
   }
 
   // The stage before the save, so only a stage that moved gets a new origin.
@@ -132,11 +130,7 @@ export async function updateCompany(
     stageBefore = (before.stage as string | null) ?? null;
   }
 
-  const { error } = await supabase
-    .from('companies')
-    .update(patch)
-    .eq('id', parsed.data.companyId)
-    .eq('user_id', user.id);
+  const { error } = await saveCompanyEdit(supabase, user.id, parsed.data.companyId, patch);
 
   if (error) return { error: error.message };
   if ('stage' in patch) {
@@ -149,7 +143,7 @@ export async function updateCompany(
 
 const renameSchema = z.object({
   companyId: z.string().uuid(),
-  name: z.string().trim().min(1, 'A company needs a name.').max(120),
+  name: z.string().trim().min(1, 'A company needs a name.').max(COMPANY_NAME_MAX),
 });
 
 /**
@@ -176,24 +170,11 @@ export async function renameCompany(
 
   const user = await requireUser();
   const supabase = await createClient();
-  const slug = slugify(parsed.data.name);
+  const rename = await renameUpdate(supabase, user.id, parsed.data.companyId, parsed.data.name);
+  if (rename.error !== null) return { error: rename.error, slug: null };
+  const { slug } = rename.update;
 
-  const { data: clash } = await supabase
-    .from('companies')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .eq('slug', slug)
-    .neq('id', parsed.data.companyId)
-    .maybeSingle();
-
-  if (clash) return { error: `You already have a company called ${clash.name}.`, slug: null };
-
-  const { error } = await supabase
-    .from('companies')
-    .update({ name: parsed.data.name, slug })
-    .eq('id', parsed.data.companyId)
-    .eq('user_id', user.id);
-
+  const { error } = await saveCompanyEdit(supabase, user.id, parsed.data.companyId, rename.update);
   if (error) return { error: error.message, slug: null };
 
   revalidatePath('/jobs/companies');
@@ -546,23 +527,6 @@ const mergeRolesSchema = z.object({
 });
 
 /**
- * The application a merge keeps: the one furthest along, ties broken by
- * whichever is older. Ranking status is lib/jobs/pipeline.ts's job, so it is
- * decided here and handed to the database.
- */
-function keptApplication(
-  apps: Array<{ id: string; status: string; created_at: string }>,
-): string | null {
-  if (apps.length === 0) return null;
-  return apps.reduce((best, app) => {
-    const appRank = statusRank(app.status as ApplicationStatus);
-    const bestRank = statusRank(best.status as ApplicationStatus);
-    if (appRank !== bestRank) return appRank > bestRank ? app : best;
-    return new Date(app.created_at) < new Date(best.created_at) ? app : best;
-  }).id;
-}
-
-/**
  * Fold one or more duplicate role rows into the survivor. They are the same
  * posting, so their applications become one, the one furthest along.
  *
@@ -570,6 +534,8 @@ function keptApplication(
  * which tables to move from the foreign keys. This action used to move eight
  * tables from a list of its own while fourteen point at an application, so a
  * merge deleted the rest with the duplicate (migration 0058 says which).
+ * lib/jobs/companies/merge-roles.ts picks the application kept and calls the
+ * function, for Dash's merge_roles too.
  */
 // latency: pending
 export async function mergeRoles(
@@ -606,13 +572,12 @@ export async function mergeRoles(
     .in('role_id', [survivorRoleId, ...mergedRoleIds]);
   if (appsError) return { error: appsError.message };
 
-  const { error } = await supabase.rpc('merge_roles', {
-    p_keep_role: survivorRoleId,
-    p_merge_roles: mergedRoleIds,
-    p_keep_application: keptApplication(
-      (apps ?? []) as Array<{ id: string; status: string; created_at: string }>,
-    ),
-  });
+  const { error } = await mergeRolesInto(
+    supabase,
+    survivorRoleId,
+    mergedRoleIds,
+    (apps ?? []) as MergeApplication[],
+  );
   if (error) return { error: error.message };
 
   revalidatePath('/jobs/companies/[slug]', 'page');

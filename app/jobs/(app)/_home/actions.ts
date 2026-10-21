@@ -5,6 +5,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LATER_REFUSED, laterUntil, untilWords } from '@/lib/core/snooze-days';
 import { setWaitingDismissal } from '@/lib/jobs/today/waiting';
+import { saveReminderEdit } from '@/lib/jobs/today/reminders';
 
 /**
  * Later's day, from the one Later menu (plan #1957.9): one of
@@ -29,13 +30,9 @@ export async function completeReminder(id: string): Promise<{ error: string | nu
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('reminders')
-    .update({ completed_at: new Date().toISOString() })
-    .eq('id', id)
-    .eq('user_id', user.id);
+  const { error } = await saveReminderEdit(supabase, user.id, id, { completed_at: new Date().toISOString() });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs');
   // A to-do added from the role page's timeline is also shown there, so
   // finishing it here has to clear it there too.
@@ -92,13 +89,9 @@ export async function snoozeReminder(
     .eq('user_id', user.id)
     .maybeSingle();
 
-  const { error } = await supabase
-    .from('reminders')
-    .update({ due_at: later.until })
-    .eq('id', id)
-    .eq('user_id', user.id);
+  const { error } = await saveReminderEdit(supabase, user.id, id, { due_at: later.until });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs');
   revalidatePath('/jobs/roles/[id]', 'page');
   // And on the company, which rolls up the to-dos of every role it has.

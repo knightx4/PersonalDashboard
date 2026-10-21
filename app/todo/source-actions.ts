@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LATER_REFUSED, laterUntil } from '@/lib/core/snooze-days';
+import { agendaRefusal, completeAgendaItem, deferAgendaItem, dismissAgendaItem } from '@/lib/todo/agenda/act';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { sourceById } from '@/lib/todo/agenda/registry';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
@@ -13,9 +14,8 @@ import { isSourceId, type SourceContext } from '@/lib/todo/agenda/sources';
  * Acting on something the agenda found somewhere else.
  *
  * Every one of these goes back through the source, which decides what the verb
- * means for its own workspace -- deferring a job reminder moves its due date,
- * deferring a return deadline writes a dismissal. The agenda does not know the
- * difference and must not learn it.
+ * means for its own workspace. Finishing, putting off and dismissing go
+ * through lib/todo/agenda/act.ts, which Dash's change_agenda_row calls too.
  */
 
 async function context(): Promise<SourceContext> {
@@ -41,29 +41,13 @@ function done(): void {
   revalidatePath('/home');
 }
 
-/**
- * Why a verb did not happen, in words a row can show.
- *
- * A source that has no `complete` is the honest case -- a return deadline is a
- * date and cannot be ticked off -- and an id no source answers to is a request
- * from a page that has gone stale. Both used to be a bare `return`, which a
- * caller could not tell from a write that worked.
- */
-function refuse(sourceId: string, verb: string): { error: string } {
-  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source) return { error: 'That is not a source this list knows about.' };
-  return { error: `${source.label}: nothing here can ${verb} that.` };
-}
-
 // latency: optimistic -- the agenda row ticks and strikes through at once
 export async function completeItem(
   sourceId: string,
   key: string,
 ): Promise<{ error: string | null }> {
-  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source?.complete) return refuse(sourceId, 'finish');
-
-  await source.complete(await context(), key);
+  const { error } = await completeAgendaItem(await context(), sourceId, key);
+  if (error) return { error };
   done();
   return { error: null };
 }
@@ -78,23 +62,19 @@ export async function deferItem(
   key: string,
   choice: string,
 ): Promise<{ error: string | null }> {
-  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source?.defer) return refuse(sourceId, 'put off');
-
   const ctx = await context();
   const later = laterUntil(choice, ctx.timezone, ctx.now);
   if (!later) return { error: LATER_REFUSED };
-  await source.defer(ctx, key, later.until);
+  const { error } = await deferAgendaItem(ctx, sourceId, key, later.until);
+  if (error) return { error };
   done();
   return { error: null };
 }
 
 // latency: optimistic -- the agenda row fades at once
 export async function dismissItem(sourceId: string, key: string): Promise<{ error: string | null }> {
-  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source?.dismiss) return refuse(sourceId, 'dismiss');
-
-  await source.dismiss(await context(), key);
+  const { error } = await dismissAgendaItem(await context(), sourceId, key);
+  if (error) return { error };
   done();
   return { error: null };
 }
@@ -103,7 +83,7 @@ export async function dismissItem(sourceId: string, key: string): Promise<{ erro
 // latency: pending
 export async function restoreItem(sourceId: string, key: string): Promise<{ error: string | null }> {
   const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source?.restore) return refuse(sourceId, 'bring back');
+  if (!source?.restore) return agendaRefusal(sourceId, 'bring back');
 
   await source.restore(await context(), key);
   done();
@@ -122,7 +102,7 @@ export async function answerItem(
   answer: string,
 ): Promise<{ error: string | null }> {
   const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
-  if (!source?.answer) return refuse(sourceId, 'answer');
+  if (!source?.answer) return agendaRefusal(sourceId, 'answer');
 
   const result = await source.answer(await context(), key, answer);
   if (result.error) return result;

@@ -1,3 +1,5 @@
+import { COMMENT_MAX } from '@/lib/goals/comments';
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { writeChange, type ChangeDeps } from '@/lib/ask/changes';
 import { checkChange, taggedWords, type ProposalToolName } from '@/lib/ask/propose';
@@ -9,8 +11,8 @@ import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
 import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { DashChangeInput, DashChangeKind, NewDashChange } from '@/lib/talk/changes';
-import { taskInput } from '@/lib/todo/tasks/input';
-import { wallClockToInstant } from '@/lib/todo/time';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
+import { completeTaskWithItems, renameInput, rescheduleInput, updateTaskFields, type TaskFields } from '@/lib/todo/tasks/write';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
 import { stepHref } from '@/lib/goals/all-goals';
@@ -21,6 +23,8 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { insertIdea } from '@/lib/ideas/insert';
+import { createCapturedNote } from '@/lib/vault/notes/create';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
@@ -189,15 +193,9 @@ async function one<T>(query: PromiseLike<{ data: unknown; error: { message: stri
 
 const todoHref = (id: string) => `/todo/all?status=all&focus=${id}`;
 
-/** The day and time a todo is due, as the two columns hold them. */
-function dueColumns(
-  dueOn: string | null,
-  dueTime: string | null,
-  timezone: string,
-): { due_on: string | null; due_at: string | null } {
-  if (!dueOn) return { due_on: null, due_at: null };
-  if (!dueTime) return { due_on: dueOn, due_at: null };
-  return { due_on: null, due_at: wallClockToInstant(dueOn, dueTime, timezone) };
+/** The person's todo client, as lib/todo/tasks/write.ts takes it. */
+async function todoClient(ctx: DashWriteContext): Promise<TodoSupabaseClient> {
+  return (await ctx.db('todo')) as unknown as TodoSupabaseClient;
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -324,13 +322,14 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   const moving = sent(args, 'due_on');
   if (!renaming && !moving) throw new Refused('Say what to change: a new title, a new due_on, or both.');
 
-  const update: Record<string, unknown> = {};
+  // The same write the form, the row's rename and its reschedule make (plan #2473.3).
+  const fields: TaskFields = {};
   let title: string | null = null;
   if (renaming) {
-    const parsed = taskInput.shape.title.safeParse(text(args, 'title'));
+    const parsed = renameInput.safeParse({ title: text(args, 'title') });
     if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
-    title = parsed.data;
-    update.title = title;
+    title = parsed.data.title;
+    fields.title = title;
   }
   let dueOn: string | null = null;
   let dueTime: string | null = null;
@@ -341,7 +340,9 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
     if (dueTime && !TIME.test(dueTime)) throw new Refused('due_time is not a time like 14:30.');
     if (dueTime && !dueOn) throw new Refused('A due_time needs a due_on.');
     if (dueTime) dueTime = dueTime.padStart(5, '0');
-    Object.assign(update, dueColumns(dueOn, dueTime, ctx.timezone ?? 'UTC'));
+    const parsed = rescheduleInput.safeParse({ dueOn: dueOn ?? '', dueTime: dueTime ?? '' });
+    if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
+    fields.due = parsed.data;
   }
 
   const task = await readTask(ctx, id);
@@ -350,10 +351,9 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
 
   const ref = toRef(TABLE.task, id);
   const before = await readSubject(ctx.db, ref);
-  const todo = await ctx.db('todo');
-  const { data, error } = await todo.from('tasks').update(update).eq('id', id).eq('user_id', ctx.userId).select('id');
-  if (error) throw new Error(error.message);
-  if ((data ?? []).length === 0) throw new Refused('That todo could not be changed.');
+  const { row, error } = await updateTaskFields(ctx.userId, id, fields, ctx.timezone ?? 'UTC', await todoClient(ctx));
+  if (error) throw new Error(error);
+  if (!row) throw new Refused('That todo could not be changed.');
   const after = await readSubject(ctx.db, ref);
 
   const now = title ?? task.title;
@@ -383,33 +383,14 @@ async function closeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteRe
   if (task.status === 'done') throw new Refused('That todo is ticked off already.');
   if (task.status !== 'open') throw new Refused(`That todo is ${task.status}, so it is not ticked off.`);
 
-  const todo = await ctx.db('todo');
-  // Finishing a todo finishes the items on its list (#261), as the page does.
-  const { data: open, error: openError } = await todo
-    .from('tasks')
-    .select('id')
-    .eq('parent_id', id)
-    .eq('user_id', ctx.userId)
-    .eq('status', 'open');
-  if (openError) throw new Error(openError.message);
-  const items = ((open ?? []) as { id: string }[]).map((row) => row.id);
-
+  // Finishing a todo finishes the items on its list (#261), through the
+  // function the checkbox calls (plan #2473.3), which says which it ticked.
   const ref = toRef(TABLE.task, id);
   const before = await readSubject(ctx.db, ref);
-  if (items.length > 0) {
-    const { error } = await todo.from('tasks').update({ status: 'done' }).in('id', items).eq('user_id', ctx.userId);
-    if (error) throw new Error(error.message);
-  }
-  const { data, error } = await todo
-    .from('tasks')
-    .update({ status: 'done' })
-    .eq('id', id)
-    .eq('user_id', ctx.userId)
-    .eq('status', 'open')
-    .select('id');
-  if (error) throw new Error(error.message);
-  if ((data ?? []).length === 0) throw new Refused('That todo changed while Dash was ticking it off.');
+  const { items, error } = await completeTaskWithItems(ctx.userId, id, await todoClient(ctx));
+  if (error) throw new Error(error);
   const after = await readSubject(ctx.db, ref);
+  if (after?.status !== 'done') throw new Refused('That todo could not be ticked off.');
 
   return made(
     'close_todo',
@@ -600,8 +581,8 @@ async function setGoalDoneWhen(ctx: DashWriteContext, args: Args): Promise<DashW
 // Jobs
 // ---------------------------------------------------------------------------
 
-/** Longest note Dash writes on a role. */
-export const ROLE_NOTE_MAX = 5000;
+/** Longest note Dash writes on a role: the role page's comment box takes no more. */
+export const ROLE_NOTE_MAX = COMMENT_MAX;
 
 async function addRoleNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
@@ -879,10 +860,11 @@ async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
     throw new Refused(`"${workspace}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
   }
 
-  const idea = await one<{ id: string }>(
-    (await ctx.db('public')).from('ideas').insert({ user_id: ctx.userId, body, module: workspace }).select('id'),
-  );
-  if (!idea) throw new Error('The idea was not saved.');
+  // The ideas page's own write.
+  const filed = await insertIdea(await ctx.db('public'), { userId: ctx.userId, body, module: workspace });
+  if (filed.error) throw new Error(filed.error);
+  if (!filed.id) throw new Error('The idea was not saved.');
+  const idea = { id: filed.id };
   const ref = toRef(TABLE.idea, idea.id);
   const line = body.split('\n')[0].trim();
   const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
@@ -920,9 +902,11 @@ async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWrit
   const body = text(args, 'text');
   if (body.length < 2) throw new Refused('text is missing: write the thought as they said it.');
   if (body.length > QUICK_NOTE_MAX) throw new Refused(`Keep the note under ${QUICK_NOTE_MAX} characters.`);
-  if (!ctx.fileQuickNote) throw new Refused('Quick notes cannot be saved from here.');
+  if (!ctx.quickNotePorts) throw new Refused('Quick notes cannot be saved from here.');
 
-  const filed = await ctx.fileQuickNote(body);
+  // The Vault page's own write (addQuickNote through fileVaultNote): the note
+  // in the Inbox, named from its text.
+  const filed = await createCapturedNote(await ctx.quickNotePorts(), body);
   if (!filed.ok) throw new Refused(filed.error);
   const ref = toRef(TABLE.note, filed.noteId);
   const line = body.split('\n')[0].trim();
@@ -974,6 +958,7 @@ const TAGS_PROP = {
 
 function tool(
   name: DashChangeKind,
+  runs: DashWriteRuns,
   description: string,
   input_schema: Anthropic.Tool['input_schema'],
   run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>,
@@ -981,6 +966,7 @@ function tool(
   return {
     name,
     kind: 'write',
+    runs,
     definition: { name, description: `${description} ${DONE_NOTE}`, input_schema },
     apply: guarded(name, run),
   };
@@ -990,6 +976,10 @@ function tool(
 export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_todo',
+    sameAs(
+      ['app/todo/actions.ts#addTask', 'lib/todo/tasks/write.ts#insertTask'],
+      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/tasks/write.ts#insertTask'],
+    ),
     `Add a todo to the person's list, when they ask you to. ${ADD_TAGS_HELP}`,
     {
       type: 'object',
@@ -1005,6 +995,11 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'change_todo',
+    sameAs(
+      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#renameTaskAction', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#rescheduleTaskAction', 'lib/todo/tasks/write.ts#updateTaskFields'],
+    ),
     'Rename one of their open todos, or move it to another day, when they ask you to ("move the dentist to Friday"). Name it by the todo.tasks ref search or todos returned for it; look it up first. Send only what changes: title to rename it, due_on to move it (null takes the date off).',
     {
       type: 'object',
@@ -1021,6 +1016,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'close_todo',
+    sameAs(['app/todo/actions.ts#completeTask', 'lib/todo/tasks/write.ts#completeTaskWithItems']),
     'Tick off one of their open todos, when they say it is done or ask you to. Name it by the todo.tasks ref a lookup returned; look it up first. The items on its list are ticked off with it.',
     {
       type: 'object',
@@ -1032,6 +1028,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal',
+    noButton(
+      'No Goals page adds a goal by hand: goals come in through capture, and the Level 3 goal on Subjects is an offer the person accepts.',
+    ),
     'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it. When none of their areas fits the goal, make one: pass new_area true with a short name for it ("Music"), rather than asking. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
     {
       type: 'object',
@@ -1048,6 +1047,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal_step',
+    sameAs(['app/goals/[goalId]/actions.ts#addStep', 'lib/goals/steps-store.ts#insertStep']),
     "Add a step under one of the person's goals, when they ask you to. Name the goal by the ref goal_status or search returned for it in the goals.items table; look it up first. The step is theirs and goes last under the goal.",
     {
       type: 'object',
@@ -1062,6 +1062,10 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'close_goal_step',
+    sameAs(
+      ['app/goals/[goalId]/actions.ts#setStepStatusAction', 'lib/goals/steps-store.ts#setStepStatus'],
+      ['app/goals/[goalId]/block-actions.ts#setGoalStepStatus', 'lib/goals/steps-store.ts#setStepStatus'],
+    ),
     'Mark a step under one of their goals done, when they say it is done or ask you to. Name it by the goals.items ref search (kinds ["step"]) or goal_status returned for it; look it up first. A goal itself is not closed this way.',
     {
       type: 'object',
@@ -1073,6 +1077,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'set_goal_done_when',
+    sameAs(['app/goals/actions.ts#editGoal', 'lib/goals/store.ts#updateGoal']),
     "Write, change or clear the done-when of one of their goals, when they ask for it: the line that says when the goal is finished (\"the song is live on Spotify\"). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write it in their words. An empty done_when clears it.",
     {
       type: 'object',
@@ -1087,6 +1092,10 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'mark_returned',
+    sameAs(
+      ['app/shopping/inventory/actions.ts#markInventoryReturned', 'lib/returns/mark.ts#markReturned'],
+      ['app/shopping/returns/actions.ts#markItemReturned', 'lib/returns/mark.ts#markReturned'],
+    ),
     'Mark an item the person owns as returned, when they say they sent it back. Name it by the ref search returned for it in the public.inventory_items table; look it up first. It records a full refund at what the item cost.',
     {
       type: 'object',
@@ -1100,6 +1109,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_role_note',
+    // The role page's notes are its thread (lib/thread/store.ts). The company page's notes,
+    // addNote, are change_company's `note` (plan #2473.8).
+    sameAs(['app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment', 'lib/thread/store.ts#addThreadTurn']),
     'Add a note to one of their roles in Jobs, when they ask you to note something on it ("note on the Stripe role that the recruiter is Sam"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref applications returned; look it up first. Write the note in their words.',
     {
       type: 'object',
@@ -1114,6 +1126,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_job_lead',
+    noButton('No Jobs page adds a role by hand: leads come in from capture, from email and from the find page.'),
     'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this. To mark the company a target as well, pass company_priority; for a job already saved, mark its company with change_company.',
     {
       type: 'object',
@@ -1134,6 +1147,10 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_idea',
+    sameAs(
+      ['app/dev/ideas/actions.ts#addIdea', 'lib/ideas/insert.ts#insertIdea'],
+      ['app/dev/ideas/actions.ts#submitIdea', 'lib/ideas/insert.ts#insertIdea'],
+    ),
     'File an idea on the ideas page in Dev, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas.',
     {
       type: 'object',
@@ -1151,6 +1168,18 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'change_items',
+    sameAs(
+      ['app/shopping/inventory/actions.ts#disposeInventoryItem', 'lib/inventory/unit-changes.ts#disposeUnits'],
+      ['app/shopping/inventory/actions.ts#quickDisposeInventoryItem', 'lib/inventory/unit-changes.ts#disposeUnits'],
+      ['app/shopping/inventory/actions.ts#setItemsForSale', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/inventory/actions.ts#toggleItemForSaleForm', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/inventory/group-actions.ts#groupItemsTogether', 'lib/inventory/group-units.ts#groupUnits'],
+      ['app/shopping/inventory/group-actions.ts#separateCopy', 'lib/inventory/group-units.ts#separateUnit'],
+      ['app/shopping/inventory/group-actions.ts#ungroupItems', 'lib/inventory/group-units.ts#ungroupUnits'],
+      ['app/shopping/returns/actions.ts#setReturnPlanned', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/returns/actions.ts#toggleReturnPlannedForm', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/returns/actions.ts#setItemsReturnPlanned', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+    ),
     `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). When a query_rows lookup matched the items (or the orders) and named the match as a set, pass set and nothing else to name them: it holds every row the lookup matched, listed or not, so never copy refs out of it. Otherwise name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more), dispose (they sold, gave away, donated, threw out, recycled or used them up: give disposal_method, and proceeds for one item sold), ungroup (every copy in the groups those items are in stacks by its own details again), separate (hold each copy out of its stack as an item of its own). Only items they still own are changed, except that ungroup takes any. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
     {
       type: 'object',
@@ -1187,6 +1216,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'move_roles',
+    sameAs(
+      ['app/jobs/(app)/pipeline/actions.ts#moveApplication', 'lib/jobs/applications/stage.ts#moveApplicationsTo'],
+    ),
     `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). When a query_rows lookup of job_search.roles or job_search.applications matched exactly the roles to move, pass the set it named as set instead of listing them. Otherwise name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
     {
       type: 'object',
@@ -1217,6 +1249,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_quick_note',
+    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/vault/notes/create.ts#createCapturedNote']),
     'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in the vault\'s Inbox, where Quick note triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
     {
       type: 'object',

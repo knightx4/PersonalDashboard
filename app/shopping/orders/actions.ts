@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { domainFromAddress } from '@/lib/email/extract/classify';
-import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
+import { restoreOrders } from '@/lib/review/moves';
+import { tagOrderItem, untagOrderItem } from '@/lib/tags/ensure';
 
 /**
  * Mute a merchant forever + remove their existing orders.
@@ -174,14 +175,8 @@ export async function restoreDeletedOrder(formData: FormData): Promise<void> {
     throw new Error('Invalid order.');
   }
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ deleted_at: null })
-    .eq('id', orderId)
-    .eq('user_id', user.id)
-    .not('deleted_at', 'is', null);
-
-  if (error) throw new Error(error.message);
+  const restored = await restoreOrders(supabase, { userId: user.id, ids: [orderId], reviewAgain: false });
+  if (!restored.ok) throw new Error(restored.error);
 
   revalidatePath('/shopping/orders');
   revalidatePath(`/shopping/orders/${orderId}`);
@@ -257,9 +252,8 @@ export async function addOrderItemTag(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!item) return;
 
-  const [tag] = await ensureItemTags(supabase, user.id, [parsed.data.tag]);
-  if (!tag) return;
-  await linkOrderItemTags(supabase, parsed.data.orderItemId, [tag.id]);
+  const tagged = await tagOrderItem(supabase, { userId: user.id, orderItemId: parsed.data.orderItemId, label: parsed.data.tag });
+  if (!tagged) return;
 
   revalidatePath(`/shopping/orders/${parsed.data.orderId}`);
   revalidatePath('/shopping/orders');
@@ -283,19 +277,8 @@ export async function removeOrderItemTag(input: {
   if (!parsed.success) return;
 
   const supabase = await createClient();
-  const { data: owned } = await supabase
-    .from('item_tags')
-    .select('id')
-    .eq('id', parsed.data.tagId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!owned) return;
-
-  await supabase
-    .from('order_item_tags')
-    .delete()
-    .eq('order_item_id', parsed.data.orderItemId)
-    .eq('tag_id', parsed.data.tagId);
+  const removed = await untagOrderItem(supabase, { userId: user.id, orderItemId: parsed.data.orderItemId, tagId: parsed.data.tagId });
+  if (removed.length === 0) return;
 
   revalidatePath(`/shopping/orders/${parsed.data.orderId}`);
   revalidatePath('/shopping/orders');

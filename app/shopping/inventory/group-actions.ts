@@ -13,11 +13,13 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import {
-  displayName,
   groupUnits,
+  separateUnit,
+  ungroupUnits,
   UNIT_SELECT as SELECT,
   type UnitRow,
 } from '@/lib/inventory/group-units';
+import { renameGroup } from '@/lib/inventory/item-writes';
 import type { ActionState } from '@/app/shopping/inventory/actions';
 
 function idsFrom(formData: FormData): string[] {
@@ -80,21 +82,8 @@ export async function separateCopy(
   const row = data as unknown as UnitRow | null;
   if (!row) return { error: 'That copy could not be found.' };
 
-  const { data: group, error: groupError } = await supabase
-    .from('item_groups')
-    .insert({ user_id: user.id, name: displayName(row), group_key: null })
-    .select('id')
-    .single();
-  if (groupError || !group) {
-    return { error: groupError?.message ?? 'Could not separate that copy.' };
-  }
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ group_id: group.id })
-    .eq('user_id', user.id)
-    .eq('id', row.id);
-  if (error) return { error: error.message };
+  const separated = await separateUnit(supabase, user.id, row);
+  if (!separated.ok) return { error: separated.error };
 
   revalidateGrouping([row.id]);
   return { message: 'Separated. It is its own item now.' };
@@ -118,33 +107,12 @@ export async function ungroupItems(
   const groupId = z.string().uuid().safeParse(formData.get('group_id'));
   if (!groupId.success) return { error: 'Missing group.' };
 
-  // Ownership is checked here rather than trusted from the form: the update
-  // below filters on user_id, but the delete needs the same guarantee.
-  const { data: group } = await supabase
-    .from('item_groups')
-    .select('id')
-    .eq('id', groupId.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!group) return { error: 'That group could not be found.' };
+  // Ownership is checked in ungroupUnits rather than trusted from the form:
+  // the update filters on user_id, and the delete needs the same guarantee.
+  const ungrouped = await ungroupUnits(supabase, user.id, { groupIds: [groupId.data], keepGroups: false });
+  if (!ungrouped.ok) return { error: ungrouped.error };
 
-  const { data: members } = await supabase
-    .from('inventory_items')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('group_id', group.id);
-  const ids = (members ?? []).map((row) => row.id as string);
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ group_id: null })
-    .eq('user_id', user.id)
-    .eq('group_id', group.id);
-  if (error) return { error: error.message };
-
-  await supabase.from('item_groups').delete().eq('id', group.id).eq('user_id', user.id);
-
-  revalidateGrouping(ids);
+  revalidateGrouping(ungrouped.ids);
   return { message: 'Ungrouped. These stack by their own details again.' };
 }
 
@@ -168,12 +136,8 @@ export async function renameItemGroup(
     .eq('user_id', user.id)
     .eq('group_id', groupId.data);
 
-  const { error } = await supabase
-    .from('item_groups')
-    .update({ name: name.slice(0, 200) })
-    .eq('id', groupId.data)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const renamed = await renameGroup(supabase, { userId: user.id, groupId: groupId.data, name });
+  if (!renamed.ok) return { error: renamed.error };
 
   revalidateGrouping((members ?? []).map((row) => row.id as string));
   return { message: 'Renamed.' };

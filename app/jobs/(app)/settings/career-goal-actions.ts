@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { THOUGHT_MAX } from '@/lib/jobs/thoughts';
+import { addThoughtRow, saveThoughtEdit, THOUGHT_MAX } from '@/lib/jobs/thoughts';
 import { formatNumber } from '@/lib/money';
 
 /**
@@ -34,8 +34,8 @@ export async function addThought(_prev: ThoughtState, form: FormData): Promise<T
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase.from('thoughts').insert({ user_id: user.id, body: body.trim() });
-  if (error) return { error: error.message };
+  const { error } = await addThoughtRow(supabase, user.id, body);
+  if (error) return { error };
 
   revalidateGoals();
   return { error: null };
@@ -48,12 +48,8 @@ export async function updateThought(id: string, body: string): Promise<{ error: 
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('thoughts')
-    .update({ body: body.trim() })
-    .eq('id', id)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveThoughtEdit(supabase, user.id, id, body);
+  if (error) return { error };
 
   revalidateGoals();
   return { error: null };
