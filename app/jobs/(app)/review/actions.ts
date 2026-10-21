@@ -6,12 +6,17 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { excludableDomains } from '@/lib/jobs/review/exclusions';
-import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
-import { type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { channelForMessage } from '@/lib/jobs/applications/channel';
-import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
+import { addPursuitFromMail, linkMessageToApplication } from '@/lib/jobs/inbox/role-mail';
+import {
+  acknowledgeEventRows,
+  confirmApplicationRow,
+  dismissMessageRows,
+  reopenApplicationRows,
+  restoreMessageRow,
+  unacknowledgeEventRows,
+} from '@/lib/jobs/review/verdicts';
 
 /**
  * Working the queue.
@@ -58,50 +63,16 @@ export async function linkMessage(
 
   if (!application) return { error: 'That application no longer exists.' };
 
-  const kind = eventKindFor(message.classification as MessageClassification);
-
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({
-      resulting_application_id: parsed.data.applicationId,
-      parse_status: 'parsed',
-      link_method: 'manual',
-      link_confidence: 1,
-      error: null,
-    })
-    .eq('id', parsed.data.messageId);
-
-  if (error) return { error: error.message };
-
-  if (kind) {
-    // The same backwards-transition rule applies to a hand link: the event is
-    // recorded, and it does not reopen a closed pursuit. Whether the conflict
-    // is worth raising is the ingestion's rule too -- a rejection landing on a
-    // pursuit that is already closed is an echo, not a reason to ask whether
-    // it reopened.
-    const conflict = handLinkedEventNeedsReview(application.status as ApplicationStatus, kind);
-    await supabase.from('application_events').insert({
-      user_id: user.id,
-      application_id: parsed.data.applicationId,
-      kind,
-      occurred_at: (message.received_at as string) ?? new Date().toISOString(),
-      source: 'email',
-      ingested_message_id: parsed.data.messageId,
-      summary: (message.subject as string) ?? 'Linked by hand from the review queue',
-      needs_review: conflict,
-    });
-
-    // An interview the email announced gets its round, with the date to be
-    // set when the email gave none, so the pursuit reads as having reached
-    // one. ensureInterviewRound books nothing where an interview is on file.
-    if (kind === 'interview_scheduled') {
-      await ensureInterviewRound(supabase, {
-        userId: user.id,
-        applicationId: parsed.data.applicationId,
-        kind: null,
-      });
-    }
-  }
+  // The link, the event its classification implies and any round it books
+  // (lib/jobs/inbox/role-mail.ts). Once the link is written the rest is best
+  // effort, as it always was: the email is on the pursuit either way.
+  const linked = await linkMessageToApplication(
+    supabase,
+    user.id,
+    { id: message.id as string, classification: message.classification, received_at: message.received_at, subject: message.subject },
+    { id: application.id as string, status: application.status },
+  );
+  if (!linked.linked) return { error: linked.error };
 
   revalidatePath('/jobs/review');
   revalidatePath('/jobs/pipeline');
@@ -157,44 +128,16 @@ export async function createRoleFromMessage(input: {
   const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
   if (company.error) return { error: company.error, roleId: null };
 
-  const { data: role, error: roleError } = await supabase
-    .from('roles')
-    .insert({
-      user_id: user.id,
-      company_id: company.id,
-      title: parsed.data.title,
-      source: channel,
-    })
-    .select('id')
-    .single();
+  // A person read the message and said this is a real pursuit, which is
+  // exactly what the inferred flag exists to ask about.
+  const { role, applicationId, error: pursuitError } = await addPursuitFromMail(supabase, user.id, {
+    companyId: company.id,
+    title: parsed.data.title,
+    channel,
+  });
+  if (pursuitError || !role || !applicationId) return { error: pursuitError, roleId: null };
 
-  if (roleError || !role) {
-    return { error: roleError?.message ?? 'Could not create the role.', roleId: null };
-  }
-
-  const { data: application, error: applicationError } = await supabase
-    .from('applications')
-    .insert({
-      user_id: user.id,
-      role_id: role.id,
-      source: channel,
-      // A person read the message and said this is a real pursuit, which is
-      // exactly what the inferred flag exists to ask about.
-      created_by: 'manual',
-    })
-    .select('id')
-    .single();
-
-  if (applicationError || !application) {
-    // The role would otherwise sit there with nothing attached to it.
-    await supabase.from('roles').delete().eq('id', role.id).eq('user_id', user.id);
-    return {
-      error: applicationError?.message ?? 'Could not create the pursuit.',
-      roleId: null,
-    };
-  }
-
-  const linked = await linkMessage(parsed.data.messageId, application.id as string);
+  const linked = await linkMessage(parsed.data.messageId, applicationId);
   if (linked.error) return { error: linked.error, roleId: role.id as string };
 
   revalidatePath('/jobs/review');
@@ -218,19 +161,9 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
   await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({
-      classification: 'not_relevant',
-      parse_status: 'skipped',
-      resulting_application_id: null,
-      link_method: null,
-      link_confidence: null,
-      error: null,
-    })
-    .eq('id', messageId);
+  const { error } = await dismissMessageRows(supabase, [messageId]);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/review');
   return { error: null };
 }
@@ -240,13 +173,9 @@ export async function confirmApplication(applicationId: string): Promise<{ error
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('applications')
-    .update({ needs_review: false })
-    .eq('id', applicationId)
-    .eq('user_id', user.id);
+  const { error } = await confirmApplicationRow(supabase, user.id, applicationId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/review');
   revalidatePath('/jobs/pipeline');
   return { error: null };
@@ -388,13 +317,9 @@ export async function acknowledgeEvent(eventId: string): Promise<{ error: string
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('application_events')
-    .update({ needs_review: false, acknowledged_at: new Date().toISOString() })
-    .eq('id', eventId)
-    .eq('user_id', user.id);
+  const { error } = await acknowledgeEventRows(supabase, user.id, [eventId]);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/review');
   return { error: null };
 }
@@ -413,23 +338,9 @@ export async function reopenApplication(
   const user = await requireUser();
   const supabase = await createClient();
 
-  await supabase.from('application_events').insert({
-    user_id: user.id,
-    application_id: applicationId,
-    kind: 'status_override',
-    occurred_at: new Date().toISOString(),
-    source: 'manual',
-    summary: `Reopened by hand as ${status.replace(/_/g, ' ')}`,
-    payload: { status },
-  });
+  const { error } = await reopenApplicationRows(supabase, user.id, applicationId, status);
 
-  const { error } = await supabase
-    .from('applications')
-    .update({ status_manual_override: status })
-    .eq('id', applicationId)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/review');
   revalidatePath('/jobs/pipeline');
   return { error: null };
@@ -504,19 +415,9 @@ export async function dismissMessages(
   }
 
   const changed = restore.map((row) => row.id);
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({
-      classification: 'not_relevant',
-      parse_status: 'skipped',
-      resulting_application_id: null,
-      link_method: null,
-      link_confidence: null,
-      error: null,
-    })
-    .in('id', changed);
+  const { error } = await dismissMessageRows(supabase, changed);
 
-  if (error) return { changed: [], restore: [], error: error.message };
+  if (error) return { changed: [], restore: [], error };
 
   revalidatePath('/jobs/review');
   return { changed, restore };
@@ -539,19 +440,16 @@ export async function restoreDismissedMessages(
   // One statement per message: each goes back to its own classification and its
   // own link. A selection is tens of rows, not thousands.
   for (const message of parsed.data) {
-    const { error } = await supabase
-      .from('ingested_messages')
-      .update({
-        classification: message.classification,
-        parse_status: message.parseStatus,
-        resulting_application_id: message.applicationId,
-        link_method: message.linkMethod,
-        link_confidence: message.linkConfidence,
-        error: message.error,
-      })
-      .eq('id', message.id);
+    const { error } = await restoreMessageRow(supabase, message.id, {
+      classification: message.classification,
+      parse_status: message.parseStatus,
+      resulting_application_id: message.applicationId,
+      link_method: message.linkMethod,
+      link_confidence: message.linkConfidence,
+      error: message.error,
+    });
 
-    if (error) return { changed: [], error: error.message };
+    if (error) return { changed: [], error };
   }
 
   revalidatePath('/jobs/review');
@@ -579,13 +477,9 @@ export async function acknowledgeEvents(ids: string[]): Promise<JobsBulkResult> 
   const changed = (events ?? []).map((row) => row.id as string);
   if (changed.length === 0) return { changed: [], error: 'Those are acknowledged already.' };
 
-  const { error } = await supabase
-    .from('application_events')
-    .update({ needs_review: false, acknowledged_at: new Date().toISOString() })
-    .in('id', changed)
-    .eq('user_id', user.id);
+  const { error } = await acknowledgeEventRows(supabase, user.id, changed);
 
-  if (error) return { changed: [], error: error.message };
+  if (error) return { changed: [], error };
 
   revalidatePath('/jobs/review');
   return { changed };
@@ -606,13 +500,9 @@ export async function unacknowledgeEvents(ids: readonly string[]): Promise<JobsB
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('application_events')
-    .update({ needs_review: true, acknowledged_at: null })
-    .in('id', parsed.data)
-    .eq('user_id', user.id);
+  const { error } = await unacknowledgeEventRows(supabase, user.id, parsed.data);
 
-  if (error) return { changed: [], error: error.message };
+  if (error) return { changed: [], error };
 
   revalidatePath('/jobs/review');
   return { changed: [...parsed.data] };

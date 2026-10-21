@@ -72,6 +72,18 @@ function setup(coverLetter: string | null) {
     ],
     'todo.tasks': [],
   };
+  // add_todo writes through insertTask (plan #2473.3): the new row takes the
+  // table's defaults, and the id this test names it by.
+  const tasks = tables['todo.tasks'];
+  Object.defineProperty(tasks, 'push', {
+    enumerable: false,
+    value: (...rows: Record<string, unknown>[]) => {
+      for (const row of rows) {
+        Array.prototype.push.call(tasks, Object.assign(row, { status: 'open', due_at: null, snoozed_until: null, parent_id: null, ...row, id: TODO }));
+      }
+      return tasks.length;
+    },
+  });
   const dash = fakeDashDeps(tables, ME);
   const db = fakeSchemaDb(tables);
   const client = db('job_search') as unknown as AppSupabaseClient;
@@ -89,21 +101,7 @@ function setup(coverLetter: string | null) {
           searchSources: [],
           seen,
           goals: async () => db('goals') as unknown as GoalsSupabaseClient,
-          createTask: async (userId, input) => {
-            tables['todo.tasks'].push({
-              id: TODO,
-              user_id: userId,
-              title: input.title,
-              body: input.body ?? null,
-              status: 'open',
-              due_on: input.dueOn ?? null,
-              due_at: null,
-              pinned: input.pinned ?? false,
-              snoozed_until: null,
-              parent_id: null,
-            });
-            return { id: TODO, error: null };
-          },
+          createTask: async () => ({ id: null, error: 'unused' }),
           thread: acts,
         },
         args,

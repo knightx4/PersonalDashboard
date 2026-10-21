@@ -20,6 +20,7 @@ import {
 } from '@/lib/jobs/evidence/sources';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { ownsResumePath } from '@/lib/jobs/resume-file';
+import { addResumeRow, pointResumeAt } from '@/lib/jobs/resume-versions';
 
 /**
  * The evidence bank.
@@ -57,20 +58,18 @@ export async function addEvidence(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('evidence_items').insert({
-    user_id: user.id,
-    title: parsed.data.title,
-    body: parsed.data.body,
-    context: parsed.data.context || null,
-    metrics: parsed.data.metrics || null,
-    strength: parsed.data.strength,
-    skills: (parsed.data.skills ?? '')
-      .split(/[,\n]/)
-      .map((entry) => entry.trim().toLowerCase().replace(/\s+/g, '_'))
-      .filter(Boolean),
-  });
+  const added = await addEvidenceItems(supabase, user.id, [
+    {
+      title: parsed.data.title,
+      body: parsed.data.body,
+      context: parsed.data.context || null,
+      metrics: parsed.data.metrics || null,
+      strength: parsed.data.strength,
+      skills: (parsed.data.skills ?? '').split(/[,\n]/),
+    },
+  ]);
 
-  if (error) return { error: error.message };
+  if (!added.ok) return { error: added.error };
   revalidatePath('/jobs/material');
   return { message: 'Added.' };
 }
@@ -119,21 +118,14 @@ export async function addResumeVersion(
     return { error: 'That upload is not in your folder. Pick the file again.' };
   }
 
-  const { error } = await supabase.from('resume_versions').insert({
-    user_id: user.id,
+  const { error } = await addResumeRow(supabase, user.id, {
     label: parsed.data.label,
     notes: parsed.data.notes || null,
     text_content: parsed.data.textContent || null,
     storage_path: storagePath,
   });
 
-  if (error) {
-    return {
-      error: /resume_versions_user_label_key/.test(error.message)
-        ? 'You already have a version with that label.'
-        : error.message,
-    };
-  }
+  if (error) return { error };
 
   revalidatePath('/jobs/material');
   return { message: 'Added.' };
@@ -167,12 +159,8 @@ export async function attachResumePdf(
     .maybeSingle();
   if (!existing) return { error: 'No such resume version.' };
 
-  const { error } = await supabase
-    .from('resume_versions')
-    .update({ storage_path: storagePath })
-    .eq('id', resumeVersionId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await pointResumeAt(supabase, user.id, resumeVersionId, storagePath);
+  if (error) return { error };
 
   const previous = existing.storage_path as string | null;
   if (previous && previous !== storagePath && ownsResumePath(user.id, previous)) {

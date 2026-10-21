@@ -7,6 +7,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { fingerprintLoose } from '@/lib/fingerprint';
 import { formatCentsAsDollarsInput, parseDollarsToCents } from '@/lib/money';
 import { findMerchantByUrl } from '@/lib/saved/resolve-merchant';
+import { saveForLater, setSavedStatus, updateSaved } from '@/lib/saved/write';
 import { ScrapeUrlError, scrapeProductUrl } from '@/lib/saved/scrape-product';
 
 export interface ActionState {
@@ -177,32 +178,20 @@ export async function createSavedItem(
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
   }
 
-  let merchantId = parsed.data.merchantId ?? null;
-  if (!merchantId) {
-    const merchants = await loadMerchants(supabase);
-    merchantId = findMerchantByUrl(parsed.data.url, merchants)?.id ?? null;
-  }
+  const saved = await saveForLater(supabase, {
+    userId: user.id,
+    url: parsed.data.url,
+    title: parsed.data.title,
+    imageUrl: parsed.data.imageUrl,
+    priceCents: parsed.data.priceCents,
+    currency: parsed.data.currency,
+    notes: parsed.data.notes ?? null,
+    merchantId: parsed.data.merchantId ?? null,
+  });
 
-  const { data, error } = await supabase
-    .from('saved_items')
-    .insert({
-      user_id: user.id,
-      url: parsed.data.url,
-      title: parsed.data.title,
-      image_url: parsed.data.imageUrl,
-      price_cents: parsed.data.priceCents,
-      currency: parsed.data.currency,
-      notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
-      merchant_id: merchantId,
-      fingerprint_loose: fingerprintLoose(parsed.data.title),
-      status: 'saved',
-    })
-    .select('id')
-    .single();
-
-  if (error) return { error: error.message };
+  if (saved.error !== undefined) return { error: saved.error };
   revalidatePath('/shopping/saved');
-  redirect(`/shopping/saved/${data.id}`);
+  redirect(`/shopping/saved/${saved.item.id as string}`);
 }
 
 // latency: pending
@@ -230,42 +219,36 @@ export async function updateSavedItem(
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
   }
 
-  const { error } = await supabase
-    .from('saved_items')
-    .update({
+  const updated = await updateSaved(supabase, {
+    userId: user.id,
+    id: parsed.data.id,
+    patch: {
       url: parsed.data.url,
       title: parsed.data.title,
       image_url: parsed.data.imageUrl,
       price_cents: parsed.data.priceCents,
       currency: parsed.data.currency,
-      notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
+      notes: parsed.data.notes ?? null,
       merchant_id: parsed.data.merchantId ?? null,
-      fingerprint_loose: fingerprintLoose(parsed.data.title),
-    })
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id);
+    },
+  });
 
-  if (error) return { error: error.message };
+  if (updated.error !== undefined) return { error: updated.error };
 
   revalidatePath('/shopping/saved');
   revalidatePath(`/shopping/saved/${parsed.data.id}`);
   return { message: 'Saved.' };
 }
 
-async function setSavedStatus(
+async function moveSaved(
   id: string,
   status: 'saved' | 'purchased' | 'dismissed',
 ): Promise<ActionState> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('saved_items')
-    .update({ status })
-    .eq('id', id)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
+  const moved = await setSavedStatus(supabase, { userId: user.id, id, status });
+  if (moved.error !== undefined) return { error: moved.error };
 
   revalidatePath('/shopping/saved');
   revalidatePath(`/shopping/saved/${id}`);
@@ -279,7 +262,7 @@ export async function markSavedPurchased(
 ): Promise<ActionState> {
   const id = String(formData.get('id') ?? '');
   if (!z.string().uuid().safeParse(id).success) return { error: 'Missing item.' };
-  return setSavedStatus(id, 'purchased');
+  return moveSaved(id, 'purchased');
 }
 
 // latency: pending
@@ -289,7 +272,7 @@ export async function dismissSavedItem(
 ): Promise<ActionState> {
   const id = String(formData.get('id') ?? '');
   if (!z.string().uuid().safeParse(id).success) return { error: 'Missing item.' };
-  return setSavedStatus(id, 'dismissed');
+  return moveSaved(id, 'dismissed');
 }
 
 // latency: pending
@@ -299,7 +282,7 @@ export async function restoreSavedItem(
 ): Promise<ActionState> {
   const id = String(formData.get('id') ?? '');
   if (!z.string().uuid().safeParse(id).success) return { error: 'Missing item.' };
-  return setSavedStatus(id, 'saved');
+  return moveSaved(id, 'saved');
 }
 
 // latency: pending

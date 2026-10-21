@@ -1,9 +1,21 @@
+import {
+  addInterviewerRow,
+  gatherIntoRound,
+  interviewerContact,
+  interviewersNamed,
+  moveInterviewToRound,
+  removeInterviewerRow,
+  saveInterviewEdit,
+  saveRoundEdit,
+  unlinkRoundEmailRow,
+} from '@/lib/jobs/interview/edit';
+import { sameAs } from './runs';
 import { isUuid, type AskDb, type SchemaClient } from '@/lib/ask/db';
 import { toRef } from '@/lib/core/refs';
 import { formatNumber } from '@/lib/money';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KINDS, interviewKindLabel } from '@/lib/jobs/interview-kinds';
-import { nextRoundNumber } from '@/lib/jobs/interview/rounds';
+import { insertInterviewRound } from '@/lib/jobs/interview/rounds';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { JobsRefused } from './jobs-refused';
 import type { JobsMade, JobsWrite, JobsWriteEnv } from './jobs-writes';
@@ -253,20 +265,27 @@ async function changeKept(env: JobsWriteEnv, undo: InterviewRowsUndo, table: str
   return written;
 }
 
-async function addKept(env: JobsWriteEnv, undo: InterviewRowsUndo, table: string, values: Row): Promise<Row> {
-  const { data, error } = await env.jobs.from(table).insert(values).select('*').single();
-  if (error || !data) throw new Error(`Adding to ${table} failed: ${error?.message ?? 'no row'}`);
-  undo.added.push({ table, id: (data as Row).id as string });
-  return data as Row;
+const jobsDb = (env: JobsWriteEnv) => env.jobs as unknown as AppSupabaseClient;
+
+/** A row a shared write changed, kept with the columns it wrote before and after. */
+async function changedBy(undo: InterviewRowsUndo, table: string, row: Row, update: Row, write: Promise<{ row: Row | null; error: string | null }>): Promise<Row> {
+  const { row: written, error } = await write;
+  if (error) throw new Error(`Changing ${table} failed: ${error}`);
+  if (!written) throw new JobsRefused('That changed while Dash was writing it. Nothing more was changed.');
+  undo.changed.push({
+    table,
+    id: row.id as string,
+    before: Object.fromEntries(Object.keys(update).map((column) => [column, row[column] ?? null])),
+    after: Object.fromEntries(Object.keys(update).map((column) => [column, written[column] ?? null])),
+  });
+  return written;
 }
 
-/** Take a row out, keeping it whole. interview_participants is scoped by its interview, which the caller has checked is theirs. */
-async function removeKept(env: JobsWriteEnv, undo: InterviewRowsUndo, table: string, row: Row): Promise<void> {
-  let query = env.jobs.from(table).delete().eq('id', row.id as string);
-  if (table !== 'interview_participants') query = query.eq('user_id', env.userId);
-  const { error } = await query.select('id');
-  if (error) throw new Error(`Taking out of ${table} failed: ${error.message}`);
-  undo.removed.push({ table, row });
+/** Rows a shared write took out, kept whole for the Undo. */
+async function removedBy(undo: InterviewRowsUndo, table: string, write: Promise<{ rows: Row[]; error: string | null }>): Promise<void> {
+  const { rows: taken, error } = await write;
+  if (error) throw new Error(`Taking out of ${table} failed: ${error}`);
+  for (const row of taken) undo.removed.push({ table, row });
 }
 
 /** A failed change of several rows puts back what it had done, then fails. */
@@ -451,9 +470,9 @@ async function changeInterview(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   }
   if (said.length === 0) throw new JobsRefused(`Nothing to change: ${name} already reads that way.`);
 
-  const { data, error } = await env.jobs.from('interviews').update(update).eq('id', interview.id as string).eq('user_id', env.userId).select('*');
-  const after = ((data ?? []) as Row[])[0];
-  if (error || !after) throw new Error(`Changing the interview failed: ${error?.message ?? 'no row'}`);
+  // The same write as the interview's card on the role page.
+  const { row: after, error } = await saveInterviewEdit(jobsDb(env), env.userId, interview.id as string, update);
+  if (error || !after) throw new Error(`Changing the interview failed: ${error ?? 'no row'}`);
   const done = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
   return {
     kind: 'change_interview',
@@ -505,7 +524,8 @@ async function changeInterviewer(env: JobsWriteEnv, args: Args): Promise<JobsMad
     if (matches.length === 0) throw new JobsRefused(`${contactRef ? 'That contact' : personName} is not named on ${name}.`);
     if (matches.length > 1) throw new JobsRefused(`More than one ${personName} is named on ${name}. Give contact_ref.`);
     const contact = await ownRow(env, 'contacts', matches[0].contact_id as string, 'contact');
-    await removeKept(env, undo, 'interview_participants', matches[0]);
+    // The same write as the round's remove.
+    await removedBy(undo, 'interview_participants', removeInterviewerRow(jobsDb(env), interview.id as string, contact.id as string));
     const who = String(contact.full_name ?? 'them');
     return {
       kind: 'change_interviewer',
@@ -527,19 +547,25 @@ async function changeInterviewer(env: JobsWriteEnv, args: Args): Promise<JobsMad
   } else {
     const role = await ownRow(env, 'roles', pursuit.roleId, 'role');
     const companyId = (role.company_id as string | null) ?? null;
-    const same = (await contactsNamed(env, personName)).filter((row) => (row.company_id ?? null) === companyId);
-    if (same.length > 1) throw new JobsRefused(`They have more than one contact called ${personName} there. Give contact_ref.`);
-    if (same[0]) contact = same[0];
-    else {
-      contact = await addKept(env, undo, 'contacts', { user_id: env.userId, company_id: companyId, full_name: personName, relationship: 'interviewer' });
-      made = true;
-    }
+    const same = await interviewersNamed(jobsDb(env), env.userId, companyId, personName);
+    if (same.error) throw new Error(`Reading their contacts failed: ${same.error}`);
+    if (same.rows.length > 1) throw new JobsRefused(`They have more than one contact called ${personName} there. Give contact_ref.`);
+    // As the round's "add someone new": the one of that name there, or a new contact.
+    const found = await interviewerContact(jobsDb(env), env.userId, companyId, personName);
+    if (found.error || !found.contact) throw new Error(`Adding the contact failed: ${found.error ?? 'no row'}`);
+    contact = found.contact;
+    made = found.made;
+    if (made) undo.added.push({ table: 'contacts', id: contact.id as string });
   }
   const who = String(contact.full_name ?? personName);
   if (onIt.some((row) => row.contact_id === contact.id)) throw new JobsRefused(`${who} is already named on ${name}. Nothing was changed; tell them so.`);
   let participant: Row;
   try {
-    participant = await addKept(env, undo, 'interview_participants', { interview_id: interview.id, contact_id: contact.id, role: 'interviewer' });
+    // The same write as the round's add.
+    const { row, error } = await addInterviewerRow(jobsDb(env), interview.id as string, contact.id as string);
+    if (error || !row) throw new Error(`Adding to interview_participants failed: ${error ?? 'no row'}`);
+    undo.added.push({ table: 'interview_participants', id: row.id as string });
+    participant = row;
   } catch (error) {
     return backOut(env, undo, error, 'change_interviewer');
   }
@@ -639,7 +665,8 @@ async function editRound(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promi
   }
   if (said.length === 0) throw new JobsRefused(`Nothing to change: ${where} already reads that way.`);
   const undo = emptyUndo();
-  const after = (await changeKept(env, undo, 'interview_groups', round, update)) as Round;
+  // The same write as the round card's name, notes and number.
+  const after = (await changedBy(undo, 'interview_groups', round, update, saveRoundEdit(jobsDb(env), env.userId, round.id, update))) as Round;
   const done = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
   return roundMade(pursuit, after, round, undo, 'Changed', where, `: ${done}`, `Dash changed ${where}: ${done}.`);
 }
@@ -648,7 +675,9 @@ async function editRound(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promi
  * Rounds gathered into one, as the role page's "group" does: the interviews
  * and emails of the later rounds move into the first named, each keeping its
  * hour, panel and notes, and the rounds left empty are taken out. A round
- * with notes of its own is refused rather than lost.
+ * with notes of its own is refused rather than lost. The gathering is
+ * gatherIntoRound, the button's own (plan #2473.7); the button gathers into a
+ * new round, the tool into the first one named, so its number and notes stay.
  */
 async function groupRounds(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promise<JobsMade> {
   const numbers = Array.isArray(args.round_numbers) ? args.round_numbers.map((n) => roundNumberOf(n, 'round_numbers')) : [];
@@ -665,30 +694,30 @@ async function groupRounds(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Pro
   if (label.length > LABEL_MAX) throw new JobsRefused(`Keep label under ${LABEL_MAX} characters.`);
 
   const undo = emptyUndo();
-  try {
-    let place = (await interviewsIn(env, kept.id)).length;
-    const keptLinks = new Set((await rows(env.jobs.from('interview_group_messages').select('message_id').eq('group_id', kept.id), 'the round\'s emails')).map((row) => row.message_id));
-    for (const round of folded) {
-      for (const interview of await interviewsIn(env, round.id)) {
-        place += 1;
-        await changeKept(env, undo, 'interviews', interview, { group_id: kept.id, round: place });
-      }
-      const links = await rows(env.jobs.from('interview_group_messages').select('*').eq('group_id', round.id).eq('user_id', env.userId), 'the round\'s emails');
-      for (const link of links) {
-        if (keptLinks.has(link.message_id)) await removeKept(env, undo, 'interview_group_messages', link);
-        else {
-          await changeKept(env, undo, 'interview_group_messages', link, { group_id: kept.id });
-          keptLinks.add(link.message_id);
-        }
-      }
-      await removeKept(env, undo, 'interview_groups', round);
-    }
-  } catch (error) {
-    return backOut(env, undo, error, 'change_interview_round');
-  }
+  const interviewIds: string[] = [];
+  for (const round of folded) for (const interview of await interviewsIn(env, round.id)) interviewIds.push(interview.id as string);
+  // The same gathering as the role page's "Make them one round", into the first round named.
+  const gathered = await gatherIntoRound(jobsDb(env), env.userId, {
+    applicationId: pursuit.applicationId,
+    groupId: kept.id,
+    interviewIds,
+    emptying: folded.map((round) => round.id),
+  });
+  const keepChange = (table: string, columns: string[]) => (entry: { before: Row; after: Row }) =>
+    undo.changed.push({
+      table,
+      id: entry.before.id as string,
+      before: Object.fromEntries(columns.map((column) => [column, entry.before[column] ?? null])),
+      after: Object.fromEntries(columns.map((column) => [column, entry.after[column] ?? null])),
+    });
+  gathered.moved.forEach(keepChange('interviews', ['group_id', 'round']));
+  gathered.relinked.forEach(keepChange('interview_group_messages', ['group_id']));
+  for (const row of gathered.unlinked) undo.removed.push({ table: 'interview_group_messages', row });
+  for (const row of gathered.removed) undo.removed.push({ table: 'interview_groups', row });
+  if (gathered.error) return backOut(env, undo, new Error(`Gathering the rounds failed: ${gathered.error}`), 'change_interview_round');
   const after = label && label !== kept.label ? ((await changeKept(env, undo, 'interview_groups', kept, { label })) as Round) : kept;
-  const gathered = folded.map((round) => `round ${round.round_number}`);
-  const from = gathered.length > 1 ? `${gathered.slice(0, -1).join(', ')} and ${gathered[gathered.length - 1]}` : gathered[0];
+  const named = folded.map((round) => `round ${round.round_number}`);
+  const from = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}` : named[0];
   const where = `${roundName(after)} of ${pursuit.roleName}`;
   return roundMade(pursuit, after, kept, undo, 'Gathered', from, ` into ${where}`, `Dash gathered ${from} into ${where}.`);
 }
@@ -698,15 +727,15 @@ async function splitInterview(env: JobsWriteEnv, args: Args): Promise<JobsMade> 
   const { interview, round, pursuit, name } = await namedInterview(env, args);
   if ((await interviewsIn(env, round.id)).length < 2) throw new JobsRefused(`${name} is the only interview in its round already. Nothing was changed; tell them so.`);
   const undo = emptyUndo();
-  const number = await nextRoundNumber(env.jobs as unknown as AppSupabaseClient, { userId: env.userId, applicationId: pursuit.applicationId });
-  const fresh = (await addKept(env, undo, 'interview_groups', {
-    user_id: env.userId,
-    application_id: pursuit.applicationId,
-    label: null,
-    round_number: number,
-  })) as Round;
+  // As the round card's "not part of this round": a round of its own, numbered after the others.
+  const made = await insertInterviewRound(jobsDb(env), { userId: env.userId, applicationId: pursuit.applicationId });
+  if (made.error || !made.id) throw new Error(`Adding the round failed: ${made.error ?? 'no row'}`);
+  undo.added.push({ table: 'interview_groups', id: made.id });
+  const fresh = (await ownRow(env, 'interview_groups', made.id, 'round')) as Round;
+  const number = fresh.round_number;
   try {
-    await changeKept(env, undo, 'interviews', interview, { group_id: fresh.id, round: 1 });
+    const moved = { group_id: fresh.id, round: 1 };
+    await changedBy(undo, 'interviews', interview, moved, moveInterviewToRound(jobsDb(env), env.userId, interview.id as string, fresh.id, 1));
   } catch (error) {
     return backOut(env, undo, error, 'change_interview_round');
   }
@@ -720,7 +749,8 @@ async function detachEmail(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Pro
   const where = `${roundName(round)} of ${pursuit.roleName}`;
   const link = await roundEmail(env, round, text(args, 'message_ref'), where);
   const undo = emptyUndo();
-  await removeKept(env, undo, 'interview_group_messages', link);
+  // The same write as the round's "take this email off".
+  await removedBy(undo, 'interview_group_messages', unlinkRoundEmailRow(jobsDb(env), env.userId, round.id, link.message_id as string));
   return roundMade(pursuit, round, round, undo, 'Took an email off', where, '; it stays on the role', `Dash took an email off ${where}. It stays on the role's timeline.`);
 }
 
@@ -747,6 +777,9 @@ const INTERVIEW_PLACE = { type: 'integer', minimum: 1, description: 'Its place i
 export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_interview',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterview', 'lib/jobs/interview/edit.ts#saveInterviewEdit'],
+    ),
     description: `Correct an interview on one of their roles in Jobs when they ask, as its card on the role page does: its kind (${INTERVIEW_KINDS.join(', ')}), its status (${STATUSES.join(', ')}; completed when it has happened), its date and time, what they noted about it, or their prep notes. Name it by role_ref and round_number (plus interview, its place, when the round holds several), or by interview_ref. Pass only what they asked to change; an empty date clears it, and an empty notes or prep_notes clears that.`,
     input_schema: {
       type: 'object',
@@ -769,6 +802,11 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_interviewer',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewer', 'lib/jobs/interview/edit.ts#addInterviewerRow'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewerByName', 'lib/jobs/interview/edit.ts#interviewerContact'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#removeInterviewer', 'lib/jobs/interview/edit.ts#removeInterviewerRow'],
+    ),
     description:
       "Name who interviewed them, or take someone off an interview, on one of their roles in Jobs when they ask (\"Priya Shah ran my technical round at Stripe\"). action add names them: by contact_ref when they are a contact (search their contacts first), or by name, which attaches the contact of that name at the role's company or adds them there as a new contact. action remove takes them off by contact_ref or name; the contact itself stays. Name the interview by role_ref and round_number (plus interview when the round holds several), or by interview_ref.",
     input_schema: {
@@ -790,6 +828,12 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_interview_round',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews', 'lib/jobs/interview/edit.ts#gatherIntoRound'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterviewGroup', 'lib/jobs/interview/edit.ts#saveRoundEdit'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#unlinkRoundMessage', 'lib/jobs/interview/edit.ts#unlinkRoundEmailRow'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview', 'lib/jobs/interview/edit.ts#moveInterviewToRound'],
+    ),
     description:
       "Change the interview rounds on one of their roles in Jobs when they ask, as the role page does. action edit renames a round (label), writes how the round went as a whole (notes) or renumbers it (new_round_number). action group gathers rounds into one (round_numbers, at least two): the interviews and emails of the later rounds move into the first, each keeping its own notes, and the emptied rounds go; a round with notes of its own is refused. action split moves one interview out of a round it shares into a round of its own, numbered after the others. action detach_email takes an email off a round (message_ref from search_mail, needed when it has several); the email stays on the role. Name the role by role_ref, and the round by round_number; split names the interview as change_interview does.",
     input_schema: {

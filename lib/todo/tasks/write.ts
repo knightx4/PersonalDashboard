@@ -182,16 +182,76 @@ export async function createItem(
   userId: string,
   parentId: string,
   input: ItemInput,
-): Promise<{ id: string | null; error: string | null }> {
-  const supabase = await createTodoClient();
+  client?: TodoSupabaseClient,
+): Promise<{ id: string | null; row: TaskRow | null; error: string | null }> {
+  const supabase = client ?? (await createTodoClient());
 
   const { data, error } = await supabase
     .from('tasks')
     .insert({ user_id: userId, title: input.title, parent_id: parentId })
-    .select('id')
+    .select('*')
     .single();
 
-  return { id: (data?.id as string) ?? null, error: error?.message ?? null };
+  const row = (data as TaskRow | null) ?? null;
+  return { id: (row?.id as string) ?? null, row, error: error?.message ?? null };
+}
+
+/** A task as the table holds it, for a caller that keeps what it wrote (Dash's Undo). */
+export type TaskRow = Record<string, unknown>;
+
+/**
+ * The columns of one task a write can change. Each is already parsed (the
+ * callers read their input through taskInput); one left out is left alone.
+ */
+export type TaskFields = {
+  title?: string;
+  body?: string | null;
+  pinned?: boolean;
+  /** The day and time it is due, through resolveDue; a null day takes the date off. */
+  due?: { dueOn: string | null; dueTime: string | null };
+  status?: 'open' | 'done' | 'dropped';
+  /** Out of sight until then, or null to bring it back. */
+  snoozedUntil?: Date | null;
+};
+
+/**
+ * The one write behind every change to a task's own row: the form, the row's
+ * rename and reschedule, the pin, Later and its way back, dropping, and Dash's
+ * change_todo and edit_todo (plan #2473.3). So a rule added here reaches the
+ * page and Dash together.
+ *
+ * Scoped to the user, so a borrowed id changes nothing; the row comes back
+ * when there was one to change, and null when there was not.
+ */
+export async function updateTaskFields(
+  userId: string,
+  id: string,
+  fields: TaskFields,
+  timezone: string,
+  client?: TodoSupabaseClient,
+): Promise<{ row: TaskRow | null; error: string | null }> {
+  const patch: Record<string, unknown> = {};
+  if (fields.title !== undefined) patch.title = fields.title;
+  if (fields.body !== undefined) patch.body = fields.body;
+  if (fields.pinned !== undefined) patch.pinned = fields.pinned;
+  // Both due columns every time, through the one function that decides which
+  // of them a day-and-maybe-a-time lands in. Clearing the date has to clear
+  // both or a task with a time keeps it after its day is taken away.
+  if (fields.due) Object.assign(patch, resolveDue(fields.due, timezone));
+  if (fields.status !== undefined) patch.status = fields.status;
+  if (fields.snoozedUntil !== undefined) patch.snoozed_until = fields.snoozedUntil?.toISOString() ?? null;
+  if (Object.keys(patch).length === 0) return { row: null, error: 'Nothing to change.' };
+
+  const supabase = client ?? (await createTodoClient());
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(patch)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('*')
+    .maybeSingle();
+
+  return { row: (data as TaskRow | null) ?? null, error: error?.message ?? null };
 }
 
 /** Writes every column the form carries. Tags are not one: see addTaskTag. */
@@ -201,20 +261,13 @@ export async function updateTask(
   input: TaskInput,
   timezone: string,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
-
-  const { error } = await supabase
-    .from('tasks')
-    .update({
-      title: input.title,
-      body: input.body,
-      pinned: input.pinned,
-      ...resolveDue(input, timezone),
-    })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(
+    userId,
+    id,
+    { title: input.title, body: input.body, pinned: input.pinned, due: { dueOn: input.dueOn, dueTime: input.dueTime } },
+    timezone,
+  );
+  return { error };
 }
 
 /**
@@ -241,14 +294,8 @@ export async function renameTask(
   const parsed = renameInput.safeParse({ title });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const supabase = await createTodoClient();
-  const { error } = await supabase
-    .from('tasks')
-    .update({ title: parsed.data.title })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { title: parsed.data.title }, 'UTC');
+  return { error };
 }
 
 export async function rescheduleTask(
@@ -260,17 +307,8 @@ export async function rescheduleTask(
   const parsed = rescheduleInput.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const supabase = await createTodoClient();
-  const { error } = await supabase
-    .from('tasks')
-    // Both columns every time, through the one function that decides which of
-    // them a day-and-maybe-a-time lands in. Clearing the date has to clear both
-    // or a task with a time keeps it after its day is taken away.
-    .update(resolveDue(parsed.data, timezone))
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { due: parsed.data }, timezone);
+  return { error };
 }
 
 /**
@@ -285,14 +323,8 @@ export async function setTaskBody(
   const parsed = taskInput.shape.body.safeParse(body);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const supabase = await createTodoClient();
-  const { error } = await supabase
-    .from('tasks')
-    .update({ body: parsed.data })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { body: parsed.data }, 'UTC');
+  return { error };
 }
 
 /**
@@ -307,15 +339,8 @@ export async function setTaskStatus(
   id: string,
   status: 'open' | 'done' | 'dropped',
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
-
-  const { error } = await supabase
-    .from('tasks')
-    .update({ status })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { status }, 'UTC');
+  return { error };
 }
 
 /**
@@ -334,8 +359,9 @@ export async function setTaskStatus(
 export async function completeTaskWithItems(
   userId: string,
   id: string,
+  client?: TodoSupabaseClient,
 ): Promise<{ items: string[]; error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   // The task first: it is what was asked for, so if only one of the two writes
   // lands it should be that one.
@@ -365,8 +391,9 @@ export async function reopenTaskWithItems(
   userId: string,
   id: string,
   items: readonly string[] = [],
+  client?: TodoSupabaseClient,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const { error } = await supabase
     .from('tasks')
@@ -382,15 +409,8 @@ export async function setTaskPinned(
   id: string,
   pinned: boolean,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
-
-  const { error } = await supabase
-    .from('tasks')
-    .update({ pinned })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { pinned }, 'UTC');
+  return { error };
 }
 
 /**
@@ -402,25 +422,13 @@ export async function snoozeTask(
   id: string,
   until: Date,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
-  const { error } = await supabase
-    .from('tasks')
-    .update({ snoozed_until: until.toISOString() })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { snoozedUntil: until }, 'UTC');
+  return { error };
 }
 
 export async function unsnoozeTask(userId: string, id: string): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
-  const { error } = await supabase
-    .from('tasks')
-    .update({ snoozed_until: null })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  return { error: error?.message ?? null };
+  const { error } = await updateTaskFields(userId, id, { snoozedUntil: null }, 'UTC');
+  return { error };
 }
 
 /**

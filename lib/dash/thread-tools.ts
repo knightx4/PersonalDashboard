@@ -1,3 +1,4 @@
+import { sameAsVia, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { DashHandoffTool, DashTool, DashWriteTool } from './registry';
 
@@ -45,10 +46,17 @@ const THREAD_ONLY = 'That can only be done in the thread it belongs to. Answer i
 
 type Schema = Anthropic.Tool['input_schema'];
 
-function write(name: string, subjects: readonly string[], description: string, input_schema: Schema): DashWriteTool {
+function write(
+  name: string,
+  runs: DashWriteRuns,
+  subjects: readonly string[],
+  description: string,
+  input_schema: Schema,
+): DashWriteTool {
   return {
     name,
     kind: 'write',
+    runs,
     subjects,
     definition: { name, description, input_schema },
     apply: async (ctx, input) => (ctx.thread ? ctx.thread(name, input) : { ok: false, error: THREAD_ONLY }),
@@ -68,6 +76,11 @@ const MODULE = {
 export const THREAD_TOOLS: readonly DashTool[] = [
   write(
     'file_idea',
+    sameAsVia(
+      'lib/comments/act.ts#fileIdea',
+      ['app/dev/ideas/actions.ts#addIdea', 'lib/ideas/insert.ts#insertIdea'],
+      ['app/dev/ideas/actions.ts#submitIdea', 'lib/ideas/insert.ts#insertIdea'],
+    ),
     DEV,
     'File a new idea on the ideas page, marked as your suggestion, when the comment tells you to ("file that as its own idea").',
     {
@@ -82,6 +95,11 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'file_note',
+    sameAsVia(
+      'lib/comments/act.ts#fileNote',
+      ['app/dev/bugs/actions.ts#submitFeedback', 'lib/feedback/insert.ts#insertFeedbackItem'],
+      ['app/dev/surfaces/actions.ts#noteOnSurface', 'lib/feedback/insert.ts#insertFeedbackItem'],
+    ),
     DEV,
     'Write a bug report or a feature request into the notes queue, filed open, when the comment says to write something up.',
     {
@@ -96,6 +114,10 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'add_step',
+    sameAsVia(
+      'lib/comments/act.ts#addStep',
+      ['app/dev/plan/actions.ts#addPlanItem', 'lib/plan/insert-item.ts#insertPlanItem'],
+    ),
     NOT_A_CHANGE,
     'Add a row to the build plan as a proposal for them to approve. On a plan step it goes beneath that step; anywhere else it is a feature at the top of the workspace named.',
     {
@@ -111,6 +133,13 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'reword',
+    sameAsVia(
+      'lib/comments/act.ts#reword',
+      ['app/dev/bugs/actions.ts#editFeedback', 'lib/feedback/edit.ts#editFeedbackItem'],
+      ['app/dev/ideas/actions.ts#updateIdea', 'lib/ideas/edit.ts#editIdea'],
+      ['app/dev/plan/actions.ts#updatePlanItem', 'lib/plan/edit-item.ts#editPlanItem'],
+      ['app/dev/plan/actions.ts#updateFeature', 'lib/plan/edit-item.ts#editFeature'],
+    ),
     [step, idea, note, change],
     'Rewrite the row the comment is on: an idea, a bug note, a plan step\'s title, detail or done-when, or a proposed spec change\'s diff, title or why. The old wording is kept under your reply.',
     {
@@ -133,6 +162,11 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'build_step',
+    sameAsVia(
+      'lib/comments/act.ts#buildStep',
+      ['app/dev/plan/actions.ts#addPlanItem', 'lib/plan/insert-item.ts#insertPlanItem'],
+      ['app/dev/plan/actions.ts#sendPlanItemToClaude', 'lib/plan/handover.ts#handStepToClaude'],
+    ),
     NOT_A_CHANGE,
     'Write a new plan step ready to be worked and start a session building it now, when the comment tells you to do the work ("do it", "go ahead"). Use add_step instead when they are putting something on the plan for later.',
     {
@@ -172,6 +206,10 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'file_goal_record',
+    sameAsVia(
+      'lib/goals/ask.ts#produceReply',
+      ['app/goals/[goalId]/information-actions.ts#saveRecordAction', 'lib/goals/collections-store.ts#addRecord'],
+    ),
     [GOAL_THREAD_TABLE],
     "File one record of facts the comment states into one of the goal's collections, as a draft for them to confirm. File only what the comment states; never guess or work out a value.",
     {
@@ -190,6 +228,10 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'schedule_goal_step',
+    sameAsVia(
+      'lib/goals/ask.ts#applySchedule',
+      ['app/goals/[goalId]/actions.ts#setStepOnTodoAction', 'lib/goals/steps-store.ts#setStepOnTodo'],
+    ),
     [GOAL_THREAD_TABLE],
     'Set the due date of the step the comment is on, or put it on their Todo or take it off, when the comment asks.',
     {
@@ -206,6 +248,7 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'move_goal_step',
+    noButton('No Goals page moves a step to another goal: the arrows move it among its siblings (change_goal_step); only a comment on the step asks for this.'),
     [GOAL_THREAD_TABLE],
     'Move the step the comment is on, with its sub-steps, to the end of another of their open goals, when the comment says it belongs there. When the comment names no listed goal, or its words fit more than one, ask which instead of calling this.',
     {
@@ -220,12 +263,17 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'archive_goal_step',
+    sameAsVia(
+      'lib/goals/thread-acts.ts#archiveGoalStep',
+      ['app/goals/[goalId]/actions.ts#archiveStepAction', 'lib/goals/steps-store.ts#setStepArchived'],
+    ),
     [GOAL_THREAD_TABLE],
     'Archive the step the comment is on, when the comment says it is no longer needed or wanted. Its sub-steps go out of view with it, and Undo on Home brings it back. Never a delete.',
     { type: 'object', properties: {}, additionalProperties: false },
   ),
   write(
     'promote_step_to_errand',
+    noButton('No Goals page turns a step into an errand; only a comment on the step asks for it.'),
     [GOAL_THREAD_TABLE],
     'Make the step the comment is on its own errand, titled as the step and carrying its notes, then archive the step, when the comment asks for that. An errand needs a due date: when the comment gives none and the step has none, ask for one instead of calling this.',
     {
@@ -244,12 +292,17 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'approve_goal',
+    sameAsVia(
+      'lib/goals/thread-acts.ts#approveProposedGoal',
+      ['app/goals/[goalId]/shaping-actions.ts#approveGoalAction', 'lib/goals/shaping-store.ts#approveGoal'],
+    ),
     [GOAL_THREAD_TABLE],
     'Approve the goal this thread is on, when Dash proposed it and the comment says to approve it. It opens the goal and its proposed steps, and Undo on Home puts them back. Refused for a goal that was not proposed or is already approved.',
     { type: 'object', properties: {}, additionalProperties: false },
   ),
   write(
     'start_errand_run',
+    noButton('No Goals page starts Dash on an errand; Todo hands a task over with handTaskToDash, which spends and has no tool.'),
     [GOAL_THREAD_TABLE],
     'Start Dash working on the errand this thread is on, when the comment tells you to get started on it. The same run as Ask Dash on the errand page. Refused for a goal that is not an errand and while a run is going.',
     { type: 'object', properties: {}, additionalProperties: false },
@@ -273,6 +326,10 @@ export const THREAD_TOOLS: readonly DashTool[] = [
   ),
   write(
     'write_cover_letter',
+    sameAsVia(
+      'lib/jobs/role-thread/ask.ts#produceReply',
+      ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter', 'lib/jobs/applications/edit.ts#saveCoverLetterText'],
+    ),
     [ROLE_THREAD_TABLE],
     "Write the role's cover letter, or change the one on file, when the comment asks. It replaces the letter on file, and the old one is kept under your reply.",
     {

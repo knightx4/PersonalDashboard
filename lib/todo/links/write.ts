@@ -57,8 +57,9 @@ export async function linkTask(
   target: LinkTarget,
   targetId: string,
   relation: LinkRelation = 'about',
+  client?: TodoSupabaseClient,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const columns = await targetColumns(supabase, target, targetId);
   if (!columns) return { error: GONE };
@@ -101,8 +102,9 @@ export async function setTaskAbout(
   taskId: string,
   target: LinkTarget,
   targetId: string,
+  client?: TodoSupabaseClient,
 ): Promise<{ error: string | null }> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const set = await targetColumns(supabase, target, targetId);
   if (!set) return { error: GONE };
@@ -126,7 +128,7 @@ export async function setTaskAbout(
   if (error) return { error: describe(error.message) };
   if ((data ?? []).length > 0) return { error: null };
 
-  return linkTask(taskId, target, targetId);
+  return linkTask(taskId, target, targetId, 'about', supabase);
 }
 
 /** Nothing in particular, and the task itself untouched. */

@@ -1,39 +1,40 @@
-import { randomUUID } from 'node:crypto';
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import { namedItems } from '@/lib/ask/change-view';
 import type { ShoppingChangeInput, ShoppingChangeKind } from '@/lib/ask/shopping-changes';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
-import { buildOwnedBookRows, type OwnedBookBundle } from '@/lib/books/create-owned-book';
+import { buildOwnedBookRows } from '@/lib/books/create-owned-book';
 import { normalizeIsbn } from '@/lib/books/isbn';
 import { resolveBook } from '@/lib/books/resolve';
 import type { CanonicalBook } from '@/lib/books/types';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { toRef } from '@/lib/core/refs';
-import { fingerprintLoose } from '@/lib/fingerprint';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { DISMISSED_REVIEW_ERROR } from '@/lib/inbox/merchant-exclusion-match';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { buildManualOrder } from '@/lib/orders/create-manual-order';
 import { extractionForAttach, isAttachableClassification, lifecycleKindForAttach } from '@/lib/review/attach-email';
 import { canReadAsOrder } from '@/lib/review/read-order';
-import { findMerchantByUrl } from '@/lib/saved/resolve-merchant';
-import { buildOwnedGameRows, type OwnedGameBundle } from '@/lib/games/create-owned-game';
+import { DISCARDED_REVIEW_ERROR, discardOrders, dismissEmails, putMessagesBack, restoreOrders, setOrdersReview, type ReviewMove as ReviewResult } from '@/lib/review/moves';
+import { merchantForLink, saveForLater, setSavedStatus, updateSaved, type SavedPatch } from '@/lib/saved/write';
+import { buildOwnedGameRows } from '@/lib/games/create-owned-game';
 import type { CanonicalGame } from '@/lib/games/types';
-import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { insertOwned, manualItemRow, ownedBookRows, ownedGameRows } from '@/lib/inventory/add-owned';
+import { addItemNote, describeItem, EDITION_CONFIRMED, renameGroup, setItemSellPrice, writeItemDetails, type ItemDescription } from '@/lib/inventory/item-writes';
 import { displayName } from '@/lib/inventory/group-units';
-import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
-import { pickListGradient } from '@/lib/lists/gradients';
-import { PERSON_COLOURS } from '@/lib/people/load';
+import { addToList, makeItemList, removeFromList, renameList } from '@/lib/lists/write';
+import { PERSON_COLOURS, type PersonColour } from '@/lib/people/load';
+import { addPersonRow, updatePersonRow } from '@/lib/people/write';
 import { mergePayments, moveCharges, renamePayment, setPaymentCounted } from '@/lib/recurring/corrections';
 import { payeeKey } from '@/lib/recurring/extraction';
 import { PAYEE_MAX } from '@/lib/recurring/limits';
 import { MOVED_NO_UNDO } from '@/lib/recurring/record';
 import { formatMoney, todayInTimezone } from '@/lib/money';
-import { sellIdentityOf } from '@/lib/sell/item-quote';
-import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
+import { addOwnShop, ownShopSlug, setReturnWindow, shopSlug } from '@/lib/returns/windows';
+import { ensureItemTags, linkOrderItemTags, tagOrderItem, untagOrderItem } from '@/lib/tags/ensure';
 import { normalizeTagLabel, slugifyTagName } from '@/lib/tags/guess';
 import { BULK_MAX } from './bulk-items';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
@@ -176,6 +177,8 @@ export type ShoppingMade = {
 
 export type ShoppingWrite = {
   name: ShoppingChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -289,61 +292,29 @@ async function changeItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMa
   const paths = new Set(['/shopping/inventory', itemHref(id), '/shopping/sell']);
 
   // Name, variant and notes describe the item, so they reach every copy in its stack, as the page's save does.
-  const values: Row = {};
-  if (name !== undefined && name !== item.name) values.name = name;
-  if (variant !== undefined && !same(variant || null, item.variant)) values.variant = variant || null;
-  if (notes !== undefined && !same(notes || null, item.notes)) values.notes = notes || null;
-  if ('name' in values || 'variant' in values) {
-    let categorySlug: string | null = null;
-    let categoryName: string | null = null;
-    if (typeof item.category_id === 'string') {
-      const { data: category } = await env.shop.from('categories').select('slug, name').eq('id', item.category_id).maybeSingle();
-      categorySlug = (category as Row | null)?.slug as string | null ?? null;
-      categoryName = (category as Row | null)?.name as string | null ?? null;
-    }
-    const enriched = enrichItemDisplay({
-      name: (values.name as string | undefined) ?? (item.name as string),
-      variant: 'variant' in values ? (values.variant as string | null) : (item.variant as string | null),
-      categorySlug,
-      categoryName,
-    });
-    values.short_name = enriched.shortName;
-    values.search_tags = enriched.searchTags;
-  }
+  const asked: ItemDescription = {};
+  if (name !== undefined && name !== item.name) asked.name = name;
+  if (variant !== undefined && !same(variant || null, item.variant)) asked.variant = variant || null;
+  if (notes !== undefined && !same(notes || null, item.notes)) asked.notes = notes || null;
   let copies = 1;
-  if (Object.keys(values).length > 0) {
-    const ids = await stackSiblingIds(env.shop as SupabaseClient, env.userId, id);
-    const { data: before, error: readError } = await env.shop
-      .from('inventory_items')
-      .select('*')
-      .eq('user_id', env.userId)
-      .in('id', ids);
-    if (readError) throw new Error(`Reading the copies failed: ${readError.message}`);
-    const { data: updated, error } = await env.shop
-      .from('inventory_items')
-      .update(values)
-      .eq('user_id', env.userId)
-      .in('id', ids)
-      .select('id');
-    if (error) throw new Error(`Changing the item failed: ${error.message}`);
-    const written = new Set(((updated ?? []) as Row[]).map((row) => row.id as string));
-    for (const copy of (before ?? []) as Row[]) {
-      if (!written.has(copy.id as string)) continue;
+  if (Object.keys(asked).length > 0) {
+    const described = await describeItem(env.shop as SupabaseClient, { userId: env.userId, itemId: id, values: asked });
+    if (!described.ok) throw new Error(`Changing the item failed: ${described.error}`);
+    const values = described.values;
+    for (const copy of described.before) {
       rows.push({ table: 'inventory_items', id: copy.id as string, before: pick(copy, Object.keys(values)), after: { ...values } });
       paths.add(itemHref(copy.id as string));
     }
-    copies = written.size;
+    copies = described.ids.length;
     if ('name' in values) said.push(`renamed it "${named(values.name, 'the item')}"`);
     if ('variant' in values) said.push(values.variant ? `set its variant to "${named(values.variant, '')}"` : 'cleared its variant');
     if ('notes' in values) said.push(values.notes ? 'rewrote its notes' : 'cleared its notes');
   }
 
   if (addNote !== undefined) {
-    const now = await ownRow(env.shop, 'inventory_items', id, env.userId, 'item');
-    const next = now.notes ? `${now.notes}\n${addNote}` : addNote;
-    const { error } = await env.shop.from('inventory_items').update({ notes: next }).eq('id', id).eq('user_id', env.userId);
-    if (error) throw new Error(`Adding the note failed: ${error.message}`);
-    rows.push({ table: 'inventory_items', id, before: { notes: now.notes ?? null }, after: { notes: next } });
+    const noted = await addItemNote(env.shop as SupabaseClient, { userId: env.userId, itemId: id, note: addNote });
+    if (!noted.ok) throw new Error(`Adding the note failed: ${noted.error}`);
+    rows.push({ table: 'inventory_items', id, before: { notes: noted.before }, after: { notes: noted.after } });
     said.push(`added the note "${named(addNote, '')}"`);
   }
 
@@ -353,38 +324,22 @@ async function changeItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMa
     }
     const group = await ownRow(env.shop, 'item_groups', item.group_id, env.userId, 'item group');
     if (group.name !== groupName) {
-      const { error } = await env.shop.from('item_groups').update({ name: groupName }).eq('id', group.id).eq('user_id', env.userId);
-      if (error) throw new Error(`Renaming the group failed: ${error.message}`);
-      rows.push({ table: 'item_groups', id: group.id as string, before: { name: group.name }, after: { name: groupName } });
+      const renamed = await renameGroup(env.shop as SupabaseClient, { userId: env.userId, groupId: group.id as string, name: groupName });
+      if (!renamed.ok) throw new Error(`Renaming the group failed: ${renamed.error}`);
+      rows.push({ table: 'item_groups', id: group.id as string, before: { name: group.name }, after: { name: renamed.name } });
       said.push(`renamed its group "${named(groupName, '')}"`);
     }
   }
 
   if (priceCents !== undefined) {
     // The price lands where the sell page reads it: a book's or a game's details, or the item itself.
-    const identity = await sellIdentityOf(env.shop as SupabaseClient, id);
-    const table: ShoppingTable = identity?.kind === 'book' ? 'book_details' : identity?.kind === 'game' ? 'game_details' : 'inventory_items';
-    let target: Row;
-    if (table === 'inventory_items') {
-      target = { id, manual_expected_price_cents: item.manual_expected_price_cents ?? null };
-    } else {
-      const { data, error } = await env.shop
-        .from(table)
-        .select('id, manual_expected_price_cents')
-        .eq('inventory_item_id', id)
-        .maybeSingle();
-      if (error || !data) throw new Error(`Reading the item's details failed: ${error?.message ?? 'no row'}`);
-      target = data as Row;
-    }
-    if (!same(target.manual_expected_price_cents, priceCents)) {
-      let query = env.shop.from(table).update({ manual_expected_price_cents: priceCents }).eq('id', target.id);
-      if (table === 'inventory_items') query = query.eq('user_id', env.userId);
-      const { error } = await query;
-      if (error) throw new Error(`Setting the sell price failed: ${error.message}`);
+    const priced = await setItemSellPrice(env.shop as SupabaseClient, { userId: env.userId, itemId: id, cents: priceCents });
+    if (!priced.ok) throw new Error(`Setting the sell price failed: ${priced.error}`);
+    if (priced.changed) {
       rows.push({
-        table,
-        id: target.id as string,
-        before: { manual_expected_price_cents: target.manual_expected_price_cents ?? null },
+        table: priced.table,
+        id: priced.id,
+        before: { manual_expected_price_cents: priced.before },
         after: { manual_expected_price_cents: priceCents },
       });
       said.push(priceCents === null ? 'cleared its sell price' : `set its sell price to ${formatMoney(priceCents)}`);
@@ -406,12 +361,10 @@ async function changeItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMa
       }
       if (!same(details.row.condition, next)) values.condition = next;
     }
-    if (confirmEdition && details.row.needs_confirmation === true) {
-      Object.assign(values, { needs_confirmation: false, candidates: [], confirmation_reason: null });
-    }
+    if (confirmEdition && details.row.needs_confirmation === true) Object.assign(values, EDITION_CONFIRMED);
     if (Object.keys(values).length > 0) {
-      const { error } = await env.shop.from(details.table).update(values).eq('id', details.row.id);
-      if (error) throw new Error(`Changing the item's details failed: ${error.message}`);
+      const wrote = await writeItemDetails(env.shop as SupabaseClient, { itemId: id, table: details.table, values });
+      if (!wrote.ok) throw new Error(`Changing the item's details failed: ${wrote.error}`);
       rows.push({ table: details.table, id: details.row.id as string, before: pick(details.row, Object.keys(values)), after: { ...values } });
       if ('condition' in values) said.push(values.condition ? `set its condition to ${String(values.condition).replace(/_/g, ' ')}` : 'cleared its condition');
       if ('needs_confirmation' in values) said.push('confirmed its edition');
@@ -501,22 +454,17 @@ async function itemLists(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMad
     if (!found) throw new ShoppingRefused(`They have no list called "${asked}".`);
     const to = listName(textArg(args, 'rename_to', 40), 'rename_to');
     if (to === found.name) throw new ShoppingRefused(`The list is called "${to}" already.`);
-    const { data: after, error } = await env.shop
-      .from('item_lists')
-      .update({ name: to })
-      .eq('id', found.id)
-      .eq('user_id', env.userId)
-      .select('*')
-      .single();
-    if (error || !after) throw new Error(`Renaming the list failed: ${error?.message ?? 'no row'}`);
     const id = found.id as string;
+    const renamed = await renameList(env.shop, { userId: env.userId, id, name: to });
+    if (renamed.error !== undefined) throw new Error(`Renaming the list failed: ${renamed.error}`);
+    const after = renamed.list;
     return {
       kind: 'item_lists',
       input: { verb: 'Renamed the list', what: to, rest: ` from "${named(found.name, '')}"`, href: listHref(id), where: 'Open the list', paths },
       subjectRef: toRef(LISTS, id),
       op: 'update',
       before: found,
-      after: after as Row,
+      after,
       undo: { rows: [{ table: 'item_lists', id, before: { name: found.name }, after: { name: to } }] },
       summary: `Dash renamed the list "${named(found.name, '')}" to "${to}".`,
       row: { table: LISTS, ref: id, title: to, href: listHref(id) },
@@ -528,20 +476,10 @@ async function itemLists(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMad
 
   if (change === 'remove') {
     if (!found) throw new ShoppingRefused(`They have no list called "${asked}".`);
-    const { data: memberships, error } = await env.shop
-      .from('inventory_item_lists')
-      .select('*')
-      .eq('list_id', found.id)
-      .in('inventory_item_id', ids);
-    if (error) throw new Error(`Reading the list failed: ${error.message}`);
-    const on = (memberships ?? []) as Row[];
+    const taken = await removeFromList(env.shop, { listId: found.id as string, itemIds: ids });
+    if (taken.error !== undefined) throw new Error(`Taking the items off the list failed: ${taken.error}`);
+    const on = taken.removed;
     if (on.length === 0) throw new ShoppingRefused(`None of those is on the list "${found.name}".`);
-    const { error: removeError } = await env.shop
-      .from('inventory_item_lists')
-      .delete()
-      .eq('list_id', found.id)
-      .in('id', on.map((row) => row.id as string));
-    if (removeError) throw new Error(`Taking the items off the list failed: ${removeError.message}`);
     const off = new Set(on.map((row) => row.inventory_item_id as string));
     const titles = items.filter((row) => off.has(row.id as string)).map(itemTitle);
     const id = found.id as string;
@@ -563,33 +501,17 @@ async function itemLists(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMad
   const added: NonNullable<ShoppingUndo['added']> = [];
   let list = found;
   if (!list) {
-    const name = listName(asked, 'list');
-    const { data: existing } = await env.shop.from('item_lists').select('color').eq('user_id', env.userId);
-    const color = pickListGradient(((existing ?? []) as Row[]).map((row) => row.color as string | null));
-    const { data: made, error } = await env.shop
-      .from('item_lists')
-      .insert({ user_id: env.userId, name, slug: slugifyCategoryName(name), color })
-      .select('*')
-      .single();
-    if (error || !made) throw new Error(`Making the list failed: ${error?.message ?? 'no row'}`);
-    list = made as Row;
+    const made = await makeItemList(env.shop, { userId: env.userId, name: listName(asked, 'list') });
+    if (made.error !== undefined) throw new Error(`Making the list failed: ${made.error}`);
+    list = made.list;
     added.push({ table: 'item_lists', id: list.id as string });
   }
-  const { data: already, error: readError } = await env.shop
-    .from('inventory_item_lists')
-    .select('inventory_item_id')
-    .eq('list_id', list.id)
-    .in('inventory_item_id', ids);
-  if (readError) throw new Error(`Reading the list failed: ${readError.message}`);
-  const on = new Set(((already ?? []) as Row[]).map((row) => row.inventory_item_id as string));
-  const joining = items.filter((row) => !on.has(row.id as string));
-  if (joining.length === 0) throw new ShoppingRefused(`Every one of those is on the list "${list.name}" already.`);
-  const { data: joined, error } = await env.shop
-    .from('inventory_item_lists')
-    .insert(joining.map((row) => ({ inventory_item_id: row.id, list_id: list!.id })))
-    .select('id');
-  if (error) throw new Error(`Putting the items on the list failed: ${error.message}`);
-  for (const row of (joined ?? []) as Row[]) added.push({ table: 'inventory_item_lists', id: row.id as string });
+  const put = await addToList(env.shop, { listId: list.id as string, itemIds: ids });
+  if (put.error !== undefined) throw new Error(`Putting the items on the list failed: ${put.error}`);
+  if (put.added.length === 0) throw new ShoppingRefused(`Every one of those is on the list "${list.name}" already.`);
+  for (const row of put.added) added.push({ table: 'inventory_item_lists', id: row.id as string });
+  const joinedIds = new Set(put.added.map((row) => row.inventory_item_id as string));
+  const joining = items.filter((row) => joinedIds.has(row.id as string));
 
   const titles = joining.map(itemTitle);
   const id = list.id as string;
@@ -776,24 +698,6 @@ async function namedCategory(env: ShoppingWriteEnv, name: string): Promise<{ id:
   return { id: found.id as string, slug: found.slug as string, name: found.name as string };
 }
 
-const inventoryRow = (bundle: OwnedBookBundle | OwnedGameBundle, notes: string | null, costCents: number, acquiredOn: string | null): Row => ({
-  id: bundle.inventory.id,
-  user_id: bundle.inventory.userId,
-  order_item_id: null,
-  category_id: bundle.inventory.categoryId,
-  name: bundle.inventory.name,
-  short_name: bundle.inventory.shortName,
-  variant: bundle.inventory.variant,
-  image_url: bundle.inventory.imageUrl,
-  fingerprint_loose: bundle.inventory.fingerprintLoose,
-  acquired_at: acquiredOn ?? bundle.inventory.acquiredAt,
-  cost_cents: costCents,
-  search_tags: bundle.inventory.searchTags,
-  notes,
-  source: bundle.inventory.source,
-  status: bundle.inventory.status,
-});
-
 /**
  * Add what they own, as the add pages save it: a book (looked up by its ISBN
  * when they give one, as the scan page does, or saved by hand), a board game
@@ -822,27 +726,10 @@ async function addItems(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade
       const found = await bookFor(item);
       if (!found) throw new ShoppingRefused(`No catalog has the ISBN in items[${i}]: ask them for the title and add it by hand.`);
       const bundle = buildOwnedBookRows({ userId: env.userId, booksCategoryId: booksId!, book: found.book, acquiredAt: today, source: 'manual' });
-      items.push(inventoryRow(bundle, item.notes, item.costCents, item.acquiredOn));
-      const d = bundle.bookDetails;
-      if (d.needsConfirmation) unconfirmed += 1;
-      books.push({
-        id: d.id,
-        inventory_item_id: d.inventoryItemId,
-        isbn_13: d.isbn13,
-        isbn_10: d.isbn10,
-        authors: d.authors,
-        edition: d.edition,
-        publisher: d.publisher,
-        published_year: d.publishedYear,
-        weight_grams: d.weightGrams,
-        condition: null,
-        resolution_source: d.resolutionSource,
-        match_confidence: d.matchConfidence,
-        needs_confirmation: d.needsConfirmation,
-        candidates: d.candidates,
-        confirmation_reason: d.confirmationReason,
-        auto_imported: false,
-      });
+      const rows = ownedBookRows(bundle, { notes: item.notes, costCents: item.costCents, acquiredOn: item.acquiredOn });
+      items.push(rows.item);
+      books.push(rows.details);
+      if (bundle.bookDetails.needsConfirmation) unconfirmed += 1;
       titles.push(found.book.title);
     } else if (item.kind === 'game') {
       const game: CanonicalGame = {
@@ -862,64 +749,32 @@ async function addItems(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade
         confirmationReason: null,
       };
       const bundle = buildOwnedGameRows({ userId: env.userId, gamesCategoryId: gamesId!, game, acquiredAt: today, source: 'manual', forceConfirmed: true });
-      items.push(inventoryRow(bundle, item.notes, item.costCents, item.acquiredOn));
-      const d = bundle.gameDetails;
-      games.push({
-        id: d.id,
-        inventory_item_id: d.inventoryItemId,
-        bgg_id: d.bggId,
-        wikidata_id: d.wikidataId,
-        barcode: d.barcode,
-        year_published: d.yearPublished,
-        publisher: d.publisher,
-        min_players: d.minPlayers,
-        max_players: d.maxPlayers,
-        playing_time_minutes: d.playingTimeMinutes,
-        condition: null,
-        resolution_source: d.resolutionSource,
-        match_confidence: d.matchConfidence,
-        needs_confirmation: d.needsConfirmation,
-        candidates: d.candidates,
-        confirmation_reason: d.confirmationReason,
-        auto_imported: d.autoImported,
-      });
+      const rows = ownedGameRows(bundle, { notes: item.notes, costCents: item.costCents, acquiredOn: item.acquiredOn });
+      items.push(rows.item);
+      games.push(rows.details);
       titles.push(game.title);
     } else {
       const name = item.title!;
       const category = item.category ? await namedCategory(env, item.category) : null;
-      const enriched = enrichItemDisplay({ name, variant: item.variant, categorySlug: category?.slug ?? null, categoryName: category?.name ?? null });
-      items.push({
-        id: randomUUID(),
-        user_id: env.userId,
-        order_item_id: null,
-        category_id: category?.id ?? null,
-        name,
-        short_name: enriched.shortName,
-        variant: item.variant,
-        image_url: null,
-        fingerprint_loose: fingerprintLoose(name),
-        acquired_at: item.acquiredOn ?? today,
-        cost_cents: item.costCents,
-        search_tags: item.barcode ? [...enriched.searchTags, item.barcode] : enriched.searchTags,
-        notes: item.notes,
-        source: 'manual',
-        status: 'owned',
-      });
+      items.push(
+        manualItemRow({
+          userId: env.userId,
+          name,
+          variant: item.variant,
+          notes: item.notes,
+          category,
+          costCents: item.costCents,
+          acquiredOn: item.acquiredOn ?? today,
+          barcode: item.barcode,
+        }),
+      );
       titles.push(name);
     }
   }
 
-  const { error } = await env.shop.from('inventory_items').insert(items);
-  if (error) throw new Error(`Adding the items failed: ${error.message}`);
-  const ids = items.map((row) => row.id as string);
-  for (const [table, rows] of [['book_details', books], ['game_details', games]] as const) {
-    if (rows.length === 0) continue;
-    const { error: detailError } = await env.shop.from(table).insert(rows);
-    if (detailError) {
-      await env.shop.from('inventory_items').delete().eq('user_id', env.userId).in('id', ids);
-      throw new Error(`Adding the ${table} failed: ${detailError.message}`);
-    }
-  }
+  const saved = await insertOwned(env.shop as SupabaseClient, { userId: env.userId, items, books, games });
+  if (!saved.ok) throw new Error(`Adding the items failed: ${saved.error}`);
+  const ids = saved.ids;
 
   const first = items[0];
   const count = items.length;
@@ -962,7 +817,6 @@ const REVIEW_HREF = '/shopping/review';
 const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/shopping/dashboard', '/shopping/review', '/shopping/settings'];
 /** One selection's worth of review rows, as the queue's bulk bar takes. */
 export const REVIEW_MAX = 100;
-const DISCARDED_ERROR = 'Discarded from review queue';
 const MESSAGE_KEYS = ['parse_status', 'resulting_order_id', 'error'] as const;
 
 /** Dollars as cents, refusing anything that is not a plain amount. */
@@ -1261,43 +1115,34 @@ async function orderItemTags(env: ShoppingWriteEnv, args: Args): Promise<Shoppin
 
   const { data: existing, error: tagError } = await env.shop.from('item_tags').select('*').eq('user_id', env.userId).eq('slug', slug).maybeSingle();
   if (tagError) throw new Error(`Reading their tags failed: ${tagError.message}`);
-  let tag = existing as Row | null;
+  const tag = existing as Row | null;
 
   if (change === 'remove') {
     if (!tag) throw new ShoppingRefused(`They have no tag called "${label}".`);
-    const { data: link, error } = await env.shop.from('order_item_tags').select('*').eq('order_item_id', lineId).eq('tag_id', tag.id as string).maybeSingle();
-    if (error) throw new Error(`Reading the line's tags failed: ${error.message}`);
-    if (!link) throw new ShoppingRefused(`"${line}" is not tagged "${tag.name as string}".`);
-    const { error: removeError } = await env.shop.from('order_item_tags').delete().eq('id', (link as Row).id as string);
-    if (removeError) throw new Error(`Taking the tag off failed: ${removeError.message}`);
+    const removed = await untagOrderItem(env.shop as SupabaseClient, { userId: env.userId, orderItemId: lineId, tagId: tag.id as string });
+    if (removed.length === 0) throw new ShoppingRefused(`"${line}" is not tagged "${tag.name as string}".`);
     const name = tag.name as string;
     return {
       kind: 'order_item_tags',
       input: { verb: 'Took', what: `the tag "${name}"`, rest: ` off ${line}`, href: orderHref(orderId), where: 'Open the order', paths },
       subjectRef: toRef(ORDERS, orderId),
       op: 'update',
-      before: link as Row,
+      before: removed[0],
       after: null,
-      undo: { removed: [{ table: 'order_item_tags', values: link as Row }] },
+      undo: { removed: removed.map((values) => ({ table: 'order_item_tags' as const, values })) },
       summary: `Dash took the tag "${name}" off "${line}" on an order.`,
       row: { table: ORDERS, ref: orderId, title: line, href: orderHref(orderId) },
     };
   }
 
-  const added: { table: ShoppingTable; id: string }[] = [];
-  if (!tag) {
-    const { data: made, error } = await env.shop.from('item_tags').insert({ user_id: env.userId, name: label, slug }).select('*').single();
-    if (error || !made) throw new Error(`Making the tag failed: ${error?.message ?? 'no row'}`);
-    tag = made as Row;
-    added.push({ table: 'item_tags', id: tag.id as string });
-  }
-  const { data: had } = await env.shop.from('order_item_tags').select('id').eq('order_item_id', lineId).eq('tag_id', tag.id as string).maybeSingle();
-  if (had) throw new ShoppingRefused(`"${line}" is tagged "${tag.name as string}" already.`);
-  const { data: link, error: linkError } = await env.shop.from('order_item_tags').insert({ order_item_id: lineId, tag_id: tag.id }).select('*').single();
-  if (linkError || !link) throw new Error(`Tagging the line failed: ${linkError?.message ?? 'no row'}`);
+  const tagged = await tagOrderItem(env.shop as SupabaseClient, { userId: env.userId, orderItemId: lineId, label });
+  if (!tagged) throw new ShoppingRefused('A tag is 2 to 40 characters with a letter or number in it.');
+  const link = tagged.link;
+  if (!link) throw new ShoppingRefused(`"${line}" is tagged "${tagged.tag.name}" already.`);
   // The link before the tag, so a tag Dash made is free of it when Undo reaches it.
-  added.unshift({ table: 'order_item_tags', id: (link as Row).id as string });
-  const name = tag.name as string;
+  const added: { table: ShoppingTable; id: string }[] = [{ table: 'order_item_tags', id: link.id as string }];
+  if (tagged.madeTag) added.push({ table: 'item_tags', id: tagged.tag.id });
+  const name = tagged.tag.name;
   return {
     kind: 'order_item_tags',
     input: { verb: 'Tagged', what: line, rest: ` "${name}"`, href: orderHref(orderId), where: 'Open the order', paths },
@@ -1341,24 +1186,24 @@ async function ownMessages(env: ShoppingWriteEnv, ids: readonly string[]): Promi
   return messages;
 }
 
-/** One update per row, keeping each row's columns before and after. */
-async function updateKept(
-  env: ShoppingWriteEnv,
+/** The rows a move wrote, each with its columns before (from `before`) and after, for Undo. */
+function keptRows(
   table: 'orders' | 'ingested_messages',
-  rows: readonly Row[],
-  values: Row,
+  before: readonly Row[],
+  after: readonly Row[],
   keys: readonly string[],
-): Promise<NonNullable<ShoppingUndo['rows']>> {
-  const kept: NonNullable<ShoppingUndo['rows']> = [];
-  for (const row of rows) {
-    let query = env.shop.from(table).update(values).eq('id', row.id as string);
-    if (table === 'orders') query = query.eq('user_id', env.userId);
-    const { data, error } = await query.select('*');
-    if (error) throw new Error(`${table}: ${error.message}`);
-    const after = ((data ?? []) as Row[])[0];
-    if (after) kept.push({ table, id: row.id as string, before: pick(row, keys), after: pick(after, keys) });
-  }
-  return kept;
+): NonNullable<ShoppingUndo['rows']> {
+  const now = new Map(after.map((row) => [row.id as string, row]));
+  return before.flatMap((row) => {
+    const written = now.get(row.id as string);
+    return written ? [{ table, id: row.id as string, before: pick(row, keys), after: pick(written, keys) }] : [];
+  });
+}
+
+/** A move's result, or the error it failed with. */
+function moved<T extends object>(result: ReviewResult<T>, what: string): T {
+  if (!result.ok) throw new Error(`${what}: ${result.error}`);
+  return result;
 }
 
 /**
@@ -1383,8 +1228,14 @@ async function reviewOrders(env: ShoppingWriteEnv, args: Args): Promise<Shopping
         ? messages.filter((m) => m.parse_status === 'needs_review')
         : messages.filter((m) => m.parse_status === 'skipped' && m.error === DISMISSED_REVIEW_ERROR);
     if (waiting.length === 0) throw new ShoppingRefused(move === 'dismiss' ? 'Those have left the queue already.' : 'None of those was dismissed from the queue.');
-    const values = move === 'dismiss' ? { parse_status: 'skipped', error: DISMISSED_REVIEW_ERROR } : { parse_status: 'needs_review', error: null };
-    const rows = await updateKept(env, 'ingested_messages', waiting, values, ['parse_status', 'error']);
+    const waitingIds = waiting.map((m) => m.id as string);
+    const { messages: after } = moved(
+      move === 'dismiss'
+        ? await dismissEmails(env.shop as SupabaseClient, { ids: waitingIds })
+        : await putMessagesBack(env.shop as SupabaseClient, waitingIds.map((id) => ({ id, parseStatus: 'needs_review', error: null }))),
+      'ingested_messages',
+    );
+    const rows = keptRows('ingested_messages', waiting, after, ['parse_status', 'error']);
     const subjects = waiting.map((m) => named(m.subject, 'an email'));
     const what = namedItems(subjects, subjects.length);
     const verb = move === 'dismiss' ? 'Dismissed' : 'Put back';
@@ -1405,55 +1256,40 @@ async function reviewOrders(env: ShoppingWriteEnv, args: Args): Promise<Shopping
   const ids = refList(args, 'order_refs', 'order');
   const { orders, merchants } = await ownOrders(env, ids);
   const live = orders.filter((o) => o.deleted_at == null);
+  const client = env.shop as SupabaseClient;
+  const idsOf = (rows: readonly Row[]) => rows.map((o) => o.id as string);
   let moving: Row[];
-  let values: Row;
-  let keys: string[];
+  let rows: NonNullable<ShoppingUndo['rows']>;
   let verb: string;
   let rest: string;
   let said: string;
-  let messageRows: NonNullable<ShoppingUndo['rows']> = [];
 
-  if (move === 'confirm') {
-    moving = live.filter((o) => o.needs_review === true);
-    if (moving.length === 0) throw new ShoppingRefused('Those are confirmed already.');
-    values = { needs_review: false };
-    keys = ['needs_review'];
-    [verb, rest, said] = ['Confirmed', ' from the review queue', 'confirmed'];
-  } else if (move === 'unconfirm') {
-    moving = live.filter((o) => o.needs_review !== true);
-    if (moving.length === 0) throw new ShoppingRefused('Those are waiting in the review queue already.');
-    values = { needs_review: true };
-    keys = ['needs_review'];
-    [verb, rest, said] = ['Put back', ' in the review queue', 'put back in the review queue'];
+  if (move === 'confirm' || move === 'unconfirm') {
+    const needsReview = move === 'unconfirm';
+    moving = live.filter((o) => (o.needs_review === true) !== needsReview);
+    if (moving.length === 0) throw new ShoppingRefused(needsReview ? 'Those are waiting in the review queue already.' : 'Those are confirmed already.');
+    const { orders: after } = moved(await setOrdersReview(client, { userId: env.userId, ids: idsOf(moving), needsReview }), 'orders');
+    rows = keptRows('orders', moving, after, ['needs_review']);
+    [verb, rest, said] = needsReview
+      ? ['Put back', ' in the review queue', 'put back in the review queue']
+      : ['Confirmed', ' from the review queue', 'confirmed'];
   } else if (move === 'discard') {
     moving = live;
     if (moving.length === 0) throw new ShoppingRefused('Those are gone already.');
-    // The emails first, as the queue does, so a re-scan does not bring the order back.
-    const { data: sources, error } = await env.shop
-      .from('inbox_messages')
-      .select('*')
-      .in('resulting_order_id', moving.map((o) => o.id as string))
-      .eq('user_id', env.userId);
-    if (error) throw new Error(`Reading the orders' emails failed: ${error.message}`);
-    messageRows = await updateKept(
-      env,
-      'ingested_messages',
-      (sources ?? []) as Row[],
-      { parse_status: 'skipped', resulting_order_id: null, error: DISCARDED_ERROR },
-      [...MESSAGE_KEYS],
-    );
-    values = { deleted_at: new Date().toISOString(), needs_review: false };
-    keys = ['deleted_at', 'needs_review'];
+    // The emails go with the order, as the queue does, so a re-scan does not bring it back.
+    const { orders: after, sources } = moved(await discardOrders(client, { userId: env.userId, ids: idsOf(moving) }), 'orders');
+    const skipped = sources.map((row) => ({ ...row, parse_status: 'skipped', resulting_order_id: null, error: DISCARDED_REVIEW_ERROR }));
+    rows = [...keptRows('orders', moving, after, ['deleted_at', 'needs_review']), ...keptRows('ingested_messages', sources, skipped, MESSAGE_KEYS)];
     [verb, rest, said] = ['Discarded', ' to Deleted orders', 'discarded'];
   } else {
     moving = orders.filter((o) => o.deleted_at != null);
     if (moving.length === 0) throw new ShoppingRefused('None of those is deleted.');
-    values = args.review_again === true ? { deleted_at: null, needs_review: true } : { deleted_at: null };
-    keys = Object.keys(values);
-    [verb, rest, said] = ['Brought back', args.review_again === true ? ' to the review queue' : ' from Deleted orders', 'brought back'];
+    const reviewAgain = args.review_again === true;
+    const { orders: after } = moved(await restoreOrders(client, { userId: env.userId, ids: idsOf(moving), reviewAgain }), 'orders');
+    rows = keptRows('orders', moving, after, reviewAgain ? ['deleted_at', 'needs_review'] : ['deleted_at']);
+    [verb, rest, said] = ['Brought back', reviewAgain ? ' to the review queue' : ' from Deleted orders', 'brought back'];
   }
 
-  const rows = [...(await updateKept(env, 'orders', moving, values, keys)), ...messageRows];
   const titles = moving.map((o) => orderTitle(o, merchants));
   const what = namedItems(titles, titles.length);
   const first = moving[0].id as string;
@@ -1628,15 +1464,6 @@ function savedUrl(value: string | undefined): string {
   throw new ShoppingRefused('url must be a full product link starting with http:// or https://.');
 }
 
-async function merchantFor(env: ShoppingWriteEnv, link: string): Promise<{ id: string; name: string } | null> {
-  const { data, error } = await env.shop.from('merchants').select('id, slug, name, domains');
-  if (error) throw new Error(`Reading the merchants failed: ${error.message}`);
-  return findMerchantByUrl(
-    link,
-    ((data ?? []) as Row[]).map((m) => ({ id: m.id as string, slug: m.slug as string, name: m.name as string, domains: (m.domains ?? []) as string[] })),
-  );
-}
-
 async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
   const change = (typeof args.change === 'string' ? args.change.trim() : '') as SavedChange;
   if (!SAVED_CHANGES.includes(change)) throw new ShoppingRefused(`change must be one of ${SAVED_CHANGES.join(', ')}.`);
@@ -1665,25 +1492,20 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
     if (!url) throw new ShoppingRefused('Give the product link as url.');
     if (!title) throw new ShoppingRefused('Give a title, so the item can be matched later.');
     const link = savedUrl(url);
-    const merchant = await merchantFor(env, link);
-    const { data: made, error } = await env.shop
-      .from('saved_items')
-      .insert({
-        user_id: env.userId,
-        url: link,
-        title,
-        image_url: imageUrl || null,
-        price_cents: priceCents ?? null,
-        currency: currency ?? 'USD',
-        notes: notes || null,
-        merchant_id: merchant?.id ?? null,
-        fingerprint_loose: fingerprintLoose(title),
-        status: 'saved',
-      })
-      .select('*')
-      .single();
-    if (error || !made) throw new Error(`Saving the item failed: ${error?.message ?? 'no row'}`);
-    const id = (made as Row).id as string;
+    const merchant = await merchantForLink(env.shop, link);
+    const saved = await saveForLater(env.shop, {
+      userId: env.userId,
+      url: link,
+      title,
+      imageUrl: imageUrl || null,
+      priceCents: priceCents ?? null,
+      currency: currency ?? 'USD',
+      notes: notes || null,
+      merchantId: merchant?.id ?? null,
+    });
+    if (saved.error !== undefined) throw new Error(`Saving the item failed: ${saved.error}`);
+    const made = saved.item;
+    const id = made.id as string;
     const shown = named(title, 'the item');
     return {
       kind: 'change_saved_item',
@@ -1691,7 +1513,7 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
       subjectRef: toRef(SAVED, id),
       op: 'insert',
       before: null,
-      after: made as Row,
+      after: made,
       undo: { added: [{ table: 'saved_items', id }] },
       summary: `Dash saved "${shown}" for later${merchant ? ` from ${merchant.name}` : ''}.`,
       row: { table: SAVED, ref: id, title: shown, href: savedHref(id) },
@@ -1708,16 +1530,13 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
 
   if (change === 'edit') {
     if (url !== undefined && url !== item.url) values.url = savedUrl(url);
-    if (title !== undefined && title !== item.title) {
-      values.title = title;
-      values.fingerprint_loose = fingerprintLoose(title);
-    }
+    if (title !== undefined && title !== item.title) values.title = title;
     if (notes !== undefined && !same(notes || null, item.notes)) values.notes = notes || null;
     if (imageUrl !== undefined && !same(imageUrl || null, item.image_url)) values.image_url = imageUrl || null;
     if (priceCents !== undefined && !same(priceCents, item.price_cents)) values.price_cents = priceCents;
     if (currency !== undefined && currency !== item.currency) values.currency = currency;
     if ('url' in values) {
-      const hit = await merchantFor(env, values.url as string);
+      const hit = await merchantForLink(env.shop, values.url as string);
       if ((hit?.id ?? null) !== item.merchant_id) values.merchant_id = hit?.id ?? null;
     }
     if (Object.keys(values).length === 0) {
@@ -1735,9 +1554,14 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
     summary = `Dash ${move.said} the saved item "${shown}".`;
   }
 
-  const { data: after, error } = await env.shop.from('saved_items').update(values).eq('id', id).eq('user_id', env.userId).select('*').single();
-  if (error || !after) throw new Error(`Changing the saved item failed: ${error?.message ?? 'no row'}`);
-  const keys = Object.keys(values);
+  const written =
+    change === 'edit'
+      ? await updateSaved(env.shop, { userId: env.userId, id, patch: values as SavedPatch })
+      : await setSavedStatus(env.shop, { userId: env.userId, id, status: values.status as 'saved' | 'purchased' | 'dismissed' });
+  if (written.error !== undefined) throw new Error(`Changing the saved item failed: ${written.error}`);
+  const after = written.item;
+  // A new title's fingerprint is part of the change, so Undo puts it back too.
+  const keys = [...Object.keys(values), ...('title' in values ? ['fingerprint_loose'] : [])];
   return {
     kind: 'change_saved_item',
     input,
@@ -1946,19 +1770,6 @@ const POLICIES_HREF = '/shopping/settings';
 const POLICY_PATHS = ['/shopping/settings', '/shopping/returns', '/shopping/inventory', '/shopping/orders', '/shopping/dashboard'];
 const windowWords = (days: unknown) => (typeof days === 'number' ? `a ${days}-day return window` : 'no return window');
 
-/** A shop's slug as Shopping's settings make one, before the owner's suffix. */
-function shopSlug(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 50) || 'merchant'
-  );
-}
-
 async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
   const name = textArg(args, 'shop', 80);
   if (!name || name.length < 2) throw new ShoppingRefused('Name the shop by shop, at least 2 characters.');
@@ -1985,7 +1796,7 @@ async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<Shopping
   // The service role reads every account's shops: only the shared ones and theirs are theirs to name.
   const theirs = ((data ?? []) as Row[]).filter((m) => m.is_global === true || m.created_by_user_id === env.userId);
   const slug = shopSlug(name);
-  const ownSlug = `${slug}-${env.userId.slice(0, 8)}`;
+  const ownSlug = ownShopSlug(name, env.userId);
   const merchant =
     theirs.find((m) => flatName(m.name) === flatName(name)) ?? theirs.find((m) => m.slug === slug || m.slug === ownSlug);
 
@@ -1994,20 +1805,10 @@ async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<Shopping
       throw new ShoppingRefused(`There is no shop called "${name}" in Shopping. If it is a shop to add, call again with new_shop true.`);
     }
     if (useDefault) throw new ShoppingRefused('A new shop has no default window to use: give days or no_window.');
-    const { data: made, error: madeError } = await env.shop
-      .from('merchants')
-      .insert({
-        name,
-        slug: ownSlug,
-        domains: [],
-        created_by_user_id: env.userId,
-        is_global: false,
-        default_return_window_days: days ?? null,
-      })
-      .select('*')
-      .single();
-    if (madeError || !made) throw new Error(`Adding the shop failed: ${madeError?.message ?? 'no row'}`);
-    const id = (made as Row).id as string;
+    const added = await addOwnShop(env.shop, { userId: env.userId, name, days: days ?? null });
+    if (added.error !== undefined) throw new ShoppingRefused(added.error);
+    const made = added.shop;
+    const id = made.id as string;
     const shown = named(name, 'the shop');
     return {
       kind: 'return_window',
@@ -2022,7 +1823,7 @@ async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<Shopping
       subjectRef: toRef('public.merchants', id),
       op: 'insert',
       before: null,
-      after: made as Row,
+      after: made,
       undo: { added: [{ table: 'merchants', id }] },
       summary: `Dash added the shop "${shown}" to Shopping with ${windowWords(days)}.`,
       row: { table: 'public.merchants', ref: id, title: shown, href: POLICIES_HREF },
@@ -2054,50 +1855,45 @@ async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<Shopping
     paths: POLICY_PATHS,
   };
   const summary = `Dash set ${shown}'s return window to ${said}.`;
-  if (policy) {
-    const { data: after, error: updateError } = await env.shop
-      .from('merchant_return_policies')
-      .update({ return_window_days: target })
-      .eq('id', policy.id)
-      .eq('user_id', env.userId)
-      .select('*')
-      .single();
-    if (updateError || !after) throw new Error(`Setting the return window failed: ${updateError?.message ?? 'no row'}`);
+  const saved = await setReturnWindow(env.shop, {
+    userId: env.userId,
+    merchantId: merchant.id as string,
+    days: target,
+    shopDays: fallback,
+    dropAtDefault: false,
+  });
+  if (saved.error !== undefined || !saved.after) throw new Error(`Setting the return window failed: ${saved.error ?? 'no row'}`);
+  const after = saved.after;
+  const id = after.id as string;
+  if (saved.before) {
     return {
       kind: 'return_window',
       input,
-      subjectRef: toRef('public.merchant_return_policies', policy.id as string),
+      subjectRef: toRef('public.merchant_return_policies', id),
       op: 'update',
-      before: policy,
-      after: after as Row,
+      before: saved.before,
+      after,
       undo: {
         rows: [
           {
             table: 'merchant_return_policies',
-            id: policy.id as string,
-            before: { return_window_days: policy.return_window_days ?? null },
+            id,
+            before: { return_window_days: saved.before.return_window_days ?? null },
             after: { return_window_days: target },
           },
         ],
       },
       summary,
-      row: { table: 'public.merchant_return_policies', ref: policy.id as string, title: shown, href: POLICIES_HREF },
+      row: { table: 'public.merchant_return_policies', ref: id, title: shown, href: POLICIES_HREF },
     };
   }
-  const { data: made, error: insertError } = await env.shop
-    .from('merchant_return_policies')
-    .insert({ user_id: env.userId, merchant_id: merchant.id, return_window_days: target })
-    .select('*')
-    .single();
-  if (insertError || !made) throw new Error(`Setting the return window failed: ${insertError?.message ?? 'no row'}`);
-  const id = (made as Row).id as string;
   return {
     kind: 'return_window',
     input,
     subjectRef: toRef('public.merchant_return_policies', id),
     op: 'insert',
     before: null,
-    after: made as Row,
+    after,
     undo: { added: [{ table: 'merchant_return_policies', id }] },
     summary,
     row: { table: 'public.merchant_return_policies', ref: id, title: shown, href: POLICIES_HREF },
@@ -2151,21 +1947,18 @@ async function changePerson(env: ShoppingWriteEnv, args: Args): Promise<Shopping
     const name = personName(textArg(args, 'name', 200), 'name');
     if (people.some((p) => flatName(p.name) === flatName(name))) throw new ShoppingRefused(`${name} is on their list of people already.`);
     // The first person added becomes the default, as the settings page makes them.
-    const { data: made, error: madeError } = await core
-      .from('people')
-      .insert({ user_id: env.userId, name, colour: colour ?? 'brand', is_default: people.length === 0 })
-      .select('*')
-      .single();
-    if (madeError?.code === '23505') throw new ShoppingRefused(`${name} is on their list of people already.`);
-    if (madeError || !made) throw new Error(`Adding the person failed: ${madeError?.message ?? 'no row'}`);
-    const id = (made as Row).id as string;
+    const added = await addPersonRow(core, { userId: env.userId, name, colour: (colour ?? 'brand') as PersonColour });
+    if (added.taken) throw new ShoppingRefused(`${name} is on their list of people already.`);
+    if (added.error !== undefined) throw new Error(`Adding the person failed: ${added.error}`);
+    const made = added.person;
+    const id = made.id as string;
     return {
       kind: 'change_person',
       input: input('Added', name, ' to the people you shop for'),
       subjectRef: toRef(PEOPLE, id),
       op: 'insert',
       before: null,
-      after: made as Row,
+      after: made,
       undo: { added: [{ table: 'people', id }] },
       summary: `Dash added ${name} to the people they shop for in Shopping.`,
       row: { table: PEOPLE, ref: id, title: name, href: PEOPLE_HREF },
@@ -2199,15 +1992,15 @@ async function changePerson(env: ShoppingWriteEnv, args: Args): Promise<Shopping
   if (Object.keys(values).length === 0) {
     throw new ShoppingRefused(`Say what changes for ${shown}: a rename_to or colour that differs from now.`);
   }
-  const { data: after, error: updateError } = await core
-    .from('people')
-    .update(values)
-    .eq('id', person.id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (updateError?.code === '23505') throw new ShoppingRefused('Somebody with that name is on their list already.');
-  if (updateError || !after) throw new Error(`Changing the person failed: ${updateError?.message ?? 'no row'}`);
+  const changed = await updatePersonRow(core, {
+    userId: env.userId,
+    personId: person.id as string,
+    name: values.name as string | undefined,
+    colour: values.colour as PersonColour | undefined,
+  });
+  if (changed.taken) throw new ShoppingRefused('Somebody with that name is on their list already.');
+  if (changed.error !== undefined) throw new Error(`Changing the person failed: ${changed.error}`);
+  const after = changed.person;
   const said = sentence([
     ...('name' in values ? [`renamed them ${named(values.name, '')}`] : []),
     ...('colour' in values ? [`gave them the colour ${String(values.colour)}`] : []),
@@ -2429,6 +2222,15 @@ const ITEM_REF = { type: 'string', description: 'The public.inventory_items ref 
 export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   {
     name: 'change_item',
+    runs: sameAs(
+      ['app/shopping/inventory/actions.ts#updateInventoryItem', 'lib/inventory/item-writes.ts#describeItem'],
+      ['app/shopping/inventory/group-actions.ts#renameItemGroup', 'lib/inventory/item-writes.ts#renameGroup'],
+      ['app/shopping/inventory/book-actions.ts#confirmBookEdition', 'lib/inventory/item-writes.ts#writeItemDetails'],
+      ['app/shopping/inventory/book-actions.ts#updateBookCondition', 'lib/inventory/item-writes.ts#writeItemDetails'],
+      ['app/shopping/inventory/game-actions.ts#confirmGameEdition', 'lib/inventory/item-writes.ts#writeItemDetails'],
+      ['app/shopping/sell/actions.ts#noteListingIntent', 'lib/inventory/item-writes.ts#addItemNote'],
+      ['app/shopping/sell/actions.ts#setSellPrice', 'lib/inventory/item-writes.ts#setItemSellPrice'],
+    ),
     description:
       "Change one item they own in Shopping, when they ask: its name, variant or notes (these reach every copy in its stack, as the item page's save does), a line added to its notes (\"planning to list it myself\"), the name of the group of copies it is in, the price they mean to sell it for, a book's or game's condition, or confirming the edition it was matched to. Give only what changes; an empty variant or notes clears it. Marking items for sale or to return, grouping, ungrouping, separating or saying they got rid of an item is change_items.",
     input_schema: {
@@ -2459,6 +2261,13 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'item_lists',
+    runs: sameAs(
+      ['app/shopping/settings/actions.ts#createItemList', 'lib/lists/write.ts#makeItemList'],
+      ['app/shopping/settings/actions.ts#renameItemList', 'lib/lists/write.ts#renameList'],
+      ['app/shopping/inventory/actions.ts#updateInventoryItemLists', 'lib/lists/write.ts#addToList'],
+      ['app/shopping/inventory/actions.ts#createItemListAndAssign', 'lib/lists/write.ts#makeItemList'],
+      ['app/shopping/inventory/actions.ts#toggleInventoryItemList', 'lib/lists/write.ts#addToList'],
+    ),
     description:
       `Put items they own on one of their Shopping lists, take them off one, or rename a list, when they ask ("put these on my Gifts list"). change add puts the items on the list named, making the list when they have none by that name; remove takes them off; rename gives the list rename_to as its name. Name the list by list (its name) or list_ref, and the items by item_refs, at most ${BULK_MAX}. Deleting a list is done in Shopping's settings, not by you.`,
     input_schema: {
@@ -2482,6 +2291,11 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'add_items',
+    runs: sameAs(
+      ['app/shopping/inventory/book-actions.ts#saveOwnedBook', 'lib/inventory/add-owned.ts#insertOwned'],
+      ['app/shopping/inventory/game-actions.ts#saveGame', 'lib/inventory/add-owned.ts#insertOwned'],
+      ['app/shopping/inventory/item-actions.ts#saveManualItem', 'lib/inventory/add-owned.ts#manualItemRow'],
+    ),
     description: `Add things they own to their Shopping inventory, when they tell you they bought or have them ("I bought a copy of Dune", a list of the board games on their shelf), as the add pages do. Each item takes a kind: book (an isbn is looked up in the book catalogs; without one, give the title and what they said of authors, publisher, year and edition), game (a board game, by its title, with year, publisher or barcode when known), or other (anything else, with an optional variant and the name of one of their categories). At most ${ADD_MAX} items. Do not add what an order email already brought in: look it up first when unsure.`,
     input_schema: {
       type: 'object',
@@ -2519,6 +2333,13 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_saved_item',
+    runs: sameAs(
+      ['app/shopping/saved/actions.ts#createSavedItem', 'lib/saved/write.ts#saveForLater'],
+      ['app/shopping/saved/actions.ts#updateSavedItem', 'lib/saved/write.ts#updateSaved'],
+      ['app/shopping/saved/actions.ts#markSavedPurchased', 'lib/saved/write.ts#setSavedStatus'],
+      ['app/shopping/saved/actions.ts#dismissSavedItem', 'lib/saved/write.ts#setSavedStatus'],
+      ['app/shopping/saved/actions.ts#restoreSavedItem', 'lib/saved/write.ts#setSavedStatus'],
+    ),
     description:
       "Work their saved-for-later list in Shopping, when they ask: add saves a product they might buy (give its url and a title; price, notes and picture are optional), edit changes a saved item's link, title, price, notes or picture, bought marks it bought, dismiss puts it aside, restore brings a dismissed or bought one back to saved. Name a saved item by saved_ref, from a lookup. Deleting a saved item is done on its page, not by you.",
     input_schema: {
@@ -2541,6 +2362,7 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'add_order',
+    runs: noButton('No page has an order form: orders come in from email, and capture files a receipt through saveReceiptOrder.'),
     description: `Enter an order they describe in Shopping, as the order form does ("I bought two mugs at Target for $8 each yesterday"), or one read from a receipt they show you: the merchant by name, the day, and a line per thing bought with its quantity and unit price in dollars; tax, shipping and discount are optional. Each unit lands in the inventory. Set from_receipt when it comes from a receipt photo; give message_ref when it is read from an email waiting in the review queue, which takes the email out of the queue. At most ${ADD_MAX} lines. Look the orders up first when it may have come in from email already.`,
     input_schema: {
       type: 'object',
@@ -2579,6 +2401,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'order_item_tags',
+    runs: sameAs(
+      ['app/shopping/orders/actions.ts#addOrderItemTag', 'lib/tags/ensure.ts#tagOrderItem'],
+      ['app/shopping/orders/actions.ts#removeOrderItemTag', 'lib/tags/ensure.ts#untagOrderItem'],
+    ),
     description:
       'Put a tag on a line of one of their Shopping orders, or take one off, when they ask ("tag the lamp as a gift"). change add tags the line, making the tag when they have none by that name; remove takes it off. Name the line by order_item_ref, from an order lookup, and the tag by its name.',
     input_schema: {
@@ -2595,6 +2421,19 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'review_orders',
+    runs: sameAs(
+      ['app/shopping/orders/actions.ts#restoreDeletedOrder', 'lib/review/moves.ts#restoreOrders'],
+      ['app/shopping/review/actions.ts#confirmOrderReview', 'lib/review/moves.ts#setOrdersReview'],
+      ['app/shopping/review/actions.ts#discardOrderReview', 'lib/review/moves.ts#discardOrders'],
+      ['app/shopping/review/actions.ts#dismissEmailReview', 'lib/review/moves.ts#dismissEmails'],
+      ['app/shopping/review/actions.ts#attachEmailToOrder', 'lib/orders/apply-lifecycle.ts#applyLifecycleToOrder'],
+      ['app/shopping/review/actions.ts#confirmOrdersReview', 'lib/review/moves.ts#setOrdersReview'],
+      ['app/shopping/review/actions.ts#unconfirmOrdersReview', 'lib/review/moves.ts#setOrdersReview'],
+      ['app/shopping/review/actions.ts#discardOrdersReview', 'lib/review/moves.ts#discardOrders'],
+      ['app/shopping/review/actions.ts#restoreDiscardedOrders', 'lib/review/moves.ts#restoreOrders'],
+      ['app/shopping/review/actions.ts#dismissEmailsReview', 'lib/review/moves.ts#dismissEmails'],
+      ['app/shopping/review/actions.ts#restoreDismissedEmails', 'lib/review/moves.ts#putMessagesBack'],
+    ),
     description: `Work the Shopping review queue and deleted orders, when they ask. On orders (order_refs, at most ${REVIEW_MAX}): confirm keeps an imported order that looks right and takes it out of the queue; unconfirm puts a confirmed one back in the queue; discard sends a bad import to Deleted orders and stops its email bringing it back; restore brings back a deleted or discarded order (review_again true puts it back in the queue too). On waiting emails (message_refs): dismiss takes an email that is not an order out of the queue; undismiss puts a dismissed one back. attach links one waiting shipping, delivery, return or confirmation email (message_ref) to the order it is about (order_ref) and writes the shipment or return it describes. Deleting an order for good stays on the page.`,
     input_schema: {
       type: 'object',
@@ -2623,6 +2462,12 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_recurring',
+    runs: sameAs(
+      ['app/shopping/recurring/actions.ts#renameRecurringPayment', 'lib/recurring/corrections.ts#renamePayment'],
+      ['app/shopping/recurring/actions.ts#mergeRecurringPayment', 'lib/recurring/corrections.ts#mergePayments'],
+      ['app/shopping/recurring/actions.ts#moveRecurringCharges', 'lib/recurring/corrections.ts#moveCharges'],
+      ['app/shopping/recurring/actions.ts#setRecurringCounted', 'lib/recurring/corrections.ts#setPaymentCounted'],
+    ),
     description:
       "Tidy their recurring payments in Shopping, the subscriptions and bills read from their mail, when they ask. Name a payment by payment, the name it shows under on the Recurring page. change rename gives it rename_to as its name; leave_out takes it off the monthly total and the agenda, and count puts it back; merge folds it into the payment named by into, moving every charge there, when the two are the same thing under two names; move takes some of its charges, named by charged_on (the days they were charged, YYYY-MM-DD), to the payment named by into or to a new one named by new_payee, when one row holds more than one subscription. A merge and a move have no Undo, so say so. A refusal lists their payments and a payment's charges.",
     input_schema: {
@@ -2647,6 +2492,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'return_window',
+    runs: sameAs(
+      ['app/shopping/returns/actions.ts#saveMerchantReturnPolicy', 'lib/returns/windows.ts#setReturnWindow'],
+      ['app/shopping/returns/actions.ts#createMerchantReturnPolicy', 'lib/returns/windows.ts#addOwnShop'],
+    ),
     description:
       "Set how long a shop gives them to return things, as Shopping's settings do, when they say (\"Target gives me 90 days\"). Name the shop by shop; give days (1 to 730), no_window when the shop takes no returns, or use_default to go back to the window Shopping knows for it. A shop Shopping does not know is added as one of theirs when new_shop is true, with the window given.",
     input_schema: {
@@ -2665,6 +2514,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_person',
+    runs: sameAs(
+      ['app/shopping/settings/people-actions.ts#addPerson', 'lib/people/write.ts#addPersonRow'],
+      ['app/shopping/settings/people-actions.ts#updatePerson', 'lib/people/write.ts#updatePersonRow'],
+    ),
     description: `Work the list of people they shop for in Shopping (the household members orders and items are put on), when they ask. change add puts someone on it by name, with an optional colour for their badge; edit renames the person named by person to rename_to or gives them another colour. Colours: ${PERSON_COLOURS.join(', ')}. Removing someone is done in Shopping's settings, not by you.`,
     input_schema: {
       type: 'object',
@@ -2713,6 +2566,7 @@ const ASK_NOTE =
 export const SHOPPING_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = SHOPPING_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!shoppingOn(ctx.enabledModules)) return { ok: false, error: SHOPPING_OFF };

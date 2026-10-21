@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { todayInTimezone } from '@/lib/money';
+import { setUnitsFlag } from '@/lib/inventory/unit-changes';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
+import { addOwnShop, setReturnWindow } from '@/lib/returns/windows';
 
 export type ActionState = {
   error?: string;
@@ -64,14 +66,8 @@ export async function setReturnPlanned(
     return { error: 'Only owned items can be marked to return.' };
   }
 
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ return_planned: planned })
-    .eq('id', item.id)
-    .eq('user_id', user.id)
-    .eq('status', 'owned');
-
-  if (error) return { error: error.message };
+  const flagged = await setUnitsFlag(supabase, { userId: user.id, ids: [item.id], column: 'return_planned', value: planned });
+  if (!flagged.ok) return { error: flagged.error };
 
   revalidateReturnSurfaces(item.id);
   return { message: planned ? 'Marked to return.' : 'Removed from to-return list.' };
@@ -106,22 +102,10 @@ export async function setItemsReturnPlanned(
     .filter((value) => z.string().uuid().safeParse(value).success);
   if (ids.length === 0) return { error: 'Pick at least one item first.' };
 
-  const { data: owned } = await supabase
-    .from('inventory_items')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('status', 'owned')
-    .in('id', ids);
-  const ownedIds = (owned ?? []).map((row) => row.id as string);
+  const flagged = await setUnitsFlag(supabase, { userId: user.id, ids, column: 'return_planned', value: planned });
+  if (!flagged.ok) return { error: flagged.error };
+  const ownedIds = flagged.ids;
   if (ownedIds.length === 0) return { error: 'None of those are owned items.' };
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ return_planned: planned })
-    .eq('user_id', user.id)
-    .eq('status', 'owned')
-    .in('id', ownedIds);
-  if (error) return { error: error.message };
 
   for (const id of ownedIds) revalidateReturnSurfaces(id);
   const noun = ownedIds.length === 1 ? 'item' : 'items';
@@ -238,38 +222,18 @@ export async function saveMerchantReturnPolicy(
   }
 
   // If the value matches the seed, drop the override so the seed stays the source.
-  if (days === (merchant.default_return_window_days as number | null)) {
-    const { error } = await supabase
-      .from('merchant_return_policies')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('merchant_id', merchant.id);
-    if (error) return { error: error.message };
+  const seeded = (merchant.default_return_window_days as number | null) ?? null;
+  const saved = await setReturnWindow(supabase, {
+    userId: user.id,
+    merchantId: merchant.id as string,
+    days,
+    shopDays: seeded,
+    dropAtDefault: true,
+  });
+  if (saved.error !== undefined) return { error: saved.error };
+  if (saved.after === null) {
     revalidatePaths();
     return { message: `Using the default ${days ?? 'none'} day window for ${merchant.name}.` };
-  }
-
-  const { data: existing } = await supabase
-    .from('merchant_return_policies')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('merchant_id', merchant.id)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from('merchant_return_policies')
-      .update({ return_window_days: days })
-      .eq('id', existing.id)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-  } else {
-    const { error } = await supabase.from('merchant_return_policies').insert({
-      user_id: user.id,
-      merchant_id: merchant.id,
-      return_window_days: days,
-    });
-    if (error) return { error: error.message };
   }
 
   revalidatePaths();
@@ -315,42 +279,9 @@ export async function createMerchantReturnPolicy(
     days = parsedDays.data;
   }
 
-  const baseSlug =
-    nameParsed.data
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 50) || 'merchant';
-  const slug = `${baseSlug}-${user.id.slice(0, 8)}`;
-
-  const { data: conflict } = await supabase
-    .from('merchants')
-    .select('id')
-    .eq('created_by_user_id', user.id)
-    .eq('slug', slug)
-    .maybeSingle();
-  if (conflict) {
-    return { error: 'You already have a merchant with that name.' };
-  }
-
-  const { data: created, error: createError } = await supabase
-    .from('merchants')
-    .insert({
-      name: nameParsed.data,
-      slug,
-      domains: [],
-      created_by_user_id: user.id,
-      is_global: false,
-      default_return_window_days: days,
-    })
-    .select('id, name')
-    .single();
-
-  if (createError || !created) {
-    return { error: createError?.message ?? 'Could not create that merchant.' };
-  }
+  const added = await addOwnShop(supabase, { userId: user.id, name: nameParsed.data, days });
+  if (added.error !== undefined) return { error: added.error };
+  const created = added.shop as { id: string; name: string };
 
   revalidatePaths();
   return {

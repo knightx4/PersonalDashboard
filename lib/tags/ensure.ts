@@ -98,6 +98,83 @@ export async function linkOrderItemTags(
   if (error) throw error;
 }
 
+/** A line's tag as tagOrderItem left it: the tag, whether it was made for this, and the new link (null when the line had it already). */
+export type OrderItemTagging = { tag: ItemTagRow; madeTag: boolean; link: Record<string, unknown> | null };
+
+/**
+ * Tag one order line by the tag's label, making the tag when they have none
+ * by that name, as the order page's tag chips and Dash's order_item_tags both
+ * do (plan #2473.4). The caller has checked the line is on an order of
+ * theirs. Null when the label has nothing a tag can be made of.
+ */
+export async function tagOrderItem(
+  supabase: SupabaseClient,
+  opts: { userId: string; orderItemId: string; label: string },
+): Promise<OrderItemTagging | null> {
+  const label = normalizeTagLabel(opts.label);
+  if (!label) return null;
+  const slug = slugifyTagName(label);
+  if (!slug) return null;
+  const { data: had, error: readError } = await supabase
+    .from('item_tags')
+    .select('id, name, slug')
+    .eq('user_id', opts.userId)
+    .eq('slug', slug)
+    .maybeSingle();
+  if (readError) throw readError;
+  const [tag] = had ? [had as ItemTagRow] : await ensureItemTags(supabase, opts.userId, [label]);
+  if (!tag) return null;
+  const { data: linked, error: linkReadError } = await supabase
+    .from('order_item_tags')
+    .select('id')
+    .eq('order_item_id', opts.orderItemId)
+    .eq('tag_id', tag.id)
+    .maybeSingle();
+  if (linkReadError) throw linkReadError;
+  if (linked) return { tag, madeTag: !had, link: null };
+  const { data: link, error } = await supabase
+    .from('order_item_tags')
+    .insert({ order_item_id: opts.orderItemId, tag_id: tag.id })
+    .select('*')
+    .single();
+  if (error || !link) throw error ?? new Error('The line was not tagged.');
+  return { tag, madeTag: !had, link: link as Record<string, unknown> };
+}
+
+/**
+ * Take one of their tags off an order line, as the order page's chip and
+ * Dash's order_item_tags both do (plan #2473.4). Hands back the links it
+ * took away, whole, so Dash can put them back; none when the tag is not
+ * theirs or the line did not carry it.
+ */
+export async function untagOrderItem(
+  supabase: SupabaseClient,
+  opts: { userId: string; orderItemId: string; tagId: string },
+): Promise<Record<string, unknown>[]> {
+  const { data: owned, error: ownError } = await supabase
+    .from('item_tags')
+    .select('id')
+    .eq('id', opts.tagId)
+    .eq('user_id', opts.userId)
+    .maybeSingle();
+  if (ownError) throw ownError;
+  if (!owned) return [];
+  const { data: links, error: readError } = await supabase
+    .from('order_item_tags')
+    .select('*')
+    .eq('order_item_id', opts.orderItemId)
+    .eq('tag_id', opts.tagId);
+  if (readError) throw readError;
+  if (!links || links.length === 0) return [];
+  const { error } = await supabase
+    .from('order_item_tags')
+    .delete()
+    .eq('order_item_id', opts.orderItemId)
+    .eq('tag_id', opts.tagId);
+  if (error) throw error;
+  return links as Record<string, unknown>[];
+}
+
 export function parseTagId(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();

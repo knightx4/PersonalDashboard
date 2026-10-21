@@ -5,20 +5,19 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import {
   DISPOSAL_METHODS,
-  inventoryStatusForDisposal,
   type DisposalMethod,
 } from '@/lib/inventory/status-actions';
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
-import { slugifyCategoryName } from '@/lib/categories/slugify';
-import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { describeItem } from '@/lib/inventory/item-writes';
 import {
   attributeKey,
   mergeAttributeValues,
   parseAttributeValues,
   type AttributeValues,
 } from '@/lib/inventory/attributes';
-import { pickListGradient } from '@/lib/lists/gradients';
-import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
+import { addToList, makeItemList, removeFromList, setItemLists } from '@/lib/lists/write';
+import { disposeUnits, setUnitsFlag } from '@/lib/inventory/unit-changes';
+import { markReturned } from '@/lib/returns/mark';
 
 export interface ActionState {
   error?: string;
@@ -70,25 +69,6 @@ export async function updateInventoryItem(
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
   }
 
-  let categorySlug: string | null = null;
-  let categoryName: string | null = null;
-  if (parsed.data.categoryId) {
-    const { data: category } = await supabase
-      .from('categories')
-      .select('slug, name')
-      .eq('id', parsed.data.categoryId)
-      .maybeSingle();
-    categorySlug = category?.slug ?? null;
-    categoryName = category?.name ?? null;
-  }
-
-  const enriched = enrichItemDisplay({
-    name: parsed.data.name,
-    variant: parsed.data.variant || null,
-    categorySlug,
-    categoryName,
-  });
-
   const submitted: AttributeValues = {};
   for (const [name, value] of formData.entries()) {
     if (!name.startsWith('attr_') || typeof value !== 'string') continue;
@@ -118,26 +98,23 @@ export async function updateInventoryItem(
 
   // Everything on this form describes the item, not the box: a name, a
   // category and a template field are as true of the second copy of Acquire as
-  // of the first. So the save reaches every copy in the stack. What genuinely
-  // differs between copies -- when it was bought, what it cost, whether this
-  // one is on the sell page -- is edited elsewhere and is never touched here.
-  const ids = await stackSiblingIds(supabase, user.id, parsed.data.id);
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({
+  // of the first. So the save reaches every copy in the stack (describeItem).
+  // What genuinely differs between copies -- when it was bought, what it cost,
+  // whether this one is on the sell page -- is edited elsewhere and is never
+  // touched here.
+  const saved = await describeItem(supabase, {
+    userId: user.id,
+    itemId: parsed.data.id,
+    values: {
       name: parsed.data.name,
-      short_name: enriched.shortName,
       variant: parsed.data.variant || null,
       category_id: parsed.data.categoryId ?? null,
-      notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
-      search_tags: enriched.searchTags,
+      notes: parsed.data.notes ?? null,
       attributes: mergeAttributeValues(parseAttributeValues(current.attributes), submitted),
-    })
-    .in('id', ids)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
+    },
+  });
+  if (!saved.ok) return { error: saved.error };
+  const ids = saved.ids;
 
   revalidatePath('/shopping/inventory');
   for (const id of ids) revalidatePath(`/shopping/inventory/${id}`);
@@ -171,22 +148,15 @@ export async function disposeInventoryItem(
   if (!id.success) return { error: 'Missing item.' };
 
   const timezone = await userTimezone(supabase, user.id);
-  const disposedAt = todayInTimezone(timezone);
-  const status = inventoryStatusForDisposal(method);
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({
-      status,
-      disposed_at: disposedAt,
-      disposal_method: method,
-      disposal_proceeds_cents: proceedsCents > 0 ? proceedsCents : null,
-    })
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .eq('status', 'owned');
-
-  if (error) return { error: error.message };
+  const disposed = await disposeUnits(supabase, {
+    userId: user.id,
+    ids: [id.data],
+    method,
+    proceedsCents,
+    today: todayInTimezone(timezone),
+  });
+  if (!disposed.ok) return { error: disposed.error };
+  const status = disposed.values.status;
 
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${id.data}`);
@@ -224,46 +194,15 @@ export async function markInventoryReturned(
     return { error: 'Refund amount cannot be negative.' };
   }
 
-  const { data: item, error: itemError } = await supabase
-    .from('inventory_items')
-    .select('id, cost_cents, status, order_item_id')
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (itemError || !item) return { error: 'That item could not be found.' };
-  if (item.status !== 'owned') return { error: 'Only owned items can be marked returned.' };
-  if (!item.order_item_id) {
-    return { error: 'This item is not linked to an order, so it cannot be returned.' };
-  }
-
-  const { data: orderItem, error: orderItemError } = await supabase
-    .from('order_items')
-    .select('order_id')
-    .eq('id', item.order_item_id)
-    .maybeSingle();
-  if (orderItemError || !orderItem) return { error: 'Could not find the parent order.' };
-
   const timezone = await userTimezone(supabase, user.id);
   const today = todayInTimezone(timezone);
-  const amount = refundCents === -1 ? item.cost_cents : refundCents;
-
-  const { error } = await supabase.from('returns').insert({
-    user_id: user.id,
-    order_id: orderItem.order_id,
-    inventory_item_id: item.id,
-    initiated_at: today,
-    refund_amount_cents: amount,
-    status: 'refunded',
-    refunded_at: today,
-  });
-
-  if (error) return { error: error.message };
+  const marked = await markReturned(supabase, user.id, id.data, today, refundCents === -1 ? undefined : refundCents);
+  if (!marked.ok) return { error: marked.error };
 
   revalidatePath('/shopping/inventory');
-  revalidatePath(`/shopping/inventory/${item.id}`);
+  revalidatePath(`/shopping/inventory/${id.data}`);
   revalidatePath('/shopping/orders');
-  revalidatePath(`/shopping/orders/${orderItem.order_id}`);
+  revalidatePath(`/shopping/orders/${marked.orderId}`);
   revalidatePath('/shopping/returns');
   revalidatePath('/shopping/dashboard');
   return { message: 'Marked as returned.' };
@@ -294,28 +233,8 @@ export async function updateInventoryItemLists(
     .maybeSingle();
   if (!item) return { error: 'That item could not be found.' };
 
-  const { data: ownedLists } = await supabase
-    .from('item_lists')
-    .select('id')
-    .eq('user_id', user.id);
-  const ownedIds = new Set((ownedLists ?? []).map((row) => row.id as string));
-  const nextIds = selected.filter((id) => ownedIds.has(id));
-
-  const { error: deleteError } = await supabase
-    .from('inventory_item_lists')
-    .delete()
-    .eq('inventory_item_id', item.id);
-  if (deleteError) return { error: deleteError.message };
-
-  if (nextIds.length > 0) {
-    const { error: insertError } = await supabase.from('inventory_item_lists').insert(
-      nextIds.map((listId) => ({
-        inventory_item_id: item.id,
-        list_id: listId,
-      })),
-    );
-    if (insertError) return { error: insertError.message };
-  }
+  const set = await setItemLists(supabase, { userId: user.id, itemId: item.id, listIds: selected });
+  if (set.error) return { error: set.error };
 
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${item.id}`);
@@ -344,9 +263,6 @@ export async function createItemListAndAssign(
     return { error: nameParsed.error.issues[0]?.message ?? 'Enter a list name.' };
   }
 
-  const slug = slugifyCategoryName(nameParsed.data);
-  if (!slug) return { error: 'Use letters or numbers in the list name.' };
-
   const { data: item } = await supabase
     .from('inventory_items')
     .select('id')
@@ -355,39 +271,11 @@ export async function createItemListAndAssign(
     .maybeSingle();
   if (!item) return { error: 'That item could not be found.' };
 
-  const { data: conflict } = await supabase
-    .from('item_lists')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('slug', slug)
-    .maybeSingle();
-  if (conflict) return { error: 'That list name is already used. Try another.' };
+  const made = await makeItemList(supabase, { userId: user.id, name: nameParsed.data });
+  if (made.error !== undefined) return { error: made.error };
 
-  const { data: existing } = await supabase
-    .from('item_lists')
-    .select('color')
-    .eq('user_id', user.id);
-  const color = pickListGradient((existing ?? []).map((row) => row.color));
-
-  const { data: created, error: createError } = await supabase
-    .from('item_lists')
-    .insert({
-      user_id: user.id,
-      name: nameParsed.data,
-      slug,
-      color,
-    })
-    .select('id')
-    .single();
-  if (createError || !created) {
-    return { error: createError?.message ?? 'Could not create that list.' };
-  }
-
-  const { error: membershipError } = await supabase.from('inventory_item_lists').insert({
-    inventory_item_id: item.id,
-    list_id: created.id,
-  });
-  if (membershipError) return { error: membershipError.message };
+  const joined = await addToList(supabase, { listId: made.list.id as string, itemIds: [item.id] });
+  if (joined.error !== undefined) return { error: joined.error };
 
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');
@@ -441,28 +329,11 @@ export async function toggleInventoryItemList(formData: FormData): Promise<void>
     .maybeSingle();
   if (!list) throw new Error('That list could not be found.');
 
-  if (parsed.data.join === 'true') {
-    const { data: existing } = await supabase
-      .from('inventory_item_lists')
-      .select('id')
-      .eq('inventory_item_id', item.id)
-      .eq('list_id', list.id)
-      .maybeSingle();
-    if (!existing) {
-      const { error } = await supabase.from('inventory_item_lists').insert({
-        inventory_item_id: item.id,
-        list_id: list.id,
-      });
-      if (error) throw new Error(error.message);
-    }
-  } else {
-    const { error } = await supabase
-      .from('inventory_item_lists')
-      .delete()
-      .eq('inventory_item_id', item.id)
-      .eq('list_id', list.id);
-    if (error) throw new Error(error.message);
-  }
+  const moved =
+    parsed.data.join === 'true'
+      ? await addToList(supabase, { listId: list.id, itemIds: [item.id] })
+      : await removeFromList(supabase, { listId: list.id, itemIds: [item.id] });
+  if (moved.error !== undefined) throw new Error(moved.error);
 
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${item.id}`);
@@ -537,24 +408,12 @@ export async function setItemsForSale(
 
   // Owned only, and only this user's: a disposed or returned unit is not
   // something to put on the sell page.
-  const { data: owned } = await supabase
-    .from('inventory_items')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('status', 'owned')
-    .in('id', ids);
-  const ownedIds = (owned ?? []).map((row) => row.id as string);
+  const flagged = await setUnitsFlag(supabase, { userId: user.id, ids, column: 'for_sale', value: forSale });
+  if (!flagged.ok) return { error: flagged.error };
+  const ownedIds = flagged.ids;
   if (ownedIds.length === 0) {
     return { error: 'None of those are owned items.' };
   }
-
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ for_sale: forSale })
-    .eq('user_id', user.id)
-    .eq('status', 'owned')
-    .in('id', ownedIds);
-  if (error) return { error: error.message };
 
   revalidateSellSurfaces(ownedIds);
   const noun = ownedIds.length === 1 ? 'item' : 'items';
