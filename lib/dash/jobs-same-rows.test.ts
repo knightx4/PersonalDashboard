@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
-import { JOBS_WRITES, runJobsWrite, type JobsWriteEnv } from './jobs-writes';
+import { fakeId, fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
+import { JOBS_WRITES, runJobsWrite, undoRoleMerge, type JobsWriteEnv } from './jobs-writes';
 import type { DashWriteContext } from './registry';
 import { WRITE_TOOLS } from './writes';
 
@@ -999,5 +999,90 @@ describe("change_role_email and add_role_from_email write the rows the role page
       expect(byTool[table], table).toEqual(byButton[table]);
     }
     expect(verdictsOf(byTool)).toEqual(verdictsOf(byButton));
+  });
+});
+
+describe('merge_roles folds roles as the Merge roles button does (plan #2473.6)', () => {
+  const ROLE_2 = '11111111-1111-4111-8111-111111111112';
+  const APP_1 = '33333333-3333-4333-8333-333333333331';
+  const APP_2 = '33333333-3333-4333-8333-333333333332';
+  const QUESTION = '99999999-9999-4999-8999-999999999991';
+
+  /** Two filings of one posting, each with an application and rows on it, some of them twins. */
+  function dupesSeed(): FakeTables {
+    const tables = roleSeed();
+    tables['job_search.roles'].push({ ...tables['job_search.roles'][0], id: ROLE_2, title: 'Data Engineer' });
+    tables['job_search.applications'] = [
+      { id: APP_1, user_id: ME, role_id: ROLE, attempt: 1, status: 'submitted', status_manual_override: null, created_at: '2026-10-01T00:00:00Z' },
+      { id: APP_2, user_id: ME, role_id: ROLE_2, attempt: 1, status: 'in_process', status_manual_override: 'in_process', created_at: '2026-10-02T00:00:00Z' },
+    ];
+    tables['job_search.application_events'] = [{ id: 'e0000000-0000-4000-8000-000000000001', user_id: ME, application_id: APP_1 }];
+    tables['job_search.application_answers'] = [
+      { id: 'a0000000-0000-4000-8000-000000000001', user_id: ME, application_id: APP_1, question_id: QUESTION },
+      { id: 'a0000000-0000-4000-8000-000000000002', user_id: ME, application_id: APP_2, question_id: QUESTION },
+    ];
+    tables['job_search.interviews'] = [{ id: 'b0000000-0000-4000-8000-000000000001', user_id: ME, application_id: APP_1, ics_uid: null }];
+    tables['job_search.fact_origins'] = [
+      { id: 'f0000000-0000-4000-8000-000000000001', user_id: ME, role_id: ROLE, field: 'location', origin: 'you' },
+      { id: 'f0000000-0000-4000-8000-000000000002', user_id: ME, role_id: ROLE_2, field: 'location', origin: 'posting' },
+      { id: 'f0000000-0000-4000-8000-000000000003', user_id: ME, role_id: ROLE_2, field: 'seniority', origin: 'posting' },
+    ];
+    tables['todo.task_links'] = [{ id: 'c0000000-0000-4000-8000-000000000001', role_id: ROLE_2, application_id: APP_1 }];
+    // Every row has its time, as the database gives it, so one put back whole compares equal.
+    for (const rows of Object.values(tables)) for (const row of rows) row.created_at ??= '2026-09-30T00:00:00Z';
+    return tables;
+  }
+
+  function toolEnv(tables: FakeTables): JobsWriteEnv {
+    const db = fakeSchemaDb(tables);
+    return { userId: ME, jobs: db('job_search'), todo: db('todo'), core: db('core') };
+  }
+
+  const merge = JOBS_WRITES.find((entry) => entry.name === 'merge_roles')!;
+
+  /** The rows, leaving out the tables a read left empty in the in-memory database. */
+  const rowsOf = (tables: FakeTables) =>
+    Object.fromEntries(Object.entries(settled(tables, new Set())).filter(([, rows]) => rows.length > 0));
+
+  it('writes the same rows as the button, and its Undo puts every one back', async () => {
+    const { mergeRoles } = await import('@/app/jobs/(app)/companies/actions');
+    session.tables = dupesSeed();
+    expect(await mergeRoles({ companyId: COMPANY, survivorRoleId: ROLE, mergedRoleIds: [ROLE_2] })).toEqual({ error: null });
+    const byButton = rowsOf(session.tables);
+
+    const tables = dupesSeed();
+    const result = await runJobsWrite(merge, toolEnv(tables), { keep_role_ref: ROLE, merge_role_refs: [ROLE_2] });
+    if ('ok' in result) throw new Error(`the tool refused: ${result.error}`);
+    expect(rowsOf(tables)).toEqual(byButton);
+    // It did fold: one role, the application furthest along on it, the twin answer and origin taken out.
+    expect(tables['job_search.roles'].map((r) => r.id)).toEqual([ROLE]);
+    expect(tables['job_search.applications']).toEqual([
+      expect.objectContaining({ id: APP_2, role_id: ROLE, attempt: 1, status_manual_override: 'in_process' }),
+    ]);
+    expect(tables['job_search.application_answers'].map((r) => r.id)).toEqual(['a0000000-0000-4000-8000-000000000002']);
+    expect(tables['job_search.fact_origins'].map((r) => r.id).sort()).toEqual([
+      'f0000000-0000-4000-8000-000000000001',
+      'f0000000-0000-4000-8000-000000000003',
+    ]);
+
+    const db = fakeSchemaDb(tables);
+    expect(await undoRoleMerge({ userId: ME, db: async (schema) => db(schema) }, result.undo)).toMatchObject({ ok: true });
+    expect(rowsOf(tables)).toEqual(rowsOf(dupesSeed()));
+  });
+
+  it('refuses, as the button does, a duplicate with comments in its thread', async () => {
+    const turn = { id: fakeId(), user_id: ME, ref: `job_search.roles:${ROLE_2}`, author: 'me', body: 'Hi' };
+    const tables = dupesSeed();
+    tables['core.conversation_turns'] = [turn];
+    const result = await runJobsWrite(merge, toolEnv(tables), { keep_role_ref: ROLE, merge_role_refs: [ROLE_2] });
+    expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/comments in its thread/) });
+    expect(tables['job_search.roles']).toHaveLength(2);
+
+    const { mergeRoles } = await import('@/app/jobs/(app)/companies/actions');
+    session.tables = { ...dupesSeed(), 'core.conversation_turns': [turn] };
+    expect(await mergeRoles({ companyId: COMPANY, survivorRoleId: ROLE, mergedRoleIds: [ROLE_2] })).toMatchObject({
+      error: expect.stringMatching(/comments in its thread/),
+    });
+    expect(session.tables['job_search.roles']).toHaveLength(2);
   });
 });

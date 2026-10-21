@@ -17,12 +17,12 @@ import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
 import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { researchBrief, STALE_AFTER_MS } from '@/lib/jobs/companies/research';
 import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { mergeRolesInto, type MergeApplication } from '@/lib/jobs/companies/merge-roles';
 import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } from '@/lib/jobs/companies/edit';
 import {
   enrichmentStageSource,
@@ -527,23 +527,6 @@ const mergeRolesSchema = z.object({
 });
 
 /**
- * The application a merge keeps: the one furthest along, ties broken by
- * whichever is older. Ranking status is lib/jobs/pipeline.ts's job, so it is
- * decided here and handed to the database.
- */
-function keptApplication(
-  apps: Array<{ id: string; status: string; created_at: string }>,
-): string | null {
-  if (apps.length === 0) return null;
-  return apps.reduce((best, app) => {
-    const appRank = statusRank(app.status as ApplicationStatus);
-    const bestRank = statusRank(best.status as ApplicationStatus);
-    if (appRank !== bestRank) return appRank > bestRank ? app : best;
-    return new Date(app.created_at) < new Date(best.created_at) ? app : best;
-  }).id;
-}
-
-/**
  * Fold one or more duplicate role rows into the survivor. They are the same
  * posting, so their applications become one, the one furthest along.
  *
@@ -551,6 +534,8 @@ function keptApplication(
  * which tables to move from the foreign keys. This action used to move eight
  * tables from a list of its own while fourteen point at an application, so a
  * merge deleted the rest with the duplicate (migration 0058 says which).
+ * lib/jobs/companies/merge-roles.ts picks the application kept and calls the
+ * function, for Dash's merge_roles too.
  */
 // latency: pending
 export async function mergeRoles(
@@ -587,13 +572,12 @@ export async function mergeRoles(
     .in('role_id', [survivorRoleId, ...mergedRoleIds]);
   if (appsError) return { error: appsError.message };
 
-  const { error } = await supabase.rpc('merge_roles', {
-    p_keep_role: survivorRoleId,
-    p_merge_roles: mergedRoleIds,
-    p_keep_application: keptApplication(
-      (apps ?? []) as Array<{ id: string; status: string; created_at: string }>,
-    ),
-  });
+  const { error } = await mergeRolesInto(
+    supabase,
+    survivorRoleId,
+    mergedRoleIds,
+    (apps ?? []) as MergeApplication[],
+  );
   if (error) return { error: error.message };
 
   revalidatePath('/jobs/companies/[slug]', 'page');
