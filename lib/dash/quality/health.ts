@@ -9,8 +9,9 @@ import { LIMIT_MARKS, UNFINISHED_OPENING } from './grade';
  *
  * The alerts are what the nightly run writes a Dev note about and the daily
  * Dash quality session works first. Each threshold is set so that one real
- * failure raises it: an answer that gave up, a lookup that broke, or a thumbs
- * down is always worth a look.
+ * failure raises it: an answer that gave up, a lookup that broke, a thumbs
+ * down or a reply that says the answer was wrong is always worth a look.
+ * This is the check that runs every day, so nothing here calls a model.
  */
 
 export type HealthTurn = {
@@ -19,6 +20,8 @@ export type HealthTurn = {
   toolCalls: readonly TalkToolCall[] | null;
   rating: 'up' | 'down' | null;
   ratingNote: string | null;
+  /** What the person wrote next in the same chat, if anything. */
+  followUp?: string | null;
 };
 
 export type HealthSpend = {
@@ -38,6 +41,8 @@ export type DashHealth = {
   failedLookups: ToolFailure[];
   skippedLookups: number;
   thumbsDown: { turn: string; note: string | null }[];
+  /** Answers the person pushed back on in their next message. */
+  pushback: { turn: string; said: string }[];
   calls: number;
   avgPromptTokens: number;
   maxPromptTokens: number;
@@ -50,6 +55,19 @@ export const PROMPT_TOKENS_ALERT = 85_000;
 
 /** A tool that fails this many times in the window is flagged, whatever the error. */
 export const TOOL_FAILURES_ALERT = 2;
+
+/**
+ * The start of a reply that says the answer was wrong or missed something:
+ * "no", "that's wrong", "you didn't", "not what I asked". Read without a model,
+ * so it costs nothing; the weekly reply check reads the subtler ones.
+ */
+const PUSHBACK =
+  /^\s*(no\b|nope\b|wrong\b|incorrect\b|that'?s (not|wrong|incorrect)|this is (not|wrong)|you (didn'?t|did not|missed|forgot|got)|not what i|i (said|asked|meant)|why (did|didn'?t|did not|can'?t)|that isn'?t|it'?s not|still (not|wrong|didn'?t))/i;
+
+/** Whether a reply to an answer pushes back on it. */
+export function pushesBack(reply: string): boolean {
+  return PUSHBACK.test(reply);
+}
 
 /** An error this way is the app's fault rather than a bad argument, and is flagged the first time. */
 const BROKEN = /failed to read the database|timeout|timed out|could not be reached|internal/i;
@@ -65,11 +83,15 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
   const failures = new Map<string, ToolFailure & { broken: boolean }>();
   let skipped = 0;
   const thumbsDown: DashHealth['thumbsDown'] = [];
+  const pushback: DashHealth['pushback'] = [];
 
   for (const turn of turns) {
     if (turn.body.startsWith(UNFINISHED_OPENING)) unfinished.push(turn.id);
     if (LIMIT_MARKS.some((mark) => turn.body.includes(mark))) limited.push(turn.id);
     if (turn.rating === 'down') thumbsDown.push({ turn: turn.id, note: turn.ratingNote });
+    if (turn.followUp && pushesBack(turn.followUp)) {
+      pushback.push({ turn: turn.id, said: turn.followUp.replace(/\s+/g, ' ').trim().slice(0, 200) });
+    }
     for (const call of turn.toolCalls ?? []) {
       const result = call.result as { ok?: unknown; error?: unknown } | undefined;
       if (!result || result.ok !== false) continue;
@@ -111,6 +133,9 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
   if (thumbsDown.length > 0) {
     alerts.push(`${thumbsDown.length} answer${thumbsDown.length === 1 ? ' was' : 's were'} marked down.`);
   }
+  if (pushback.length > 0) {
+    alerts.push(`${pushback.length} answer${pushback.length === 1 ? ' was' : 's were'} pushed back on: ${pushback.map((p) => `"${p.said.slice(0, 80)}"`).join('; ')}`);
+  }
   if (avgPromptTokens > PROMPT_TOKENS_ALERT) {
     alerts.push(`Calls averaged ${grouped(avgPromptTokens)} prompt tokens, above ${grouped(PROMPT_TOKENS_ALERT)}.`);
   }
@@ -122,6 +147,7 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
     failedLookups: failedLookups.map(({ broken: _broken, ...f }) => f),
     skippedLookups: skipped,
     thumbsDown,
+    pushback,
     calls: spend.length,
     avgPromptTokens,
     maxPromptTokens,

@@ -13,7 +13,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { answerQuestion } from '@/lib/dash/ask';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
-import { runDashQuality, type DashQualityPorts } from '@/lib/dash/quality/run';
+import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readJobBoard } from '@/lib/jobs/discover/read-board';
@@ -22,8 +22,9 @@ import { allSearchSources } from '@/lib/search/registry';
 import type { TalkToolCall } from '@/lib/talk/talk';
 
 /**
- * The nightly Dash check's ports (lib/dash/quality/run.ts), called by
- * /api/cron/dash-quality from pg_cron (supabase/migrations/0277).
+ * The Dash check's ports (lib/dash/quality/run.ts), called by
+ * /api/cron/dash-quality from pg_cron: the free health read daily, the cases
+ * monthly (supabase/migrations/0277, 0279).
  *
  * Each case is asked as Ask asks it (answerQuestion with the person's chosen
  * model and every workspace they have on), with three differences: no write,
@@ -86,13 +87,10 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       return dashModelFor(core, userId);
     },
 
-    async cases(userId) {
-      const { data, error } = await core
-        .from('dash_eval_cases')
-        .select('id, question, expect')
-        .eq('user_id', userId)
-        .eq('active', true)
-        .order('created_at', { ascending: true });
+    async cases(userId, only) {
+      let query = core.from('dash_eval_cases').select('id, question, expect').eq('user_id', userId);
+      query = only ? query.eq('id', only) : query.eq('active', true);
+      const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw new Error(`Reading the cases failed: ${error.message}`);
       return (data ?? []) as { id: string; question: string; expect: unknown }[];
     },
@@ -138,26 +136,50 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
     async turns(userId, since) {
       const { data, error } = await core
         .from('conversation_turns')
-        .select('id, body, tool_calls, rating, rating_note, conversations!inner(subject_kind)')
+        .select('id, conversation_id, created_at, body, tool_calls, rating, rating_note, conversations!inner(subject_kind)')
         .eq('user_id', userId)
         .eq('role', 'assistant')
         .eq('conversations.subject_kind', 'ask')
         .gte('created_at', since)
         .limit(DAY_ROWS);
       if (error) throw new Error(`Reading the day's answers failed: ${error.message}`);
-      return ((data ?? []) as {
+      const rows = (data ?? []) as {
         id: string;
+        conversation_id: string;
+        created_at: string;
         body: string;
         tool_calls: TalkToolCall[] | null;
         rating: 'up' | 'down' | null;
         rating_note: string | null;
-      }[]).map(
+      }[];
+      // What the person wrote next in each chat, for the pushback check.
+      const replies = new Map<string, { created_at: string; body: string }[]>();
+      const chats = [...new Set(rows.map((row) => row.conversation_id))];
+      for (let i = 0; i < chats.length; i += 200) {
+        const { data: said, error: saidError } = await core
+          .from('conversation_turns')
+          .select('conversation_id, created_at, body')
+          .eq('user_id', userId)
+          .eq('role', 'user')
+          .in('conversation_id', chats.slice(i, i + 200))
+          .gte('created_at', since)
+          .order('created_at', { ascending: true })
+          .limit(DAY_ROWS);
+        if (saidError) throw new Error(`Reading the day's replies failed: ${saidError.message}`);
+        for (const row of (said ?? []) as { conversation_id: string; created_at: string; body: string }[]) {
+          const list = replies.get(row.conversation_id) ?? [];
+          list.push(row);
+          replies.set(row.conversation_id, list);
+        }
+      }
+      return rows.map(
         (row): HealthTurn => ({
           id: row.id,
           body: row.body,
           toolCalls: row.tool_calls,
           rating: row.rating,
           ratingNote: row.rating_note,
+          followUp: replies.get(row.conversation_id)?.find((reply) => reply.created_at > row.created_at)?.body ?? null,
         }),
       );
     },
@@ -228,10 +250,11 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
   };
 }
 
-export async function runDashQualityCheck(trigger: 'nightly' | 'manual') {
+export async function runDashQualityCheck(trigger: DashQualityTrigger, only: string | null = null) {
   const core = createCoreServiceSupabase();
   return runDashQuality(dashQualityPorts(core), {
     trigger,
+    only,
     deploy: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
   });
 }

@@ -2,13 +2,20 @@ import { dashHealth, type DashHealth, type HealthSpend, type HealthTurn } from '
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 
 /**
- * One run of the nightly Dash check (supabase/migrations/0277): ask every
- * active case of the owner's, grade each answer, work out the last day of
- * real answers, keep it all in core.dash_eval_runs, and write a Dev note when
- * anything failed. The ports are inngest/core/dash-quality.ts.
+ * One run of the Dash check (supabase/migrations/0277, 0279): ask the cases
+ * the trigger calls for (none on the free daily run, all of them monthly, or
+ * one by hand), grade each answer, work out the last day of real answers,
+ * keep it all in core.dash_eval_runs, and write a Dev note when anything
+ * failed. The ports are inngest/core/dash-quality.ts.
  */
 
 export type EvalCase = { id: string; question: string; expect: unknown };
+
+/**
+ * health: the free daily run, which asks no case. monthly: every active case.
+ * manual: every active case, or one named by `only`.
+ */
+export type DashQualityTrigger = 'health' | 'monthly' | 'manual';
 
 export type CaseResult = {
   case: string;
@@ -25,12 +32,13 @@ export type CaseResult = {
 export type DashQualityPorts = {
   owner(): Promise<string>;
   model(userId: string): Promise<string>;
-  cases(userId: string): Promise<EvalCase[]>;
+  /** The active cases, or the one named, active or not. */
+  cases(userId: string, only?: string): Promise<EvalCase[]>;
   /** Asks one question as a new chat, read-only, and kept nowhere. */
   ask(userId: string, question: string): Promise<{ outcome: CaseOutcome; costMicros: number }>;
   turns(userId: string, since: string): Promise<HealthTurn[]>;
   spend(userId: string, since: string): Promise<HealthSpend[]>;
-  start(row: { userId: string; trigger: 'nightly' | 'manual'; model: string; deploy: string | null }): Promise<string>;
+  start(row: { userId: string; trigger: DashQualityTrigger; model: string; deploy: string | null }): Promise<string>;
   finish(id: string, row: { cases: number; passed: number; results: CaseResult[]; health: DashHealth; costMicros: number; noteId: string | null; error: string | null }): Promise<void>;
   writeNote(userId: string, body: string): Promise<string>;
 };
@@ -67,7 +75,12 @@ async function inTurns<T, R>(items: readonly T[], size: number, each: (item: T) 
 export function qualityNote(results: readonly CaseResult[], health: DashHealth, runId: string): string | null {
   const failed = results.filter((r) => !r.passed);
   if (failed.length === 0 && health.alerts.length === 0) return null;
-  const lines = [`Dash quality check: ${failed.length} of ${results.length} questions failed, ${health.alerts.length} alerts from the last day`, ''];
+  const lines = [
+    results.length > 0
+      ? `Dash quality check: ${failed.length} of ${results.length} questions failed, ${health.alerts.length} alerts from the last day`
+      : `Dash quality check: ${health.alerts.length} alert${health.alerts.length === 1 ? '' : 's'} from the last day of answers`,
+    '',
+  ];
   if (failed.length > 0) {
     lines.push('Questions that failed:');
     for (const r of failed) lines.push(`- "${r.question}": ${r.failures.join(' ')}`);
@@ -84,7 +97,7 @@ export function qualityNote(results: readonly CaseResult[], health: DashHealth, 
 
 export async function runDashQuality(
   ports: DashQualityPorts,
-  options: { trigger: 'nightly' | 'manual'; deploy: string | null; now?: Date },
+  options: { trigger: DashQualityTrigger; only?: string | null; deploy: string | null; now?: Date },
 ): Promise<{ runId: string; cases: number; passed: number; alerts: number; noteId: string | null }> {
   const now = options.now ?? new Date();
   const userId = await ports.owner();
@@ -94,7 +107,8 @@ export async function runDashQuality(
   let results: CaseResult[] = [];
   let error: string | null = null;
   try {
-    const cases = await ports.cases(userId);
+    // The daily run reads real answers only: asking cases costs model spend.
+    const cases = options.trigger === 'health' ? [] : await ports.cases(userId, options.only ?? undefined);
     results = await inTurns(cases, CASE_CONCURRENCY, async (c): Promise<CaseResult> => {
       try {
         const { outcome, costMicros } = await ports.ask(userId, c.question);

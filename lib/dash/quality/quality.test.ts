@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
-import { dashHealth, PROMPT_TOKENS_ALERT, type HealthTurn } from './health';
+import { dashHealth, PROMPT_TOKENS_ALERT, pushesBack, type HealthTurn } from './health';
 import { qualityNote, runDashQuality, type DashQualityPorts } from './run';
 
 const ROLE = { table: 'job_search.applications', ref: 'a-1', title: 'Strategy Lead at Concourse', href: '/jobs/roles/r-1' };
@@ -100,6 +100,18 @@ describe('the day of real answers', () => {
     expect(health.failedLookups[0]).toMatchObject({ tool: 'add_idea', count: 2, turns: ['t4'] });
   });
 
+  it('hears pushback in the reply after an answer, at no cost', () => {
+    for (const reply of ['no, the other one', "that's wrong", 'You missed the Concourse role', 'not what i asked', 'why did you say that', 'still wrong']) {
+      expect(pushesBack(reply)).toBe(true);
+    }
+    for (const reply of ['thanks', 'now do the same for Decagon', 'nothing else', 'know anyone there?']) {
+      expect(pushesBack(reply)).toBe(false);
+    }
+    const health = dashHealth([{ ...turn('t1', 'One role.'), followUp: "That's wrong, I applied to two" }, { ...turn('t2', 'Ok.'), followUp: 'great' }], []);
+    expect(health.pushback).toEqual([{ turn: 't1', said: "That's wrong, I applied to two" }]);
+    expect(health.alerts).toEqual(['1 answer was pushed back on: "That\'s wrong, I applied to two"']);
+  });
+
   it('lets one bad argument pass as the model\'s slip', () => {
     const health = dashHealth([turn('t1', 'Ok.', [{ name: 'read_dev_row', input: {}, result: { ok: false, error: '#2072.1 names no step on the plan.' } }])], []);
     expect(health.alerts).toEqual([]);
@@ -139,7 +151,7 @@ describe('a run', () => {
 
   it('grades every case, keeps the run, and writes a note naming what failed', async () => {
     const { port, notes, finished } = ports();
-    const summary = await runDashQuality(port, { trigger: 'nightly', deploy: 'abc' });
+    const summary = await runDashQuality(port, { trigger: 'monthly', deploy: 'abc' });
     expect(summary).toEqual({ runId: 'run-1', cases: 2, passed: 1, alerts: 0, noteId: 'note-1' });
     expect(notes[0]).toContain('1 of 2 questions failed');
     expect(notes[0]).toContain('"what did i spend on books": The answer does not mention "£12".');
@@ -168,8 +180,36 @@ describe('a run', () => {
         throw new Error('relation does not exist');
       },
     });
-    await runDashQuality(broken.port, { trigger: 'nightly', deploy: null });
+    await runDashQuality(broken.port, { trigger: 'monthly', deploy: null });
     expect(broken.notes[0]).toContain('The run could not read its cases: relation does not exist');
+  });
+
+  it('asks no case on the free daily run, and says so in the note', async () => {
+    let asked = 0;
+    const free = ports({
+      ask: async () => {
+        asked++;
+        return { outcome: answered('x'), costMicros: 1 };
+      },
+      turns: async () => [{ id: 't1', body: 'I could not finish this answer: …', toolCalls: [], rating: 'down', ratingNote: 'useless' }],
+    });
+    const summary = await runDashQuality(free.port, { trigger: 'health', deploy: null });
+    expect(asked).toBe(0);
+    expect(summary).toMatchObject({ cases: 0, passed: 0, alerts: 2 });
+    expect(free.notes[0].split('\n')[0]).toBe('Dash quality check: 2 alerts from the last day of answers');
+    expect(free.finished[0]).toMatchObject({ costMicros: 0 });
+  });
+
+  it('asks only the case named on a run by hand', async () => {
+    const named: (string | undefined)[] = [];
+    const one = ports({
+      cases: async (_user, only) => {
+        named.push(only);
+        return [{ id: 'c1', question: 'what roles have i applied to at concourse', expect: {} }];
+      },
+    });
+    await runDashQuality(one.port, { trigger: 'manual', only: 'c1', deploy: null });
+    expect(named).toEqual(['c1']);
   });
 
   it('has nothing to say for a clean day', () => {
