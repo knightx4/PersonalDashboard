@@ -22,6 +22,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { insertIdea } from '@/lib/ideas/insert';
 import { createCapturedNote } from '@/lib/vault/notes/create';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
@@ -858,10 +859,11 @@ async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
     throw new Refused(`"${workspace}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
   }
 
-  const idea = await one<{ id: string }>(
-    (await ctx.db('public')).from('ideas').insert({ user_id: ctx.userId, body, module: workspace }).select('id'),
-  );
-  if (!idea) throw new Error('The idea was not saved.');
+  // The ideas page's own write.
+  const filed = await insertIdea(await ctx.db('public'), { userId: ctx.userId, body, module: workspace });
+  if (filed.error) throw new Error(filed.error);
+  if (!filed.id) throw new Error('The idea was not saved.');
+  const idea = { id: filed.id };
   const ref = toRef(TABLE.idea, idea.id);
   const line = body.split('\n')[0].trim();
   const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
@@ -1143,8 +1145,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_idea',
     sameAs(
-      ['app/dev/ideas/actions.ts#addIdea', 'app/dev/ideas/actions.ts#addIdea'],
-      ['app/dev/ideas/actions.ts#submitIdea', 'app/dev/ideas/actions.ts#submitIdea'],
+      ['app/dev/ideas/actions.ts#addIdea', 'lib/ideas/insert.ts#insertIdea'],
+      ['app/dev/ideas/actions.ts#submitIdea', 'lib/ideas/insert.ts#insertIdea'],
     ),
     'File an idea on the ideas page in Dev, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas.',
     {

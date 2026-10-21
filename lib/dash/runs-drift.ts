@@ -13,10 +13,6 @@
  */
 export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   add_role_note: ['app/jobs/(app)/roles/[id]/actions.ts#addNote'],
-  add_idea: [
-    'app/dev/ideas/actions.ts#addIdea',
-    'app/dev/ideas/actions.ts#submitIdea',
-  ],
   move_roles: ['app/jobs/(app)/pipeline/actions.ts#moveApplication'],
   change_role: [
     'app/jobs/(app)/roles/actions.ts#updateRole',
@@ -104,24 +100,11 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview',
   ],
   link_round_email: ['app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage'],
-  file_idea: [
-    'app/dev/ideas/actions.ts#addIdea',
-    'app/dev/ideas/actions.ts#submitIdea',
-  ],
-  file_note: [
-    'app/dev/bugs/actions.ts#submitFeedback',
-    'app/dev/surfaces/actions.ts#noteOnSurface',
-  ],
-  add_step: ['app/dev/plan/actions.ts#addPlanItem'],
   reword: [
     'app/dev/bugs/actions.ts#editFeedback',
     'app/dev/ideas/actions.ts#updateIdea',
     'app/dev/plan/actions.ts#updatePlanItem',
     'app/dev/plan/actions.ts#updateFeature',
-  ],
-  build_step: [
-    'app/dev/plan/actions.ts#addPlanItem',
-    'app/dev/plan/actions.ts#sendPlanItemToClaude',
   ],
   write_cover_letter: ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter'],
 };

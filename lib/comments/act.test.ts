@@ -302,6 +302,8 @@ describe('rewording the row a comment is on', () => {
           detail: null,
           status: 'proposed',
           kind: 'build',
+          block_kind: null,
+          block_ask: null,
           position: 30,
         },
       },
@@ -341,6 +343,7 @@ describe('filing a note from a comment', () => {
           kind: 'bug',
           body: 'The shelf picker opens on the wrong shelf.',
           page_path: '/dev/plan',
+          user_agent: null,
         },
       },
     ]);
@@ -371,7 +374,7 @@ describe('filing a note from a comment', () => {
   it('sets no priority, no status and no resolution', async () => {
     const { writes, supabase } = db();
     await carryOut(input({ supabase, action: action({ name: 'file_note', text: 'Something.' }) }));
-    expect(Object.keys(writes[0].row).sort()).toEqual(['body', 'kind', 'page_path', 'user_id']);
+    expect(Object.keys(writes[0].row).sort()).toEqual(['body', 'kind', 'page_path', 'user_agent', 'user_id']);
   });
 
   it('writes nothing when it cannot tell what to write up', async () => {
@@ -411,6 +414,8 @@ describe('adding a step from a comment', () => {
           detail: 'Square, and centred on the shelf.',
           status: 'proposed',
           kind: 'build',
+          block_kind: null,
+          block_ask: null,
           position: 50,
         },
       },
