@@ -9,9 +9,8 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { connectorAccess } from '@/lib/connector/access';
 import { serveMcp } from '@/lib/connector/mcp';
 import type { ConnectorWriteContext } from '@/lib/connector/writes';
-import type { QuickNoteFiled } from '@/lib/dash/registry';
 import { noteCreatePorts } from '@/lib/vault/db/ports';
-import { createCapturedNote } from '@/lib/vault/notes/create';
+import type { CreateNotePorts } from '@/lib/vault/notes/create';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 
 /**
@@ -65,13 +64,14 @@ function serviceAskDb(): AskDb {
 }
 
 /**
- * A quick note in the person's vault Inbox, as the capture address writes one
- * (lib/capture/address-server.ts): the connection opened by user id, since the
- * service role passes no RLS, and the note embedded once the reply has gone.
+ * The note-create ports for a quick note in the person's vault Inbox, as the
+ * capture address writes one (lib/capture/address-server.ts): the connection
+ * opened by user id, since the service role passes no RLS, and the note
+ * embedded once the reply has gone.
  */
-async function fileQuickNote(userId: string, core: SchemaClient, text: string): Promise<QuickNoteFiled> {
+function quickNotePorts(userId: string, core: SchemaClient): CreateNotePorts {
   const vault = createVaultServiceSupabase();
-  const ports = noteCreatePorts({
+  return noteCreatePorts({
     supabase: vault,
     userId,
     afterSave: () => {
@@ -84,9 +84,6 @@ async function fileQuickNote(userId: string, core: SchemaClient, text: string): 
       });
     },
   });
-  const result = await createCapturedNote(ports, text);
-  if (!result.ok) return { ok: false, error: result.error };
-  return { ok: true, noteId: result.noteId, path: result.path, title: result.title, blobSha: result.blobSha };
 }
 
 function writeContext(userId: string): ConnectorWriteContext {
@@ -97,7 +94,7 @@ function writeContext(userId: string): ConnectorWriteContext {
     core,
     db: serviceAskDb(),
     goals: async (history) => createGoalsServiceSupabase({ ...history, actor: history.actor ?? 'me' }),
-    fileQuickNote: (text) => fileQuickNote(userId, core, text),
+    quickNotePorts: async () => quickNotePorts(userId, core),
     later: (work) => after(work),
     recordSpend: async (owner, operation, reports) => {
       for (const report of reports) {

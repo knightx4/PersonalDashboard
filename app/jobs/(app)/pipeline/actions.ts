@@ -9,7 +9,8 @@ import {
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
-import { stageMoveEvent } from '@/lib/jobs/move';
+import { GHOSTED_REFUSAL, moveApplicationsTo } from '@/lib/jobs/applications/stage';
+import { channelEdit, excitementError, saveApplicationEdit } from '@/lib/jobs/applications/edit';
 
 /**
  * Moving a card writes a status_override EVENT and sets the override column.
@@ -31,27 +32,13 @@ export async function moveApplication(
   if (!parsed.success) return { error: 'That is not a status this board can set.' };
 
   // 'ghosted' is derived from silence and is deliberately not settable by hand.
-  // Letting it be set manually means nobody maintains it, and the funnel then
-  // treats abandoned pursuits as live ones.
-  if (parsed.data.status === 'ghosted') {
-    return { error: 'Ghosted is worked out from silence, so it cannot be set by hand.' };
-  }
+  if (parsed.data.status === 'ghosted') return { error: GHOSTED_REFUSAL };
 
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error: eventError } = await supabase
-    .from('application_events')
-    .insert(stageMoveEvent(user.id, parsed.data.applicationId, parsed.data.status, 'hand', new Date().toISOString()));
-  if (eventError) return { error: eventError.message };
-
-  const { error } = await supabase
-    .from('applications')
-    .update({ status_manual_override: parsed.data.status })
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
+  const { error } = await moveApplicationsTo(supabase, user.id, [parsed.data.applicationId], parsed.data.status, 'hand');
+  if (error) return { error };
 
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
@@ -69,17 +56,12 @@ export async function setExcitement(
   applicationId: string,
   excitement: number | null,
 ): Promise<{ error: string | null }> {
-  if (excitement !== null && (excitement < 1 || excitement > 5)) {
-    return { error: 'Excitement runs from 1 to 5.' };
-  }
+  const invalid = excitementError(excitement);
+  if (invalid) return { error: invalid };
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('applications')
-    .update({ excitement })
-    .eq('id', applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveApplicationEdit(supabase, user.id, applicationId, { excitement });
+  if (error) return { error };
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
   revalidatePath('/jobs/roles/[id]', 'page');
@@ -110,15 +92,13 @@ export async function setChannel(
   if (!parsed.success) return { error: 'That is not a channel this can set.' };
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('applications')
-    .update({
-      source: parsed.data.source,
-      referral_contact_id: parsed.data.source === 'referral' ? parsed.data.referralContactId : null,
-    })
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveApplicationEdit(
+    supabase,
+    user.id,
+    parsed.data.applicationId,
+    channelEdit(parsed.data.source, parsed.data.referralContactId),
+  );
+  if (error) return { error };
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/analytics');
   revalidatePath('/jobs/roles/[id]', 'page');

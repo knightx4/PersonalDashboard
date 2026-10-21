@@ -1,10 +1,13 @@
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { YouChangeInput, YouChangeKind } from '@/lib/ask/you-changes';
 import { toRef } from '@/lib/core/refs';
 import { EDUCATION_HREF } from '@/lib/you/education';
 import { jobDates, jobHref, parseJob, type Job } from '@/lib/you/work-history';
-import { positionForSave } from '@/lib/you/place-position';
+import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { insertPlace, updatePlace } from '@/lib/you/places-store';
+import { saveJob as writeJob } from '@/lib/you/work-history-store';
 import {
   checkPlace,
   draftOf,
@@ -54,6 +57,8 @@ export type YouMade = {
 
 export type YouWrite = {
   name: YouChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -121,13 +126,7 @@ async function addPlace(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const checked = checkPlace(draft);
   if (!checked.ok) throw refusal(checked.errors);
 
-  const { data, error } = await env.you
-    .from('places')
-    .insert({ ...checked.row, ...positionForSave(null, checked.row), user_id: env.userId })
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Adding the place failed: ${error?.message ?? 'no row'}`);
-  const after = data as Row;
+  const after = await insertPlace(env.you as YouSupabaseClient, env.userId, checked.row);
   return made('add_place', 'Added the place', after, null, `, lived in ${placeSpan(placeFromRow(after as unknown as PlaceRow))}`);
 }
 
@@ -160,15 +159,9 @@ async function changePlace(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const checked = checkPlace(draft);
   if (!checked.ok) throw refusal(checked.errors);
 
-  const { data, error } = await env.you
-    .from('places')
-    .update({ ...checked.row, ...positionForSave(before as unknown as PlaceRow, checked.row) })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Changing the place failed: ${error?.message ?? 'no row'}`);
-  return made('change_place', 'Changed the place', data as Row, before, `: ${changed.join(', ')}`);
+  const data = await updatePlace(env.you as YouSupabaseClient, env.userId, id, checked.row);
+  if (!data) throw new YouRefused('That place is not there any more. Nothing was changed.');
+  return made('change_place', 'Changed the place', data, before, `: ${changed.join(', ')}`);
 }
 
 const JOB_PATHS = [EDUCATION_HREF, '/home'];
@@ -228,26 +221,11 @@ async function saveJob(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const checked = parseJob((field) => values[field] ?? '');
   if (!checked.ok) throw new YouRefused(`${checked.field}: ${checked.error}`);
 
-  if (before) {
-    const { data, error } = await env.you
-      .from('work_history')
-      .update({ ...checked.job, edited: true })
-      .eq('id', ref)
-      .eq('user_id', env.userId)
-      .select('*')
-      .single();
-    if (error || !data) throw new Error(`Changing the job failed: ${error?.message ?? 'no row'}`);
-    return madeJob(data as Row, before, 'Changed the job at', `: ${changed.join(', ')}`);
-  }
-
-  const { data, error } = await env.you
-    .from('work_history')
-    .insert({ ...checked.job, user_id: env.userId, edited: true })
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Adding the job failed: ${error?.message ?? 'no row'}`);
+  const data = await writeJob(env.you, env.userId, before ? ref : null, checked.job);
+  if (!data) throw new YouRefused('That job is not there any more. Nothing was changed.');
+  if (before) return madeJob(data, before, 'Changed the job at', `: ${changed.join(', ')}`);
   const dates = jobDates(data as unknown as Job);
-  return madeJob(data as Row, null, 'Added the job at', dates ? `, ${dates}` : '');
+  return madeJob(data, null, 'Added the job at', dates ? `, ${dates}` : '');
 }
 
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
@@ -268,6 +246,7 @@ const FIELDS = {
 export const YOU_WRITES: readonly YouWrite[] = [
   {
     name: 'add_place',
+    runs: noButton('The places page edits a place that is already there; no page adds one by hand.'),
     description:
       'Add a place the person has lived to You\'s Places tab, when they tell you ("I lived in Leeds from 2015 to 2019"). A year is enough for the dates; leave moved_out out for where they live now.',
     input_schema: {
@@ -280,6 +259,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'change_place',
+    runs: sameAs(['app/you/places/actions.ts#savePlace', 'lib/you/places-store.ts#updatePlace']),
     description:
       'Change one of the places the person has lived, when they ask: its name, where it is, when they moved in or out, or the note. Name it by the you.places ref list_rows returned. Send only what changes; an empty moved_out means they live there now.',
     input_schema: {
@@ -295,6 +275,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'save_job',
+    runs: sameAs(['app/you/work/job-actions.ts#saveJobAction', 'lib/you/work-history-store.ts#saveJob']),
     description:
       "Add a job to the person's Work & school tab, or correct one, when they tell you (\"I worked at the corner bookshop from 2014 to 2016\"). Leave job_ref out to add a job, which needs an employer; give the you.work_history ref list_rows returned to correct one, sending only what changes. A year is enough for the dates; an empty ended means they work there now. A job you save is theirs, so reading their résumé again will not replace it.",
     input_schema: {
@@ -343,6 +324,7 @@ const ASK_NOTE =
 export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('you')) {

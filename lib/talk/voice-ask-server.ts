@@ -11,7 +11,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { askDash } from '@/lib/dash/ask';
-import type { DashWriteContext, QuickNoteFiled } from '@/lib/dash/registry';
+import type { DashWriteContext } from '@/lib/dash/registry';
 import { publicEnv } from '@/lib/env';
 import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { readMail } from '@/lib/inbox/read-mail';
@@ -23,7 +23,7 @@ import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { insertTask } from '@/lib/todo/tasks/write';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { noteCreatePorts } from '@/lib/vault/db/ports';
-import { createCapturedNote } from '@/lib/vault/notes/create';
+import type { CreateNotePorts } from '@/lib/vault/notes/create';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { insertMadeChange } from './changes';
 import { appendTurns, loadConversation, startAsk } from './store';
@@ -57,14 +57,9 @@ function goalsClient(accessToken: string, history: Parameters<typeof historyHead
   }) as unknown as GoalsSupabaseClient;
 }
 
-/** fileVaultNote (lib/capture/vault.ts) on the session's vault client, embedded once the reply has gone. */
-async function fileQuickNote(
-  userId: string,
-  vault: VaultSupabaseClient,
-  core: CoreSupabaseClient,
-  text: string,
-): Promise<QuickNoteFiled> {
-  const ports = noteCreatePorts({
+/** The note-create ports on the session's vault client, each note embedded once the reply has gone. */
+function quickNotePorts(userId: string, vault: VaultSupabaseClient, core: CoreSupabaseClient): CreateNotePorts {
+  return noteCreatePorts({
     supabase: vault,
     userId,
     afterSave: () => {
@@ -77,9 +72,6 @@ async function fileQuickNote(
       });
     },
   });
-  const result = await createCapturedNote(ports, text);
-  if (!result.ok) return { ok: false, error: result.error };
-  return { ok: true, noteId: result.noteId, path: result.path, title: result.title, blobSha: result.blobSha };
 }
 
 export function voiceAskDeps(): VoiceAskDeps {
@@ -107,8 +99,7 @@ export function voiceAskDeps(): VoiceAskDeps {
           goals: async (history) => goalsClient(session.accessToken, history),
           createTask: async (owner, input, timezone) =>
             insertTask((await db('todo')) as unknown as TodoSupabaseClient, owner, input, timezone),
-          fileQuickNote: async (text) =>
-            fileQuickNote(userId, (await db('obsidian')) as unknown as VaultSupabaseClient, core, text),
+          quickNotePorts: async () => quickNotePorts(userId, (await db('obsidian')) as unknown as VaultSupabaseClient, core),
         };
         return await askDash(
           {

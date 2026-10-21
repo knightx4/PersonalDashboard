@@ -6,6 +6,8 @@ import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { threadText } from '@/lib/comments/context';
 import { planRoutine } from '@/lib/feedback/routine';
+import { insertIdea } from '@/lib/ideas/insert';
+import { editIdea } from '@/lib/ideas/edit';
 import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
 import { withThreads } from '@/lib/thread/store';
 import { FOLLOW_ON_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
@@ -48,21 +50,13 @@ export async function addIdea(
   if (!body.success) return { error: body.error.issues[0].message };
   if (!scope.success) return { error: scope.error.issues[0].message };
 
-  const { data, error } = await supabase
-    .from('ideas')
-    .insert({
-      user_id: user.id,
-      body: body.data,
-      module: scope.data,
-    })
-    .select('id')
-    .single();
-  if (error) return { error: error.message };
+  const { id, error } = await insertIdea(supabase, { userId: user.id, body: body.data, module: scope.data });
+  if (error) return { error };
 
   revalidatePath('/dev/ideas');
   return {
     message: 'Idea saved.',
-    filed: data?.id ? { table: 'ideas', id: String(data.id) } : undefined,
+    filed: id ? { table: 'ideas', id } : undefined,
   };
 }
 
@@ -130,12 +124,8 @@ export async function updateIdea(
   if (!body.success) return { error: body.error.issues[0].message };
   if (!scope.success) return { error: scope.error.issues[0].message };
 
-  const { error } = await supabase
-    .from('ideas')
-    .update({ body: body.data, module: scope.data })
-    .eq('id', id.data)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const edited = await editIdea(supabase, { userId: user.id, id: id.data, body: body.data, module: scope.data });
+  if ('error' in edited) return { error: edited.error };
 
   revalidatePath('/dev/ideas');
   return { message: 'Saved.' };

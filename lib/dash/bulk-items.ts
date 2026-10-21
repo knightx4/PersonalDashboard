@@ -1,10 +1,11 @@
 import type { AskDb, SchemaClient } from '@/lib/ask/db';
 import { readSubject, sameValue } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
-import { displayName, groupUnits } from '@/lib/inventory/group-units';
+import { displayName, groupUnits, separateUnit, ungroupUnits } from '@/lib/inventory/group-units';
 import { isUuid } from '@/lib/ask/db';
 import { DISPOSAL_WORDS, namedItems } from '@/lib/ask/change-view';
-import { DISPOSAL_METHODS, inventoryStatusForDisposal, type DisposalMethod } from '@/lib/inventory/status-actions';
+import { DISPOSAL_METHODS, type DisposalMethod } from '@/lib/inventory/status-actions';
+import { disposeUnits, setUnitsFlag } from '@/lib/inventory/unit-changes';
 import { parseDollarsToCents } from '@/lib/money';
 import type { DashChangeInput } from '@/lib/talk/changes';
 import type { DashWriteContext, DashWriteResult } from './registry';
@@ -153,12 +154,6 @@ async function ungroup(
 ): Promise<{ ok: true; rows: ChangedRow[]; members: ItemRow[] } | { ok: false; error: string }> {
   const groupIds = [...new Set(named.flatMap((row) => (row.group_id ? [row.group_id] : [])))];
   if (groupIds.length === 0) return { ok: false, error: 'None of those items is in a group, so nothing was changed.' };
-  const { data: groups, error: groupsError } = await shop
-    .from('item_groups')
-    .select('id, group_key')
-    .eq('user_id', userId)
-    .in('id', groupIds);
-  if (groupsError) throw new Error(`item_groups: ${groupsError.message}`);
   const { data: memberData, error: membersError } = await shop
     .from('inventory_items')
     .select(ITEM_SELECT)
@@ -170,14 +165,9 @@ async function ungroup(
     return { ok: false, error: `Those groups hold ${members.length} copies, and at most ${BULK_MAX} can be changed at once.` };
   }
 
-  const { data: updated, error: writeError } = await shop
-    .from('inventory_items')
-    .update({ group_id: null })
-    .eq('user_id', userId)
-    .in('group_id', groupIds)
-    .select('id');
-  if (writeError) throw new Error(`inventory_items: ${writeError.message}`);
-  const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+  const ungrouped = await ungroupUnits(shop, userId, { groupIds, keepGroups: true });
+  if (!ungrouped.ok) throw new Error(`inventory_items: ${ungrouped.error}`);
+  const written = new Set(ungrouped.ids);
   // The ones they named first, so the summary names theirs.
   const order = new Map(named.map((row, i) => [row.id, i]));
   const rows: ChangedRow[] = members
@@ -186,10 +176,8 @@ async function ungroup(
     .map((row) => ({ id: row.id, before: { group_id: row.group_id }, after: { group_id: null } }));
   if (rows.length === 0) return { ok: false, error: 'Those groups have no copies in them, so nothing was changed.' };
 
-  for (const group of (groups ?? []) as { id: string; group_key: string | null }[]) {
+  for (const group of ungrouped.groups) {
     if (!group.group_key) continue;
-    const { error } = await shop.from('item_groups').update({ group_key: null }).eq('id', group.id).eq('user_id', userId);
-    if (error) throw new Error(`item_groups: ${error.message}`);
     rows.push({ id: group.id, table: 'item_groups', before: { group_key: group.group_key }, after: { group_key: null } });
   }
   return { ok: true, rows, members };
@@ -316,39 +304,24 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
     if (owned.length === 0) return refuse('None of those are items they still own, so nothing was changed.');
     rows = [];
     for (const row of owned) {
-      const { data: group, error: groupError } = await shop
-        .from('item_groups')
-        .insert({ user_id: ctx.userId, name: displayName(row), group_key: null })
-        .select('id')
-        .single();
-      if (groupError || !group) throw new Error(`item_groups: ${groupError?.message ?? 'no row'}`);
-      const groupId = (group as { id: string }).id;
+      const separated = await separateUnit(shop, ctx.userId, row);
+      if (!separated.ok) throw new Error(`item_groups: ${separated.error}`);
+      const groupId = separated.groupId;
       groupsMade.push(groupId);
-      const { error: moveError } = await shop
-        .from('inventory_items')
-        .update({ group_id: groupId })
-        .eq('user_id', ctx.userId)
-        .eq('id', row.id);
-      if (moveError) throw new Error(`inventory_items: ${moveError.message}`);
       rows.push({ id: row.id, before: { group_id: row.group_id }, after: { group_id: groupId } });
     }
   } else if (change === 'dispose') {
     if (owned.length === 0) return refuse('None of those are items they still own, so nothing was changed.');
-    const values = {
-      status: inventoryStatusForDisposal(method!),
-      disposed_at: ctx.today,
-      disposal_method: method,
-      disposal_proceeds_cents: proceedsCents && proceedsCents > 0 ? proceedsCents : null,
-    };
-    const { data: updated, error: writeError } = await shop
-      .from('inventory_items')
-      .update(values)
-      .eq('user_id', ctx.userId)
-      .eq('status', 'owned')
-      .in('id', owned.map((row) => row.id))
-      .select('id');
-    if (writeError) throw new Error(`inventory_items: ${writeError.message}`);
-    const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+    const disposed = await disposeUnits(shop, {
+      userId: ctx.userId,
+      ids: owned.map((row) => row.id),
+      method: method!,
+      proceedsCents,
+      today: ctx.today,
+    });
+    if (!disposed.ok) throw new Error(`inventory_items: ${disposed.error}`);
+    const { values } = disposed;
+    const written = new Set(disposed.ids);
     rows = owned
       .filter((row) => written.has(row.id))
       .map((row) => ({
@@ -373,15 +346,9 @@ export async function changeItems(ctx: DashWriteContext, args: Record<string, un
           (notOwned ? ` ${notOwned} more are no longer owned.` : ''),
       );
     }
-    const { data: updated, error: writeError } = await shop
-      .from('inventory_items')
-      .update({ [column]: value })
-      .eq('user_id', ctx.userId)
-      .eq('status', 'owned')
-      .in('id', moving.map((row) => row.id))
-      .select('id');
-    if (writeError) throw new Error(`inventory_items: ${writeError.message}`);
-    const written = new Set(((updated ?? []) as { id: string }[]).map((row) => row.id));
+    const flagged = await setUnitsFlag(shop, { userId: ctx.userId, ids: moving.map((row) => row.id), column, value });
+    if (!flagged.ok) throw new Error(`inventory_items: ${flagged.error}`);
+    const written = new Set(flagged.ids);
     rows = moving
       .filter((row) => written.has(row.id))
       .map((row) => ({ id: row.id, before: { [column]: row[column] }, after: { [column]: value } }));

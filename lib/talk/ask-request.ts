@@ -34,7 +34,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
-import { fileVaultNote, undoVaultCapture } from '@/lib/capture/vault';
+import { fileVaultNote, sessionInboxPorts, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { readMail } from '@/lib/inbox/read-mail';
@@ -153,7 +153,7 @@ export async function askDashInRequest(input: {
       // A write runs as the person, through their own clients (plan #1440).
       write: (tool, args, seen) =>
         tool.apply(
-          { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, fileQuickNote: (text) => fileVaultNote(user.id, text) },
+          { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, quickNotePorts: () => sessionInboxPorts(user.id) },
           args,
         ),
       // A paid press is checked and priced as the person, and only queued (plan #2228.1).
@@ -236,7 +236,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           seen,
           goals: (history) => createGoalsClient(history),
           createTask,
-          fileQuickNote: (text) => fileVaultNote(userId, text),
+          quickNotePorts: () => sessionInboxPorts(userId),
           thread: acts,
         },
         args,

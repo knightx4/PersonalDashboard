@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
@@ -97,15 +98,26 @@ export function resolveSpan(
   return { span: { starts_on: null, ends_on: null, starts_at, ends_at }, error: null };
 }
 
+/** An event as the table holds it, for a caller that keeps what it wrote (Dash's Undo). */
+export type EventRow = Record<string, unknown>;
+
+/** When an event is, as the form sends it once parsed. */
+export type EventWhen = Omit<EventInput, 'title' | 'body' | 'location'>;
+
+/**
+ * Written by the calendar's form and by Dash's add_event (plan #2473.3), so
+ * the two keep the same rules.
+ */
 export async function createEvent(
   userId: string,
   input: EventInput,
   timezone: string,
-): Promise<{ id: string | null; error: string | null }> {
+  client?: TodoSupabaseClient,
+): Promise<{ id: string | null; row: EventRow | null; error: string | null }> {
   const { span, error: spanError } = resolveSpan(input, timezone);
-  if (!span) return { id: null, error: spanError };
+  if (!span) return { id: null, row: null, error: spanError };
 
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const { data, error } = await supabase
     .from('events')
@@ -116,10 +128,11 @@ export async function createEvent(
       location: input.location,
       ...span,
     })
-    .select('id')
+    .select('*')
     .single();
 
-  return { id: (data?.id as string) ?? null, error: error?.message ?? null };
+  const row = (data as EventRow | null) ?? null;
+  return { id: (row?.id as string) ?? null, row, error: error?.message ?? null };
 }
 
 export async function updateEvent(
@@ -128,23 +141,52 @@ export async function updateEvent(
   input: EventInput,
   timezone: string,
 ): Promise<{ error: string | null }> {
-  const { span, error: spanError } = resolveSpan(input, timezone);
-  if (!span) return { error: spanError };
+  const { error } = await updateEventFields(
+    userId,
+    id,
+    { title: input.title, body: input.body, location: input.location, when: input },
+    timezone,
+  );
+  return { error };
+}
 
-  const supabase = await createTodoClient();
+/** The parts of an event one write changes, each already parsed through eventInput. */
+export type EventFields = { title?: string; body?: string | null; location?: string | null; when?: EventWhen };
 
-  const { error } = await supabase
+/**
+ * The one write behind changing an event: the calendar's form, which sends
+ * every field, and Dash's change_event, which sends what changes (plan
+ * #2473.3). A field left out is left alone. Scoped to the user, so a borrowed
+ * id changes nothing and comes back as no row.
+ */
+export async function updateEventFields(
+  userId: string,
+  id: string,
+  fields: EventFields,
+  timezone: string,
+  client?: TodoSupabaseClient,
+): Promise<{ row: EventRow | null; error: string | null }> {
+  const patch: Record<string, unknown> = {};
+  if (fields.title !== undefined) patch.title = fields.title;
+  if (fields.body !== undefined) patch.body = fields.body;
+  if (fields.location !== undefined) patch.location = fields.location;
+  if (fields.when) {
+    const { span, error: spanError } = resolveSpan(fields.when, timezone);
+    if (!span) return { row: null, error: spanError };
+    Object.assign(patch, span);
+  }
+  if (Object.keys(patch).length === 0) return { row: null, error: 'Nothing to change.' };
+
+  const supabase = client ?? (await createTodoClient());
+  const { data, error } = await supabase
     .from('events')
-    .update({
-      title: input.title,
-      body: input.body,
-      location: input.location,
-      ...span,
-    })
+    .update(patch)
     .eq('id', id)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select('*')
+    .maybeSingle();
 
-  return { error: error?.message ?? null };
+  return { row: (data as EventRow | null) ?? null, error: error?.message ?? null };
 }
 
 export async function deleteEvent(userId: string, id: string): Promise<{ error: string | null }> {

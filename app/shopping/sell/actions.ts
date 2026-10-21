@@ -10,6 +10,7 @@ import {
 import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check';
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
+import { addItemNote, setItemSellPrice } from '@/lib/inventory/item-writes';
 import { loadForSaleItems, priceTargetOf } from '@/lib/sell/for-sale';
 import { priceOneTarget } from '@/lib/sell/price-run';
 import { ESTIMATE_SPEND, priceItemsFor } from '@/lib/sell/price-items-run';
@@ -104,23 +105,11 @@ export async function noteListingIntent(
 
   const note = String(formData.get('note') ?? '').trim() || 'Planning to list myself.';
 
-  const { data: item } = await supabase
-    .from('inventory_items')
-    .select('id, notes')
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!item) return { error: 'Item not found.' };
-
-  const nextNotes = item.notes ? `${item.notes}\n${note}` : note;
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ notes: nextNotes })
-    .eq('id', item.id);
-  if (error) return { error: error.message };
+  const noted = await addItemNote(supabase, { userId: user.id, itemId: id.data, note });
+  if (!noted.ok) return { error: noted.error };
 
   revalidatePath('/shopping/sell');
-  revalidatePath(`/shopping/inventory/${item.id}`);
+  revalidatePath(`/shopping/inventory/${id.data}`);
   return { message: 'Noted — draft only; nothing was posted.' };
 }
 
@@ -387,23 +376,8 @@ export async function setSellPrice(
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const identity = await sellIdentityOf(supabase, item.id);
-  const { error } =
-    identity?.kind === 'book'
-      ? await supabase
-          .from('book_details')
-          .update({ manual_expected_price_cents: cents })
-          .eq('inventory_item_id', item.id)
-      : identity?.kind === 'game'
-        ? await supabase
-            .from('game_details')
-            .update({ manual_expected_price_cents: cents })
-            .eq('inventory_item_id', item.id)
-        : await supabase
-            .from('inventory_items')
-            .update({ manual_expected_price_cents: cents })
-            .eq('id', item.id);
-  if (error) return { error: error.message };
+  const priced = await setItemSellPrice(supabase, { userId: user.id, itemId: item.id, cents });
+  if (!priced.ok) return { error: priced.error };
 
   revalidatePath('/shopping/sell');
   revalidatePath(`/shopping/inventory/${item.id}`);

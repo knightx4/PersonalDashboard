@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import {
-  DISMISSED_REVIEW_ERROR,
   EXCLUDED_SENDER_ERROR,
   isExcludedSender,
 } from '@/lib/inbox/merchant-exclusion-match';
@@ -19,6 +18,7 @@ import {
 } from '@/lib/review/attach-email';
 import { fetchMessageBody } from '@/lib/inbox/fetch-message-body';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
+import { discardOrders, dismissEmails, putMessagesBack, restoreOrders, setOrdersReview } from '@/lib/review/moves';
 
 export interface ActionState {
   error?: string;
@@ -60,13 +60,8 @@ export async function confirmOrderReview(
   if (!order) return { error: 'Order not found.' };
   if (!order.needs_review) return { message: 'Already confirmed.' };
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ needs_review: false })
-    .eq('id', orderId)
-    .eq('user_id', user.id);
-
-  if (error) return { error: error.message };
+  const confirmed = await setOrdersReview(supabase, { userId: user.id, ids: [orderId], needsReview: false });
+  if (!confirmed.ok) return { error: confirmed.error };
 
   revalidateReviewSurfaces();
   return { message: 'Order confirmed.' };
@@ -98,25 +93,9 @@ export async function discardOrderReview(
   if (loadError) return { error: loadError.message };
   if (!order) return { error: 'Order not found.' };
 
-  const { error: messageError } = await supabase
-    .from('ingested_messages')
-    .update({
-      parse_status: 'skipped',
-      resulting_order_id: null,
-      error: 'Discarded from review queue',
-    })
-    .eq('resulting_order_id', orderId);
-
-  if (messageError) return { error: messageError.message };
-
   // Soft-delete so it can be restored from Settings → Deleted orders.
-  const { error: deleteError } = await supabase
-    .from('orders')
-    .update({ deleted_at: new Date().toISOString(), needs_review: false })
-    .eq('id', orderId)
-    .eq('user_id', user.id);
-
-  if (deleteError) return { error: deleteError.message };
+  const discarded = await discardOrders(supabase, { userId: user.id, ids: [orderId] });
+  if (!discarded.ok) return { error: discarded.error };
 
   revalidateReviewSurfaces();
   revalidatePath('/shopping/settings');
@@ -152,15 +131,8 @@ export async function dismissEmailReview(
   if (loadError) return { error: loadError.message };
   if (!message) return { error: 'Message not found.' };
 
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({
-      parse_status: 'skipped',
-      error: DISMISSED_REVIEW_ERROR,
-    })
-    .eq('id', messageId);
-
-  if (error) return { error: error.message };
+  const dismissed = await dismissEmails(supabase, { ids: [messageId] });
+  if (!dismissed.ok) return { error: dismissed.error };
 
   revalidateReviewSurfaces();
   return { message: 'Email dismissed.' };
@@ -482,13 +454,8 @@ export async function confirmOrdersReview(ids: string[]): Promise<BulkReviewResu
   const changed = (orders ?? []).map((row) => row.id as string);
   if (changed.length === 0) return { changed: [], error: 'Those are already confirmed.' };
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ needs_review: false })
-    .in('id', changed)
-    .eq('user_id', user.id);
-
-  if (error) return { changed: [], error: error.message };
+  const confirmed = await setOrdersReview(supabase, { userId: user.id, ids: changed, needsReview: false });
+  if (!confirmed.ok) return { changed: [], error: confirmed.error };
 
   revalidateReviewSurfaces();
   return { changed };
@@ -503,14 +470,8 @@ export async function unconfirmOrdersReview(ids: readonly string[]): Promise<Bul
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ needs_review: true })
-    .in('id', parsed.data)
-    .eq('user_id', user.id)
-    .is('deleted_at', null);
-
-  if (error) return { changed: [], error: error.message };
+  const unconfirmed = await setOrdersReview(supabase, { userId: user.id, ids: parsed.data, needsReview: true });
+  if (!unconfirmed.ok) return { changed: [], error: unconfirmed.error };
 
   revalidateReviewSurfaces();
   return { changed: parsed.data };
@@ -543,17 +504,12 @@ export async function discardOrdersReview(
   const changed = (orders ?? []).map((row) => row.id as string);
   if (changed.length === 0) return { changed: [], restore: [], error: 'Those are gone already.' };
 
-  const { data: sources, error: sourceError } = await supabase
-    .from('inbox_messages')
-    .select('id, parse_status, error, resulting_order_id')
-    .in('resulting_order_id', changed)
-    .eq('user_id', user.id);
-
-  if (sourceError) return { changed: [], restore: [], error: sourceError.message };
+  const discarded = await discardOrders(supabase, { userId: user.id, ids: changed });
+  if (!discarded.ok) return { changed: [], restore: [], error: discarded.error };
 
   const restore: DiscardedOrder[] = changed.map((orderId) => ({
     orderId,
-    messages: (sources ?? [])
+    messages: discarded.sources
       .filter((row) => row.resulting_order_id === orderId)
       .map((row) => ({
         id: row.id as string,
@@ -561,25 +517,6 @@ export async function discardOrdersReview(
         error: (row.error as string | null) ?? null,
       })),
   }));
-
-  const { error: messageError } = await supabase
-    .from('ingested_messages')
-    .update({
-      parse_status: 'skipped',
-      resulting_order_id: null,
-      error: 'Discarded from review queue',
-    })
-    .in('resulting_order_id', changed);
-
-  if (messageError) return { changed: [], restore: [], error: messageError.message };
-
-  const { error: deleteError } = await supabase
-    .from('orders')
-    .update({ deleted_at: new Date().toISOString(), needs_review: false })
-    .in('id', changed)
-    .eq('user_id', user.id);
-
-  if (deleteError) return { changed: [], restore: [], error: deleteError.message };
 
   revalidateReviewSurfaces();
   revalidatePath('/shopping/settings');
@@ -596,30 +533,14 @@ export async function restoreDiscardedOrders(restore: DiscardedOrder[]): Promise
   const supabase = await createClient();
 
   const orderIds = parsed.data.map((entry) => entry.orderId);
-  const { error } = await supabase
-    .from('orders')
-    .update({ deleted_at: null, needs_review: true })
-    .in('id', orderIds)
-    .eq('user_id', user.id);
+  const restored = await restoreOrders(supabase, { userId: user.id, ids: orderIds, reviewAgain: true });
+  if (!restored.ok) return { changed: [], error: restored.error };
 
-  if (error) return { changed: [], error: error.message };
-
-  // One statement per message, because each one goes back to its own status
-  // and its own error. A selection is tens of rows, not thousands.
-  for (const entry of parsed.data) {
-    for (const message of entry.messages) {
-      const { error: messageError } = await supabase
-        .from('ingested_messages')
-        .update({
-          parse_status: message.parseStatus,
-          error: message.error,
-          resulting_order_id: entry.orderId,
-        })
-        .eq('id', message.id);
-
-      if (messageError) return { changed: [], error: messageError.message };
-    }
-  }
+  const back = await putMessagesBack(
+    supabase,
+    parsed.data.flatMap((entry) => entry.messages.map((message) => ({ ...message, resultingOrderId: entry.orderId }))),
+  );
+  if (!back.ok) return { changed: [], error: back.error };
 
   revalidateReviewSurfaces();
   revalidatePath('/shopping/settings');
@@ -655,15 +576,8 @@ export async function dismissEmailsReview(
     return { changed: [], restore: [], error: 'Those are dismissed already.' };
   }
 
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({ parse_status: 'skipped', error: DISMISSED_REVIEW_ERROR })
-    .in(
-      'id',
-      restore.map((row) => row.id),
-    );
-
-  if (error) return { changed: [], restore: [], error: error.message };
+  const dismissed = await dismissEmails(supabase, { ids: restore.map((row) => row.id) });
+  if (!dismissed.ok) return { changed: [], restore: [], error: dismissed.error };
 
   revalidateReviewSurfaces();
   return { changed: restore.map((row) => row.id), restore };
@@ -678,14 +592,8 @@ export async function restoreDismissedEmails(restore: DismissedEmail[]): Promise
   await requireUser();
   const supabase = await createClient();
 
-  for (const message of parsed.data) {
-    const { error } = await supabase
-      .from('ingested_messages')
-      .update({ parse_status: message.parseStatus, error: message.error })
-      .eq('id', message.id);
-
-    if (error) return { changed: [], error: error.message };
-  }
+  const back = await putMessagesBack(supabase, parsed.data);
+  if (!back.ok) return { changed: [], error: back.error };
 
   revalidateReviewSurfaces();
   return { changed: parsed.data.map((row) => row.id) };

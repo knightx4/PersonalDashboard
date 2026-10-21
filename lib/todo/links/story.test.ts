@@ -9,7 +9,7 @@ import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
  * because what is checked here is what makeStoryTask decides: one open task
  * per story however often it is made, titled with the headline and linked to
  * the saved story, a finished task not counting, and a refused link leaving
- * no task behind. createTask, linkTask and setTaskStatus write into the same
+ * no task behind. insertTask, linkTask and updateTaskFields write into the same
  * stand-in, the way they write into Postgres. That a link can point at a
  * saved story at all is checked in Postgres by tests/news-story-pointers.test.ts.
  */
@@ -27,15 +27,15 @@ vi.mock('@/lib/todo/tasks/write', async () => {
   const { taskInput } = await import('@/lib/todo/tasks/input');
   return {
     taskInput,
-    createTask: async (userId: string, input: { title: string; body: string | null }) => {
+    insertTask: async (_client: unknown, userId: string, input: { title: string; body: string | null }) => {
       const id = `task-${(db.next += 1)}`;
       db.tasks.push({ id, user_id: userId, title: input.title, body: input.body, status: 'open', created_at: db.next });
       return { id, error: null };
     },
-    setTaskStatus: async (_userId: string, id: string, status: string) => {
+    updateTaskFields: async (_userId: string, id: string, { status }: { status: string }) => {
       const task = db.tasks.find((t) => t.id === id);
       if (task) task.status = status;
-      return { error: null };
+      return { row: task ?? null, error: null };
     },
   };
 });

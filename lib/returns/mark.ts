@@ -20,11 +20,16 @@ export type MarkReturned =
   | { ok: true; returnId: string; orderId: string; refundCents: number | null }
   | { ok: false; error: string };
 
+/**
+ * Mark an owned item returned and refunded today: at what it cost, or at
+ * `refundCents` when the inventory's form gives another amount.
+ */
 export async function markReturned(
   supabase: PublicClient,
   userId: string,
   itemId: string,
   today: string,
+  refundCents?: number,
 ): Promise<MarkReturned> {
   const { data: item, error: itemError } = await supabase
     .from('inventory_items')
@@ -46,7 +51,7 @@ export async function markReturned(
     .maybeSingle();
   if (orderItemError || !orderItem) return { ok: false, error: 'Could not find the parent order.' };
 
-  const refundCents = (item.cost_cents as number | null) ?? null;
+  const refund = refundCents ?? (item.cost_cents as number | null) ?? null;
   const { data: inserted, error } = await supabase
     .from('returns')
     .insert({
@@ -54,7 +59,7 @@ export async function markReturned(
       order_id: orderItem.order_id,
       inventory_item_id: item.id,
       initiated_at: today,
-      refund_amount_cents: refundCents,
+      refund_amount_cents: refund,
       status: 'refunded',
       refunded_at: today,
     })
@@ -62,7 +67,7 @@ export async function markReturned(
     .single();
 
   if (error || !inserted) return { ok: false, error: error?.message ?? 'The return was not written.' };
-  return { ok: true, returnId: inserted.id as string, orderId: orderItem.order_id as string, refundCents };
+  return { ok: true, returnId: inserted.id as string, orderId: orderItem.order_id as string, refundCents: refund };
 }
 
 export type UnmarkReturned = { ok: true; orderId: string } | { ok: false; error: string };

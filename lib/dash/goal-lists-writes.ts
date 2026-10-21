@@ -1,3 +1,4 @@
+import { sameAs } from './runs';
 import { isUuid } from '@/lib/ask/db';
 import { toRef } from '@/lib/core/refs';
 import { fieldsError, liveFields, parseCollectionName, type CollectionField } from '@/lib/goals/collections';
@@ -398,6 +399,11 @@ async function changeGoalList(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
 
 export const CHANGE_GOAL_LIST: GoalsWrite = {
   name: 'change_goal_list',
+  runs: sameAs(
+    ['app/goals/[goalId]/list-actions.ts#addGoalListAction', 'lib/goals/lists-store.ts#createGoalList'],
+    ['app/goals/[goalId]/list-actions.ts#addListRowAction', 'lib/goals/lists-store.ts#addListRowFromLink'],
+    ['app/goals/[goalId]/list-actions.ts#confirmListRowAction', 'lib/goals/collections-store.ts#confirmRecord'],
+  ),
   description:
     "Change the lists one of the person's goals keeps of its own, for things with no other home in the app such as pantries to compare or volunteer groups to try, when they ask: start a list (change add_list, with name and optionally fields), rename it (rename_list, with name), add fields to it (add_fields), archive it (archive_list), add a row from values they give (add_row, with values keyed by field key or label), add a row from a product link they paste, which reads the page's name, picture and price and adds it as a draft for them to confirm (add_link, with link), change a row's values (edit_row, with row and values), mark the row they chose as picked, which rules out every other row (pick_row, with row; setting a status to Picked with edit_row does the same), keep a draft as a row (confirm_row), or archive a row or bring one back (archive_row, restore_row). Name the goal by the goals.items ref a lookup returned, the list by its name, and a row by words from it. Readings, events, saved products and contacts the app already holds are linked with change_goal_link, not copied into a list.",
   input_schema: {

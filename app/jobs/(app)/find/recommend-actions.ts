@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { addContact, addTouch, BEFORE_CONTACTED_AGAIN, markContacted, suggestedContact } from '@/lib/jobs/contacts/edit';
 import { detectPosting } from '@/lib/jobs/ats';
 import { startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
 import { isDismissReason } from '@/lib/jobs/suggest/feedback';
@@ -130,40 +131,20 @@ export async function markSuggestionSent(id: string): Promise<{ error: string | 
   if (!contactId && row.person_name) {
     const company = row.company_name ? await ensureCompany(supabase, user.id, row.company_name as string) : null;
     if (company?.error) return { error: company.error };
-    const source = (row.source_url as string | null) ?? null;
-    const { data: contact, error: contactError } = await supabase
-      .from('contacts')
-      .insert({
-        user_id: user.id,
-        company_id: company?.id ?? null,
-        full_name: row.person_name,
-        title: row.person_title,
-        linkedin_url: source && /linkedin\.com\/in\//.test(source) ? source : null,
-        relationship: 'cold',
-        status: 'contacted',
-        notes: source ? `Found by Dash: ${source}` : 'Found by Dash.',
-      })
-      .select('id')
-      .single();
-    if (contactError || !contact) return { error: contactError?.message ?? 'Could not add them as a contact.' };
+    const { row: contact, error: contactError } = await addContact(supabase, user.id, suggestedContact(row, company?.id ?? null));
+    if (contactError || !contact) return { error: contactError ?? 'Could not add them as a contact.' };
     contactId = contact.id as string;
   }
 
   if (contactId) {
-    const { error: touchError } = await supabase.from('contact_touches').insert({
-      user_id: user.id,
+    const { error: touchError } = await addTouch(supabase, user.id, {
       contact_id: contactId,
-      channel: row.channel ?? 'other',
+      channel: (row.channel as string | null) ?? 'other',
       direction: 'outbound',
-      message: row.message,
+      message: (row.message as string | null) ?? null,
     });
-    if (touchError) return { error: touchError.message };
-    await supabase
-      .from('contacts')
-      .update({ status: 'contacted' })
-      .eq('id', contactId)
-      .eq('user_id', user.id)
-      .in('status', ['to_contact', 'dormant']);
+    if (touchError) return { error: touchError };
+    await markContacted(supabase, user.id, contactId, BEFORE_CONTACTED_AGAIN);
     revalidatePath('/jobs/contacts');
   }
   return closeSuggestion(parsed.data, 'done', contactId ? { contact_id: contactId } : {});

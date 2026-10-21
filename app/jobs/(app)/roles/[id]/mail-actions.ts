@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { linkMessage } from '@/app/jobs/(app)/review/actions';
 import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
+import { declineMessageForApplication, unlinkMessageFromApplication } from '@/lib/jobs/inbox/role-mail';
 
 const unlinkSchema = z.object({
   messageId: z.string().uuid(),
@@ -39,39 +40,11 @@ export async function unlinkMessage(
 
   if (!message) return { error: 'That message is no longer in the mailbox.' };
 
-  // Events first: while the message still points at the application, a failure
-  // here leaves the link intact rather than a pursuit whose timeline has
-  // quietly lost its evidence.
-  const { error: eventsError } = await supabase
-    .from('application_events')
-    .delete()
-    .eq('ingested_message_id', parsed.data.messageId)
-    .eq('application_id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  if (eventsError) return { error: eventsError.message };
-
-  const { error } = await supabase
-    .from('ingested_messages')
-    .update({
-      resulting_application_id: null,
-      parse_status: 'needs_review',
-      link_method: null,
-      link_confidence: null,
-      error: 'Unlinked by hand from the role page.',
-    })
-    .eq('id', parsed.data.messageId);
-
-  if (error) return { error: error.message };
-
-  await supabase.from('message_link_dismissals').upsert(
-    {
-      user_id: user.id,
-      application_id: parsed.data.applicationId,
-      message_id: parsed.data.messageId,
-    },
-    { onConflict: 'application_id,message_id' },
-  );
+  // Events first, then the email back to the queue, then the pair declined
+  // (lib/jobs/inbox/role-mail.ts). A decline that did not stick only lets the
+  // suggestion offer itself again, so it is not an error here.
+  const { unlinked, error } = await unlinkMessageFromApplication(supabase, user.id, parsed.data.applicationId, parsed.data.messageId);
+  if (!unlinked) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/review');
@@ -111,16 +84,9 @@ export async function declineCandidateMessage(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('message_link_dismissals').upsert(
-    {
-      user_id: user.id,
-      application_id: parsed.data.applicationId,
-      message_id: parsed.data.messageId,
-    },
-    { onConflict: 'application_id,message_id' },
-  );
+  const { error } = await declineMessageForApplication(supabase, user.id, parsed.data.applicationId, parsed.data.messageId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }

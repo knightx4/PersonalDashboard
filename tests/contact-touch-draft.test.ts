@@ -42,7 +42,14 @@ function builder(table: string) {
       data: { id: 't-1', channel: 'email', direction: 'outbound', sent_at: 'x', responded_at: null, message: null, ...call.values },
       error: null,
     }),
-    maybeSingle: async () => ({ data: touchRow, error: null }),
+    // A write hands back the row as written: an insert its values, an update the row it matched.
+    maybeSingle: async () => ({
+      data:
+        call.op === 'insert'
+          ? { id: 't-1', channel: 'email', direction: 'outbound', sent_at: 'x', responded_at: null, message: null, ...call.values }
+          : touchRow && { ...touchRow, ...call.values },
+      error: null,
+    }),
     then: (res: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(res),
   };
   return b;

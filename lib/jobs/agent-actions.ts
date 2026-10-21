@@ -119,7 +119,8 @@ export const jobsActions: ModuleActions = {
     saveDraftedAnswer: tool('save_answer'),
   },
   'app/jobs/(app)/roles/[id]/actions.ts': {
-    addNote: tool('add_role_note'),
+    // Files the company page's notes only (plan #2473.8); the role page's notes are its thread, addRoleComment.
+    addNote: tool('change_company'),
     saveCoverLetter: tool('write_cover_letter'),
     draftCoverLetter: tool('draft_cover_letter'),
     saveCoverLetterReplies: none('theirs'),
@@ -161,7 +162,7 @@ export const jobsActions: ModuleActions = {
     linkReminderMessage: tool('change_reminder'),
   },
   'app/jobs/(app)/roles/[id]/comment-actions.ts': {
-    addRoleComment: none('theirs'),
+    addRoleComment: tool('add_role_note'),
     deleteRoleComment: none('deletes'),
   },
 };

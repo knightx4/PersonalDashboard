@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import type { TaskInput } from '@/lib/todo/tasks/input';
 import { changeHref, confirmChange, declineChange, undoChange, type ChangeDeps } from './changes';
 import type { AskSchema, SchemaClient } from './db';
 import type { DashPaidTool } from '@/lib/dash/registry';
@@ -184,7 +183,18 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
   };
   tables['core.dash_actions'].push(change);
 
-  const created: TaskInput[] = [];
+  // add_todo writes through insertTask (plan #2473.3); a new todo row takes the
+  // column defaults the table gives it, and `onTodo` runs after it lands.
+  const hooks: { onTodo?: () => void } = {};
+  const tasks = tables['todo.tasks'];
+  Object.defineProperty(tasks, 'push', {
+    enumerable: false,
+    value: (...rows: Row[]) => {
+      for (const row of rows) Array.prototype.push.call(tasks, Object.assign(row, { status: 'open', due_at: null, snoozed_until: null, parent_id: null, ...row }));
+      hooks.onTodo?.();
+      return tasks.length;
+    },
+  });
   const deps: ChangeDeps = {
     userId: ME,
     timezone: 'UTC',
@@ -193,26 +203,9 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
     core: client('core'),
     db: async (schema: AskSchema) => client(schema),
     goals: async (history) => client('goals', history) as unknown as GoalsSupabaseClient,
-    createTask: async (userId, input) => {
-      created.push(input);
-      const row = {
-        id: id(++counter),
-        user_id: userId,
-        title: input.title,
-        body: input.body,
-        status: 'open',
-        due_on: input.dueOn,
-        due_at: null,
-        pinned: input.pinned,
-        snoozed_until: null,
-        parent_id: null,
-      };
-      tables['todo.tasks'].push(row);
-      return { id: row.id, error: null };
-    },
     now: () => '2026-09-29T12:00:00Z',
   };
-  return { tables, deps, change, created };
+  return { tables, deps, change, hooks };
 }
 
 const STEP_INPUT = { parentId: GOAL, goalTitle: 'Find a new job', title: 'Update the CV', kind: 'mine' };
@@ -383,10 +376,8 @@ describe('what can be pressed when', () => {
   });
 
   it('takes back its write when another press confirmed the change first', async () => {
-    const { tables, deps, change } = setup();
-    const createTask = deps.createTask;
-    deps.createTask = async (...args) => {
-      const out = await createTask(...args);
+    const { tables, deps, change, hooks } = setup();
+    hooks.onTodo = () => {
       // The other window's confirm lands between this write and its mark.
       Object.assign(tables['core.dash_actions'][0], {
         status: 'done',
@@ -394,7 +385,6 @@ describe('what can be pressed when', () => {
         subject_ref: `todo.tasks:${id(900)}`,
         op: 'insert',
       });
-      return out;
     };
     const confirmed = await confirmChange(deps, change.id as string);
     expect(confirmed).toMatchObject({ ok: false, error: 'You have already confirmed this change.' });

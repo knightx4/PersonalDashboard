@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { SchemaClient } from '@/lib/ask/db';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import type { TalkCitation } from '@/lib/talk/talk';
@@ -356,14 +357,26 @@ export async function saveSummary(db: MayaDb, threadId: string, summary: string)
   return !error;
 }
 
-/** Rewrite the thread's question. */
-export async function renameQuestion(db: MayaDb, threadId: string, question: string): Promise<boolean> {
-  const { data, error } = await db.core
+/**
+ * Rewrite the thread's question, as the thread's page and Dash's
+ * rename_maya_question both do (plan #2473.5). Narrowed to the user, so the
+ * connector's service-role client is held to the person too. The thread as
+ * it is now, or null when no thread with Maya of theirs has that id.
+ */
+export async function renameQuestion(
+  core: SchemaClient,
+  userId: string,
+  threadId: string,
+  question: string,
+  columns = 'id',
+): Promise<Record<string, unknown> | null> {
+  const { data, error } = await core
     .from('conversations')
     .update({ title: question })
     .eq('id', threadId)
+    .eq('user_id', userId)
     .eq('voice', 'maya')
-    .select('id')
-    .maybeSingle();
-  return !error && Boolean(data);
+    .select(columns);
+  if (error) throw new Error(`Rewriting the question failed: ${error.message}`);
+  return ((data ?? []) as unknown as Record<string, unknown>[])[0] ?? null;
 }

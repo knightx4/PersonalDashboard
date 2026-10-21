@@ -77,6 +77,7 @@ export async function insertCardNote(
     .from('feed_cards')
     .select('id, concept_id')
     .eq('id', cardId)
+    .eq('user_id', userId)
     .maybeSingle();
   assertSchemaExposed(readError, LEARN_SCHEMA);
   if (readError) throw new Error(`Reading that card failed: ${readError.message}`);
@@ -101,6 +102,7 @@ export async function insertConceptNote(
     .from('concepts')
     .select('id')
     .eq('id', conceptId)
+    .eq('user_id', userId)
     .maybeSingle();
   assertSchemaExposed(readError, LEARN_SCHEMA);
   if (readError) throw new Error(`Reading that idea failed: ${readError.message}`);
