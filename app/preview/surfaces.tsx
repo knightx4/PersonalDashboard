@@ -720,6 +720,7 @@ const rolePanels: PanelProps = {
   jdLookupAt: '2026-10-01T08:00:00Z',
   jdUrl: 'https://example.com/jobs/quant-dev',
   location: 'London, hybrid three days a week',
+  kind: 'job',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,
@@ -871,6 +872,7 @@ const pipelineRow = (
   companyLogoUrl: null,
   companyDomains: [],
   companyWebsite: null,
+  roleKind: 'job',
   location: 'London',
   workMode: 'hybrid',
   source: 'portal',
@@ -880,6 +882,7 @@ const pipelineRow = (
   readyToApply: false,
   allQuestionsAdded: false,
   hasCoverLetter: null,
+  hasQuestions: false,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -995,6 +998,7 @@ const pipelineRows: PipelineRow[] = [
     readyToApply: true,
     allQuestionsAdded: true,
     hasCoverLetter: false,
+    hasQuestions: true,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -4477,7 +4481,8 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Pipeline narrowed to the roles with all their questions added (plan
-     * #2196.2): the one chip set, the rest of the line unchanged. */
+     * #2196.2): the one chip set, the rest of the line unchanged, with the
+     * questions-or-letter chip after the cover letter's (note 732901e4). */
     id: 'jobs-pipeline-marks',
     label: 'Pipeline · All questions added filter',
     module: 'jobs',

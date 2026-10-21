@@ -90,6 +90,8 @@ export type PipelineParams = {
   questions?: string;
   /** `yes` has a cover letter, `no` marked as having none; unanswered is neither. */
   letter?: string;
+  /** `yes` has questions added or a cover letter, `no` has neither (note 732901e4). */
+  material?: string;
   /** A company's slug: only its applications, set from the table's Company column. */
   company?: string;
   page?: string;
@@ -115,6 +117,8 @@ export type PipelineState = {
   questions: boolean | null;
   /** Has a cover letter (true), marked as having none (false), or either (null). */
   letter: boolean | null;
+  /** Has questions added or a cover letter (true), has neither (false), or either (null). */
+  material: boolean | null;
   /** A company's slug, or null for every company. */
   company: string | null;
   /** One-based. */
@@ -143,6 +147,7 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     ready: parseYesNo(params.ready),
     questions: parseYesNo(params.questions),
     letter: parseYesNo(params.letter),
+    material: parseYesNo(params.material),
     company: params.company?.trim() || null,
     view,
     scope,
@@ -181,12 +186,21 @@ export function filterPipeline(
       (state.questions === null || row.allQuestionsAdded === state.questions) &&
       // Only an answer of no is without a letter: an unanswered role is in neither list.
       (state.letter === null || row.hasCoverLetter === state.letter) &&
+      (state.material === null || hasMaterial(row) === state.material) &&
       (!state.excitement || (row.excitement ?? 0) >= state.excitement) &&
       // A row not scored passes, as an unscored opening passes the openings' filters.
       passesMinimum(row.scoreNote, state.minimum) &&
       (state.terms.length === 0 || matchesSearch([row.companyName, row.roleTitle], state.terms)),
   );
   return { scoped, filtered };
+}
+
+/**
+ * Whether anything has been put into the application yet: a question added,
+ * or the cover letter answered yes. An unanswered letter counts as none.
+ */
+export function hasMaterial(row: Pick<PipelineRow, 'hasQuestions' | 'hasCoverLetter'>): boolean {
+  return row.hasQuestions || row.hasCoverLetter === true;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

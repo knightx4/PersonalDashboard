@@ -26,6 +26,7 @@ import {
   pageOf,
   parsePipeline,
   pipelineDescription,
+  hasMaterial,
   pipelineHref,
   withoutPage,
   type PipelineParams,
@@ -122,6 +123,8 @@ export function PipelinePage({
     noQuestions: scoped.filter((row) => !row.allQuestionsAdded).length,
     letter: scoped.filter((row) => row.hasCoverLetter === true).length,
     noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
+    material: scoped.filter(hasMaterial).length,
+    noMaterial: scoped.filter((row) => !hasMaterial(row)).length,
   };
   const scored = rows.some((row) => row.scoreNote);
 

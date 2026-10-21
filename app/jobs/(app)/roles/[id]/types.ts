@@ -1,3 +1,4 @@
+import type { RoleKind } from '@/lib/jobs/role-kind';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -20,6 +21,8 @@ export interface PanelProps {
   jdLookupAt: string | null;
   jdUrl: string | null;
   location: string | null;
+  /** What kind of opening it is (lib/jobs/role-kind.ts). */
+  kind: RoleKind;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
