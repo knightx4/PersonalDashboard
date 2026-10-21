@@ -1,10 +1,8 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { fingerprintLoose } from '@/lib/fingerprint';
-import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { insertOwned, manualItemRow } from '@/lib/inventory/add-owned';
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
 
 export type ItemActionState = {
@@ -62,48 +60,29 @@ export async function saveManualItem(
 
   // The category's slug and name feed the search tags, so an item filed under
   // "Kitchen" is findable by the words that category implies.
-  let categorySlug: string | null = null;
-  let categoryName: string | null = null;
+  let category: { id: string; slug: string; name: string } | null = null;
   if (categoryId) {
-    const { data: category } = await supabase
+    const { data } = await supabase
       .from('categories')
       .select('slug, name')
       .eq('id', categoryId)
       .maybeSingle();
-    if (!category) return { error: 'That category no longer exists.' };
-    categorySlug = category.slug as string;
-    categoryName = category.name as string;
+    if (!data) return { error: 'That category no longer exists.' };
+    category = { id: categoryId, slug: data.slug as string, name: data.name as string };
   }
 
-  const variant = String(formData.get('variant') ?? '').trim() || null;
-  const notes = String(formData.get('notes') ?? '').trim() || null;
-
-  const enriched = enrichItemDisplay({
+  const row = manualItemRow({
+    userId: user.id,
     name,
-    variant,
-    categorySlug,
-    categoryName,
+    variant: String(formData.get('variant') ?? '').trim() || null,
+    notes: String(formData.get('notes') ?? '').trim() || null,
+    category,
+    costCents,
+    acquiredOn: acquiredRaw || today,
   });
-
-  const id = randomUUID();
-  const { error } = await supabase.from('inventory_items').insert({
-    id,
-    user_id: user.id,
-    order_item_id: null,
-    category_id: categoryId,
-    name,
-    short_name: enriched.shortName,
-    variant,
-    image_url: null,
-    fingerprint_loose: fingerprintLoose(name),
-    acquired_at: acquiredRaw || today,
-    cost_cents: costCents,
-    search_tags: enriched.searchTags,
-    notes,
-    source: 'manual',
-    status: 'owned',
-  });
-  if (error) return { error: error.message };
+  const saved = await insertOwned(supabase, { userId: user.id, items: [row] });
+  if (!saved.ok) return { error: saved.error };
+  const id = row.id as string;
 
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/sell');

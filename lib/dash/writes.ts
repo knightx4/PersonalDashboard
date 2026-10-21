@@ -1108,7 +1108,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'mark_returned',
     sameAs(
-      ['app/shopping/inventory/actions.ts#markInventoryReturned', 'app/shopping/inventory/actions.ts#markInventoryReturned'],
+      ['app/shopping/inventory/actions.ts#markInventoryReturned', 'lib/returns/mark.ts#markReturned'],
       ['app/shopping/returns/actions.ts#markItemReturned', 'lib/returns/mark.ts#markReturned'],
     ),
     'Mark an item the person owns as returned, when they say they sent it back. Name it by the ref search returned for it in the public.inventory_items table; look it up first. It records a full refund at what the item cost.',
@@ -1182,16 +1182,16 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'change_items',
     sameAs(
-      ['app/shopping/inventory/actions.ts#disposeInventoryItem', 'app/shopping/inventory/actions.ts#disposeInventoryItem'],
-      ['app/shopping/inventory/actions.ts#quickDisposeInventoryItem', 'app/shopping/inventory/actions.ts#quickDisposeInventoryItem'],
-      ['app/shopping/inventory/actions.ts#setItemsForSale', 'app/shopping/inventory/actions.ts#setItemsForSale'],
-      ['app/shopping/inventory/actions.ts#toggleItemForSaleForm', 'app/shopping/inventory/actions.ts#toggleItemForSaleForm'],
+      ['app/shopping/inventory/actions.ts#disposeInventoryItem', 'lib/inventory/unit-changes.ts#disposeUnits'],
+      ['app/shopping/inventory/actions.ts#quickDisposeInventoryItem', 'lib/inventory/unit-changes.ts#disposeUnits'],
+      ['app/shopping/inventory/actions.ts#setItemsForSale', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/inventory/actions.ts#toggleItemForSaleForm', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
       ['app/shopping/inventory/group-actions.ts#groupItemsTogether', 'lib/inventory/group-units.ts#groupUnits'],
-      ['app/shopping/inventory/group-actions.ts#separateCopy', 'app/shopping/inventory/group-actions.ts#separateCopy'],
-      ['app/shopping/inventory/group-actions.ts#ungroupItems', 'app/shopping/inventory/group-actions.ts#ungroupItems'],
-      ['app/shopping/returns/actions.ts#setReturnPlanned', 'app/shopping/returns/actions.ts#setReturnPlanned'],
-      ['app/shopping/returns/actions.ts#toggleReturnPlannedForm', 'app/shopping/returns/actions.ts#toggleReturnPlannedForm'],
-      ['app/shopping/returns/actions.ts#setItemsReturnPlanned', 'app/shopping/returns/actions.ts#setItemsReturnPlanned'],
+      ['app/shopping/inventory/group-actions.ts#separateCopy', 'lib/inventory/group-units.ts#separateUnit'],
+      ['app/shopping/inventory/group-actions.ts#ungroupItems', 'lib/inventory/group-units.ts#ungroupUnits'],
+      ['app/shopping/returns/actions.ts#setReturnPlanned', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/returns/actions.ts#toggleReturnPlannedForm', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
+      ['app/shopping/returns/actions.ts#setItemsReturnPlanned', 'lib/inventory/unit-changes.ts#setUnitsFlag'],
     ),
     `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). When a query_rows lookup matched the items (or the orders) and named the match as a set, pass set and nothing else to name them: it holds every row the lookup matched, listed or not, so never copy refs out of it. Otherwise name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more), dispose (they sold, gave away, donated, threw out, recycled or used them up: give disposal_method, and proceeds for one item sold), ungroup (every copy in the groups those items are in stacks by its own details again), separate (hold each copy out of its stack as an item of its own). Only items they still own are changed, except that ungroup takes any. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
     {
