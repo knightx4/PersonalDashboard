@@ -10,6 +10,7 @@ import {
   turnLookups,
   type LookupWire,
 } from './lookups';
+import { LOOKUP_NOT_RUN } from './talk';
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -109,5 +110,34 @@ describe('turnLookups', () => {
       ['Searching email for “lease”', '4 found'],
       ['Reading an email', 'did not work'],
     ]);
+  });
+});
+
+describe('lookups refused at a limit', () => {
+  it('shows a lookup that never ran as not run, not as one that did not work', () => {
+    const lines = turnLookups([
+      { name: 'job_applications', input: {}, result: { ok: true, rows: [{}] } },
+      { name: 'open_row', input: { table: 'job_search.companies', ref: 'c-1' }, result: { ok: false, error: LOOKUP_NOT_RUN } },
+      { name: 'read_mail', input: {}, result: { ok: false, error: 'no mailbox' } },
+    ]);
+    expect(lines.map((l) => [l.state, lookupOutcome(l)])).toEqual([
+      ['done', '1 found'],
+      ['skipped', 'not run'],
+      ['failed', 'did not work'],
+    ]);
+  });
+
+  it('carries the same state over the stream', () => {
+    const wire = lookupWire({
+      phase: 'finished',
+      id: 'u1',
+      index: 3,
+      name: 'table_info',
+      input: { table: 'job_search.roles' },
+      ok: false,
+      result: { ok: false, error: LOOKUP_NOT_RUN },
+    });
+    expect(wire).toMatchObject({ ok: false, skipped: true });
+    expect(heardLookup([], wire!)[0]).toMatchObject({ state: 'skipped' });
   });
 });

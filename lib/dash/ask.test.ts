@@ -9,6 +9,8 @@ import { filesEstimate } from './file-cost';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
+  budgetTokens,
+  INPUT_BUDGET,
   answerFromWrites,
   madeSummary,
   FALLBACK_ROWS,
@@ -981,6 +983,8 @@ describe('questions that need several lookups (plan #1437)', () => {
       ...rounds,
       reply([use('u9', 'search', { query: 'one more' })]),
       reply([], 'end_turn'),
+      // Asked once more in words, it still writes nothing.
+      reply([], 'end_turn'),
     ]);
     const { stores, written } = memoryStores();
     const result = await askDash(
@@ -1029,7 +1033,8 @@ describe('questions that need several lookups (plan #1437)', () => {
     const { client } = stubClient([
       reply([use('u1', 'nope', {})]),
       reply([], 'end_turn'),
-      // Asked once more for its answer, it still gives none, nor in words.
+      // Asked once more for its answer, it still gives none, nor in words, twice.
+      reply([], 'end_turn'),
       reply([], 'end_turn'),
       reply([], 'end_turn'),
     ]);
@@ -1108,6 +1113,7 @@ describe('questions that need several lookups (plan #1437)', () => {
       reply([], 'end_turn'),
       reply([], 'end_turn'),
       reply([], 'end_turn'),
+      reply([], 'end_turn'),
     ]);
     const answer = await answerQuestion({
       turns: [{ role: 'user', body: 'q' }],
@@ -1154,5 +1160,68 @@ describe('questions that need several lookups (plan #1437)', () => {
       'finished u2 2',
     ]);
     expect(events[1]).toMatchObject({ ok: true, result: { ok: true, rows: [app(0)] } });
+  });
+});
+
+describe('a long prompt read from the cache (the Concourse question, 21 October 2026)', () => {
+  // The rules and tools were about 76,000 tokens, read from the cache on
+  // every call after the first.
+  const cached = { input_tokens: 2, output_tokens: 100, cache_read_input_tokens: 76_000, cache_creation_input_tokens: 800 };
+  const round = (id: string) => ({ ...reply([use(id, 'search', { query: id })]), usage: cached });
+
+  it('counts a cache read at a tenth against the budget', () => {
+    expect(budgetTokens({ inputTokens: 2, cachedInputTokens: 76_000, cacheWriteTokens: 800 })).toBe(8_402);
+    // Counted in full, two such calls spent it.
+    expect(2 * (2 + 76_000 + 800)).toBeGreaterThan(INPUT_BUDGET);
+  });
+
+  it('keeps looking past the second call instead of being told to answer', async () => {
+    const { client, sent } = stubClient([
+      round('u1'),
+      round('u2'),
+      round('u3'),
+      round('u4'),
+      { ...reply([use('a', 'answer', { answer: 'Two roles at Concourse.', cited: [] })]), usage: cached },
+    ]);
+    const { execute, calls } = stubExecute();
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      today: '2026-10-21',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    expect(sent).toHaveLength(5);
+    // Counted in full, the third round's lookup was refused unrun.
+    expect(calls).toHaveLength(4);
+    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'Two roles at Concourse.' });
+  });
+
+  it('asks for the answer in words beside the refused lookups, and once more when that comes back empty', async () => {
+    let clock = 0;
+    const { execute } = stubExecute();
+    const timed = async (name: string, input: unknown) => {
+      clock += TIME_BUDGET_MS;
+      return execute(name, input);
+    };
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'Concourse' })]),
+      // Past the time budget it looks something up instead of answering.
+      reply([use('u2', 'open_row', { table: 'job_search.companies', ref: 'c-1' })]),
+      reply([], 'end_turn'),
+      reply([{ type: 'text', text: 'I found the company but not its roles.' }], 'end_turn'),
+    ]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      today: '2026-10-21',
+      execute: timed,
+      anthropicApiKey: 'k',
+      client,
+      now: () => clock,
+    });
+    const refused = sent[2].messages.at(-1)!.content as { type: string }[];
+    expect(refused.map((b) => b.type)).toEqual(['tool_result', 'text']);
+    expect(sent[3].tool_choice).toEqual({ type: 'none' });
+    expect(answer).toMatchObject({ ok: true, body: expect.stringContaining('I found the company but not its roles.') });
   });
 });
