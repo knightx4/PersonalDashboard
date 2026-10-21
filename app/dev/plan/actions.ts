@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { insertPlanItem } from '@/lib/plan/insert-item';
+import { editFeature, editPlanItem, friendlyPlanError, type PlanItemEdit } from '@/lib/plan/edit-item';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import {
@@ -32,7 +33,6 @@ import {
   blockPatch,
   isClosed,
   isDismissed,
-  isPlanBlockKind,
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
@@ -313,29 +313,21 @@ export async function updatePlanItem(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('parent_id, module, block_kind')
+    .select('parent_id, module')
     .eq('user_id', user.id)
     .eq('id', parsed.data.id)
     .maybeSingle();
   if (!current) return { error: 'That step no longer exists.' };
 
-  // A step already blocked keeps the kind it was blocked with. This form saves
-  // the whole row at once, and rewriting the kind because somebody fixed a
-  // typo in the detail would turn a block that clears itself into one that
-  // does not.
-  const storedKind = current.block_kind as string | null;
-  const blockKind = storedKind && isPlanBlockKind(storedKind) ? storedKind : null;
-
-  const patch: Record<string, unknown> = {
+  // A blocked step keeps the kind it was blocked with, and a step saved out
+  // of blocked loses the ask and the kind together: editPlanItem's rule.
+  const fields: PlanItemEdit = {
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
-    // The same rule the status control follows: a blocked row carries a kind,
-    // and a step saved out of blocked loses the ask and the kind together.
-    ...blockPatch(parsed.data.status, blockKind),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
@@ -353,17 +345,13 @@ export async function updatePlanItem(
       if (!parent.ok) return { error: parent.error };
       scope = parent.module;
     }
-    patch.parent_id = parsed.data.parent;
-    patch.module = scope;
-    patch.position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
+    fields.parent_id = parsed.data.parent;
+    fields.module = scope;
+    fields.position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
   }
 
-  const { error } = await supabase
-    .from('plan_items')
-    .update(patch)
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id);
-  if (error) return { error: friendly(error.message) };
+  const edited = await editPlanItem(supabase, { userId: user.id, id: parsed.data.id, fields });
+  if ('error' in edited) return { error: edited.error };
 
   revalidatePlan();
   return { message: 'Saved.' };
@@ -464,9 +452,10 @@ export async function updateFeature(
   const parsed = featureSchema.omit({ module: true }).safeParse(featureFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { data, error } = await supabase
-    .from('plan_items')
-    .update({
+  const edited = await editFeature(supabase, {
+    userId: user.id,
+    id: id.data,
+    fields: {
       title: parsed.data.title,
       summary: parsed.data.summary || null,
       detail: parsed.data.detail || null,
@@ -474,12 +463,9 @@ export async function updateFeature(
       priority: parsed.data.priority,
       size: parsed.data.size,
       assignee: parsed.data.assignee,
-    })
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .select('id');
-  if (error) return { error: friendly(error.message) };
-  if (!data || data.length === 0) return { error: 'That feature no longer exists.' };
+    },
+  });
+  if ('error' in edited) return { error: edited.error };
 
   revalidatePlan();
   return { message: 'Saved.' };
@@ -2004,6 +1990,5 @@ export async function setAutoApproveAction(
  * constraint" is not something a person should have to read.
  */
 function friendly(message: string): string {
-  if (/plan_dependencies_pair_key/.test(message)) return 'It already waits on that step.';
-  return message;
+  return friendlyPlanError(message);
 }
