@@ -53,7 +53,7 @@ import {
   type FactWrite,
   type RoleFactField,
 } from '@/lib/jobs/fact-origins';
-import { APPLICATION_SOURCES, SOURCE_LABELS, statusRank, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { APPLICATION_SOURCES, SOURCE_LABELS, TERMINAL_STATUSES, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { LATER_UNTIL_HELP, laterUntil, untilWords } from '@/lib/core/snooze-days';
@@ -61,6 +61,7 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
 import { CAREER_WRITES, companyHeld } from './career-writes';
 import { INTERVIEW_EDIT_WRITES } from './interview-edit-writes';
 import { JobsRefused } from './jobs-refused';
+import { keptApplication, mergeRolesInto, type MergeApplication } from '@/lib/jobs/companies/merge-roles';
 
 /**
  * The Jobs changes an agent makes when asked (plan #1894.6.1, feature
@@ -1187,12 +1188,13 @@ export async function undoAddedCompany(
 /**
  * The rows that hang off an application, by `schema.table`, with the column
  * that names it, whether the table keeps a user_id, and the columns that,
- * with the application, may hold only one row. Every one is moved onto the
- * application kept, so nothing goes with the duplicates. A table added
- * with a foreign key to applications or roles and left out of these lists
- * fails tests/merge-children-jobs.test.ts, which reads the keys from the
- * database. The company page merges through job_search.merge_roles, which
- * reads them itself.
+ * with the application, may hold only one row. job_search.merge_roles moves
+ * every one onto the application kept, reading the keys itself; these lists
+ * are what Dash's merge reads before and after it, to record each row's move
+ * for its Undo, and what the in-memory database in
+ * tests/stubs/fake-schema-db.ts moves. A table added with a foreign key to
+ * applications or roles and left out of these lists fails
+ * tests/merge-children-jobs.test.ts, which reads the keys from the database.
  */
 export const APPLICATION_CHILDREN = [
   { table: 'job_search.application_drafts', column: 'application_id', owned: true, unique: 'kind' },
@@ -1214,12 +1216,14 @@ export const APPLICATION_CHILDREN = [
 /**
  * The rows that hang off a role itself, moved onto the role kept. Its
  * applications are handled on their own, and a role's old thread notes
- * (job_search.notes.role_id) refuse the merge (refuseThreads).
+ * (job_search.notes.role_id) refuse the merge (refuseThreads). A merged
+ * role's fact origin moves too, unless the role kept has one for that field.
  */
 export const ROLE_CHILDREN = [
-  { table: 'job_search.attachments', column: 'role_id', owned: true },
-  { table: 'job_search.suggestions', column: 'role_id', owned: true },
-  { table: 'todo.task_links', column: 'role_id', owned: false },
+  { table: 'job_search.attachments', column: 'role_id', owned: true, unique: null },
+  { table: 'job_search.fact_origins', column: 'role_id', owned: true, unique: 'field' },
+  { table: 'job_search.suggestions', column: 'role_id', owned: true, unique: null },
+  { table: 'todo.task_links', column: 'role_id', owned: false, unique: null },
 ] as const;
 
 /** Every table a merge's undo may name, and whether it keeps a user_id. */
@@ -1253,16 +1257,6 @@ function schemaOf(env: JobsWriteEnv, table: string): { client: SchemaClient; nam
   return { client: schema === 'todo' ? env.todo : env.jobs, name };
 }
 
-/** The applications the page counts furthest along win; between two as far along, the older. */
-function keptApplication(apps: Row[]): Row {
-  return apps.reduce((best, app) => {
-    const appRank = statusRank(app.status as ApplicationStatus);
-    const bestRank = statusRank(best.status as ApplicationStatus);
-    if (appRank !== bestRank) return appRank > bestRank ? app : best;
-    return new Date(app.created_at as string) < new Date(best.created_at as string) ? app : best;
-  });
-}
-
 async function rowsWhere(env: JobsWriteEnv, table: string, column: string, values: string[], owned: boolean): Promise<Row[]> {
   if (values.length === 0) return [];
   const { client, name } = schemaOf(env, table);
@@ -1285,7 +1279,7 @@ async function refuseThreads(env: JobsWriteEnv, merged: Row[], losers: string[],
     if (error) throw new Error(`Reading the role's thread failed: ${error.message}`);
     if ((data ?? []).length > 0) {
       throw new JobsRefused(
-        `${names.get(role.id as string)} has comments in its thread, which a merge would leave behind. Ask them to keep that role instead, or to merge on the company page.`,
+        `${names.get(role.id as string)} has comments in its thread, which a merge would leave behind. Ask them to keep that role instead.`,
       );
     }
   }
@@ -1320,91 +1314,65 @@ async function mergeRoles(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 
   const roleIds = [keepId, ...mergedIds];
   const apps = await rowsWhere(env, APPLICATIONS, 'role_id', roleIds, true);
-  const target = apps.length > 0 ? keptApplication(apps) : null;
+  const target: Row | null = keptApplication(apps as (Row & MergeApplication)[]);
   const losers = apps.filter((app) => app.id !== target?.id);
   const loserIds = losers.map((app) => app.id as string);
 
   await refuseThreads(env, merged, loserIds, names);
 
+  // What the merge will move: every row on a duplicate application or role,
+  // read whole before the function runs, so the Undo can put back the ones
+  // it takes out.
+  const beforeRows = async (children: readonly { table: string; column: string; owned: boolean }[], parents: string[]) =>
+    Promise.all(children.map(async (child) => ({ child, rows: await rowsWhere(env, child.table, child.column, parents, child.owned) })));
+  const beforeApps = target ? await beforeRows(APPLICATION_CHILDREN, loserIds) : [];
+  const beforeRoles = await beforeRows(ROLE_CHILDREN, mergedIds);
+
+  // The same merge as the company page's Merge roles button, in one transaction.
+  const { keptApplicationId, error: mergeError } = await mergeRolesInto(env.jobs, keepId, mergedIds, apps as MergeApplication[]);
+  if (mergeError) {
+    // The function's own refusals say why in words; anything else is a failure.
+    if (mergeError.code === '22023' || mergeError.code === 'P0002') throw new JobsRefused(mergeError.message);
+    throw new Error(`The merge failed: ${mergeError.message}`);
+  }
+  if (keptApplicationId !== (target?.id ?? null)) throw new Error('The merge kept a different application from the one read.');
+
+  // Then what it did, read back: each row is now on the one kept, or gone
+  // because the one kept already had its twin.
   const undo: MergeUndo = { roles_removed: [], updated: [], applications_removed: [], moved: [], removed: [] };
   try {
-    if (target) {
-      const targetId = target.id as string;
-      for (const child of APPLICATION_CHILDREN) {
-        const rows = await rowsWhere(env, child.table, child.column, loserIds, child.owned);
-        if (rows.length === 0) continue;
-        const theirs = child.unique ? await rowsWhere(env, child.table, child.column, [targetId], child.owned) : [];
-        const taken = new Set(theirs.map((row) => row[child.unique as string]).filter((value) => value !== null && value !== undefined));
-        const { client, name } = schemaOf(env, child.table);
-        for (const row of rows) {
-          const key = child.unique ? row[child.unique] : null;
-          if (child.unique && key !== null && key !== undefined && taken.has(key)) {
-            // The application kept already has its twin: this one is kept whole for the Undo and taken out.
-            const { error } = await client.from(name).delete().eq('id', row.id as string);
-            if (error) throw new Error(`${child.table}: ${error.message}`);
-            undo.removed.push({ table: child.table, values: row });
-            continue;
-          }
-          const { error } = await client
-            .from(name)
-            .update({ [child.column]: targetId })
-            .eq('id', row.id as string)
-            .eq(child.column, row[child.column] as string);
-          if (error) throw new Error(`${child.table}: ${error.message}`);
-          undo.moved.push({ table: child.table, id: row.id as string, column: child.column, from: row[child.column] as string, to: targetId });
-          if (key !== null && key !== undefined && child.unique) taken.add(key);
+    for (const { child, rows } of [...beforeApps, ...beforeRoles]) {
+      if (rows.length === 0) continue;
+      const now = new Map((await rowsWhere(env, child.table, 'id', rows.map((row) => row.id as string), child.owned)).map((row) => [row.id as string, row]));
+      for (const row of rows) {
+        const moved = now.get(row.id as string);
+        if (!moved) undo.removed.push({ table: child.table, values: row });
+        else if (moved[child.column] !== row[child.column]) {
+          undo.moved.push({ table: child.table, id: row.id as string, column: child.column, from: row[child.column] as string, to: moved[child.column] as string });
         }
       }
-
-      for (const loser of losers) {
-        const { error } = await env.jobs.from('applications').delete().eq('id', loser.id as string).eq('user_id', env.userId);
-        if (error) throw new Error(`applications: ${error.message}`);
-        undo.applications_removed.push(loser);
-      }
-
-      // As the page merges: a status set by hand on a duplicate is a decision
-      // of theirs, kept when the application kept has none, and the one kept
-      // becomes the first attempt at the role kept.
-      const change: Row = {};
-      const override = losers.find((app) => app.status_manual_override)?.status_manual_override;
-      if (!target.status_manual_override && override) change.status_manual_override = override;
-      if (target.role_id !== keepId || target.attempt !== 1) {
-        change.role_id = keepId;
-        change.attempt = 1;
-      }
-      if (Object.keys(change).length > 0) {
-        const { error } = await env.jobs.from('applications').update(change).eq('id', targetId).eq('user_id', env.userId);
-        if (error) throw new Error(`applications: ${error.message}`);
-        const was = Object.fromEntries(Object.keys(change).map((column) => [column, target[column] ?? null]));
-        undo.updated.push({ table: APPLICATIONS, id: targetId, before: was, after: change });
-      }
     }
-
-    for (const child of ROLE_CHILDREN) {
-      const rows = await rowsWhere(env, child.table, child.column, mergedIds, child.owned);
-      const { client, name } = schemaOf(env, child.table);
-      for (const row of rows) {
-        const { error } = await client
-          .from(name)
-          .update({ [child.column]: keepId })
-          .eq('id', row.id as string)
-          .eq(child.column, row[child.column] as string);
-        if (error) throw new Error(`${child.table}: ${error.message}`);
-        undo.moved.push({ table: child.table, id: row.id as string, column: child.column, from: row[child.column] as string, to: keepId });
+    if (target) {
+      const targetId = target.id as string;
+      const [now] = await rowsWhere(env, APPLICATIONS, 'id', [targetId], true);
+      if (now) {
+        const changed = ['role_id', 'attempt', 'status_manual_override'].filter((column) => (now[column] ?? null) !== (target[column] ?? null));
+        if (changed.length > 0) {
+          undo.updated.push({
+            table: APPLICATIONS,
+            id: targetId,
+            before: Object.fromEntries(changed.map((column) => [column, target[column] ?? null])),
+            after: Object.fromEntries(changed.map((column) => [column, now[column] ?? null])),
+          });
+        }
       }
+      const left = new Set((await rowsWhere(env, APPLICATIONS, 'id', loserIds, true)).map((app) => app.id as string));
+      undo.applications_removed.push(...losers.filter((app) => !left.has(app.id as string)));
     }
-
-    for (const role of merged) {
-      const { error } = await env.jobs.from('roles').delete().eq('id', role.id as string).eq('user_id', env.userId);
-      if (error) throw new Error(`roles: ${error.message}`);
-      undo.roles_removed.push(role);
-    }
+    const left = new Set((await rowsWhere(env, ROLES, 'id', mergedIds, true)).map((role) => role.id as string));
+    undo.roles_removed.push(...merged.filter((role) => !left.has(role.id as string)));
   } catch (error) {
-    // Put back whatever went before the failure, so a merge is whole or not at all.
-    await putBackMerge({ userId: env.userId, db: async (schema) => (schema === 'todo' ? env.todo : env.jobs) }, undo).catch(
-      (failed: unknown) => console.error('merge_roles: putting a failed merge back failed', failed),
-    );
-    throw error;
+    throw new Error(`The roles were merged, but reading back what moved failed, so the merge has no Undo: ${(error as Error).message}`);
   }
 
   const after = await ownRow(env.jobs, 'roles', keepId, env.userId, 'role');
@@ -3188,7 +3156,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'merge_roles',
-    runs: sameAs(['app/jobs/(app)/companies/actions.ts#mergeRoles', 'app/jobs/(app)/companies/actions.ts#mergeRoles']),
+    runs: sameAs(['app/jobs/(app)/companies/actions.ts#mergeRoles', 'lib/jobs/companies/merge-roles.ts#mergeRolesInto']),
     description: `Fold duplicate roles at one company into the one they keep, when they ask: the same posting filed twice. Everything on the duplicates (applications and their events, rounds, answers, letters, reminders, attachments and todo links) moves onto the role kept, the applications become one, the one furthest along, and the duplicates are taken out. Up to ${MERGE_MAX} at a time. A duplicate with comments in its thread is refused.`,
     input_schema: {
       type: 'object',

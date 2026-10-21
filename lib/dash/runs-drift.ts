@@ -56,7 +56,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   rename_maya_question: ['app/vault/maya/actions.ts#renameMayaQuestion'],
   change_course: ['app/you/work/actions.ts#updateCourseAction'],
   save_transcript: ['app/you/work/actions.ts#saveTranscriptAction'],
-  merge_roles: ['app/jobs/(app)/companies/actions.ts#mergeRoles'],
   rewrite_post: ['app/dev/posts/actions.ts#editPostBody'],
   suggest_post: ['app/dev/posts/actions.ts#suggestPostAbout'],
   file_idea: [
