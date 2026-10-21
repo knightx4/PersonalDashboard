@@ -41,7 +41,7 @@ import { extractPdfText, ownsReadingPdfPath } from '@/lib/learn/tracks/reading-p
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { RESUME_MAX_BYTES } from '@/lib/jobs/resume-file';
-import { recordOutcome } from '@/lib/learn/next/record';
+import { markReadingStatus } from '@/lib/learn/tracks/status';
 import { formatNumber } from '@/lib/money';
 
 /**
@@ -246,20 +246,13 @@ export async function updateStatus(
   const supabase = await createLearnClient();
   let check: StatusActionState['check'];
   try {
-    await setReadingStatus(supabase, parsed.data.readingId, parsed.data.status);
+    // Finishing it is what Learn next orders from, so markReadingStatus
+    // records that outcome as it marks the reading read. Written here rather
+    // than when the page drew the row, so opening Learn next and closing it
+    // again leaves nothing behind.
+    await markReadingStatus(supabase, user.id, parsed.data.readingId, parsed.data.status);
 
-    // Finishing it is what Learn next orders from -- #479 settled that reading
-    // it counts and giving up on it does not. Written here rather than when the
-    // page drew the row, so opening Learn next and closing it again leaves
-    // nothing behind. A reading finished twice is one fact, and the unique
-    // index on the table is what says so, rather than a read of the row first.
     if (parsed.data.status === 'read') {
-      await recordOutcome(supabase, user.id, {
-        kind: 'reading',
-        readingId: parsed.data.readingId,
-        outcome: 'read',
-      });
-
       // A reading queued for a gap was read to close it, so offer one question
       // on that idea while it is fresh. One you added yourself has no concept
       // and offers nothing. The answer is recorded by the probe like any other.

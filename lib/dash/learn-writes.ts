@@ -12,8 +12,13 @@ import { rewrittenClaimUpdate } from '@/lib/learn/graph/rewrite-save';
 import { isSameClaim, MAX_CLAIM } from '@/lib/learn/graph/rewrite';
 import { noteBody } from '@/lib/learn/notes/notes';
 import { cleanReadingText, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
+import type { ResolvedSource } from '@/lib/learn/import/resolve-payload';
+import { insertCardNote, insertConceptNote } from '@/lib/learn/notes/store';
+import { findReadingForLink } from '@/lib/learn/tracks/link';
+import { addManualReading, attachSourceToReading, createTrack, setReadingNote, setReadingText, setReadNow, upsertSource } from '@/lib/learn/tracks/save';
+import { markReadingStatus } from '@/lib/learn/tracks/status';
 import { settleVideoCards } from '@/lib/learn/youtube/video-card-run';
-import { isVerdict, PILE_LABEL, VERDICTS } from '@/lib/learn/youtube/videos';
+import { fileVideo, isVerdict, PILE_LABEL, setWatched, VERDICTS, type Verdict } from '@/lib/learn/youtube/videos';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -175,86 +180,85 @@ function httpsLink(value: string): string {
   return url.toString();
 }
 
-/** The person's source for a link, found by its address or added, so the reading points at it. */
-async function sourceFor(env: LearnWriteEnv, link: string, title: string): Promise<string> {
-  const { data, error } = await env.learn
-    .from('sources')
-    .select('id')
-    .eq('user_id', env.userId)
-    .eq('canonical_url', link)
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Looking up the source failed: ${error.message}`);
-  if (data) return (data as { id: string }).id;
-  const source = await inserted(
-    env,
-    'sources',
-    { user_id: env.userId, title, kind: 'page', canonical_url: link, access: 'unknown', access_checked_at: new Date().toISOString() },
-    'source',
-  );
-  return source.id as string;
+/** A link Dash was given, as a page of unknown access, for upsertSource and attachSourceToReading. */
+function givenPage(link: string, title: string, basis: string): ResolvedSource {
+  return {
+    title,
+    author: null,
+    kind: 'page',
+    year: null,
+    canonical_url: link,
+    access: 'unknown',
+    price_cents: null,
+    page_count: null,
+    locator_kind: 'whole',
+    locator_label: null,
+    page_from: null,
+    page_to: null,
+    locator_basis: basis,
+    locator_verified: false,
+    why: null,
+    not_found: false,
+  };
 }
 
 async function changeReading(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
   const id = idOf(args, 'reading_id', 'reading');
   const before = await ownRow(env, 'readings', id, 'reading');
   const title = named(before.title, 'the reading');
-  const patch: Row = {};
+  // Each change is checked first, then made through the reading page's own
+  // write (lib/learn/tracks/save.ts and status.ts), narrowed to the person.
+  const writes: (() => Promise<unknown>)[] = [];
   const said: string[] = [];
 
+  let finished = false;
   if (sent(args, 'status')) {
     const status = text(args, 'status') as ReadingStatus;
     if (!READING_STATUSES.includes(status)) throw new LearnRefused(`status must be one of ${READING_STATUSES.join(', ')}.`);
-    patch.status = status;
-    // Finishing or giving up takes it off the shelf, as the reading page does.
-    if (status === 'read' || status === 'abandoned') patch.read_now_at = null;
+    // Finishing or giving up takes it off the shelf, and finishing records
+    // the outcome Learn next orders from, as the reading page does.
+    finished = status === 'read' || status === 'abandoned';
+    writes.push(() => markReadingStatus(env.learn, env.userId, id, status));
     said.push(`marked ${STATUS_WORDS[status]}`);
   }
   if (sent(args, 'read_now')) {
     if (typeof args.read_now !== 'boolean') throw new LearnRefused('read_now must be true or false.');
-    if (args.read_now && patch.read_now_at === null) {
+    if (args.read_now && finished) {
       throw new LearnRefused('A reading marked read or given up cannot go on the Read now shelf too.');
     }
-    patch.read_now_at = args.read_now ? new Date().toISOString() : null;
-    said.push(args.read_now ? 'put on the Read now shelf' : 'taken off the Read now shelf');
+    const on = args.read_now;
+    writes.push(() => setReadNow(env.learn, id, on, env.userId));
+    said.push(on ? 'put on the Read now shelf' : 'taken off the Read now shelf');
   }
   if (sent(args, 'note')) {
     if (typeof args.note !== 'string') throw new LearnRefused('note must be text.');
-    const note = args.note.trim();
+    const note = args.note;
     if (note.length > READING_NOTE_MAX) throw new LearnRefused(`Keep the note under ${READING_NOTE_MAX} characters.`);
-    patch.note = note || null;
-    said.push(note ? 'its note written' : 'its note cleared');
+    writes.push(() => setReadingNote(env.learn, id, note, env.userId));
+    said.push(note.trim() ? 'its note written' : 'its note cleared');
   }
   if (sent(args, 'text')) {
     if (typeof args.text !== 'string') throw new LearnRefused('text must be the reading\'s text.');
     const cleaned = cleanReadingText(args.text);
     if (!cleaned.ok) throw new LearnRefused(cleaned.error);
-    Object.assign(patch, { given_text: cleaned.text, given_text_label: PASTED_LABEL, given_text_at: new Date().toISOString() });
+    writes.push(() => setReadingText(env.learn, id, { text: cleaned.text, label: PASTED_LABEL }, env.userId));
     said.push('its text kept for Dash to read');
   } else if (args.clear_text === true) {
-    Object.assign(patch, { given_text: null, given_text_label: null, given_text_at: null });
+    writes.push(() => setReadingText(env.learn, id, null, env.userId));
     said.push('its kept text cleared');
   }
   if (sent(args, 'link')) {
     const link = httpsLink(text(args, 'link'));
-    const sourceId = await sourceFor(env, link, title);
-    Object.assign(patch, {
-      source_id: sourceId,
-      open_url: link,
-      locator_kind: 'whole',
-      locator_label: null,
-      page_from: null,
-      page_to: null,
-      locator_confidence: 'unverified',
-      locator_basis: 'Dash attached this link when asked. Nothing has been checked on it yet.',
-    });
+    const page = givenPage(link, title, 'Dash attached this link when asked. Nothing has been checked on it yet.');
+    writes.push(() => attachSourceToReading(env.learn, env.userId, id, page));
     said.push('given its link');
   }
   if (said.length === 0) {
     throw new LearnRefused('Say what to change: status, read_now, note, text, clear_text or link.');
   }
 
-  const after = await updated(env, 'readings', id, patch, 'reading');
+  for (const write of writes) await write();
+  const after = await ownRow(env, 'readings', id, 'reading');
   const list = said.length === 1 ? said[0] : `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`;
   const href = `/learn/r/${id}`;
   return {
@@ -280,8 +284,8 @@ async function addLearnTrack(env: LearnWriteEnv, args: Args): Promise<LearnMade>
   const question = text(args, 'question');
   if (question.length > 2000) throw new LearnRefused('Keep the question under 2000 characters.');
 
-  const after = await inserted(env, 'tracks', { user_id: env.userId, title, question: question || null }, 'reading list');
-  const id = after.id as string;
+  const id = await createTrack(env.learn, env.userId, { title, question: question || null });
+  const after = await ownRow(env, 'tracks', id, 'reading list');
   const href = `/learn/t/${id}`;
   return {
     kind: 'add_learn_track',
@@ -304,39 +308,25 @@ async function addTrackReading(env: LearnWriteEnv, args: Args): Promise<LearnMad
   const why = text(args, 'why');
   if (why.length > 500) throw new LearnRefused('Keep why under 500 characters.');
   const link = sent(args, 'link') ? httpsLink(text(args, 'link')) : null;
+  // A link is kept once, as saving one on Reading lists finds the reading already there.
+  if (link) {
+    const held = await findReadingForLink(env.learn, env.userId, link);
+    if (held) throw new LearnRefused(`That link is on their lists already, as "${named(held.title, link)}". Nothing was added.`);
+  }
 
-  // At the end of the list, as the list page adds one.
-  const { data: last, error } = await env.learn
-    .from('readings')
-    .select('position')
-    .eq('track_id', trackId)
-    .eq('user_id', env.userId)
-    .order('position', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Reading the list failed: ${error.message}`);
-  const position = ((last as { position: number } | null)?.position ?? 0) + 10;
-
-  const after = await inserted(
-    env,
-    'readings',
-    {
-      user_id: env.userId,
-      track_id: trackId,
-      source_id: link ? await sourceFor(env, link, title) : null,
-      open_url: link,
-      title,
-      why: why || null,
-      position,
-      locator_kind: 'whole',
-      locator_basis: link
-        ? 'Dash added this with the link it was given. Nothing has been checked on it yet.'
-        : 'Dash added this when asked. Nothing has been looked up for it.',
-      locator_confidence: 'unverified',
-    },
-    'reading',
-  );
-  const id = after.id as string;
+  // At the end of the list, through the write the list page's Add makes.
+  const basis = link
+    ? 'Dash added this with the link it was given. Nothing has been checked on it yet.'
+    : 'Dash added this when asked. Nothing has been looked up for it.';
+  const sourceId = link ? await upsertSource(env.learn, env.userId, givenPage(link, title, basis)) : null;
+  const id = await addManualReading(env.learn, env.userId, {
+    trackId,
+    title,
+    why: why || null,
+    basis,
+    link: link && sourceId ? { sourceId, url: link } : null,
+  });
+  const after = await ownRow(env, 'readings', id, 'reading');
   const href = `/learn/r/${id}`;
   const list = named(track.title, 'the list');
   return {
@@ -390,11 +380,10 @@ async function addConceptNote(env: LearnWriteEnv, args: Args): Promise<LearnMade
   const hasCard = sent(args, 'card_id');
   if (hasCard === sent(args, 'concept_id')) throw new LearnRefused('Give one of concept_id or card_id.');
 
-  let cardId: string | null = null;
   let conceptId: string | null;
+  let card: Row | null = null;
   if (hasCard) {
-    const card = await ownRow(env, 'feed_cards', idOf(args, 'card_id', 'card'), 'Learn now card');
-    cardId = card.id as string;
+    card = await ownRow(env, 'feed_cards', idOf(args, 'card_id', 'card'), 'Learn now card');
     conceptId = (card.concept_id as string | null) ?? null;
   } else {
     conceptId = (await ownRow(env, 'concepts', idOf(args, 'concept_id', 'idea'), 'idea')).id as string;
@@ -404,13 +393,13 @@ async function addConceptNote(env: LearnWriteEnv, args: Args): Promise<LearnMade
     : null;
   const name = named((concept?.data as { name?: string } | null)?.name, 'a Learn card');
 
-  const after = await inserted(
-    env,
-    'card_notes',
-    { user_id: env.userId, card_id: cardId, concept_id: conceptId, body: parsed.body },
-    'note',
-  );
-  const id = after.id as string;
+  // The write the card's and the idea's own Add note make.
+  const note = card
+    ? await insertCardNote(env.learn, env.userId, card.id as string, parsed.body)
+    : await insertConceptNote(env.learn, env.userId, conceptId as string, parsed.body);
+  if (!note) throw new LearnRefused('That is not there any more. Nothing was kept.');
+  const id = note.id;
+  const after = await ownRow(env, 'card_notes', id, 'note');
   const href = conceptId ? `/learn/c/${conceptId}` : '/learn/now';
   return {
     kind: 'add_concept_note',
@@ -441,29 +430,31 @@ async function changeVideo(env: LearnWriteEnv, args: Args): Promise<LearnMade> {
   const videoId = text(args, 'video_id');
   if (!VIDEO_ID.test(videoId)) throw new LearnRefused('video_id must be the YouTube video id, eleven characters, as a lookup returned it.');
   const before = await ownRow(env, 'watch_list', videoId, 'video on the watch list', 'video_id');
-  const stamp = new Date().toISOString();
-  const patch: Row = { updated_at: stamp };
+  const now = new Date();
   const said: string[] = [];
 
+  let watched: boolean | null = null;
   if (sent(args, 'watched')) {
     if (typeof args.watched !== 'boolean') throw new LearnRefused('watched must be true or false.');
-    patch.watched_at = args.watched ? stamp : null;
-    said.push(args.watched ? 'marked watched' : 'marked not watched');
+    watched = args.watched;
+    said.push(watched ? 'marked watched' : 'marked not watched');
   }
-  let moved = false;
+  let pile: Verdict | null = null;
   if (sent(args, 'pile')) {
-    const pile = text(args, 'pile');
-    if (!isVerdict(pile)) throw new LearnRefused(`pile must be one of ${VERDICTS.join(', ')}.`);
-    // Kept as the person's verdict, which the judge never overwrites, as the
-    // Videos page's own move is: they asked for it.
-    Object.assign(patch, { verdict: pile, verdict_by: 'you', judged_at: stamp });
+    const asked = text(args, 'pile');
+    if (!isVerdict(asked)) throw new LearnRefused(`pile must be one of ${VERDICTS.join(', ')}.`);
+    pile = asked;
     said.push(`moved to ${PILE_LABEL[pile]}`);
-    moved = true;
   }
   if (said.length === 0) throw new LearnRefused('Say what to change: watched or pile.');
 
+  // The Videos page's own writes. A move is kept as the person's verdict,
+  // which the judge never overwrites, as the page's move is: they asked for it.
+  if (watched !== null) await setWatched(env.learn, env.userId, videoId, watched, now);
+  if (pile) await fileVideo(env.learn, env.userId, videoId, pile, now);
+  const moved = pile !== null;
   const id = before.id as string;
-  const after = await updated(env, 'watch_list', id, patch, 'video');
+  const after = await ownRow(env, 'watch_list', id, 'video');
   // The video's cards follow a move, as on the page; the hourly run settles them if this fails.
   if (moved) {
     await settleVideoCards(env.learn, env.userId).catch((error: unknown) => {
@@ -713,7 +704,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
     name: 'change_reading',
     runs: sameAs(
       ['app/learn/r/[id]/actions.ts#attachSource', 'lib/learn/tracks/save.ts#attachSourceToReading'],
-      ['app/learn/r/[id]/actions.ts#updateStatus', 'lib/learn/tracks/save.ts#setReadingStatus'],
+      ['app/learn/r/[id]/actions.ts#updateStatus', 'lib/learn/tracks/status.ts#markReadingStatus'],
       ['app/learn/r/[id]/actions.ts#toggleReadNow', 'lib/learn/tracks/save.ts#setReadNow'],
       ['app/learn/r/[id]/actions.ts#updateNote', 'lib/learn/tracks/save.ts#setReadingNote'],
       ['app/learn/r/[id]/actions.ts#saveReadingText', 'lib/learn/tracks/save.ts#setReadingText'],
@@ -757,8 +748,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   {
     name: 'add_track_reading',
     runs: sameAs(
-      ['app/learn/c/[id]/actions.ts#queueMaterial', 'lib/learn/catalogue/queue.ts#queueCatalogueSegment'],
-      ['app/learn/save/actions.ts#saveReadingLink', 'lib/learn/tracks/link.ts#saveLink'],
+      ['app/learn/save/actions.ts#saveReadingLink', 'lib/learn/tracks/save.ts#addManualReading'],
       ['app/learn/t/[id]/actions.ts#addToTrack', 'lib/learn/tracks/save.ts#addManualReading'],
     ),
     description:

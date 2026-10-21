@@ -15,8 +15,16 @@ import type { ResolvedSource } from '@/lib/learn/import/resolve-payload';
  *
  * Every write goes through the session client, so RLS decides what lands. The
  * user id is passed explicitly on insert -- a policy's `with check` compares
- * it to auth.uid() and rejects anything else -- and is never used as a filter.
+ * it to auth.uid() and rejects anything else. The reading writes Dash's
+ * change_reading and add_track_reading share with the pages (plan #2473.5)
+ * also take it as a filter, since the connector runs them on a service-role
+ * client that RLS does not narrow.
  */
+
+/** A filter chain narrowed to the user, when one is given. */
+function mine<Q extends { eq(column: string, value: string): Q }>(query: Q, userId: string | undefined): Q {
+  return userId ? query.eq('user_id', userId) : query;
+}
 
 export type SaveRow = {
   resolved: ResolvedSource;
@@ -52,6 +60,7 @@ export async function upsertSource(
       .from('sources')
       .select('id')
       .eq('canonical_url', url)
+      .eq('user_id', userId)
       .maybeSingle();
 
     assertSchemaExposed(error, LEARN_SCHEMA);
@@ -250,7 +259,16 @@ export async function saveBranchedAreas(
 export async function addManualReading(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { trackId: string; title: string; why: string | null; conceptId?: string | null },
+  input: {
+    trackId: string;
+    title: string;
+    why: string | null;
+    conceptId?: string | null;
+    /** Where it came from, when not typed on the list: a saved link, or Dash. */
+    basis?: string;
+    /** The page it opens, already a source (upsertSource): a saved link, or one Dash was given. */
+    link?: { sourceId: string; url: string } | null;
+  },
 ): Promise<string> {
   // Append. One query for the current end of the list beats a sequence, and a
   // personal track is tens of rows.
@@ -258,6 +276,7 @@ export async function addManualReading(
     .from('readings')
     .select('position')
     .eq('track_id', input.trackId)
+    .eq('user_id', userId)
     .order('position', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -269,15 +288,18 @@ export async function addManualReading(
     .insert({
       user_id: userId,
       track_id: input.trackId,
-      source_id: null,
+      source_id: input.link?.sourceId ?? null,
+      open_url: input.link?.url ?? null,
       title: input.title,
       why: input.why,
       position,
       concept_id: input.conceptId ?? null,
       locator_kind: 'whole',
-      locator_basis: input.conceptId
-        ? 'A gap in your graph, put in the queue. Nothing has been looked up for it yet.'
-        : 'You wrote this down yourself. Nothing has been looked up for it.',
+      locator_basis:
+        input.basis ??
+        (input.conceptId
+          ? 'A gap in your graph, put in the queue. Nothing has been looked up for it yet.'
+          : 'You wrote this down yourself. Nothing has been looked up for it.'),
       locator_confidence: 'unverified',
     })
     .select('id')
@@ -321,7 +343,8 @@ export async function attachSourceToReading(
       locator_confidence: 'unverified',
       locator_basis: resolved.locator_basis,
     })
-    .eq('id', readingId);
+    .eq('id', readingId)
+    .eq('user_id', userId);
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Attaching the source', error);
@@ -367,13 +390,17 @@ export async function setReadingStatus(
   supabase: LearnSupabaseClient,
   readingId: string,
   status: 'queued' | 'reading' | 'read' | 'abandoned',
+  userId?: string,
 ): Promise<void> {
   const done = status === 'read' || status === 'abandoned';
 
-  const { error } = await supabase
-    .from('readings')
-    .update(done ? { status, read_now_at: null } : { status })
-    .eq('id', readingId);
+  const { error } = await mine(
+    supabase
+      .from('readings')
+      .update(done ? { status, read_now_at: null } : { status })
+      .eq('id', readingId),
+    userId,
+  );
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Updating the reading', error);
 }
@@ -388,11 +415,15 @@ export async function setReadNow(
   supabase: LearnSupabaseClient,
   readingId: string,
   on: boolean,
+  userId?: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('readings')
-    .update({ read_now_at: on ? new Date().toISOString() : null })
-    .eq('id', readingId);
+  const { error } = await mine(
+    supabase
+      .from('readings')
+      .update({ read_now_at: on ? new Date().toISOString() : null })
+      .eq('id', readingId),
+    userId,
+  );
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Changing the shelf', error);
 }
@@ -402,12 +433,16 @@ export async function setReadingNote(
   supabase: LearnSupabaseClient,
   readingId: string,
   note: string,
+  userId?: string,
 ): Promise<void> {
   const trimmed = note.trim();
-  const { error } = await supabase
-    .from('readings')
-    .update({ note: trimmed === '' ? null : trimmed })
-    .eq('id', readingId);
+  const { error } = await mine(
+    supabase
+      .from('readings')
+      .update({ note: trimmed === '' ? null : trimmed })
+      .eq('id', readingId),
+    userId,
+  );
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Saving your note', error);
 }
@@ -448,16 +483,19 @@ export async function setReadingText(
   supabase: LearnSupabaseClient,
   readingId: string,
   given: { text: string; label: string } | null,
+  userId?: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('readings')
-    .update(
-      given
-        ? { given_text: given.text, given_text_label: given.label, given_text_at: new Date().toISOString() }
-        : { given_text: null, given_text_label: null, given_text_at: null },
-    )
-    .eq('id', readingId)
-    .select('id');
+  const { data, error } = await mine(
+    supabase
+      .from('readings')
+      .update(
+        given
+          ? { given_text: given.text, given_text_label: given.label, given_text_at: new Date().toISOString() }
+          : { given_text: null, given_text_label: null, given_text_at: null },
+      )
+      .eq('id', readingId),
+    userId,
+  ).select('id');
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Saving the text', error);
   return (data?.length ?? 0) > 0;

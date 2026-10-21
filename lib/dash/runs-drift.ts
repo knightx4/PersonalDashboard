@@ -12,33 +12,12 @@
  * workspace by workspace.
  */
 export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
-  add_goal: ['app/learn/know/level3-actions.ts#addLevel3Goal'],
   add_role_note: ['app/jobs/(app)/roles/[id]/actions.ts#addNote'],
   add_idea: [
     'app/dev/ideas/actions.ts#addIdea',
     'app/dev/ideas/actions.ts#submitIdea',
   ],
   move_roles: ['app/jobs/(app)/pipeline/actions.ts#moveApplication'],
-  change_reading: [
-    'app/learn/r/[id]/actions.ts#attachSource',
-    'app/learn/r/[id]/actions.ts#updateStatus',
-    'app/learn/r/[id]/actions.ts#toggleReadNow',
-    'app/learn/r/[id]/actions.ts#updateNote',
-    'app/learn/r/[id]/actions.ts#saveReadingText',
-    'app/learn/r/[id]/actions.ts#saveReadingPdf',
-    'app/learn/r/[id]/actions.ts#clearReadingText',
-  ],
-  add_learn_track: ['app/learn/lists/actions.ts#startTrack'],
-  add_track_reading: [
-    'app/learn/c/[id]/actions.ts#queueMaterial',
-    'app/learn/save/actions.ts#saveReadingLink',
-    'app/learn/t/[id]/actions.ts#addToTrack',
-  ],
-  add_concept_note: [
-    'app/learn/c/[id]/actions.ts#addConceptNote',
-    'app/learn/now/actions.ts#addCardNote',
-  ],
-  change_video: ['app/learn/videos/actions.ts#setWatchedAction'],
   change_role: [
     'app/jobs/(app)/roles/actions.ts#updateRole',
     'app/jobs/(app)/roles/[id]/actions.ts#renameRole',

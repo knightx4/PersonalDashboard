@@ -1025,7 +1025,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal',
-    sameAs(['app/learn/know/level3-actions.ts#addLevel3Goal', 'lib/learn/aims-store.ts#insertLevel3Aim']),
+    noButton(
+      'No Goals page adds a goal by hand: goals come in through capture, and the Level 3 goal on Subjects is an offer the person accepts.',
+    ),
     'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it. When none of their areas fits the goal, make one: pass new_area true with a short name for it ("Music"), rather than asking. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
     {
       type: 'object',
