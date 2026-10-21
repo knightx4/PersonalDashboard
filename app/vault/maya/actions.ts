@@ -136,9 +136,14 @@ export async function renameMayaQuestion(id: string, raw: string): Promise<{ err
   const next = question.safeParse(raw);
   if (!next.success) return { error: next.error.issues[0]?.message ?? 'That question cannot be saved.' };
 
-  await requireUser();
-  const ok = await renameQuestion({ core: await createCoreClient(), vault: await createVaultClient() }, parsed.data, next.data);
-  if (!ok) return { error: 'The question was not saved. Try again.' };
+  const user = await requireUser();
+  let renamed: Record<string, unknown> | null = null;
+  try {
+    renamed = await renameQuestion(await createCoreClient(), user.id, parsed.data, next.data);
+  } catch {
+    // Said below, as a question that did not save.
+  }
+  if (!renamed) return { error: 'The question was not saved. Try again.' };
 
   revalidatePath('/vault/maya');
   revalidatePath(mayaThreadHref(parsed.data));

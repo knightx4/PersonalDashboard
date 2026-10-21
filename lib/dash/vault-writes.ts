@@ -11,6 +11,8 @@ import { fileQuickNote, isInInbox } from '@/lib/vault/notes/file';
 import { renameNote } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { vaultUndoRecord, type VaultUndo, type VaultUndoPorts } from '@/lib/vault/notes/undo';
+import { renameThemeRow, themeNameProblem } from '@/lib/vault/map/rename-theme';
+import { renameQuestion } from '@/lib/vault/maya/store';
 import { basenameOf, isTriageNotePath, mayaThreadHref, noteHref } from '@/lib/vault/paths';
 import { COURSE_FIELD_NAMES, EDUCATION_HREF, parseCourse, schoolField } from '@/lib/you/education';
 import { saveTranscriptWithCourses, updateCourse } from '@/lib/you/transcript-store';
@@ -328,8 +330,8 @@ const THEME_COLUMNS = 'id, user_id, name, about, created_at, updated_at';
 
 async function renameTheme(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
   const name = text(args, 'name');
-  if (!name) throw new VaultRefused('A theme needs a name.');
-  if (name.length > 200) throw new VaultRefused('Keep the name under 200 characters.');
+  const problem = themeNameProblem(name);
+  if (problem) throw new VaultRefused(problem);
 
   let before: Row;
   if (text(args, 'theme_ref')) {
@@ -346,15 +348,13 @@ async function renameTheme(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
   if (before.name === name) throw new VaultRefused('That is its name already.');
 
   const id = before.id as string;
-  const { data, error } = await env.vault
-    .from('themes')
-    .update({ name })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select(THEME_COLUMNS)
-    .single();
-  if (error?.code === '23505') throw new VaultRefused('Another theme already has that name.');
-  if (error || !data) throw new Error(`Renaming the theme failed: ${error?.message ?? 'no row'}`);
+  const renamed = await renameThemeRow(env.vault, env.userId, id, name, THEME_COLUMNS);
+  if (!renamed.ok) {
+    if (renamed.reason === 'taken') throw new VaultRefused('Another theme already has that name.');
+    if (renamed.reason === 'missing') throw new VaultRefused('That theme is no longer in the map.');
+    throw new Error(`Renaming the theme failed: ${renamed.message}`);
+  }
+  const data = renamed.row;
 
   const href = `/vault/map/${id}`;
   const from = named(before.name, 'the theme');
@@ -396,15 +396,8 @@ async function renameMayaQuestion(env: VaultWriteEnv, args: Args): Promise<Vault
   if (before.title === question) throw new VaultRefused('The thread is about that already.');
 
   const id = before.id as string;
-  const { data, error } = await env.core
-    .from('conversations')
-    .update({ title: question })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .eq('voice', 'maya')
-    .select(THREAD_COLUMNS)
-    .single();
-  if (error || !data) throw new Error(`Rewriting the question failed: ${error?.message ?? 'no row'}`);
+  const data = await renameQuestion(env.core, env.userId, id, question, THREAD_COLUMNS);
+  if (!data) throw new VaultRefused('That thread with Maya is not there any more.');
 
   const href = mayaThreadHref(id);
   return {
@@ -538,7 +531,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   {
     name: 'write_vault_note',
     runs: sameAs(
-      ['app/vault/actions.ts#newVaultNote', 'lib/capture/vault.ts#fileVaultNote'],
+      ['app/vault/actions.ts#newVaultNote', 'lib/vault/notes/create.ts#createCapturedNote'],
       ['app/vault/actions.ts#openDailyNote', 'lib/vault/notes/create.ts#createCapturedNote'],
     ),
     modules: ['vault'],
@@ -558,7 +551,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
     name: 'edit_vault_note',
     runs: sameAs(
       ['app/vault/n/[...path]/actions.ts#saveNoteEdit', 'lib/vault/notes/save.ts#saveNote'],
-      ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote', 'lib/learn/essays/notes-to-vault.ts#addNotesToVault'],
+      ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote', 'lib/vault/notes/save.ts#saveNote'],
     ),
     modules: ['vault'],
     description:
@@ -611,7 +604,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_theme',
-    runs: sameAs(['app/vault/map/actions.ts#renameTheme', 'app/vault/map/actions.ts#renameTheme']),
+    runs: sameAs(['app/vault/map/actions.ts#renameTheme', 'lib/vault/map/rename-theme.ts#renameThemeRow']),
     modules: ['vault'],
     description:
       'Rename a theme on their vault map, when they ask. Name it by theme_ref, or by theme with its name as it is now. Names are unique on the map, ignoring case.',

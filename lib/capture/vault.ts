@@ -6,7 +6,8 @@ import { forgetFiles, markDashActionUndone, type DashAction, type DashActionDeps
 import { parseRef } from '@/lib/core/refs';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteRemovePorts, noteRenamePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
-import { createCapturedNote } from '@/lib/vault/notes/create';
+import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import { createCapturedNote, type CreateNotePorts } from '@/lib/vault/notes/create';
 import { readVaultUndo, undoVaultWrite } from '@/lib/vault/notes/undo';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { rebuildTriageNote } from '@/lib/vault/notes/triage-note-run';
@@ -46,14 +47,18 @@ export async function vaultWritable(userId: string): Promise<boolean> {
 /** How long the embedding after a note is written may run, as after a save. */
 const EMBED_AFTER_WRITE_MS = 20_000;
 
-/** Write a note into the vault's Inbox, as the signed-in person. */
-export async function fileVaultNote(
-  userId: string,
-  text: string,
-  title?: string,
-): Promise<{ ok: true; noteId: string; path: string; title: string; blobSha: string } | { ok: false; error: string }> {
-  const supabase = await createVaultClient();
-  const ports = noteCreatePorts({
+/**
+ * The note-create ports on the signed-in person's vault, each note embedded
+ * once the reply has gone: what fileVaultNote writes with, and what Ask hands
+ * add_quick_note, which calls createCapturedNote on them as the Vault page's
+ * quick note does (plan #2473.5).
+ */
+export async function sessionInboxPorts(userId: string): Promise<CreateNotePorts> {
+  return inboxPorts(await createVaultClient(), userId);
+}
+
+function inboxPorts(supabase: VaultSupabaseClient, userId: string): CreateNotePorts {
+  return noteCreatePorts({
     supabase,
     afterSave: () => {
       after(async () => {
@@ -68,7 +73,16 @@ export async function fileVaultNote(
       });
     },
   });
-  const result = await createCapturedNote(ports, text, title);
+}
+
+/** Write a note into the vault's Inbox, as the signed-in person. */
+export async function fileVaultNote(
+  userId: string,
+  text: string,
+  title?: string,
+): Promise<{ ok: true; noteId: string; path: string; title: string; blobSha: string } | { ok: false; error: string }> {
+  const supabase = await createVaultClient();
+  const result = await createCapturedNote(inboxPorts(supabase, userId), text, title);
   if (!result.ok) {
     // The token stopped writing since it was checked: stop offering the vault.
     if (result.reason === 'read-only' || result.reason === 'reconnect') ACCESS.delete(userId);

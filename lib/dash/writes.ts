@@ -22,6 +22,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { createCapturedNote } from '@/lib/vault/notes/create';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
@@ -898,9 +899,11 @@ async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWrit
   const body = text(args, 'text');
   if (body.length < 2) throw new Refused('text is missing: write the thought as they said it.');
   if (body.length > QUICK_NOTE_MAX) throw new Refused(`Keep the note under ${QUICK_NOTE_MAX} characters.`);
-  if (!ctx.fileQuickNote) throw new Refused('Quick notes cannot be saved from here.');
+  if (!ctx.quickNotePorts) throw new Refused('Quick notes cannot be saved from here.');
 
-  const filed = await ctx.fileQuickNote(body);
+  // The Vault page's own write (addQuickNote through fileVaultNote): the note
+  // in the Inbox, named from its text.
+  const filed = await createCapturedNote(await ctx.quickNotePorts(), body);
   if (!filed.ok) throw new Refused(filed.error);
   const ref = toRef(TABLE.note, filed.noteId);
   const line = body.split('\n')[0].trim();
@@ -1239,7 +1242,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_quick_note',
-    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/capture/vault.ts#fileVaultNote']),
+    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/vault/notes/create.ts#createCapturedNote']),
     'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in the vault\'s Inbox, where Quick note triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
     {
       type: 'object',

@@ -19,7 +19,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/dev/ideas/actions.ts#submitIdea',
   ],
   move_roles: ['app/jobs/(app)/pipeline/actions.ts#moveApplication'],
-  add_quick_note: ['app/vault/actions.ts#addQuickNote'],
   change_reading: [
     'app/learn/r/[id]/actions.ts#attachSource',
     'app/learn/r/[id]/actions.ts#updateStatus',
@@ -40,10 +39,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/learn/now/actions.ts#addCardNote',
   ],
   change_video: ['app/learn/videos/actions.ts#setWatchedAction'],
-  write_vault_note: ['app/vault/actions.ts#newVaultNote'],
-  edit_vault_note: ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote'],
-  rename_theme: ['app/vault/map/actions.ts#renameTheme'],
-  rename_maya_question: ['app/vault/maya/actions.ts#renameMayaQuestion'],
   change_role: [
     'app/jobs/(app)/roles/actions.ts#updateRole',
     'app/jobs/(app)/roles/[id]/actions.ts#renameRole',
