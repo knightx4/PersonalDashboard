@@ -79,8 +79,8 @@ export function ModelChip({
         className={cn(chipVariants({ tone: 'neutral' }), 'press-area shrink-0 hover:text-ink')}
       >
         <span>{label}</span>
-        {/* Off on a phone, where the box's foot has no room for it beside the scope chip. */}
-        <ChevronDown strokeWidth={1.75} aria-hidden className="max-sm:hidden" />
+        {/* On a phone too, where Add a file gives up its words to make room (plan #2458.5). */}
+        <ChevronDown strokeWidth={1.75} aria-hidden />
       </button>
       {open && (
         <div

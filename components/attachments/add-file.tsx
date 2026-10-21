@@ -4,6 +4,7 @@ import { useId, useImperativeHandle, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { FieldError } from '@/components/ui/field';
 import {
   ATTACHMENT_ACCEPT,
@@ -54,6 +55,7 @@ export function AddFile({
   max = ATTACHMENTS_PER_ITEM,
   disabled = false,
   onUploadingChange,
+  iconOnPhone = false,
 }: {
   ref?: React.Ref<AddFileHandle>;
   value: readonly UploadedAttachment[];
@@ -63,6 +65,12 @@ export function AddFile({
   max?: number;
   disabled?: boolean;
   onUploadingChange?: (uploading: boolean) => void;
+  /**
+   * Draw the button as the paperclip alone below `sm`, for a box whose foot
+   * also holds chips: Ask Dash's scope and model chips need the room at 390
+   * (plan #2458.5).
+   */
+  iconOnPhone?: boolean;
 }) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -127,18 +135,36 @@ export function AddFile({
           void choose(files);
         }}
       />
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        pending={uploading}
-        disabled={disabled || room <= 0}
-        aria-describedby={errors.length > 0 ? errorId : undefined}
-        onClick={() => input.current?.click()}
-      >
-        <Paperclip strokeWidth={1.75} aria-hidden className="size-4" />
-        {uploading ? 'Adding…' : 'Add a file'}
-      </Button>
+      {iconOnPhone ? (
+        <Tooltip label="Add a file">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            pending={uploading}
+            disabled={disabled || room <= 0}
+            aria-label={uploading ? 'Adding…' : 'Add a file'}
+            aria-describedby={errors.length > 0 ? errorId : undefined}
+            onClick={() => input.current?.click()}
+          >
+            <Paperclip strokeWidth={1.75} aria-hidden className="size-4" />
+            <span className="max-sm:hidden">{uploading ? 'Adding…' : 'Add a file'}</span>
+          </Button>
+        </Tooltip>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          pending={uploading}
+          disabled={disabled || room <= 0}
+          aria-describedby={errors.length > 0 ? errorId : undefined}
+          onClick={() => input.current?.click()}
+        >
+          <Paperclip strokeWidth={1.75} aria-hidden className="size-4" />
+          {uploading ? 'Adding…' : 'Add a file'}
+        </Button>
+      )}
       {value.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Files to add">
           {value.map((file) => (
