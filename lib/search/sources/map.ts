@@ -21,6 +21,16 @@ export function escapeLike(query: string): string {
   return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
+/**
+ * An `or` filter matching any of `columns`, for PostgREST. The pattern is
+ * quoted so a comma or bracket in the query is not read as filter syntax, and
+ * the backslashes escapeLike adds are doubled for the quotes.
+ */
+export function ilikeAnyFilter(columns: readonly string[], query: string): string {
+  const pattern = `%${escapeLike(query)}%`.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return columns.map((column) => `${column}.ilike."${pattern}"`).join(',');
+}
+
 /** A PostgREST embed comes back as an object or a one-element array. */
 export function embedded<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;

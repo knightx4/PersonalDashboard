@@ -8,7 +8,7 @@ import type {
   SearchListContext,
   SearchSource,
 } from '@/lib/search/sources';
-import { companyHit, contactHit, embedded, escapeLike, roleHit } from '@/lib/search/sources/map';
+import { companyHit, contactHit, embedded, escapeLike, ilikeAnyFilter, roleHit } from '@/lib/search/sources/map';
 
 /**
  * The job search, in the command palette.
@@ -21,7 +21,9 @@ import { companyHit, contactHit, embedded, escapeLike, roleHit } from '@/lib/sea
  *
  * Names only. That was decided on the feature: names and titles now, note
  * bodies later, and the difference is a migration per schema rather than an
- * ilike.
+ * ilike. Two short labels count as names: a company's industry and a role's
+ * kind, so "accelerator" finds the founder role at Antler and the accelerator
+ * companies (note ecbb3524).
  *
  * `find` and `list` are the same three reads: listing is matching with the
  * `ilike` left off, so both go through the functions below and neither can
@@ -36,7 +38,7 @@ type Read = SearchListContext & { query?: string };
 async function findCompanies(ctx: Read): Promise<SearchHit[]> {
   const supabase = await sourceClient(ctx, 'job_search', createClient);
   let read = supabase.from('companies').select('id, name, slug, industry');
-  if (ctx.query) read = read.ilike('name', contains(ctx.query));
+  if (ctx.query) read = read.or(ilikeAnyFilter(['name', 'industry'], ctx.query));
 
   const { data, error } = await read.order('updated_at', { ascending: false }).limit(ctx.limit);
 
@@ -53,7 +55,7 @@ async function findCompanies(ctx: Read): Promise<SearchHit[]> {
 async function findRoles(ctx: Read): Promise<SearchHit[]> {
   const supabase = await sourceClient(ctx, 'job_search', createClient);
   let read = supabase.from('roles').select('id, title, location, companies(name)');
-  if (ctx.query) read = read.ilike('title', contains(ctx.query));
+  if (ctx.query) read = read.or(ilikeAnyFilter(['title', 'kind'], ctx.query));
 
   const { data, error } = await read.order('updated_at', { ascending: false }).limit(ctx.limit);
 
