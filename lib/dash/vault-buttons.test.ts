@@ -77,7 +77,7 @@ async function vaultTool(name: string, tables: FakeTables, input: Record<string,
 describe('the Vault tools write what their buttons write', () => {
   it('write_vault_note writes the note in the Inbox as New note does', async () => {
     const [page, dash] = twins({ 'obsidian.notes': [] });
-    await press(page, () => vaultPage.newVaultNote({}, (() => {
+    await press(page, () => vaultPage.newVaultNote({ error: null }, (() => {
       const data = new FormData();
       data.set('title', 'Boiler');
       data.set('body', 'Book the service in March.');
