@@ -9,7 +9,7 @@ export const maxDuration = 60;
  * Commits the vault editor's drafts once they have sat ten minutes untouched.
  *
  * Called every five minutes by a pg_cron job through pg_net
- * (supabase/migrations/0272_note_drafts_cron.sql), because Vercel's free
+ * (supabase/migrations/0274_note_drafts_cron.sql), because Vercel's free
  * plan allows one cron a day. GET and POST both; the body is ignored.
  *
  * Authorised like the other cron routes, with `Authorization: Bearer

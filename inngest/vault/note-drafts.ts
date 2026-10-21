@@ -5,7 +5,7 @@ import { commitDraftPorts } from '@/lib/vault/db/draft-ports';
 import { commitDraft, QUIET_MS, type DueDraft } from '@/lib/vault/notes/drafts';
 
 /**
- * The note-drafts tick (vault migration 0040, migration 0272): every five
+ * The note-drafts tick (vault migration 0040, migration 0274): every five
  * minutes, commit each draft from the vault editor that has sat for ten
  * minutes untouched, so a sitting of writing is one commit.
  *
