@@ -880,6 +880,7 @@ const pipelineRow = (
   readyToApply: false,
   allQuestionsAdded: false,
   hasCoverLetter: null,
+  hasQuestions: false,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',

@@ -53,6 +53,8 @@ export function PipelineFilters({
     noQuestions: number;
     letter: number;
     noLetter: number;
+    material: number;
+    noMaterial: number;
   };
   /** The company the table's Company column narrowed to, by name. */
   companyName?: string;
@@ -63,7 +65,7 @@ export function PipelineFilters({
   const [more, setMore] = useState(false);
   const tucked = (set: boolean) => (more || set ? undefined : 'max-sm:hidden');
   const anyTucked =
-    !more && (state.ready === null || state.questions === null || state.letter === null || !state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
+    !more && (state.ready === null || state.questions === null || state.letter === null || state.material === null || !state.excitement || (scored && (!state.minimum.fit || state.minimum.chance === 'any')));
   const go = (changes: Partial<Record<keyof PipelineParams, string | undefined>>) =>
     router.push(pipelineHref(params, changes), { scroll: false });
 
@@ -196,6 +198,18 @@ export function PipelineFilters({
         <option value="">Any cover letter</option>
         <option value="yes">With a cover letter · {marks.letter}</option>
         <option value="no">Without a cover letter · {marks.noLetter}</option>
+      </PressChip>
+      <PressChip
+        className={tucked(state.material !== null)}
+        name="material"
+        aria-label="Filter by questions or cover letter"
+        placeholderValue=""
+        value={state.material === null ? '' : state.material ? 'yes' : 'no'}
+        onChange={(event) => go({ material: event.currentTarget.value || undefined })}
+      >
+        <option value="">Any questions or letter</option>
+        <option value="yes">Questions or a letter · {marks.material}</option>
+        <option value="no">Neither yet · {marks.noMaterial}</option>
       </PressChip>
       {anyTucked && (
         <Button type="button" variant="ghost" size="xs" onClick={() => setMore(true)} className="sm:hidden">

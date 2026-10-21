@@ -47,6 +47,8 @@ export interface PipelineRow {
   allQuestionsAdded: boolean;
   /** true has a cover letter, false has none, null not answered. */
   hasCoverLetter: boolean | null;
+  /** At least one application question has been added to it. */
+  hasQuestions: boolean;
   createdBy: string;
   submittedAt: string | null;
   confirmationReceivedAt: string | null;
@@ -98,7 +100,8 @@ const SELECT = `
     id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
-  interviews ( kind, scheduled_at, time_known )
+  interviews ( kind, scheduled_at, time_known ),
+  application_answers ( count )
 `;
 
 type RawRow = {
@@ -140,6 +143,7 @@ type RawRow = {
     };
   };
   interviews: { kind: string; scheduled_at: string | null; time_known: boolean | null }[] | null;
+  application_answers: { count: number }[] | null;
 };
 
 export async function loadPipeline(
@@ -193,6 +197,7 @@ export async function loadPipeline(
     readyToApply: row.ready_to_apply === true,
     allQuestionsAdded: row.all_questions_added === true,
     hasCoverLetter: row.has_cover_letter ?? null,
+    hasQuestions: (row.application_answers?.[0]?.count ?? 0) > 0,
     createdBy: row.created_by,
     submittedAt: row.submitted_at,
     confirmationReceivedAt: row.confirmation_received_at,
