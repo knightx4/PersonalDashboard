@@ -207,7 +207,7 @@ export function PipelineFilters({
         value={state.material === null ? '' : state.material ? 'yes' : 'no'}
         onChange={(event) => go({ material: event.currentTarget.value || undefined })}
       >
-        <option value="">Any questions or letter</option>
+        <option value="">Any material</option>
         <option value="yes">Questions or a letter · {marks.material}</option>
         <option value="no">Neither yet · {marks.noMaterial}</option>
       </PressChip>
