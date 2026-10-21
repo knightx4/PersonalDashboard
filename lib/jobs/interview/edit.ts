@@ -121,3 +121,102 @@ export function unlinkRoundEmailRow(supabase: AppSupabaseClient, userId: string,
     supabase.from('interview_group_messages').delete().eq('group_id', groupId).eq('message_id', messageId).eq('user_id', userId).select('*'),
   );
 }
+
+/** What gathering interviews into a round wrote, row by row, so Dash can keep it for its Undo. */
+export type Gathered = {
+  /** The interviews moved in, as they were and as they are now. */
+  moved: { before: Row; after: Row }[];
+  /** The emails of the rounds they left, now on the round they went into. */
+  relinked: { before: Row; after: Row }[];
+  /** Links taken out because the email was already on the round they went into. */
+  unlinked: Row[];
+  /** The rounds left with nothing in them, taken out whole. */
+  removed: Row[];
+  error: string | null;
+};
+
+/**
+ * Interviews gathered into one round, as the role page's "Make them one
+ * round" and Dash's change_interview_round group both do it (plan #2473.7).
+ * Each interview keeps its hour, panel and notes and is placed after those
+ * already in the round, in the order given. The emails of the rounds they
+ * leave go with them, and a round left with no interview and no notes of its
+ * own is taken out, so nothing anyone wrote goes with it. `emptying` names
+ * rounds to fold in that hold no interview at all, so their emails come too.
+ *
+ * Stops at the first failed write and says what it had done by then.
+ */
+export async function gatherIntoRound(
+  supabase: AppSupabaseClient,
+  userId: string,
+  opts: { applicationId: string; groupId: string; interviewIds: readonly string[]; emptying?: readonly string[] },
+): Promise<Gathered> {
+  const done: Gathered = { moved: [], relinked: [], unlinked: [], removed: [], error: null };
+  const fail = (error: string): Gathered => ({ ...done, error });
+
+  const found = await many(
+    supabase.from('interviews').select('*').in('id', [...opts.interviewIds]).eq('application_id', opts.applicationId).eq('user_id', userId),
+  );
+  if (found.error) return fail(found.error);
+  const byId = new Map(found.rows.map((row) => [row.id as string, row]));
+  const named: Row[] = [];
+  for (const id of new Set(opts.interviewIds)) {
+    const row = byId.get(id);
+    if (!row) return fail('Some of those interviews are not on this role.');
+    named.push(row);
+  }
+
+  const leaving = [...new Set([...named.map((row) => row.group_id as string | null), ...(opts.emptying ?? [])])].filter(
+    (id): id is string => Boolean(id) && id !== opts.groupId,
+  );
+
+  const already = await many(supabase.from('interviews').select('id').eq('group_id', opts.groupId).eq('user_id', userId));
+  if (already.error) return fail(already.error);
+  let place = already.rows.length;
+  for (const interview of named) {
+    if (interview.group_id === opts.groupId) continue;
+    place += 1;
+    const after = await moveInterviewToRound(supabase, userId, interview.id as string, opts.groupId, place);
+    if (after.error || !after.row) return fail(after.error ?? 'An interview changed while it was being moved.');
+    done.moved.push({ before: interview, after: after.row });
+  }
+
+  const kept = await many(supabase.from('interview_group_messages').select('message_id').eq('group_id', opts.groupId).eq('user_id', userId));
+  if (kept.error) return fail(kept.error);
+  const onRound = new Set(kept.rows.map((row) => row.message_id));
+  for (const groupId of leaving) {
+    const links = await many(supabase.from('interview_group_messages').select('*').eq('group_id', groupId).eq('user_id', userId));
+    if (links.error) return fail(links.error);
+    for (const link of links.rows) {
+      if (onRound.has(link.message_id)) {
+        const taken = await many(supabase.from('interview_group_messages').delete().eq('id', link.id as string).eq('user_id', userId).select('*'));
+        if (taken.error) return fail(taken.error);
+        done.unlinked.push(...taken.rows);
+        continue;
+      }
+      const after = await one(
+        supabase
+          .from('interview_group_messages')
+          .update({ group_id: opts.groupId })
+          .eq('id', link.id as string)
+          .eq('user_id', userId)
+          .select('*')
+          .maybeSingle(),
+      );
+      if (after.error || !after.row) return fail(after.error ?? 'An email changed while it was being moved.');
+      done.relinked.push({ before: link, after: after.row });
+      onRound.add(link.message_id);
+    }
+
+    const round = await one(supabase.from('interview_groups').select('*').eq('id', groupId).eq('user_id', userId).maybeSingle());
+    if (round.error) return fail(round.error);
+    if (!round.row || (typeof round.row.notes === 'string' && round.row.notes.trim())) continue;
+    const inside = await many(supabase.from('interviews').select('id').eq('group_id', groupId).eq('user_id', userId));
+    if (inside.error) return fail(inside.error);
+    if (inside.rows.length > 0) continue;
+    const taken = await many(supabase.from('interview_groups').delete().eq('id', groupId).eq('user_id', userId).select('*'));
+    if (taken.error) return fail(taken.error);
+    done.removed.push(...taken.rows);
+  }
+  return done;
+}

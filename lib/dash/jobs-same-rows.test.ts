@@ -783,6 +783,55 @@ describe("the interview tools write the rows the role page's round cards do", ()
     expect(byTool['job_search.interview_groups']).toHaveLength(3);
   });
 
+  it('gathers interviews into one round as "Make them one round" does, emails and all (plan #2473.7)', async () => {
+    const { groupInterviews } = await import('@/app/jobs/(app)/roles/[id]/interview-actions');
+    const { byButton, byTool } = await bothWays(
+      interviewSeed,
+      () => groupInterviews({ applicationId: APP, interviewIds: [I1, I2, I3], label: 'Superday' }),
+      'change_interview_round',
+      { action: 'group', role_ref: ROLE, round_numbers: [1, 2], label: 'Superday' },
+    );
+    // The one difference is where they go: the button makes a new round,
+    // numbered after the others, and the tool keeps the first round named.
+    // Past the round's id and number (and the columns a seeded row and a new
+    // one spell differently) the rows are the same.
+    const oneRound = (tables: Record<string, unknown[]>) => {
+      const rounds = (tables['job_search.interview_groups'] as string[]).map((row) => JSON.parse(row) as Record<string, unknown>);
+      expect(rounds).toHaveLength(1);
+      const [round] = rounds;
+      const id = JSON.stringify(round.id);
+      return {
+        number: round.round_number,
+        tables: <Record<string, unknown[]>>{
+          ...Object.fromEntries(Object.entries(tables).map(([name, rows]) => [name, (rows as string[]).map((row) => row.replaceAll(id, '"<round>"')).sort()])),
+          'job_search.interview_groups': [{ application_id: round.application_id, user_id: round.user_id, label: round.label, notes: round.notes ?? null }],
+        },
+      };
+    };
+    const pressed = oneRound(byButton);
+    const told = oneRound(byTool);
+    expect(told.tables).toEqual(pressed.tables);
+    expect([pressed.number, told.number]).toEqual([3, 1]);
+    const interviews = (told.tables['job_search.interviews'] as string[]).map((row) => JSON.parse(row) as Record<string, unknown>);
+    expect(interviews.map((row) => [row.id, row.group_id, row.round]).sort()).toEqual([
+      [I1, '<round>', 1],
+      [I2, '<round>', 2],
+      [I3, '<round>', 3],
+    ]);
+    expect(told.tables['job_search.interview_group_messages']).toHaveLength(1);
+    expect(told.tables['job_search.interview_group_messages'][0]).toContain('"group_id":"<round>"');
+  });
+
+  it('keeps a round the button empties when it holds notes, rather than losing them', async () => {
+    const { groupInterviews } = await import('@/app/jobs/(app)/roles/[id]/interview-actions');
+    session.tables = interviewSeed();
+    session.tables['job_search.interview_groups'][0].notes = 'The recruiter liked the portfolio.';
+    expect(await groupInterviews({ applicationId: APP, interviewIds: [I1, I2, I3] })).toEqual({ error: null });
+    const rounds = session.tables['job_search.interview_groups'];
+    expect(rounds.map((row) => row.id)).toContain(R1);
+    expect(rounds.map((row) => row.id)).not.toContain(R2);
+  });
+
   it('attaches an email to a round as the round card does', async () => {
     const { linkRoundMessage } = await import('@/app/jobs/(app)/roles/[id]/interview-actions');
     const { byButton, byTool } = await bothWays(interviewSeed, () => linkRoundMessage({ groupId: R1, messageId: MAIL }), 'link_round_email', {

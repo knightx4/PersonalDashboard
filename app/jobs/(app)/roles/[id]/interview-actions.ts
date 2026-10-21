@@ -8,6 +8,7 @@ import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
 import { insertInterview, insertInterviewRound } from '@/lib/jobs/interview/rounds';
 import {
   addInterviewerRow,
+  gatherIntoRound,
   interviewerContact,
   linkRoundEmailRow,
   moveInterviewToRound,
@@ -309,6 +310,8 @@ const groupSchema = z.object({
  * Each of them was in a round of its own before this, so the rounds they leave
  * behind are swept up: an empty round the user never made and cannot see the
  * purpose of is litter, and the next visit would offer to gather it again.
+ * Their emails come into the new round first, and one left holding notes is
+ * kept (gatherIntoRound, which Dash's change_interview_round calls too).
  */
 // latency: pending
 export async function groupInterviews(input: {
@@ -322,77 +325,31 @@ export async function groupInterviews(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  // Noted before the move, because afterwards there is no way back to them.
-  const { data: leaving } = await supabase
-    .from('interviews')
-    .select('group_id')
-    .in('id', parsed.data.interviewIds)
-    .eq('application_id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  const vacated = [
-    ...new Set(
-      (leaving ?? [])
-        .map((row) => row.group_id as string | null)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-
-  const round = await roundForNewInterview(supabase, {
+  const round = await insertInterviewRound(supabase, {
     userId: user.id,
     applicationId: parsed.data.applicationId,
-    groupId: null,
+    label: parsed.data.label,
   });
-  if (!round.groupId) return { error: round.error };
+  if (!round.id) return { error: round.error };
 
-  if (parsed.data.label) {
-    await supabase
-      .from('interview_groups')
-      .update({ label: parsed.data.label })
-      .eq('id', round.groupId)
-      .eq('user_id', user.id);
-  }
+  const gathered = await gatherIntoRound(supabase, user.id, {
+    applicationId: parsed.data.applicationId,
+    groupId: round.id,
+    interviewIds: parsed.data.interviewIds,
+  });
 
-  const { error } = await supabase
-    .from('interviews')
-    .update({ group_id: round.groupId })
-    .in('id', parsed.data.interviewIds)
-    .eq('application_id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  if (error) {
+  if (gathered.error) {
     // A round with nothing in it is litter, and the next visit would offer to
-    // make another one beside it.
-    await supabase.from('interview_groups').delete().eq('id', round.groupId).eq('user_id', user.id);
-    return { error: error.message };
+    // make another one beside it. Once an interview is in it, it stays: taking
+    // the round out would take the interview with it.
+    if (gathered.moved.length === 0) {
+      await supabase.from('interview_groups').delete().eq('id', round.id).eq('user_id', user.id);
+    }
+    return { error: gathered.error };
   }
-
-  await deleteEmptyRounds(supabase, { userId: user.id, groupIds: vacated });
 
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
-}
-
-/**
- * Drop the rounds among these that nothing is left in.
- *
- * Only ever called for rounds the app itself made a moment ago to hold one
- * interview. A round the user made and then emptied is theirs to keep or
- * remove; this is for the ones they never saw.
- */
-async function deleteEmptyRounds(
-  supabase: AppSupabaseClient,
-  opts: { userId: string; groupIds: readonly string[] },
-): Promise<void> {
-  for (const groupId of opts.groupIds) {
-    const { count } = await supabase
-      .from('interviews')
-      .select('id', { count: 'exact', head: true })
-      .eq('group_id', groupId);
-    if (count) continue;
-
-    await supabase.from('interview_groups').delete().eq('id', groupId).eq('user_id', opts.userId);
-  }
 }
 
 const newRoundSchema = z.object({

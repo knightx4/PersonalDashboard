@@ -1,5 +1,6 @@
 import {
   addInterviewerRow,
+  gatherIntoRound,
   interviewerContact,
   interviewersNamed,
   moveInterviewToRound,
@@ -285,15 +286,6 @@ async function removedBy(undo: InterviewRowsUndo, table: string, write: Promise<
   const { rows: taken, error } = await write;
   if (error) throw new Error(`Taking out of ${table} failed: ${error}`);
   for (const row of taken) undo.removed.push({ table, row });
-}
-
-/** Take a row out, keeping it whole. interview_participants is scoped by its interview, which the caller has checked is theirs. */
-async function removeKept(env: JobsWriteEnv, undo: InterviewRowsUndo, table: string, row: Row): Promise<void> {
-  let query = env.jobs.from(table).delete().eq('id', row.id as string);
-  if (table !== 'interview_participants') query = query.eq('user_id', env.userId);
-  const { error } = await query.select('id');
-  if (error) throw new Error(`Taking out of ${table} failed: ${error.message}`);
-  undo.removed.push({ table, row });
 }
 
 /** A failed change of several rows puts back what it had done, then fails. */
@@ -683,7 +675,9 @@ async function editRound(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promi
  * Rounds gathered into one, as the role page's "group" does: the interviews
  * and emails of the later rounds move into the first named, each keeping its
  * hour, panel and notes, and the rounds left empty are taken out. A round
- * with notes of its own is refused rather than lost.
+ * with notes of its own is refused rather than lost. The gathering is
+ * gatherIntoRound, the button's own (plan #2473.7); the button gathers into a
+ * new round, the tool into the first one named, so its number and notes stay.
  */
 async function groupRounds(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Promise<JobsMade> {
   const numbers = Array.isArray(args.round_numbers) ? args.round_numbers.map((n) => roundNumberOf(n, 'round_numbers')) : [];
@@ -700,30 +694,30 @@ async function groupRounds(env: JobsWriteEnv, args: Args, pursuit: Pursuit): Pro
   if (label.length > LABEL_MAX) throw new JobsRefused(`Keep label under ${LABEL_MAX} characters.`);
 
   const undo = emptyUndo();
-  try {
-    let place = (await interviewsIn(env, kept.id)).length;
-    const keptLinks = new Set((await rows(env.jobs.from('interview_group_messages').select('message_id').eq('group_id', kept.id), 'the round\'s emails')).map((row) => row.message_id));
-    for (const round of folded) {
-      for (const interview of await interviewsIn(env, round.id)) {
-        place += 1;
-        await changeKept(env, undo, 'interviews', interview, { group_id: kept.id, round: place });
-      }
-      const links = await rows(env.jobs.from('interview_group_messages').select('*').eq('group_id', round.id).eq('user_id', env.userId), 'the round\'s emails');
-      for (const link of links) {
-        if (keptLinks.has(link.message_id)) await removeKept(env, undo, 'interview_group_messages', link);
-        else {
-          await changeKept(env, undo, 'interview_group_messages', link, { group_id: kept.id });
-          keptLinks.add(link.message_id);
-        }
-      }
-      await removeKept(env, undo, 'interview_groups', round);
-    }
-  } catch (error) {
-    return backOut(env, undo, error, 'change_interview_round');
-  }
+  const interviewIds: string[] = [];
+  for (const round of folded) for (const interview of await interviewsIn(env, round.id)) interviewIds.push(interview.id as string);
+  // The same gathering as the role page's "Make them one round", into the first round named.
+  const gathered = await gatherIntoRound(jobsDb(env), env.userId, {
+    applicationId: pursuit.applicationId,
+    groupId: kept.id,
+    interviewIds,
+    emptying: folded.map((round) => round.id),
+  });
+  const keepChange = (table: string, columns: string[]) => (entry: { before: Row; after: Row }) =>
+    undo.changed.push({
+      table,
+      id: entry.before.id as string,
+      before: Object.fromEntries(columns.map((column) => [column, entry.before[column] ?? null])),
+      after: Object.fromEntries(columns.map((column) => [column, entry.after[column] ?? null])),
+    });
+  gathered.moved.forEach(keepChange('interviews', ['group_id', 'round']));
+  gathered.relinked.forEach(keepChange('interview_group_messages', ['group_id']));
+  for (const row of gathered.unlinked) undo.removed.push({ table: 'interview_group_messages', row });
+  for (const row of gathered.removed) undo.removed.push({ table: 'interview_groups', row });
+  if (gathered.error) return backOut(env, undo, new Error(`Gathering the rounds failed: ${gathered.error}`), 'change_interview_round');
   const after = label && label !== kept.label ? ((await changeKept(env, undo, 'interview_groups', kept, { label })) as Round) : kept;
-  const gathered = folded.map((round) => `round ${round.round_number}`);
-  const from = gathered.length > 1 ? `${gathered.slice(0, -1).join(', ')} and ${gathered[gathered.length - 1]}` : gathered[0];
+  const named = folded.map((round) => `round ${round.round_number}`);
+  const from = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}` : named[0];
   const where = `${roundName(after)} of ${pursuit.roleName}`;
   return roundMade(pursuit, after, kept, undo, 'Gathered', from, ` into ${where}`, `Dash gathered ${from} into ${where}.`);
 }
@@ -835,7 +829,7 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_interview_round',
     runs: sameAs(
-      ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews', 'app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews', 'lib/jobs/interview/edit.ts#gatherIntoRound'],
       ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterviewGroup', 'lib/jobs/interview/edit.ts#saveRoundEdit'],
       ['app/jobs/(app)/roles/[id]/interview-actions.ts#unlinkRoundMessage', 'lib/jobs/interview/edit.ts#unlinkRoundEmailRow'],
       ['app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview', 'lib/jobs/interview/edit.ts#moveInterviewToRound'],
