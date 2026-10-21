@@ -57,7 +57,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   change_course: ['app/you/work/actions.ts#updateCourseAction'],
   save_transcript: ['app/you/work/actions.ts#saveTranscriptAction'],
   merge_roles: ['app/jobs/(app)/companies/actions.ts#mergeRoles'],
-  change_interview_round: ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews'],
   rewrite_post: ['app/dev/posts/actions.ts#editPostBody'],
   suggest_post: ['app/dev/posts/actions.ts#suggestPostAbout'],
   file_idea: [
