@@ -72,7 +72,7 @@ export function Funnel({ view }: { view: FunnelView }) {
       <p className="font-display text-title tracking-tight text-ink sm:text-figure sm:leading-tight">
         {view.headline.parts.map((part, i) =>
           part.stage ? (
-            <span key={i} style={{ color: TONE[part.stage] }}>
+            <span key={i} className={styles.warm} style={tone(part.stage)}>
               {part.text}
             </span>
           ) : (

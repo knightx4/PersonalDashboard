@@ -24,6 +24,23 @@
   overflow: visible;
 }
 
+/*
+ * The name in the sentence over the funnel. In the stage's colour where the
+ * sentence is large; on a phone, where it is not, the colour falls under
+ * 4.5:1 on the page, so the name keeps the ink and the colour underlines it.
+ */
+.warm {
+  color: var(--tone);
+}
+
+@media (max-width: 39.99rem) {
+  .warm {
+    color: var(--c-ink);
+    text-decoration: underline 3px color-mix(in oklab, var(--tone) 70%, transparent);
+    text-underline-offset: 5px;
+  }
+}
+
 /* -- tubes ---------------------------------------------------------------- */
 
 .tube {
