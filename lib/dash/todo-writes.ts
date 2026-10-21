@@ -1,3 +1,4 @@
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import { loadAgendaItems, verbsOf } from '@/lib/ask/agenda';
@@ -75,6 +76,8 @@ export type TodoMade = {
 
 export type TodoWrite = {
   name: TodoChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -667,6 +670,15 @@ const WHEN_PROPERTIES = {
 export const TODO_WRITES: readonly TodoWrite[] = [
   {
     name: 'edit_todo',
+    runs: sameAs(
+      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTask'],
+      ['app/todo/actions.ts#reopenTask', 'lib/todo/tasks/write.ts#reopenTaskWithItems'],
+      ['app/todo/actions.ts#dropTask', 'app/todo/actions.ts#dropTask'],
+      ['app/todo/actions.ts#pinTask', 'lib/todo/tasks/write.ts#setTaskPinned'],
+      ['app/todo/actions.ts#laterTask', 'lib/core/snooze-days.ts#snoozeDay'],
+      ['app/todo/actions.ts#bringBackTask', 'lib/todo/tasks/write.ts#unsnoozeTask'],
+      ['app/todo/actions.ts#tagTask', 'lib/todo/tasks/write.ts#addTaskTag'],
+    ),
     description:
       "Change one of the person's todos in ways change_todo does not, when they ask: write or clear its notes, pin or unpin it, put it off to a day (later: tomorrow, weekend, next_week, next_month or a day) or bring it back (later: back), drop it (state: dropped), or reopen one that is done or dropped (state: open). Send only what they asked to change. Renaming it, moving it to another day and ticking it off are not done with this tool. An open todo with no tags is tagged as it is changed: now when it is due today or before, eventually when it has no date or one more than two weeks off. Send tags only for more: now for one they said they need today, and any tag they already use (the todos lookup lists them in tags_in_use) that clearly fits; never make up new ones. A todo that has tags already keeps them: do not send tags for it.",
     input_schema: {
@@ -690,6 +702,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'add_todo_item',
+    runs: sameAs(['app/todo/actions.ts#addItem', 'lib/todo/tasks/write.ts#createItem']),
     description:
       'Add one item to the list on one of their todos, when they ask ("add milk to the shopping todo"). The item is ticked off with the todo. An item cannot hold a list of its own.',
     input_schema: {
@@ -705,6 +718,10 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'link_todo',
+    runs: sameAs(
+      ['app/todo/actions.ts#pointTaskAt', 'lib/todo/links/write.ts#setTaskAbout'],
+      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/tasks/write.ts#createTask'],
+    ),
     description: `Say what one of their todos is about, when they ask ("this todo is for the Stripe role"), so it shows on that row's page as well. A todo is about one thing: this replaces what it was about before. about is one of ${TARGET_LOOKUPS}; about_ref is that row's ref from a lookup.`,
     input_schema: {
       type: 'object',
@@ -720,6 +737,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'add_event',
+    runs: sameAs(['app/todo/calendar/actions.ts#addEvent', 'lib/todo/events/write.ts#createEvent']),
     description:
       "Add an event to the person's own calendar in Todo, when they ask (\"put lunch with Sam on Friday at 1\"). Give the day, and either both times or all_day. Calendars they subscribe to from elsewhere are not changed here.",
     input_schema: {
@@ -737,6 +755,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'change_event',
+    runs: sameAs(['app/todo/calendar/actions.ts#editEvent', 'lib/todo/events/write.ts#updateEvent']),
     description:
       "Change one event on the person's own calendar, when they ask: rename it, move it (give start_day again with the times or all_day), or set or clear its place or notes. Name it by the todo.events ref list_rows or an earlier row returned. Send only what changes.",
     input_schema: {
@@ -755,6 +774,11 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'change_agenda_row',
+    runs: sameAs(
+      ['app/todo/source-actions.ts#completeItem', 'app/todo/source-actions.ts#completeItem'],
+      ['app/todo/source-actions.ts#deferItem', 'app/todo/source-actions.ts#deferItem'],
+      ['app/todo/source-actions.ts#dismissItem', 'app/todo/source-actions.ts#dismissItem'],
+    ),
     description:
       "Finish, put off or dismiss a row another workspace has put on the person's Todo agenda, such as a job reminder, a goal step sent to Todo, a draft waiting to be sent or a return deadline, when they ask. Find it with the agenda lookup and pass its agenda_source and agenda_key; the verbs a row takes are listed in its can. Finish is not offered for a date such as a return deadline. Their own todos are not changed with this tool: use close_todo and edit_todo.",
     input_schema: {
@@ -1053,6 +1077,7 @@ const ASK_NOTE =
 
 const ADD_TODOS_TOOL: DashWriteTool<DashWriteResult> = {
   name: 'add_todos',
+  runs: noButton('One todo for each row a lookup matched, which no page offers: the Todo page adds them one at a time.'),
   kind: 'write',
   definition: {
     name: 'add_todos',
@@ -1086,6 +1111,7 @@ export const TODO_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...TODO_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('todo')) {

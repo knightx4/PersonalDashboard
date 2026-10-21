@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { VaultChangeInput, VaultChangeKind } from '@/lib/ask/vault-changes';
@@ -75,6 +76,8 @@ export type VaultMade = {
 
 export type VaultWrite = {
   name: VaultChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** The workspaces that must be switched on for the change. */
   modules: readonly ModuleId[];
   /** Without the line each surface adds on where the change shows. */
@@ -544,6 +547,10 @@ const COURSE_TEXT = (what: string) => ({ type: 'string', description: `${what}. 
 export const VAULT_WRITES: readonly VaultWrite[] = [
   {
     name: 'write_vault_note',
+    runs: sameAs(
+      ['app/vault/actions.ts#newVaultNote', 'lib/capture/vault.ts#fileVaultNote'],
+      ['app/vault/actions.ts#openDailyNote', 'lib/vault/notes/create.ts#createCapturedNote'],
+    ),
     modules: ['vault'],
     description:
       'Write a new note in their vault, when they ask for a note with a title or more than a quick thought. It goes into the Inbox folder, named by its title, and reaches Obsidian on its next pull. A quick thought to sort later is add_quick_note.',
@@ -559,6 +566,10 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'edit_vault_note',
+    runs: sameAs(
+      ['app/vault/n/[...path]/actions.ts#saveNoteEdit', 'lib/vault/notes/save.ts#saveNote'],
+      ['app/learn/e/[id]/notes-to-vault-actions.ts#addEssayNotesToVaultNote', 'lib/learn/essays/notes-to-vault.ts#addNotesToVault'],
+    ),
     modules: ['vault'],
     description:
       'Change the text of one of their vault notes, when they ask. Give append to add text at the note\'s foot, or body to replace the whole text (without the frontmatter, which is kept as it is). Name the note by the obsidian.notes ref a lookup returned. A note changed in Obsidian since the last sync is refused.',
@@ -576,6 +587,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_vault_note',
+    runs: sameAs(['app/vault/n/[...path]/actions.ts#renameNoteAction', 'lib/vault/notes/rename.ts#renameNote']),
     modules: ['vault'],
     description:
       'Rename one of their vault notes, when they ask. Its file moves to the new name in the same folder; links to the old name in other notes are left as they are. Name the note by the obsidian.notes ref a lookup returned.',
@@ -592,6 +604,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'file_quick_note',
+    runs: sameAs(['app/vault/triage/actions.ts#fileQuickNoteAction', 'lib/vault/notes/file.ts#fileQuickNote']),
     modules: ['vault'],
     description:
       'File one of their quick notes out of the Inbox, when they ask: into another note, where its text is added at the foot under the day\'s date, or as a note of its own at the top of the vault when into_note_ref is left out. Name both by the obsidian.notes refs a lookup returned.',
@@ -608,6 +621,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_theme',
+    runs: sameAs(['app/vault/map/actions.ts#renameTheme', 'app/vault/map/actions.ts#renameTheme']),
     modules: ['vault'],
     description:
       'Rename a theme on their vault map, when they ask. Name it by theme_ref, or by theme with its name as it is now. Names are unique on the map, ignoring case.',
@@ -625,6 +639,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'rename_maya_question',
+    runs: sameAs(['app/vault/maya/actions.ts#renameMayaQuestion', 'lib/vault/maya/store.ts#renameQuestion']),
     modules: ['vault'],
     description: `Rewrite the question a thread with Maya is about, when they ask. Name the thread by thread_ref, or by note_ref for the note it is about. At most ${QUESTION_MAX} characters.`,
     input_schema: {
@@ -641,6 +656,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'change_course',
+    runs: sameAs(['app/you/work/actions.ts#updateCourseAction', 'app/you/work/actions.ts#updateCourseAction']),
     modules: ['you'],
     description:
       'Correct a saved course on their Work & school tab, when they ask. Name it by the you.courses ref the courses lookup returned, and give only the fields that change.',
@@ -663,6 +679,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'save_transcript',
+    runs: sameAs(['app/you/work/actions.ts#saveTranscriptAction', 'app/you/work/actions.ts#saveTranscriptAction']),
     modules: ['you'],
     description:
       'Keep an academic transcript on their Work & school tab from its text, when they give you one and ask to save it. Pass the school, the transcript\'s text as they gave it (kept as its original), and every course on it, each with its title and whatever of code, term, year, credits and grade it shows. A course from another school names its own.',
@@ -726,6 +743,7 @@ const ASK_NOTE =
 export const VAULT_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = VAULT_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     const off = vaultSwitchedOff(write, ctx.enabledModules);

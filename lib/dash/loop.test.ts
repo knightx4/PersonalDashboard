@@ -36,6 +36,7 @@ const call = (id: string, name: string, input: unknown) => ({
 const ADD_GOAL: DashWriteTool = {
   name: 'add_goal',
   kind: 'write',
+  runs: { none: 'A fixture.' },
   definition: { name: 'add_goal', description: 'Add a goal.', input_schema: { type: 'object', properties: {} } },
   apply: async () => ({ ok: false, error: 'not run in this test' }),
 };

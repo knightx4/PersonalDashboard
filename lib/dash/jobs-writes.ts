@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
 import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
@@ -152,6 +153,8 @@ export type JobsMade = {
 
 export type JobsWrite = {
   name: JobsChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -3072,6 +3075,11 @@ const CLEARABLE = 'An empty string clears it.';
 export const JOBS_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_role',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/actions.ts#updateRole', 'app/jobs/(app)/roles/actions.ts#updateRole'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#renameRole', 'app/jobs/(app)/roles/[id]/actions.ts#renameRole'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany'],
+    ),
     description:
       "Change a role in their Jobs workspace when they ask: its title, location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
@@ -3109,6 +3117,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_application',
+    runs: sameAs(
+      ['app/jobs/(app)/pipeline/actions.ts#setExcitement', 'app/jobs/(app)/pipeline/actions.ts#setExcitement'],
+      ['app/jobs/(app)/pipeline/actions.ts#setChannel', 'app/jobs/(app)/pipeline/actions.ts#setChannel'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks', 'app/jobs/(app)/roles/[id]/actions.ts#saveApplicationMarks'],
+    ),
     description:
       'Set how excited they are about a role (1 to 5, or 0 to clear it), how they applied (the channel; for a referral, who referred them by the job_search.contacts ref a lookup returned), whether the application is ready to apply, whether all its questions are added, or whether it has a cover letter, when they ask. Name it by application_ref, or role_ref for the role\'s latest application.',
     input_schema: {
@@ -3132,6 +3145,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_application_questions',
+    runs: sameAs(['app/jobs/(app)/roles/actions.ts#addQuestions', 'lib/jobs/fingerprint.ts#splitQuestionBlock']),
     description: `Add the questions an application asks to it, when they give them: each goes into their question bank too, or is matched to the same question already there, and one already on the application is left out. Up to ${QUESTIONS_MAX} at a time. Name the application by application_ref, or role_ref for the role's latest one. Answer them with save_answer.`,
     input_schema: {
       type: 'object',
@@ -3147,6 +3161,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'save_answer',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/actions.ts#saveAnswer', 'app/jobs/(app)/roles/actions.ts#saveAnswer'],
+      ['app/jobs/(app)/roles/actions.ts#saveDraftedAnswer', 'app/jobs/(app)/roles/actions.ts#saveDraftedAnswer'],
+    ),
     description:
       "Save their answer to a question on an application, when they ask: its words, and whether it is a draft, approved or submitted. When they ask you to write or rewrite answers, do it in one pass without asking for the words: read the answers and their questions with application_answers (role_ref or application_ref), read their evidence bank with list_rows on job_search.evidence_items and the role's description with open_row on job_search.roles, write each new version, and save each with its own save_answer call in the same reply, passing the ref from application_answers as answer_ref, with the evidence_refs it rests on and any unsupported_claims it makes. Writing rules for a rewrite: plain first-person language in their own voice; shorter than the old version; an answer to \"why this company\" says why the company and why they fit before any story; facts only from the evidence bank, their résumé and the job description, and every claim nothing there backs goes in unsupported_claims. Leave status as draft unless they say otherwise; never mark an answer approved or submitted on your own. Finish by telling them which answers you changed, naming each question. Give only what to change. A single answer can also be named by question with application_ref or role_ref. Nothing is sent to the employer.",
     input_schema: {
@@ -3167,6 +3185,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'set_default_answer',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/actions.ts#promoteToCanonical', 'app/jobs/(app)/roles/actions.ts#promoteToCanonical'],
+    ),
     description:
       "Make an answer the one reused for a question on every application, when they ask, as the role page's Make this my default answer does. Name the question by question_ref (list_rows on job_search.questions), or by answer_ref to reuse that answer's words; answer gives the words instead.",
     input_schema: {
@@ -3182,6 +3203,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_company',
+    runs: sameAs(
+      ['app/jobs/(app)/companies/actions.ts#updateCompany', 'app/jobs/(app)/companies/actions.ts#updateCompany'],
+      ['app/jobs/(app)/companies/actions.ts#renameCompany', 'app/jobs/(app)/companies/actions.ts#renameCompany'],
+    ),
     description:
       "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company. To mark the company of a job already saved as a target, look up the role and pass its company here with priority target.",
     input_schema: {
@@ -3214,6 +3239,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_company',
+    runs: sameAs(['app/jobs/(app)/companies/actions.ts#addCompany', 'app/jobs/(app)/companies/actions.ts#addCompany']),
     description:
       "Add a company to their Jobs workspace from scratch when they ask, as the companies page's Add company does: by name, with how much they want to work there (priority, interested when they do not say) and any details they gave. A company already on file under that name, domain or job board is refused with its ref; change it with change_company. One company per call. A role at it is add_job_lead, a person there is change_contact.",
     input_schema: {
@@ -3236,6 +3262,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'merge_roles',
+    runs: sameAs(['app/jobs/(app)/companies/actions.ts#mergeRoles', 'app/jobs/(app)/companies/actions.ts#mergeRoles']),
     description: `Fold duplicate roles at one company into the one they keep, when they ask: the same posting filed twice. Everything on the duplicates (applications and their events, rounds, answers, letters, reminders, attachments and todo links) moves onto the role kept, the applications become one, the one furthest along, and the duplicates are taken out. Up to ${MERGE_MAX} at a time. A duplicate with comments in its thread is refused.`,
     input_schema: {
       type: 'object',
@@ -3254,6 +3281,12 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_reminder',
+    runs: sameAs(
+      ['app/jobs/(app)/_home/actions.ts#completeReminder', 'app/jobs/(app)/_home/actions.ts#completeReminder'],
+      ['app/jobs/(app)/_home/actions.ts#snoozeReminder', 'app/jobs/(app)/_home/actions.ts#snoozeReminder'],
+      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder', 'app/jobs/(app)/roles/[id]/timeline-actions.ts#updateReminder'],
+      ['app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage', 'app/jobs/(app)/roles/[id]/timeline-actions.ts#linkReminderMessage'],
+    ),
     description: `Change a Jobs reminder (a to-do or follow-up on a role) when they ask: finish it, put it off to a day as Jobs Today's Later does, reword it, move it to another day, or link it to the email that asked for it (or unlink it). Find it with list_rows on job_search.reminders. Give only what to change.`,
     input_schema: {
       type: 'object',
@@ -3275,6 +3308,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_waiting',
+    runs: sameAs(
+      ['app/jobs/(app)/_home/actions.ts#completeWaiting', 'app/jobs/(app)/_home/actions.ts#completeWaiting'],
+      ['app/jobs/(app)/_home/actions.ts#snoozeWaiting', 'app/jobs/(app)/_home/actions.ts#snoozeWaiting'],
+    ),
     description: `Finish or put off to a day a row under "Waiting on you" on Jobs Today, when they ask: an email on a role that asked them for something. Name it by the job_search.application_events ref of that email's event, which list_rows on job_search.application_events returns.`,
     input_schema: {
       type: 'object',
@@ -3290,6 +3327,12 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_role_email',
+    runs: sameAs(
+      ['app/jobs/(app)/review/actions.ts#linkMessage', 'lib/jobs/interview/ensure-round.ts#ensureInterviewRound'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#unlinkMessage'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#linkCandidateMessage'],
+      ['app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage', 'app/jobs/(app)/roles/[id]/mail-actions.ts#declineCandidateMessage'],
+    ),
     description:
       "Link an email to a role, turn a suggested email down, or take an email off a role it was wrongly linked to, when they ask. link files the email on the role's timeline as the review queue does (an email linked to another role must be unlinked first); decline remembers that the email is not this role's, so it is not suggested again, and leaves the email alone; unlink takes the email and the events it wrote off the role and returns it to the review queue. Name the role by application_ref or role_ref and the email by email_ref.",
     input_schema: {
@@ -3310,6 +3353,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'review_application',
+    runs: sameAs(
+      ['app/jobs/(app)/review/actions.ts#confirmApplication', 'app/jobs/(app)/review/actions.ts#confirmApplication'],
+      ['app/jobs/(app)/review/actions.ts#reopenApplication', 'app/jobs/(app)/review/actions.ts#reopenApplication'],
+    ),
     description:
       'Work an application in Jobs review when they ask: confirm one the inbox found as a real pursuit, or reopen a closed one (rejected, withdrawn or gone quiet) as in process or final round, as when a recruiter comes back. Name it by application_ref, or role_ref for the role\'s latest application.',
     input_schema: {
@@ -3327,6 +3374,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'review_events',
+    runs: sameAs(
+      ['app/jobs/(app)/review/actions.ts#acknowledgeEvent', 'app/jobs/(app)/review/actions.ts#acknowledgeEvent'],
+      ['app/jobs/(app)/review/actions.ts#acknowledgeEvents', 'app/jobs/(app)/review/actions.ts#acknowledgeEvents'],
+      ['app/jobs/(app)/review/actions.ts#unacknowledgeEvents', 'app/jobs/(app)/review/actions.ts#unacknowledgeEvents'],
+    ),
     description: `Acknowledge events flagged in Jobs review when they ask (mail that conflicts with where a pursuit stands, such as an invite after a rejection): each stays on the timeline and the flag clears. take_back flags them again. Up to ${EVENTS_MAX} at a time, named by their job_search.application_events refs, which list_rows on job_search.application_events returns.`,
     input_schema: {
       type: 'object',
@@ -3341,6 +3393,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'review_emails',
+    runs: sameAs(
+      ['app/jobs/(app)/review/actions.ts#dismissMessage', 'app/jobs/(app)/review/actions.ts#dismissMessage'],
+      ['app/jobs/(app)/review/actions.ts#dismissMessages', 'app/jobs/(app)/review/actions.ts#dismissMessages'],
+      ['app/jobs/(app)/review/actions.ts#restoreDismissedMessages', 'app/jobs/(app)/review/actions.ts#restoreDismissedMessages'],
+    ),
     description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
     input_schema: {
       type: 'object',
@@ -3360,6 +3417,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_contact',
+    runs: sameAs(
+      ['app/jobs/(app)/contacts/actions.ts#createContact', 'app/jobs/(app)/contacts/actions.ts#createContact'],
+      ['app/jobs/(app)/contacts/actions.ts#updateContact', 'app/jobs/(app)/contacts/actions.ts#updateContact'],
+    ),
     description:
       "Add a contact to their job search, or correct one, when they ask: name, title, company (by name; one not on file is added), LinkedIn page, work email, how they know them (relationship, and how_we_connect in their words), notes, and whether they are a potential lead. An agent that finds people for them marks each one found_by_dash, marks it potential_lead when it could lead to a job, and says in notes why it picked them. Leave contact_ref out to add one; give it, with only the fields to change, to correct one. There is no field for a personal phone number or home address, and none is kept.",
     input_schema: {
@@ -3383,6 +3444,12 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_touch',
+    runs: sameAs(
+      ['app/jobs/(app)/contacts/actions.ts#logTouch', 'app/jobs/(app)/contacts/actions.ts#logTouch'],
+      ['app/jobs/(app)/contacts/actions.ts#updateTouch', 'app/jobs/(app)/contacts/actions.ts#updateTouch'],
+      ['app/jobs/(app)/contacts/actions.ts#markTouchSent', 'app/jobs/(app)/contacts/actions.ts#markTouchSent'],
+      ['app/jobs/(app)/contacts/actions.ts#markTouchAnswered', 'app/jobs/(app)/contacts/actions.ts#markTouchAnswered'],
+    ),
     description:
       "Keep the outreach log on a contact when they ask: log that they reached out to someone or heard from them (log; a message they sent moves the contact from to-contact to contacted), correct a logged touch's channel or words (edit), or mark one answered with what came back (answered; the contact moves to responded). This records what they did; nothing is sent. Touches are listed by list_rows on job_search.contact_touches.",
     input_schema: {
@@ -3404,6 +3471,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'mark_suggestion_sent',
+    runs: sameAs(
+      ['app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent', 'app/jobs/(app)/find/recommend-actions.ts#markSuggestionSent'],
+    ),
     description:
       "Mark a person Dash suggested on Find as messaged, when they say they sent it, as Find's Sent press does: they are added as a contact if they are not one, the suggested message is logged as sent in the outreach log, and the suggestion is closed. Nothing is sent from here. Name it by suggestion_ref, or by person for who it suggested (a name or words from its line); an unclear name is refused with the open ones listed.",
     input_schema: {
@@ -3418,6 +3488,9 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_role_from_email',
+    runs: sameAs(
+      ['app/jobs/(app)/review/actions.ts#createRoleFromMessage', 'app/jobs/(app)/review/actions.ts#createRoleFromMessage'],
+    ),
     description:
       "Make a new role from an email in Jobs review when they say it is about a pursuit with nothing on file, as the review page's new role option does: the company (found by name, or added), the role and its application are made, and the email is linked to it, filing the event its classification implies, such as a rejection or an interview invite. Refused when the company already has a role of that title; link the email to a role on file with change_role_email.",
     input_schema: {
@@ -3469,6 +3542,7 @@ const ASK_NOTE =
 export const JOBS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = JOBS_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('jobs')) return { ok: false, error: JOBS_OFF };

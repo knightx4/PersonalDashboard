@@ -155,10 +155,62 @@ export function functionsReachedBy(file: string, name: string): Set<string> {
   return new Set([...visited].map((key) => relative(ROOT, key)));
 }
 
+/**
+ * Every function a piece of code inside `file` can call, followed as
+ * functionsReachedBy follows a function's body. `node` is what
+ * writeToolEntries found: a function, a call or a name.
+ */
+export function functionsReachedFrom(file: string, node: ts.Node): Set<string> {
+  const { visited } = walkFrom(file, '', new Set(), node);
+  return new Set([...visited].map((key) => relative(ROOT, key)));
+}
+
+/**
+ * Where the Dash write tools a file declares do their work (plan #2473.1),
+ * by tool name. Found in the two shapes the write files use:
+ * - a call inside an array literal whose first argument is the tool's name,
+ *   such as `tool('add_todo', …, (ctx, args) => addTodo(ctx, args))`: the
+ *   call itself, so its arguments are followed;
+ * - an object literal whose `name` is the tool's name and which has a `run`
+ *   or an `apply`: that property's value.
+ * A tool whose apply only hands the call to its thread (lib/dash/thread-tools.ts)
+ * is found here too, and reaches nothing past `ctx.thread`.
+ */
+export function writeToolEntries(file: string): Map<string, ts.Node[]> {
+  const parsed = parse(file);
+  const found = new Map<string, ts.Node[]>();
+  if (!parsed) return found;
+  const add = (tool: string, node: ts.Node) => found.set(tool, [...(found.get(tool) ?? []), node]);
+  const walk = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isArrayLiteralExpression(node.parent) &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      add(node.arguments[0].text, node);
+    } else if (ts.isObjectLiteralExpression(node)) {
+      let tool: string | null = null;
+      let body: ts.Node | null = null;
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) continue;
+        const key = property.name.text;
+        if (key === 'name' && ts.isStringLiteral(property.initializer)) tool = property.initializer.text;
+        if (key === 'run' || key === 'apply') body = property.initializer;
+      }
+      if (tool && body) add(tool, body);
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(parsed.source);
+  return found;
+}
+
 function walkFrom(
   file: string,
   name: string,
   known: ReadonlySet<string>,
+  startNode?: ts.Node,
 ): { result: ActionOperations; visited: Set<string> } {
   const result: ActionOperations = { operations: new Set(), unread: [] };
   const visited = new Set<string>();
@@ -232,6 +284,10 @@ function walkFrom(
       return;
     }
 
+    walkNode(parsed, file, declaration);
+  }
+
+  function walkNode(parsed: Parsed, file: string, root: ts.Node): void {
     const walk = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
         const callee = node.expression;
@@ -259,11 +315,19 @@ function walkFrom(
       }
       ts.forEachChild(node, walk);
     };
-    walk(declaration);
+    walk(root);
   }
 
   const start = file;
-  visit(file, name);
+  if (startNode) {
+    const parsed = parse(file);
+    if (parsed) {
+      if (ts.isIdentifier(startNode)) follow(parsed, startNode.text);
+      else walkNode(parsed, file, startNode);
+    }
+  } else {
+    visit(file, name);
+  }
   return { result, visited };
 }
 

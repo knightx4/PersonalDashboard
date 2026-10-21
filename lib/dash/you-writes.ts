@@ -1,3 +1,4 @@
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { YouChangeInput, YouChangeKind } from '@/lib/ask/you-changes';
@@ -54,6 +55,8 @@ export type YouMade = {
 
 export type YouWrite = {
   name: YouChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -268,6 +271,7 @@ const FIELDS = {
 export const YOU_WRITES: readonly YouWrite[] = [
   {
     name: 'add_place',
+    runs: noButton('The places page edits a place that is already there; no page adds one by hand.'),
     description:
       'Add a place the person has lived to You\'s Places tab, when they tell you ("I lived in Leeds from 2015 to 2019"). A year is enough for the dates; leave moved_out out for where they live now.',
     input_schema: {
@@ -280,6 +284,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'change_place',
+    runs: sameAs(['app/you/places/actions.ts#savePlace', 'lib/you/places-store.ts#updatePlace']),
     description:
       'Change one of the places the person has lived, when they ask: its name, where it is, when they moved in or out, or the note. Name it by the you.places ref list_rows returned. Send only what changes; an empty moved_out means they live there now.',
     input_schema: {
@@ -295,6 +300,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'save_job',
+    runs: sameAs(['app/you/work/job-actions.ts#saveJobAction', 'app/you/work/job-actions.ts#saveJobAction']),
     description:
       "Add a job to the person's Work & school tab, or correct one, when they tell you (\"I worked at the corner bookshop from 2014 to 2016\"). Leave job_ref out to add a job, which needs an employer; give the you.work_history ref list_rows returned to correct one, sending only what changes. A year is enough for the dates; an empty ended means they work there now. A job you save is theirs, so reading their résumé again will not replace it.",
     input_schema: {
@@ -343,6 +349,7 @@ const ASK_NOTE =
 export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('you')) {

@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { GoalsChangeInput, GoalsChangeKind } from '@/lib/ask/goals-changes';
@@ -124,6 +125,8 @@ export type GoalsMade = {
 
 export type GoalsWrite = {
   name: GoalsChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -1830,6 +1833,12 @@ async function recordWent(env: GoalsWriteEnv, went: boolean, wanted: string): Pr
 export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_area',
+    runs: sameAs(
+      ['app/goals/actions.ts#renameAreaAction', 'lib/goals/store.ts#renameArea'],
+      ['app/goals/actions.ts#setAreaNoteAction', 'lib/goals/store.ts#setAreaNote'],
+      ['app/goals/actions.ts#moveAreaAction', 'lib/goals/store.ts#moveArea'],
+      ['app/goals/actions.ts#archiveAreaAction', 'lib/goals/store.ts#archiveArea'],
+    ),
     description:
       "Change one of the person's areas in Goals, when they ask: add a new area (change add, with name), rename one (rename, with name), write or clear what they want from it (note; an empty note clears it), move it up or down the list (move_up, move_down), archive it with the goals in it (archive), or bring an archived one back with them (restore). Name the area by its name as they have it, or by the goals.areas ref a lookup returned. A goal under an area is add_goal or change_goal.",
     input_schema: {
@@ -1847,6 +1856,12 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal',
+    runs: sameAs(
+      ['app/goals/actions.ts#editGoal', 'lib/goals/store.ts#updateGoal'],
+      ['app/goals/actions.ts#moveGoalAction', 'lib/goals/store.ts#moveGoal'],
+      ['app/goals/actions.ts#archiveGoalAction', 'lib/goals/store.ts#setGoalArchived'],
+      ['app/goals/actions.ts#settleGoalAction', 'lib/goals/store.ts#settleGoal'],
+    ),
     description:
       "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, or move it to another area (change edit, with any of title, due_on, due_precision and area), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
     input_schema: {
@@ -1870,6 +1885,21 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_step',
+    runs: sameAs(
+      ['app/goals/[goalId]/actions.ts#editStep', 'lib/goals/steps-store.ts#updateStep'],
+      ['app/goals/[goalId]/actions.ts#setStepStatusAction', 'lib/goals/steps-store.ts#setStepStatus'],
+      ['app/goals/[goalId]/actions.ts#moveStepAction', 'lib/goals/steps-store.ts#moveStep'],
+      ['app/goals/[goalId]/actions.ts#archiveStepAction', 'lib/goals/steps-store.ts#setStepArchived'],
+      ['app/goals/[goalId]/actions.ts#linkStepAction', 'lib/goals/steps-store.ts#linkStep'],
+      ['app/goals/[goalId]/actions.ts#unlinkStepAction', 'lib/goals/steps-store.ts#unlinkStep'],
+      ['app/goals/[goalId]/block-actions.ts#setGoalStepStatus', 'lib/goals/steps-store.ts#setStepStatus'],
+      ['app/goals/[goalId]/block-actions.ts#blockGoalStep', 'app/goals/[goalId]/block-actions.ts#blockGoalStep'],
+      ['app/goals/[goalId]/block-actions.ts#addGoalStepDependency', 'lib/goals/steps-store.ts#insertDependency'],
+      ['app/goals/[goalId]/block-actions.ts#removeGoalStepDependency', 'lib/goals/steps-store.ts#deleteDependency'],
+      ['app/goals/home-actions.ts#setAsideAction', 'lib/core/snooze-days.ts#snoozeDay'],
+      ['app/goals/home-actions.ts#restoreAsideAction', 'lib/goals/steps-store.ts#updateStep'],
+      ['app/goals/home-actions.ts#bringBackAction', 'lib/goals/steps-store.ts#updateStep'],
+    ),
     description:
       "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), bring a set-aside step back now (bring_back), or make it its own errand, due on due_on or the step's own date, in area or the goal's, and archive the step (make_errand). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
     input_schema: {
@@ -1913,6 +1943,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_number',
+    runs: sameAs(
+      ['app/goals/[goalId]/reading-actions.ts#setMeasureAction', 'lib/goals/readings-store.ts#setGoalMeasure'],
+      ['app/goals/[goalId]/reading-actions.ts#setNumberFromAction', 'lib/goals/readings-store.ts#setNumberFrom'],
+    ),
     description:
       "Change how one of the person's goals is measured, when they ask: set the unit and the target it aims for (change measure, with unit and target; an empty unit stops measuring it by a number), or work its number out from a collection serving it, or go back to readings typed in (number_from, with from naming the choice, such as \"Total balance of Loans\", or \"Number of Events with status Went\" to count only the rows of a list holding one option; empty for typed readings). Name the goal by the goals.items ref a lookup returned. A wrong from is refused with the choices the goal has.",
     input_schema: {
@@ -1931,6 +1965,12 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_link',
+    runs: sameAs(
+      ['app/goals/[goalId]/link-actions.ts#linkAimAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#linkJobSearchAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#linkRowAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#unlinkAction', 'lib/goals/links-store.ts#unlinkTarget'],
+    ),
     description:
       "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Or list one of their readings, calendar events, saved products or contacts on the goal, or take it off (link_row or unlink_row, with kind and target, and list for the list's name, such as \"Pantries to compare\"; a row already listed moves to the list named). Give step_ref to list the row on one of the goal's steps instead: a saved product listed on a step closes that step when it is bought. Name the goal by the goals.items ref a lookup returned, the Learn goal by its name as they have it, and the row by its ref or its name. The goal points at the row rather than copying it, and nothing in Learn, Todo, Shopping or the job search is changed.",
     input_schema: {
@@ -1961,6 +2001,12 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_form',
+    runs: sameAs(
+      ['app/goals/[goalId]/document-actions.ts#saveDocumentKindAction', 'lib/goals/document-kinds-store.ts#editKind'],
+      ['app/goals/[goalId]/document-actions.ts#forgetDocumentKindAction', 'lib/goals/document-kinds-store.ts#forgetKind'],
+      ['app/goals/[goalId]/information-actions.ts#archiveRecordAction', 'lib/goals/collections-store.ts#archiveRecord'],
+      ['app/goals/[goalId]/information-actions.ts#saveQuestionsAction', 'lib/goals/steps-store.ts#setStepQuestions'],
+    ),
     description:
       "Change the form on one of the person's steps that gathers information, or a collection serving a goal, when they ask: set the questions it asks (change set_questions, with questions as the whole list; a wording kept keeps its answer, and an empty list clears them), add a row with the values they give (add_record, with values by field label) or change one (edit_record, with record and the values that change), on a step's form by step_ref or on a list serving a goal by goal_ref and collection (its name, such as the spaces list), archive one of its rows or bring an archived one back (archive_record, restore_record, with record as words from the row such as its name), change a kind of document it has learned to read (edit_document_kind, with document_kind and any of name, recognise, senders and skipped), or forget one so the next is read as new (forget_document_kind). Name the step by the goals.items ref a lookup returned. A row or kind that does not match is refused with the ones there are.",
     input_schema: {
@@ -1990,6 +2036,11 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goals_inbox',
+    runs: sameAs(
+      ['app/goals/suggestion-actions.ts#recordAttendedAction', 'lib/goals/suggestions-store.ts#recordAttended'],
+      ['app/goals/inbox/actions.ts#snoozeInboxRowAction', 'lib/core/snooze-days.ts#snoozeDay'],
+      ['app/goals/inbox/actions.ts#unsnoozeInboxRowAction', 'lib/core/inbox-snooze-store.ts#unsnoozeRow'],
+    ),
     description:
       "Change a row on the person's Goals Inbox, when they ask: snooze a goal or step there until a day (change snooze, with row_ref and until) or bring a snoozed one back (unsnooze, with row_ref), or record whether they went to an event they said they were going to (went, did_not_go, with event in their words). Name the goal or step by the goals.items ref a lookup returned. An event that does not match is refused with the ones waiting for an answer. Putting a step off on Goals itself, so it leaves Up next, is change_goal_step set_aside.",
     input_schema: {
@@ -2031,6 +2082,7 @@ const ASK_NOTE =
 export const GOALS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = GOALS_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('goals')) {
