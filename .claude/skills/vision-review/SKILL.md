@@ -418,7 +418,9 @@ already said no to it.
 more gaps, file the ones the window's page opens and notes say matter most,
 and name the rest in the report. Each is one idea in the form the ideas page
 reads: a title line, a blank line, then two to four sentences saying what
-the person would get. Write it to `docs/WRITING-GUIDE.md`, with Dash for the
+the idea is, which part of the vision it comes from and why the person would
+want it. A bare title is the kind of suggestion the person could not make
+sense of (note 8e038483). Write it to `docs/WRITING-GUIDE.md`, with Dash for the
 assistant.
 
 ```sql

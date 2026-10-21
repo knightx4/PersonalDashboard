@@ -59,8 +59,11 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # user's own ideas. --from names the step
                                                # you were on when you thought of it. One
                                                # close to an idea already filed is refused
-                                               # and names what it matched. Two an hour
-                                               # is the most a session can file.
+                                               # and names what it matched. Three a day
+                                               # is the most sessions can file. Write a
+                                               # title line, a blank line, then what the
+                                               # idea is, where it came from and why it
+                                               # would be useful; a bare title is refused.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
                                 [--detail "…"] [--module <id>] [--from <n>]
