@@ -13,7 +13,6 @@
  */
 export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   add_goal: ['app/learn/know/level3-actions.ts#addLevel3Goal'],
-  add_role_note: ['app/jobs/(app)/roles/[id]/actions.ts#addNote'],
   add_idea: [
     'app/dev/ideas/actions.ts#addIdea',
     'app/dev/ideas/actions.ts#submitIdea',

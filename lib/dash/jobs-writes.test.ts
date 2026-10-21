@@ -262,6 +262,32 @@ describe('change_company (plan #1894.6.2)', () => {
     t['job_search.companies'][0].user_id = SOMEONE;
     expect(await refused('change_company', t, { company_ref: COMPANY, industry: 'Robots' })).toMatch(/no company of theirs/);
   });
+
+  it("adds a note to the company's Notes as the company page does, kept as an insert its Undo takes out (plan #2473.8)", async () => {
+    const t = tables();
+    t['job_search.notes'] = [];
+    const change = await made('change_company', t, { company_ref: COMPANY, note: '  Heard they are hiring in Q1.  ' });
+
+    expect(t['job_search.notes']).toEqual([
+      expect.objectContaining({ user_id: ME, company_id: COMPANY, role_id: null, body: 'Heard they are hiring in Q1.' }),
+    ]);
+    expect(change.subjectRef).toBe(`job_search.notes:${t['job_search.notes'][0].id as string}`);
+    expect(change.op).toBe('insert');
+    expect(change.before).toBeNull();
+    expect(change.after).toMatchObject({ company_id: COMPANY, body: 'Heard they are hiring in Q1.' });
+    expect(change.summary).toBe('Dash added a note to the company Acme.');
+    expect(change.row.href).toBe('/jobs/companies/acme');
+    // The company itself is left as it was.
+    expect(t['job_search.companies'][0]).toMatchObject({ name: 'Acme', slug: 'acme' });
+  });
+
+  it('refuses a note given with other changes, and an empty one', async () => {
+    const t = tables();
+    t['job_search.notes'] = [];
+    expect(await refused('change_company', t, { company_ref: COMPANY, note: 'Hiring.', priority: 'target' })).toMatch(/on its own/);
+    expect(await refused('change_company', t, { company_ref: COMPANY, note: '   ' })).toMatch(/write the note/);
+    expect(t['job_search.notes']).toEqual([]);
+  });
 });
 
 describe('merge_roles (plan #1894.6.2)', () => {
