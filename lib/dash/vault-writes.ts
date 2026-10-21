@@ -13,6 +13,7 @@ import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { vaultUndoRecord, type VaultUndo, type VaultUndoPorts } from '@/lib/vault/notes/undo';
 import { basenameOf, isTriageNotePath, mayaThreadHref, noteHref } from '@/lib/vault/paths';
 import { COURSE_FIELD_NAMES, EDUCATION_HREF, parseCourse, schoolField } from '@/lib/you/education';
+import { saveTranscriptWithCourses, updateCourse } from '@/lib/you/transcript-store';
 import { TRANSCRIPTS_BUCKET, transcriptStoragePath } from '@/lib/you/transcripts';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -436,14 +437,8 @@ async function changeCourse(env: VaultWriteEnv, args: Args): Promise<VaultMade> 
   const read = parseCourse(field, before.school as string);
   if (!read.ok) throw new VaultRefused(read.field ? `${read.field}: ${read.error}` : read.error);
 
-  const { data, error } = await env.you
-    .from('courses')
-    .update(read.course)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Correcting the course failed: ${error?.message ?? 'no row'}`);
+  const data = await updateCourse(env.you, env.userId, id, read.course);
+  if (!data) throw new VaultRefused('That course is not there any more. Nothing was changed.');
 
   const title = named(read.course.title, 'the course');
   return {
@@ -504,24 +499,19 @@ async function saveTranscript(env: VaultWriteEnv, args: Args): Promise<VaultMade
     .upload(path, bytes, { contentType: 'text/plain', upsert: false });
   if (uploadError) throw new Error(`Keeping the transcript's text failed: ${uploadError.message}`);
 
-  const { data: transcript, error } = await env.you
-    .from('transcripts')
-    .insert({ id, user_id: env.userId, school: school.data, file_name: fileName, storage_path: path, mime_type: 'text/plain', size_bytes: bytes.byteLength })
-    .select('*')
-    .single();
-  if (error || !transcript) {
+  // The page's own write: the transcript, then its courses, and a refused
+  // course list takes the transcript back out. The file is ours to remove.
+  const saved = await saveTranscriptWithCourses(
+    env.you,
+    env.userId,
+    { id, school: school.data, fileName, storagePath: path, mimeType: 'text/plain', sizeBytes: bytes.byteLength },
+    courses,
+  );
+  if (!saved.ok) {
     await env.you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
-    throw new Error(`Saving the transcript failed: ${error?.message ?? 'no row'}`);
+    throw new Error(`Saving the ${saved.failed === 'courses' ? 'courses' : 'transcript'} failed: ${saved.message}`);
   }
-  const { error: coursesError } = await env.you
-    .from('courses')
-    .insert(courses.map((course, position) => ({ ...course, user_id: env.userId, transcript_id: id, position })));
-  if (coursesError) {
-    // Take the transcript back out, as the page does, so nothing half-saved is left.
-    await env.you.from('transcripts').delete().eq('id', id).eq('user_id', env.userId);
-    await env.you.storage.from(TRANSCRIPTS_BUCKET).remove([path]);
-    throw new Error(`Saving the courses failed: ${coursesError.message}`);
-  }
+  const transcript = saved.transcript;
 
   const count = `${courses.length} ${courses.length === 1 ? 'course' : 'courses'}`;
   return {
@@ -656,7 +646,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'change_course',
-    runs: sameAs(['app/you/work/actions.ts#updateCourseAction', 'app/you/work/actions.ts#updateCourseAction']),
+    runs: sameAs(['app/you/work/actions.ts#updateCourseAction', 'lib/you/transcript-store.ts#updateCourse']),
     modules: ['you'],
     description:
       'Correct a saved course on their Work & school tab, when they ask. Name it by the you.courses ref the courses lookup returned, and give only the fields that change.',
@@ -679,7 +669,7 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
   },
   {
     name: 'save_transcript',
-    runs: sameAs(['app/you/work/actions.ts#saveTranscriptAction', 'app/you/work/actions.ts#saveTranscriptAction']),
+    runs: sameAs(['app/you/work/actions.ts#saveTranscriptAction', 'lib/you/transcript-store.ts#saveTranscriptWithCourses']),
     modules: ['you'],
     description:
       'Keep an academic transcript on their Work & school tab from its text, when they give you one and ask to save it. Pass the school, the transcript\'s text as they gave it (kept as its original), and every course on it, each with its title and whatever of code, term, year, credits and grade it shows. A course from another school names its own.',
