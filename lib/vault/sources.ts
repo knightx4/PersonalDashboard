@@ -22,6 +22,8 @@ export const vaultSources: ModuleSources = {
       search: ['title', 'body', 'path'],
       title: 'title',
       ref: 'path',
+      // Notes holding credentials are never read by Dash or a connected app.
+      readFrom: 'readable_notes',
       href: noteHref,
       section: NOTES,
       note:

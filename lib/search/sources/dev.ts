@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@/lib/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import { isOwner } from '@/lib/dev/owner';
 import { SPECS } from '@/lib/specs/registry';
 import type {
@@ -88,7 +89,7 @@ async function numberOfOutline(
 }
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'public', createClient);
   if (!(await isOwner({ supabase }))) return [];
 
   const pattern = ctx.query ? `%${escapeLike(ctx.query)}%` : null;

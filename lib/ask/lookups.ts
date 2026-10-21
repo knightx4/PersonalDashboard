@@ -11,7 +11,7 @@ import type { ModuleId } from '@/lib/modules';
 import { searchEverything } from '@/lib/search/search';
 import { HIT_KINDS, type HitKind } from '@/lib/search/sources';
 import { SOURCES } from '@/lib/sources/catalogue';
-import type { Source } from '@/lib/sources/types';
+import { readableName, type Source } from '@/lib/sources/types';
 import { noteHref } from '@/lib/vault/paths';
 import { transcriptHref } from '@/lib/you/education';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
@@ -111,6 +111,7 @@ export async function searchLookup(ctx: AskContext, input: Input): Promise<AskTo
     kinds: kinds && kinds.length > 0 ? kinds : undefined,
     perSourceLimit: 8,
     totalLimit: 20,
+    db: ctx.db,
   });
 
   return {
@@ -170,10 +171,45 @@ export function openableSource(table: string): Source | null {
   return OPENABLE.find((s) => s.table === table) ?? null;
 }
 
+/**
+ * How much of one long text column open_row returns at a time. Before, every
+ * column was flattened onto one line and cut at 1,500 characters, with no way
+ * to read on: asked where they left off on a take-home exercise, Dash could
+ * only see the opening of the note and said so (21 October 2026).
+ */
+export const OPEN_PART_CHARS = 8000;
+
+/**
+ * Text as a person wrote it, line breaks kept and runs of blank lines and
+ * spaces closed up, split into parts of about OPEN_PART_CHARS at a line
+ * break where one is near.
+ */
+export function textParts(text: string, size: number = OPEN_PART_CHARS): string[] {
+  const tidy = text
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  const parts: string[] = [];
+  let rest = tidy;
+  while (rest.length > size) {
+    const window = rest.slice(0, size);
+    const at = Math.max(window.lastIndexOf('\n'), window.lastIndexOf('. ') + 1);
+    const cut = at > size / 2 ? at : size;
+    parts.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
 export async function openLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const table = optionalString(input, 'table');
   const ref = optionalString(input, 'ref');
   if (!table || !ref) throw new AskInputError('Give both table and ref.');
+  const part = input.part === undefined || input.part === null ? 1 : Number(input.part);
+  if (!Number.isInteger(part) || part < 1) throw new AskInputError('part is a whole number from 1.');
   const source = openableSource(table);
   if (!source) throw new AskInputError(`${table} is not a table that can be opened.`);
 
@@ -189,7 +225,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
 
   const client = await ctx.db(schema);
   const { data, error } = await client
-    .from(name)
+    .from(readableName(source))
     .select(columns.join(', '))
     .eq(owner, ctx.userId)
     .eq(byId ? 'id' : refColumn, ref)
@@ -201,12 +237,34 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   const canonical = String(row[refColumn] ?? row.id ?? ref);
   const href = (BETTER_HREFS[table] ?? source.href!)(canonical);
   const detail: Record<string, string | null> = {};
-  for (const column of [...source.search, ...(source.facts ?? [])]) detail[column] = clip(asText(row[column]), 1500);
-  const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
-  if (comments) detail.comments = comments;
+  const longer: string[] = [];
+  let more = false;
+  for (const column of source.search) {
+    const text = asText(row[column]);
+    const parts = text ? textParts(text) : [];
+    if (part > Math.max(parts.length, 1)) continue;
+    detail[column] = parts[part - 1] ?? null;
+    if (parts.length > 1) longer.push(`${column} is part ${part} of ${parts.length}`);
+    if (parts.length > part) more = true;
+  }
+  if (part > 1 && Object.keys(detail).length === 0) {
+    throw new AskInputError(`${table} row ${ref} has no part ${part}: its text is shorter than that.`);
+  }
+  if (part === 1) {
+    for (const column of source.facts ?? []) detail[column] = clip(asText(row[column]), 1500);
+    const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
+    if (comments) detail.comments = comments;
+  }
+  const note =
+    longer.length === 0
+      ? undefined
+      : more
+        ? `Long text: ${longer.join('; ')}. Call open_row with the same table and ref and part ${part + 1} to read on.`
+        : `Long text: ${longer.join('; ')}. This is the last part.`;
 
   return {
     ok: true,
+    ...(note ? { note } : {}),
     rows: [
       {
         table,
@@ -807,8 +865,9 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
   if (!from && !to && !query) throw new AskInputError('Give a period (from, to), a query, or both.');
 
   const client = await ctx.db('obsidian');
+  // readable_notes leaves out the notes that hold credentials.
   let read = client
-    .from('notes')
+    .from('readable_notes')
     .select('id, path, title, body, git_updated_at', { count: 'exact' })
     .eq('user_id', ctx.userId)
     .is('deleted_at', null);

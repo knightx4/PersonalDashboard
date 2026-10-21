@@ -32,6 +32,14 @@ export type HealthSpend = {
   costMicros: number | null;
 };
 
+/** One call a connected app (claude.ai, Claude Desktop) made through the connector. */
+export type HealthConnectorCall = {
+  id: string;
+  tool: string;
+  outcome: 'ok' | 'partial' | 'error' | 'limited';
+  error: string | null;
+};
+
 export type ToolFailure = { tool: string; count: number; sample: string; turns: string[] };
 
 export type DashHealth = {
@@ -43,6 +51,8 @@ export type DashHealth = {
   thumbsDown: { turn: string; note: string | null }[];
   /** Answers the person pushed back on in their next message. */
   pushback: { turn: string; said: string }[];
+  /** Calls from connected apps, and the ones that failed or answered in part, by tool. */
+  connector: { calls: number; failed: ToolFailure[] };
   calls: number;
   avgPromptTokens: number;
   maxPromptTokens: number;
@@ -69,15 +79,49 @@ export function pushesBack(reply: string): boolean {
   return PUSHBACK.test(reply);
 }
 
-/** An error this way is the app's fault rather than a bad argument, and is flagged the first time. */
-const BROKEN = /failed to read the database|timeout|timed out|could not be reached|internal/i;
+/**
+ * An error this way is the app's fault rather than a bad argument, and is
+ * flagged the first time. "Could not read" is a lookup that answered with
+ * only part of what it was asked: search over the connector read none of the
+ * person's workspaces for weeks that way, logged as a clean answer.
+ */
+const BROKEN = /failed to read the database|timeout|timed out|could not be reached|internal|could not read/i;
+
+/** What a lookup that answered says it could not read, or null. */
+function unreadOf(note: unknown): string | null {
+  const match = typeof note === 'string' ? note.match(/Could not read: [^.]*\./) : null;
+  return match ? match[0] : null;
+}
+
+/** Counts one failed call under its tool. */
+function countFailure(failures: Map<string, ToolFailure & { broken: boolean }>, tool: string, error: string, at: string) {
+  const seen = failures.get(tool) ?? { tool, count: 0, sample: error, turns: [], broken: false };
+  seen.count++;
+  if (!seen.turns.includes(at)) seen.turns.push(at);
+  if (BROKEN.test(error)) {
+    seen.broken = true;
+    seen.sample = error;
+  }
+  failures.set(tool, seen);
+}
+
+/** The alert lines for a set of failing tools: any that broke, and any that failed again and again. */
+function failureAlerts(failures: readonly (ToolFailure & { broken: boolean })[], where: string): string[] {
+  return failures
+    .filter((f) => f.broken || f.count >= TOOL_FAILURES_ALERT)
+    .map((f) => `${where}${f.tool} failed ${f.count} time${f.count === 1 ? '' : 's'}: ${f.sample}`);
+}
 
 /** 85000 as "85,000". */
 function grouped(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthSpend[]): DashHealth {
+export function dashHealth(
+  turns: readonly HealthTurn[],
+  spend: readonly HealthSpend[],
+  connectorCalls: readonly HealthConnectorCall[] = [],
+): DashHealth {
   const unfinished: string[] = [];
   const limited: string[] = [];
   const failures = new Map<string, ToolFailure & { broken: boolean }>();
@@ -93,21 +137,19 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
       pushback.push({ turn: turn.id, said: turn.followUp.replace(/\s+/g, ' ').trim().slice(0, 200) });
     }
     for (const call of turn.toolCalls ?? []) {
-      const result = call.result as { ok?: unknown; error?: unknown } | undefined;
-      if (!result || result.ok !== false) continue;
+      const result = call.result as { ok?: unknown; error?: unknown; note?: unknown } | undefined;
+      if (!result) continue;
+      if (result.ok !== false) {
+        const unread = unreadOf(result.note);
+        if (unread) countFailure(failures, call.name, unread, turn.id);
+        continue;
+      }
       const error = typeof result.error === 'string' ? result.error.replace(/\s+/g, ' ').slice(0, 200) : 'no reason given';
       if (error === LOOKUP_NOT_RUN) {
         skipped++;
         continue;
       }
-      const seen = failures.get(call.name) ?? { tool: call.name, count: 0, sample: error, turns: [], broken: false };
-      seen.count++;
-      if (!seen.turns.includes(turn.id)) seen.turns.push(turn.id);
-      if (BROKEN.test(error)) {
-        seen.broken = true;
-        seen.sample = error;
-      }
-      failures.set(call.name, seen);
+      countFailure(failures, call.name, error, turn.id);
     }
   }
 
@@ -117,6 +159,13 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
   const costUsd = Math.round(spend.reduce((sum, s) => sum + (s.costMicros ?? 0), 0) / 10_000) / 100;
 
   const failedLookups = [...failures.values()].sort((a, b) => b.count - a.count);
+  const fromApps = new Map<string, ToolFailure & { broken: boolean }>();
+  for (const call of connectorCalls) {
+    if (call.outcome === 'error' || call.outcome === 'partial') {
+      countFailure(fromApps, call.tool, (call.error ?? 'no reason given').replace(/\s+/g, ' ').slice(0, 200), call.id);
+    }
+  }
+  const connectorFailed = [...fromApps.values()].sort((a, b) => b.count - a.count);
   const alerts: string[] = [];
   if (unfinished.length > 0) {
     alerts.push(`${unfinished.length} answer${unfinished.length === 1 ? '' : 's'} fell back to "I could not finish".`);
@@ -125,11 +174,8 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
     alerts.push(`${limited.length} answer${limited.length === 1 ? ' was' : 's were'} cut short by a limit.`);
   }
   if (skipped > 0) alerts.push(`${skipped} lookup${skipped === 1 ? ' was' : 's were'} refused at a limit.`);
-  for (const f of failedLookups) {
-    if (f.broken || f.count >= TOOL_FAILURES_ALERT) {
-      alerts.push(`Lookup ${f.tool} failed ${f.count} time${f.count === 1 ? '' : 's'}: ${f.sample}`);
-    }
-  }
+  alerts.push(...failureAlerts(failedLookups, 'Lookup '));
+  alerts.push(...failureAlerts(connectorFailed, 'Connected apps: '));
   if (thumbsDown.length > 0) {
     alerts.push(`${thumbsDown.length} answer${thumbsDown.length === 1 ? ' was' : 's were'} marked down.`);
   }
@@ -145,6 +191,7 @@ export function dashHealth(turns: readonly HealthTurn[], spend: readonly HealthS
     unfinished: { count: unfinished.length, turns: unfinished },
     limited: { count: limited.length, turns: limited },
     failedLookups: failedLookups.map(({ broken: _broken, ...f }) => f),
+    connector: { calls: connectorCalls.length, failed: connectorFailed.map(({ broken: _broken, ...f }) => f) },
     skippedLookups: skipped,
     thumbsDown,
     pushback,

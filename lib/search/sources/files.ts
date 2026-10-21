@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createCoreClient } from '@/lib/core/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import { fileHref } from '@/lib/files/files';
 import type {
   SearchContext,
@@ -28,7 +29,7 @@ type FileRow = {
 };
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const core = await createCoreClient();
+  const core = await sourceClient(ctx, 'core', createCoreClient);
   let files = core.from('files').select('id, title, made_by, summary, body').is('archived_at', null);
   if (ctx.query) files = files.or(fileTextFilter(ctx.query));
   const { data, error } = await files.order('updated_at', { ascending: false }).limit(ctx.limit);

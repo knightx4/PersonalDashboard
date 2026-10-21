@@ -112,6 +112,23 @@ describe('the day of real answers', () => {
     expect(health.alerts).toEqual(['1 answer was pushed back on: "That\'s wrong, I applied to two"']);
   });
 
+  it('counts a lookup that answered with only part of what it was asked, in Ask and from connected apps', () => {
+    const partial = { name: 'search', input: {}, result: { ok: true, rows: [], note: 'Matches titles and names only. Could not read: Job search, Todo. 0 matched, showing all.' } };
+    const health = dashHealth(
+      [turn('t1', 'Nothing found.', [partial])],
+      [],
+      [
+        { id: 'c1', tool: 'search', outcome: 'partial', error: 'Could not read: Job search, Shopping, Todo.' },
+        { id: 'c2', tool: 'recall', outcome: 'ok', error: null },
+      ],
+    );
+    expect(health.alerts).toEqual([
+      'Lookup search failed 1 time: Could not read: Job search, Todo.',
+      'Connected apps: search failed 1 time: Could not read: Job search, Shopping, Todo.',
+    ]);
+    expect(health.connector).toMatchObject({ calls: 2, failed: [{ tool: 'search', count: 1 }] });
+  });
+
   it('lets one bad argument pass as the model\'s slip', () => {
     const health = dashHealth([turn('t1', 'Ok.', [{ name: 'read_dev_row', input: {}, result: { ok: false, error: '#2072.1 names no step on the plan.' } }])], []);
     expect(health.alerts).toEqual([]);
@@ -136,6 +153,7 @@ describe('a run', () => {
       }),
       turns: async () => [],
       spend: async () => [],
+      connectorCalls: async () => [],
       start: async () => 'run-1',
       finish: async (_id, row) => {
         finished.push(row);

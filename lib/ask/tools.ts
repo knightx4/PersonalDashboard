@@ -147,12 +147,17 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'open_row',
-    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
+    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. Long text comes in parts of about 8,000 characters with its line breaks kept; when the answer says there are more, call again with part 2, 3 and so on before saying what the row holds. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
     input_schema: {
       type: 'object',
       properties: {
         table: { type: 'string', enum: OPENABLE.map((s) => s.table) },
         ref: { type: 'string', description: 'The ref another tool returned for the row.' },
+        part: {
+          type: 'integer',
+          minimum: 1,
+          description: 'For a long note or other long text, which part to read: 1 (the default) is the start. The answer says how many parts there are.',
+        },
       },
       required: ['table', 'ref'],
       additionalProperties: false,

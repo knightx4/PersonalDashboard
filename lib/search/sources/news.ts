@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createNewsClient } from '@/lib/news/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -24,7 +25,7 @@ const ISSUES_READ = 300;
 type Read = SearchListContext & { query?: string };
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createNewsClient();
+  const supabase = await sourceClient(ctx, 'news', createNewsClient);
   const { data, error } = await supabase
     .from('issues')
     .select('id, subject, stories')

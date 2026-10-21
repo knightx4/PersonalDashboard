@@ -81,8 +81,19 @@ export interface SearchHit {
   href: string;
 }
 
+/** The schemas a search source reads, by the name AskDb takes. */
+export type SearchSchema = 'public' | 'core' | 'job_search' | 'obsidian' | 'todo' | 'learn' | 'news' | 'goals' | 'you';
+
 export interface SearchListContext {
   userId: string;
+  /**
+   * The clients to read through, one per schema, as Dash's lookups hold them
+   * (AskDb). Absent in the command box, where each source opens its own on
+   * the signed-in cookie. Dash passes its own, because a connected app or a
+   * scheduled run has no cookie: without them every source failed and
+   * `search` found nothing over the connector (21 October 2026).
+   */
+  db?: (schema: SearchSchema) => Promise<unknown>;
   /**
    * The most rows to take from any one table. A read that comes back full
    * means the source is holding back rows the caller will never see, which is

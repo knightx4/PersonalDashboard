@@ -39,7 +39,7 @@ function portsFor(vault: VaultSupabaseClient, userId: string): NotePositionsPort
     ...mayaRetrieveStore(vault, userId),
     async find(ref) {
       const { data, error } = await vault
-        .from('notes')
+        .from('readable_notes')
         .select('id, path')
         .eq('user_id', userId)
         .eq(UUID.test(ref) ? 'id' : 'path', ref)

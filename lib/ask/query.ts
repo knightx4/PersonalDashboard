@@ -1,4 +1,4 @@
-import type { Source } from '@/lib/sources/types';
+import { readableName, type Source } from '@/lib/sources/types';
 import { AskInputError, clip, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
 import { asText, fallbackHref, LISTABLE, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
 import { listableShapes, type TableColumn, type TableShape } from './table-info';
@@ -352,7 +352,7 @@ export async function queryRowsLookup(ctx: AskContext, input: Record<string, unk
   const owner = ownerColumn(source) as string;
   const client = await ctx.db(schema);
   const scoped = (select: string, options?: { count: 'exact'; head?: boolean }) => {
-    let query = client.from(name).select([select, ...embeds].join(', '), options).eq(owner, ctx.userId);
+    let query = client.from(readableName(source)).select([select, ...embeds].join(', '), options).eq(owner, ctx.userId);
     for (const c of conditions) query = applyCondition(query, c);
     return query;
   };

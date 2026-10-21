@@ -12,7 +12,7 @@ import { costMicrosFor, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { answerQuestion } from '@/lib/dash/ask';
 import { dashModelFor } from '@/lib/dash/model-choice';
-import type { HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
 import { searchMail } from '@/lib/inbox/search-mail';
@@ -208,6 +208,17 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
           costMicros: row.cost_micros,
         }),
       );
+    },
+
+    async connectorCalls(userId, since) {
+      const { data, error } = await core
+        .from('connector_calls')
+        .select('id, tool, outcome, error')
+        .eq('user_id', userId)
+        .gte('created_at', since)
+        .limit(DAY_ROWS);
+      if (error) throw new Error(`Reading the day's connector calls failed: ${error.message}`);
+      return (data ?? []) as HealthConnectorCall[];
     },
 
     async start(row) {

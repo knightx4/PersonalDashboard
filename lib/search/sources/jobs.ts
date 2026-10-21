@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@/lib/jobs/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -33,7 +34,7 @@ const contains = (query: string) => `%${escapeLike(query)}%`;
 type Read = SearchListContext & { query?: string };
 
 async function findCompanies(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'job_search', createClient);
   let read = supabase.from('companies').select('id, name, slug, industry');
   if (ctx.query) read = read.ilike('name', contains(ctx.query));
 
@@ -50,7 +51,7 @@ async function findCompanies(ctx: Read): Promise<SearchHit[]> {
 }
 
 async function findRoles(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'job_search', createClient);
   let read = supabase.from('roles').select('id, title, location, companies(name)');
   if (ctx.query) read = read.ilike('title', contains(ctx.query));
 
@@ -67,7 +68,7 @@ async function findRoles(ctx: Read): Promise<SearchHit[]> {
 }
 
 async function findContacts(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'job_search', createClient);
   let read = supabase.from('contacts').select('id, full_name, title, companies(name)');
   if (ctx.query) read = read.ilike('full_name', contains(ctx.query));
 

@@ -183,7 +183,34 @@ when you see a cause of failure that one fix will not remove.
 5. **Cover every workspace.** At least one case per workspace that is on
    (jobs, shopping, todo, goals, learn, vault, news, you), and one for
    recall. Write them from real questions in their chats.
-6. **Keep it cheap.** The person does not want to pay for testing. Hold the
+6. **The connector (MCP) is Dash too.** Connected apps (claude.ai, Claude
+   Desktop) call the same lookups through `app/api/mcp` and `lib/connector/`;
+   the daily health reads `core.connector_calls` and alerts on `error` and
+   `partial` outcomes. Audit of 21 October 2026, still open:
+   - The tool list a client loads is 109 tools, about 40,000 tokens: the
+     catalogue of tables is repeated in list_rows, open_row, query_rows and
+     table_info (`lib/ask/tools.ts`). Name it once.
+   - Descriptions name tools the connector does not have: `propose_delete`,
+     `change_todo`, `close_todo`, `move_roles`, `search_mail`,
+     `propose_watch` (`lib/ask/tools.ts`, `lib/dash/todo-writes.ts`,
+     `lib/dash/jobs-writes.ts`, `lib/dash/news-writes.ts`). Make each
+     description true for the surface it is sent to.
+   - The connector cannot add, rename or close a plain todo, move a role to
+     another stage, or delete anything (`CONNECTOR_WRITE_TOOLS` in
+     `lib/connector/writes.ts` against the Ask registry).
+   - `recordConnectorCall` runs after a write and throws if the log insert
+     fails, so the app sees an error for a change that was made and may make
+     it again (`lib/connector/mcp.ts`). Log first or never fail the call on
+     the log.
+   - Partial failures still answer as clean: `agenda` drops the workspaces it
+     could not read, `recall` drops rows whose link failed while its totals
+     still count them, and `open_row` drops a thread it could not read. Say
+     what could not be read in the note, as `search` does, so the log and the
+     health see it.
+   - `recall` over the connector cannot record its embedding spend (token
+     transactions are read-only, migration 0134), so it goes unrecorded.
+   - No lookup has a time limit; the route allows 300 seconds.
+7. **Keep it cheap.** The person does not want to pay for testing. Hold the
    monthly run under $1.50 (`cost_micros`), and the month's checks, by hand
    and monthly, under about $3 together (`core.model_spend`, operation
    `check-dash-quality`). When the cases outgrow it, retire the oldest

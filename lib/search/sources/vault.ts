@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -52,11 +53,14 @@ function newest(rows: NoteRow[], limit: number): NoteRow[] {
 }
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createVaultClient();
+  const supabase = await sourceClient(ctx, 'obsidian', createVaultClient);
+  // Dash and connected apps read through readable_notes, which leaves out the
+  // notes holding credentials; the person's own command box still finds them.
+  const notes = ctx.db ? 'readable_notes' : 'notes';
 
   const search = (column: 'title' | 'path', pattern: string) =>
     supabase
-      .from('notes')
+      .from(notes)
       .select(COLUMNS)
       .ilike(column, pattern)
       .order('updated_at', { ascending: false })
@@ -80,7 +84,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
     rows.push(...((byPath.data ?? []) as unknown as NoteRow[]));
   } else {
     const { data, error } = await supabase
-      .from('notes')
+      .from(notes)
       .select(COLUMNS)
       .order('updated_at', { ascending: false })
       .limit(ctx.limit);

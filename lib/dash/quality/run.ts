@@ -1,4 +1,4 @@
-import { dashHealth, type DashHealth, type HealthSpend, type HealthTurn } from './health';
+import { dashHealth, type DashHealth, type HealthConnectorCall, type HealthSpend, type HealthTurn } from './health';
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 
 /**
@@ -38,6 +38,8 @@ export type DashQualityPorts = {
   ask(userId: string, question: string): Promise<{ outcome: CaseOutcome; costMicros: number }>;
   turns(userId: string, since: string): Promise<HealthTurn[]>;
   spend(userId: string, since: string): Promise<HealthSpend[]>;
+  /** What connected apps called through the connector (core.connector_calls). */
+  connectorCalls(userId: string, since: string): Promise<HealthConnectorCall[]>;
   start(row: { userId: string; trigger: DashQualityTrigger; model: string; deploy: string | null }): Promise<string>;
   finish(id: string, row: { cases: number; passed: number; results: CaseResult[]; health: DashHealth; costMicros: number; noteId: string | null; error: string | null }): Promise<void>;
   writeNote(userId: string, body: string): Promise<string>;
@@ -87,7 +89,7 @@ export function qualityNote(results: readonly CaseResult[], health: DashHealth, 
     lines.push('');
   }
   if (health.alerts.length > 0) {
-    lines.push(`The last day of real answers (${health.answers}):`);
+    lines.push(`The last day of real answers (${health.answers} in Ask, ${health.connector.calls} calls from connected apps):`);
     for (const alert of health.alerts) lines.push(`- ${alert}`);
     lines.push('');
   }
@@ -134,7 +136,11 @@ export async function runDashQuality(
   }
 
   const since = new Date(now.getTime() - HEALTH_HOURS * 3_600_000).toISOString();
-  const health = dashHealth(await ports.turns(userId, since), await ports.spend(userId, since));
+  const health = dashHealth(
+    await ports.turns(userId, since),
+    await ports.spend(userId, since),
+    await ports.connectorCalls(userId, since),
+  );
   if (error) health.alerts.unshift(`The run could not read its cases: ${error}`);
   const body = qualityNote(results, health, runId);
   const noteId = body ? await ports.writeNote(userId, body) : null;

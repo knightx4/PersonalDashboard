@@ -263,3 +263,23 @@ describe('revocations', () => {
     expect(await lastConnectorRevocation(asClient(fake), THEM, 'nobody')).toBeNull();
   });
 });
+
+describe('a partial answer', () => {
+  it('is logged as partial, keeping its reads and saying what it could not read', async () => {
+    const { connectorCallRow, unreadIn } = await import('./calls');
+    const row = connectorCallRow({
+      userId: 'u',
+      clientId: 'c',
+      tool: 'search',
+      input: { query: 'ReSpark' },
+      result: {
+        ok: true,
+        rows: [{ table: 'job_search.roles', ref: 'r', title: 'Manager at ReSpark', href: '/jobs/roles/r' }],
+        note: 'Matches titles and names only. Could not read: Shopping, Todo. 1 matched, showing all.',
+      },
+    } as Parameters<typeof connectorCallRow>[0]);
+    expect(row).toMatchObject({ outcome: 'partial', error: 'Could not read: Shopping, Todo.' });
+    expect(row.reads).toHaveLength(1);
+    expect(unreadIn('3 matched, showing all.')).toBeNull();
+  });
+});

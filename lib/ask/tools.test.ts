@@ -239,10 +239,18 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
   };
 }
 
+/** The rows a relation holds; obsidian.readable_notes is the live notes that hold no credentials, as the view is. */
+function relationRows(tables: Tables, schema: AskSchema, table: string): Row[] {
+  if (schema === 'obsidian' && table === 'readable_notes') {
+    return (tables['obsidian.notes'] ?? []).filter((row) => row.voice !== 'secret' && !row.deleted_at);
+  }
+  return tables[`${schema}.${table}`] ?? [];
+}
+
 function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
   return async (schema: AskSchema) =>
     ({
-      from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? [], tables, schema),
+      from: (table: string) => new FakeQuery(relationRows(tables, schema, table), tables, schema),
       rpc: fakeRpc(tables, calls, owner),
     }) as unknown as SchemaClient;
 }
@@ -358,6 +366,43 @@ describe('open_row', () => {
       href: '/vault/n/Work/Leaving.md',
       detail: { body: 'Thinking about leaving my job.' },
     });
+  });
+
+  it('never opens a note that holds credentials, by path or by id', async () => {
+    const secret: Tables = {
+      'obsidian.notes': [
+        { id: '33333333-3333-4333-8333-333333333333', user_id: ME, path: 'Keys.md', title: 'Keys', body: 'password: hunter2', voice: 'secret' },
+      ],
+    };
+    for (const ref of ['Keys.md', '33333333-3333-4333-8333-333333333333']) {
+      const result = await executeAskTool('open_row', { table: 'obsidian.notes', ref }, context(secret));
+      expect(result.ok && result.rows).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain('hunter2');
+    }
+    const listed = await executeAskTool('list_rows', { table: 'obsidian.notes' }, context(secret));
+    expect(JSON.stringify(listed)).not.toContain('hunter2');
+  });
+
+  it('reads a long note in parts with its line breaks, and says how to read on', async () => {
+    const line = 'Checked the master comparison tab against each source and the counts agree. ';
+    const body = Array.from({ length: 300 }, (_, i) => `${i}. ${line}`).join('\n');
+    const long: Tables = {
+      'obsidian.notes': [{ id: '44444444-4444-4444-8444-444444444444', user_id: ME, path: 'respark take home.md', title: 'respark take home', body }],
+    };
+    const first = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md' }, context(long));
+    if (!first.ok) throw new Error(first.error);
+    const firstBody = String(first.rows[0].detail?.body);
+    expect(firstBody.length).toBeGreaterThan(6000);
+    expect(firstBody).toContain('\n1. ');
+    expect(first.note).toMatch(/body is part 1 of 4\. Call open_row with the same table and ref and part 2 to read on\./);
+
+    const last = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md', part: 4 }, context(long));
+    if (!last.ok) throw new Error(last.error);
+    expect(String(last.rows[0].detail?.body)).toContain('299. ');
+    expect(last.note).toContain('This is the last part.');
+
+    const past = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md', part: 9 }, context(long));
+    expect(past).toMatchObject({ ok: false });
   });
 
   it('opens a row by the id search gave it, and points a task at itself on the list', async () => {
