@@ -13,6 +13,7 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import type { ModuleId } from '@/lib/modules';
 import { PAID_TOOLS } from './paid-tools';
+import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
 
 /**
@@ -187,6 +188,12 @@ export type DashWriteResult =
 
 export type DashWriteTool<R = DashWriteResult | DashRecordedWrite> = DashToolBase & {
   kind: 'write';
+  /**
+   * The buttons it does the same as, and the function each button's action
+   * and this tool should both call; or why no page offers it (./runs.ts,
+   * plan #2473.1). lib/dash/runs.test.ts follows both through the code.
+   */
+  runs: DashWriteRuns;
   /** Validates the input, makes the change, and says what it changed. Never throws. */
   apply: (ctx: DashWriteContext, input: unknown) => Promise<R | { ok: false; error: string }>;
   /**

@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid } from '@/lib/ask/db';
 import type { PostChangeInput, PostChangeKind } from '@/lib/ask/post-changes';
@@ -310,6 +311,7 @@ function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promi
 
 function tool(
   name: PostChangeKind,
+  runs: DashWriteRuns,
   description: string,
   input_schema: Anthropic.Tool['input_schema'],
   run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>,
@@ -317,6 +319,7 @@ function tool(
   return {
     name,
     kind: 'write',
+    runs,
     definition: { name, description: `${description} ${DONE_NOTE}`, input_schema },
     apply: guarded(name, run),
   };
@@ -326,6 +329,7 @@ function tool(
 export const POST_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'rewrite_post',
+    sameAs(['app/dev/posts/actions.ts#editPostBody', 'app/dev/posts/actions.ts#editPostBody']),
     `Rewrite the text of one of their X post drafts on the Posts tab in Dev, when they ask ("make it shorter", "drop the second post", "say it more plainly"). Name the draft by the public.social_posts ref a lookup returned, or the draft the thread is on. Send posts as the whole new text, one string per post in the thread, at most ${MAX_THREAD_POSTS}; a post left out is gone from the thread. Keep to their wording where they did not ask for a change. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes, @ mentions, amounts or anything from another workspace; a rewrite that breaks one is refused with the reasons, and nothing changes. A draft they have posted or put aside cannot be rewritten. What Dash first wrote is kept, so the tab still shows what changed.`,
     {
       type: 'object',
@@ -346,6 +350,7 @@ export const POST_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'suggest_post',
+    sameAs(['app/dev/posts/actions.ts#suggestPostAbout', 'lib/dev/posts-run.ts#startPostsRun']),
     `Save a new X post draft to the Posts tab in Dev, when they ask you for a post about something that shipped ("write a post about the new plan page"). Read what shipped first (the plan steps and changelog), and write about what the app does, never what they keep in it. Send angle as the one idea the post is about, in a short line, and posts as the text, one string per post in the thread, at most ${MAX_THREAD_POSTS}. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture the post_pictures lookup returned, of the screen the post is about, where one fits; leave it out otherwise. The draft waits on the Posts tab for them: you never post it.`,
     {
       type: 'object',

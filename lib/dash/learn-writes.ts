@@ -1,3 +1,4 @@
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { LearnChangeInput, LearnChangeKind } from '@/lib/ask/learn-changes';
@@ -80,6 +81,8 @@ export type LearnMade = {
 
 export type LearnWrite = {
   name: LearnChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -708,6 +711,15 @@ const ID = (description: string) => ({ type: 'string', description }) as const;
 export const LEARN_WRITES: readonly LearnWrite[] = [
   {
     name: 'change_reading',
+    runs: sameAs(
+      ['app/learn/r/[id]/actions.ts#attachSource', 'lib/learn/tracks/save.ts#attachSourceToReading'],
+      ['app/learn/r/[id]/actions.ts#updateStatus', 'lib/learn/tracks/save.ts#setReadingStatus'],
+      ['app/learn/r/[id]/actions.ts#toggleReadNow', 'lib/learn/tracks/save.ts#setReadNow'],
+      ['app/learn/r/[id]/actions.ts#updateNote', 'lib/learn/tracks/save.ts#setReadingNote'],
+      ['app/learn/r/[id]/actions.ts#saveReadingText', 'lib/learn/tracks/save.ts#setReadingText'],
+      ['app/learn/r/[id]/actions.ts#saveReadingPdf', 'lib/learn/tracks/save.ts#setReadingText'],
+      ['app/learn/r/[id]/actions.ts#clearReadingText', 'lib/learn/tracks/save.ts#setReadingText'],
+    ),
     description:
       "Change one reading on the person's Learn lists, when they ask: mark it queued, reading, read or abandoned (given up); put it on the Read now shelf or take it off; write or clear their note on it; keep the text of it for Dash to read (what they pasted, or a PDF's text), or clear that text; or give it the link it opens. Send only what they asked to change.",
     input_schema: {
@@ -728,6 +740,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'add_learn_track',
+    runs: sameAs(['app/learn/lists/actions.ts#startTrack', 'lib/learn/tracks/save.ts#createTrack']),
     description:
       'Start a new, empty reading list in Learn, when they ask for one on a topic. Add what goes on it with add_track_reading.',
     input_schema: {
@@ -743,6 +756,11 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'add_track_reading',
+    runs: sameAs(
+      ['app/learn/c/[id]/actions.ts#queueMaterial', 'lib/learn/catalogue/queue.ts#queueCatalogueSegment'],
+      ['app/learn/save/actions.ts#saveReadingLink', 'lib/learn/tracks/link.ts#saveLink'],
+      ['app/learn/t/[id]/actions.ts#addToTrack', 'lib/learn/tracks/save.ts#addManualReading'],
+    ),
     description:
       'Add one thing to read at the end of one of their Learn reading lists, when they ask. Give the list, the work, why it is worth reading in their words, and a link only if they gave one.',
     input_schema: {
@@ -760,6 +778,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'reword_concept',
+    runs: sameAs(['app/learn/c/[id]/actions.ts#rewriteClaim', 'lib/learn/graph/rewrite-save.ts#rewrittenClaimUpdate']),
     description:
       "Put one of the person's Learn ideas in new words, when they ask to reword or correct what it claims. The first wording is kept on the idea.",
     input_schema: {
@@ -775,6 +794,10 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'add_concept_note',
+    runs: sameAs(
+      ['app/learn/c/[id]/actions.ts#addConceptNote', 'lib/learn/notes/store.ts#insertConceptNote'],
+      ['app/learn/now/actions.ts#addCardNote', 'lib/learn/notes/store.ts#insertCardNote'],
+    ),
     description:
       'Write a note on one of their Learn ideas, or on a Learn now card (kept on the card and its idea), when they ask. Give exactly one of concept_id or card_id.',
     input_schema: {
@@ -791,6 +814,10 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'change_video',
+    runs: sameAs(
+      ['app/learn/videos/actions.ts#setWatchedAction', 'lib/learn/youtube/videos.ts#setWatched'],
+      ['app/learn/videos/actions.ts#moveVideoAction', 'lib/learn/youtube/video-card-run.ts#settleVideoCards'],
+    ),
     description:
       "Mark a video on the person's Learn watch list watched or not, or move it to another pile (watch, card or skip) when they disagree with where it was put. Their move is kept as their own verdict.",
     input_schema: {
@@ -807,6 +834,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'research_topic',
+    runs: noButton('No page starts research from a sentence: the Learn pages propose a brief from a goal, which the person approves.'),
     description:
       'Research a topic they say they want to learn about ("I want to learn how SOX controls apply to AI", "look into X for me"): ' +
       'Dash makes a reading list and a brief, splits the question into three to five sub-questions, and spends the next few minutes ' +
@@ -831,6 +859,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'add_to_brief',
+    runs: noButton('No page adds a finding to a research brief: the brief\'s own run writes its findings.'),
     description:
       'Add a finding to one of their research briefs, when they ask to add what a conversation found to their research ' +
       '("add this to my brief on X", "put these sources in my research"). Give the brief, the finding in a few sentences of ' +
@@ -867,6 +896,7 @@ export const LEARN_WRITES: readonly LearnWrite[] = [
   },
   {
     name: 'attach_vault_note',
+    runs: noButton('The essay\'s Notes tab can only take a vault note off (detachVaultNote); attaching one is Dash\'s alone.'),
     description:
       "Attach one of their vault notes to the notes of one of their Learn essays, when they ask (\"attach my Walzer note to " +
       'the essay", "use this note for my essay"). The note is listed on the essay\'s Notes tab and Dash reads it with their ' +
@@ -909,6 +939,7 @@ const ASK_NOTE =
 export const LEARN_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = LEARN_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('learn')) {

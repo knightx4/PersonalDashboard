@@ -15,6 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { actionGaps, unconvertedPaidButtons } from '../lib/agent-actions/catalogue';
+import { driftedPairs } from '../lib/dash/runs-drift';
 import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
@@ -628,6 +629,16 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: "paid buttons catalogued as none('spends') with no reason and no tool",
     target: 0,
     measure: () => unconvertedPaidButtons(),
+  },
+  {
+    // Plan #2473.1: the buttons a free Dash write tool matches without
+    // calling the function the button's action calls (lib/dash/runs.ts).
+    // lib/dash/runs.test.ts holds the list to the code; this keeps it from
+    // growing, so a new tool starts out on its button's function.
+    name: 'dash-tools-off-their-button',
+    counts: "buttons a free Dash tool matches without calling the button's function",
+    target: 0,
+    measure: () => driftedPairs(),
   },
   {
     name: 'ai-on-controls',

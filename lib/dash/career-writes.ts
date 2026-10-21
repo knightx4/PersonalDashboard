@@ -1,3 +1,4 @@
+import { sameAs } from './runs';
 import { isUuid, type AskDb } from '@/lib/ask/db';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { toRef } from '@/lib/core/refs';
@@ -490,6 +491,9 @@ const PDF_BY_REF = { type: 'string', description: 'Instead of file_name: the cor
 export const CAREER_WRITES: readonly JobsWrite[] = [
   {
     name: 'add_evidence',
+    runs: sameAs(
+      ['app/jobs/(app)/material/evidence-actions.ts#addEvidence', 'app/jobs/(app)/material/evidence-actions.ts#addEvidence'],
+    ),
     description:
       "Add a story to their evidence bank on Material when they ask: a piece of their own work and its result, which applications and drafts draw on. Write it in their words; do not invent results they did not give.",
     input_schema: {
@@ -509,6 +513,9 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_resume_version',
+    runs: sameAs(
+      ['app/jobs/(app)/material/evidence-actions.ts#addResumeVersion', 'app/jobs/(app)/material/evidence-actions.ts#addResumeVersion'],
+    ),
     description:
       'Add a resume version on Material when they ask: a label, the resume as text, notes, and the PDF if they sent you one (by file_name). A label they already use is refused; to give an existing version a PDF, call attach_resume_pdf.',
     input_schema: {
@@ -527,6 +534,9 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'attach_resume_pdf',
+    runs: sameAs(
+      ['app/jobs/(app)/material/evidence-actions.ts#attachResumePdf', 'app/jobs/(app)/material/evidence-actions.ts#attachResumePdf'],
+    ),
     description:
       "Keep a PDF they sent you as an existing resume version's file, replacing the one it had, when they ask. Name the version by resume_ref (list_rows on job_search.resume_versions) or by its label, and the PDF by file_name.",
     input_schema: {
@@ -543,6 +553,10 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_career_thought',
+    runs: sameAs(
+      ['app/jobs/(app)/settings/career-goal-actions.ts#addThought', 'app/jobs/(app)/settings/career-goal-actions.ts#addThought'],
+      ['app/jobs/(app)/settings/career-goal-actions.ts#updateThought', 'app/jobs/(app)/settings/career-goal-actions.ts#updateThought'],
+    ),
     description:
       'Write a career goals entry on Jobs Settings when they ask (what they want from the next job, where they are now), or reword one of theirs by thought_ref (list_rows on job_search.thoughts). A new entry is dated today and older ones stay as they were. The roles and people searches read them.',
     input_schema: {
@@ -558,6 +572,10 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'add_discovered_company',
+    runs: sameAs(
+      ['app/jobs/(app)/companies/actions.ts#addCompany', 'app/jobs/(app)/companies/actions.ts#addCompany'],
+      ['app/jobs/(app)/find/actions.ts#addDiscoveredCompany', 'app/jobs/(app)/find/actions.ts#addDiscoveredCompany'],
+    ),
     description:
       "Add a startup Find discovered to their companies when they ask, as Find's \"Add to my companies\" does: it becomes a company with its website and job board, so the roles search reads that board every day. Name it by its name as Find shows it, or startup_ref.",
     input_schema: {

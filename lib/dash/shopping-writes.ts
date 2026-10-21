@@ -1,3 +1,4 @@
+import { sameAs, noButton, type DashWriteRuns } from './runs';
 import { randomUUID } from 'node:crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -176,6 +177,8 @@ export type ShoppingMade = {
 
 export type ShoppingWrite = {
   name: ShoppingChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -2429,6 +2432,15 @@ const ITEM_REF = { type: 'string', description: 'The public.inventory_items ref 
 export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   {
     name: 'change_item',
+    runs: sameAs(
+      ['app/shopping/inventory/actions.ts#updateInventoryItem', 'app/shopping/inventory/actions.ts#updateInventoryItem'],
+      ['app/shopping/inventory/group-actions.ts#renameItemGroup', 'app/shopping/inventory/group-actions.ts#renameItemGroup'],
+      ['app/shopping/inventory/book-actions.ts#confirmBookEdition', 'app/shopping/inventory/book-actions.ts#confirmBookEdition'],
+      ['app/shopping/inventory/book-actions.ts#updateBookCondition', 'app/shopping/inventory/book-actions.ts#updateBookCondition'],
+      ['app/shopping/inventory/game-actions.ts#confirmGameEdition', 'app/shopping/inventory/game-actions.ts#confirmGameEdition'],
+      ['app/shopping/sell/actions.ts#noteListingIntent', 'app/shopping/sell/actions.ts#noteListingIntent'],
+      ['app/shopping/sell/actions.ts#setSellPrice', 'app/shopping/sell/actions.ts#setSellPrice'],
+    ),
     description:
       "Change one item they own in Shopping, when they ask: its name, variant or notes (these reach every copy in its stack, as the item page's save does), a line added to its notes (\"planning to list it myself\"), the name of the group of copies it is in, the price they mean to sell it for, a book's or game's condition, or confirming the edition it was matched to. Give only what changes; an empty variant or notes clears it. Marking items for sale or to return, grouping, ungrouping, separating or saying they got rid of an item is change_items.",
     input_schema: {
@@ -2459,6 +2471,13 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'item_lists',
+    runs: sameAs(
+      ['app/shopping/settings/actions.ts#createItemList', 'app/shopping/settings/actions.ts#createItemList'],
+      ['app/shopping/settings/actions.ts#renameItemList', 'app/shopping/settings/actions.ts#renameItemList'],
+      ['app/shopping/inventory/actions.ts#updateInventoryItemLists', 'app/shopping/inventory/actions.ts#updateInventoryItemLists'],
+      ['app/shopping/inventory/actions.ts#createItemListAndAssign', 'app/shopping/inventory/actions.ts#createItemListAndAssign'],
+      ['app/shopping/inventory/actions.ts#toggleInventoryItemList', 'app/shopping/inventory/actions.ts#toggleInventoryItemList'],
+    ),
     description:
       `Put items they own on one of their Shopping lists, take them off one, or rename a list, when they ask ("put these on my Gifts list"). change add puts the items on the list named, making the list when they have none by that name; remove takes them off; rename gives the list rename_to as its name. Name the list by list (its name) or list_ref, and the items by item_refs, at most ${BULK_MAX}. Deleting a list is done in Shopping's settings, not by you.`,
     input_schema: {
@@ -2482,6 +2501,11 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'add_items',
+    runs: sameAs(
+      ['app/shopping/inventory/book-actions.ts#saveOwnedBook', 'app/shopping/inventory/book-actions.ts#saveOwnedBook'],
+      ['app/shopping/inventory/game-actions.ts#saveGame', 'app/shopping/inventory/game-actions.ts#saveGame'],
+      ['app/shopping/inventory/item-actions.ts#saveManualItem', 'app/shopping/inventory/item-actions.ts#saveManualItem'],
+    ),
     description: `Add things they own to their Shopping inventory, when they tell you they bought or have them ("I bought a copy of Dune", a list of the board games on their shelf), as the add pages do. Each item takes a kind: book (an isbn is looked up in the book catalogs; without one, give the title and what they said of authors, publisher, year and edition), game (a board game, by its title, with year, publisher or barcode when known), or other (anything else, with an optional variant and the name of one of their categories). At most ${ADD_MAX} items. Do not add what an order email already brought in: look it up first when unsure.`,
     input_schema: {
       type: 'object',
@@ -2519,6 +2543,13 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_saved_item',
+    runs: sameAs(
+      ['app/shopping/saved/actions.ts#createSavedItem', 'app/shopping/saved/actions.ts#createSavedItem'],
+      ['app/shopping/saved/actions.ts#updateSavedItem', 'app/shopping/saved/actions.ts#updateSavedItem'],
+      ['app/shopping/saved/actions.ts#markSavedPurchased', 'app/shopping/saved/actions.ts#markSavedPurchased'],
+      ['app/shopping/saved/actions.ts#dismissSavedItem', 'app/shopping/saved/actions.ts#dismissSavedItem'],
+      ['app/shopping/saved/actions.ts#restoreSavedItem', 'app/shopping/saved/actions.ts#restoreSavedItem'],
+    ),
     description:
       "Work their saved-for-later list in Shopping, when they ask: add saves a product they might buy (give its url and a title; price, notes and picture are optional), edit changes a saved item's link, title, price, notes or picture, bought marks it bought, dismiss puts it aside, restore brings a dismissed or bought one back to saved. Name a saved item by saved_ref, from a lookup. Deleting a saved item is done on its page, not by you.",
     input_schema: {
@@ -2541,6 +2572,7 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'add_order',
+    runs: noButton('No page has an order form: orders come in from email, and capture files a receipt through saveReceiptOrder.'),
     description: `Enter an order they describe in Shopping, as the order form does ("I bought two mugs at Target for $8 each yesterday"), or one read from a receipt they show you: the merchant by name, the day, and a line per thing bought with its quantity and unit price in dollars; tax, shipping and discount are optional. Each unit lands in the inventory. Set from_receipt when it comes from a receipt photo; give message_ref when it is read from an email waiting in the review queue, which takes the email out of the queue. At most ${ADD_MAX} lines. Look the orders up first when it may have come in from email already.`,
     input_schema: {
       type: 'object',
@@ -2579,6 +2611,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'order_item_tags',
+    runs: sameAs(
+      ['app/shopping/orders/actions.ts#addOrderItemTag', 'lib/tags/ensure.ts#ensureItemTags'],
+      ['app/shopping/orders/actions.ts#removeOrderItemTag', 'app/shopping/orders/actions.ts#removeOrderItemTag'],
+    ),
     description:
       'Put a tag on a line of one of their Shopping orders, or take one off, when they ask ("tag the lamp as a gift"). change add tags the line, making the tag when they have none by that name; remove takes it off. Name the line by order_item_ref, from an order lookup, and the tag by its name.',
     input_schema: {
@@ -2595,6 +2631,19 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'review_orders',
+    runs: sameAs(
+      ['app/shopping/orders/actions.ts#restoreDeletedOrder', 'app/shopping/orders/actions.ts#restoreDeletedOrder'],
+      ['app/shopping/review/actions.ts#confirmOrderReview', 'app/shopping/review/actions.ts#confirmOrderReview'],
+      ['app/shopping/review/actions.ts#discardOrderReview', 'app/shopping/review/actions.ts#discardOrderReview'],
+      ['app/shopping/review/actions.ts#dismissEmailReview', 'app/shopping/review/actions.ts#dismissEmailReview'],
+      ['app/shopping/review/actions.ts#attachEmailToOrder', 'lib/orders/apply-lifecycle.ts#applyLifecycleToOrder'],
+      ['app/shopping/review/actions.ts#confirmOrdersReview', 'app/shopping/review/actions.ts#confirmOrdersReview'],
+      ['app/shopping/review/actions.ts#unconfirmOrdersReview', 'app/shopping/review/actions.ts#unconfirmOrdersReview'],
+      ['app/shopping/review/actions.ts#discardOrdersReview', 'app/shopping/review/actions.ts#discardOrdersReview'],
+      ['app/shopping/review/actions.ts#restoreDiscardedOrders', 'app/shopping/review/actions.ts#restoreDiscardedOrders'],
+      ['app/shopping/review/actions.ts#dismissEmailsReview', 'app/shopping/review/actions.ts#dismissEmailsReview'],
+      ['app/shopping/review/actions.ts#restoreDismissedEmails', 'app/shopping/review/actions.ts#restoreDismissedEmails'],
+    ),
     description: `Work the Shopping review queue and deleted orders, when they ask. On orders (order_refs, at most ${REVIEW_MAX}): confirm keeps an imported order that looks right and takes it out of the queue; unconfirm puts a confirmed one back in the queue; discard sends a bad import to Deleted orders and stops its email bringing it back; restore brings back a deleted or discarded order (review_again true puts it back in the queue too). On waiting emails (message_refs): dismiss takes an email that is not an order out of the queue; undismiss puts a dismissed one back. attach links one waiting shipping, delivery, return or confirmation email (message_ref) to the order it is about (order_ref) and writes the shipment or return it describes. Deleting an order for good stays on the page.`,
     input_schema: {
       type: 'object',
@@ -2623,6 +2672,12 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_recurring',
+    runs: sameAs(
+      ['app/shopping/recurring/actions.ts#renameRecurringPayment', 'lib/recurring/corrections.ts#renamePayment'],
+      ['app/shopping/recurring/actions.ts#mergeRecurringPayment', 'lib/recurring/corrections.ts#mergePayments'],
+      ['app/shopping/recurring/actions.ts#moveRecurringCharges', 'lib/recurring/corrections.ts#moveCharges'],
+      ['app/shopping/recurring/actions.ts#setRecurringCounted', 'lib/recurring/corrections.ts#setPaymentCounted'],
+    ),
     description:
       "Tidy their recurring payments in Shopping, the subscriptions and bills read from their mail, when they ask. Name a payment by payment, the name it shows under on the Recurring page. change rename gives it rename_to as its name; leave_out takes it off the monthly total and the agenda, and count puts it back; merge folds it into the payment named by into, moving every charge there, when the two are the same thing under two names; move takes some of its charges, named by charged_on (the days they were charged, YYYY-MM-DD), to the payment named by into or to a new one named by new_payee, when one row holds more than one subscription. A merge and a move have no Undo, so say so. A refusal lists their payments and a payment's charges.",
     input_schema: {
@@ -2647,6 +2702,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'return_window',
+    runs: sameAs(
+      ['app/shopping/returns/actions.ts#saveMerchantReturnPolicy', 'app/shopping/returns/actions.ts#saveMerchantReturnPolicy'],
+      ['app/shopping/returns/actions.ts#createMerchantReturnPolicy', 'app/shopping/returns/actions.ts#createMerchantReturnPolicy'],
+    ),
     description:
       "Set how long a shop gives them to return things, as Shopping's settings do, when they say (\"Target gives me 90 days\"). Name the shop by shop; give days (1 to 730), no_window when the shop takes no returns, or use_default to go back to the window Shopping knows for it. A shop Shopping does not know is added as one of theirs when new_shop is true, with the window given.",
     input_schema: {
@@ -2665,6 +2724,10 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   },
   {
     name: 'change_person',
+    runs: sameAs(
+      ['app/shopping/settings/people-actions.ts#addPerson', 'app/shopping/settings/people-actions.ts#addPerson'],
+      ['app/shopping/settings/people-actions.ts#updatePerson', 'app/shopping/settings/people-actions.ts#updatePerson'],
+    ),
     description: `Work the list of people they shop for in Shopping (the household members orders and items are put on), when they ask. change add puts someone on it by name, with an optional colour for their badge; edit renames the person named by person to rename_to or gives them another colour. Colours: ${PERSON_COLOURS.join(', ')}. Removing someone is done in Shopping's settings, not by you.`,
     input_schema: {
       type: 'object',
@@ -2713,6 +2776,7 @@ const ASK_NOTE =
 export const SHOPPING_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = SHOPPING_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!shoppingOn(ctx.enabledModules)) return { ok: false, error: SHOPPING_OFF };

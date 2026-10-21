@@ -1,3 +1,4 @@
+import { sameAs } from './runs';
 import { isUuid, type AskDb, type SchemaClient } from '@/lib/ask/db';
 import { toRef } from '@/lib/core/refs';
 import { formatNumber } from '@/lib/money';
@@ -747,6 +748,9 @@ const INTERVIEW_PLACE = { type: 'integer', minimum: 1, description: 'Its place i
 export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   {
     name: 'change_interview',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterview', 'app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterview'],
+    ),
     description: `Correct an interview on one of their roles in Jobs when they ask, as its card on the role page does: its kind (${INTERVIEW_KINDS.join(', ')}), its status (${STATUSES.join(', ')}; completed when it has happened), its date and time, what they noted about it, or their prep notes. Name it by role_ref and round_number (plus interview, its place, when the round holds several), or by interview_ref. Pass only what they asked to change; an empty date clears it, and an empty notes or prep_notes clears that.`,
     input_schema: {
       type: 'object',
@@ -769,6 +773,11 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_interviewer',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewer', 'app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewer'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewerByName', 'app/jobs/(app)/roles/[id]/interview-actions.ts#addInterviewerByName'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#removeInterviewer', 'app/jobs/(app)/roles/[id]/interview-actions.ts#removeInterviewer'],
+    ),
     description:
       "Name who interviewed them, or take someone off an interview, on one of their roles in Jobs when they ask (\"Priya Shah ran my technical round at Stripe\"). action add names them: by contact_ref when they are a contact (search their contacts first), or by name, which attaches the contact of that name at the role's company or adds them there as a new contact. action remove takes them off by contact_ref or name; the contact itself stays. Name the interview by role_ref and round_number (plus interview when the round holds several), or by interview_ref.",
     input_schema: {
@@ -790,6 +799,12 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
   },
   {
     name: 'change_interview_round',
+    runs: sameAs(
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews', 'app/jobs/(app)/roles/[id]/interview-actions.ts#groupInterviews'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterviewGroup', 'app/jobs/(app)/roles/[id]/interview-actions.ts#saveInterviewGroup'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#unlinkRoundMessage', 'app/jobs/(app)/roles/[id]/interview-actions.ts#unlinkRoundMessage'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview', 'app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview'],
+    ),
     description:
       "Change the interview rounds on one of their roles in Jobs when they ask, as the role page does. action edit renames a round (label), writes how the round went as a whole (notes) or renumbers it (new_round_number). action group gathers rounds into one (round_numbers, at least two): the interviews and emails of the later rounds move into the first, each keeping its own notes, and the emptied rounds go; a round with notes of its own is refused. action split moves one interview out of a round it shares into a round of its own, numbered after the others. action detach_email takes an email off a round (message_ref from search_mail, needed when it has several); the email stays on the role. Name the role by role_ref, and the round by round_number; split names the interview as change_interview does.",
     input_schema: {

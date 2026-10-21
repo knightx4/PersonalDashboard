@@ -1,3 +1,4 @@
+import { sameAs } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { DASH_CHOICES, type DashChoiceId } from '@/lib/core/models';
 import { toRef } from '@/lib/core/refs';
@@ -110,5 +111,5 @@ const definition: Anthropic.Tool = {
 
 /** The model write tools, in the order the model is sent them. */
 export const MODEL_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
-  { name: 'set_dash_model', kind: 'write', definition, apply: guarded(setDashModel) },
+  { name: 'set_dash_model', runs: sameAs(['lib/dash/model-choice-actions.ts#setDashModel', 'lib/dash/model-choice.ts#saveDashModel']), kind: 'write', definition, apply: guarded(setDashModel) },
 ];

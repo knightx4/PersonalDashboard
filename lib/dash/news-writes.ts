@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { NewsChangeInput, NewsChangeKind } from '@/lib/ask/news-changes';
@@ -57,6 +58,8 @@ export type NewsMade = {
 
 export type NewsWrite = {
   name: NewsChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** The workspaces that must be switched on for the change. */
   modules: readonly ModuleId[];
   /** Without the line each surface adds on where the change shows. */
@@ -370,6 +373,7 @@ const STORY_PROPERTIES = {
 export const NEWS_WRITES: readonly NewsWrite[] = [
   {
     name: 'mark_issue_unread',
+    runs: sameAs(['app/news/i/[id]/actions.ts#markIssueUnread', 'lib/news/issues/read.ts#markUnread']),
     modules: ['news'],
     description:
       'Put one newsletter back in the unread list, when they ask. Name it by the news.issues ref a lookup returned.',
@@ -383,6 +387,10 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'save_story',
+    runs: sameAs(
+      ['app/news/i/[id]/actions.ts#setStorySaved', 'lib/news/saved/stories.ts#saveStory'],
+      ['app/news/saved/actions.ts#removeSaved', 'lib/news/saved/stories.ts#removeSavedStoryById'],
+    ),
     modules: ['news'],
     description:
       'Save a story from a newsletter to the Saved list, or take one off it, when they ask. saved true saves; false takes it off. Name the story by issue_ref and headline, or by saved_story_ref when it is on Saved already.',
@@ -396,6 +404,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'send_story_to_learn',
+    runs: sameAs(['app/news/i/[id]/actions.ts#sendStoryToLearn', 'lib/learn/tracks/news.ts#queueNewsStory']),
     modules: ['news', 'learn'],
     description:
       "Put a newsletter story on Learn's From News reading list, when they ask. The story is saved first and stays on Saved. A story already on the queue is refused. Name it by issue_ref and headline, or by saved_story_ref.",
@@ -404,6 +413,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'make_todo_from_story',
+    runs: sameAs(['app/news/i/[id]/actions.ts#makeTodoFromStory', 'lib/todo/links/story.ts#makeStoryTask']),
     modules: ['news', 'todo'],
     description:
       'Make a todo titled with a newsletter story\'s headline that opens the story, when they ask. The story is saved first and stays on Saved. A story that has an open todo already is refused. Name it by issue_ref and headline, or by saved_story_ref.',
@@ -412,6 +422,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'stop_watch',
+    runs: sameAs(['app/home/actions.ts#stopWatch', 'app/home/actions.ts#stopWatch']),
     modules: [],
     description:
       "Stop a price watch that is running, when they ask. Name it by the core.watches ref a lookup returned. A stopped watch does not start again; starting a new one is a proposal they confirm.",
@@ -453,6 +464,7 @@ const ASK_NOTE =
 export const NEWS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = NEWS_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     const off = switchedOff(write, ctx.enabledModules);
