@@ -42,10 +42,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
   change_video: ['app/learn/videos/actions.ts#setWatchedAction'],
   change_place: ['app/you/places/actions.ts#savePlace'],
   save_job: ['app/you/work/job-actions.ts#saveJobAction'],
-  mark_issue_unread: ['app/news/i/[id]/actions.ts#markIssueUnread'],
-  save_story: ['app/news/saved/actions.ts#removeSaved'],
-  make_todo_from_story: ['app/news/i/[id]/actions.ts#makeTodoFromStory'],
-  stop_watch: ['app/home/actions.ts#stopWatch'],
   change_goal_area: ['app/goals/actions.ts#moveAreaAction'],
   change_goal_step: [
     'app/goals/[goalId]/actions.ts#moveStepAction',
