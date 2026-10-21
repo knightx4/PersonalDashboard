@@ -139,8 +139,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview',
   ],
   link_round_email: ['app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage'],
-  rewrite_post: ['app/dev/posts/actions.ts#editPostBody'],
-  suggest_post: ['app/dev/posts/actions.ts#suggestPostAbout'],
   file_idea: [
     'app/dev/ideas/actions.ts#addIdea',
     'app/dev/ideas/actions.ts#submitIdea',

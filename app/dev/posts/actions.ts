@@ -19,6 +19,7 @@ import {
   parsePostedUrl,
   POST_IMAGES_BUCKET,
 } from '@/lib/dev/posts';
+import { rewritePostBody } from '@/lib/dev/post-body';
 import { startPostsRun } from '@/lib/dev/posts-run';
 import { POST_WANTS_MAX } from '@/lib/dev/posts-page';
 import { formatNumber } from '@/lib/money';
@@ -192,15 +193,9 @@ export async function editPostBody(
     };
   }
 
-  const { data, error } = await supabase
-    .from('social_posts')
-    .update({ body })
-    .eq('user_id', user.id)
-    .eq('id', id.data)
-    .in('status', OPEN_POST_STATUSES)
-    .select('id');
-  if (error) return { error: error.message };
-  if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
+  const { row, error } = await rewritePostBody(supabase, user.id, id.data, body);
+  if (error) return { error };
+  if (!row) return { error: 'This draft is no longer waiting to be posted.' };
 
   revalidatePath(POSTS_PATH);
   return { message: 'Saved.' };
