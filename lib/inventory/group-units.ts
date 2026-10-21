@@ -132,3 +132,72 @@ export async function groupUnits(supabase: Client, userId: string, ids: readonly
 
   return { ok: true, groupId, made: existing === null, ids: unitIds };
 }
+
+/**
+ * Hold one copy out of the stack it is in, as the item page's Separate and
+ * Dash's change_items (separate) both do (plan #2473.4). It goes into a group
+ * of its own with no derived key, so nothing is ever drawn back into it.
+ */
+export async function separateUnit(
+  supabase: Client,
+  userId: string,
+  unit: Pick<UnitRow, 'id' | 'name' | 'short_name'>,
+): Promise<{ ok: true; groupId: string } | { ok: false; error: string }> {
+  const { data: group, error: groupError } = await supabase
+    .from('item_groups')
+    .insert({ user_id: userId, name: displayName(unit), group_key: null })
+    .select('id')
+    .single();
+  if (groupError || !group) return { ok: false, error: groupError?.message ?? 'Could not separate that copy.' };
+  const groupId = (group as { id: string }).id;
+  const { error } = await supabase.from('inventory_items').update({ group_id: groupId }).eq('user_id', userId).eq('id', unit.id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, groupId };
+}
+
+/**
+ * Take every copy out of these groups of theirs, so each stacks by its own
+ * details again, as the item page's Ungroup and Dash's change_items (ungroup)
+ * both do (plan #2473.4).
+ *
+ * The page deletes the groups (`keepGroups` false). Dash never deletes, so it
+ * keeps them, empty, with the key each claimed cleared so nothing draws the
+ * copies back in, and Undo can put them back. Hands back the copies it moved
+ * and each group's key before.
+ */
+export async function ungroupUnits(
+  supabase: Client,
+  userId: string,
+  opts: { groupIds: readonly string[]; keepGroups: boolean },
+): Promise<{ ok: true; ids: string[]; groups: { id: string; group_key: string | null }[] } | { ok: false; error: string }> {
+  if (opts.groupIds.length === 0) return { ok: false, error: 'That group could not be found.' };
+  const { data: groupData, error: groupsError } = await supabase
+    .from('item_groups')
+    .select('id, group_key')
+    .eq('user_id', userId)
+    .in('id', [...opts.groupIds]);
+  if (groupsError) return { ok: false, error: groupsError.message };
+  const groups = (groupData ?? []) as { id: string; group_key: string | null }[];
+  if (groups.length === 0) return { ok: false, error: 'That group could not be found.' };
+
+  const { data: moved, error } = await supabase
+    .from('inventory_items')
+    .update({ group_id: null })
+    .eq('user_id', userId)
+    .in(
+      'group_id',
+      groups.map((group) => group.id),
+    )
+    .select('id');
+  if (error) return { ok: false, error: error.message };
+
+  for (const group of groups) {
+    if (opts.keepGroups && !group.group_key) continue;
+    const write = opts.keepGroups
+      ? supabase.from('item_groups').update({ group_key: null })
+      : supabase.from('item_groups').delete();
+    const { error: groupError } = await write.eq('id', group.id).eq('user_id', userId);
+    if (groupError) return { ok: false, error: groupError.message };
+  }
+  return { ok: true, ids: ((moved ?? []) as { id: string }[]).map((row) => row.id), groups };
+}
