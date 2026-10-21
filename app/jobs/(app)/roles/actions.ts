@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
-import { extractCompBand, extractRequirements, jdHash } from '@/lib/jobs/jd/requirements';
+import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { countEvidenceUse, saveAnswerEdit, setCanonicalAnswer } from '@/lib/jobs/answers/edit';
 import { recordHandEditOrigins } from '@/lib/jobs/fact-origins';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
@@ -49,31 +50,9 @@ export async function updateRole(
   if (patch.compMaxCents !== undefined) update.comp_max_cents = patch.compMaxCents;
   if (patch.compSource !== undefined) update.comp_source = patch.compSource;
   if (patch.jdText !== undefined) {
-    const text = patch.jdText?.trim() || null;
-    update.jd_text = text;
-    update.jd_hash = text ? jdHash(text) : null;
-    update.jd_source = text ? 'manual' : null;
-    // The nightly board lookup's note explains an empty panel or a title-based
-    // match. Once you have pasted the description yourself it explains nothing,
-    // so it goes with the thing it was about.
-    update.jd_lookup_note = null;
-    // Requirements are extracted once per JD; changing the JD re-extracts.
-    update.requirements = text ? extractRequirements(text) : null;
-    update.requirements_extracted_at = text ? new Date().toISOString() : null;
-
-    // Fill the comp band from the posting text itself -- but only when the
-    // extraction actually found one, and only when this same call is not
-    // already setting comp by hand. A JD with no visible range should not
-    // erase a number pulled from a call with the recruiter.
-    if (text && patch.compMinCents === undefined && patch.compMaxCents === undefined) {
-      const comp = extractCompBand(text);
-      if (comp) {
-        update.comp_min_cents = comp.minCents;
-        update.comp_max_cents = comp.maxCents;
-        update.comp_source = 'posted';
-        payFromPosting = true;
-      }
-    }
+    const read = descriptionUpdate(patch.jdText, patch.compMinCents !== undefined || patch.compMaxCents !== undefined);
+    Object.assign(update, read.update);
+    payFromPosting = read.payFromPosting;
   }
 
   // What the facts were, so only the ones this save changes get an origin:
@@ -85,11 +64,7 @@ export async function updateRole(
     .eq('user_id', user.id)
     .maybeSingle();
 
-  const { error } = await supabase
-    .from('roles')
-    .update(update)
-    .eq('id', roleId)
-    .eq('user_id', user.id);
+  const { error } = await saveRoleEdit(supabase, user.id, roleId, update);
 
   if (error) return { error: error.message };
   if (before) await recordHandEditOrigins(supabase, user.id, roleId, before, update, { payFromPosting });
@@ -162,12 +137,8 @@ export async function saveAnswer(
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('application_answers')
-    .update({ answer, status })
-    .eq('id', answerId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveAnswerEdit(supabase, user.id, answerId, { answer, status });
+  if (error) return { error };
   revalidatePath('/jobs/material');
   return { error: null };
 }
@@ -223,15 +194,8 @@ export async function promoteToCanonical(
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('questions')
-    .update({
-      canonical_answer: answer,
-      canonical_answer_updated_at: new Date().toISOString(),
-    })
-    .eq('id', questionId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await setCanonicalAnswer(supabase, user.id, questionId, answer);
+  if (error) return { error };
   revalidatePath('/jobs/material');
   return { error: null };
 }
@@ -496,25 +460,19 @@ export async function saveDraftedAnswer(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('application_answers')
-    .update({
-      answer: parsed.data.answer,
-      status: 'draft',
-      evidence_item_ids: parsed.data.evidenceItemIds,
-      unsupported_claims: parsed.data.unsupportedClaims,
-      considerations: parsed.data.considerations,
-    })
-    .eq('id', parsed.data.answerId)
-    .eq('user_id', user.id);
+  const { error } = await saveAnswerEdit(supabase, user.id, parsed.data.answerId, {
+    answer: parsed.data.answer,
+    status: 'draft',
+    evidence_item_ids: parsed.data.evidenceItemIds,
+    unsupported_claims: parsed.data.unsupportedClaims,
+    considerations: parsed.data.considerations,
+  });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   // Best effort: a use counter that failed to tick is not a reason to lose the
   // answer that was just saved.
-  if (parsed.data.evidenceItemIds.length > 0) {
-    await supabase.rpc('bump_evidence_use', { item_ids: parsed.data.evidenceItemIds });
-  }
+  await countEvidenceUse(supabase, parsed.data.evidenceItemIds);
 
   revalidatePath('/jobs/material');
   return { error: null };

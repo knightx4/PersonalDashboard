@@ -331,7 +331,7 @@ export const THREAD_TOOLS: readonly DashTool[] = [
     'write_cover_letter',
     sameAsVia(
       'lib/jobs/role-thread/ask.ts#produceReply',
-      ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter', 'app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#saveCoverLetter', 'lib/jobs/applications/edit.ts#saveCoverLetterText'],
     ),
     [ROLE_THREAD_TABLE],
     "Write the role's cover letter, or change the one on file, when the comment asks. It replaces the letter on file, and the old one is kept under your reply.",

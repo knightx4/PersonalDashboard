@@ -1,3 +1,4 @@
+import { linkRoundEmailRow } from '@/lib/jobs/interview/edit';
 import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskDb } from '@/lib/ask/db';
@@ -305,13 +306,10 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
     return { ok: false, error: `That email is already attached to ${roundName} of ${roleTitle}. Nothing was changed; tell them so.` };
   }
 
-  const { data, error } = await jobs
-    .from('interview_group_messages')
-    .insert({ user_id: ctx.userId, group_id: round.roundId, message_id: message.id })
-    .select('id')
-    .single();
-  if (error || !data) throw new Error(error?.message ?? 'The email was not attached.');
-  const linkId = (data as { id: string }).id;
+  // The same write as the round card's "add an email".
+  const { row: data, error } = await linkRoundEmailRow(jobs as unknown as AppSupabaseClient, ctx.userId, round.roundId, message.id);
+  if (error || !data) throw new Error(error ?? 'The email was not attached.');
+  const linkId = data.id as string;
 
   const href = `/jobs/roles/${roleId}`;
   const subjectRef = toRef('job_search.interview_group_messages', linkId);
@@ -476,7 +474,7 @@ export const INTERVIEW_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = 
   tool(
     'link_round_email',
     sameAs(
-      ['app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage', 'app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage'],
+      ['app/jobs/(app)/roles/[id]/interview-actions.ts#linkRoundMessage', 'lib/jobs/interview/edit.ts#linkRoundEmailRow'],
     ),
     "Attach an email to an interview round on one of their roles in Jobs, when they ask (\"attach the recruiter's invite to round 2\"). Find the email first with search_mail and pass the message ref it returned. Name the round by its role (the job_search.roles or job_search.applications ref a lookup returned) and its number on that role: the number add_interview_round gave, or the one the role page shows. The email is only said to belong to the round; it stays on the role's timeline, and Undo removes just the attachment. If it is already attached this says so and changes nothing.",
     {

@@ -6,6 +6,16 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
 import { insertInterview, insertInterviewRound } from '@/lib/jobs/interview/rounds';
+import {
+  addInterviewerRow,
+  interviewerContact,
+  linkRoundEmailRow,
+  moveInterviewToRound,
+  removeInterviewerRow,
+  saveInterviewEdit,
+  saveRoundEdit,
+  unlinkRoundEmailRow,
+} from '@/lib/jobs/interview/edit';
 
 /**
  * When a round is, in the three states it can actually be in: an hour, a day
@@ -75,13 +85,9 @@ export async function saveInterview(
     update.time_known = schedule.data.timeKnown;
   }
 
-  const { error } = await supabase
-    .from('interviews')
-    .update(update)
-    .eq('id', interviewId)
-    .eq('user_id', user.id);
+  const { error } = await saveInterviewEdit(supabase, user.id, interviewId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
@@ -200,16 +206,9 @@ export async function addInterviewer(input: {
     .maybeSingle();
   if (!contact) return { error: 'That contact no longer exists.' };
 
-  const { error } = await supabase.from('interview_participants').upsert(
-    {
-      interview_id: parsed.data.interviewId,
-      contact_id: parsed.data.contactId,
-      role: 'interviewer',
-    },
-    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
-  );
+  const { error } = await addInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
@@ -261,46 +260,12 @@ export async function addInterviewerByName(input: {
   // Someone of that name already on this company is the same person, not a
   // second copy of them: typing a name that is already in the list should
   // attach the record rather than fork it.
-  const byName = supabase
-    .from('contacts')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('full_name', parsed.data.name);
+  const { contact, error: contactError } = await interviewerContact(supabase, user.id, companyId, parsed.data.name);
+  if (contactError || !contact) return { error: contactError ?? 'Could not add that person.' };
 
-  const { data: existing } = await (
-    companyId ? byName.eq('company_id', companyId) : byName.is('company_id', null)
-  )
-    .limit(1)
-    .maybeSingle();
+  const { error } = await addInterviewerRow(supabase, parsed.data.interviewId, contact.id as string);
 
-  let contactId = (existing?.id as string | undefined) ?? null;
-
-  if (!contactId) {
-    const { data: created, error } = await supabase
-      .from('contacts')
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        full_name: parsed.data.name,
-        relationship: 'interviewer',
-      })
-      .select('id')
-      .single();
-
-    if (error || !created) return { error: error?.message ?? 'Could not add that person.' };
-    contactId = created.id as string;
-  }
-
-  const { error } = await supabase.from('interview_participants').upsert(
-    {
-      interview_id: parsed.data.interviewId,
-      contact_id: contactId,
-      role: 'interviewer',
-    },
-    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
-  );
-
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
@@ -319,13 +284,9 @@ export async function removeInterviewer(input: {
   await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_participants')
-    .delete()
-    .eq('interview_id', parsed.data.interviewId)
-    .eq('contact_id', parsed.data.contactId);
+  const { error } = await removeInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
@@ -544,13 +505,9 @@ export async function saveInterviewGroup(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_groups')
-    .update(update)
-    .eq('id', parsed.data.groupId)
-    .eq('user_id', user.id);
+  const { error } = await saveRoundEdit(supabase, user.id, parsed.data.groupId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -594,16 +551,9 @@ export async function linkRoundMessage(input: {
     .maybeSingle();
   if (!message) return { error: 'That message is no longer in the mailbox.' };
 
-  const { error } = await supabase.from('interview_group_messages').upsert(
-    {
-      user_id: user.id,
-      group_id: parsed.data.groupId,
-      message_id: parsed.data.messageId,
-    },
-    { onConflict: 'group_id,message_id' },
-  );
+  const { error } = await linkRoundEmailRow(supabase, user.id, parsed.data.groupId, parsed.data.messageId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -626,14 +576,9 @@ export async function unlinkRoundMessage(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_group_messages')
-    .delete()
-    .eq('group_id', parsed.data.groupId)
-    .eq('message_id', parsed.data.messageId)
-    .eq('user_id', user.id);
+  const { error } = await unlinkRoundEmailRow(supabase, user.id, parsed.data.groupId, parsed.data.messageId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -672,13 +617,9 @@ export async function ungroupInterview(interviewId: string): Promise<{ error: st
   });
   if (!round.groupId) return { error: round.error };
 
-  const { error } = await supabase
-    .from('interviews')
-    .update({ group_id: round.groupId, round: 1 })
-    .eq('id', parsed.data)
-    .eq('user_id', user.id);
+  const { error } = await moveInterviewToRound(supabase, user.id, parsed.data, round.groupId, 1);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
