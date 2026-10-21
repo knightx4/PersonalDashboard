@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
@@ -88,9 +88,23 @@ export function ResearchPanel({
       meta={meta}
       action={
         running || !available ? undefined : (
-          <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={start}>
-            {pending ? 'Starting…' : shown ? 'Refresh research' : 'Research this company'}
-          </Button>
+          <DashAction
+            type="button"
+            size="sm"
+            variant="secondary"
+            pending={pending}
+            disabled={pending}
+            onClick={start}
+            routine="goals"
+            what="Where the research runs"
+            align="end"
+          >
+            {/* "Refresh", not "Refresh research": the card is titled Research,
+                and with Dash's mark and the routine's $ beside it the longer
+                label pushed the button off the title's line at 390 (critic,
+                plan #2459). */}
+            {pending ? 'Starting…' : shown ? 'Refresh' : 'Research this company'}
+          </DashAction>
         )
       }
     >

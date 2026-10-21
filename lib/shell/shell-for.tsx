@@ -8,6 +8,7 @@ import { getUser } from '@/lib/auth/server';
 import type { SessionUser } from '@/lib/auth/session-user';
 import { loadAccountSettings, type AccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { dashModelFor } from '@/lib/dash/model-choice';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import {
   estimatePaidActions,
@@ -130,7 +131,7 @@ export async function shellFor(options: ShellOptions) {
         ]
       : undefined);
 
-  const [settings, counts, activity, mainCheck, owner, costs] = await Promise.all([
+  const [settings, counts, activity, mainCheck, owner, costs, dashModel] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
@@ -141,6 +142,10 @@ export async function shellFor(options: ShellOptions) {
           .then((core) => estimatePaidActions(core, user.id, paidActions))
           .catch(() => ({}))
       : null,
+    // The model Ask Dash answers with (plan #2458.2), for the sheet's file-reading hint.
+    createCoreClient()
+      .then((core) => dashModelFor(core, user.id))
+      .catch(() => undefined),
   ]);
 
   const frame: ShellFrame = { user, settings, owner, counts };
@@ -179,6 +184,7 @@ export async function shellFor(options: ShellOptions) {
         theme={settings.theme}
         activity={activity}
         mainCheck={mainCheck}
+        dashModel={dashModel}
         brief={brief}
         banner={banner}
       >

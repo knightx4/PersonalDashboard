@@ -400,9 +400,23 @@ async function main() {
           console.log(`  (${surfaceId} is ${pageHeight}px tall — shooting at 1x)`);
         }
 
+        // A page too tall even at 1x (the whole of /dev/ui is over 70,000px on
+        // a phone) is shot from the top down to the most a capture can hold.
+        // Past MAX_SIDE the picture is one no image reader opens, so the critic
+        // saw nothing of it (plan #2457.7). The page's parts that matter have
+        // surfaces of their own, as dev-ui-corrections does.
+        const clipHeight = Math.floor(Math.min(MAX_SIDE - 1, MAX_AREA / size.width));
+        const clipped = !windowOnly && !fits(1);
+        if (clipped) {
+          console.log(`  (${surfaceId} is cut to its top ${clipHeight}px)`);
+        }
+
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
           captureBeyondViewport: !windowOnly,
+          ...(clipped
+            ? { clip: { x: 0, y: 0, width: size.width, height: clipHeight, scale: 1 } }
+            : {}),
         });
         const name = `${surfaceId}--${size.name}-${slug(theme)}.png`;
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
