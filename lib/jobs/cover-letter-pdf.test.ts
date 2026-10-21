@@ -48,13 +48,16 @@ describe('letterBlocks', () => {
 describe('the download', () => {
   it('names the file and dates the letter as the Word letters did', () => {
     expect(letterFileName('Hebbia / AI')).toBe('Selvey Knight Cover Letter - Hebbia AI.pdf');
-    expect(letterDate(new Date(2026, 9, 3))).toBe('October 3, 2026');
+    expect(letterDate(new Date('2026-10-03T15:00:00Z'), 'America/New_York')).toBe(
+      'October 3, 2026',
+    );
   });
 
   it('builds a PDF from text Times cannot all draw', async () => {
     const bytes = await coverLetterPdf({
       letter: 'Dear team,\n\nI → shipped it — fast ✓.',
       company: 'Hebbia',
+      timeZone: 'UTC',
     });
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
   });

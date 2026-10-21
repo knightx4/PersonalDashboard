@@ -18,7 +18,12 @@ export function LetterPdf({ text, company }: { text: string; company: string }) 
     setError(null);
     try {
       const { coverLetterPdf, letterFileName } = await import('@/lib/jobs/cover-letter-pdf');
-      const bytes = await coverLetterPdf({ letter: text, company });
+      const { deviceTimeZone } = await import('@/lib/core/when');
+      const bytes = await coverLetterPdf({
+        letter: text,
+        company,
+        timeZone: deviceTimeZone() ?? 'America/New_York',
+      });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;

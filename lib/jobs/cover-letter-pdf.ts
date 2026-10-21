@@ -10,6 +10,7 @@
  * is always the day the PDF is made. One without a salutation or sign-off
  * gets the letter's usual ones.
  */
+import { whenDate } from '@/lib/core/when';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 export const LETTER_SIGNER = 'Selvey Knight';
@@ -123,8 +124,9 @@ export function letterBlocks(letter: string): Block[] {
 }
 
 /** The date as the letter writes it: October 3, 2026. */
-export function letterDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+export function letterDate(date: Date, timeZone: string): string {
+  const [day, month, year] = whenDate(date, { timeZone, month: 'long' }).split(' ');
+  return `${month} ${day}, ${year}`;
 }
 
 /** The name the download is saved under, as the Word letters were. */
@@ -207,10 +209,13 @@ export async function coverLetterPdf({
   letter,
   company,
   date = new Date(),
+  timeZone,
 }: {
   letter: string;
   company: string;
   date?: Date;
+  /** The zone today is read in for the date line. */
+  timeZone: string;
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`${LETTER_SIGNER} Cover Letter - ${company}`);
@@ -236,7 +241,7 @@ export async function coverLetterPdf({
   const blank = () => advance();
 
   const header: Block[] = [
-    { kind: 'para', lines: [[{ text: letterDate(date), bold: false }]] },
+    { kind: 'para', lines: [[{ text: letterDate(date, timeZone), bold: false }]] },
     ...(company.trim()
       ? [{ kind: 'para' as const, lines: [[{ text: company.trim(), bold: false }]] }]
       : []),
