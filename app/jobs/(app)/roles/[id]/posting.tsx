@@ -11,7 +11,8 @@ import { CardSection } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
-import { Field, FieldError, Textarea, Input } from '@/components/ui/field';
+import { Field, FieldError, Textarea, Input, Select } from '@/components/ui/field';
+import { ROLE_KINDS, ROLE_KIND_LABELS, type RoleKind } from '@/lib/jobs/role-kind';
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { experienceAsk, experienceRange } from '@/lib/jobs/jd/experience';
@@ -28,6 +29,7 @@ export function Posting({
   jdLookupNote,
   jdUrl,
   location,
+  kind,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -95,6 +97,7 @@ export function Posting({
         roleId={roleId}
         jdUrl={jdUrl}
         location={location}
+        kind={kind}
         atsJobId={atsJobId}
         compMinCents={compMinCents}
         compMaxCents={compMaxCents}
@@ -249,6 +252,7 @@ function RoleDetailsCard({
   roleId,
   jdUrl,
   location,
+  kind,
   atsJobId,
   compMinCents,
   compMaxCents,
@@ -258,6 +262,7 @@ function RoleDetailsCard({
   roleId: string;
   jdUrl: string | null;
   location: string | null;
+  kind: RoleKind;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
@@ -269,6 +274,7 @@ function RoleDetailsCard({
   const [editing, setEditing] = useState(false);
   const [jdUrlDraft, setJdUrlDraft] = useState(jdUrl ?? '');
   const [locationDraft, setLocationDraft] = useState(location ?? '');
+  const [kindDraft, setKindDraft] = useState<RoleKind>(kind);
   const [atsJobIdDraft, setAtsJobIdDraft] = useState(atsJobId ?? '');
   const [compMinDraft, setCompMinDraft] = useState(
     compMinCents !== null ? String(Math.round(compMinCents / 100)) : '',
@@ -308,6 +314,7 @@ function RoleDetailsCard({
       const result = await updateRole(roleId, {
         jdUrl: nextUrl,
         location: locationDraft.trim() || null,
+        kind: kindDraft,
         atsJobId: atsJobIdDraft.trim() || null,
         compMinCents: min,
         compMaxCents: max,
@@ -362,6 +369,7 @@ function RoleDetailsCard({
               ) : null
             }
           />
+          <ValueRow label="Kind" value={ROLE_KIND_LABELS[kind]} />
           <ValueRow label="Location" value={location} />
           <ValueRow label="ATS job id" value={atsJobId} />
           <ValueRow
@@ -441,6 +449,16 @@ function RoleDetailsCard({
             onChange={(event) => setJdUrlDraft(event.target.value)}
             placeholder="https://…"
           />
+        </Field>
+        {/* An accelerator or a fellowship goes through the same pipeline as a job. */}
+        <Field id={`kind-${roleId}`} label="Kind">
+          <Select value={kindDraft} onChange={(event) => setKindDraft(event.target.value as RoleKind)}>
+            {ROLE_KINDS.map((option) => (
+              <option key={option} value={option}>
+                {ROLE_KIND_LABELS[option]}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field id={`location-${roleId}`} label="Location">
           <Input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} />

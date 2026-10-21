@@ -60,6 +60,7 @@ const pursuit = (over: Partial<PipelineRow>): PipelineRow => ({
   companyDomains: [],
   companyWebsite: null,
   roleTitle: 'Backend Engineer',
+  roleKind: 'job',
   location: null,
   workMode: null,
   status: 'acknowledged',

@@ -1,6 +1,7 @@
 import { NO_GROUP, type ListDisplaySpec } from '@/lib/list-display';
 import { APPLICATION_STATUSES, SOURCE_LABELS } from '@/lib/jobs/pipeline';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
+import { ROLE_KINDS, ROLE_KIND_LABELS } from '@/lib/jobs/role-kind';
 import { noteRank } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
@@ -111,6 +112,16 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         id: 'company',
         label: 'Company',
         bucket: (row) => ({ key: row.companySlug, label: row.companyName }),
+      },
+      {
+        id: 'kind',
+        label: 'Kind',
+        // In the order ROLE_KINDS lists them, jobs first.
+        bucket: (row) => ({
+          key: row.roleKind,
+          label: ROLE_KIND_LABELS[row.roleKind],
+          rank: ROLE_KINDS.indexOf(row.roleKind),
+        }),
       },
       {
         id: 'source',

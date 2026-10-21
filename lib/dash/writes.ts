@@ -1,4 +1,5 @@
 import { COMMENT_MAX } from '@/lib/goals/comments';
+import { isRoleKind, ROLE_KINDS, type RoleKind } from '@/lib/jobs/role-kind';
 import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { writeChange, type ChangeDeps } from '@/lib/ask/changes';
@@ -680,11 +681,14 @@ async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   if (priority && !(COMPANY_PRIORITIES as readonly string[]).includes(priority)) {
     throw new Refused(`company_priority must be one of: ${COMPANY_PRIORITIES.join(', ')}.`);
   }
+  const kind = text(args, 'kind') || null;
+  if (kind && !isRoleKind(kind)) throw new Refused(`kind must be one of: ${ROLE_KINDS.join(', ')}.`);
   return saveJobLead(ctx, {
     url: text(args, 'url') || null,
     title: text(args, 'title'),
     company: text(args, 'company'),
     companyPriority: priority as CompanyPriority | null,
+    kind: kind as RoleKind | null,
   });
 }
 
@@ -733,7 +737,7 @@ function leadRefusalForPerson(message: string): string {
 
 async function saveJobLead(
   ctx: JobLeadContext,
-  input: { url: string | null; title: string; company: string; companyPriority?: CompanyPriority | null },
+  input: { url: string | null; title: string; company: string; companyPriority?: CompanyPriority | null; kind?: RoleKind | null },
 ): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
   const url = input.url?.trim() || null;
@@ -811,6 +815,7 @@ async function saveJobLead(
         jd_url: url,
         ats_job_id: atsJobId ?? detected?.jobId ?? null,
         location,
+        ...(input.kind ? { kind: input.kind } : {}),
       })
       .select('id'),
   );
@@ -1127,13 +1132,18 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_job_lead',
     noButton('No Jobs page adds a role by hand: leads come in from capture, from email and from the find page.'),
-    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this. To mark the company a target as well, pass company_priority; for a job already saved, mark its company with change_company.',
+    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this. To mark the company a target as well, pass company_priority; for a job already saved, mark its company with change_company. An application that is not a job, such as an accelerator they apply to as a founder, is saved the same way with kind: the title is what they would be (such as "Founder"), the company is the programme (such as Antler).',
     {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'The job posting link, when there is one.' },
         title: { type: 'string', description: 'The role title, when they gave it or you know it.' },
         company: { type: 'string', description: 'The company the role is at.' },
+        kind: {
+          type: 'string',
+          enum: [...ROLE_KINDS],
+          description: 'What kind of opening it is. Leave it out for a job; accelerator, fellowship, grant or other for the rest.',
+        },
         company_priority: {
           type: 'string',
           enum: [...COMPANY_PRIORITIES],

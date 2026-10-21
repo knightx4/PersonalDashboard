@@ -1,4 +1,5 @@
 import { RowLink } from '@/components/shell/back-link';
+import { roleKindLabel } from '@/lib/jobs/role-kind';
 import { ColumnHeading } from '@/components/shell/column-heading';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
@@ -85,6 +86,9 @@ export function RolesTable({
           <TR key={row.applicationId} href={`/jobs/roles/${row.roleId}`}>
             <TD primary className={cell}>
               {row.roleTitle}
+              {roleKindLabel(row.roleKind) && (
+                <span className="ml-1.5 text-small font-normal text-ink-muted">{roleKindLabel(row.roleKind)}</span>
+              )}
               {row.attempt > 1 && (
                 <span className="tabular ml-1.5 text-small font-normal text-ink-muted">
                   attempt {row.attempt}
