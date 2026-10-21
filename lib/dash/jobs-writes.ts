@@ -41,6 +41,7 @@ import {
 import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } from '@/lib/jobs/companies/edit';
 import { CLASSIFICATIONS, type MessageClassification } from '@/lib/jobs/email/classify';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { fileJobNote } from '@/lib/jobs/notes';
 import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { channelEdit, excitementError, saveApplicationEdit, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import {
@@ -1009,6 +1010,7 @@ const COMPANY_FIELDS = [
 
 async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   const before = await namedCompany(env, args);
+  if (given(args, 'note')) return noteOnCompany(env, args, before);
   const id = before.id as string;
   const update: Row = {};
   const changed: string[] = [];
@@ -1069,6 +1071,44 @@ async function changeCompany(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
     after,
     summary: `Dash changed ${listed(changed)} on the company ${was}.`,
     row: { table: COMPANIES, ref: id, title: now, href },
+    undo: null,
+  };
+}
+
+/**
+ * A note on the company, as the company page's Add note files it
+ * (fileJobNote, plan #2473.8). It is its own change, so its Undo takes the
+ * note out and leaves the company as it was.
+ */
+async function noteOnCompany(env: JobsWriteEnv, args: Args, company: Row): Promise<JobsMade> {
+  const others = Object.keys(args).filter((key) => !['company_ref', 'company', 'note'].includes(key) && given(args, key));
+  if (others.length) throw new JobsRefused('Add the note on its own: make the other changes in a second call.');
+  const body = text(args, 'note');
+  if (!body) throw new JobsRefused('note is empty: write the note.');
+  if (body.length > NOTES_MAX) throw new JobsRefused(`Keep the note under ${NOTES_MAX} characters.`);
+
+  const id = company.id as string;
+  const filed = await fileJobNote(env.jobs as unknown as AppSupabaseClient, env.userId, { companyId: id, body });
+  if (filed.error !== null) throw new Error(`Adding the company note failed: ${filed.error}`);
+
+  const name = company.name as string;
+  const href = companyHref(company.slug as string);
+  return {
+    kind: 'change_company',
+    input: {
+      verb: 'Added a note to',
+      what: name,
+      rest: `: "${body.length > 80 ? `${body.slice(0, 79)}…` : body}"`,
+      href,
+      where: 'Open the company',
+      paths: ['/jobs/companies', href],
+    },
+    subjectRef: toRef('job_search.notes', filed.row.id as string),
+    op: 'insert',
+    before: null,
+    after: filed.row,
+    summary: `Dash added a note to the company ${name}.`,
+    row: { table: COMPANIES, ref: id, title: name, href },
     undo: null,
   };
 }
@@ -3132,14 +3172,16 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     runs: sameAs(
       ['app/jobs/(app)/companies/actions.ts#updateCompany', 'lib/jobs/companies/edit.ts#saveCompanyEdit'],
       ['app/jobs/(app)/companies/actions.ts#renameCompany', 'lib/jobs/companies/edit.ts#saveCompanyEdit'],
+      ['app/jobs/(app)/roles/[id]/actions.ts#addNote', 'lib/jobs/notes.ts#fileJobNote'],
     ),
     description:
-      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. Name the company by company_ref, or by its name in company. To mark the company of a job already saved as a target, look up the role and pass its company here with priority target.",
+      "Change a company in their Jobs workspace when they ask: its name (its page's address moves with it, and a name another of their companies has is refused), its priority, research notes, the email domains that link mail to it, industry, headquarters, website, careers page or LinkedIn page, or the six answers on its Perspective tab, their own view of a company they want to focus on (the perspective_ fields). Give only the fields to change. To add a note to the company's Notes, give note alone. Name the company by company_ref, or by its name in company. To mark the company of a job already saved as a target, look up the role and pass its company here with priority target.",
     input_schema: {
       type: 'object',
       properties: {
         company_ref: { type: 'string', description: 'The job_search.companies ref a lookup returned for the company.' },
         company: { type: 'string', description: "Instead of company_ref: the company's name as it is on file." },
+        note: { type: 'string', description: "A note to add to the company's Notes, in their words. Give it with the company and nothing else." },
         name: { type: 'string', description: 'The new name.' },
         priority: { type: 'string', enum: [...PRIORITIES], description: 'How much they want to work there.' },
         research: { type: 'string', description: `Their research notes on the company, in full, replacing what is there. ${CLEARABLE}` },

@@ -4,76 +4,34 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { fileJobNote, type JobNoteInput } from '@/lib/jobs/notes';
 import { saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { COVER_LETTER_MAX, saveApplicationEdit, saveCoverLetterText, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
 
-/**
- * Notes attach to exactly one parent, enforced by a check constraint in the
- * database rather than by this code path remembering to.
- */
-const noteSchema = z
-  .object({
-    body: z.string().trim().min(1, 'A note needs some text.'),
-    companyId: z.string().uuid().optional(),
-    roleId: z.string().uuid().optional(),
-    applicationId: z.string().uuid().optional(),
-    contactId: z.string().uuid().optional(),
-    interviewId: z.string().uuid().optional(),
-  })
-  .refine(
-    (value) =>
-      [
-        value.companyId,
-        value.roleId,
-        value.applicationId,
-        value.contactId,
-        value.interviewId,
-      ].filter(Boolean).length === 1,
-    { message: 'A note attaches to exactly one thing.' },
-  );
-
 // latency: pending
-export async function addNote(input: {
-  body: string;
-  companyId?: string;
-  roleId?: string;
-  applicationId?: string;
-  contactId?: string;
-  interviewId?: string;
-}): Promise<{ error: string | null }> {
-  const parsed = noteSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
+export async function addNote(input: JobNoteInput): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('notes').insert({
-    user_id: user.id,
-    body: parsed.data.body,
-    company_id: parsed.data.companyId ?? null,
-    role_id: parsed.data.roleId ?? null,
-    application_id: parsed.data.applicationId ?? null,
-    contact_id: parsed.data.contactId ?? null,
-    interview_id: parsed.data.interviewId ?? null,
-  });
+  // The same write as Dash's change_company `note` (plan #2473.8).
+  const { note, error } = await fileJobNote(supabase, user.id, input);
+  if (error !== null) return { error };
 
-  if (error) return { error: error.message };
-
-  if (parsed.data.roleId) revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
-  if (parsed.data.companyId) revalidatePath('/jobs/companies');
-  if (parsed.data.contactId) revalidatePath('/jobs/contacts');
+  if (note.roleId) revalidatePath(`/jobs/roles/${note.roleId}`);
+  if (note.companyId) revalidatePath('/jobs/companies');
+  if (note.contactId) revalidatePath('/jobs/contacts');
 
   // A note on a round is read on the role page, which is two joins away from
   // the id the note carries. Worth one lookup: without it the note is written
   // and the page it was written on does not show it.
-  if (parsed.data.interviewId) {
+  if (note.interviewId) {
     const { data: interview } = await supabase
       .from('interviews')
       .select('applications!inner ( role_id )')
-      .eq('id', parsed.data.interviewId)
+      .eq('id', note.interviewId)
       .eq('user_id', user.id)
       .maybeSingle<{ applications: { role_id: string } }>();
     if (interview) revalidatePath(`/jobs/roles/${interview.applications.role_id}`);

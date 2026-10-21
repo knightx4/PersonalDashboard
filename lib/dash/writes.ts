@@ -1102,12 +1102,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_role_note',
-    // The role page's notes are its thread (lib/thread/store.ts). addNote, which the catalogue
-    // still pairs with this tool, now files only the company page's notes in job_search.notes.
-    sameAs(
-      ['app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment', 'lib/thread/store.ts#addThreadTurn'],
-      ['app/jobs/(app)/roles/[id]/actions.ts#addNote', 'app/jobs/(app)/roles/[id]/actions.ts#addNote'],
-    ),
+    // The role page's notes are its thread (lib/thread/store.ts). The company page's notes,
+    // addNote, are change_company's `note` (plan #2473.8).
+    sameAs(['app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment', 'lib/thread/store.ts#addThreadTurn']),
     'Add a note to one of their roles in Jobs, when they ask you to note something on it ("note on the Stripe role that the recruiter is Sam"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref applications returned; look it up first. Write the note in their words.',
     {
       type: 'object',
