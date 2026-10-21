@@ -8,17 +8,10 @@
  * It may only get shorter. The `dash-tools-off-their-button` counter in
  * scripts/spec-counts.ts counts the pairs, and the gate refuses a count that
  * rises: a new write tool starts out calling its button's function, or says
- * why no button does what it does. Steps #2473.2 to #2473.5 work it down,
- * workspace by workspace.
+ * why no button does what it does. Steps #2473.2 to #2473.9 worked it down,
+ * workspace by workspace, to empty.
  */
-export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
-  reword: [
-    'app/dev/bugs/actions.ts#editFeedback',
-    'app/dev/ideas/actions.ts#updateIdea',
-    'app/dev/plan/actions.ts#updatePlanItem',
-    'app/dev/plan/actions.ts#updateFeature',
-  ],
-};
+export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {};
 
 /** Every listed pair, as `tool file#export`. */
 export function driftedPairs(): string[] {

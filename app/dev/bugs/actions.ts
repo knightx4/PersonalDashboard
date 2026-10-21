@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
 import { insertFeedbackItem } from '@/lib/feedback/insert';
+import { editFeedbackItem } from '@/lib/feedback/edit';
 import { notesRoutine, runUrlFrom } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
@@ -329,24 +330,13 @@ export async function editFeedback(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { data: existing } = await supabase
-    .from('feedback_items')
-    .select('status')
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (!existing) return { error: 'That note no longer exists.' };
-  if (!(OUTSTANDING_STATUSES as readonly string[]).includes(existing.status as string)) {
-    return { error: 'That one is already closed. Reopen it first to change what it asks for.' };
-  }
-
-  const { error } = await supabase
-    .from('feedback_items')
-    .update({ kind: parsed.data.kind, body: parsed.data.body })
-    .eq('id', parsed.data.id)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const edited = await editFeedbackItem(supabase, {
+    userId: user.id,
+    id: parsed.data.id,
+    kind: parsed.data.kind,
+    body: parsed.data.body,
+  });
+  if ('error' in edited) return { error: edited.error };
 
   revalidateFeedback();
   return { message: 'Saved.' };

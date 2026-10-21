@@ -85,8 +85,13 @@ function db(
         update(row: Record<string, unknown>) {
           writes.push({ table, op: 'update', row });
           // Awaited after one `eq`, or after a second that only touches a
-          // row still in the state it was read in.
-          const narrowed = (): unknown => Object.assign(Promise.resolve({ error }), { eq: narrowed });
+          // row still in the state it was read in. A plan row's save asks for
+          // the row back, to tell a write to nothing from a write.
+          const narrowed = (): unknown =>
+            Object.assign(Promise.resolve({ error }), {
+              eq: narrowed,
+              select: () => Promise.resolve({ data: error ? null : [{ id: 'row-1' }], error }),
+            });
           return { eq: narrowed };
         },
       };
@@ -249,7 +254,7 @@ describe('rewording the row a comment is on', () => {
   });
 
   it('rewrites a bug note and carries the old report back', async () => {
-    const { writes, supabase } = db({ row: { body: 'The picker is broken.' } });
+    const { writes, supabase } = db({ row: { body: 'The picker is broken.', status: 'open' } });
     const outcome = await carryOut(
       input({
         supabase,
@@ -271,7 +276,7 @@ describe('rewording the row a comment is on', () => {
   // The status, the priority and the resolution are the queue's record of the
   // work, not the report of the problem.
   it('touches nothing on a note but its body', async () => {
-    const { writes, supabase } = db({ row: { body: 'Was' } });
+    const { writes, supabase } = db({ row: { body: 'Was', status: 'open' } });
     await carryOut(input({ supabase, target: 'note', action: action({ name: 'reword', text: 'Now' }) }));
     expect(Object.keys(writes[0].row)).toEqual(['body']);
   });
