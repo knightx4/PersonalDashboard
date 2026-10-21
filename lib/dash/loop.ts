@@ -1172,7 +1172,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
             return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
           }
-          if (prose.stop_reason === 'max_tokens' || prose.stop_reason === 'refusal') break;
+          // Widened: the installed SDK's type may predate the reason.
+          const ended: string | null = prose.stop_reason;
+          if (ended === 'max_tokens' || ended === 'refusal') break;
         }
         return fail(whyNoReport(prose!), stoppedInWords(prose!));
       }

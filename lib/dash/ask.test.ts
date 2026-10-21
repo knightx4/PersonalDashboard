@@ -1167,7 +1167,7 @@ describe('a long prompt read from the cache (the Concourse question, 21 October 
   // The rules and tools were about 76,000 tokens, read from the cache on
   // every call after the first.
   const cached = { input_tokens: 2, output_tokens: 100, cache_read_input_tokens: 76_000, cache_creation_input_tokens: 800 };
-  const round = (id: string) => ({ ...reply([use(id, 'search', { query: id })]), usage: cached });
+  const round = (id: string) => ({ ...reply([{ type: 'tool_use', id, name: 'search', input: { query: id } }]), usage: cached });
 
   it('counts a cache read at a tenth against the budget', () => {
     expect(budgetTokens({ inputTokens: 2, cachedInputTokens: 76_000, cacheWriteTokens: 800 })).toBe(8_402);
