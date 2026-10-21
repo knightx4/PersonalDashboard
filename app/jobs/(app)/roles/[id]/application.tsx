@@ -43,6 +43,7 @@ export function Answers({
   applicationId,
   roleId,
   coverLetter,
+  companyName,
   readyToApply,
   allQuestionsAdded,
   hasCoverLetter,
@@ -306,6 +307,7 @@ export function Answers({
           key={coverLetter}
           applicationId={applicationId}
           roleId={roleId}
+          companyName={companyName}
           initial={coverLetter}
           closed={closed}
           initialDraft={coverLetterDraft}
