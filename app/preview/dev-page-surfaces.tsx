@@ -884,6 +884,7 @@ const groups: WaitingGroup[] = [
           number: 1535,
           title: 'What happens after a third failed design round?',
           health: 'unanswered',
+          feature: { number: 1530, title: 'Every screen goes past the design critic before it ships' },
           detail:
             'A — Ship it and file the fixes as a note. Keeps the step moving.\nB — Block the step for you to look at. Nothing ships with a known fix outstanding.\nRecommend B.',
           ask: 'A — Ship it and file the fixes as a note. Keeps the step moving.\nB — Block the step for you to look at. Nothing ships with a known fix outstanding.\nRecommend B.',
