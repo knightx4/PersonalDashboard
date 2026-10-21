@@ -857,7 +857,9 @@ export function AppShell({
                   <CaptureButton />
                   {/* No bell (plan #1937.7): what is on you is Home's Inbox,
                   counted on Home's first screen, and each workspace's own. */}
-                  <NoteButton />
+                  {/* Below lg only: from lg up it is in the status line, just
+                  left of the four Dashes (note 2f0f2a60). */}
+                  <NoteButton className="lg:hidden" />
 
                   <AccountMenu initial={initial} label={`Your account, ${displayName ?? email}`} theme={theme} />
                 </div>

@@ -87,6 +87,12 @@ export type WaitingRow = {
    * page shows and either page can be the one you write it on.
    */
   thread: DevComment[];
+  /**
+   * The feature the row sits under, so a question says what it is about
+   * before it is read (note f11b600a). Its title alone ("Draft the other
+   * areas now?") often did not. Null, or left out, on a feature itself.
+   */
+  feature?: { number: number; title: string } | null;
 };
 
 /**
@@ -130,8 +136,23 @@ const ORDER: Record<WaitingRow['health'], number> = {
 
 export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
   const rows: WaitingRow[] = [];
+  const nodes = flattenSections(sections);
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  // The top of the row's chain: the feature it is a step of, however deep.
+  const featureOf = (node: PlanNode): WaitingRow['feature'] => {
+    let top: PlanNode | null = null;
+    const seen = new Set<string>();
+    for (let id = node.parentId; id && !seen.has(id); ) {
+      seen.add(id);
+      const parent = byId.get(id);
+      if (!parent) break;
+      top = parent;
+      id = parent.parentId;
+    }
+    return top ? { number: top.number, title: top.title } : null;
+  };
 
-  for (const node of flattenSections(sections)) {
+  for (const node of nodes) {
     // The row on its own terms, with nothing beneath it.
     //
     // `healthOf` reports a feature as blocked when every open step under it is,
@@ -178,6 +199,7 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
         (step) => step.id !== node.id && step.status === 'proposed',
       ).length,
       thread: node.thread,
+      feature: featureOf(node),
       ask,
       job: health === 'blocked' && isJobForYou(ask),
     });
