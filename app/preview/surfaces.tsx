@@ -996,6 +996,7 @@ const pipelineRows: PipelineRow[] = [
     readyToApply: true,
     allQuestionsAdded: true,
     hasCoverLetter: false,
+    hasQuestions: true,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -4478,7 +4479,8 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Pipeline narrowed to the roles with all their questions added (plan
-     * #2196.2): the one chip set, the rest of the line unchanged. */
+     * #2196.2): the one chip set, the rest of the line unchanged, with the
+     * questions-or-letter chip after the cover letter's (note 732901e4). */
     id: 'jobs-pipeline-marks',
     label: 'Pipeline · All questions added filter',
     module: 'jobs',
