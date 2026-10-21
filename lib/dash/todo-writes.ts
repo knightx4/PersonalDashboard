@@ -4,11 +4,13 @@ import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } fr
 import { loadAgendaItems, verbsOf } from '@/lib/ask/agenda';
 import type { TodoChangeInput, TodoChangeKind } from '@/lib/ask/todo-changes';
 import { toRef } from '@/lib/core/refs';
-import { eventInput, resolveSpan } from '@/lib/todo/events/write';
-import { appointmentRefFor } from '@/lib/todo/links/load';
-import { APPOINTMENT_COLUMNS, isLinkTarget, LINK_TARGETS, TARGET_COLUMNS, type LinkTarget } from '@/lib/todo/links/model';
+import { createEvent, eventInput, resolveSpan, updateEventFields, type EventFields, type EventWhen } from '@/lib/todo/events/write';
+import { isLinkTarget, LINK_TARGETS, TARGET_COLUMNS, type LinkTarget } from '@/lib/todo/links/model';
+import { setTaskAbout } from '@/lib/todo/links/write';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { taskInput } from '@/lib/todo/tasks/input';
+import { addTaskTag, createItem, itemInput, reopenTaskWithItems, removeTaskTag, updateTaskFields, type TaskFields } from '@/lib/todo/tasks/write';
+import { completeAgendaItem, deferAgendaItem, dismissAgendaItem } from '@/lib/todo/agenda/act';
 import { clientsOver } from '@/lib/todo/agenda/clients';
 import { sourceById } from '@/lib/todo/agenda/registry';
 import { isSourceId, SOURCE_IDS, type AgendaSource, type SourceContext, type SourceId } from '@/lib/todo/agenda/sources';
@@ -42,6 +44,15 @@ import { rowsOfSet, SET_CAP } from './sets';
  * Each is one row, inserted or updated, so the one undo rule in
  * lib/core/dash-actions.ts puts it back from the values kept (#1894.4: an
  * agent's writes go straight in, each listed on Home with an Undo).
+ *
+ * Each writes through the function its button on the Todo pages calls (plan
+ * #2473.3, ./runs.ts), on the client it is given: updateTaskFields,
+ * reopenTaskWithItems, addTaskTag and createItem in lib/todo/tasks/write.ts,
+ * setTaskAbout in lib/todo/links/write.ts, createEvent and updateEventFields
+ * in lib/todo/events/write.ts, and the agenda's verbs in
+ * lib/todo/agenda/act.ts. What is checked here is what Dash needs beyond the
+ * button: that the row is theirs, that the change says something, and the
+ * words the model reads.
  *
  * Both Ask and the connector run them, as Learn's (lib/dash/learn-writes.ts):
  * Ask on the person's own todo client, the connector on a service-role one
@@ -133,22 +144,13 @@ async function ownRow(env: TodoWriteEnv, table: string, id: string, what: string
   return data as Row;
 }
 
-async function updated(env: TodoWriteEnv, table: string, id: string, patch: Row, what: string): Promise<Row> {
-  const { data, error } = await env.todo
-    .from(table)
-    .update(patch)
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Changing the ${what} failed: ${error?.message ?? 'no row'}`);
-  return data as Row;
-}
+/** The person's todo client, as the lib writes take it. */
+const todoClient = (env: TodoWriteEnv) => env.todo as unknown as TodoSupabaseClient;
 
-async function inserted(env: TodoWriteEnv, table: string, row: Row, what: string): Promise<Row> {
-  const { data, error } = await env.todo.from(table).insert(row).select('*').single();
-  if (error || !data) throw new Error(`Adding the ${what} failed: ${error?.message ?? 'no row'}`);
-  return data as Row;
+/** The row a lib write gave back, or the failure it said. */
+function written(result: { row: Row | null; error: string | null }, what: string): Row {
+  if (result.error || !result.row) throw new Error(`Changing the ${what} failed: ${result.error ?? 'no row'}`);
+  return result.row;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,19 +163,22 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   const id = idOf(args, 'todo_ref', 'todo');
   const before = await ownRow(env, 'tasks', id, 'todo');
   const title = named(before.title, 'the todo');
-  const patch: Row = {};
+  // The fields go through updateTaskFields, as the form, the pin, Later and
+  // Drop do; reopening goes through reopenTaskWithItems, as the checkbox does.
+  const fields: TaskFields = {};
+  let reopening = false;
   const said: string[] = [];
 
   if (sent(args, 'notes')) {
     if (typeof args.notes !== 'string') throw new TodoRefused('notes must be text.');
     const parsed = taskInput.shape.body.safeParse(args.notes);
     if (!parsed.success) throw new TodoRefused('Keep the notes under 20,000 characters.');
-    patch.body = parsed.data;
+    fields.body = parsed.data;
     said.push(parsed.data ? 'its notes written' : 'its notes cleared');
   }
   if (sent(args, 'pinned')) {
     const pinned = bool(args, 'pinned');
-    patch.pinned = pinned;
+    fields.pinned = pinned;
     said.push(pinned ? 'pinned' : 'unpinned');
   }
   if (sent(args, 'later')) {
@@ -181,12 +186,12 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     // until it begins, still open, still due when it was. "back" brings it back.
     const choice = text(args, 'later');
     if (choice === 'back') {
-      patch.snoozed_until = null;
+      fields.snoozedUntil = null;
       said.push('brought back');
     } else {
       const later = laterUntil(choice, env.timezone);
       if (!later) throw new TodoRefused(`later must be ${LATER_UNTIL_HELP}, or back. ${LATER_REFUSED}`);
-      patch.snoozed_until = later.until.toISOString();
+      fields.snoozedUntil = later.until;
       said.push(`put off ${untilWords(later.day, env.timezone)}`);
     }
   }
@@ -195,7 +200,8 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
     if (!TODO_STATES.includes(state)) throw new TodoRefused(`state must be one of ${TODO_STATES.join(', ')}.`);
     if (before.status === state) throw new TodoRefused(`That todo is ${state} already.`);
     // The database stamps completed_at and dropped_at from the status.
-    patch.status = state;
+    if (state === 'open') reopening = true;
+    else fields.status = state;
     said.push(state === 'open' ? 'reopened' : 'dropped');
   }
   const asked = sent(args, 'tags');
@@ -210,7 +216,7 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
       `That todo is tagged ${existing.join(', ')} already, and Dash leaves tags they set alone. Leave tags out, and tell them they can change its tags on its row.`,
     );
   }
-  const status = (patch.status ?? before.status) as string;
+  const status = reopening ? 'open' : ((fields.status ?? before.status) as string);
   const tagging = existing.length === 0 && (asked || (status === 'open' && !before.parent_id));
   let tags: string[] = [];
   if (tagging) {
@@ -225,13 +231,18 @@ async function editTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   // The tags first, so a failure there changes nothing; they come off again when the row's change fails.
   if (tags.length > 0) await addTags(env, id, tags);
   let after = before;
-  if (Object.keys(patch).length > 0) {
-    try {
-      after = await updated(env, 'tasks', id, patch, 'todo');
-    } catch (error) {
-      if (tags.length > 0) await env.todo.from('task_tags').delete().eq('task_id', id).in('tag', tags);
-      throw error;
+  try {
+    if (Object.keys(fields).length > 0) {
+      after = written(await updateTaskFields(env.userId, id, fields, env.timezone, todoClient(env)), 'todo');
     }
+    if (reopening) {
+      const { error } = await reopenTaskWithItems(env.userId, id, [], todoClient(env));
+      if (error) throw new Error(`Reopening the todo failed: ${error}`);
+      after = await ownRow(env, 'tasks', id, 'todo');
+    }
+  } catch (error) {
+    if (tags.length > 0) await removeTags(env, id, tags);
+    throw error;
   }
   const href = todoHref(id);
   return {
@@ -254,9 +265,21 @@ async function tagsOf(env: TodoWriteEnv, taskId: string): Promise<string[]> {
   return ((data ?? []) as { tag: string }[]).map((row) => row.tag);
 }
 
+/** Each tag through addTaskTag, as the tag picker does; all or none. */
 async function addTags(env: TodoWriteEnv, taskId: string, tags: string[]): Promise<void> {
-  const { error } = await env.todo.from('task_tags').insert(tags.map((tag) => ({ task_id: taskId, tag })));
-  if (error) throw new Error(`Tagging the todo failed: ${error.message}`);
+  const added: string[] = [];
+  for (const tag of tags) {
+    const { error } = await addTaskTag(env.userId, taskId, tag, todoClient(env));
+    if (error) {
+      await removeTags(env, taskId, added);
+      throw new Error(`Tagging the todo failed: ${error}`);
+    }
+    added.push(tag);
+  }
+}
+
+async function removeTags(env: TodoWriteEnv, taskId: string, tags: string[]): Promise<void> {
+  for (const tag of tags) await removeTaskTag(env.userId, taskId, tag, todoClient(env));
 }
 
 // ---------------------------------------------------------------------------
@@ -267,10 +290,12 @@ async function addTodoItem(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   const parentId = idOf(args, 'todo_ref', 'todo');
   const parent = await ownRow(env, 'tasks', parentId, 'todo');
   if (parent.parent_id) throw new TodoRefused('That is an item on a list already. Add the item to the todo it sits under.');
-  const parsed = taskInput.shape.title.safeParse(text(args, 'title'));
+  const parsed = itemInput.shape.title.safeParse(text(args, 'title'));
   if (!parsed.success) throw new TodoRefused(parsed.error.issues[0].message);
 
-  const after = await inserted(env, 'tasks', { user_id: env.userId, title: parsed.data, parent_id: parentId }, 'item');
+  const made = await createItem(env.userId, parentId, { title: parsed.data }, todoClient(env));
+  if (made.error || !made.row) throw new Error(`Adding the item failed: ${made.error ?? 'no row'}`);
+  const after = made.row;
   const id = after.id as string;
   const list = named(parent.title, 'the todo');
   const href = todoHref(parentId);
@@ -313,11 +338,20 @@ const TARGET_WORDS: Record<LinkTarget, string> = {
 const TARGET_LOOKUPS =
   'application (job_search.applications), role (job_search.roles), company, contact, interview, note (obsidian.notes), order (public.orders), inventory (public.inventory_items), saved, reading (learn.readings), track (learn.tracks), subject, goal (goals.items, a goal or a step), appointment (todo.feed_events) or story (a saved news story)';
 
-/** Refusals the link's trigger and keys give, in the words a person reads. */
+/** Refusals setTaskAbout gives (the link's trigger, its keys, a gone appointment), in the words the model reads. */
 function linkError(message: string): Error {
-  if (message.includes('must point at something')) return new TodoRefused('That is not theirs to link to. Look it up first.');
+  if (message.includes('not yours to link to') || message.includes('must point at something')) {
+    return new TodoRefused('That is not theirs to link to. Look it up first.');
+  }
   if (message.includes('violates foreign key')) return new TodoRefused('There is nothing with that ref to link to. Look it up first.');
+  if (message.includes('no longer on the calendar')) return new TodoRefused('That appointment is no longer on the calendar.');
   return new Error(`Linking the todo failed: ${message}`);
+}
+
+async function aboutLink(env: TodoWriteEnv, taskId: string): Promise<Row | null> {
+  const { data, error } = await env.todo.from('task_links').select('*').eq('task_id', taskId).eq('relation', 'about').maybeSingle();
+  if (error) throw new Error(`Reading what the todo is about failed: ${error.message}`);
+  return (data as Row | null) ?? null;
 }
 
 async function linkTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
@@ -328,59 +362,16 @@ async function linkTodo(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   const task = await ownRow(env, 'tasks', taskId, 'todo');
   const title = named(task.title, 'the todo');
 
-  // Every target column cleared, then the one being set, as setTaskAbout does:
-  // the check constraint wants exactly one, and a moved link must stop naming
-  // what it named before.
-  const columns: Row = {};
-  for (const each of LINK_TARGETS) columns[TARGET_COLUMNS[each]] = null;
-  for (const column of APPOINTMENT_COLUMNS) columns[column] = null;
-  if (target === 'appointment') {
-    // The calendar row is rewritten on every refresh, so the link keeps the appointment it copies.
-    const ref = await appointmentRefFor(targetId, env.todo as TodoSupabaseClient);
-    if (!ref) throw new TodoRefused('That appointment is no longer on the calendar.');
-    Object.assign(columns, {
-      feed_id: ref.feedId,
-      feed_uid: ref.uid,
-      feed_occurrence: ref.occurrence,
-      feed_title: ref.title,
-      feed_starts_on: ref.startsOn,
-      feed_starts_at: ref.startsAt,
-    });
-  } else {
-    columns[TARGET_COLUMNS[target]] = targetId;
-  }
-
-  // A todo is about one thing (task_links_about_key), so a second moves the one there.
-  const { data: existing, error: readError } = await env.todo
-    .from('task_links')
-    .select('*')
-    .eq('task_id', taskId)
-    .eq('relation', 'about')
-    .maybeSingle();
-  if (readError) throw new Error(`Reading what the todo is about failed: ${readError.message}`);
-
-  let before: Row | null = null;
-  let after: Row;
-  if (existing) {
-    before = existing as Row;
-    const { data, error } = await env.todo
-      .from('task_links')
-      .update(columns)
-      .eq('id', before.id as string)
-      .eq('task_id', taskId)
-      .select('*')
-      .single();
-    if (error || !data) throw linkError(error?.message ?? 'no row');
-    after = data as Row;
-  } else {
-    const { data, error } = await env.todo
-      .from('task_links')
-      .insert({ task_id: taskId, relation: 'about', ...columns })
-      .select('*')
-      .single();
-    if (error || !data) throw linkError(error?.message ?? 'no row');
-    after = data as Row;
-  }
+  // A todo is about one thing (task_links_about_key), so a second moves the
+  // one there. setTaskAbout, which Point at on the row calls, clears every
+  // target column and sets the one asked for, and keeps an appointment by
+  // what it copies. The task was read under their id above, so the link is on
+  // a todo of theirs; the trigger checks the target is theirs too.
+  const before = await aboutLink(env, taskId);
+  const { error } = await setTaskAbout(taskId, target, targetId, todoClient(env));
+  if (error) throw linkError(error);
+  const after = await aboutLink(env, taskId);
+  if (!after) throw new Error('Linking the todo failed: no row');
 
   const id = after.id as string;
   const href = todoHref(taskId);
@@ -408,8 +399,12 @@ function clock(value: string): string {
   return value ? value.padStart(5, '0') : '';
 }
 
-/** The four columns for when an event is, from the arguments, or a refusal. */
-function spanFrom(env: TodoWriteEnv, args: Args, title: string) {
+/**
+ * When an event is, from the arguments, parsed as the calendar's form is, or
+ * a refusal. The write resolves it again; it is checked here so the model
+ * reads why it was refused.
+ */
+function whenFrom(env: TodoWriteEnv, args: Args, title: string): EventWhen {
   const parsed = eventInput.safeParse({
     title,
     body: '',
@@ -423,15 +418,18 @@ function spanFrom(env: TodoWriteEnv, args: Args, title: string) {
   if (!parsed.success) throw new TodoRefused(parsed.error.issues[0].message);
   const { span, error } = resolveSpan(parsed.data, env.timezone);
   if (!span) throw new TodoRefused(error ?? 'That is not a time the calendar can hold.');
-  return span;
+  const { allDay, startDay, endDay, startTime, endTime } = parsed.data;
+  return { allDay, startDay, endDay, startTime, endTime };
 }
 
-/** Notes or a place, as the form keeps them: trimmed, and empty kept as nothing. */
-function optional(args: Args, key: string, max: number, what: string): string | null {
+/** Notes or a place, read as the calendar's form reads them: trimmed, and empty kept as nothing. */
+function optional(args: Args, key: 'notes' | 'location', max: number, what: string): string | null {
   if (typeof args[key] !== 'string') throw new TodoRefused(`${key} must be text.`);
   const value = (args[key] as string).trim();
   if (value.length > max) throw new TodoRefused(`Keep the ${what} under ${max} characters.`);
-  return value || null;
+  const parsed = eventInput.shape[key === 'notes' ? 'body' : 'location'].safeParse(value);
+  if (!parsed.success) throw new TodoRefused(parsed.error.issues[0].message);
+  return parsed.data;
 }
 
 /**
@@ -457,19 +455,20 @@ function eventTitle(args: Args): string {
 
 async function addEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   const title = eventTitle(args);
-  const span = spanFrom(env, args, title);
-  const after = await inserted(
-    env,
-    'events',
+  const when = whenFrom(env, args, title);
+  const made = await createEvent(
+    env.userId,
     {
-      user_id: env.userId,
       title,
       body: sent(args, 'notes') ? optional(args, 'notes', 20_000, 'notes') : null,
       location: sent(args, 'location') ? optional(args, 'location', 500, 'place') : null,
-      ...span,
+      ...when,
     },
-    'event',
+    env.timezone,
+    todoClient(env),
   );
+  if (made.error || !made.row) throw new Error(`Adding the event failed: ${made.error ?? 'no row'}`);
+  const after = made.row;
   const id = after.id as string;
   const day = eventDay(after, env.timezone);
   const href = calendarHref(day);
@@ -489,33 +488,33 @@ async function addEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
 async function changeEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
   const id = idOf(args, 'event_ref', 'event');
   const before = await ownRow(env, 'events', id, 'event');
-  const patch: Row = {};
+  const fields: EventFields = {};
   const said: string[] = [];
 
   let title = String(before.title ?? '');
   if (sent(args, 'title')) {
     title = eventTitle(args);
     if (title !== before.title) {
-      patch.title = title;
+      fields.title = title;
       said.push(`renamed "${title}"`);
     }
   }
   if (WHEN_KEYS.some((key) => sent(args, key))) {
     if (!sent(args, 'start_day')) throw new TodoRefused('To move it, give start_day, and the times or all_day.');
-    Object.assign(patch, spanFrom(env, args, title));
+    fields.when = whenFrom(env, args, title);
     said.push(`moved to ${text(args, 'start_day')}`);
   }
   if (sent(args, 'location')) {
-    patch.location = optional(args, 'location', 500, 'place');
-    said.push(patch.location ? 'its place set' : 'its place cleared');
+    fields.location = optional(args, 'location', 500, 'place');
+    said.push(fields.location ? 'its place set' : 'its place cleared');
   }
   if (sent(args, 'notes')) {
-    patch.body = optional(args, 'notes', 20_000, 'notes');
-    said.push(patch.body ? 'its notes written' : 'its notes cleared');
+    fields.body = optional(args, 'notes', 20_000, 'notes');
+    said.push(fields.body ? 'its notes written' : 'its notes cleared');
   }
   if (said.length === 0) throw new TodoRefused('Say what to change: title, when, location or notes.');
 
-  const after = await updated(env, 'events', id, patch, 'event');
+  const after = written(await updateEventFields(env.userId, id, fields, env.timezone, todoClient(env)), 'event');
   const name = named(before.title, 'the event');
   const href = calendarHref(eventDay(after, env.timezone));
   return {
@@ -535,9 +534,9 @@ async function changeEvent(env: TodoWriteEnv, args: Args): Promise<TodoMade> {
 // ---------------------------------------------------------------------------
 
 const AGENDA_VERBS = {
-  finish: { method: 'complete', done: 'Finished', said: 'finished', cannot: 'finish' },
-  put_off: { method: 'defer', done: 'Put off', said: 'put off', cannot: 'put off' },
-  dismiss: { method: 'dismiss', done: 'Dismissed', said: 'dismissed', cannot: 'dismiss' },
+  finish: { done: 'Finished', said: 'finished', cannot: 'finish' },
+  put_off: { done: 'Put off', said: 'put off', cannot: 'put off' },
+  dismiss: { done: 'Dismissed', said: 'dismissed', cannot: 'dismiss' },
 } as const;
 type AgendaVerb = keyof typeof AGENDA_VERBS;
 
@@ -625,8 +624,13 @@ async function changeAgendaRow(env: TodoWriteEnv, args: Args): Promise<TodoMade>
   const now = new Date();
   const today = todayIn(env.timezone, now);
   const ctx: SourceContext = { userId: env.userId, timezone: env.timezone, from: today, to: today, now, clients: clientsOver(env.db) };
-  if (later) await source.defer!(ctx, key, later.until);
-  else await (source[verb.method] as (ctx: SourceContext, key: string) => Promise<void>)(ctx, key);
+  // The agenda's own verbs, as its Done, Later and Drop call them.
+  const { error } = later
+    ? await deferAgendaItem(ctx, sourceId, key, later.until)
+    : verbName === 'finish'
+      ? await completeAgendaItem(ctx, sourceId, key)
+      : await dismissAgendaItem(ctx, sourceId, key);
+  if (error) throw new TodoRefused(error);
 
   const after = await subjectRow(env, subject);
   if (!after) throw new Error('Changing the agenda row failed: the row is gone.');
@@ -671,12 +675,12 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   {
     name: 'edit_todo',
     runs: sameAs(
-      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTask'],
+      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
       ['app/todo/actions.ts#reopenTask', 'lib/todo/tasks/write.ts#reopenTaskWithItems'],
-      ['app/todo/actions.ts#dropTask', 'app/todo/actions.ts#dropTask'],
-      ['app/todo/actions.ts#pinTask', 'lib/todo/tasks/write.ts#setTaskPinned'],
-      ['app/todo/actions.ts#laterTask', 'lib/core/snooze-days.ts#snoozeDay'],
-      ['app/todo/actions.ts#bringBackTask', 'lib/todo/tasks/write.ts#unsnoozeTask'],
+      ['app/todo/actions.ts#dropTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#pinTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#laterTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#bringBackTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
       ['app/todo/actions.ts#tagTask', 'lib/todo/tasks/write.ts#addTaskTag'],
     ),
     description:
@@ -720,7 +724,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
     name: 'link_todo',
     runs: sameAs(
       ['app/todo/actions.ts#pointTaskAt', 'lib/todo/links/write.ts#setTaskAbout'],
-      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/tasks/write.ts#createTask'],
+      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/links/write.ts#linkTask'],
     ),
     description: `Say what one of their todos is about, when they ask ("this todo is for the Stripe role"), so it shows on that row's page as well. A todo is about one thing: this replaces what it was about before. about is one of ${TARGET_LOOKUPS}; about_ref is that row's ref from a lookup.`,
     input_schema: {
@@ -755,7 +759,7 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   },
   {
     name: 'change_event',
-    runs: sameAs(['app/todo/calendar/actions.ts#editEvent', 'lib/todo/events/write.ts#updateEvent']),
+    runs: sameAs(['app/todo/calendar/actions.ts#editEvent', 'lib/todo/events/write.ts#updateEventFields']),
     description:
       "Change one event on the person's own calendar, when they ask: rename it, move it (give start_day again with the times or all_day), or set or clear its place or notes. Name it by the todo.events ref list_rows or an earlier row returned. Send only what changes.",
     input_schema: {
@@ -775,9 +779,9 @@ export const TODO_WRITES: readonly TodoWrite[] = [
   {
     name: 'change_agenda_row',
     runs: sameAs(
-      ['app/todo/source-actions.ts#completeItem', 'app/todo/source-actions.ts#completeItem'],
-      ['app/todo/source-actions.ts#deferItem', 'app/todo/source-actions.ts#deferItem'],
-      ['app/todo/source-actions.ts#dismissItem', 'app/todo/source-actions.ts#dismissItem'],
+      ['app/todo/source-actions.ts#completeItem', 'lib/todo/agenda/act.ts#completeAgendaItem'],
+      ['app/todo/source-actions.ts#deferItem', 'lib/todo/agenda/act.ts#deferAgendaItem'],
+      ['app/todo/source-actions.ts#dismissItem', 'lib/todo/agenda/act.ts#dismissAgendaItem'],
     ),
     description:
       "Finish, put off or dismiss a row another workspace has put on the person's Todo agenda, such as a job reminder, a goal step sent to Todo, a draft waiting to be sent or a return deadline, when they ask. Find it with the agenda lookup and pass its agenda_source and agenda_key; the verbs a row takes are listed in its can. Finish is not offered for a date such as a return deadline. Their own todos are not changed with this tool: use close_todo and edit_todo.",

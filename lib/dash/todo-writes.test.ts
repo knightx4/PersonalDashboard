@@ -126,7 +126,7 @@ describe('the Todo writes', () => {
     const tables: FakeTables = { 'todo.tasks': [task()], 'todo.task_links': [] };
     const first = await made('link_todo', tables, { todo_ref: TASK, about: 'role', about_ref: ROLE });
     expect(first.op).toBe('insert');
-    expect(first.after).toMatchObject({ task_id: TASK, relation: 'about', role_id: ROLE, note_id: null });
+    expect(first.after).toMatchObject({ task_id: TASK, relation: 'about', role_id: ROLE });
     expect(first.summary).toBe('Dash said the todo "Book the dentist" is about a role.');
 
     const second = await made('link_todo', tables, { todo_ref: TASK, about: 'note', about_ref: ROLE });

@@ -12,16 +12,6 @@
  * workspace by workspace.
  */
 export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
-  add_todo: [
-    'app/todo/actions.ts#addTask',
-    'app/todo/link-actions.ts#addLinkedTask',
-  ],
-  change_todo: [
-    'app/todo/actions.ts#editTask',
-    'app/todo/actions.ts#renameTaskAction',
-    'app/todo/actions.ts#rescheduleTaskAction',
-  ],
-  close_todo: ['app/todo/actions.ts#completeTask'],
   add_goal: ['app/learn/know/level3-actions.ts#addLevel3Goal'],
   mark_returned: ['app/shopping/inventory/actions.ts#markInventoryReturned'],
   add_role_note: ['app/jobs/(app)/roles/[id]/actions.ts#addNote'],
@@ -62,26 +52,6 @@ export const DRIFTED_BUTTONS: Readonly<Record<string, readonly string[]>> = {
     'app/learn/now/actions.ts#addCardNote',
   ],
   change_video: ['app/learn/videos/actions.ts#setWatchedAction'],
-  edit_todo: [
-    'app/todo/actions.ts#editTask',
-    'app/todo/actions.ts#reopenTask',
-    'app/todo/actions.ts#dropTask',
-    'app/todo/actions.ts#pinTask',
-    'app/todo/actions.ts#bringBackTask',
-    'app/todo/actions.ts#tagTask',
-  ],
-  add_todo_item: ['app/todo/actions.ts#addItem'],
-  link_todo: [
-    'app/todo/actions.ts#pointTaskAt',
-    'app/todo/link-actions.ts#addLinkedTask',
-  ],
-  add_event: ['app/todo/calendar/actions.ts#addEvent'],
-  change_event: ['app/todo/calendar/actions.ts#editEvent'],
-  change_agenda_row: [
-    'app/todo/source-actions.ts#completeItem',
-    'app/todo/source-actions.ts#deferItem',
-    'app/todo/source-actions.ts#dismissItem',
-  ],
   change_place: ['app/you/places/actions.ts#savePlace'],
   save_job: ['app/you/work/job-actions.ts#saveJobAction'],
   mark_issue_unread: ['app/news/i/[id]/actions.ts#markIssueUnread'],

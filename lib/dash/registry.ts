@@ -109,7 +109,7 @@ export type DashWriteContext = AskContext & {
    */
   goals: ChangeDeps['goals'];
   /** createTask from lib/todo/tasks/write.ts. */
-  createTask: ChangeDeps['createTask'];
+  createTask: NonNullable<ChangeDeps['createTask']>;
   /**
    * What the thread's own tools do, bound by the thread to the row it hangs
    * from (lib/dash/thread.ts). Absent outside a thread, where those tools are

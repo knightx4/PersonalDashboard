@@ -10,8 +10,8 @@ import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
 import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { DashChangeInput, DashChangeKind, NewDashChange } from '@/lib/talk/changes';
-import { taskInput } from '@/lib/todo/tasks/input';
-import { wallClockToInstant } from '@/lib/todo/time';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
+import { completeTaskWithItems, renameInput, rescheduleInput, updateTaskFields, type TaskFields } from '@/lib/todo/tasks/write';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
 import { stepHref } from '@/lib/goals/all-goals';
@@ -190,15 +190,9 @@ async function one<T>(query: PromiseLike<{ data: unknown; error: { message: stri
 
 const todoHref = (id: string) => `/todo/all?status=all&focus=${id}`;
 
-/** The day and time a todo is due, as the two columns hold them. */
-function dueColumns(
-  dueOn: string | null,
-  dueTime: string | null,
-  timezone: string,
-): { due_on: string | null; due_at: string | null } {
-  if (!dueOn) return { due_on: null, due_at: null };
-  if (!dueTime) return { due_on: dueOn, due_at: null };
-  return { due_on: null, due_at: wallClockToInstant(dueOn, dueTime, timezone) };
+/** The person's todo client, as lib/todo/tasks/write.ts takes it. */
+async function todoClient(ctx: DashWriteContext): Promise<TodoSupabaseClient> {
+  return (await ctx.db('todo')) as unknown as TodoSupabaseClient;
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -325,13 +319,14 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   const moving = sent(args, 'due_on');
   if (!renaming && !moving) throw new Refused('Say what to change: a new title, a new due_on, or both.');
 
-  const update: Record<string, unknown> = {};
+  // The same write the form, the row's rename and its reschedule make (plan #2473.3).
+  const fields: TaskFields = {};
   let title: string | null = null;
   if (renaming) {
-    const parsed = taskInput.shape.title.safeParse(text(args, 'title'));
+    const parsed = renameInput.safeParse({ title: text(args, 'title') });
     if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
-    title = parsed.data;
-    update.title = title;
+    title = parsed.data.title;
+    fields.title = title;
   }
   let dueOn: string | null = null;
   let dueTime: string | null = null;
@@ -342,7 +337,9 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
     if (dueTime && !TIME.test(dueTime)) throw new Refused('due_time is not a time like 14:30.');
     if (dueTime && !dueOn) throw new Refused('A due_time needs a due_on.');
     if (dueTime) dueTime = dueTime.padStart(5, '0');
-    Object.assign(update, dueColumns(dueOn, dueTime, ctx.timezone ?? 'UTC'));
+    const parsed = rescheduleInput.safeParse({ dueOn: dueOn ?? '', dueTime: dueTime ?? '' });
+    if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
+    fields.due = parsed.data;
   }
 
   const task = await readTask(ctx, id);
@@ -351,10 +348,9 @@ async function changeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteR
 
   const ref = toRef(TABLE.task, id);
   const before = await readSubject(ctx.db, ref);
-  const todo = await ctx.db('todo');
-  const { data, error } = await todo.from('tasks').update(update).eq('id', id).eq('user_id', ctx.userId).select('id');
-  if (error) throw new Error(error.message);
-  if ((data ?? []).length === 0) throw new Refused('That todo could not be changed.');
+  const { row, error } = await updateTaskFields(ctx.userId, id, fields, ctx.timezone ?? 'UTC', await todoClient(ctx));
+  if (error) throw new Error(error);
+  if (!row) throw new Refused('That todo could not be changed.');
   const after = await readSubject(ctx.db, ref);
 
   const now = title ?? task.title;
@@ -384,33 +380,14 @@ async function closeTodo(ctx: DashWriteContext, args: Args): Promise<DashWriteRe
   if (task.status === 'done') throw new Refused('That todo is ticked off already.');
   if (task.status !== 'open') throw new Refused(`That todo is ${task.status}, so it is not ticked off.`);
 
-  const todo = await ctx.db('todo');
-  // Finishing a todo finishes the items on its list (#261), as the page does.
-  const { data: open, error: openError } = await todo
-    .from('tasks')
-    .select('id')
-    .eq('parent_id', id)
-    .eq('user_id', ctx.userId)
-    .eq('status', 'open');
-  if (openError) throw new Error(openError.message);
-  const items = ((open ?? []) as { id: string }[]).map((row) => row.id);
-
+  // Finishing a todo finishes the items on its list (#261), through the
+  // function the checkbox calls (plan #2473.3), which says which it ticked.
   const ref = toRef(TABLE.task, id);
   const before = await readSubject(ctx.db, ref);
-  if (items.length > 0) {
-    const { error } = await todo.from('tasks').update({ status: 'done' }).in('id', items).eq('user_id', ctx.userId);
-    if (error) throw new Error(error.message);
-  }
-  const { data, error } = await todo
-    .from('tasks')
-    .update({ status: 'done' })
-    .eq('id', id)
-    .eq('user_id', ctx.userId)
-    .eq('status', 'open')
-    .select('id');
-  if (error) throw new Error(error.message);
-  if ((data ?? []).length === 0) throw new Refused('That todo changed while Dash was ticking it off.');
+  const { items, error } = await completeTaskWithItems(ctx.userId, id, await todoClient(ctx));
+  if (error) throw new Error(error);
   const after = await readSubject(ctx.db, ref);
+  if (after?.status !== 'done') throw new Refused('That todo could not be ticked off.');
 
   return made(
     'close_todo',
@@ -994,8 +971,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_todo',
     sameAs(
-      ['app/todo/actions.ts#addTask', 'lib/todo/tasks/write.ts#createTask'],
-      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/tasks/write.ts#createTask'],
+      ['app/todo/actions.ts#addTask', 'lib/todo/tasks/write.ts#insertTask'],
+      ['app/todo/link-actions.ts#addLinkedTask', 'lib/todo/tasks/write.ts#insertTask'],
     ),
     `Add a todo to the person's list, when they ask you to. ${ADD_TAGS_HELP}`,
     {
@@ -1013,9 +990,9 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'change_todo',
     sameAs(
-      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTask'],
-      ['app/todo/actions.ts#renameTaskAction', 'lib/todo/tasks/write.ts#renameTask'],
-      ['app/todo/actions.ts#rescheduleTaskAction', 'app/todo/actions.ts#rescheduleTaskAction'],
+      ['app/todo/actions.ts#editTask', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#renameTaskAction', 'lib/todo/tasks/write.ts#updateTaskFields'],
+      ['app/todo/actions.ts#rescheduleTaskAction', 'lib/todo/tasks/write.ts#updateTaskFields'],
     ),
     'Rename one of their open todos, or move it to another day, when they ask you to ("move the dentist to Friday"). Name it by the todo.tasks ref search or todos returned for it; look it up first. Send only what changes: title to rename it, due_on to move it (null takes the date off).',
     {
