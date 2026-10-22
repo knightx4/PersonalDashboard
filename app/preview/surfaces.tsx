@@ -129,7 +129,8 @@ import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
-import type { PipelineRow } from '@/lib/jobs/applications/load';
+import { toFunnelApplications, type PipelineRow } from '@/lib/jobs/applications/load';
+import { funnelMetrics } from '@/lib/jobs/pipeline';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { CompaniesPage } from '@/components/jobs/companies/companies-page';
@@ -137,7 +138,7 @@ import type { CompanyRow } from '@/lib/jobs/companies-view';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
-import { summariseSearch } from '@/lib/jobs/home/summary';
+import { buildFunnel } from '@/lib/jobs/home/funnel';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
@@ -1830,6 +1831,59 @@ const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
       ? { ...row, status: 'final_round', lastTurnEvent: 'interview_scheduled' }
       : row,
 );
+/**
+ * The funnel over the same rows: five suggestions still open, a month of
+ * suggestions taken, dismissed and left to expire, and two interviews held.
+ */
+const todayPageFunnel = buildFunnel({
+  now: todayPageNow,
+  // Closures under five stages at once, as a real search has them, so the
+  // labels on the floor are drawn crowded the way they will be.
+  applications: [
+    ...todayPageRows,
+    ...(
+      [
+        ['role_closed', null, null, 6],
+        ['role_closed', null, null, 5],
+        ['withdrawn', null, null, 4],
+        ['rejected', null, null, 2],
+        ['ghosted', '2026-08-01T09:00:00.000Z', null, 0],
+        ['ghosted', '2026-08-02T09:00:00.000Z', null, 0],
+        ['rejected', '2026-08-03T09:00:00.000Z', null, 0],
+        ['role_closed', '2026-08-04T09:00:00.000Z', null, 0],
+        ['ghosted', '2026-07-20T09:00:00.000Z', '2026-08-01T09:00:00.000Z', 0],
+        ['withdrawn', '2026-07-20T09:00:00.000Z', '2026-08-01T09:00:00.000Z', 0],
+        ['rejected', '2026-07-10T09:00:00.000Z', '2026-07-20T09:00:00.000Z', 2],
+      ] as const
+    ).map(([status, submittedAt, firstHumanResponseAt, interviews], i) =>
+      pipelineRow({
+        applicationId: `fc${i}`,
+        companyName: `Closed ${i + 1}`,
+        roleTitle: 'Analyst',
+        status,
+        submittedAt,
+        firstHumanResponseAt,
+        closedAt: `2026-09-0${1 + (i % 7)}T12:00:00.000Z`,
+        interviewKinds: Array.from({ length: interviews }, () => 'technical'),
+      }),
+    ),
+  ],
+  suggestions: [
+    { id: 'fs1', name: 'Wrenfield', headline: 'Platform Engineer, Payments', status: 'open', createdAt: '2026-09-08T07:00:00.000Z', actedAt: null },
+    { id: 'fs2', name: 'Osier Labs', headline: 'Backend Engineer, Risk', status: 'open', createdAt: '2026-09-08T07:00:00.000Z', actedAt: null },
+    { id: 'fs3', name: 'Coldharbour', headline: 'Write to Priya Raman, head of engineering', status: 'open', createdAt: '2026-09-07T07:00:00.000Z', actedAt: null },
+    { id: 'fs4', name: 'Tamsin & Hale', headline: 'Software Engineer, Trading Tools', status: 'open', createdAt: '2026-09-05T07:00:00.000Z', actedAt: null },
+    { id: 'fs5', name: 'Fintech Builders', headline: 'Meetup in Shoreditch, 17 September', status: 'open', createdAt: '2026-09-04T07:00:00.000Z', actedAt: null },
+    ...Array.from({ length: 9 }, (_, i) => ({ id: `fd${i}`, name: 'Taken', headline: '', status: 'done', createdAt: '2026-08-20T07:00:00.000Z', actedAt: `2026-08-${String(21 + i).padStart(2, '0')}T09:00:00.000Z` })),
+    ...Array.from({ length: 14 }, (_, i) => ({ id: `fx${i}`, name: 'Passed', headline: '', status: i < 10 ? 'dismissed' : 'expired', createdAt: `2026-08-${String(12 + i).padStart(2, '0')}T07:00:00.000Z`, actedAt: null })),
+  ],
+  interviewsHeld: [
+    { applicationId: 'p1', scheduledAt: '2026-09-02T14:00:00.000Z' },
+    { applicationId: 'p2', scheduledAt: '2026-08-28T10:00:00.000Z' },
+  ],
+  watched: 48,
+  replyRate: funnelMetrics(toFunnelApplications(todayPageRows), { now: todayPageNow }).responseRate,
+});
 const todayPageSince: SinceView = {
   state: 'loaded',
   hint: 'Since 8 Sept, 6:40 PM BST',
@@ -3958,16 +4012,7 @@ function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   return (
     <TodayPage
       board={board}
-      summary={summariseSearch(
-        todayPageRows,
-        board.interviews.map((interview) => ({
-          id: interview.id,
-          scheduledAt: interview.scheduledAt,
-          timeKnown: interview.timeKnown,
-          groupId: interview.groupId,
-        })),
-        todayPageNow,
-      )}
+      funnel={todayPageFunnel}
       since={todayPageSince}
       timezone="Europe/London"
     />
