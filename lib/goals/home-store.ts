@@ -17,6 +17,8 @@ import type { RunListing } from '@/lib/goals/runs';
 import { loadRunsStartedSince } from '@/lib/goals/runs-store';
 import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
+import { loadMentionStates } from '@/lib/goals/mentions-store';
+import { passiveMentions, type MentionState, type PassiveMention } from '@/lib/goals/passive-mentions';
 import { todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
 import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
@@ -47,6 +49,8 @@ export type Home = {
   laterOn: LaterLaneItem[];
   /** Runs waiting on your answer to a question they asked partway (plan #1824). */
   waitingRuns: RunQuestion[];
+  /** What is coming up within a week under a passive goal, not dismissed (plan #2503.5). */
+  mentions: PassiveMention[];
 };
 
 /** How far back the home reads runs: past QUIET_DAYS, so a quiet goal is told from one never worked. */
@@ -66,7 +70,7 @@ export async function loadHome(
 ): Promise<Home> {
   const tree = await loadLiveTree(client, { today });
   const since = new Date(now - RUNS_READ_DAYS * 86_400_000).toISOString();
-  const [input, runs, waitingRuns] = await Promise.all([
+  const [input, runs, waitingRuns, mentionStates] = await Promise.all([
     // Its reviews double as the goal lines' statuses; a failed read of them
     // leaves the statuses off the lines rather than the page.
     loadTodayInput(client, supabase, { userId, today, tree, now }),
@@ -74,6 +78,8 @@ export async function loadHome(
     loadRunsStartedSince(client, since).catch((): RunListing[] => []),
     // A failed read leaves the questions off the Inbox, not the page.
     loadGoalRunQuestions(client).catch((): RunQuestion[] => []),
+    // A failed read leaves the mentions off, since a dismissed one must not come back.
+    loadMentionStates(client).catch((): Map<string, MentionState> | null => null),
   ]);
   const { reviews } = input;
   // The drafts come from the tree already read: a prep step's result, or the step's own.
@@ -101,6 +107,15 @@ export async function loadHome(
     dash: dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
     waitingRuns,
+    mentions: mentionStates
+      ? passiveMentions({
+          goals: tree.goals.map((g) => g.goal),
+          byGoal: tree.byGoal,
+          suggestions: input.suggestions,
+          today,
+          states: mentionStates,
+        })
+      : [],
   };
 }
 

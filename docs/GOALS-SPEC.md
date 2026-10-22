@@ -451,6 +451,17 @@ without working on it now, so it asks for no attention:
 - Questions, asks, flags and proposals waiting on approval still show in Do
   next, since they hold up work.
 
+What is coming up under a passive goal is mentioned, and nothing more (plan
+#2503.5). A step of the person's due within seven days, and a suggestion
+nobody has answered that happens within seven days, is a mention
+(`passiveMentions` in `lib/goals/passive-mentions.ts`). The morning brief
+lists each one once, and Dash mentions it in the home's note as one line
+marked optional. The Goals home lists every mention not dismissed under
+"Coming up, optional", as a plain line with Decline. `goals.mentions` (goals
+migration 0087) records which the note has mentioned and which were
+dismissed, one row per step or suggestion, so a dismissed mention does not
+come back when its date moves.
+
 ## Todo
 
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown

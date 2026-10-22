@@ -30,16 +30,22 @@ function rows(data: unknown): Suggestion[] {
   return ((data ?? []) as SuggestionRow[]).map(toSuggestion);
 }
 
-/** This fortnight's suggestions, for the home to pick from. */
+/**
+ * This fortnight's suggestions, for the home to pick from. The morning brief
+ * reads them with the service-role client, so it names the person (plan
+ * #2503.5).
+ */
 export async function loadRecentSuggestions(
   client: GoalsSupabaseClient,
   now: number = Date.now(),
+  userId?: string,
 ): Promise<Suggestion[]> {
-  const { data, error } = await client
+  let query = client
     .from('suggestions')
     .select(SUGGESTION_COLUMNS)
-    .gte('created_at', new Date(now - SHOWN_FOR_MS).toISOString())
-    .order('created_at', { ascending: false });
+    .gte('created_at', new Date(now - SHOWN_FOR_MS).toISOString());
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.order('created_at', { ascending: false });
   if (error) throw new Error(`Could not read suggestions: ${error.message}`);
   return rows(data);
 }

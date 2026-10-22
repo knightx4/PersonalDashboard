@@ -13,6 +13,7 @@
  * reads and writes are in inngest/goals/daily.ts.
  */
 import type { OutOfDateStep } from '@/lib/goals/answers';
+import { mentionLine, type PassiveMention } from '@/lib/goals/passive-mentions';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import { prepLine, type PrepCandidate } from '@/lib/goals/prep-candidates';
 import { underWayLine, type ProgressNudges } from '@/lib/goals/progress-nudges';
@@ -127,6 +128,13 @@ export function dailyRunText(input: {
    * no collection has a sender to search.
    */
   statements?: string[];
+  /**
+   * What is coming up within a week under a passive goal and has not been
+   * mentioned or dismissed (plan #2503.5; passiveMentions in
+   * lib/goals/passive-mentions.ts). The home's note mentions each once,
+   * marked optional, and nothing else is done about it.
+   */
+  mentions?: PassiveMention[];
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
@@ -134,6 +142,7 @@ export function dailyRunText(input: {
   const unjudged = input.unjudged ?? [];
   const stalled = input.underWay?.stalled ?? [];
   const finished = input.underWay?.finished ?? [];
+  const mentions = input.mentions ?? [];
   const lines = input.steps.map(
     (step) =>
       `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
@@ -244,6 +253,19 @@ export function dailyRunText(input: {
       : review.length > 0
         ? ['No Claude step is ready today.', '']
         : []),
+    ...(mentions.length > 0
+      ? [
+          'These are coming up within a week under goals the person has marked passive. Mention',
+          'each in one line of the note you leave for the Goals home, marked optional ("Optional:',
+          'the Riverside open day is on Saturday, under Learn pottery"), and leave a home note for',
+          'them even if nothing else needs one. Do nothing more: no step, no Todo, no verdict, and',
+          'no mention on a later morning. Follow .claude/skills/goals/SKILL.md, "Reviewing each',
+          'goal", on passive goals.',
+          '',
+          ...mentions.map(mentionLine),
+          '',
+        ]
+      : []),
     ...(answers.length > 0
       ? [
           'These information steps have answers out of date, since a row they read has changed:',

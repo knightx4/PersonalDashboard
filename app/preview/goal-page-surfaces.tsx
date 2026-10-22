@@ -418,6 +418,26 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
   },
+  // Coming up under passive goals (plan #2503.5): a step and an event, one
+  // with a long title.
+  mentions: [
+    {
+      ref: 'step:p-open-day',
+      title: 'Open day at the Riverside pottery studio',
+      on: '2026-09-27',
+      goalId: 'g-pottery',
+      goalTitle: 'Learn pottery',
+      href: '/goals/g-pottery',
+    },
+    {
+      ref: 'suggestion:p-talk',
+      title: 'Evening talk: glazes and kilns for beginners, with a short demonstration and questions afterwards',
+      on: '2026-09-30',
+      goalId: 'g-pottery',
+      goalTitle: 'Learn pottery',
+      href: 'https://example.com/talk',
+    },
+  ],
 };
 
 export function GoalsHomeSurface() {
