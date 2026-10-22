@@ -39,7 +39,7 @@ import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
-import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
+import { nextPosition, reorder, toGoalActivity, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
@@ -97,6 +97,7 @@ type ItemRow = {
   estimated_total?: number | string | null;
   total_unit?: string | null;
   notify_on_done?: boolean | null;
+  activity?: string | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -126,7 +127,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, activity';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -185,6 +186,7 @@ const toGoal = (row: ItemRow): Goal => ({
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
+  activity: toGoalActivity(row.activity),
   createdAt: row.created_at ?? null,
   closedAt: row.closed_at ?? null,
 });

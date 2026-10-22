@@ -61,6 +61,7 @@ export function GoalNumber({
   sources = [],
   startEditing = false,
   onClose,
+  undated = false,
 }: {
   goalId: string;
   unit: string | null;
@@ -80,6 +81,8 @@ export function GoalNumber({
   startEditing?: boolean;
   /** Called when that form closes on a goal still not measured. */
   onClose?: () => void;
+  /** A passive goal has no date to set (plan #2503.2), so the line offers none. */
+  undated?: boolean;
 }) {
   const [editing, setEditing] = useState(startEditing);
 
@@ -117,6 +120,7 @@ export function GoalNumber({
           target={target}
           dueOn={dueOn}
           duePrecision={toDuePrecision(duePrecision)}
+          undated={undated}
         />
       </div>
       {(numberFrom || sources.length > 0) && (
@@ -171,12 +175,14 @@ function MeasureLine({
   target,
   dueOn,
   duePrecision,
+  undated,
 }: {
   goalId: string;
   unit: string | null;
   target: number | null;
   dueOn: string | null;
   duePrecision: DuePrecision;
+  undated: boolean;
 }) {
   const [state, save, saving] = useActionState(setMeasureAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
@@ -271,7 +277,7 @@ function MeasureLine({
           />
         </>
       )}
-      {unit && target !== null && !addingDate && (
+      {unit && target !== null && !undated && !addingDate && (
         // No date yet: one quiet press rather than an empty date box waiting
         // for typing (plan #1671).
         <Button type="button" variant="link" onClick={() => setAddingDate(true)} disabled={saving}>
@@ -280,7 +286,7 @@ function MeasureLine({
             : 'add a date'}
         </Button>
       )}
-      {unit && target !== null && addingDate && (
+      {unit && target !== null && !undated && addingDate && (
         <>
           <span>by</span>
           <DueField

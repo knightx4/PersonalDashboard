@@ -81,11 +81,18 @@ covers a direction means you leave that direction alone.
    inside the goal as a `rhythm` step.
 4. **A `detail` of one or two sentences**: why this goal serves the area, and
    what it assumes about the person. That sentence is what they decide on.
-5. **One first move under each**, as a proposed step with its own
+5. **Say whether it is active or passive**, in `activity`. An active goal is
+   one the person works on: its steps reach Do next, Todo and the daily
+   verdicts. A passive one is a goal they want kept in view without being
+   asked about it, such as "Know what is on at the local theatre this season":
+   only a dated event under it is mentioned, as an option. The person sees
+   your suggestion on the proposal before approving and can change it later.
+   Write `active` when you are unsure.
+6. **One first move under each**, as a proposed step with its own
    `acceptance`: the smallest thing that would start the goal this week. Only
    one. The full map comes from **Ask Dash** once they approve the goal,
    so do not map it here.
-6. **`position` in the order to start them**, in tens after the area's
+7. **`position` in the order to start them**, in tens after the area's
    existing goals. Put the goal that is easiest to start, and that makes the
    others easier, first.
 
@@ -108,12 +115,12 @@ list"), not in the title.
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
 with g as (
-  insert into goals.items (user_id, level, area_id, title, acceptance, detail, status, position)
+  insert into goals.items (user_id, level, area_id, title, acceptance, detail, activity, status, position)
   values ('<user>', 'goal', '<area id>',
           'Be a regular at your community board',
           'You have attended six full board or committee meetings and spoken at one.',
           'Community boards are where land use and street changes are argued first, and the same people come every month. Assumes you live in one board''s district.',
-          'proposed', 10)
+          'active', 'proposed', 10)
   returning id
 )
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)

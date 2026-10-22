@@ -1,4 +1,4 @@
-import type { ModuleSources, Page, PageRow, Section } from '@/lib/sources/types';
+import type { ModuleSources, NotASource, Page, PageRow, Section } from '@/lib/sources/types';
 import { stepHref } from '@/lib/goals/all-goals';
 
 /**
@@ -82,5 +82,13 @@ export const goalsSources: ModuleSources = {
     'goals.metrics',
     // Whether the morning and weekly runs start (/goals/settings).
     'goals.settings',
-  ].map((table) => ({ table, reason: OWN, page: PAGES[table] })),
+  ]
+    .map((table): NotASource => ({ table, reason: OWN, page: PAGES[table] }))
+    .concat([
+      {
+        table: 'goals.mentions',
+        reason:
+          'Bookkeeping: which dated steps and suggestions under a passive goal the morning note has mentioned and which were declined on the Goals home (plan #2503.5).',
+      },
+    ]),
 };

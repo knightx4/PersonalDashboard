@@ -92,6 +92,8 @@ export type TodayItem = {
   prepared?: Prepared;
   /** For a step of yours: whether it is on Todo, sent there by you or by Dash. */
   onTodo?: boolean;
+  /** For a step on Todo that Dash sent there rather than you (plan #2503). */
+  sentByDash?: boolean;
   /** Set when a snooze on the row ran out and nothing changed under it (plan #1844). */
   backFromSnooze?: boolean;
 };
@@ -303,6 +305,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
               unblocks,
               on,
               ...(node.onTodo && { onTodo: true }),
+              ...(node.onTodo && node.onTodoBy === 'claude' && { sentByDash: true }),
             });
             if (plain) plainTaken = true;
           }
@@ -484,6 +487,8 @@ export function rankToday(candidates: readonly Candidate[]): TodayItem[] {
       on: c.on,
       ...(c.startsOn ? { startsOn: c.startsOn } : {}),
       ...(c.url ? { url: c.url } : {}),
+      ...(c.onTodo ? { onTodo: true } : {}),
+      ...(c.sentByDash ? { sentByDash: true } : {}),
     }));
 }
 

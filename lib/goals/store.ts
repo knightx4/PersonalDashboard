@@ -6,6 +6,7 @@ import { toDuePrecision } from '@/lib/goals/due-precision';
 import {
   nextPosition,
   reorder,
+  toGoalActivity,
   type Area,
   type Goal,
   type GoalFields,
@@ -36,6 +37,7 @@ type GoalRow = {
   due_on: string | null;
   due_precision?: string | null;
   errand: boolean;
+  activity?: string | null;
   archived_at?: string | null;
 };
 
@@ -59,6 +61,7 @@ const toGoal = (row: GoalRow): Goal => ({
   dueOn: row.due_on,
   duePrecision: toDuePrecision(row.due_precision),
   errand: row.errand,
+  activity: toGoalActivity(row.activity),
   archivedAt: row.archived_at ?? null,
 });
 
@@ -85,7 +88,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, status, position, unit, target, due_on, due_precision, errand, archived_at')
+    .select('id, area_id, title, acceptance, status, position, unit, target, due_on, due_precision, errand, activity, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');

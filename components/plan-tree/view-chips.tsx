@@ -25,6 +25,7 @@ export function ViewChips<V extends string>({
   counts,
   scroll,
   className,
+  label: navLabel = 'View',
 }: {
   view: V;
   chips: readonly V[];
@@ -35,6 +36,8 @@ export function ViewChips<V extends string>({
   /** Passed to each link: false keeps the page where it is when the view changes. */
   scroll?: boolean;
   className?: string;
+  /** What the row narrows, for a reader; a page with two rows names the second. */
+  label?: string;
 }) {
   const label = (candidate: V) => {
     const count = counts?.[candidate] ?? 0;
@@ -49,7 +52,10 @@ export function ViewChips<V extends string>({
   const inMenu = menu.includes(view);
 
   return (
-    <nav aria-label="View" className={cn('flex flex-wrap items-center gap-x-1 gap-y-2', className)}>
+    <nav
+      aria-label={navLabel}
+      className={cn('flex flex-wrap items-center gap-x-1 gap-y-2', className)}
+    >
       {chips.map((candidate) => (
         <Link
           key={candidate}

@@ -12,7 +12,7 @@
  * Pure, so the narrowing is tested without a page.
  */
 import { DEFAULT_GOAL_VIEW, GOAL_VIEW_CHIPS, type GoalView } from '@/lib/goals/plan-rows';
-import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type AreaWithGoals, type Goal } from '@/lib/goals/tree';
 
 export type AllGoalsView = (typeof GOAL_VIEW_CHIPS)[number];
 
@@ -26,6 +26,46 @@ export function isAllGoalsView(value: GoalView | string): value is AllGoalsView 
 export function allGoalsViewOf(param: string | string[] | undefined): AllGoalsView {
   const requested = Array.isArray(param) ? param[0] : param;
   return requested && isAllGoalsView(requested) ? requested : (DEFAULT_GOAL_VIEW as AllGoalsView);
+}
+
+/**
+ * Which kind of goal the list shows (plan #2503.4): active goals only,
+ * passive ones only, or both. A second narrowing beside the view, kept in
+ * `?kind=`, with both as the default so the bare address shows every goal
+ * the view holds.
+ */
+export type GoalKindFilter = 'both' | 'active' | 'passive';
+
+export const GOAL_KIND_FILTERS: readonly GoalKindFilter[] = ['both', 'active', 'passive'];
+
+export const GOAL_KIND_LABEL: Record<GoalKindFilter, string> = {
+  both: 'Both',
+  active: 'Active',
+  passive: 'Passive',
+};
+
+/** The kind a `?kind=` parameter asks for, or both when it names neither. */
+export function goalKindOf(param: string | string[] | undefined): GoalKindFilter {
+  const requested = Array.isArray(param) ? param[0] : param;
+  return requested === 'active' || requested === 'passive' ? requested : 'both';
+}
+
+/** The address of a view and kind on a list page, leaving the defaults out. */
+export function allGoalsHref(
+  path: string,
+  view: AllGoalsView,
+  kind: GoalKindFilter = 'both',
+): string {
+  const params = new URLSearchParams();
+  if (view !== DEFAULT_GOAL_VIEW) params.set('view', view);
+  if (kind !== 'both') params.set('kind', kind);
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+/** Whether a goal is of the kind asked for; a goal with no activity stored reads as active. */
+export function goalOfKind(goal: Goal, kind: GoalKindFilter): boolean {
+  return kind === 'both' || toGoalActivity(goal.activity) === kind;
 }
 
 /**
@@ -59,7 +99,10 @@ export function onYouByGoal(items: readonly { goalId: string }[]): Map<string, n
  */
 function isOpen(goal: Goal): boolean {
   return (
-    !goal.archivedAt && goal.status !== 'done' && goal.status !== 'dropped' && goal.status !== 'parked'
+    !goal.archivedAt &&
+    goal.status !== 'done' &&
+    goal.status !== 'dropped' &&
+    goal.status !== 'parked'
   );
 }
 
@@ -67,7 +110,9 @@ export function goalInView(
   goal: Goal,
   view: AllGoalsView,
   onYou: ReadonlyMap<string, number>,
+  kind: GoalKindFilter = 'both',
 ): boolean {
+  if (!goalOfKind(goal, kind)) return false;
   switch (view) {
     case 'all':
       return true;
@@ -91,10 +136,13 @@ export function areasInView(
   areas: readonly AreaWithGoals[],
   view: AllGoalsView,
   onYou: ReadonlyMap<string, number>,
+  kind: GoalKindFilter = 'both',
 ): AreaInView[] {
   return areas.flatMap((area) => {
-    const shown = areaInView(area, view, onYou);
-    const hide = shown.goals.length === 0 && (view === 'you' || area.goals.length > 0);
+    const shown = areaInView(area, view, onYou, kind);
+    // Narrowed to one kind, an area with none of that kind is hidden too.
+    const hide =
+      shown.goals.length === 0 && (view === 'you' || kind !== 'both' || area.goals.length > 0);
     return hide ? [] : [shown];
   });
 }
@@ -107,9 +155,13 @@ export function areaInView(
   area: AreaWithGoals,
   view: AllGoalsView,
   onYou: ReadonlyMap<string, number>,
+  kind: GoalKindFilter = 'both',
 ): AreaInView {
-  const shown = area.goals.filter((goal) => goalInView(goal, view, onYou));
-  const goals = [...shown.filter((goal) => !goal.archivedAt), ...shown.filter((goal) => goal.archivedAt)];
+  const shown = area.goals.filter((goal) => goalInView(goal, view, onYou, kind));
+  const goals = [
+    ...shown.filter((goal) => !goal.archivedAt),
+    ...shown.filter((goal) => goal.archivedAt),
+  ];
   const liveCount = area.goals.filter((goal) => !goal.archivedAt).length;
   return { ...area, goals, liveCount };
 }
@@ -119,9 +171,10 @@ export function countAllGoalsView(
   areas: readonly AreaWithGoals[],
   view: AllGoalsView,
   onYou: ReadonlyMap<string, number>,
+  kind: GoalKindFilter = 'both',
 ): number {
   return areas.reduce(
-    (sum, area) => sum + area.goals.filter((goal) => goalInView(goal, view, onYou)).length,
+    (sum, area) => sum + area.goals.filter((goal) => goalInView(goal, view, onYou, kind)).length,
     0,
   );
 }

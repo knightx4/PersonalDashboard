@@ -75,8 +75,24 @@ instead: the rows stay as they are until the next morning.
 
 Every morning run begins here, before any step is worked, and it runs even on
 a morning with no step ready: each open goal carries a status that is never
-more than a day old, and this is the only run that writes it. The brief lists
-every open goal with its done-when, when anything was last done on it (a step
+more than a day old, and this is the only run that writes it. A passive goal
+(`goals.items.activity = 'passive'`, plan #2503) is the exception: it carries
+no verdict, the brief leaves it out, and you write it none, even when its tree
+would read as waiting on the person or stalled.
+
+What is coming up under a passive goal within a week (a step of the
+person's with that due date, or a dated suggestion nobody has answered) is
+the one thing said about it (plan #2503.5). The brief lists each under
+"coming up under goals the person has marked passive", once: it records them
+as mentioned when the run starts and never lists them again, nor after the
+person declines one on the Goals home. Mention each in one line of the
+home's note, marked optional ("Optional: the Riverside open day is on
+Saturday, under Learn pottery"), and leave a home note for them even on a
+morning that needs no other. Write nothing else about them: no step, no
+Todo, no verdict, and nothing in the goal's own note.
+
+The brief lists every open
+active goal with its done-when, when anything was last done on it (a step
 closed as done, or a reading logged), and the last verdict when there was
 one. Read each goal's tree before judging it: what is done, what is open,
 what waits on the person, what waits on a date, and what waits on you.
@@ -100,7 +116,8 @@ move. Write what matters as context, proposed, and say so in the reason.
 Todo holds only what was sent there (docs/GOALS-SPEC.md, "Goals without a
 deadline"; plan #1736). Do this after closing, merging and moving steps and
 before the verdicts, so a step you just closed is not sent. Put a step on
-Todo, as Dash, when it is one of these:
+Todo, as Dash, when it is one of these, and never under a passive goal
+(`coalesce(activity, 'active') = 'passive'`): only the person sends those.
 
 - a step of the person's (`kind = 'mine'`, `open`) whose own `due_on` is
   within seven days of today, a past date included, because it is the most

@@ -24,7 +24,7 @@
  * Pure. The reads are in lib/goals/reviews-store.ts.
  */
 import { paceLine, type GoalPace } from '@/lib/goals/pace';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 import { parseSnapshot, type ProgressSnapshot } from '@/lib/progress-snapshot';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -109,6 +109,8 @@ export type PaceItemRow = {
   due_on: string | null;
   errand: boolean | null;
   on_todo: boolean | null;
+  /** 'active' or 'passive' on a goal (plan #2503); null reads as active. */
+  activity?: string | null;
 };
 
 /** The goals among `rows` that are judged on their pace (judgedOnPace), from flat rows. */
@@ -133,18 +135,31 @@ export function pacedGoalIds(rows: readonly PaceItemRow[]): Set<string> {
   return new Set(rows.filter((row) => row.level === 'goal' && !dated.has(row.id)).map((row) => row.id));
 }
 
+/** The passive goals among `rows` (plan #2503), which carry no verdict at all. */
+export function passiveGoalIds(rows: readonly PaceItemRow[]): Set<string> {
+  return new Set(
+    rows
+      .filter((row) => row.level === 'goal' && toGoalActivity(row.activity) === 'passive')
+      .map((row) => row.id),
+  );
+}
+
 /**
  * The reviews that still stand as each goal's status. A goal judged on its
  * pace keeps only a met or pace verdict, so a "Waiting on you" written before
  * it lost its date or its step on Todo, or before plan #1738, stops showing,
- * and a goal whose pace is not known yet shows no status at all.
+ * and a goal whose pace is not known yet shows no status at all. A passive
+ * goal (plan #2503) keeps none, so a verdict written before it was made
+ * passive stops showing that day.
  */
 export function standingReviews(
   latest: ReadonlyMap<string, GoalReview>,
   paced: ReadonlySet<string>,
+  passive: ReadonlySet<string> = new Set(),
 ): Map<string, GoalReview> {
   const out = new Map<string, GoalReview>();
   for (const [goalId, review] of latest) {
+    if (passive.has(goalId)) continue;
     if (paced.has(goalId) && !PACE_GOAL_VERDICTS.has(review.verdict)) continue;
     out.set(goalId, review);
   }
@@ -353,8 +368,9 @@ export type ReviewGoal = {
 };
 
 /**
- * Every open goal, in tree order, with what the review needs to know about
- * it. `paces` holds an entry for each goal judged on its pace (plan #1738),
+ * Every open active goal, in tree order, with what the review needs to know
+ * about it. A passive goal (plan #2503) is left out, so the morning brief
+ * writes it no verdict. `paces` holds an entry for each goal judged on its pace (plan #1738),
  * which is never forced to stalled: three quiet weeks on a goal with no
  * deadline read as slower than usual, or as nothing while its pace is unknown.
  */
@@ -366,7 +382,7 @@ export function reviewGoals(
   paces: ReadonlyMap<string, GoalPace | null> = new Map(),
 ): ReviewGoal[] {
   return goals
-    .filter((g) => g.status === 'open')
+    .filter((g) => g.status === 'open' && toGoalActivity(g.activity) !== 'passive')
     .map((g) => {
       const seen = activity.get(g.id);
       const from = seen?.lastDoneAt ?? seen?.since ?? null;

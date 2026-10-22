@@ -32,8 +32,10 @@ import type { GoalProgress } from '@/lib/goals/status';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
+import type { GoalKindFilter } from '@/lib/goals/all-goals';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
+import type { ActivitySwitchDrawn } from '@/app/goals/[goalId]/goal-activity-switch';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
@@ -103,6 +105,17 @@ const job = goal('g-job', 'a-career', 'Move into a quant research role', {
 const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
   createdAt: '2026-09-25T07:30:00Z',
 });
+/** Passive goals (plan #2503.4): kept in view, not worked. One title runs long. */
+const pottery = goal('g-pottery', 'a-health', 'Learn pottery', {
+  activity: 'passive',
+  position: 30,
+});
+const flatPrices = goal(
+  'g-flat',
+  'a-money',
+  'Keep an eye on what flats near the river sell for, in case one comes up we could afford',
+  { activity: 'passive', position: 40 },
+);
 
 /** The areas a goal can be moved to, for the menu in the page's header. */
 const PLACES = [
@@ -310,6 +323,19 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       next: null,
       hasSteps: true,
     },
+    // Two passive goals (plan #2503.4), listed under their own heading.
+    ...[pottery, flatPrices].map((passive) => ({
+      goal: passive,
+      areaName: passive.areaId === 'a-money' ? 'Money' : 'Health',
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
+        move: 'settled',
+      }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: false,
+    })),
   ],
   dashToday: <WorkspaceDashTodayFixture />,
   todayOn: TODAY,
@@ -418,12 +444,31 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
   },
+  // Coming up under passive goals (plan #2503.5): a step and an event, one
+  // with a long title.
+  mentions: [
+    {
+      ref: 'step:p-open-day',
+      title: 'Open day at the Riverside pottery studio',
+      on: '2026-09-27',
+      goalId: 'g-pottery',
+      goalTitle: 'Learn pottery',
+      href: '/goals/g-pottery',
+    },
+    {
+      ref: 'suggestion:p-talk',
+      title:
+        'Evening talk: glazes and kilns for beginners, with a short demonstration and questions afterwards',
+      on: '2026-09-30',
+      goalId: 'g-pottery',
+      goalTitle: 'Learn pottery',
+      href: 'https://example.com/talk',
+    },
+  ],
 };
 
-export function GoalsHomeSurface() {
-  return (
-    <HomeView {...home} timeZone="Europe/London" canRun />
-  );
+export function GoalsHomeSurface({ passiveOpen = false }: { passiveOpen?: boolean } = {}) {
+  return <HomeView {...home} timeZone="Europe/London" canRun passiveOpen={passiveOpen} />;
 }
 
 /** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
@@ -480,18 +525,33 @@ export function GoalsAllSurface({
   notes = false,
   more = false,
   select,
+  kind = 'both',
+  passive = false,
 }: {
+  /** Active, passive or both (plan #2503.4). */
+  kind?: GoalKindFilter;
+  /** Two passive goals among the rest, so the kinds show (plan #2503.4). */
+  passive?: boolean;
   notes?: boolean;
   /** Six goals rather than five, for archiving more than five at once (plan #2097.2). */
   more?: boolean;
   /** Select already on, with these goals ticked (plan #2097.2). */
   select?: { selecting?: boolean; ticked?: string[] };
 }) {
-  const shown = more
+  const withPassive = passive
     ? areas.map((area) =>
-        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+        area.id === 'a-money'
+          ? { ...area, goals: [...area.goals, flatPrices] }
+          : area.id === 'a-health'
+            ? { ...area, goals: [...area.goals, pottery] }
+            : area,
       )
     : areas;
+  const shown = more
+    ? withPassive.map((area) =>
+        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+      )
+    : withPassive;
   return (
     <PageColumn>
       <PageHeader title="All goals" subject={{ ref: null, path: allGoalsCrumbs() }} />
@@ -503,6 +563,7 @@ export function GoalsAllSurface({
         }
         select={select}
         view="open"
+        kind={kind}
         onYou={{ [cards.id]: 1 }}
         progress={{
           [cards.id]: cardsProgress,
@@ -543,6 +604,7 @@ const moneyArea: AreaWithGoals = {
     }),
     goal('g-insurance', 'a-money', 'Get contents insurance for the flat', {
       status: 'proposed',
+      activity: 'passive',
       position: 40,
     }),
   ],
@@ -764,7 +826,16 @@ const CARD_SUGGESTIONS: Suggestion[] = [
  * one Learn goal linked and a file, as More holds them. The page header is
  * the real one, with the path above it (plan #1622).
  */
-export function GoalTopSurface({ frameOnly = false }: { frameOnly?: boolean } = {}) {
+export function GoalTopSurface({
+  frameOnly = false,
+  passive = false,
+  activityDrawn,
+}: {
+  frameOnly?: boolean;
+  /** The goal marked passive (plan #2503.2): no Due, and the switch on Passive. */
+  passive?: boolean;
+  activityDrawn?: ActivitySwitchDrawn;
+} = {}) {
   const which = {
     ...step('which', {
       title: 'Which card first?',
@@ -776,7 +847,8 @@ export function GoalTopSurface({ frameOnly = false }: { frameOnly?: boolean } = 
   };
   return (
     <GoalDetail
-      goal={cards}
+      goal={passive ? { ...cards, activity: 'passive' } : cards}
+      activityDrawn={activityDrawn}
       areaName="Money"
       places={PLACES}
       review={cardsReview}

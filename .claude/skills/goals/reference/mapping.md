@@ -505,8 +505,9 @@ Say in the run's summary which kinds you proposed and why.
 ### A goal that is several goals
 
 A goal that turns out to be several goals gets them proposed as goals:
-`level = 'goal'`, the same `area_id`, `status = 'proposed'`. The person
-approves each one on its own page.
+`level = 'goal'`, the same `area_id`, `status = 'proposed'`, and `activity`
+set to `active` or `passive` as "What to propose" in `area.md` describes
+(`active` when unsure). The person approves each one on its own page.
 
 ### Titles
 

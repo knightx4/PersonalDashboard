@@ -143,6 +143,10 @@ export const goalsActions: ModuleActions = {
     estimateGoalCapture: none('page'),
     goalCaptureCosts: none('page'),
   },
+  'app/goals/mention-actions.ts': {
+    dismissMentionAction: none('theirs'),
+    undismissMentionAction: none('theirs'),
+  },
   'app/goals/settings/actions.ts': {
     setGoalRun: none('setting'),
   },

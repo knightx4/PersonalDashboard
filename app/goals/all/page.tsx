@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn';
 import { FileText } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
-import { allGoalsViewOf } from '@/lib/goals/all-goals';
+import { allGoalsViewOf, goalKindOf } from '@/lib/goals/all-goals';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { GoalsView } from '../goals-view';
 import { loadAllGoals } from './data';
@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
  * this period's progress. An area's name opens its own page (plan #1619),
  * which draws the same section on its own.
  *
+ * Active, passive or both narrow it again (plan #2503.4), kept in `?kind=`.
  * Open, On you and Everything narrow it (plan #1158), kept in `?view=` as a
  * goal page's step views are. On you is what the home's Today list gathers,
  * counted per goal, so the live tree is read once for that and for each
@@ -32,9 +33,11 @@ export const dynamic = 'force-dynamic';
 export default async function AllGoalsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string | string[] }>;
+  searchParams: Promise<{ view?: string | string[]; kind?: string | string[] }>;
 }) {
-  const view = allGoalsViewOf((await searchParams).view);
+  const query = await searchParams;
+  const view = allGoalsViewOf(query.view);
+  const kind = goalKindOf(query.kind);
   const user = await requireUser();
   const data = await loadAllGoals(user, view);
 
@@ -54,7 +57,7 @@ export default async function AllGoalsPage({
           </Link>
         }
       />
-      <GoalsView {...data} view={view} />
+      <GoalsView {...data} view={view} kind={kind} />
     </PageColumn>
   );
 }
