@@ -12,7 +12,7 @@ import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
-import { ChipSelect } from '@/components/ui/field';
+import { ChipSelect, Input } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
@@ -36,7 +36,7 @@ import {
   sortOpenings,
   WORKPLACE_LABELS,
 } from '@/lib/jobs/suggest/scores';
-import { DISMISS_REASON_LABELS, DISMISS_REASONS } from '@/lib/jobs/suggest/feedback';
+import { DECLINE_TEXT_MAX } from '@/lib/jobs/suggest/decline-text';
 import { formatCost, OPENING_ORIGIN_LABELS, type OriginStats } from '@/lib/jobs/suggest/stats';
 import type { RunLine } from '@/lib/jobs/suggest/search-runs';
 import {
@@ -258,8 +258,11 @@ export function RecommendedRoles({
   stats = [],
   searchCostMicros = 0,
   searchLine = null,
+  declining,
 }: {
   suggestions: OpenSuggestion[];
+  /** The gallery's: the role whose decline box is drawn open. */
+  declining?: string;
   /** Sort and filters, read from the URL by the page (opening-view.ts). */
   view?: OpeningView;
   /** The page's other parameters, carried through the filter form. */
@@ -307,7 +310,7 @@ export function RecommendedRoles({
       }
     >
       {shown.map((suggestion) => (
-        <RoleRow key={suggestion.id} suggestion={suggestion} />
+        <RoleRow key={suggestion.id} suggestion={suggestion} defaultDeclining={suggestion.id === declining} />
       ))}
     </RecommendedSection>
   );
@@ -934,15 +937,15 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
  * A recommended role, read in three lines: title (the link to the posting),
  * the facts, and why it fits. Details is a <details>, so it folds before
  * JavaScript loads (law 10); while it is open the row's action line drops
- * below it and the why stops being cut. Not for me asks why before it turns
- * the role down: the reason is what the next search learns from
- * (lib/jobs/suggest/feedback.ts).
+ * below it and the why stops being cut. Not for me opens a box for why, and
+ * submitting it turns the role down with or without words (plan #2504.3):
+ * what was typed is what the next search learns from.
  */
-function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
+function RoleRow({ suggestion, defaultDeclining = false }: { suggestion: OpenSuggestion; defaultDeclining?: boolean }) {
   const [busy, start] = useTransition();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const [choosing, setChoosing] = useState(defaultDeclining);
   const steps = moveSteps(suggestion.move);
 
   const act = (action: () => Promise<{ error: string | null }>) =>
@@ -1028,11 +1031,16 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
             )}
         </Disclosure>
         <span className="ml-auto flex items-center justify-end gap-2">
-          <CloseButton
-            lifecycle="declined"
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            pressed={choosing}
             aria-expanded={choosing}
             onClick={() => setChoosing(!choosing)}
-          />
+          >
+            Not for me
+          </Button>
           <Button
             type="button"
             size="sm"
@@ -1045,25 +1053,24 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         </span>
       </div>
       {choosing && (
-        <div
-          className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-small"
-          role="group"
+        <form
+          className="flex flex-wrap items-center gap-2 max-sm:[&_input]:min-h-11"
           aria-label="Why not this one"
+          action={(form) => {
+            const text = String(form.get('text') ?? '');
+            decline(() => dismissOpening(suggestion.id, text));
+          }}
         >
-          <span className="text-ink-muted">Why not?</span>
-          {DISMISS_REASONS.map((reason) => (
-            <Button
-              key={reason}
-              type="button"
-              variant="link"
-              disabled={busy}
-              onClick={() => decline(() => dismissOpening(suggestion.id, reason))}
-              className="text-ink"
-            >
-              {DISMISS_REASON_LABELS[reason]}
-            </Button>
-          ))}
-        </div>
+          <Input
+            name="text"
+            maxLength={DECLINE_TEXT_MAX}
+            autoFocus={!defaultDeclining}
+            aria-label="Why not? Optional, and the next search reads it"
+            placeholder="Why not? (optional)"
+            className="min-w-0 flex-1 basis-56"
+          />
+          <CloseButton type="submit" lifecycle="declined" variant="secondary" pending={busy} />
+        </form>
       )}
       {error && <p className="text-small text-danger">{error}</p>}
     </li>

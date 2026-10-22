@@ -7,7 +7,7 @@ import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { addContact, addTouch, BEFORE_CONTACTED_AGAIN, markContacted, suggestedContact } from '@/lib/jobs/contacts/edit';
 import { detectPosting } from '@/lib/jobs/ats';
 import { startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
-import { isDismissReason } from '@/lib/jobs/suggest/feedback';
+import { declineText } from '@/lib/jobs/suggest/decline-text';
 
 /**
  * Dash's recommendations (job_search.suggestions, 0028): the roles and the
@@ -89,7 +89,7 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
   const supabase = await createClient();
   const { error } = await supabase
     .from('suggestions')
-    .update({ status: 'open', acted_at: null, dismiss_reason: null })
+    .update({ status: 'open', acted_at: null, dismiss_reason: null, dismiss_text: null })
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .eq('status', 'dismissed');
@@ -98,11 +98,15 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
   return { error: null };
 }
 
-/** Turn a recommended role down, saying why. */
+/**
+ * Turn a recommended role down, with whatever the person typed in the box
+ * (plan #2504.3), or nothing. The typed text goes in dismiss_text; the fixed
+ * reason is left empty, which the feedback reads as "no reason given", so the
+ * declines made from the old menu keep their reasons and still read the same.
+ */
 // latency: pending -- should be optimistic: a dismiss that waits for the round trip
-export async function dismissOpening(id: string, reason: string): Promise<{ error: string | null }> {
-  if (!isDismissReason(reason)) return { error: 'Choose a reason.' };
-  return closeSuggestion(id, 'dismissed', { dismiss_reason: reason });
+export async function dismissOpening(id: string, text: string): Promise<{ error: string | null }> {
+  return closeSuggestion(id, 'dismissed', { dismiss_reason: null, dismiss_text: declineText(text) });
 }
 
 /**
