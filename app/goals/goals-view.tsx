@@ -631,7 +631,11 @@ function GoalRow({
           </p>
         )}
         {!archived && goal.status === 'proposed' && (
-          <SettleProposedGoal goalId={goal.id} onDecline={(form) => archive(form, 'declined')} />
+          <SettleProposedGoal
+            goalId={goal.id}
+            activity={goal.activity ?? 'active'}
+            onDecline={(form) => archive(form, 'declined')}
+          />
         )}
         {!archived && (goal.status === 'parked' || goal.status === 'done') && (
           <TakeBackUp status={goal.status} onReopen={() => reopen('reopen')} />
@@ -650,14 +654,22 @@ function GoalRow({
  */
 function SettleProposedGoal({
   goalId,
+  activity,
   onDecline,
 }: {
   goalId: string;
+  activity: 'active' | 'passive';
   onDecline: (form: FormData) => Promise<void>;
 }) {
   const [state, approve, approving] = useActionState(approveGoalAction, {});
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+      {/* Dash's suggestion, which approving keeps; it is changed from the goal's page. */}
+      <span className="text-small text-ink-muted">
+        {activity === 'passive'
+          ? 'Dash suggests passive: kept in view, not asked about'
+          : 'Dash suggests active: something you work on'}
+      </span>
       <form action={approve}>
         <input type="hidden" name="goalId" value={goalId} />
         <Button type="submit" size="sm" variant="secondary" pending={approving}>
