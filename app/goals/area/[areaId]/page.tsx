@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
-import { allGoalsViewOf } from '@/lib/goals/all-goals';
+import { allGoalsViewOf, goalKindOf } from '@/lib/goals/all-goals';
 import { loadAllGoals } from '../../all/data';
 import { GoalsView } from '../../goals-view';
 import { PageColumn } from '@/components/shell/page-width';
@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
  * and its rhythms, with the editing All goals offers, since it draws the same
  * section from the same read. The name is the heading and is renamed here,
  * under the path Goals › the area (plan #1622).
- * Open, On you and Everything narrow its goals as they do on All goals.
+ * Open, On you and Everything narrow its goals as they do on All goals, and
+ * so does the kind of goal, `?kind=` (plan #2503.4).
  *
  * An archived area, or an id that is not one of the person's areas, has no
  * page: an id that is not a uuid goes to All goals, and an unknown one is a
@@ -24,18 +25,20 @@ export default async function AreaPage({
   searchParams,
 }: {
   params: Promise<{ areaId: string }>;
-  searchParams: Promise<{ view?: string | string[] }>;
+  searchParams: Promise<{ view?: string | string[]; kind?: string | string[] }>;
 }) {
   const { areaId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(areaId)) redirect('/goals/all');
-  const view = allGoalsViewOf((await searchParams).view);
+  const query = await searchParams;
+  const view = allGoalsViewOf(query.view);
+  const kind = goalKindOf(query.kind);
   const user = await requireUser();
   const data = await loadAllGoals(user, view);
   if (!data.areas.some((area) => area.id === areaId)) notFound();
 
   return (
     <PageColumn>
-      <GoalsView {...data} view={view} areaId={areaId} />
+      <GoalsView {...data} view={view} kind={kind} areaId={areaId} />
     </PageColumn>
   );
 }

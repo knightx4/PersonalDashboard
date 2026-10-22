@@ -20,14 +20,17 @@ import { useToast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
   ALL_GOALS_VIEWS,
+  allGoalsHref,
   areaInView,
   areasInView,
   countAllGoalsView,
+  GOAL_KIND_FILTERS,
+  GOAL_KIND_LABEL,
   type AllGoalsView,
   type AreaInView,
+  type GoalKindFilter,
 } from '@/lib/goals/all-goals';
 import { VIEW_LABEL } from '@/lib/core/move';
-import { goalViewHref } from '@/lib/goals/plan-rows';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import { AREA_NAME_MAX, AREA_NOTE_MAX, type AreaWithGoals, type Goal } from '@/lib/goals/tree';
@@ -164,9 +167,30 @@ const EMPTY_VIEW: Record<AllGoalsView, { title: string; description: string }> =
   all: { title: 'No goals yet', description: 'Add a goal under an area.' },
 };
 
+/** What a view narrowed to one kind says when it has no goal of that kind (plan #2503.4). */
+const EMPTY_KIND: Record<
+  Exclude<GoalKindFilter, 'both'>,
+  { title: string; description: string }
+> = {
+  active: {
+    title: 'No active goals here',
+    description: 'Every goal this view holds is passive. Switch a goal to active from its page.',
+  },
+  passive: {
+    title: 'No passive goals here',
+    description:
+      'A passive goal is kept in view without Dash asking about it. Switch one to passive from its page.',
+  },
+};
+
+function emptyFor(view: AllGoalsView, kind: GoalKindFilter) {
+  return kind === 'both' ? EMPTY_VIEW[view] : EMPTY_KIND[kind];
+}
+
 export function GoalsView({
   areas: allAreas,
   view,
+  kind = 'both',
   onYou: onYouCounts,
   progress,
   areaRuns,
@@ -178,6 +202,8 @@ export function GoalsView({
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
   view: AllGoalsView;
+  /** Active goals, passive ones or both (plan #2503.4); in the address as `?kind=`. */
+  kind?: GoalKindFilter;
   /** How many things on you each goal holds, keyed by goal id, from the Today list. */
   onYou: Record<string, number>;
   progress: Progress;
@@ -198,23 +224,49 @@ export function GoalsView({
   const pageIndex = areaId ? allAreas.findIndex((area) => area.id === areaId) : -1;
   const pageArea = pageIndex >= 0 ? allAreas[pageIndex] : null;
   const counted = pageArea ? [pageArea] : allAreas;
+  const path = pageArea ? `/goals/area/${pageArea.id}` : '/goals/all';
+  // The kinds narrow nothing until a goal is passive, so they show once one is.
+  const showKinds =
+    kind !== 'both' ||
+    counted.some((area) => area.goals.some((goal) => goal.activity === 'passive'));
   const chips = counted.length > 0 && (
-    <div className="flex items-center gap-2">
-      <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-      <div className="min-w-0 flex-1">
+    <div className={cn('flex gap-2', showKinds ? 'items-start' : 'items-center')}>
+      <ListFilter
+        className={cn('size-3.5 shrink-0 text-ink-muted', showKinds && 'mt-2')}
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      {/* The view, then which kind of goal (plan #2503.4); on a phone the kinds wrap under. */}
+      <div
+        className={cn('min-w-0 flex-1', showKinds && 'flex flex-wrap items-center gap-x-3 gap-y-2')}
+      >
         <ViewChips
           view={view}
           chips={ALL_GOALS_VIEWS}
           labels={VIEW_LABEL}
-          hrefOf={(candidate) =>
-            goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
-          }
+          hrefOf={(candidate) => allGoalsHref(path, candidate, kind)}
           counts={{
-            open: countAllGoalsView(counted, 'open', onYou),
-            you: countAllGoalsView(counted, 'you', onYou),
+            open: countAllGoalsView(counted, 'open', onYou, kind),
+            you: countAllGoalsView(counted, 'you', onYou, kind),
           }}
           scroll={false}
         />
+        {showKinds && (
+          <ViewChips
+            label="Kind of goal"
+            // A line of its own on a phone, so neither row breaks inside.
+            className="max-sm:basis-full"
+            view={kind}
+            chips={GOAL_KIND_FILTERS}
+            labels={GOAL_KIND_LABEL}
+            hrefOf={(candidate) => allGoalsHref(path, view, candidate)}
+            counts={{
+              active: countAllGoalsView(counted, view, onYou, 'active'),
+              passive: countAllGoalsView(counted, view, onYou, 'passive'),
+            }}
+            scroll={false}
+          />
+        )}
       </div>
       {/* Several goals parked or archived at once (plan #2097.2). */}
       <SelectGoalsToggle />
@@ -222,7 +274,7 @@ export function GoalsView({
   );
 
   if (pageArea) {
-    const area = areaInView(pageArea, view, onYou);
+    const area = areaInView(pageArea, view, onYou, kind);
     return (
       <GoalSelectProvider goals={selectable([area])} initial={select}>
         <AreaSection
@@ -234,9 +286,11 @@ export function GoalsView({
           rhythms={rhythms[area.id] ?? []}
           canRun={canRun}
           places={places}
+          kind={kind}
           page={{
             chips,
-            empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
+            empty:
+              area.goals.length === 0 && pageArea.goals.length > 0 ? emptyFor(view, kind) : null,
           }}
         />
         <GoalSelectBar />
@@ -244,7 +298,7 @@ export function GoalsView({
     );
   }
 
-  const areas = areasInView(allAreas, view, onYou);
+  const areas = areasInView(allAreas, view, onYou, kind);
   return (
     <GoalSelectProvider goals={selectable(areas)} initial={select}>
       <div className="space-y-6">
@@ -256,7 +310,7 @@ export function GoalsView({
             description="Start with the directions you care about, such as money, career or the city, then put goals under each."
           />
         ) : areas.length === 0 ? (
-          <EmptyState icon={Flag} {...EMPTY_VIEW[view]} />
+          <EmptyState icon={Flag} {...emptyFor(view, kind)} />
         ) : (
           areas.map((area, index) => (
             <AreaSection
@@ -270,6 +324,7 @@ export function GoalsView({
               canRun={canRun}
               places={places}
               view={view}
+              kind={kind}
             />
           ))
         )}
@@ -295,6 +350,7 @@ function AreaSection({
   canRun,
   places,
   view = 'open',
+  kind = 'both',
   page,
 }: {
   area: AreaInView;
@@ -307,6 +363,8 @@ function AreaSection({
   places: Place[];
   /** The view All goals is on, which the area's link keeps. */
   view?: AllGoalsView;
+  /** The kind of goal shown, which the area's link keeps; with both, each passive goal says so. */
+  kind?: GoalKindFilter;
   /**
    * Drawn as the area's own page: the name is the page's heading and is
    * renamed there, the view chips sit under the note, and a view that leaves
@@ -411,7 +469,7 @@ function AreaSection({
             </IconButton>
           </Tooltip>
           <Link
-            href={goalViewHref(`/goals/area/${area.id}`, view)}
+            href={allGoalsHref(`/goals/area/${area.id}`, view, kind)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.
             // eslint-disable-next-line no-restricted-syntax -- text-base matches InlineInput's phone size.
             className="press-area min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink [overflow-wrap:anywhere] hover:underline sm:text-ui"
@@ -457,12 +515,7 @@ function AreaSection({
           </form>
           {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
           {goalCount === 0 && (
-            <AreaPlanner
-              areaId={area.id}
-              hasGoals={liveCount > 0}
-              run={run}
-              canRun={canRun}
-            />
+            <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
           )}
         </div>
         {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
@@ -484,6 +537,7 @@ function AreaSection({
                       count={goalCount}
                       steps={progress[goal.id]}
                       places={places}
+                      labelPassive={kind === 'both'}
                     />
                   ))
                 }
@@ -493,12 +547,7 @@ function AreaSection({
         )}
         {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
         {goalCount > 0 && (
-          <AreaPlanner
-            areaId={area.id}
-            hasGoals={liveCount > 0}
-            run={run}
-            canRun={canRun}
-          />
+          <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
         )}
         <GoalComposer areaId={area.id} areaName={area.name} />
       </div>
@@ -512,12 +561,15 @@ function GoalRow({
   count,
   steps,
   places,
+  labelPassive = false,
 }: {
   goal: Goal;
   index: number;
   count: number;
   steps: GoalProgressData | undefined;
   places: Place[];
+  /** Say "Passive" on the row when the goal is (plan #2503.4). */
+  labelPassive?: boolean;
 }) {
   // Reopen and Take it back up open the goal on the row when pressed, and
   // put it back with the reason in a toast if refused (plan #1851).
@@ -608,6 +660,10 @@ function GoalRow({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pt-0.5">
           {/* `contents`, so its parts wrap in this line beside Full tree rather than
               as a block of their own: at 390 a goal's meta then takes two lines. */}
+          {/* A proposed goal says Dash's suggestion below instead. */}
+          {labelPassive && goal.activity === 'passive' && goal.status !== 'proposed' && (
+            <span className="text-small text-ink-muted">Passive</span>
+          )}
           {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}

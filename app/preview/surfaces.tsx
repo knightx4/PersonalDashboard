@@ -5284,6 +5284,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsHomeSurface />,
   },
   {
+    /* The Goals home with Passive goals open (plan #2503.4): the passive
+     * goals under their areas, apart from Other goals, and the way to them
+     * on All goals. */
+    id: 'goals-home-passive',
+    label: 'Goals · home, passive goals open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsHomeSurface passiveOpen />,
+  },
+  {
     /* Everything on you in Goals, grouped as the Inbox in Dev is. */
     id: 'goals-inbox',
     label: 'Goals · Inbox',
@@ -5353,6 +5363,31 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* All goals holding passive goals (plan #2503.4): the kind chips beside
+     * the views, and each passive goal saying so on its row. */
+    id: 'goals-all-kinds',
+    label: 'Goals · all goals, active and passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes passive />,
+  },
+  {
+    /* All goals narrowed to Passive (plan #2503.4). */
+    id: 'goals-all-passive',
+    label: 'Goals · all goals, passive only',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes passive kind="passive" />,
+  },
+  {
+    /* Passive asked for with no passive goal: the empty state (plan #2503.4). */
+    id: 'goals-all-passive-empty',
+    label: 'Goals · all goals, no passive goals',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes kind="passive" />,
   },
   {
     /* A goal's row menu on All goals, open: Later and Drop (plans #2097.1, #1957.8). */

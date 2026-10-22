@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allGoalsHref,
   allGoalsViewOf,
   areaHref,
   areaInView,
   areasInView,
   countAllGoalsView,
   goalInView,
+  goalKindOf,
   onYouByGoal,
 } from './all-goals';
 import { buildForest, markStartDates, type Step } from './steps';
@@ -146,8 +148,54 @@ describe('areaHref', () => {
 
 describe('areaInView', () => {
   it('keeps an area whose goals all fall out of the view', () => {
-    const area = { id: 'a1', name: 'Health', note: null, position: 0, goals: [] } as unknown as AreaWithGoals;
+    const area = {
+      id: 'a1',
+      name: 'Health',
+      note: null,
+      position: 0,
+      goals: [],
+    } as unknown as AreaWithGoals;
     expect(areaInView(area, 'you', new Map())).toMatchObject({ id: 'a1', goals: [], liveCount: 0 });
     expect(areasInView([area], 'you', new Map())).toEqual([]);
+  });
+});
+
+describe('the kind filter (plan #2503.4)', () => {
+  const money: AreaWithGoals = {
+    id: 'money',
+    name: 'Money',
+    note: null,
+    position: 10,
+    goals: [
+      goal('fund'),
+      goal('watch', { activity: 'passive' }),
+      goal('old', { activity: undefined }),
+    ],
+  } as AreaWithGoals;
+  const city: AreaWithGoals = { ...money, id: 'city', name: 'City', goals: [goal('park')] };
+  const none = new Map<string, number>();
+
+  it('shows active, passive or both, a goal with no activity reading as active', () => {
+    const ids = (kind: 'both' | 'active' | 'passive') =>
+      areasInView([money, city], 'open', none, kind).flatMap((area) => area.goals.map((g) => g.id));
+    expect(ids('both')).toEqual(['fund', 'watch', 'old', 'park']);
+    expect(ids('active')).toEqual(['fund', 'old', 'park']);
+    expect(ids('passive')).toEqual(['watch']);
+    expect(countAllGoalsView([money, city], 'open', none, 'passive')).toBe(1);
+    expect(goalInView(goal('x', { activity: 'passive' }), 'all', none, 'active')).toBe(false);
+  });
+
+  it('hides an area with none of the kind asked for', () => {
+    expect(areasInView([money, city], 'open', none, 'passive').map((a) => a.id)).toEqual(['money']);
+  });
+
+  it('reads ?kind= and writes both parameters, leaving the defaults out', () => {
+    expect(goalKindOf('passive')).toBe('passive');
+    expect(goalKindOf(['active'])).toBe('active');
+    expect(goalKindOf('open')).toBe('both');
+    expect(goalKindOf(undefined)).toBe('both');
+    expect(allGoalsHref('/goals/all', 'open')).toBe('/goals/all');
+    expect(allGoalsHref('/goals/all', 'open', 'passive')).toBe('/goals/all?kind=passive');
+    expect(allGoalsHref('/goals/all', 'all', 'active')).toBe('/goals/all?view=all&kind=active');
   });
 });

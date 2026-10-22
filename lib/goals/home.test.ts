@@ -238,11 +238,7 @@ describe('homeLists', () => {
   });
 
   it('lists the goals with no due date, errands first, and an errand with no row in Do next', () => {
-    expect(homeLists([], goals, 5).otherGoals.map((l) => l.goal.id)).toEqual([
-      'soon',
-      'far',
-      'b',
-    ]);
+    expect(homeLists([], goals, 5).otherGoals.map((l) => l.goal.id)).toEqual(['soon', 'far', 'b']);
     const listed = homeLists([onYou('soon-step', 'soon')], goals, 5);
     expect(listed.otherGoals.map((l) => l.goal.id)).toEqual(['far', 'b']);
   });
@@ -258,9 +254,23 @@ describe('homeLists', () => {
       onYou('p-question', 'p', 'question'),
       onYou('p-flag', 'p', 'flag'),
     ];
-    const { doNext, rest, otherGoals } = homeLists(ranked, [passive], 5);
+    const { doNext, rest, otherGoals, passiveGoals } = homeLists(ranked, [passive], 5);
     expect([...doNext, ...rest].map((item) => item.id)).toEqual(['p-mine', 'p-question', 'p-flag']);
-    expect(otherGoals.map((l) => l.goal.id)).toEqual(['p']);
+    expect(otherGoals).toEqual([]);
+    expect(passiveGoals.map((l) => l.goal.id)).toEqual(['p']);
+  });
+
+  it('lists passive goals under their own heading and not under Other goals', () => {
+    const asPassive = (line: (typeof goals)[number]) => ({
+      ...line,
+      goal: { ...line.goal, activity: 'passive' as const },
+    });
+    const mixed = goals.map((line) =>
+      line.goal.id === 'b' || line.goal.id === 'far' ? asPassive(line) : line,
+    );
+    const lists = homeLists([], mixed, 5);
+    expect(lists.otherGoals.map((l) => l.goal.id)).toEqual(['soon']);
+    expect(lists.passiveGoals.map((l) => l.goal.id).sort()).toEqual(['b', 'far']);
   });
 
   it('leaves out a step of a goal with no due date that is not on Todo', () => {
@@ -282,7 +292,8 @@ describe('briefParts', () => {
 
 describe('preparedExcerpt', () => {
   it('gives the first lines as plain text', () => {
-    const text = '## Script\n\n- **Say** who you are\n- [ ] Ask for the \x60fee\x60\n1. Thank them\n> Last';
+    const text =
+      '## Script\n\n- **Say** who you are\n- [ ] Ask for the \x60fee\x60\n1. Thank them\n> Last';
     expect(preparedExcerpt(text)).toBe('Script\nSay who you are\nAsk for the fee');
   });
 });

@@ -32,6 +32,7 @@ import type { GoalProgress } from '@/lib/goals/status';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
+import type { GoalKindFilter } from '@/lib/goals/all-goals';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import type { ActivitySwitchDrawn } from '@/app/goals/[goalId]/goal-activity-switch';
@@ -104,6 +105,17 @@ const job = goal('g-job', 'a-career', 'Move into a quant research role', {
 const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
   createdAt: '2026-09-25T07:30:00Z',
 });
+/** Passive goals (plan #2503.4): kept in view, not worked. One title runs long. */
+const pottery = goal('g-pottery', 'a-health', 'Learn pottery', {
+  activity: 'passive',
+  position: 30,
+});
+const flatPrices = goal(
+  'g-flat',
+  'a-money',
+  'Keep an eye on what flats near the river sell for, in case one comes up we could afford',
+  { activity: 'passive', position: 40 },
+);
 
 /** The areas a goal can be moved to, for the menu in the page's header. */
 const PLACES = [
@@ -311,6 +323,19 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       next: null,
       hasSteps: true,
     },
+    // Two passive goals (plan #2503.4), listed under their own heading.
+    ...[pottery, flatPrices].map((passive) => ({
+      goal: passive,
+      areaName: passive.areaId === 'a-money' ? 'Money' : 'Health',
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
+        move: 'settled',
+      }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: false,
+    })),
   ],
   dashToday: <WorkspaceDashTodayFixture />,
   todayOn: TODAY,
@@ -432,7 +457,8 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     },
     {
       ref: 'suggestion:p-talk',
-      title: 'Evening talk: glazes and kilns for beginners, with a short demonstration and questions afterwards',
+      title:
+        'Evening talk: glazes and kilns for beginners, with a short demonstration and questions afterwards',
       on: '2026-09-30',
       goalId: 'g-pottery',
       goalTitle: 'Learn pottery',
@@ -441,8 +467,8 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
   ],
 };
 
-export function GoalsHomeSurface() {
-  return <HomeView {...home} timeZone="Europe/London" canRun />;
+export function GoalsHomeSurface({ passiveOpen = false }: { passiveOpen?: boolean } = {}) {
+  return <HomeView {...home} timeZone="Europe/London" canRun passiveOpen={passiveOpen} />;
 }
 
 /** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
@@ -499,18 +525,33 @@ export function GoalsAllSurface({
   notes = false,
   more = false,
   select,
+  kind = 'both',
+  passive = false,
 }: {
+  /** Active, passive or both (plan #2503.4). */
+  kind?: GoalKindFilter;
+  /** Two passive goals among the rest, so the kinds show (plan #2503.4). */
+  passive?: boolean;
   notes?: boolean;
   /** Six goals rather than five, for archiving more than five at once (plan #2097.2). */
   more?: boolean;
   /** Select already on, with these goals ticked (plan #2097.2). */
   select?: { selecting?: boolean; ticked?: string[] };
 }) {
-  const shown = more
+  const withPassive = passive
     ? areas.map((area) =>
-        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+        area.id === 'a-money'
+          ? { ...area, goals: [...area.goals, flatPrices] }
+          : area.id === 'a-health'
+            ? { ...area, goals: [...area.goals, pottery] }
+            : area,
       )
     : areas;
+  const shown = more
+    ? withPassive.map((area) =>
+        area.id === 'a-career' ? { ...area, goals: [...area.goals, paper] } : area,
+      )
+    : withPassive;
   return (
     <PageColumn>
       <PageHeader title="All goals" subject={{ ref: null, path: allGoalsCrumbs() }} />
@@ -522,6 +563,7 @@ export function GoalsAllSurface({
         }
         select={select}
         view="open"
+        kind={kind}
         onYou={{ [cards.id]: 1 }}
         progress={{
           [cards.id]: cardsProgress,

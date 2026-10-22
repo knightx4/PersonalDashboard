@@ -26,6 +26,7 @@ import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import type { RunListing } from '@/lib/goals/runs';
 import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
 import { goalInboxCount } from '@/lib/goals/inbox';
+import { toGoalActivity } from '@/lib/goals/tree';
 import type { RunQuestion } from '@/lib/core/run-questions';
 import { AskDash } from './ask-dash';
 import { FoldLine } from './fold-line';
@@ -96,6 +97,8 @@ export type HomeViewProps = {
   dashToday?: React.ReactNode;
   /** What is coming up within a week under a passive goal, not declined (plan #2503.5). */
   mentions?: PassiveMention[];
+  /** The gallery's way in: Passive goals drawn open. */
+  passiveOpen?: boolean;
 };
 
 export function HomeView({
@@ -116,6 +119,7 @@ export function HomeView({
   filesToRead = [],
   dashToday,
   mentions = [],
+  passiveOpen = false,
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -131,10 +135,13 @@ export function HomeView({
     );
   }
 
-  const summary = homeSummary(goals);
+  // Passive goals get no status (plan #2503.3), so the sentence counts the active ones.
+  const summary = homeSummary(
+    goals.filter((line) => toGoalActivity(line.goal.activity) === 'active'),
+  );
   const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
   const { errands } = splitErrands(goals);
-  const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
+  const { doNext, otherGoals, passiveGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
     <MainRail
@@ -156,8 +163,8 @@ export function HomeView({
                 <div className="voice-dash space-y-3 px-3 py-2">
                   {away !== null && (
                     <p className="text-body text-ink">
-                      Welcome back. You were away {away} days. What Dash did today is below, and every
-                      run it made while you were gone is on Every run.
+                      Welcome back. You were away {away} days. What Dash did today is below, and
+                      every run it made while you were gone is on Every run.
                     </p>
                   )}
                   {summary && <p className="text-body text-ink">{summary}</p>}
@@ -192,6 +199,8 @@ export function HomeView({
             doNext={doNext}
             inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
             otherGoals={otherGoals}
+            passiveGoals={passiveGoals}
+            passiveOpen={passiveOpen}
             todayOn={todayOn}
             preparable={preparable}
             dash={dash}
