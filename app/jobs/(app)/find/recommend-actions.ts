@@ -103,10 +103,20 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
  * (plan #2504.3), or nothing. The typed text goes in dismiss_text; the fixed
  * reason is left empty, which the feedback reads as "no reason given", so the
  * declines made from the old menu keep their reasons and still read the same.
+ * With "Never this company" ticked (plan #2504.5) the fixed reason is the
+ * company one Not this company set: openingsTaken reads it to keep that
+ * company out of every later search, and nothing else changes.
  */
 // latency: pending -- should be optimistic: a dismiss that waits for the round trip
-export async function dismissOpening(id: string, text: string): Promise<{ error: string | null }> {
-  return closeSuggestion(id, 'dismissed', { dismiss_reason: null, dismiss_text: declineText(text) });
+export async function dismissOpening(
+  id: string,
+  text: string,
+  neverCompany = false,
+): Promise<{ error: string | null }> {
+  return closeSuggestion(id, 'dismissed', {
+    dismiss_reason: neverCompany === true ? 'company' : null,
+    dismiss_text: declineText(text),
+  });
 }
 
 /**
