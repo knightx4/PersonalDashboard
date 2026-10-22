@@ -321,7 +321,7 @@ archive one the person confirmed.
 **Only with the person's approval of that step:** anything that acts outside
 the plan. See "Steps that act outside the plan".
 
-**Never, approved or not:** add a goal except as a proposal; change a goal's
+**Never, approved or not:** add a goal except as a proposal, with its `activity` (`active` or `passive`, `active` when unsure) suggested; change a goal's
 `acceptance` (its done-when); close, park, drop or archive a goal, or set its
 `kept_open_at` (propose closing with a `met` verdict instead, see "Reviewing
 each goal"; Today offers parking by itself); drop or archive a

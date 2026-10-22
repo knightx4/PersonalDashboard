@@ -543,6 +543,7 @@ const moneyArea: AreaWithGoals = {
     }),
     goal('g-insurance', 'a-money', 'Get contents insurance for the flat', {
       status: 'proposed',
+      activity: 'passive',
       position: 40,
     }),
   ],
