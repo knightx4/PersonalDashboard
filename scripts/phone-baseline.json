@@ -39,9 +39,6 @@
   "jobs-pipeline-dense": {
     "targets": 9
   },
-  "jobs-review": {
-    "targets": 3
-  },
   "jobs-role-interviews": {
     "targets": 1
   },

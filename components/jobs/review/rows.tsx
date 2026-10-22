@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { Kbd } from '@/components/ui/kbd';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { Group } from '@/components/ui/disclosure';
 import { Field, FieldError, Input } from '@/components/ui/field';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
@@ -24,6 +25,7 @@ import {
   type ReviewRow,
   type SearchableRole,
 } from '@/lib/jobs/review/load';
+import { reviewRowLabel } from '@/lib/jobs/review/bulk';
 import { domainFromAddress } from '@/lib/jobs/email/ats-senders';
 import { usableCompanyName } from '@/lib/jobs/email/link';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -46,7 +48,8 @@ import {
  * the Jobs Inbox draws it inside its own row (plan #2502).
  *
  * `onDone` hears every button's outcome. A decline reports through its toast
- * instead, since that is where its Undo is.
+ * instead, since that is where its Undo is; a page that drops the row itself
+ * passes `onDecline` to hear that it went and that Undo brought it back.
  */
 export function ReviewRowBody({
   row,
@@ -55,6 +58,9 @@ export function ReviewRowBody({
   companyNames,
   allRoles,
   onDone,
+  onDecline,
+  shortcuts = true,
+  startOpen,
 }: {
   row: ReviewRow;
   timezone: string;
@@ -65,6 +71,11 @@ export function ReviewRowBody({
   /** Every pursuit on file, for linking to one the top three did not offer. */
   allRoles: SearchableRole[];
   onDone: (outcome: ReviewOutcome) => void;
+  onDecline?: DeclineHooks;
+  /** Whether the 1, 2, 3 beside the suggestions are drawn; only Review binds them. */
+  shortcuts?: boolean;
+  /** The gallery's way to draw a message with its picker or form already open. */
+  startOpen?: MessageOpen;
 }) {
   if (row.kind === 'message') {
     return (
@@ -75,6 +86,9 @@ export function ReviewRowBody({
         companies={companyNames}
         allRoles={allRoles}
         onDone={onDone}
+        onDecline={onDecline}
+        shortcuts={shortcuts}
+        startOpen={startOpen}
       />
     );
   }
@@ -84,12 +98,20 @@ export function ReviewRowBody({
   return <EventReviewRow row={row} timezone={timezone} busy={busy} onDone={onDone} />;
 }
 
+/** What a page that drops a declined row itself is told: it went, and Undo brought it back. */
+export type DeclineHooks = { declined: () => void; restored: () => void };
+
+/** Which of a message's two in-place parts is open: the other-role picker or the new-role form. */
+export type MessageOpen = 'other-role' | 'new-role';
+
 /**
  * Decline one message (plan #1957.8): it leaves the queue as not relevant,
  * and the toast names it with an Undo that puts back everything the
  * dismissal cleared, the way the bulk bar's does.
  */
-export function useDeclineMessage(): (row: ReviewMessageRow) => Promise<void> {
+export function useDeclineMessage(
+  hooks?: DeclineHooks,
+): (row: ReviewMessageRow) => Promise<void> {
   const toast = useToast();
   return useCallback(
     async (row) => {
@@ -98,25 +120,22 @@ export function useDeclineMessage(): (row: ReviewMessageRow) => Promise<void> {
         toast({ text: result.error });
         return;
       }
+      hooks?.declined();
       const restore = result.restore;
       toast({
         text: closedToast('declined', reviewRowLabel(row)),
         undo: async () => {
           const back = await restoreDismissedMessages(restore);
           if (back.error) throw new Error(back.error);
+          hooks?.restored();
         },
       });
     },
-    [toast],
+    [toast, hooks],
   );
 }
 
-/** What the row is, in a few words: the tick box's name and the toast's. */
-export function reviewRowLabel(row: ReviewRow): string {
-  if (row.kind === 'message') return row.subject?.trim() || 'message without a subject';
-  if (row.kind === 'application') return `${row.companyName} · ${row.roleTitle}`;
-  return row.summary?.trim() || `${row.eventKind} at ${row.companyName}`;
-}
+export { reviewRowLabel };
 
 export function MessageReviewRow({
   row,
@@ -125,6 +144,9 @@ export function MessageReviewRow({
   companies,
   allRoles,
   onDone,
+  onDecline,
+  shortcuts = true,
+  startOpen,
 }: {
   row: ReviewMessageRow;
   timezone: string;
@@ -132,9 +154,16 @@ export function MessageReviewRow({
   companies: string[];
   allRoles: SearchableRole[];
   onDone: (outcome: ReviewOutcome) => void;
+  onDecline?: DeclineHooks;
+  shortcuts?: boolean;
+  startOpen?: MessageOpen;
 }) {
   const [, startTransition] = useTransition();
-  const declineMessage = useDeclineMessage();
+  const declineMessage = useDeclineMessage(onDecline);
+  // One of the two in-place parts open at a time; their presses sit on the
+  // footer's one line with Decline and Gmail, so a phone gives a held email
+  // one line of controls rather than three (law 9).
+  const [open, setOpen] = useState<MessageOpen | null>(startOpen ?? null);
 
   return (
     <>
@@ -169,13 +198,13 @@ export function MessageReviewRow({
         <p className="mt-3 text-ui text-ink-muted">
           {companies.length === 0
             ? 'No companies on file yet, so there is nothing to match against. Add a role and this becomes linkable.'
-            : 'No pursuits to link this to yet.'}
+            : 'Nothing on file matched this message.'}
         </p>
       ) : (
         <ul className="mt-3 space-y-1.5">
           {row.candidates.map((candidate, index) => (
             <li key={candidate.applicationId} className="flex flex-wrap items-center gap-2">
-              <Kbd always>{index + 1}</Kbd>
+              {shortcuts && <Kbd always>{index + 1}</Kbd>}
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-2 text-ui text-ink sm:truncate">{candidate.label}</p>
                 <p className="text-small text-ink-muted sm:truncate">
@@ -202,13 +231,44 @@ export function MessageReviewRow({
         </ul>
       )}
 
-      <OtherRolePicker row={row} roles={allRoles} onDone={onDone} />
+      {open === 'other-role' && (
+        <OtherRolePicker row={row} roles={allRoles} onDone={onDone} onClose={() => setOpen(null)} />
+      )}
 
-      <NewRoleForm row={row} companies={companies} onDone={onDone} />
+      {open === 'new-role' && (
+        <NewRoleForm row={row} companies={companies} onDone={onDone} onClose={() => setOpen(null)} />
+      )}
 
-      <footer className="mt-3 flex flex-wrap items-center gap-3">
+      <footer className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-2 sm:gap-x-3">
+        {allRoles.length > 0 && open !== 'other-role' && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="max-sm:px-2"
+            onClick={() => setOpen('other-role')}
+          >
+            <Search className="size-3.5 max-sm:hidden" strokeWidth={1.75} aria-hidden />
+            <span className="sm:hidden">Other role</span>
+            <span className="hidden sm:inline">Some other role — search all {allRoles.length}</span>
+          </Button>
+        )}
+        {open !== 'new-role' && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="max-sm:px-2"
+            onClick={() => setOpen('new-role')}
+          >
+            <Plus className="size-3.5 max-sm:hidden" strokeWidth={1.75} aria-hidden />
+            <span className="sm:hidden">New role</span>
+            <span className="hidden sm:inline">None of these — start a new role</span>
+          </Button>
+        )}
         <CloseButton
           lifecycle="declined"
+          className="max-sm:px-2"
           disabled={busy}
           onClick={() => startTransition(() => declineMessage(row))}
         />
@@ -217,9 +277,10 @@ export function MessageReviewRow({
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
-            className={cn(linkVariants({ tone: 'quiet' }), 'inline-flex items-center gap-1 text-small')}
+            className={cn(linkVariants({ tone: 'quiet' }), 'press-area inline-flex items-center gap-1 text-small')}
           >
-            Open in Gmail
+            <span className="sm:hidden">Gmail</span>
+            <span className="hidden sm:inline">Open in Gmail</span>
             <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
           </GmailAnchor>
         )}
@@ -242,31 +303,15 @@ function OtherRolePicker({
   row,
   roles,
   onDone,
+  onClose,
 }: {
   row: ReviewMessageRow;
   roles: SearchableRole[];
   onDone: (outcome: ReviewOutcome) => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [pending, startTransition] = useTransition();
-
-  if (roles.length === 0) return null;
-
-  if (!open) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="mt-3"
-        onClick={() => setOpen(true)}
-      >
-        <Search className="size-3.5" strokeWidth={1.75} aria-hidden />
-        Some other role — search all {roles.length}
-      </Button>
-    );
-  }
 
   const matches = matchRoles(roles, query);
 
@@ -282,6 +327,7 @@ function OtherRolePicker({
         disabled={pending}
         placeholder="Company or role title"
         aria-label="Search every role by company or title"
+        className="max-sm:min-h-11"
         onChange={(event) => setQuery(event.target.value)}
       />
 
@@ -298,7 +344,7 @@ function OtherRolePicker({
                   startTransition(async () => {
                     const label = `${role.companyName} · ${role.roleTitle}`;
                     const result = await linkToRole(row.id, role.applicationId, label);
-                    if (result.ok) setOpen(false);
+                    if (result.ok) onClose();
                     onDone(result);
                   })
                 }
@@ -317,7 +363,7 @@ function OtherRolePicker({
         </ul>
       )}
 
-      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
+      <Button type="button" variant="ghost" size="sm" onClick={onClose}>
         Cancel
       </Button>
     </Group>
@@ -337,31 +383,17 @@ function NewRoleForm({
   row,
   companies,
   onDone,
+  onClose,
 }: {
   row: ReviewMessageRow;
   companies: string[];
   onDone: (outcome: ReviewOutcome) => void;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [company, setCompany] = useState(() => suggestedCompany(row));
   const [title, setTitle] = useState(() => suggestedTitle(row));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  if (!open) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="mt-3"
-        onClick={() => setOpen(true)}
-      >
-        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
-        None of these — start a new role
-      </Button>
-    );
-  }
 
   const submit = () => {
     setError(null);
@@ -375,7 +407,7 @@ function NewRoleForm({
         setError(result.message);
         return;
       }
-      setOpen(false);
+      onClose();
       onDone(result);
     });
   };
@@ -421,7 +453,7 @@ function NewRoleForm({
           size="sm"
           variant="ghost"
           disabled={pending}
-          onClick={() => setOpen(false)}
+          onClick={onClose}
         >
           Cancel
         </Button>
@@ -497,14 +529,40 @@ export function ApplicationReviewRow({
         </Button>
         <Link
           href={`/jobs/roles/${row.roleId}`}
-          className={cn(linkVariants(), 'text-ui font-medium')}
+          className={cn(linkVariants(), 'press-area text-ui font-medium')}
         >
           Edit the details
         </Link>
+        {/* At 390 the two ways out share one menu, so the row keeps one line
+            of controls (law 9); from `sm` up they are buttons as before. */}
+        <span className="ml-auto sm:hidden">
+          <ActionMenu
+            label={`More for ${row.companyName} · ${row.roleTitle}`}
+            items={[
+              {
+                id: 'not-relevant',
+                label: 'Not relevant',
+                disabled: busy,
+                onSelect: () => act(() => removeImported(row.applicationId)),
+              },
+              ...(row.companyDomains.length > 0
+                ? [
+                    {
+                      id: 'exclude',
+                      label: `Exclude ${row.companyName}`,
+                      disabled: busy,
+                      onSelect: () => act(() => excludeImportedCompany(row.applicationId)),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </span>
         <Button
           type="button"
           size="sm"
           variant="ghost"
+          className="max-sm:hidden"
           disabled={busy}
           onClick={() => act(() => removeImported(row.applicationId))}
         >
@@ -519,6 +577,7 @@ export function ApplicationReviewRow({
             type="button"
             size="sm"
             variant="ghost"
+            className="max-sm:hidden"
             disabled={busy}
             title={`Stop hearing from ${row.companyDomains.join(', ')}`}
             onClick={() => act(() => excludeImportedCompany(row.applicationId))}
@@ -583,7 +642,8 @@ export function EventReviewRow({
           disabled={busy}
           onClick={() => act(() => reopenFromEvent(row.applicationId))}
         >
-          They really did come back — reopen
+          <span className="sm:hidden">Reopen it</span>
+          <span className="hidden sm:inline">They really did come back — reopen</span>
         </Button>
       </footer>
     </>
