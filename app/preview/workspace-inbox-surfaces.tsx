@@ -4,6 +4,8 @@ import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
 import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
+import { reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
+import type { MessageOpen } from '@/components/jobs/review/rows';
 
 /**
  * Each workspace's Inbox (plan #1937.5), drawn from rows shaped as the
@@ -70,8 +72,8 @@ const jobsWaiting: InboxRow = {
   decline,
 };
 
-export const JOBS: InboxRow[] = [
-  ...queue(queueRow('jobs-review', 2)),
+/** The Jobs Inbox's own rows; Home's Inbox puts the review queue's count row before them. */
+const JOBS_ON_YOU: InboxRow[] = [
   {
     ...jobsWaiting,
     card: (
@@ -115,6 +117,8 @@ export const JOBS: InboxRow[] = [
     decline,
   },
 ];
+
+export const JOBS: InboxRow[] = [...queue(queueRow('jobs-review', 2)), ...JOBS_ON_YOU];
 
 export const TODO: InboxRow[] = [
   {
@@ -181,8 +185,26 @@ export function ShoppingInboxSurface() {
   return <WorkspaceInbox workspace="shopping" rows={SHOPPING} />;
 }
 
-export function JobsInboxSurface() {
-  return <WorkspaceInbox workspace="jobs" rows={JOBS} />;
+/**
+ * The Jobs Inbox with its review items listed (plan #2502.2): the gallery
+ * passes the review queue's fixtures, and which message has its picker or
+ * form open, or a failed press, for the hidden parts.
+ */
+export function JobsInboxSurface({
+  review,
+  open,
+  failed,
+}: {
+  review: Parameters<typeof reviewInboxRows>[0];
+  open?: Record<string, MessageOpen>;
+  failed?: Record<string, string>;
+}) {
+  return (
+    <WorkspaceInbox
+      workspace="jobs"
+      rows={[...reviewInboxRows(review, 'Europe/London', { open, failed }), ...JOBS_ON_YOU]}
+    />
+  );
 }
 
 export function TodoInboxSurface() {
