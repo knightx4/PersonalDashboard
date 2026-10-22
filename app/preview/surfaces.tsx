@@ -6133,6 +6133,25 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Not for me pressed on the first role (plan #2504.3): the box for why,
+     * open and empty, with the Decline that sends it as it is. */
+    id: 'jobs-recommended-roles-decline',
+    label: 'Find · Recommended roles · Not for me',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ToastProvider>
+        <RecommendedRoles
+          suggestions={recommendedRoles}
+          stats={recommendedStats}
+          searchCostMicros={4_200_000}
+          searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
+          declining={recommendedRoles[0].id}
+        />
+      </ToastProvider>
+    ),
+  },
+  {
     /* The same page on its table view, which was the Roles page (plan #1590),
      * still on the live applications. */
     id: 'jobs-roles-table',
