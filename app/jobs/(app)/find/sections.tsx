@@ -12,7 +12,7 @@ import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
-import { ChipSelect, Input } from '@/components/ui/field';
+import { CheckRow, ChipSelect, Input } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
@@ -1058,7 +1058,8 @@ function RoleRow({ suggestion, defaultDeclining = false }: { suggestion: OpenSug
           aria-label="Why not this one"
           action={(form) => {
             const text = String(form.get('text') ?? '');
-            decline(() => dismissOpening(suggestion.id, text));
+            const never = suggestion.companyName ? form.get('never') === 'on' : false;
+            decline(() => dismissOpening(suggestion.id, text, never));
           }}
         >
           <Input
@@ -1069,6 +1070,14 @@ function RoleRow({ suggestion, defaultDeclining = false }: { suggestion: OpenSug
             placeholder="Why not? (optional)"
             className="min-w-0 flex-1 basis-56"
           />
+          {suggestion.companyName && (
+            <CheckRow
+              name="never"
+              title="Never this company"
+              hint="Keeps it out of every later search."
+              className="order-last basis-full"
+            />
+          )}
           <CloseButton type="submit" lifecycle="declined" variant="secondary" pending={busy} />
         </form>
       )}
