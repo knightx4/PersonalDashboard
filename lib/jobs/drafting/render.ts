@@ -10,6 +10,7 @@
  */
 import { describeLimit } from './limits';
 import type {
+  EarlierLetter,
   GatheredEvidence,
   GatheredMaterial,
   GatheredQuestion,
@@ -49,6 +50,10 @@ export function renderPastAnswer(past: PastAnswer): string {
 
 export function renderThought(thought: GatheredThought): string {
   return `- ${thought.at ? `${thought.at.slice(0, 10)}: ` : ''}${thought.body}`;
+}
+
+export function renderEarlierLetter(letter: EarlierLetter): string {
+  return `For the ${letter.roleTitle} role:\n${letter.text}`;
 }
 
 export function renderVaultPassage(passage: VaultPassage): string {
@@ -99,6 +104,10 @@ export function renderMaterial(material: GatheredMaterial): string {
       lines([role.research, ...role.notes.map((note) => `- ${note}`)]) || null,
     ),
     section('Their own view of the company, in their words', role.perspective),
+    section(
+      'Cover letters they wrote to this company before',
+      role.earlierLetters.length > 0 ? role.earlierLetters.map(renderEarlierLetter).join('\n\n---\n\n') : null,
+    ),
     section('Research prepared on the company', role.researchWriteUp),
     section(
       'Their evidence bank',

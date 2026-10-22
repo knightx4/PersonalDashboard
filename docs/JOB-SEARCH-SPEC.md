@@ -659,12 +659,12 @@ Same machinery, a fixed template (`lib/jobs/drafting/draft-cover-letter.ts`). St
 
 The résumé goes with the letter, so the letter does not retell its stories. It is four short paragraphs, about 220 to 300 words, written the way the person writes in their own notes:
 
-1. Two or three sentences: who they are and the role; the part of their background this posting most needs, as the kind of work rather than the story; and why this role, from their own reasons. With no reason on file the drafter writes a neutral line about what the role does, claiming no motive, and asks them why this role.
+1. Two or three plain sentences: who they are and the role; the part of their background this posting most needs, as the kind of work and where it was (clients, industry, focus), never a specific deal, number or result, and never framed as checking numbers after the fact; and why this role, one plainly stated preference from their own reasons (the Perspective tab, earlier letters to the same company, their thinking about the search, comments, replies). With no reason on file the drafter writes a neutral line about what the role does, claiming no motive, and asks them why this role.
 2. A line from the posting about AI, automation or how the work gets done; something building with AI has shown them; which way they lean and why; one thing they built, named in passing.
 3. A second observation about AI, tied to a concrete detail of something they built.
 4. One line asking to talk about something specific, then "Thank you," and their name.
 
-The observations come from their vault notes about building with AI, which the drafter searches for separately from the role's own passages. An observation the notes do not hold is reported as an unsupported claim. The letter does not analyse the company's business or guess at its problems, and a list of stock phrases (`LETTER_BANNED`) is checked on top of the person's banned constructions.
+Earlier letters to the same company are gathered with the rest of the material (`earlierLetters` in `lib/jobs/drafting/gather.ts`), since that is where a reason for wanting to work there is most often already written. The observations come from their vault notes about building with AI, which the drafter searches for separately from the role's own passages. An observation the notes do not hold is reported as an unsupported claim. The letter does not analyse the company's business or guess at its problems, and a list of stock phrases (`LETTER_BANNED`) is checked on top of the person's banned constructions.
 
 ---
 
