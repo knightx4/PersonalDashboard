@@ -9,8 +9,22 @@ import { AskInputError, clip, readIn, type AskContext, type AskRow, type AskTool
  */
 
 const TABLE = 'job_search.application_answers';
-/** How much of an answer is shown: enough to tell two drafts apart. */
-const OPENING_CHARS = 160;
+/**
+ * The most of one answer shown, line breaks kept. Answers run to about 2,500
+ * characters at most, so this is the whole answer. It was the first 160,
+ * with a note to open the rest with open_row, which cannot open this table:
+ * asked to fill a question "the way I answered it on another Decagon role",
+ * Dash spent all twelve lookups failing to read the other answer and wrote
+ * nothing (22 October 2026).
+ */
+export const ANSWER_CHARS = 6000;
+
+/** An answer as written, line breaks kept, cut only past ANSWER_CHARS. */
+function wholeAnswer(text: string | null): string | null {
+  if (!text?.trim()) return null;
+  const tidy = text.replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return tidy.length <= ANSWER_CHARS ? tidy : `${tidy.slice(0, ANSWER_CHARS).trimEnd()}…`;
+}
 
 type Input = Record<string, unknown>;
 
@@ -102,7 +116,7 @@ export async function applicationAnswersLookup(ctx: AskContext, input: Input): P
         question,
         status: a.status,
         word_limit: a.word_limit,
-        opening: clip(a.answer, OPENING_CHARS),
+        answer: wholeAnswer(a.answer),
         application_ref: application.id,
         role_ref: application.role_id,
       },
@@ -116,6 +130,6 @@ export async function applicationAnswersLookup(ctx: AskContext, input: Input): P
     note:
       rows.length === 0
         ? 'That application has no questions on it yet.'
-        : `The ${rows.length} answers on application ${application.id}, each with its question. An answer with no opening is still empty. Open one with open_row on its ref for the full text.`,
+        : `The ${rows.length} answers on application ${application.id}, each with its question and its whole text. An answer with no text is still empty.`,
   };
 }

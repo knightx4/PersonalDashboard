@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
 import type { DashChange } from '@/lib/talk/changes';
+import type { TalkToolCall } from '@/lib/talk/talk';
 
 /**
  * Reading and writing the thread under any row, in core.conversations
@@ -217,7 +218,14 @@ export async function loadThread(
  */
 export async function addThreadTurn(
   client: AnyClient,
-  input: { userId: string; ref: string; author: CommentAuthor; body: string },
+  input: {
+    userId: string;
+    ref: string;
+    author: CommentAuthor;
+    body: string;
+    /** Dash's lookups for this reply, kept on the turn for the daily Dash check. */
+    toolCalls?: readonly TalkToolCall[];
+  },
 ): Promise<string> {
   const { data, error } = await client.schema('core').rpc('add_thread_turn', {
     p_user_id: input.userId,
@@ -228,6 +236,16 @@ export async function addThreadTurn(
   if (error && /is not a row of yours|no thread under/.test(error.message)) throw new Error(THREAD_ROW_NOT_YOURS);
   if (error) throw new Error(`Keeping that failed: ${error.message}`);
   if (typeof data !== 'string') throw new Error('Keeping that failed: no id came back.');
+  if (input.author === 'claude' && input.toolCalls && input.toolCalls.length > 0) {
+    // The reply is kept either way: a lookup record that fails to save is logged, not raised.
+    const { error: callsError } = await client
+      .schema('core')
+      .from('conversation_turns')
+      .update({ tool_calls: input.toolCalls })
+      .eq('id', data)
+      .eq('user_id', input.userId);
+    if (callsError) console.error('thread reply lookups not kept', callsError.message);
+  }
   return data;
 }
 

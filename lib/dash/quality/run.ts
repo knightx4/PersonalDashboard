@@ -89,7 +89,7 @@ export function qualityNote(results: readonly CaseResult[], health: DashHealth, 
     lines.push('');
   }
   if (health.alerts.length > 0) {
-    lines.push(`The last day of real answers (${health.answers} in Ask, ${health.connector.calls} calls from connected apps):`);
+    lines.push(`The last day of real answers (${health.answers} in Ask and threads, ${health.connector.calls} calls from connected apps):`);
     for (const alert of health.alerts) lines.push(`- ${alert}`);
     lines.push('');
   }

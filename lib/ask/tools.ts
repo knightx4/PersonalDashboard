@@ -314,7 +314,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'application_answers',
     description:
-      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the first words of the answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
+      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the whole answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", to reuse an answer from one application on another (read it here, then save_answer), and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
     input_schema: {
       type: 'object',
       properties: {
