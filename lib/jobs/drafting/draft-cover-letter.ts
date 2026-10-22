@@ -12,8 +12,8 @@
  *
  * The letter follows one template (docs/JOB-SEARCH-SPEC.md, Cover letters):
  * who they are and why this role, two paragraphs of what building with AI
- * has shown them, taken from their vault notes, and one line of ask. The
- * résumé carries the stories.
+ * has shown them, taken from their vault notes, and a conventional close.
+ * The résumé carries the stories.
  *
  * The model can ask the person things back. Their replies are stored on the
  * same row and sent with the next call, so pressing Redraft uses them.
@@ -116,9 +116,16 @@ their material says they are writing to).
    to a concrete detail of something they built: what it does, what it
    checks, what it produces. When the posting says nothing about AI, tie it
    to the work the posting describes instead.
-4. One line asking to talk about something specific to this team, such as
-   how it uses AI today, then "Thank you," and their full name on the next
-   line.
+4. A conventional close in two sentences, the same in every letter apart
+   from the role's name. First the next step: they would welcome the chance
+   to talk about the role and how they could contribute, with no new topic
+   or question for the team. Then thanks for the reader's time and for
+   considering their application. Then "Sincerely," on its own line, a
+   blank line, and their full name. A close they approved:
+
+   "I would welcome the chance to talk about the Strategic Finance Lead
+   role and how I could contribute to the team. Thank you for your time
+   and for considering my application."
 
 This paragraph is from a letter they approved; match its register:
 
