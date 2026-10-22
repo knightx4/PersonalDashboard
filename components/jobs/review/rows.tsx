@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useTransition } from 'react';
-import { ExternalLink, Plus, Search } from 'lucide-react';
+import { CircleAlert, ExternalLink, Mail, Plus, Search } from 'lucide-react';
 import { closedToast } from '@/lib/core/lifecycle';
 import { CloseButton } from '@/components/inbox/close-button';
 import { useToast } from '@/components/ui/toast';
@@ -26,8 +26,7 @@ import {
   type SearchableRole,
 } from '@/lib/jobs/review/load';
 import { reviewRowLabel } from '@/lib/jobs/review/bulk';
-import { domainFromAddress } from '@/lib/jobs/email/ats-senders';
-import { usableCompanyName } from '@/lib/jobs/email/link';
+import { guessNewRole } from '@/lib/jobs/review/new-role-guess';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { dismissMessages, restoreDismissedMessages } from '@/app/jobs/(app)/review/actions';
 import {
@@ -348,9 +347,9 @@ function OtherRolePicker({
                     onDone(result);
                   })
                 }
-                className="press flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-start gap-2 rounded-control px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50 sm:items-center"
               >
-                <span className="min-w-0 flex-1 truncate text-ui text-ink">
+                <span className="min-w-0 flex-1 text-ui text-ink sm:truncate">
                   {role.companyName} · {role.roleTitle}
                 </span>
                 <StatusBadge
@@ -390,8 +389,9 @@ function NewRoleForm({
   onDone: (outcome: ReviewOutcome) => void;
   onClose: () => void;
 }) {
-  const [company, setCompany] = useState(() => suggestedCompany(row));
-  const [title, setTitle] = useState(() => suggestedTitle(row));
+  const [guess] = useState(() => guessNewRole(row));
+  const [company, setCompany] = useState(guess.company);
+  const [title, setTitle] = useState(guess.title);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -467,19 +467,6 @@ function NewRoleForm({
   );
 }
 
-/** The employer, as far as the sender can say. Blank rather than wrong. */
-function suggestedCompany(row: ReviewMessageRow): string {
-  const display = row.fromAddress?.match(/^\s*"?([^"<]+?)"?\s*</)?.[1];
-  const domain = domainFromAddress(row.fromAddress);
-  return usableCompanyName(display) ?? usableCompanyName(domain) ?? '';
-}
-
-/** The subject with the usual mail furniture off the front. */
-function suggestedTitle(row: ReviewMessageRow): string {
-  const subject = (row.subject ?? '').replace(/^\s*((re|fwd|fw)\s*:\s*)+/i, '').trim();
-  return subject.slice(0, 200);
-}
-
 export function ApplicationReviewRow({
   row,
   timezone,
@@ -501,7 +488,8 @@ export function ApplicationReviewRow({
     <>
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <Chip tone="accent" size="sm">
+        <Chip size="sm">
+          <Mail aria-hidden />
           Created from email
         </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
@@ -612,6 +600,7 @@ export function EventReviewRow({
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <Chip tone="caution" size="sm">
+          <CircleAlert aria-hidden />
           Arrived after it closed
         </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
