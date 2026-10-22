@@ -48,6 +48,8 @@ export type PastOpening = {
   headline: string | null;
   companyName: string | null;
   dismissReason: string | null;
+  /** What they typed when they turned it down, when they typed anything. */
+  dismissText?: string | null;
 };
 
 export type OpeningFeedback = {
@@ -62,6 +64,16 @@ export type OpeningFeedback = {
 /** How many of each list the search reads. Enough to show a pattern. */
 export const FEEDBACK_LIMIT = 30;
 
+/** Longest typed reason the search reads; the rest is cut. */
+export const DISMISS_TEXT_LIMIT = 300;
+
+/** The typed reason on one line, or null when it is empty. */
+function typedReason(text: string | null | undefined): string | null {
+  const one = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!one) return null;
+  return one.length > DISMISS_TEXT_LIMIT ? `${one.slice(0, DISMISS_TEXT_LIMIT).trimEnd()}...` : one;
+}
+
 function label(row: PastOpening): string | null {
   if (!row.headline) return null;
   return row.companyName ? `${row.headline} at ${row.companyName}` : row.headline;
@@ -69,7 +81,8 @@ function label(row: PastOpening): string | null {
 
 /**
  * The saved and turned-down roles, newest first. A dismissal with no reason
- * (from before reasons were asked) still counts, as "no reason given"; one
+ * (from before reasons were asked) still counts, as "no reason given"; text
+ * they typed stands in for the fixed reason; one
  * Dash made itself (a closed or duplicate posting) has status expired and is
  * not the person's judgement, so it is left out.
  */
@@ -86,7 +99,7 @@ export function openingFeedback(rows: readonly PastOpening[]): OpeningFeedback {
         const key = companyKey(row.companyName);
         if (key) companies.add(key);
       }
-      if (text && dismissed.length < FEEDBACK_LIMIT) dismissed.push(`${text} (${REASON_FOR_SEARCH[reason]})`);
+      if (text && dismissed.length < FEEDBACK_LIMIT) dismissed.push(`${text} (${typedReason(row.dismissText) ?? REASON_FOR_SEARCH[reason]})`);
     }
   }
   return { saved, dismissed, companies };

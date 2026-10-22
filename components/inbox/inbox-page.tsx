@@ -99,7 +99,18 @@ export type InboxRow = {
   card?: ReactNode;
   /** On a page drawn in `groups`, the key of the group the row is listed under. */
   group?: string;
+  /**
+   * How many things the row stands for in the counts, 1 when unset. A row
+   * that opens the rest of a queue the page shows only the head of stands
+   * for everything it leaves out (the Jobs Inbox's "Open all in Review").
+   */
+  stands?: number;
 };
+
+/** What a list of rows counts for: each row's `stands`, or 1. */
+export function inboxRowsCount(rows: readonly InboxRow[]): number {
+  return rows.reduce((sum, row) => sum + (row.stands ?? 1), 0);
+}
 
 /**
  * A group on a page that lists its rows by where they come from rather than
@@ -378,7 +389,7 @@ export function InboxPage({
         rows: rows.filter((row) => row.section === key),
       })).filter((section) => section.rows.length > 0);
 
-  const total = sections.reduce((sum, section) => sum + section.rows.length, 0);
+  const total = sections.reduce((sum, section) => sum + inboxRowsCount(section.rows), 0);
 
   // No count card above the rows: each heading carries its own count, and the
   // total is one line after the last section (the list pattern's count).
@@ -393,7 +404,7 @@ export function InboxPage({
             title={
               <>
                 {section.title}
-                <span className="tabular ml-2 font-normal text-ink-muted">{section.rows.length}</span>
+                <span className="tabular ml-2 font-normal text-ink-muted">{inboxRowsCount(section.rows)}</span>
               </>
             }
             action={

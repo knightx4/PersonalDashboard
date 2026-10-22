@@ -12,7 +12,7 @@ import { DashAction } from '@/components/ui/dash-action';
 import { CardSection } from '@/components/ui/card';
 import { chipVariants } from '@/components/ui/chip';
 import { Note } from '@/components/ui/note';
-import { ChipSelect } from '@/components/ui/field';
+import { CheckRow, ChipSelect, Input } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
@@ -36,7 +36,7 @@ import {
   sortOpenings,
   WORKPLACE_LABELS,
 } from '@/lib/jobs/suggest/scores';
-import { DISMISS_REASON_LABELS, DISMISS_REASONS } from '@/lib/jobs/suggest/feedback';
+import { DECLINE_TEXT_MAX } from '@/lib/jobs/suggest/decline-text';
 import { formatCost, OPENING_ORIGIN_LABELS, type OriginStats } from '@/lib/jobs/suggest/stats';
 import type { RunLine } from '@/lib/jobs/suggest/search-runs';
 import {
@@ -132,7 +132,9 @@ function RecommendedSection({
   // The search button sits in the body, beside the line about the latest
   // search, rather than as the section's header action: the header keeps
   // room for an action whether or not the title needs it, which pushed
-  // "Recommended roles 4" onto a second line at 390 (plan #1589).
+  // "Recommended roles 4" onto a second line at 390 (plan #1589). It is at
+  // the top of every section, with or without a line beside it, so it is in
+  // the same place on each (note 418f87d0).
   const lines = [
     (count > 0 ? hint : empty) ? (
       <p key="hint" className="text-small text-ink-muted">
@@ -189,19 +191,12 @@ function RecommendedSection({
       }
       meta={count > 0 ? count : undefined}
     >
-      {lines.length > 0 || count === 0 ? (
-        <div className="mb-2 flex items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-1">{lines}</div>
-          {search}
-        </div>
-      ) : null}
+      <div className="mb-2 flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+        {search}
+      </div>
       {count > 0 && toolbar}
       {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
-      {/* With no line to sit beside, the button closes the list instead of
-          taking a row of its own above the first item (plan #1589). */}
-      {lines.length === 0 && count > 0 && (
-        <div className="mt-2 flex justify-end border-t border-border pt-2">{search}</div>
-      )}
       {footer}
     </CardSection>
   );
@@ -258,8 +253,11 @@ export function RecommendedRoles({
   stats = [],
   searchCostMicros = 0,
   searchLine = null,
+  declining,
 }: {
   suggestions: OpenSuggestion[];
+  /** The gallery's: the role whose decline box is drawn open. */
+  declining?: string;
   /** Sort and filters, read from the URL by the page (opening-view.ts). */
   view?: OpeningView;
   /** The page's other parameters, carried through the filter form. */
@@ -307,7 +305,7 @@ export function RecommendedRoles({
       }
     >
       {shown.map((suggestion) => (
-        <RoleRow key={suggestion.id} suggestion={suggestion} />
+        <RoleRow key={suggestion.id} suggestion={suggestion} defaultDeclining={suggestion.id === declining} />
       ))}
     </RecommendedSection>
   );
@@ -934,15 +932,15 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
  * A recommended role, read in three lines: title (the link to the posting),
  * the facts, and why it fits. Details is a <details>, so it folds before
  * JavaScript loads (law 10); while it is open the row's action line drops
- * below it and the why stops being cut. Not for me asks why before it turns
- * the role down: the reason is what the next search learns from
- * (lib/jobs/suggest/feedback.ts).
+ * below it and the why stops being cut. Not for me opens a box for why, and
+ * submitting it turns the role down with or without words (plan #2504.3):
+ * what was typed is what the next search learns from.
  */
-function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
+function RoleRow({ suggestion, defaultDeclining = false }: { suggestion: OpenSuggestion; defaultDeclining?: boolean }) {
   const [busy, start] = useTransition();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const [choosing, setChoosing] = useState(defaultDeclining);
   const steps = moveSteps(suggestion.move);
 
   const act = (action: () => Promise<{ error: string | null }>) =>
@@ -1028,11 +1026,16 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
             )}
         </Disclosure>
         <span className="ml-auto flex items-center justify-end gap-2">
-          <CloseButton
-            lifecycle="declined"
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            pressed={choosing}
             aria-expanded={choosing}
             onClick={() => setChoosing(!choosing)}
-          />
+          >
+            Not for me
+          </Button>
           <Button
             type="button"
             size="sm"
@@ -1045,25 +1048,33 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         </span>
       </div>
       {choosing && (
-        <div
-          className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-small"
-          role="group"
+        <form
+          className="flex flex-wrap items-center gap-2 max-sm:[&_input]:min-h-11"
           aria-label="Why not this one"
+          action={(form) => {
+            const text = String(form.get('text') ?? '');
+            const never = suggestion.companyName ? form.get('never') === 'on' : false;
+            decline(() => dismissOpening(suggestion.id, text, never));
+          }}
         >
-          <span className="text-ink-muted">Why not?</span>
-          {DISMISS_REASONS.map((reason) => (
-            <Button
-              key={reason}
-              type="button"
-              variant="link"
-              disabled={busy}
-              onClick={() => decline(() => dismissOpening(suggestion.id, reason))}
-              className="text-ink"
-            >
-              {DISMISS_REASON_LABELS[reason]}
-            </Button>
-          ))}
-        </div>
+          <Input
+            name="text"
+            maxLength={DECLINE_TEXT_MAX}
+            autoFocus={!defaultDeclining}
+            aria-label="Why not? Optional, and the next search reads it"
+            placeholder="Why not? (optional)"
+            className="min-w-0 flex-1 basis-56"
+          />
+          {suggestion.companyName && (
+            <CheckRow
+              name="never"
+              title="Never this company"
+              hint="Keeps it out of every later search."
+              className="order-last basis-full"
+            />
+          )}
+          <CloseButton type="submit" lifecycle="declined" variant="secondary" pending={busy} />
+        </form>
       )}
       {error && <p className="text-small text-danger">{error}</p>}
     </li>

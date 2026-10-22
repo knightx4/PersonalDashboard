@@ -1366,6 +1366,49 @@ const allRoles: SearchableRole[] = pipelineRows.map((row) => ({
 }));
 
 /**
+ * The Jobs Inbox's review items (plan #2502.2): the queue above with one more
+ * message, its subject as long as recruiters write them, and nine waiting in
+ * all, so the first five show and "Open all 9 in Review" follows them.
+ */
+const inboxReview = {
+  rows: [
+    ...reviewRows,
+    {
+      kind: 'message' as const,
+      id: 'r5',
+      subject:
+        'RE: Next steps for the Staff Software Engineer, Real-Time Risk & Settlement Infrastructure (London or Remote, UK) role',
+      fromAddress: 'Priya Ramanathan <priya.ramanathan@halloran-achterberg.example>',
+      threadId: 'thread-halloran',
+      replyToAddress: null,
+      roleHint: 'Staff Software Engineer, Real-Time Risk & Settlement Infrastructure',
+      receivedAt: '2026-09-07T10:12:00.000Z',
+      classification: 'interview_invite',
+      reason: 'Two pursuits at this company could be the one it means.',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/12',
+      candidates: [
+        {
+          applicationId: 'p1',
+          label: 'Larkspur Vane · Quantitative Developer, Systematic Strategies',
+          reason: 'Same recruiter wrote about it before',
+          confidence: 0.48,
+        },
+        {
+          applicationId: 'p3',
+          label: 'Tallow · Backend Engineer, Payments',
+          reason: 'Recent pursuit',
+          confidence: null,
+        },
+      ],
+      sortAt: '2026-09-07T10:12:00.000Z',
+    },
+  ] satisfies ReviewRow[],
+  counts: { all: 9, messages: 5, applications: 2, events: 2 },
+  companyNames: [...new Set(pipelineRows.map((row) => row.companyName))].sort(),
+  allRoles,
+};
+
+/**
  * Settings for somebody three weeks in: one inbox connected and scanned, one
  * resume, a couple of senders muted, and an evidence bank with something in it.
  */
@@ -5326,7 +5369,36 @@ export const SURFACES: readonly Surface[] = [
     label: 'Job search · Inbox',
     module: 'jobs',
     width: 'page',
-    render: () => <JobsInboxSurface />,
+    render: () => <JobsInboxSurface review={inboxReview} />,
+  },
+  /* The Jobs Inbox's hidden parts (plan #2502.2): a held message with its
+   * "some other role" search open, the same with the new-role form open, and
+   * a row whose press failed, saying why under it. */
+  {
+    id: 'jobs-inbox-other-role',
+    label: 'Job search · Inbox, other role open',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface review={inboxReview} open={{ 'message-r1': 'other-role' }} />,
+  },
+  {
+    id: 'jobs-inbox-new-role',
+    label: 'Job search · Inbox, new role open',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface review={inboxReview} open={{ 'message-r1': 'new-role' }} />,
+  },
+  {
+    id: 'jobs-inbox-error',
+    label: 'Job search · Inbox, a press failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsInboxSurface
+        review={inboxReview}
+        failed={{ 'application-r3': 'Could not confirm it: the application was removed in another tab.' }}
+      />
+    ),
   },
   {
     id: 'todo-inbox',
@@ -6120,6 +6192,25 @@ export const SURFACES: readonly Surface[] = [
         searchCostMicros={4_200_000}
         searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
       />
+    ),
+  },
+  {
+    /* Not for me pressed on the first role (plan #2504.3): the box for why,
+     * open and empty, with the Decline that sends it as it is. */
+    id: 'jobs-recommended-roles-decline',
+    label: 'Find · Recommended roles · Not for me',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ToastProvider>
+        <RecommendedRoles
+          suggestions={recommendedRoles}
+          stats={recommendedStats}
+          searchCostMicros={4_200_000}
+          searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
+          declining={recommendedRoles[0].id}
+        />
+      </ToastProvider>
     ),
   },
   {
