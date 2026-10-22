@@ -433,6 +433,24 @@ The week's focus is gone (plan #1742, decision #1741). The `focus` column on
 `goals.items` and `goals.visits.planned_week` stay in the database with what
 they held, and nothing reads or writes them.
 
+### Active and passive goals
+
+Plan #2503. A goal is active or passive, stored in `goals.items.activity`
+(null reads as active). A passive goal is one the person keeps in view
+without working on it now, so it asks for no attention:
+
+- None of its steps or rhythms appear in Do next, even when it has a due
+  date, and it is listed under Other goals (`homeLists` in
+  `lib/goals/home.ts`).
+- On Todo it keeps only the steps the person sent there. A step Dash sent
+  leaves Todo while the goal is passive, and Dash sends none
+  (`todoSteps` in `lib/goals/todo.ts`).
+- It gets no verdict: the morning brief leaves it out, its pace is not
+  read, and the pages show no older verdict on it (`reviewGoals` and
+  `standingReviews` in `lib/goals/reviews.ts`).
+- Questions, asks, flags and proposals waiting on approval still show in Do
+  next, since they hold up work.
+
 ## Todo
 
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown

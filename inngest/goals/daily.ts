@@ -12,7 +12,7 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { evidenceLines, evidenceSteps, filterEvidence } from '@/lib/goals/evidence';
 import { evidenceSince, loadEvidenceItems } from '@/lib/goals/evidence-store';
 import type { StepNode } from '@/lib/goals/steps';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 import { holdActingSteps, type HoldSurface } from '@/lib/goals/hold-acts-store';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { goalRunOn } from '@/lib/goals/settings-store';
@@ -169,7 +169,13 @@ async function paces({
   today: string;
   timeZone: string;
 }): Promise<Map<string, GoalPace | null>> {
-  const paced = goals.filter((g) => g.status === 'open' && judgedOnPace(g, byGoal.get(g.id) ?? []));
+  // A passive goal gets no verdict (plan #2503), so its pace is not read.
+  const paced = goals.filter(
+    (g) =>
+      g.status === 'open' &&
+      toGoalActivity(g.activity) !== 'passive' &&
+      judgedOnPace(g, byGoal.get(g.id) ?? []),
+  );
   const out = new Map<string, GoalPace | null>(paced.map((g) => [g.id, null]));
   if (paced.length === 0) return out;
   try {

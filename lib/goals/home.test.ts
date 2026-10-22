@@ -247,6 +247,22 @@ describe('homeLists', () => {
     expect(listed.otherGoals.map((l) => l.goal.id)).toEqual(['far', 'b']);
   });
 
+  it('keeps from a passive goal only what you sent to Todo and what holds up work', () => {
+    const base = dated('p', 'x', '2026-11-01');
+    const passive = { ...base, goal: { ...base.goal, activity: 'passive' as const } };
+    const ranked = [
+      onYou('p-step', 'p'),
+      onYou('p-rhythm', 'p', 'rhythm'),
+      onYou('p-mine', 'p', 'step', true),
+      { ...onYou('p-dash', 'p', 'step', true), sentByDash: true },
+      onYou('p-question', 'p', 'question'),
+      onYou('p-flag', 'p', 'flag'),
+    ];
+    const { doNext, rest, otherGoals } = homeLists(ranked, [passive], 5);
+    expect([...doNext, ...rest].map((item) => item.id)).toEqual(['p-mine', 'p-question', 'p-flag']);
+    expect(otherGoals.map((l) => l.goal.id)).toEqual(['p']);
+  });
+
   it('leaves out a step of a goal with no due date that is not on Todo', () => {
     const { doNext, otherGoals } = homeLists([onYou('1', 'b')], [dated('b', 'x', null)], 5);
     expect(doNext).toEqual([]);

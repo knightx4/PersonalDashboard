@@ -12,6 +12,7 @@ import {
   latestByGoal,
   pacedGoalIds,
   paceVerdict,
+  passiveGoalIds,
   reviewGoals,
   reviewLines,
   standingReviews,
@@ -365,5 +366,33 @@ describe('goals judged on their pace (plan #1738)', () => {
     const [dated] = reviewGoals([goal({})], quiet, new Map(), NOW);
     expect(dated.stalled).toBe(true);
     expect(reviewLines(dated).join('\n')).not.toContain('judged on its pace');
+  });
+});
+
+describe('passive goals get no verdict (plan #2503)', () => {
+  it('leaves a passive goal out of the morning review', () => {
+    const goals = [goal({ id: 'a' }), goal({ id: 'p', activity: 'passive' }), goal({ id: 'n', activity: undefined })];
+    expect(reviewGoals(goals, new Map(), new Map(), NOW).map((g) => g.id)).toEqual(['a', 'n']);
+  });
+
+  it('finds passive goals from flat rows, a null reading as active', () => {
+    const base = { parent_id: null, status: 'open', due_on: null, errand: false, on_todo: false };
+    const passive = passiveGoalIds([
+      { ...base, id: 'p', level: 'goal', activity: 'passive' },
+      { ...base, id: 'a', level: 'goal', activity: 'active' },
+      { ...base, id: 'n', level: 'goal', activity: null },
+      { ...base, id: 's', level: 'step', activity: 'passive' },
+    ]);
+    expect([...passive]).toEqual(['p']);
+  });
+
+  it('lets no verdict stand on a passive goal, whatever it was', () => {
+    const latest = new Map<string, GoalReview>([
+      ['p', review({ goalId: 'p', verdict: 'waiting_on_you' })],
+      ['q', review({ goalId: 'q', verdict: 'pace_holding' })],
+      ['a', review({ goalId: 'a', verdict: 'waiting_on_you' })],
+    ]);
+    const standing = standingReviews(latest, new Set(['q']), new Set(['p', 'q']));
+    expect([...standing.keys()]).toEqual(['a']);
   });
 });
