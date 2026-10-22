@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultViewHref, type SavedView } from './store';
+import { defaultViewHref, viewNamed, type SavedView } from './store';
 
 /**
  * Which view a bare list opens on.
@@ -40,5 +40,21 @@ describe('opening a list on a saved view', () => {
 
   it('does nothing when there are no views at all', () => {
     expect(defaultViewHref([], {})).toBeNull();
+  });
+});
+
+describe('saving under a name already used', () => {
+  const views = [
+    { id: 'a', name: 'Recent' },
+    { id: 'b', name: 'Ready to apply' },
+  ];
+
+  it('finds the view the name would replace, whatever its case', () => {
+    expect(viewNamed(views, 'recent')?.id).toBe('a');
+    expect(viewNamed(views, 'READY TO APPLY')?.id).toBe('b');
+  });
+
+  it('finds nothing for a new name', () => {
+    expect(viewNamed(views, 'Leads')).toBeNull();
   });
 });
