@@ -234,6 +234,26 @@ describe('goals isolation', () => {
       asUser(userB, (tx) => tx`insert into visits (user_id) values (${userA})`),
     ).rejects.toThrow(/row-level security/);
   });
+
+  it('keeps a declined mention to its owner, one row per ref (plan #2503.5)', async () => {
+    const ref = 'step:00000000-0000-4000-8000-000000000001';
+    await asUser(userA, (tx) => tx`
+      insert into mentions (user_id, ref, on_date, dismissed_at) values (${userA}, ${ref}, '2026-10-24', now())`);
+    await asUser(userA, (tx) => tx`
+      insert into mentions (user_id, ref, on_date, mentioned_at) values (${userA}, ${ref}, '2026-10-25', now())
+      on conflict (user_id, ref) do update set on_date = excluded.on_date, mentioned_at = excluded.mentioned_at`);
+    const mine = await asUser(userA, (tx) => tx<{ dismissed: boolean; mentioned: boolean }[]>`
+      select dismissed_at is not null as dismissed, mentioned_at is not null as mentioned from mentions`);
+    expect(mine).toEqual([{ dismissed: true, mentioned: true }]);
+    const theirs = await asUser(userB, (tx) => tx<{ ref: string }[]>`select ref from mentions`);
+    expect(theirs).toEqual([]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into mentions (user_id, ref, on_date) values (${userA}, ${ref}, '2026-10-24')`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      asUser(userA, (tx) => tx`insert into mentions (user_id, ref, on_date) values (${userA}, 'step:nope', '2026-10-24')`),
+    ).rejects.toThrow(/mentions_ref_ck/);
+  });
 });
 
 describe('goals shape', () => {
@@ -2494,12 +2514,13 @@ describe('RLS coverage', () => {
   // load of the home and records nothing done to a goal (migrations-goals/0027).
   // goals.settings (plan #1937.10) is the third: whether the routines start,
   // which is a setting rather than anything done to a goal (0077).
-  it('records history on every table but history itself, visits and settings', async () => {
+  // mentions is bookkeeping, as visits and settings are (plan #2503.5).
+  it('records history on every table but history itself, visits, settings and mentions', async () => {
     const tables = await admin<{ tablename: string }[]>`
       select c.relname as tablename
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'goals' and c.relkind = 'r' and c.relname not in ('history', 'visits', 'settings')
+      where n.nspname = 'goals' and c.relkind = 'r' and c.relname not in ('history', 'visits', 'settings', 'mentions')
       order by 1`;
     const recorded = await admin<{ tablename: string }[]>`
       select distinct c.relname as tablename

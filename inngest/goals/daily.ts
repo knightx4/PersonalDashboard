@@ -25,6 +25,10 @@ import { prepCandidates } from '@/lib/goals/prep-candidates';
 import { summariseProgress } from '@/lib/goals/progress';
 import { progressNudges } from '@/lib/goals/progress-nudges';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
+import { loadMentionStates, markMentioned } from '@/lib/goals/mentions-store';
+import { passiveMentions, unmentioned, type PassiveMention } from '@/lib/goals/passive-mentions';
+import type { Suggestion } from '@/lib/goals/suggestions';
+import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
 import { statementLines, type StatementSource } from '@/lib/goals/statements';
@@ -84,6 +88,8 @@ export type GoalsDailyResult =
       evidence: number | null;
       /** Collections whose new Gmail statements the run was asked to read (plan #1023). */
       statements: number;
+      /** Dated things under passive goals the home's note was asked to mention (plan #2503.5). */
+      mentions: number;
     };
 
 export type GoalsDailyDeps = {
@@ -101,7 +107,41 @@ export type GoalsDailyDeps = {
     userId: string,
     today: string,
   ) => Promise<StatementSource[]>;
+  /** Stands in for readMentions (plan #2503.5). */
+  mentions?: (input: MentionsInput) => Promise<PassiveMention[]>;
+  /** Stands in for markMentioned. */
+  markMentioned?: typeof markMentioned;
 };
+
+type MentionsInput = {
+  client: GoalsSupabaseClient;
+  userId: string;
+  today: string;
+  now: number;
+  goals: Goal[];
+  byGoal: Map<string, StepNode[]>;
+};
+
+/**
+ * The dated things under passive goals the home's note has not mentioned
+ * and you have not dismissed (plan #2503.5). Never throws: a failed read
+ * leaves them for tomorrow rather than holding up the run.
+ */
+async function readMentions(input: MentionsInput): Promise<PassiveMention[]> {
+  try {
+    const [suggestions, states] = await Promise.all([
+      loadRecentSuggestions(input.client, input.now, input.userId).catch((): Suggestion[] => []),
+      loadMentionStates(input.client, input.userId),
+    ]);
+    return unmentioned(
+      passiveMentions({ goals: input.goals, byGoal: input.byGoal, suggestions, today: input.today, states }),
+      states,
+    );
+  } catch (error) {
+    console.warn(`[goals] passive mentions not read: ${error instanceof Error ? error.message : 'failed'}`);
+    return [];
+  }
+}
 
 type EvidenceInput = {
   client: GoalsSupabaseClient;
@@ -315,6 +355,14 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     );
   }
 
+  // A passive goal is left out of the review (plan #2503), so what is coming
+  // up under one is read on its own path, from the passive goals alone.
+  const passiveGoals = goals.map((g) => g.goal).filter((g) => toGoalActivity(g.activity) === 'passive');
+  const mentions =
+    passiveGoals.length > 0
+      ? await (deps?.mentions ?? readMentions)({ client, userId, today, now, goals: passiveGoals, byGoal })
+      : [];
+
   const result = await recordAndFire({
     client,
     userId,
@@ -332,6 +380,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         unjudged,
         evidence: evidence?.lines ?? null,
         statements: statementLines(statements),
+        mentions,
       }),
     fetch: deps?.fetch,
   });
@@ -339,6 +388,13 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   // is one, already says failed with the reason.
   if (!result.ok) {
     throw new Error(`The morning goals run did not start (run ${result.runId ?? 'not recorded'}): ${result.error}`);
+  }
+  // Recorded once the run has started, so each is mentioned in one note. A
+  // failed write only means tomorrow's brief lists it again.
+  try {
+    await (deps?.markMentioned ?? markMentioned)(client, userId, mentions, now);
+  } catch (error) {
+    console.warn(`[goals] mentions not recorded: ${error instanceof Error ? error.message : 'failed'}`);
   }
   return {
     started: true,
@@ -353,5 +409,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     finished: underWay.finished.length,
     evidence: evidence?.steps ?? null,
     statements: statements.length,
+    mentions: mentions.length,
   };
 }

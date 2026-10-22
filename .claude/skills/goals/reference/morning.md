@@ -78,7 +78,20 @@ a morning with no step ready: each open goal carries a status that is never
 more than a day old, and this is the only run that writes it. A passive goal
 (`goals.items.activity = 'passive'`, plan #2503) is the exception: it carries
 no verdict, the brief leaves it out, and you write it none, even when its tree
-would read as waiting on the person or stalled. The brief lists every open
+would read as waiting on the person or stalled.
+
+What is coming up under a passive goal within a week (a step of the
+person's with that due date, or a dated suggestion nobody has answered) is
+the one thing said about it (plan #2503.5). The brief lists each under
+"coming up under goals the person has marked passive", once: it records them
+as mentioned when the run starts and never lists them again, nor after the
+person declines one on the Goals home. Mention each in one line of the
+home's note, marked optional ("Optional: the Riverside open day is on
+Saturday, under Learn pottery"), and leave a home note for them even on a
+morning that needs no other. Write nothing else about them: no step, no
+Todo, no verdict, and nothing in the goal's own note.
+
+The brief lists every open
 active goal with its done-when, when anything was last done on it (a step
 closed as done, or a reading logged), and the last verdict when there was
 one. Read each goal's tree before judging it: what is done, what is open,
