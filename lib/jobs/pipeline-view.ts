@@ -45,10 +45,13 @@ export type PipelineScope = 'live' | 'closed' | 'all';
  * board's columns, folded the way the board folds them. `submitted` and
  * `acknowledged` are one column, and so are `in_process` and `final_round`.
  * Together they are every live status, so the stage counts add up to the
- * live count.
+ * live count. Leads and drafting are two, named as the board and the table
+ * name them: one "Not sent yet" filter over rows reading "Lead" was the
+ * mismatch note 6d8f73b1 reported.
  */
 export const PIPELINE_STAGES = [
-  { key: 'unsent', label: 'Not sent yet', statuses: ['lead', 'drafting'] },
+  { key: 'lead', label: 'Leads', statuses: ['lead'] },
+  { key: 'drafting', label: 'Drafting', statuses: ['drafting'] },
   { key: 'submitted', label: 'Submitted', statuses: ['submitted', 'acknowledged'] },
   { key: 'in_process', label: 'In process', statuses: ['in_process', 'final_round'] },
   { key: 'offer', label: 'Offer', statuses: ['offer'] },
