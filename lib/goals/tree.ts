@@ -160,6 +160,8 @@ export type GoalFields = {
   dueOn?: string | null;
   /** What the date is the end of; a date other than a day must be its period's last day. */
   duePrecision?: DuePrecision;
+  /** Whether the goal is worked on or only kept in view (plan #2503). */
+  activity?: GoalActivity;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -231,6 +233,15 @@ export function parseGoalFields(
     if (fields.errand && !fields.dueOn) {
       return { ok: false, error: 'An errand needs a date it is due by.' };
     }
+  }
+
+  const rawActivity = get('activity');
+  if (rawActivity !== null && rawActivity !== undefined) {
+    const activity = clean(rawActivity);
+    if (activity !== 'active' && activity !== 'passive') {
+      return { ok: false, error: 'Could not tell whether the goal is active or passive.' };
+    }
+    fields.activity = activity;
   }
 
   return { ok: true, value: fields };

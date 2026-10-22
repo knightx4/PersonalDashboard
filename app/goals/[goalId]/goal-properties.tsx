@@ -26,16 +26,16 @@ function dayOf(iso: string | null | undefined, timeZone: string): string | null 
  * added. The area is the crumb above the title, so it is not said again.
  */
 export function goalLine(
-  goal: Pick<Goal, 'createdAt' | 'errand'>,
+  goal: Pick<Goal, 'createdAt' | 'errand' | 'activity'>,
   timeZone: string,
 ): string {
-  const kind = goal.errand ? 'Errand' : 'Goal';
+  const kind = goal.errand ? 'Errand' : goal.activity === 'passive' ? 'Passive goal' : 'Goal';
   const added = dayOf(goal.createdAt, timeZone);
   return added ? `${kind}, added ${added}` : kind;
 }
 
 type Props = {
-  goal: Pick<Goal, 'areaId' | 'status' | 'dueOn' | 'duePrecision' | 'createdAt' | 'closedAt' | 'errand'>;
+  goal: Pick<Goal, 'areaId' | 'status' | 'dueOn' | 'duePrecision' | 'createdAt' | 'closedAt' | 'errand' | 'activity'>;
   areaName: string;
   review: GoalReview | null;
   progress: Pick<GoalProgress, 'live' | 'done' | 'bands'>;
@@ -117,6 +117,11 @@ function goalFacts(
   return { closed, split };
 }
 
+/** Whether the Due fact shows: a passive goal has no date to keep to (plan #2503.2). */
+function shownDue(goal: Props['goal']): boolean {
+  return Boolean(goal.dueOn) && goal.activity !== 'passive';
+}
+
 /** How many facts `GoalProperties` draws, said on the closed fold on a phone. */
 export function goalDetailCount(
   goal: Props['goal'],
@@ -128,7 +133,7 @@ export function goalDetailCount(
   const { closed, split } = goalFacts(goal, progress, timeZone);
   const last = pace && lastActiveWords(pace) && !lastActiveFirst(review, progress, pace);
   const pacing = pace ? 1 + (last ? 1 : 0) : 0;
-  return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0) + pacing;
+  return 1 + (shownDue(goal) ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0) + pacing;
 }
 
 /**
@@ -148,7 +153,7 @@ export function GoalProperties({ goal, areaName, review, progress, timeZone, pac
       {/* Plain text, as the feature page's Module is: the path above the
           title already goes to the area. */}
       <Property label="Area" value={areaName} />
-      {goal.dueOn && <Property label="Due" value={formatDue(goal.dueOn, goal.duePrecision)} />}
+      {shownDue(goal) && <Property label="Due" value={formatDue(goal.dueOn!, goal.duePrecision)} />}
       {closed && (
         <Property label={goal.status === 'dropped' ? 'Dropped' : 'Finished'} value={closed} />
       )}

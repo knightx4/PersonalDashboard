@@ -5430,6 +5430,33 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalTopSurface />,
   },
   {
+    /* A passive goal's page (plan #2503.2): the switch in the header on
+     * Passive, the line under the title saying so, and no Due. */
+    id: 'goals-page-top-passive',
+    label: 'Goal · marked passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTopSurface frameOnly passive />,
+  },
+  {
+    /* The switch mid-save: both segments held until the write returns. */
+    id: 'goals-page-top-passive-saving',
+    label: 'Goal · saving active or passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTopSurface frameOnly passive activityDrawn={{ saving: true }} />,
+  },
+  {
+    /* The save refused: the switch back where it was and a line saying why. */
+    id: 'goals-page-top-passive-error',
+    label: 'Goal · active or passive not saved',
+    module: 'goals',
+    width: 'page',
+    render: () => (
+      <GoalTopSurface frameOnly activityDrawn={{ error: 'Could not make this goal passive. Try again.' }} />
+    ),
+  },
+  {
     /* The same frame on its Steps tab: the step tree and its stages. */
     id: 'goals-page-steps',
     label: 'Goal · the Steps tab',

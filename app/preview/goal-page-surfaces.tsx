@@ -34,6 +34,7 @@ import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
+import type { ActivitySwitchDrawn } from '@/app/goals/[goalId]/goal-activity-switch';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
@@ -421,9 +422,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
 };
 
 export function GoalsHomeSurface() {
-  return (
-    <HomeView {...home} timeZone="Europe/London" canRun />
-  );
+  return <HomeView {...home} timeZone="Europe/London" canRun />;
 }
 
 /** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
@@ -764,7 +763,16 @@ const CARD_SUGGESTIONS: Suggestion[] = [
  * one Learn goal linked and a file, as More holds them. The page header is
  * the real one, with the path above it (plan #1622).
  */
-export function GoalTopSurface({ frameOnly = false }: { frameOnly?: boolean } = {}) {
+export function GoalTopSurface({
+  frameOnly = false,
+  passive = false,
+  activityDrawn,
+}: {
+  frameOnly?: boolean;
+  /** The goal marked passive (plan #2503.2): no Due, and the switch on Passive. */
+  passive?: boolean;
+  activityDrawn?: ActivitySwitchDrawn;
+} = {}) {
   const which = {
     ...step('which', {
       title: 'Which card first?',
@@ -776,7 +784,8 @@ export function GoalTopSurface({ frameOnly = false }: { frameOnly?: boolean } = 
   };
   return (
     <GoalDetail
-      goal={cards}
+      goal={passive ? { ...cards, activity: 'passive' } : cards}
+      activityDrawn={activityDrawn}
       areaName="Money"
       places={PLACES}
       review={cardsReview}
