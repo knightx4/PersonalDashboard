@@ -89,7 +89,7 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
   const supabase = await createClient();
   const { error } = await supabase
     .from('suggestions')
-    .update({ status: 'open', acted_at: null, dismiss_reason: null })
+    .update({ status: 'open', acted_at: null, dismiss_reason: null, dismiss_text: null })
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .eq('status', 'dismissed');
