@@ -11,8 +11,9 @@
  * follows.
  *
  * The letter follows one template (docs/JOB-SEARCH-SPEC.md, Cover letters):
- * who they are, two paragraphs of what building with AI has shown them, taken
- * from their vault notes, and one line of ask. The résumé carries the stories.
+ * who they are and why this role, two paragraphs of what building with AI
+ * has shown them, taken from their vault notes, and one line of ask. The
+ * résumé carries the stories.
  *
  * The model can ask the person things back. Their replies are stored on the
  * same row and sent with the next call, so pressing Redraft uses them.
@@ -71,13 +72,24 @@ claim.
 The résumé goes with the letter, so the letter does not retell its stories.
 It says what they think about building with AI, in the way they write in
 their own notes. Every letter follows this template: four short paragraphs,
-about 180 to 250 words, after "Dear [team] Hiring Team:" (or the person
+about 220 to 300 words, after "Dear [team] Hiring Team:" (or the person
 their material says they are writing to).
 
-1. One sentence on who they are and the role, with credentials from the
-   résumé: "I'm a CPA and Yale MBA with three years at EY, applying for the
-   Finance Associate role on Strategic Finance in New York." Nothing more
-   about the company than its name and the team.
+1. Two or three sentences. First, who they are and the role, with
+   credentials from the résumé: "I'm a CPA and Yale MBA with three years at
+   EY, applying for the Finance Associate role on Strategic Finance in New
+   York." Then the one part of their background this posting most needs, in
+   a clause or two and in words this team would use: what kind of work it
+   was, never the story itself. Then why this role, in one sentence, from
+   their own reasons: their Perspective tab, their thinking about the
+   search, their comments or replies. When their material gives no reason
+   for this role, write a plain, neutral line about the work the role does
+   that claims no motive for them ("The role sits close to the people using
+   the product, which is the part of the work I've enjoyed most" claims a
+   motive; "The role works directly with the practitioners using the
+   product" does not), and ask them why this role in asks. Nothing about
+   the company beyond its name, its team and what the posting says the role
+   does.
 2. The first AI paragraph. Open on one thing the posting says about AI,
    automation, tooling or how the work gets done, in plain words. Then
    something building with AI has shown them, from their notes on building
@@ -129,8 +141,9 @@ Report through ${TOOL_NAME}:
   exactly from its "id:" line. Empty when it draws on none.
 - unsupported_claims: as above.
 - asks: up to ${MAX_ASKS} short questions for them whose answers would make the
-  letter better, such as an observation about building with AI when their
-  notes hold fewer than two that fit, what the posting means by a line about
+  letter better, such as why they want this role when their material gives
+  no reason (always ask this one then), an observation about building with
+  AI when their notes hold fewer than two that fit, what the posting means by a line about
   AI, or who they are writing to. Ask only what their material and earlier
   replies do not already answer. Empty when nothing is missing.`;
 
