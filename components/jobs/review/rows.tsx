@@ -489,7 +489,7 @@ export function ApplicationReviewRow({
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <Chip size="sm">
-          <Mail aria-hidden />
+          <Mail strokeWidth={1.75} aria-hidden />
           Created from email
         </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
@@ -600,7 +600,7 @@ export function EventReviewRow({
       {/* Identity first below `sm`; see the note on the message header. */}
       <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <Chip tone="caution" size="sm">
-          <CircleAlert aria-hidden />
+          <CircleAlert strokeWidth={1.75} aria-hidden />
           Arrived after it closed
         </Chip>
         <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
