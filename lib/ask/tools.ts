@@ -287,7 +287,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'job_applications',
     description:
-      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched; lists the newest 50, each linking to its role. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), or to sent applications that never had a reply (no_reply).',
+      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched; lists the newest 50, each linking to its role. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
     input_schema: {
       type: 'object',
       properties: {
@@ -306,6 +306,11 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         no_reply: {
           type: 'boolean',
           description: 'Only sent applications the company never replied to, an automatic confirmation aside, whatever their status now.',
+        },
+        changed_status: {
+          type: 'boolean',
+          description:
+            'Only applications whose status changed between from and to (from defaults to six days ago, to to today), by hand or from mail, with what it was before (status_before) and after (status_after). from and to then date the change, not the day sent, and status filters status_after. For "what did I move to submitted this week that wasn\'t before", changed_status with status submitted and acknowledged, since a sent one whose confirmation came is acknowledged.',
         },
       },
       additionalProperties: false,
