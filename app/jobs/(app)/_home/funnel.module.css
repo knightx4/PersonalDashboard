@@ -9,6 +9,16 @@
 .stage {
   position: relative;
   overflow: hidden;
+}
+
+/*
+ * The dot grid, on a layer of its own. On the card itself its tile size
+ * reached the glass themes' own gradient on .sheet and tiled it into squares.
+ */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   background-image: radial-gradient(color-mix(in oklab, var(--c-ink) 7%, transparent) 1px, transparent 1px);
   background-size: 24px 24px;
 }

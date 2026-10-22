@@ -112,6 +112,19 @@ describe('buildFunnel', () => {
     ]);
   });
 
+  it('names two causes under a stage and counts the rest as other', () => {
+    const closed = (status: FunnelApplicationInput['status']) => app({ status, closedAt: ago(2) });
+    const view = buildFunnel({
+      now: NOW,
+      applications: [closed('role_closed'), closed('role_closed'), closed('role_closed'), closed('withdrawn'), closed('withdrawn'), closed('rejected'), closed('ghosted')],
+      suggestions: [],
+      interviewsHeld: [],
+      watched: null,
+      replyRate: null,
+    });
+    expect(view.drops).toEqual([{ from: 'leads', count: 7, label: 'closed', parts: '3 role closed · 2 withdrawn · 2 other' }]);
+  });
+
   it('puts the search’s reply rate on the band out of Applied, and no rate where there is none', () => {
     const base = { now: NOW, applications: [], suggestions: [], interviewsHeld: [], watched: null };
     expect(buildFunnel({ ...base, replyRate: 0.0984 }).flows.find((f) => f.from === 'applied')!.rate).toBe('10% reply rate');

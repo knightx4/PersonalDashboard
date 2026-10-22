@@ -266,11 +266,15 @@ export function buildFunnel(input: FunnelInput): FunnelView {
     const counts = closedBy.get(key);
     if (!counts) continue;
     const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    // Two causes and the rest as one, so the line fits under its own tube.
+    const rest = ordered.slice(2).reduce((sum, [, n]) => sum + n, 0);
+    const parts = ordered.slice(0, 2).map(([word, n]) => `${n} ${word}`);
+    if (rest > 0) parts.push(`${rest} other`);
     drops.push({
       from: key,
       count: ordered.reduce((sum, [, n]) => sum + n, 0),
       label: 'closed',
-      parts: ordered.map(([word, n]) => `${n} ${word}`).join(' · '),
+      parts: parts.join(' · '),
     });
   }
 

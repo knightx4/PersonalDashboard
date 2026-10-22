@@ -103,7 +103,7 @@ export function Funnel({ view }: { view: FunnelView }) {
 
 // -- laptop width: the tubes --------------------------------------------------
 
-const HEIGHT = 572;
+const HEIGHT = 604;
 const CY = 262;
 const FLOOR = 512;
 const COMPACT_W = [96, 88, 80, 72, 64, 58];
@@ -123,7 +123,7 @@ function layout(width: number, openIndex: number, counts: readonly number[]): Bo
     return Math.round(Math.min(440, inner - 5 * SLIVER - 5 * 56));
   });
   const heights = COMPACT_H.map((h, i) =>
-    i === openIndex ? (counts[i] ? Math.max(208, Math.min(360, 112 + counts[i]! * 58)) : 172) : h,
+    i === openIndex ? (counts[i] ? Math.max(200, Math.min(360, 100 + counts[i]! * 56)) : 172) : h,
   );
   const gap = (inner - widths.reduce((a, b) => a + b, 0)) / 5;
   let x = margin;
@@ -247,9 +247,10 @@ function Tubes({
     const w = bandWidth(flow.count);
     const y0 = attach(i, Math.max(w, 2));
     const y1 = attach(i + 1, Math.max(w, 2));
-    // Each end starts inside its tube, behind the glass, so the band comes out of the edge.
-    const x0 = a.x + a.w - 14;
-    const x1 = b.x + 14;
+    // Each end stops a pixel under the tube's edge. Tucked further in, it showed
+    // through the glass themes' see-through tubes as a block.
+    const x0 = a.x + a.w - 1;
+    const x1 = b.x + 1;
     const m = (a.x + a.w + b.x) / 2;
     return {
       flow,
@@ -262,6 +263,11 @@ function Tubes({
     };
   });
 
+  // The narrowest distance between two tubes' middles: the room each drop's label has.
+  const column = Math.min(
+    ...boxes.slice(1).map((box, i) => box.x + box.w / 2 - (boxes[i]!.x + boxes[i]!.w / 2)),
+  );
+
   const drops = view.drops.map((drop) => {
     const i = view.stages.findIndex((s) => s.key === drop.from);
     const box = boxes[i]!;
@@ -272,6 +278,7 @@ function Tubes({
 
   return (
     <div ref={ref} className={styles.canvas} style={{ height: HEIGHT }}>
+      <div className={styles.grid} aria-hidden />
       <svg className={styles.svg} width={width} height={HEIGHT} aria-hidden>
         <defs>
           {view.flows.map((flow, i) => (
@@ -370,7 +377,7 @@ function Tubes({
       ))}
 
       {drops.map(({ drop, cx }) => (
-        <DropLabel key={drop.from} drop={drop} left={Math.max(4, Math.min(width - 228, cx - 112))} />
+        <DropLabel key={drop.from} drop={drop} cx={cx} span={column} width={width} />
       ))}
     </div>
   );
@@ -387,13 +394,27 @@ function FlowLabel({ flow, narrow, last }: { flow: FunnelFlow; narrow: boolean; 
   );
 }
 
-function DropLabel({ drop, left }: { drop: FunnelDrop; left: number }) {
+/**
+ * What closed under one tube, kept inside that tube's column so the labels of
+ * neighbouring stages never run into each other; the causes wrap instead.
+ */
+function DropLabel({ drop, cx, span, width }: { drop: FunnelDrop; cx: number; span: number; width: number }) {
+  const w = Math.round(Math.max(96, Math.min(224, span - 12)));
+  const left = Math.max(4, Math.min(width - w - 4, cx - w / 2));
   return (
-    <div className="pointer-events-none absolute flex w-56 flex-col items-center text-center" style={{ left, top: FLOOR + 12 }}>
+    <div className="pointer-events-none absolute flex flex-col items-center text-center" style={{ left, top: FLOOR + 12, width: w }}>
       <span className="text-ui text-ink-muted">
         <span className="tabular font-semibold text-ink">{drop.count}</span> {drop.label}
       </span>
-      {drop.parts && <span className="whitespace-nowrap text-micro text-ink-ghost">{drop.parts}</span>}
+      {drop.parts && (
+        <span className="flex flex-wrap justify-center gap-x-1.5 text-micro leading-snug text-ink-ghost">
+          {drop.parts.split(' · ').map((part) => (
+            <span key={part} className="whitespace-nowrap">
+              {part}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }
