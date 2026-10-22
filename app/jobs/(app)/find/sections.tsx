@@ -1054,7 +1054,7 @@ function RoleRow({ suggestion, defaultDeclining = false }: { suggestion: OpenSug
       </div>
       {choosing && (
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-center gap-2 max-sm:[&_input]:min-h-11"
           aria-label="Why not this one"
           action={(form) => {
             const text = String(form.get('text') ?? '');
