@@ -139,7 +139,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         .select('id, conversation_id, created_at, body, tool_calls, rating, rating_note, conversations!inner(subject_kind)')
         .eq('user_id', userId)
         .eq('role', 'assistant')
-        .eq('conversations.subject_kind', 'ask')
+        .in('conversations.subject_kind', ['ask', 'row'])
         .gte('created_at', since)
         .limit(DAY_ROWS);
       if (error) throw new Error(`Reading the day's answers failed: ${error.message}`);

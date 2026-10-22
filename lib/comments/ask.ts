@@ -62,6 +62,7 @@ import { recordSessionSpend } from '@/lib/core/spend/session';
 import { actionSchema } from './reply-payload';
 import { stepRef } from '@/lib/plan/ref';
 import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
+import type { TalkToolCall } from '@/lib/talk/talk';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -351,12 +352,13 @@ async function subjectRowOf(input: AskInput): Promise<Subject | null> {
 }
 
 /** A reply in the thread, under the same account and marked as Claude's. */
-async function say(input: AskInput, body: string): Promise<void> {
+async function say(input: AskInput, body: string, toolCalls?: readonly TalkToolCall[]): Promise<void> {
   await addThreadTurn(input.supabase, {
     userId: input.userId,
     ref: threadRef(input.target, input.id),
     author: 'claude',
     body,
+    toolCalls,
   });
 }
 
@@ -563,7 +565,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   if (session && reply.made.length === 0) return { ok: true, message: session };
   if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
-  await say(input, reply.body);
+  await say(input, reply.body, reply.toolCalls);
   checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);
   return reply.made.length > 0
     ? { ok: true, message: 'Done, and said in the thread.', redraw }

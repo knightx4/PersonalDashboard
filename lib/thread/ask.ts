@@ -29,6 +29,7 @@ import { pageFor } from '@/lib/sources/catalogue';
 import { whyNotRead } from '@/lib/vault/map/rules';
 import { acknowledgeThreadTurn, addThreadTurn, loadThread, type AnyClient } from './store';
 import { rowText } from './row-text';
+import type { TalkToolCall } from '@/lib/talk/talk';
 
 /** The model a reply under any other row is written with. */
 export const ROW_REPLY_MODEL = DASH_MODELS.rowThread;
@@ -60,8 +61,8 @@ export type RowAskInput = {
 
 export type RowAskOutcome = { ok: true; message: string } | { ok: false; error: string };
 
-async function say(input: RowAskInput, body: string): Promise<void> {
-  await addThreadTurn(input.client, { userId: input.userId, ref: input.ref, author: 'claude', body });
+async function say(input: RowAskInput, body: string, toolCalls?: readonly TalkToolCall[]): Promise<void> {
+  await addThreadTurn(input.client, { userId: input.userId, ref: input.ref, author: 'claude', body, toolCalls });
 }
 
 export async function askDashOnRow(input: RowAskInput): Promise<RowAskOutcome> {
@@ -128,7 +129,7 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
 
   if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
-  await say(input, reply.body);
+  await say(input, reply.body, reply.toolCalls);
   return { ok: true, message: reply.made.length > 0 ? 'Done, and said in the thread.' : 'Answered in the thread.' };
 }
 

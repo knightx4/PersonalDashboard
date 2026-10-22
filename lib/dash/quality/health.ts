@@ -3,7 +3,7 @@ import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
 import { LIMIT_MARKS, UNFINISHED_OPENING } from './grade';
 
 /**
- * How the person's real Ask Dash answers went over a window, usually the last
+ * How the person's real Dash answers went over a window, usually the last
  * day, worked out from what is already kept: the turns with their lookups and
  * thumbs, and the spend rows of ask-dash. Nothing here reads a database.
  *

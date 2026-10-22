@@ -35,6 +35,7 @@ import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { parseRoleReply, renderBank, replyBody, roleReplyMessage, type Turn } from './reply';
+import type { TalkToolCall } from '@/lib/talk/talk';
 
 /** The model a role reply is written with: Sonnet, since a letter goes out under their name. */
 export const ROLE_REPLY_MODEL = DASH_MODELS.roleThread;
@@ -91,12 +92,13 @@ export type RoleAskInput = {
 
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
 
-async function say(input: RoleAskInput, body: string): Promise<void> {
+async function say(input: RoleAskInput, body: string, toolCalls?: readonly TalkToolCall[]): Promise<void> {
   await addThreadTurn(input.client, {
     userId: input.userId,
     ref: toRef(ROLE_THREAD_TABLE, input.roleId),
     author: 'claude',
     body,
+    toolCalls,
   });
 }
 
@@ -272,7 +274,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
   if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
-  await say(input, reply.body);
+  await say(input, reply.body, reply.toolCalls);
   return {
     ok: true,
     message: letterWritten

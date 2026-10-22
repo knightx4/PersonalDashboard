@@ -30,8 +30,9 @@ fix, re-ask the one case it is about, never all of them.
   owner's rows. Not in git, because they are about the person's data.
 - **Daily health run**, free, 07:17 UTC every day but the 1st (trigger
   `health`, migration 0279): pg_cron posts to `/api/cron/dash-quality`, which
-  calls no model. It reads the last 24 hours of real Ask Dash answers and
-  grades them (`lib/dash/quality/health.ts`): fallbacks to "I could not
+  calls no model. It reads the last 24 hours of real Dash answers, in Ask
+  and in comment threads (an `@dash` comment on a role, an answer, a step),
+  and from connected apps, and grades them (`lib/dash/quality/health.ts`): fallbacks to "I could not
   finish", limits, failed or refused lookups, thumbs down with their notes,
   replies that pushed back, and prompt size. The run is a row in
   `core.dash_eval_runs` (`health` holds it all, with turn ids). Any alert
@@ -177,7 +178,9 @@ when you see a cause of failure that one fix will not remove.
    50 rows of a list. Find where the tools return a page and the prompt lets
    the model answer from it.
 4. **Grounding.** Every factual claim about their data must rest on a row a
-   lookup returned. Add a check (cheap model or rules) that flags an answer
+   lookup returned. On 22 October a thread reply said an answer "calls
+   Decagon's pricing on work done a finance question"; the answer says
+   nothing of the kind, and Dash had read only its first 160 characters. Add a check (cheap model or rules) that flags an answer
    naming rows, amounts or dates its lookups did not return, and record it
    in the run's grading.
 5. **Cover every workspace.** At least one case per workspace that is on
@@ -210,7 +213,15 @@ when you see a cause of failure that one fix will not remove.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
    - No lookup has a time limit; the route allows 300 seconds.
-7. **Keep it cheap.** The person does not want to pay for testing. Hold the
+7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
+   a reply to an `@dash` comment keeps its lookups on its turn
+   (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or
+   run out of lookups. Still open: Goals comments are written through
+   `writeComment` (`lib/goals/ask.ts`) and keep no lookups; and a thread
+   reply has no thumbs, so the person can only say it was bad by replying,
+   which the pushback check reads. Give thread replies the same thumbs Ask
+   answers have.
+8. **Keep it cheap.** The person does not want to pay for testing. Hold the
    monthly run under $1.50 (`cost_micros`), and the month's checks, by hand
    and monthly, under about $3 together (`core.model_spend`, operation
    `check-dash-quality`). When the cases outgrow it, retire the oldest

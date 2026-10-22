@@ -560,7 +560,7 @@ describe('application_answers', () => {
       { id: 'n1', user_id: ME, application_id: 'a1', question_id: 'q1', answer: 'Because the work matters. '.repeat(20), status: 'draft', word_limit: 150, created_at: '2026-09-01T10:00:00Z' },
       { id: 'n2', user_id: ME, application_id: 'a1', question_id: 'q2', answer: null, status: 'approved', word_limit: null, created_at: '2026-09-01T11:00:00Z' },
       { id: 'n0', user_id: ME, application_id: 'a1-old', question_id: 'q3', answer: 'Old attempt', status: 'submitted', word_limit: null, created_at: '2026-08-01T10:00:00Z' },
-      { id: 'n3', user_id: ME, application_id: 'a2', question_id: 'q3', answer: 'Negotiable', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
+      { id: 'n3', user_id: ME, application_id: 'a2', question_id: 'q3', answer: 'Negotiable,\r\n\n\n\nwithin reason', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
       { id: 'n4', user_id: THEM, application_id: 'a4', question_id: 'q4', answer: 'Theirs', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
     ],
   };
@@ -572,13 +572,16 @@ describe('application_answers', () => {
     expect(rows.map((r) => r.title)).toEqual(['Why do you want to work here?', 'Describe a hard deadline.']);
     expect(rows[0]).toMatchObject({ table: 'job_search.application_answers', href: '/jobs/roles/r1' });
     expect(rows[0].detail).toMatchObject({ status: 'draft', word_limit: 150 });
-    expect(String(rows[0].detail?.opening).length).toBeLessThanOrEqual(160);
-    expect(rows[1].detail).toMatchObject({ status: 'approved', opening: null });
+    // The whole answer, so it can be reused on another application (22 October 2026).
+    expect(rows[0].detail?.answer).toBe('Because the work matters. '.repeat(20).trim());
+    expect(rows[1].detail).toMatchObject({ status: 'approved', answer: null });
+    expect(result.ok && result.note).not.toContain('open_row');
   });
 
   it('reads one application by its ref, with the table prefix accepted', async () => {
     const result = await executeAskTool('application_answers', { application_ref: 'job_search.applications:a2' }, context(tables));
     expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['n3']);
+    expect(expectLinkedRows(result)[0].detail?.answer).toBe('Negotiable,\n\nwithin reason');
   });
 
   it("refuses another person's role and application, and a call that names neither", async () => {
