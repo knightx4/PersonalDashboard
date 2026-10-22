@@ -101,6 +101,12 @@ describe('parseGoalFields', () => {
     ).toEqual({ ok: true, value: { title: 'Pay off the debts', acceptance: 'Every card at zero' } });
   });
 
+  it('takes active or passive, and refuses anything else (plan #2503.2)', () => {
+    expect(parseGoalFields(form({ activity: 'passive' }))).toEqual({ ok: true, value: { activity: 'passive' } });
+    expect(parseGoalFields(form({ activity: 'active' }))).toEqual({ ok: true, value: { activity: 'active' } });
+    expect(parseGoalFields(form({ activity: 'idle' })).ok).toBe(false);
+  });
+
   it('refuses a new goal with no title', () => {
     expect(parseGoalFields(form({ acceptance: 'x' }), { requireTitle: true }).ok).toBe(false);
     expect(parseGoalFields(form({ title: ' ' }), { requireTitle: true }).ok).toBe(false);

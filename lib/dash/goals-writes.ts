@@ -45,7 +45,7 @@ import {
   unlinkStep,
   updateStep,
 } from '@/lib/goals/steps-store';
-import { parseAreaName, parseAreaNote, parseGoalFields } from '@/lib/goals/tree';
+import { parseAreaName, parseAreaNote, parseGoalFields, toGoalActivity } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CHANGE_GOAL_LIST } from './goal-lists-writes';
 import { GoalsRefused } from './goals-refused';
@@ -382,7 +382,7 @@ async function changeGoal(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
   }
 }
 
-/** A goal's wording, due date or area, any of them in one write, as the page's edit is. */
+/** A goal's wording, due date, area or whether it is active, any of them in one write, as the page's edit is. */
 async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<GoalsMade> {
   const id = before.id as string;
   const title = named(before.title, 'the goal');
@@ -392,6 +392,7 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
     if (key === 'title') return text(args, 'title') || undefined;
     if (key === 'due') return dueSent ? text(args, 'due_on') : undefined;
     if (key === 'duePrecision') return precision || undefined;
+    if (key === 'activity') return text(args, 'activity') || undefined;
     return undefined;
   });
   if (!parsed.ok) throw new GoalsRefused(parsed.error);
@@ -409,8 +410,9 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
     delete fields.dueOn;
     delete fields.duePrecision;
   }
+  if (fields.activity && fields.activity === toGoalActivity(before.activity)) delete fields.activity;
   if (Object.keys(fields).length === 0) {
-    throw new GoalsRefused('Nothing to change: give a new title, due_on or area, different from what the goal has.');
+    throw new GoalsRefused('Nothing to change: give a new title, due_on, area or activity, different from what the goal has.');
   }
   // An errand needs its date (goals 0061): clearing an errand's date is refused by the database too.
   if (before.errand === true && fields.dueOn === null) throw new GoalsRefused('That goal is an errand, which needs a date it is due by.');
@@ -421,6 +423,7 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
   if (fields.title) parts.push(`reworded it to "${fields.title}"`);
   if ('dueOn' in fields) parts.push(fields.dueOn ? `set it due by ${fields.dueOn}` : 'cleared its due date');
   if (area) parts.push(`moved it to ${named(area.name, 'another area')}`);
+  if (fields.activity) parts.push(`marked it ${fields.activity}`);
   const said = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
   return reportGoal(env, before, {
     verb: 'Changed',
@@ -1800,7 +1803,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       ['app/goals/actions.ts#settleGoalAction', 'lib/goals/store.ts#settleGoal'],
     ),
     description:
-      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, or move it to another area (change edit, with any of title, due_on, due_precision and area), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
+      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, move it to another area, or mark it active or passive (change edit, with any of title, due_on, due_precision, area and activity), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1814,6 +1817,11 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
           description: 'For edit, with due_on: what the date is the end of, when they named a month, quarter, half or year. Default day.',
         },
         area: { type: 'string', description: 'For edit: the area to move it to, by its name or goals.areas ref.' },
+        activity: {
+          type: 'string',
+          enum: ['active', 'passive'],
+          description: 'For edit: active for a goal they are working on, passive for one only kept in view, which leaves Do next, Todo and the daily verdicts.',
+        },
       },
       required: ['change', 'goal_ref'],
       additionalProperties: false,

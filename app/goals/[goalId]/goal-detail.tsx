@@ -6,8 +6,9 @@ import { tabsWithLists, type ListView } from '@/lib/goals/goal-lists';
 import type { GoalPace } from '@/lib/goals/pace';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { goalGlyph, type GoalProgress } from '@/lib/goals/status';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 import type { Place } from '../move-goal';
+import { GoalActivitySwitch, type ActivitySwitchDrawn } from './goal-activity-switch';
 import { GoalAreaMenu } from './goal-area-menu';
 import { GoalGlyph } from './goal-close';
 import { GoalHeadingField } from './goal-heading';
@@ -30,6 +31,7 @@ export function GoalDetail({
   pace = null,
   metrics = null,
   lists = [],
+  activityDrawn,
   children,
 }: {
   goal: Goal;
@@ -51,12 +53,15 @@ export function GoalDetail({
    * after Steps; fewer leave the tabs as they are.
    */
   lists?: readonly ListView[];
+  /** For the gallery: the active or passive switch drawn mid-save or failed. */
+  activityDrawn?: ActivitySwitchDrawn;
   /** The open tab's content. */
   children: React.ReactNode;
 }) {
   const closed = goal.status === 'done';
   const hexagon = goalGlyph(goal.status, progress);
   const open = progress.live - progress.done;
+  const line = goalLine(goal, timeZone);
   const tabs = tabsWithLists(
     GOAL_TABS.map((t) => (t.id === 'steps' ? { ...t, count: open } : t)),
     lists,
@@ -75,7 +80,21 @@ export function GoalDetail({
       }
       // Title, one line under it, then the menu on the title's line, as on a
       // feature's page (plan #1688).
-      description={<span className="text-small">{goalLine(goal, timeZone)}</span>}
+      description={
+        // Active or passive (plan #2503.2) at the end of the one line, for a
+        // goal still being kept: a closed one is neither worked on nor watched.
+        goal.status === 'open' || goal.status === 'parked' ? (
+          <GoalActivitySwitch
+            goalId={goal.id}
+            activity={toGoalActivity(goal.activity)}
+            drawn={activityDrawn}
+          >
+            <span className="text-small">{line}</span>
+          </GoalActivitySwitch>
+        ) : (
+          <span className="text-small">{line}</span>
+        )
+      }
       actions={
         <GoalAreaMenu
           goal={{
