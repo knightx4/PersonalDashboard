@@ -89,12 +89,26 @@ const QUEUE_COUNTS: Partial<Record<AgendaInbox, { queue: InboxQueue; label: stri
   ],
 };
 
-/** A workspace's queues as rows, with any queue that could not be counted named. */
+/**
+ * Queues the workspace's own Inbox lists item by item, so it takes no count
+ * row there; Home's Inbox still shows each as one. Jobs' review items are
+ * drawn with their buttons by the Jobs Inbox page (plan #2502.2).
+ */
+const LISTED_ON_THEIR_INBOX: readonly InboxQueue[] = ['jobs-review'];
+
+/**
+ * A workspace's queues as rows, with any queue that could not be counted
+ * named. `on` is the page asking: the workspace's own Inbox leaves out a
+ * queue it lists item by item.
+ */
 export async function queueRowsFor(
   userId: string,
   workspace: AgendaInbox,
+  on: 'home' | 'inbox' = 'home',
 ): Promise<{ rows: InboxRow[]; failed: string[] }> {
-  const queues = QUEUE_COUNTS[workspace] ?? [];
+  const queues = (QUEUE_COUNTS[workspace] ?? []).filter(
+    (q) => on === 'home' || !LISTED_ON_THEIR_INBOX.includes(q.queue),
+  );
   const counted = await Promise.allSettled(queues.map((q) => q.count(userId)));
   const rows: InboxRow[] = [];
   const failed: string[] = [];
@@ -121,7 +135,7 @@ export async function loadWorkspaceInbox(userId: string, workspace: AgendaInbox)
   const now = new Date();
   const [agenda, queues] = await Promise.all([
     loadAgenda(userId, now, sessionClients, { workspace }),
-    queueRowsFor(userId, workspace),
+    queueRowsFor(userId, workspace, 'inbox'),
   ]);
   const today = todayIn(agenda.timezone, now);
   const rows = agendaRowsOf(inboxEntries(agenda.piles, workspace, sourceModule), today);
