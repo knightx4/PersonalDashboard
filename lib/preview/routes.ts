@@ -170,6 +170,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-contact-draft-undo': ['/jobs/contacts/[id]'],
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
+  'jobs-recommended-roles-decline': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
   'jobs-pipeline-filtered': ['/jobs/pipeline'],
   'jobs-pipeline-marks': ['/jobs/pipeline'],
