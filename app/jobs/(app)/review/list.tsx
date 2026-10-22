@@ -143,9 +143,6 @@ export function ReviewQueue({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-small leading-relaxed text-ink-muted">
-            Bodies are never stored, so each row links out to Gmail for the full message.
-          </p>
         </LeftRail>
 
         <div className="min-w-0 flex-1 space-y-2">
