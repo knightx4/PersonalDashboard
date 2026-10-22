@@ -132,7 +132,9 @@ function RecommendedSection({
   // The search button sits in the body, beside the line about the latest
   // search, rather than as the section's header action: the header keeps
   // room for an action whether or not the title needs it, which pushed
-  // "Recommended roles 4" onto a second line at 390 (plan #1589).
+  // "Recommended roles 4" onto a second line at 390 (plan #1589). It is at
+  // the top of every section, with or without a line beside it, so it is in
+  // the same place on each (note 418f87d0).
   const lines = [
     (count > 0 ? hint : empty) ? (
       <p key="hint" className="text-small text-ink-muted">
@@ -189,19 +191,12 @@ function RecommendedSection({
       }
       meta={count > 0 ? count : undefined}
     >
-      {lines.length > 0 || count === 0 ? (
-        <div className="mb-2 flex items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-1">{lines}</div>
-          {search}
-        </div>
-      ) : null}
+      <div className="mb-2 flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+        {search}
+      </div>
       {count > 0 && toolbar}
       {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
-      {/* With no line to sit beside, the button closes the list instead of
-          taking a row of its own above the first item (plan #1589). */}
-      {lines.length === 0 && count > 0 && (
-        <div className="mt-2 flex justify-end border-t border-border pt-2">{search}</div>
-      )}
       {footer}
     </CardSection>
   );

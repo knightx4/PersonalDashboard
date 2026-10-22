@@ -18,7 +18,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { askListFilter } from '@/lib/ask/list-filter';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
-import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
+import { APPLICATION_SOURCES, isLive } from '@/lib/jobs/pipeline';
 import { openApplications } from '@/lib/jobs/board-moment';
 import { pipelineColumnFilters } from '@/lib/jobs/pipeline-columns';
 import {
@@ -26,7 +26,7 @@ import {
   pageOf,
   parsePipeline,
   pipelineDescription,
-  hasMaterial,
+  pipelineCounts,
   pipelineHref,
   withoutPage,
   type PipelineParams,
@@ -103,7 +103,6 @@ export function PipelinePage({
 
   const state = parsePipeline(params);
   const { scoped, filtered } = filterPipeline(rows, state);
-  const liveCount = rows.filter((row) => isLive(row.status)).length;
   const href = (changes: Partial<Record<keyof PipelineParams, string | undefined>>) =>
     pipelineHref(params, changes);
 
@@ -114,18 +113,8 @@ export function PipelinePage({
   const menu = listDisplayMenu(displaySpec, listParams, savedViews);
   const display = parseListDisplay(displaySpec, listParams);
 
-  const countsBySource = new Map<ApplicationSource, number>();
-  for (const row of scoped) countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
-  const marks = {
-    ready: scoped.filter((row) => row.readyToApply).length,
-    notReady: scoped.filter((row) => !row.readyToApply).length,
-    questions: scoped.filter((row) => row.allQuestionsAdded).length,
-    noQuestions: scoped.filter((row) => !row.allQuestionsAdded).length,
-    letter: scoped.filter((row) => row.hasCoverLetter === true).length,
-    noLetter: scoped.filter((row) => row.hasCoverLetter === false).length,
-    material: scoped.filter(hasMaterial).length,
-    noMaterial: scoped.filter((row) => !hasMaterial(row)).length,
-  };
+  const counts = pipelineCounts(rows, state);
+  const { sources: countsBySource, marks } = counts;
   const scored = rows.some((row) => row.scoreNote);
 
   const askFilter = askListFilter('pipeline', params);
@@ -154,7 +143,7 @@ export function PipelinePage({
           <PipelineFilters
             params={params}
             state={state}
-            counts={{ live: liveCount, closed: rows.length - liveCount, all: rows.length }}
+            counts={counts.status}
             sources={APPLICATION_SOURCES.filter((s) => countsBySource.has(s)).map(
               (source) => [source, countsBySource.get(source) ?? 0] as const,
             )}
@@ -212,7 +201,7 @@ export function PipelinePage({
   }
 
   const paged = pageOf(sortRows(filtered, display), state.page);
-  const columnFilters = pipelineColumnFilters(params, state, scoped, rows, scored);
+  const columnFilters = pipelineColumnFilters(params, state, counts, scored);
   const sections = groupRows(paged.rows, display.groupBy);
 
   return (

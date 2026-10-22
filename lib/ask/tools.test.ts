@@ -684,6 +684,35 @@ describe('job_applications', () => {
     );
     expect(expectLinkedRows(result).map((r) => r.ref).sort()).toEqual(['a1', 'a2']);
   });
+
+  it('finds what moved to a status in a period, with what it was before (note 4056ed9d)', async () => {
+    const lead = (id: string, role: string, created: string) =>
+      app(id, ME, role, 'lead', created, { submitted_at: null, created_at: `${created}T09:00:00Z` });
+    const moved: Tables = {
+      ...tables,
+      'job_search.applications': [
+        // Moved by hand from lead to acknowledged this week.
+        { ...lead('m1', 'r1', '2026-10-01'), status: 'acknowledged', status_manual_override: 'acknowledged' },
+        // Already sent last month: not a change this week.
+        app('m2', ME, 'r2', 'acknowledged', '2026-09-10'),
+        // Still a lead.
+        lead('m3', 'r3', '2026-10-01'),
+      ],
+      'job_search.application_events': [
+        { application_id: 'm1', user_id: ME, kind: 'status_override', source: 'manual', payload: { status: 'acknowledged' }, occurred_at: '2026-10-20T18:00:00Z' },
+        { application_id: 'm2', user_id: ME, kind: 'submitted', source: 'email', payload: null, occurred_at: '2026-09-10T10:00:00Z' },
+        { application_id: 'm2', user_id: ME, kind: 'confirmation', source: 'email', payload: null, occurred_at: '2026-09-10T11:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool(
+      'job_applications',
+      { changed_status: true, from: '2026-10-16', to: '2026-10-22', status: ['submitted', 'acknowledged'] },
+      context(moved, { today: '2026-10-22' }),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.ref)).toEqual(['m1']);
+    expect(rows[0].detail).toMatchObject({ status_before: 'lead', status_after: 'acknowledged' });
+  });
 });
 
 describe('todos', () => {
