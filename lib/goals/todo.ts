@@ -12,7 +12,9 @@
  * open, and reachable through open steps from an open goal. A step under a
  * dropped branch or a goal you have not taken on yet leaves Todo with it, the
  * same way the Goals home leaves it out, and comes back if that branch is
- * reopened. A step whose start date has not come is still listed, with that
+ * reopened. A passive goal (plan #2503) keeps only the steps you sent: one
+ * Dash sent leaves Todo while the goal is passive and comes back if it is
+ * made active again. A step whose start date has not come is still listed, with that
  * date, so Todo can hold it until the day. The flag itself is never cleared
  * by this, so reopening the step puts it back where you asked for it.
  *
@@ -21,7 +23,7 @@
  * lib/todo/agenda/sources/goal-steps.ts.
  */
 import type { Step, StepNode } from '@/lib/goals/steps';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 
 export type TodoStep = {
   id: string;
@@ -45,10 +47,11 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
   const out: TodoStep[] = [];
   for (const goal of goals) {
     if (goal.status !== 'open') continue;
+    const passive = toGoalActivity(goal.activity) === 'passive';
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
         if (node.status !== 'open') continue;
-        if (node.onTodo && canShowOnTodo(node)) {
+        if (node.onTodo && canShowOnTodo(node) && !(passive && node.onTodoBy === 'claude')) {
           out.push({
             id: node.id,
             title: node.title,

@@ -149,6 +149,22 @@ describe('todoSteps', () => {
   });
 });
 
+describe('todoSteps on a passive goal (plan #2503)', () => {
+  it('keeps the steps you sent and drops the ones Dash sent', () => {
+    const steps = [
+      step('mine', 'g', { onTodo: true, onTodoBy: 'me' }),
+      step('older', 'g', { onTodo: true }),
+      step('dash', 'g', { onTodo: true, onTodoBy: 'claude', onTodoReason: 'Due on the 13th' }),
+    ];
+    expect(run([goal('g', { activity: 'passive' })], steps).map((s) => s.id)).toEqual(['mine', 'older']);
+    expect(run([goal('g', { activity: 'active' })], steps).map((s) => s.id)).toEqual([
+      'mine',
+      'older',
+      'dash',
+    ]);
+  });
+});
+
 describe('canShowOnTodo', () => {
   it('is your open steps only', () => {
     expect(canShowOnTodo({ kind: 'mine', status: 'open' })).toBe(true);

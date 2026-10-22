@@ -14,7 +14,7 @@ import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 
 /** One open goal as its line on the home reads it. */
 export type HomeGoal = {
@@ -223,15 +223,28 @@ export type HomeLists = {
  * that belongs to a goal with a due date, and anything of ANY_GOAL_KINDS.
  * Other goals is every goal with no due date, plus an errand with no row in
  * Do next, so a dated errand always shows somewhere.
+ *
+ * A passive goal (plan #2503) asks for nothing: its due date does not bring
+ * its steps or rhythms in, and only a step you sent to Todo yourself and the
+ * ANY_GOAL_KINDS rows, which hold up work, are kept from it. It is listed
+ * under Other goals like a goal with no due date.
  */
 export function homeLists(
   ranked: readonly TodayItem[],
   goals: readonly HomeGoal[],
   cap: number,
 ): HomeLists {
-  const dated = new Set(goals.filter((line) => line.goal.dueOn).map((line) => line.goal.id));
+  const passive = new Set(
+    goals.filter((line) => toGoalActivity(line.goal.activity) === 'passive').map((line) => line.goal.id),
+  );
+  const dated = new Set(
+    goals.filter((line) => line.goal.dueOn && !passive.has(line.goal.id)).map((line) => line.goal.id),
+  );
   const kept = ranked.filter(
-    (item) => ANY_GOAL_KINDS.has(item.kind) || item.onTodo === true || dated.has(item.goalId),
+    (item) =>
+      ANY_GOAL_KINDS.has(item.kind) ||
+      (item.onTodo === true && !(passive.has(item.goalId) && item.sentByDash === true)) ||
+      dated.has(item.goalId),
   );
   const doNext = kept.slice(0, cap);
   const listed = new Set(doNext.map((item) => item.goalId));
