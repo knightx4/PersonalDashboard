@@ -47,6 +47,17 @@ describe('the pile question', () => {
     expect(isMailPile('toString')).toBe(false);
   });
 
+  it('puts subscription and app-store receipts and payment problems in bill, not order (plan #2520.1)', () => {
+    const { bill, order } = MAIL_PILE_QUESTION.options;
+    expect(bill).toMatch(/receipt/);
+    expect(bill).toMatch(/app-store charge/);
+    expect(bill).toMatch(/Apple/);
+    expect(bill).toMatch(/Google Payments/);
+    expect(bill).toMatch(/problem with their payment/);
+    expect(order).toMatch(/one-off purchase/);
+    expect(order).toMatch(/app-store charge is a bill, not an order/);
+  });
+
   it('reads the sender and subject, and a reply-to only when it differs', () => {
     expect(mailState(ENVELOPE)).toEqual({ from: 'no-reply@shop.example', subject: 'Your order has shipped' });
     expect(mailState({ ...ENVELOPE, replyToAddress: 'help@shop.example' })).toMatchObject({
