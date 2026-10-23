@@ -287,7 +287,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'job_applications',
     description:
-      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched; lists the newest 50, each linking to its role. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
+      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched, and how many were sent (not a lead or a draft); lists the newest 50, each linking to its role. For "how many have I applied to" answer from the sent count, never from the rows listed or the ones with a sent day alone. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
     input_schema: {
       type: 'object',
       properties: {

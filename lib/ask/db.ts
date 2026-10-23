@@ -225,6 +225,12 @@ export function isUuid(value: string): boolean {
   return UUID.test(value);
 }
 
+/** A row's id from a ref written bare or as "schema.table:id", which the model sometimes sends. */
+export function bareRef(value: string): string {
+  const at = value.lastIndexOf(':');
+  return at > 0 && /^[a-z_]+\.[a-z_]+$/.test(value.slice(0, at)) ? value.slice(at + 1) : value;
+}
+
 /**
  * Rows whose `column` is one of `values`, read a hundred at a time so a long
  * list of ids never makes a URL too long for PostgREST.

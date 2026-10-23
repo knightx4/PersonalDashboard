@@ -10,7 +10,7 @@ import {
   unlinkRoundEmailRow,
 } from '@/lib/jobs/interview/edit';
 import { sameAs } from './runs';
-import { isUuid, type AskDb, type SchemaClient } from '@/lib/ask/db';
+import { bareRef, isUuid, type AskDb, type SchemaClient } from '@/lib/ask/db';
 import { toRef } from '@/lib/core/refs';
 import { formatNumber } from '@/lib/money';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
@@ -87,8 +87,9 @@ function given(args: Args, key: string): boolean {
 }
 
 function idOf(value: string, what: string): string {
-  if (!isUuid(value)) throw new JobsRefused(`That is not a ${what}'s ref, as a lookup returned it.`);
-  return value;
+  const id = bareRef(value);
+  if (!isUuid(id)) throw new JobsRefused(`That is not a ${what}'s ref, as a lookup returned it.`);
+  return id;
 }
 
 async function ownRow(env: JobsWriteEnv, table: string, id: string, what: string): Promise<Row> {

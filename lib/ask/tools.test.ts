@@ -643,6 +643,8 @@ describe('job_applications', () => {
     if (!result.ok) return;
     expect(result.totals).toEqual({
       count: 3,
+      sent: 3,
+      sent_without_sent_day: 0,
       by_status: { submitted: 1, in_process: 1, rejected: 1 },
       rejected_at_stage: { recruiter_screen: 1 },
     });
@@ -651,6 +653,20 @@ describe('job_applications', () => {
       title: 'Analyst at Acme',
       href: '/jobs/roles/r1',
     });
+  });
+
+  it('counts as sent an application added by hand with no sent day, and not a lead', async () => {
+    const added: Tables = {
+      ...tables,
+      'job_search.applications': [
+        app('a1', ME, 'r1', 'submitted', '2026-10-19'),
+        app('a2', ME, 'r2', 'acknowledged', '2026-10-19', { submitted_at: null }),
+        app('a3', ME, 'r3', 'lead', '2026-10-19', { submitted_at: null }),
+      ],
+    };
+    const result = await executeAskTool('job_applications', { from: '2026-10-18', to: '2026-10-22' }, context(added));
+    if (!result.ok) throw new Error('lookup failed');
+    expect(result.totals).toMatchObject({ count: 3, sent: 2, sent_without_sent_day: 1 });
   });
 
   it('finds open applications with nothing back from the company in a month', async () => {

@@ -2,7 +2,7 @@ import { sameAs, type DashWriteRuns } from './runs';
 import { ROLE_KINDS } from '@/lib/jobs/role-kind';
 import type Anthropic from '@anthropic-ai/sdk';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
-import { isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
+import { bareRef, isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { channelForMessage } from '@/lib/jobs/applications/channel';
@@ -252,8 +252,9 @@ function pay(args: Args, key: string): number | null {
 }
 
 function idOf(value: string, what: string): string {
-  if (!isUuid(value)) throw new JobsRefused(`That is not a ${what}'s ref, as a lookup returned it.`);
-  return value;
+  const id = bareRef(value);
+  if (!isUuid(id)) throw new JobsRefused(`That is not a ${what}'s ref, as a lookup returned it.`);
+  return id;
 }
 
 async function ownRow(client: SchemaClient, table: string, id: string, userId: string, what: string): Promise<Row> {

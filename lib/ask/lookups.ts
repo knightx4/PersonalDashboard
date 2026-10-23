@@ -593,6 +593,9 @@ export function statusAt(events: readonly EventRow[], at: Date): ApplicationStat
   }).status;
 }
 
+/** Statuses of an application that was never sent. */
+const NOT_SENT_STATUSES = ['lead', 'drafting'];
+
 export async function applicationsLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const from = optionalDate(input, 'from');
   const to = optionalDate(input, 'to');
@@ -715,6 +718,13 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     }
   }
 
+  // "How many have I applied to": a lead or a draft was never sent. One with no
+  // sent day (added by hand, already past that stage) still counts, dated by
+  // the day it was added; the thumbs down of turn 43830566 was a count of 2
+  // taken from the sent days alone when 40 had been added and sent on.
+  const sentApplications = applications.filter((a) => !NOT_SENT_STATUSES.includes(statusFor(a)));
+  const sentWithoutDay = sentApplications.filter((a) => a.submitted_at === null).length;
+
   const rows: AskRow[] = applications.slice(0, MAX_ROWS).map((a) => {
     const role = roleById.get(a.role_id);
     const company = role?.company_id ? companyById.get(role.company_id) : undefined;
@@ -745,8 +755,15 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   return {
     ok: true,
     rows,
-    totals: { count: applications.length, by_status: byStatus, rejected_at_stage: rejectedAt },
+    totals: {
+      count: applications.length,
+      sent: sentApplications.length,
+      sent_without_sent_day: sentWithoutDay,
+      by_status: byStatus,
+      rejected_at_stage: rejectedAt,
+    },
     note:
+      `sent counts the applications that are not a lead or a draft; ${sentWithoutDay} of them have no sent day and are dated by the day they were added. For "how many did I apply to" answer with sent, and say how many have no sent day. ` +
       (noReply
         ? 'Sent applications with no reply from the company: no reply, screen, assessment, interview, offer or rejection, an automatic confirmation aside. '
         : '') +
