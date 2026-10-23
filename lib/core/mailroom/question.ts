@@ -32,8 +32,14 @@ export type MailPile =
 
 export const MAIL_PILE_OPTIONS: Readonly<Record<MailPile, string>> = {
   job: 'About their job search: an application, a recruiter, an interview, an assessment, an offer, a rejection or a job alert.',
-  order: 'About something they bought: an order confirmation, shipping, delivery, a return, a refund or a cancelled order.',
-  bill: 'About something they pay for regularly: a subscription, a membership, a bill or statement, a renewal, a price change or a trial ending.',
+  // The order and bill wording was reworked on plan #2520.1. Under the first
+  // wording Jev filed 28 "Your receipt from Apple." emails as orders at 0.97
+  // and Apple's payment-problem notices as other, so the recurring gate showed
+  // 36 of 108 bill emails missed. Asked again with this wording, the same mail
+  // went to bill every time, and the commerce mail stayed in order.
+  order:
+    'About a one-off purchase: an order confirmation, shipping, delivery, a return, a refund or a cancelled order. A receipt for a subscription, a membership or an app-store charge is a bill, not an order.',
+  bill: 'About something they pay for regularly or a charge to their account: a subscription, a membership, a bill or statement, a receipt or payment confirmation for a subscription or an app-store charge (Apple, Google Play, Google Payments), a renewal, a price change, a trial ending, or a problem with their payment information.',
   appointment:
     'A booking at a set time: an appointment, a reservation, a ticket, a flight or a hotel stay, or a change to one.',
   newsletter: 'A newsletter, digest or marketing email sent to many people.',
