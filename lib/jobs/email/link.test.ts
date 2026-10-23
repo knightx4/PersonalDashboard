@@ -775,3 +775,55 @@ describe('roleHintFor (note b48d2b61)', () => {
     expect(right).toBeGreaterThan(wrong);
   });
 });
+
+describe('a sender domain that spells the company name', () => {
+  // The iCapital case: the company was added by hand with no domains, so its
+  // rejection from talentacquisition@icapital.com scored 0.7 on the name and
+  // role and waited in review for a link the sender already settled.
+  const icapital = candidate({
+    companyId: 'c-icapital',
+    companyName: 'iCapital',
+    companyDomains: [],
+    roleTitle: 'Corporate Finance, Strategic Finance - Associate / Assistant Vice President',
+    atsJobId: null,
+    status: 'ghosted',
+  });
+  const rejection = message({
+    threadId: null,
+    fromAddress: 'talentacquisition@icapital.com',
+    replyToAddress: null,
+    subject: 'iCapital - Application Update',
+    classification: 'rejection',
+    extractedCompany: 'iCapital',
+    extractedRole: 'Corporate Finance, Strategic Finance - Associate / Assistant Vice President',
+  });
+
+  it('links the rejection without a domain on file', () => {
+    const decision = decideLink(rejection, [icapital], { companies: [] });
+    expect(decision.action).toBe('link');
+  });
+
+  it('scores above the link threshold from what the review queue keeps', () => {
+    const scored = scoreCandidate({ ...rejection, extractedCompany: null }, icapital);
+    expect(scored.confidence).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+    expect(scored.reasons).toContain('Sender or reply-to domain belongs to this company');
+  });
+
+  it('finds the name under a subdomain and a two-part suffix', () => {
+    const monzo = candidate({ companyName: 'Monzo', companyDomains: [] });
+    for (const from of ['jobs@careers.monzo.com', 'people@monzo.co.uk']) {
+      const scored = scoreCandidate(message({ fromAddress: from, replyToAddress: null }), monzo);
+      expect(scored.method).toBe('domain');
+    }
+  });
+
+  it('does not match another company, free mail or an ATS', () => {
+    for (const from of ['a@icapitalnetwork.com', 'icapital@gmail.com', 'no-reply@icapital.greenhouse.io']) {
+      const scored = scoreCandidate(
+        { ...rejection, fromAddress: from, extractedCompany: null, subject: null },
+        icapital,
+      );
+      expect(scored.reasons).not.toContain('Sender or reply-to domain belongs to this company');
+    }
+  });
+});

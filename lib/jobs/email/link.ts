@@ -264,9 +264,32 @@ function domainHit(candidate: LinkCandidate, domains: readonly (string | null)[]
       const needle = owned.toLowerCase();
       if (domain === needle || domain.endsWith(`.${needle}`)) return true;
     }
+    if (domainSpellsName(domain, candidate.companyName)) return true;
   }
   return false;
 }
+
+/**
+ * Whether a sender domain is the company's name spelled as a hostname:
+ * icapital.com for iCapital, careers.uber.com for Uber.
+ *
+ * Most companies on file carry no domains, because they were added by hand or
+ * from a posting, so the strongest signal short of a thread never fired:
+ * iCapital's rejection from talentacquisition@icapital.com scored on its
+ * subject line alone and waited in review. Free mail is a person, and the
+ * caller has already dropped ATS and scheduling senders.
+ */
+function domainSpellsName(domain: string, companyName: string): boolean {
+  if (FREE_MAIL.test(domain)) return false;
+  const compact = normalizeCompanyName(companyName).replace(/ /g, '');
+  if (compact.length < 3) return false;
+  // Every label but the suffix, so a subdomain (careers.uber.com) and a
+  // two-part suffix (monzo.co.uk) both find the name.
+  const labels = domain.split('.').slice(0, -1);
+  return labels.some((label) => label.replace(/-/g, '') === compact);
+}
+
+const FREE_MAIL = /^(gmail|googlemail|outlook|hotmail|yahoo|icloud|proton(mail)?|aol)\./;
 
 /**
  * Score one candidate. Signals are ordered by precision, and the two exact ones
@@ -522,7 +545,7 @@ export function employerDomain(input: LinkInput): string | null {
     if (!domain) continue;
     if (isKnownAtsSender(domain) || isSchedulingSender(domain)) continue;
     // Free mail is a person, not an employer.
-    if (/^(gmail|googlemail|outlook|hotmail|yahoo|icloud|proton(mail)?|aol)\./.test(domain)) continue;
+    if (FREE_MAIL.test(domain)) continue;
     return domain;
   }
   return null;
