@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createTodoClient } from '@/lib/todo/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -27,7 +28,7 @@ import { escapeLike } from '@/lib/search/sources/map';
 type Read = SearchListContext & { query?: string };
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createTodoClient();
+  const supabase = await sourceClient(ctx, 'todo', createTodoClient);
 
   let tasks = supabase.from('tasks').select('id, title, status, due_on');
   if (ctx.query) tasks = tasks.ilike('title', `%${escapeLike(ctx.query)}%`);

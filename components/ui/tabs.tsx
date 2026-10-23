@@ -36,6 +36,7 @@ export function Tabs({
   param,
   address,
   shallow = false,
+  compact = false,
   className,
 }: {
   tabs: readonly Tab[];
@@ -46,6 +47,12 @@ export function Tabs({
   /** How the page keeps its tab in the address, when it is not the plain `?tab=`. */
   address?: TabAddress;
   shallow?: boolean;
+  /**
+   * For a row of more tabs than a phone holds: below sm the icons go and the
+   * tabs sit closer, so more of them show, and the row snaps to a tab's edge
+   * so none rests cut through a word.
+   */
+  compact?: boolean;
   className?: string;
 }) {
   const pathname = usePathname();
@@ -95,6 +102,7 @@ export function Tabs({
       aria-label={label}
       className={cn(
         'flex gap-1 overflow-x-auto border-b border-border',
+        compact && 'max-sm:snap-x max-sm:snap-mandatory max-sm:gap-0',
         // Below laptop width the row runs on through the page's gutter to
         // the edge of the screen, so a tab that does not fit shows cut off
         // there rather than vanishing, which is what says the row scrolls.
@@ -123,10 +131,11 @@ export function Tabs({
             aria-current={on ? 'page' : undefined}
             className={cn(
               'press-area -mb-px flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 text-ui font-medium transition-colors duration-quick',
+              compact && 'max-sm:snap-start max-sm:gap-1 max-sm:px-1 max-sm:text-small',
               on ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink',
             )}
           >
-            {Icon && <Icon className="size-4" strokeWidth={1.75} aria-hidden />}
+            {Icon && <Icon className={cn('size-4', compact && 'max-sm:hidden')} strokeWidth={1.75} aria-hidden />}
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
               <span className="tabular font-normal text-ink-muted">{tab.count}</span>

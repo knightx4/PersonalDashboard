@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { Popover } from '@/components/ui/popover';
 import { sendCiFixToDash, type CiFixState } from '@/app/dev/ci-fix-action';
 import { usePopover } from '@/lib/use-popover';
@@ -26,6 +26,7 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { useGoingRunLine, type GoingRunLine } from '@/components/runs/use-going-run-line';
 import { runPose } from '@/lib/core/run-pose';
 import { RunnerDashes } from '@/components/shell/runner-dashes';
+import { NoteButton } from '@/components/shell/feedback-button';
 
 /**
  * The status line.
@@ -51,7 +52,9 @@ import { RunnerDashes } from '@/components/shell/runner-dashes';
  *
  * Just before the dot, for the owner, are the runner's four Dashes, the same
  * four as the runner card on /dev/plan: working while their slot works and
- * asleep while it does not (components/shell/runner-dashes.tsx).
+ * asleep while it does not (components/shell/runner-dashes.tsx). Before
+ * them, for every account, is the button that files a note (note 2f0f2a60),
+ * which the top bar carries instead below lg.
  *
  * The workspace's one-line summary reads at the left of this line from lg up,
  * where the middle of the top bar used to carry it. It is the one thing here
@@ -92,8 +95,7 @@ export function StatusLine({
   // matters on a quiet day -- main goes red on the nights nothing else is
   // happening -- and the summary is the third, on a workspace where nothing has
   // happened yet at all. With none of the three there is still nothing to draw.
-  if (lines.length === 0 && !main && !brief && !going && !owner) return null;
-
+  // Never empty: the note button is on it for every account.
   return (
     <div className="pointer-events-none sticky bottom-0 z-status hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
       <div
@@ -122,6 +124,7 @@ export function StatusLine({
         <span className="min-w-0 flex-1 truncate">
           {lines.map((line) => line.text).join('  ·  ')}
         </span>
+        <NoteButton inStatusLine className="pointer-events-auto" />
         <RunnerDashes owner={owner} />
         <MainDotMark check={main} />
         <Timestamp />
@@ -360,15 +363,16 @@ function FixWithDash() {
 
   return (
     <div className="mt-3">
-      <Button
+      <DashAction
         size="sm"
         variant="secondary"
         pending={pending}
         disabled={pending || Boolean(state.message)}
         onClick={() => start(async () => setState(await sendCiFixToDash()))}
+        routine="plan"
       >
         Fix with Dash
-      </Button>
+      </DashAction>
       {(state.message ?? state.error) && (
         <p className={cn('mt-2 text-caption', state.error ? 'text-danger' : 'text-ink-muted')}>
           {state.message ?? state.error}

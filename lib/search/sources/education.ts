@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createYouClient } from '@/lib/you/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import { courseHref } from '@/lib/you/education';
 import { rankHits } from '@/lib/search/rank';
 import type {
@@ -49,7 +50,7 @@ export function courseHit(row: CourseRow): SearchHit {
 }
 
 async function readAll(ctx: SearchListContext, limit: number): Promise<SearchHit[]> {
-  const supabase = await createYouClient();
+  const supabase = await sourceClient(ctx, 'you', createYouClient);
   const { data, error } = await supabase
     .from('courses')
     .select(COLUMNS)

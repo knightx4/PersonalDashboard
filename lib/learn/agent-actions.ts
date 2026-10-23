@@ -28,10 +28,10 @@ export const learnActions: ModuleActions = {
     proposeBranch: none('spends', PROPOSES),
     approveBranch: none('theirs'),
     rewriteClaim: tool('reword_concept'),
-    queueMaterial: {
-      tool: 'add_track_reading',
-      note: 'Dash adds the work by its title and link, where the page queues a section the catalogue found for the idea.',
-    },
+    queueMaterial: none(
+      'theirs',
+      'Queues a section the catalogue found for the idea, which is the person taking a suggestion. Asked in words, Dash adds the work by its title and link with add_track_reading.',
+    ),
     addConceptNote: tool('add_concept_note'),
   },
   'app/learn/topics/actions.ts': {
@@ -164,10 +164,10 @@ export const learnActions: ModuleActions = {
     moveTheme: none('setting', 'Where a theme sits on the areas grid is how the person arranges their own map.'),
   },
   'app/learn/know/level3-actions.ts': {
-    addLevel3Goal: {
-      tool: 'add_goal',
-      note: 'A ready-made goal offered as one press on Subjects; asked for in words, Dash adds the goal with add_goal.',
-    },
+    addLevel3Goal: none(
+      'theirs',
+      'Takes the ready-made Level 3 goal Subjects offers, which is the person accepting an offer. Asked for in words, Dash adds a goal with add_goal.',
+    ),
   },
   'app/learn/lists/actions.ts': {
     startTrack: tool('add_learn_track'),

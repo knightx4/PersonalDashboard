@@ -358,6 +358,22 @@ describe('todayList ranking', () => {
     expect(list.map((item) => item.id)).toEqual(['f1', 'b1']);
   });
 
+  it('marks a step on Todo that Dash sent, so a passive goal can leave it out (plan #2503)', () => {
+    const list = todayRanked(
+      input(
+        [g],
+        [
+          step('mine', 'g', { onTodo: true, onTodoBy: 'me', dueOn: '2026-10-01' }),
+          step('dash', 'g', { onTodo: true, onTodoBy: 'claude', dueOn: '2026-10-02' }),
+        ],
+      ),
+    );
+    expect(list.map((item) => [item.id, item.onTodo, item.sentByDash])).toEqual([
+      ['mine', true, undefined],
+      ['dash', true, true],
+    ]);
+  });
+
   it('keeps one plain step per goal, and every step that unblocks or has a date', () => {
     const list = todayList(
       input(

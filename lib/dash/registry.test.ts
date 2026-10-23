@@ -17,6 +17,7 @@ import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
+import { MODEL_CHANGE_KINDS } from '@/lib/ask/model-changes';
 import { isShownLookup, PAID_TOOL_NAMES_SHOWN_AS_CARDS, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 const PAID_NAMES = PAID_TOOLS.map((tool) => tool.name);
@@ -97,6 +98,7 @@ describe('DASH_TOOLS', () => {
       ...JOBS_CHANGE_KINDS,
       ...INTERVIEW_CHANGE_KINDS,
       ...POST_CHANGE_KINDS,
+      ...MODEL_CHANGE_KINDS,
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,

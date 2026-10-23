@@ -3,10 +3,14 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, type AskLookupEvent, type AskStores } from './ask';
+import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, scopedVoice, type AskLookupEvent, type AskStores } from './ask';
+import { DASH_CHOICES, HAIKU, OPUS, SONNET } from '@/lib/core/models';
+import { filesEstimate } from './file-cost';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
+  budgetTokens,
+  INPUT_BUDGET,
   answerFromWrites,
   madeSummary,
   FALLBACK_ROWS,
@@ -461,6 +465,59 @@ const GOAL_ROWS: Row[] = [
   { id: GOAL_ID, user_id: ME, title: 'Find a new job', level: 'goal', status: 'open', archived_at: null },
   { id: THEIR_GOAL_ID, user_id: THEM, title: 'Their goal', level: 'goal', status: 'open', archived_at: null },
 ];
+
+describe('the model the person chose (plan #2458.2)', () => {
+  const replies = [
+    reply([use('u1', 'search', { query: 'ebay' })]),
+    reply([use('u2', 'answer', { answer: 'One order, from eBay.', cited: [{ table: 'public.orders', ref: 'o-1' }] })]),
+  ];
+  const lookupThenAnswer = () => stubClient(structuredClone(replies));
+
+  it.each(DASH_CHOICES.map((c) => [c.label, c.id] as const))(
+    'sends every call to %s and records the spend under it',
+    async (_label, model) => {
+      const { client, sent } = lookupThenAnswer();
+      const { execute } = stubExecute();
+      const { stores, spend } = memoryStores();
+      const result = await askDash(
+        { question: 'What did I buy on eBay?', today: '2026-10-20', execute, anthropicApiKey: 'k', client, model },
+        stores,
+      );
+      expect(result.error).toBeUndefined();
+      expect(sent).toHaveLength(2);
+      expect(sent.every((s) => s.model === model)).toBe(true);
+      expect(spend).toHaveLength(2);
+      expect(spend.every((report) => report.model === model)).toBe(true);
+    },
+  );
+
+  it('answers with Sonnet when nothing is saved', async () => {
+    const { client, sent } = lookupThenAnswer();
+    const { execute } = stubExecute();
+    const { stores, spend } = memoryStores();
+    await askDash({ question: 'What did I buy on eBay?', today: '2026-10-20', execute, anthropicApiKey: 'k', client }, stores);
+    expect(ASK_MODEL).toBe(SONNET);
+    expect(sent.every((s) => s.model === SONNET)).toBe(true);
+    expect(spend.every((report) => report.model === SONNET)).toBe(true);
+  });
+
+  it('keeps a scoped question to its workspace on the chosen model', () => {
+    const voice = scopedVoice('shopping', HAIKU);
+    expect(voice.model).toBe(HAIKU);
+    expect(voice.tools.length).toBe(scopedVoice('shopping').tools.length);
+    expect(scopedVoice(null).model).toBe(SONNET);
+    expect(scopedVoice(null, SONNET)).toBe(ASK_VOICE);
+    // The default voice itself is never changed by a choice.
+    expect(ASK_VOICE.model).toBe(SONNET);
+  });
+
+  it('prices reading a file for the chosen model', () => {
+    const file = [{ contentType: 'image/png', size: 2_000_000 }];
+    const [haiku, sonnet, opus] = [HAIKU, SONNET, OPUS].map((m) => filesEstimate(file, m)!.medianMicros);
+    expect(haiku).toBeLessThan(sonnet);
+    expect(sonnet).toBeLessThan(opus);
+  });
+});
 
 describe('askDash proposals', () => {
   function goalExecute() {
@@ -926,6 +983,8 @@ describe('questions that need several lookups (plan #1437)', () => {
       ...rounds,
       reply([use('u9', 'search', { query: 'one more' })]),
       reply([], 'end_turn'),
+      // Asked once more in words, it still writes nothing.
+      reply([], 'end_turn'),
     ]);
     const { stores, written } = memoryStores();
     const result = await askDash(
@@ -974,7 +1033,8 @@ describe('questions that need several lookups (plan #1437)', () => {
     const { client } = stubClient([
       reply([use('u1', 'nope', {})]),
       reply([], 'end_turn'),
-      // Asked once more for its answer, it still gives none, nor in words.
+      // Asked once more for its answer, it still gives none, nor in words, twice.
+      reply([], 'end_turn'),
       reply([], 'end_turn'),
       reply([], 'end_turn'),
     ]);
@@ -1053,6 +1113,7 @@ describe('questions that need several lookups (plan #1437)', () => {
       reply([], 'end_turn'),
       reply([], 'end_turn'),
       reply([], 'end_turn'),
+      reply([], 'end_turn'),
     ]);
     const answer = await answerQuestion({
       turns: [{ role: 'user', body: 'q' }],
@@ -1099,5 +1160,68 @@ describe('questions that need several lookups (plan #1437)', () => {
       'finished u2 2',
     ]);
     expect(events[1]).toMatchObject({ ok: true, result: { ok: true, rows: [app(0)] } });
+  });
+});
+
+describe('a long prompt read from the cache (the Concourse question, 21 October 2026)', () => {
+  // The rules and tools were about 76,000 tokens, read from the cache on
+  // every call after the first.
+  const cached = { input_tokens: 2, output_tokens: 100, cache_read_input_tokens: 76_000, cache_creation_input_tokens: 800 };
+  const round = (id: string) => ({ ...reply([{ type: 'tool_use', id, name: 'search', input: { query: id } }]), usage: cached });
+
+  it('counts a cache read at a tenth against the budget', () => {
+    expect(budgetTokens({ inputTokens: 2, cachedInputTokens: 76_000, cacheWriteTokens: 800 })).toBe(8_402);
+    // Counted in full, two such calls spent it.
+    expect(2 * (2 + 76_000 + 800)).toBeGreaterThan(INPUT_BUDGET);
+  });
+
+  it('keeps looking past the second call instead of being told to answer', async () => {
+    const { client, sent } = stubClient([
+      round('u1'),
+      round('u2'),
+      round('u3'),
+      round('u4'),
+      { ...reply([use('a', 'answer', { answer: 'Two roles at Concourse.', cited: [] })]), usage: cached },
+    ]);
+    const { execute, calls } = stubExecute();
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      today: '2026-10-21',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    expect(sent).toHaveLength(5);
+    // Counted in full, the third round's lookup was refused unrun.
+    expect(calls).toHaveLength(4);
+    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'Two roles at Concourse.' });
+  });
+
+  it('asks for the answer in words beside the refused lookups, and once more when that comes back empty', async () => {
+    let clock = 0;
+    const { execute } = stubExecute();
+    const timed = async (name: string, input: unknown) => {
+      clock += TIME_BUDGET_MS;
+      return execute(name, input);
+    };
+    const { client, sent } = stubClient([
+      reply([use('u1', 'search', { query: 'Concourse' })]),
+      // Past the time budget it looks something up instead of answering.
+      reply([use('u2', 'open_row', { table: 'job_search.companies', ref: 'c-1' })]),
+      reply([], 'end_turn'),
+      reply([{ type: 'text', text: 'I found the company but not its roles.' }], 'end_turn'),
+    ]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      today: '2026-10-21',
+      execute: timed,
+      anthropicApiKey: 'k',
+      client,
+      now: () => clock,
+    });
+    const refused = sent[2].messages.at(-1)!.content as { type: string }[];
+    expect(refused.map((b) => b.type)).toEqual(['tool_result', 'text']);
+    expect(sent[3].tool_choice).toEqual({ type: 'none' });
+    expect(answer).toMatchObject({ ok: true, body: expect.stringContaining('I found the company but not its roles.') });
   });
 });

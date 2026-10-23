@@ -23,7 +23,7 @@ const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /** How a call ended: answered, refused or failed by the lookup, or refused by the cap before it ran. */
-export type ConnectorOutcome = 'ok' | 'error' | 'limited';
+export type ConnectorOutcome = 'ok' | 'partial' | 'error' | 'limited';
 
 export type ConnectorCall = {
   userId: string;
@@ -52,6 +52,17 @@ export type ConnectorCallRow = {
   error: string | null;
 };
 
+/**
+ * What an answer says it could not read ("Could not read: Shopping, Todo."),
+ * or null. A lookup that reads several workspaces answers with the rest when
+ * one fails, and says so in its note; the log keeps that as a partial answer
+ * rather than a clean one.
+ */
+export function unreadIn(note: string | undefined): string | null {
+  const match = note?.match(/Could not read: [^.]*\./);
+  return match ? match[0] : null;
+}
+
 export function connectorCallRow(call: ConnectorCall): ConnectorCallRow {
   const input =
     call.input && typeof call.input === 'object' && !Array.isArray(call.input)
@@ -67,11 +78,12 @@ export function connectorCallRow(call: ConnectorCall): ConnectorCallRow {
   if ('limited' in call) return { ...base, reads: [], outcome: 'limited', error: call.limited };
   const { result } = call;
   if (!result.ok) return { ...base, reads: [], outcome: 'error', error: result.error };
+  const unread = unreadIn(result.note);
   return {
     ...base,
     reads: result.rows.map(({ table, ref, title, href }) => ({ table, ref, title, href })),
-    outcome: 'ok',
-    error: null,
+    outcome: unread ? 'partial' : 'ok',
+    error: unread,
   };
 }
 

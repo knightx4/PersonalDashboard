@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jobsSelectionTargets, reviewRowKey } from './bulk';
+import { inboxReviewHead, jobsSelectionTargets, reviewRowKey, reviewRowLabel } from './bulk';
 import type { ReviewRow } from './load';
 
 const row = (kind: ReviewRow['kind'], id: string): ReviewRow => ({ kind, id }) as ReviewRow;
@@ -42,5 +42,28 @@ describe('jobsSelectionTargets', () => {
 
   it('is empty for an empty selection', () => {
     expect(jobsSelectionTargets(rows, () => false)).toEqual({ messageIds: [], eventIds: [] });
+  });
+});
+
+describe('inboxReviewHead', () => {
+  const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+  it('lists the first five and leaves the rest for Review', () => {
+    expect(inboxReviewHead(many, 7)).toEqual({ shown: ['a', 'b', 'c', 'd', 'e'], rest: 2 });
+  });
+
+  it('leaves nothing over when five or fewer wait', () => {
+    expect(inboxReviewHead(['a', 'b'], 2)).toEqual({ shown: ['a', 'b'], rest: 0 });
+  });
+
+  it('counts the rest from the queue total, not the rows handed over', () => {
+    expect(inboxReviewHead(many.slice(0, 5), 9).rest).toBe(4);
+  });
+});
+
+describe('reviewRowLabel', () => {
+  it('names a message by its subject, or says it has none', () => {
+    expect(reviewRowLabel({ kind: 'message', subject: ' Next steps ' } as ReviewRow)).toBe('Next steps');
+    expect(reviewRowLabel({ kind: 'message', subject: null } as ReviewRow)).toBe('message without a subject');
   });
 });

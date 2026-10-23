@@ -2,30 +2,52 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
-import { useActionState, useRef, useState, useTransition } from 'react';
+import {
+  useActionState,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type Ref,
+} from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { ComposeBox, FieldError, InlineInput } from '@/components/ui/field';
-import { MarkdownEditor } from '@/components/learn/markdown-editor';
+import { cardVariants } from '@/components/ui/card';
+import { FieldError, InlineInput } from '@/components/ui/field';
+import { NoteEditor } from '@/components/vault/note-editor';
+import { cn } from '@/lib/cn';
+import { buildLinkIndex, parseWikiLink, resolveWikiLink } from '@/lib/vault/markdown/obsidian';
+import type { DraftFailure } from '@/lib/vault/notes/drafts';
 import { basenameOf, noteHref } from '@/lib/vault/paths';
-import { renameNoteAction, saveNoteEdit, type RenameNoteState, type SaveNoteState } from './actions';
+import {
+  dropNoteDraft,
+  renameNoteAction,
+  saveNoteDraft,
+  sendNoteDraft,
+  type DraftSaveState,
+  type RenameNoteState,
+  type SaveNoteState,
+} from './actions';
 
 /**
  * Editing a note in place on its page (plan #1425).
  *
  * At rest this is the note as the page renders it, with an Edit button beside
  * the title. Edit, or a click into the note itself (note 469f3771), swaps the
- * rendered body for the essay editor's live preview holding the note's text,
- * in the same place, with Save and Cancel under it; the title and
- * the properties stay as they are, because the save keeps the frontmatter it
- * opened with and only the body is edited.
+ * rendered body for a live-preview editor on the same card, in the same type,
+ * with the caret where the click landed (note of 20 October 2026). The note
+ * saves itself as you write, and Done (or Escape) goes back to the rendered
+ * note. The title and the properties stay as they are, because the save keeps
+ * the frontmatter it opened with and only the body is edited.
  *
- * A save goes through `saveNoteEdit`, which commits to the vault repository
- * and revalidates this page, so the rendered note that comes back is the
- * saved one. The two failures with a way forward say so: a note changed in
- * Obsidian since the editor opened offers a reload, and a token that cannot
- * write (or no usable token) links to vault settings.
+ * A save keeps the text as the note's draft, which the page shows from then
+ * on; the vault gets it as one commit ten minutes after the last change. When
+ * that commit is refused, the note at rest says why and what can be done: a
+ * note changed in Obsidian meanwhile offers to keep either version, and a
+ * token that cannot write links to vault settings and offers to try again.
  */
 
 /** Where the person goes to give the vault a token that can save. */
@@ -35,12 +57,18 @@ export function NoteEdit({
   notePath,
   body,
   blobSha,
+  linkPaths = [],
+  draft = null,
   heading,
   properties,
   children,
 }: {
   notePath: string;
-  /** The note's body as stored: the text the editor opens with. */
+  /** The note's draft waiting for its commit, if it has one. */
+  draft?: { failure: DraftFailure | null } | null;
+  /** Every note's path in the vault, which wikilinks in the editor resolve against. */
+  linkPaths?: string[];
+  /** The text the editor opens with: the note's draft if it has one, else its body. */
   body: string;
   /** The version of the note the page rendered; the save is refused if it has moved on. */
   blobSha: string;
@@ -50,6 +78,9 @@ export function NoteEdit({
   children: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
+  const [caretAt, setCaretAt] = useState<{ x: number; y: number } | null>(null);
+  const [status, setStatus] = useState<SaveStatus>('idle');
+  const editor = useRef<EditFormHandle>(null);
   const [renaming, setRenaming] = useState(false);
   // The version a reload was asked for after a refused save. While the page
   // still shows that version, the app has not pulled Obsidian's one yet.
@@ -59,8 +90,19 @@ export function NoteEdit({
 
   function reload() {
     setStaleAt(blobSha);
-    setEditing(false);
+    stopEditing();
     startReload(() => router.refresh());
+  }
+
+  function startEditing(at: { x: number; y: number } | null) {
+    setCaretAt(at);
+    setStatus('idle');
+    setEditing(true);
+  }
+
+  // Each save revalidates the page, so the rendered note is already the saved one.
+  function stopEditing() {
+    setEditing(false);
   }
 
   return (
@@ -79,9 +121,17 @@ export function NoteEdit({
             <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(true)}>
               Rename
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => startEditing(null)}>
               <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
               Edit
+            </Button>
+          </div>
+        )}
+        {editing && (
+          <div className="flex shrink-0 items-center gap-3">
+            <SaveStatusText status={status} />
+            <Button type="button" variant="secondary" size="sm" onClick={() => editor.current?.close()}>
+              Done
             </Button>
           </div>
         )}
@@ -93,12 +143,16 @@ export function NoteEdit({
         <EditForm
           notePath={notePath}
           body={body}
-          blobSha={blobSha}
-          onDone={() => setEditing(false)}
+          linkPaths={linkPaths}
+          caretAt={caretAt}
+          handle={editor}
+          onStatus={setStatus}
+          onDone={stopEditing}
           onReload={reload}
         />
       ) : (
         <>
+          {draft && <DraftNotice notePath={notePath} failure={draft.failure} />}
           {staleAt === blobSha && !reloading && (
             <p className="mb-4 text-ui text-ink-muted">
               The app has not fetched the version from Obsidian yet. It arrives with the next
@@ -119,7 +173,7 @@ export function NoteEdit({
               const target = event.target as HTMLElement;
               if (target.closest('a, button, input, select, textarea, summary, label, video, audio')) return;
               if (window.getSelection()?.toString()) return;
-              setEditing(true);
+              startEditing({ x: event.clientX, y: event.clientY });
             }}
           >
             {children}
@@ -185,84 +239,240 @@ export function RenameForm({
   );
 }
 
+/** How long typing has to pause before the draft is saved. A save makes no commit. */
+const AUTOSAVE_MS = 1500;
+
+export type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'failed';
+
+/** What the header's Done button asks of the editor. */
+export type EditFormHandle = { close: () => void };
+
 /**
- * The editor itself. Mounted only while editing, so a refused save's message
- * goes with it when the editor closes and is not there when it opens again.
+ * The editor itself, saving as you go (note of 20 October 2026): a pause in
+ * typing, leaving the editor, Cmd-S, Done, Escape and following a link each
+ * keep what has changed as the note's draft, and leaving the page does too.
+ * A draft is not a commit: the vault gets one commit for the sitting, ten
+ * minutes after the last change (lib/vault/notes/drafts.ts).
+ *
+ * Saves run one at a time, each saying what text it last saved, so the save
+ * is refused when the note changed somewhere else meanwhile. That refusal, and
+ * a note that is gone, stop the saving and say so; any other failure is tried
+ * again with the next edit. Mounted only while editing, so the message goes
+ * with the editor when it closes.
  */
 export function EditForm({
   notePath,
   body,
-  blobSha,
+  linkPaths = [],
+  caretAt = null,
+  handle,
+  onStatus,
   onDone,
   onReload,
 }: {
   notePath: string;
+  /** The text the editor opens with: the note's draft if it has one, else its body. */
   body: string;
-  blobSha: string;
+  /** Every note's path in the vault, which the editor's wikilinks resolve against. */
+  linkPaths?: string[];
+  /** Where the click that opened the editor landed. */
+  caretAt?: { x: number; y: number } | null;
+  handle?: Ref<EditFormHandle>;
+  onStatus?: (status: SaveStatus) => void;
   onDone: () => void;
   onReload: () => void;
 }) {
-  // Held here rather than left to the textarea: React resets a form's fields
-  // after its action runs, and a refused save must not empty the box.
-  const [draft, setDraft] = useState(body);
-  const form = useRef<HTMLFormElement>(null);
+  const router = useRouter();
+  const index = useMemo(() => buildLinkIndex(linkPaths.map((path) => ({ path, title: '' }))), [linkPaths]);
+  const [state, setState] = useState<SaveNoteState>({});
+  const saved = useRef(body);
+  const latest = useRef(body);
+  const running = useRef<Promise<void> | null>(null);
+  const blocked = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const status = useRef<(next: SaveStatus) => void>(() => {});
+  useEffect(() => {
+    status.current = (next) => onStatus?.(next);
+  });
 
-  const [state, save, pending] = useActionState<SaveNoteState, FormData>(
-    async (prev, formData) => {
-      const result = await saveNoteEdit(prev, formData);
-      if (result.savedBlobSha) onDone();
-      return result;
-    },
-    {},
-  );
+  async function flush(): Promise<void> {
+    clearTimeout(timer.current);
+    while (running.current) await running.current;
+    if (blocked.current || latest.current === saved.current) return;
+    const text = latest.current;
+    const run = (async () => {
+      status.current('saving');
+      let result: DraftSaveState;
+      try {
+        result = await saveNoteDraft({ notePath, text, from: saved.current });
+      } catch {
+        result = { ok: false, reason: 'error', error: 'The note could not be saved. Check your connection.' };
+      }
+      if (result.ok) {
+        saved.current = text;
+        setState({});
+      } else {
+        if (result.reason !== 'error') blocked.current = true;
+        setState({ reason: result.reason, error: result.error });
+      }
+      status.current(!result.ok ? 'failed' : latest.current === saved.current ? 'saved' : 'unsaved');
+    })();
+    running.current = run;
+    try {
+      await run;
+    } finally {
+      running.current = null;
+    }
+  }
 
-  const dirty = draft !== body;
+  async function close() {
+    await flush();
+    // A refusal that stops saving lets the editor close: its message said the edit was not saved.
+    if (latest.current !== saved.current && !blocked.current) return;
+    onDone();
+    // The rendered note is drawn from the page, which has not seen the draft yet.
+    router.refresh();
+  }
+
+  useImperativeHandle(handle, () => ({ close: () => void close() }));
+
+  // Leaving the page with an edit not yet kept: the browser asks first, and a
+  // move within the app keeps it on the way out.
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (latest.current !== saved.current && !blocked.current) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+      clearTimeout(timer.current);
+      if (latest.current !== saved.current && !blocked.current && !running.current)
+        void saveNoteDraft({ notePath, text: latest.current, from: saved.current });
+    };
+    // Mount and unmount only; the refs hold what changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <form ref={form} action={save}>
-      <input type="hidden" name="notePath" value={notePath} />
-      <input type="hidden" name="blobSha" value={blobSha} />
-      <input type="hidden" name="text" value={draft} />
-      {/* The essay editor's live preview (note 469f3771): the markdown reads
-          as it renders, with the marks shown only on the line being typed. */}
-      <div
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            form.current?.requestSubmit();
-          } else if (event.key === 'Escape' && !dirty) {
-            // Only an untouched note closes on Escape: a stray key must not
-            // throw away a paragraph.
-            event.preventDefault();
-            onDone();
-          }
-        }}
-      >
-        <ComposeBox>
-          {/* Short enough that Save is on screen when the editor opens, at both widths. */}
-          <div className="max-h-[60dvh] min-h-48 overflow-y-auto">
-            <MarkdownEditor
-              initialDoc={body}
-              label="Note text, in markdown"
-              autoFocus
-              onChange={(doc) => setDraft(doc)}
-              onSaveNow={() => form.current?.requestSubmit()}
-            />
-          </div>
-        </ComposeBox>
+    <div>
+      <div className={cn(cardVariants({ padding: 'standard' }), 'cursor-text')}>
+        <NoteEditor
+          initialDoc={body}
+          label="Note text, in markdown"
+          autoFocus
+          caretAt={caretAt}
+          linkExists={(target) => resolveWikiLink(parseWikiLink(target, false), index) !== null}
+          onOpenLink={(target) => {
+            const path = resolveWikiLink(parseWikiLink(target, false), index);
+            if (!path) return;
+            void flush().then(() => router.push(noteHref(path)));
+          }}
+          onChange={(doc) => {
+            latest.current = doc;
+            if (blocked.current) return;
+            status.current('unsaved');
+            clearTimeout(timer.current);
+            timer.current = setTimeout(() => void flush(), AUTOSAVE_MS);
+          }}
+          onBlur={() => void flush()}
+          onSaveNow={() => void flush()}
+          onClose={() => void close()}
+        />
       </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" pending={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone} pending={pending}>
-          Cancel
-        </Button>
-      </div>
-
       <SaveError state={state} onReload={onReload} />
-    </form>
+    </div>
+  );
+}
+
+/**
+ * A draft waiting at rest: when it goes to Obsidian, or why it did not and
+ * what can be done about it.
+ */
+export function DraftNotice({ notePath, failure }: { notePath: string; failure: DraftFailure | null }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function send(overwrite: boolean) {
+    startTransition(async () => {
+      const result = await sendNoteDraft({ notePath, overwrite });
+      setError(result.reason ? (result.error ?? null) : null);
+    });
+  }
+
+  function drop() {
+    startTransition(async () => {
+      const result = await dropNoteDraft({ notePath });
+      setError(result.error ?? null);
+    });
+  }
+
+  if (!failure) {
+    return (
+      <p className="mb-4 text-ui text-ink-muted">
+        Your edits go to Obsidian ten minutes after the last change.{' '}
+        <button type="button" className={linkVariants()} onClick={() => send(false)} disabled={pending}>
+          {pending ? 'Sending…' : 'Send now'}
+        </button>
+        {error && <FieldError>{error}</FieldError>}
+      </p>
+    );
+  }
+
+  return (
+    <Banner tone="bad" role="alert" className="mb-4">
+      <div className="space-y-2">
+        <p className="text-ui">
+          {failure === 'changed'
+            ? 'This note changed in Obsidian after you edited it here, so your edits have not gone to Obsidian. The note below is your version.'
+            : failure === 'read-only'
+              ? 'The vault token can read notes but not save them, so your edits have not gone to Obsidian. Add a token that can write, then try again.'
+              : failure === 'reconnect'
+                ? 'The vault needs reconnecting, so your edits have not gone to Obsidian. Reconnect it, then try again.'
+                : failure === 'too-large'
+                  ? 'The note is too large to save from here, so your edits have not gone to Obsidian.'
+                  : 'This note is not in the vault any more, so your edits have nowhere to go.'}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {failure === 'changed' ? (
+            <>
+              <Button type="button" size="sm" variant="secondary" onClick={() => send(true)} pending={pending}>
+                Keep my version
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={drop} pending={pending}>
+                Use the Obsidian version
+              </Button>
+            </>
+          ) : failure === 'read-only' || failure === 'reconnect' ? (
+            <>
+              <Button type="button" size="sm" variant="secondary" onClick={() => send(false)} pending={pending}>
+                Try again
+              </Button>
+              <Link href={SETTINGS_HREF} className={`inline-flex items-center gap-1 text-ui ${linkVariants()}`}>
+                Open vault settings
+                <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </Link>
+            </>
+          ) : (
+            <Button type="button" size="sm" variant="ghost" onClick={drop} pending={pending}>
+              Throw away my edits
+            </Button>
+          )}
+        </div>
+        {error && <FieldError>{error}</FieldError>}
+      </div>
+    </Banner>
+  );
+}
+
+/** The editor's saving, said quietly where the Edit button was. */
+export function SaveStatusText({ status }: { status: SaveStatus }) {
+  const text = { idle: '', unsaved: 'Edited', saving: 'Saving…', saved: 'Saved', failed: 'Not saved' }[
+    status
+  ];
+  return (
+    <span role="status" className="text-ui text-ink-muted">
+      {text}
+    </span>
   );
 }
 

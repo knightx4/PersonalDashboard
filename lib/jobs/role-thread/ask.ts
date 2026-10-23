@@ -23,6 +23,7 @@ import 'server-only';
 
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
+import { saveCoverLetterText } from '@/lib/jobs/applications/edit';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -34,6 +35,7 @@ import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { parseRoleReply, renderBank, replyBody, roleReplyMessage, type Turn } from './reply';
+import type { TalkToolCall } from '@/lib/talk/talk';
 
 /** The model a role reply is written with: Sonnet, since a letter goes out under their name. */
 export const ROLE_REPLY_MODEL = DASH_MODELS.roleThread;
@@ -90,12 +92,13 @@ export type RoleAskInput = {
 
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
 
-async function say(input: RoleAskInput, body: string): Promise<void> {
+async function say(input: RoleAskInput, body: string, toolCalls?: readonly TalkToolCall[]): Promise<void> {
   await addThreadTurn(input.client, {
     userId: input.userId,
     ref: toRef(ROLE_THREAD_TABLE, input.roleId),
     author: 'claude',
     body,
+    toolCalls,
   });
 }
 
@@ -232,12 +235,10 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     if (!parsed.coverLetter) return { ok: false, error: 'The letter was empty, so nothing was filed.' };
     const ref = toRef('job_search.applications', application.id as string);
     const before = await readSubjectOrNull(input.dash, ref);
-    const { error } = await client
-      .from('applications')
-      .update({ cover_letter: parsed.coverLetter })
-      .eq('id', application.id as string)
-      .eq('user_id', userId);
-    if (error) return { ok: false, error: `The letter could not be saved: ${error.message}` };
+    // The same write as the role page's Save. The Cover letter mark is left as it is: the
+    // record's Undo puts back the letter, and a mark set here would outlive it.
+    const { error } = await saveCoverLetterText(client, userId, application.id as string, parsed.coverLetter, false);
+    if (error) return { ok: false, error: `The letter could not be saved: ${error}` };
     await recordDashAction(input.dash, {
       surface: 'thread',
       kind: 'write_cover_letter',
@@ -273,7 +274,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
   if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
-  await say(input, reply.body);
+  await say(input, reply.body, reply.toolCalls);
   return {
     ok: true,
     message: letterWritten

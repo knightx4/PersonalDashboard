@@ -127,7 +127,7 @@ export function CompanyPanels(props: {
   return (
     // Shallow: the page reads every tab's data at once for the counts, so a
     // switch writes the address without loading the company again.
-    <TabbedSections tabs={tabs} label="Company" address={{ opensOn: props.opensOn }} shallow>
+    <TabbedSections tabs={tabs} label="Company" address={{ opensOn: props.opensOn }} shallow compact>
       {tab === 'roles' && props.roles}
       {tab === 'perspective' && <PerspectivePanel {...props} />}
       {tab === 'about' && (
@@ -221,10 +221,7 @@ function PerspectivePanel({
 
   return (
     <div className="space-y-4">
-      <CardSection
-        title="Focus"
-        hint="Mark the handful of companies you most want as Target. They lead the Companies list, with how far each view has got."
-      >
+      <CardSection title="Focus">
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <Segmented<Priority>
             label="How much you want to work here"

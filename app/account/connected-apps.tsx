@@ -121,7 +121,9 @@ function CallRow({ call, when }: { call: ConnectedAppCall; when: (at: string) =>
       ? 'Refused: too many calls'
       : call.outcome === 'error'
         ? `Failed: ${call.error ?? 'no reason given'}`
-        : count === 0
+        : call.outcome === 'partial'
+          ? `${count === 1 ? 'Read 1 row' : `Read ${count} rows`}. ${call.error ?? 'Some of it could not be read.'}`
+          : count === 0
           ? 'Found nothing'
           : count === 1
             ? 'Read 1 row'

@@ -1,4 +1,5 @@
 import { marksFromRow } from '@/lib/jobs/application-marks';
+import { isRoleKind, roleKindLabel } from '@/lib/jobs/role-kind';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -101,7 +102,7 @@ export default async function RoleDetailPage({
   const { data: role } = await supabase
     .from('roles')
     .select(
-      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, jd_lookup_at, ats_job_id, seniority, location, work_mode,
+      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, jd_lookup_at, ats_job_id, seniority, location, work_mode, kind,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, stage, ats_type, priority, logo_url, domains, website, careers_url )`,
@@ -454,6 +455,7 @@ export default async function RoleDetailPage({
                   slug={company.slug}
                   companies={(allCompanies ?? []).map((row) => row.name as string)}
                 />
+                {roleKindLabel(role.kind as string) && <span>{` · ${roleKindLabel(role.kind as string)}`}</span>}
                 <HeaderFacts
                   facts={[
                     ['location', (role.location as string | null) ?? null],
@@ -589,6 +591,7 @@ export default async function RoleDetailPage({
           jdLookupAt={(role.jd_lookup_at as string) ?? null}
           jdUrl={(role.jd_url as string) ?? null}
           location={(role.location as string | null) ?? null}
+          kind={isRoleKind(role.kind) ? role.kind : 'job'}
           atsJobId={(role.ats_job_id as string) ?? null}
           compMinCents={(role.comp_min_cents as number) ?? null}
           compMaxCents={(role.comp_max_cents as number) ?? null}

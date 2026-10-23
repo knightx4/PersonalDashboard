@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { saveReminderEdit } from '@/lib/jobs/today/reminders';
 
 const reminderPatchSchema = z.object({
   reminderId: z.string().uuid(),
@@ -33,16 +34,12 @@ export async function updateReminder(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('reminders')
-    .update({
-      body: parsed.data.body,
-      due_at: new Date(parsed.data.dueAt).toISOString(),
-    })
-    .eq('id', parsed.data.reminderId)
-    .eq('user_id', user.id);
+  const { error } = await saveReminderEdit(supabase, user.id, parsed.data.reminderId, {
+    body: parsed.data.body,
+    due_at: new Date(parsed.data.dueAt).toISOString(),
+  });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
@@ -88,13 +85,11 @@ export async function linkReminderMessage(input: {
     if (!message) return { error: 'That email is no longer linked to this role.' };
   }
 
-  const { error } = await supabase
-    .from('reminders')
-    .update({ ingested_message_id: parsed.data.messageId })
-    .eq('id', parsed.data.reminderId)
-    .eq('user_id', user.id);
+  const { error } = await saveReminderEdit(supabase, user.id, parsed.data.reminderId, {
+    ingested_message_id: parsed.data.messageId,
+  });
 
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');

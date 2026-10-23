@@ -24,6 +24,7 @@
  */
 import 'server-only';
 import { PROJECTS, type DevProject } from '@/lib/plan/projects';
+import type { RoutineKey } from '@/lib/feedback/routine-names';
 
 export const DEFAULT_FEATURE_ROUTINE_ID = 'trig_018TQKkc6qbGLmP1Y7AKWn4N';
 
@@ -183,6 +184,24 @@ export function projectRoutineIds(): ReadonlySet<string> {
     PROJECTS.map((project) => projectRoutine(project).id).filter((id): id is string => !!id),
   );
 }
+
+/**
+ * Each routine above under the key its buttons name it by
+ * (lib/feedback/routine-names.ts). Typed against that list both ways, so a
+ * routine cannot be fired here without a name on its buttons, nor named on a
+ * button without being one that is fired.
+ */
+export const ROUTINE_FIRES = {
+  notes: notesRoutine,
+  plan: planRoutine,
+  review: reviewRoutine,
+  goals: goalsRoutine,
+  vision: visionRoutine,
+  spec_audit: specAuditRoutine,
+  dash_backup: dashBackupRoutine,
+  overhaul: overhaulRoutine,
+  project: projectRoutine,
+} satisfies { [K in RoutineKey]: (...args: never[]) => RoutineTarget };
 
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';

@@ -13,6 +13,8 @@ export const BUDGETS = {
   posting: 8_000,
   companyResearch: 3_000,
   perspective: 3_000,
+  earlierLetters: 4_000,
+  earlierLetter: 2_000,
   researchWriteUp: 6_000,
   notes: 3_000,
   requirements: 4_000,

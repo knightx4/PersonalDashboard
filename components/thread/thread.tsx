@@ -1518,7 +1518,14 @@ function TalkThread({
             withFiles || boxStart ? (
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 {withFiles && (
-                  <AddFile ref={adder} value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+                  <AddFile
+                    ref={adder}
+                    value={files}
+                    onChange={setFiles}
+                    disabled={sending}
+                    onUploadingChange={setUploading}
+                    iconOnPhone={Boolean(boxStart)}
+                  />
                 )}
                 {boxStart}
               </div>

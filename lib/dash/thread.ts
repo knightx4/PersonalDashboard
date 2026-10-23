@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
 import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
-import type { TalkCitation } from '@/lib/talk/talk';
+import type { TalkCitation, TalkToolCall } from '@/lib/talk/talk';
 import { MAX_LOOKUPS, runDash, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
 import type { PaidQueued } from './paid';
 import {
@@ -197,6 +197,12 @@ export type ThreadReply =
       acknowledged: boolean;
       /** The paid presses queued for an approval (plan #2228.1), as their core.dash_actions ids. */
       queued?: string[];
+      /**
+       * Every lookup and change the reply made, kept on the reply's turn so
+       * the daily Dash check can see a thread reply that broke or ran out of
+       * lookups, as it sees Ask's (lib/dash/quality/health.ts).
+       */
+      toolCalls?: TalkToolCall[];
     }
   | { ok: false; detail: string };
 
@@ -342,9 +348,11 @@ export async function replyInThread(input: {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {
       const body = said.length > 0 ? said.join('\n\n') : UNFINISHED;
-      return { ok: true, body, citations: [], made, passedOn, acknowledged: false, queued };
+      return { ok: true, body, citations: [], made, passedOn, acknowledged: false, queued, toolCalls: answer.toolCalls };
     }
-    if (queued.length > 0) return { ok: true, body: QUEUED_UNFINISHED, citations: [], made, passedOn, acknowledged: false, queued };
+    if (queued.length > 0) {
+      return { ok: true, body: QUEUED_UNFINISHED, citations: [], made, passedOn, acknowledged: false, queued, toolCalls: answer.toolCalls };
+    }
     return { ok: false, detail: answer.detail };
   }
   if (answer.acknowledged) return { ok: true, body: '', citations: [], made, passedOn, acknowledged: true };
@@ -356,6 +364,7 @@ export async function replyInThread(input: {
     passedOn,
     acknowledged: false,
     queued,
+    toolCalls: answer.toolCalls,
   };
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { COLUMN_COMPANY_LIMIT, pipelineColumnFilters } from './pipeline-columns';
-import { filterPipeline, parsePipeline, type PipelineParams } from './pipeline-view';
+import { filterPipeline, parsePipeline, pipelineCounts, type PipelineParams } from './pipeline-view';
 
 function row(status: ApplicationStatus, company: string): PipelineRow {
   return {
@@ -20,8 +20,7 @@ const rows = [row('submitted', 'Monzo'), row('submitted', 'Monzo'), row('lead', 
 
 function filtersFor(params: PipelineParams, scored = false) {
   const state = parsePipeline(params);
-  const { scoped } = filterPipeline(rows, state);
-  return pipelineColumnFilters(params, state, scoped, rows, scored);
+  return pipelineColumnFilters(params, state, pipelineCounts(rows, state), scored);
 }
 
 describe('pipelineColumnFilters', () => {
@@ -36,13 +35,14 @@ describe('pipelineColumnFilters', () => {
     const params: PipelineParams = { view: 'table', ready: 'yes' };
     const state = parsePipeline(params);
     const all = [...rows, marked];
-    const { scoped, filtered } = filterPipeline(all, state);
-    const { ready, questions } = pipelineColumnFilters(params, state, scoped, all, false);
+    const { filtered } = filterPipeline(all, state);
+    const { ready, questions } = pipelineColumnFilters(params, state, pipelineCounts(all, state), false);
 
     expect(filtered).toEqual([marked]);
     expect(ready.active).toBe(true);
     expect(ready.choices.map((c) => c.label)).toEqual(['Ready or not', 'Ready to apply · 1', 'Not ready · 3']);
     expect(questions.active).toBe(false);
+    // Questions counts within the ready ones: choosing it would show the one.
     expect(questions.choices[1]).toMatchObject({
       label: 'All questions added · 1',
       href: '/jobs/pipeline?view=table&ready=yes&questions=yes',
@@ -67,7 +67,7 @@ describe('pipelineColumnFilters', () => {
   it('caps the company list', () => {
     const many = Array.from({ length: COLUMN_COMPANY_LIMIT + 3 }, (_, i) => row('submitted', `Co${i}`));
     const state = parsePipeline({ view: 'table' });
-    const { company } = pipelineColumnFilters({ view: 'table' }, state, many, many, false);
+    const { company } = pipelineColumnFilters({ view: 'table' }, state, pipelineCounts(many, state), false);
     expect(company.choices).toHaveLength(COLUMN_COMPANY_LIMIT + 1);
   });
 
@@ -77,4 +77,23 @@ describe('pipelineColumnFilters', () => {
     expect(status.choices.find((c) => c.id === 'stage-submitted')?.label).toBe('Submitted · 2');
     expect(filtersFor({ view: 'table', stage: 'submitted' }).status.active).toBe(true);
   });
+
+  it('counts each choice within the other filters already set (note d7af5bd8)', () => {
+    const ready = { ...row('submitted', 'Monzo'), readyToApply: true } as PipelineRow;
+    const all = [...rows, ready];
+    // On Leads, the only lead is not ready: Ready to apply would show none.
+    const leads = filtersOver(all, { view: 'table', stage: 'lead' });
+    expect(leads.ready.choices.map((c) => c.label)).toEqual(['Ready or not', 'Ready to apply · 0', 'Not ready · 1']);
+    // On ready ones, the status menu counts the ready ones at each stage.
+    const onReady = filtersOver(all, { view: 'table', ready: 'yes' });
+    expect(onReady.status.choices.find((c) => c.id === 'stage-lead')?.label).toBe('Leads · 0');
+    expect(onReady.status.choices.find((c) => c.id === 'stage-submitted')?.label).toBe('Submitted · 1');
+    // A filter's own choice is left out of its count, so the others still say what they would show.
+    expect(onReady.ready.choices[2].label).toBe('Not ready · 3');
+  });
 });
+
+function filtersOver(all: PipelineRow[], params: PipelineParams) {
+  const state = parsePipeline(params);
+  return pipelineColumnFilters(params, state, pipelineCounts(all, state), false);
+}

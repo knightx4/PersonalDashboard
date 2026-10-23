@@ -43,6 +43,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { BUDGETS, cutOptional, cutText, fitToBudget } from './budget';
 import { answerLimit } from './limits';
 import {
+  renderEarlierLetter,
   renderEvidenceItem,
   renderPastAnswer,
   renderRequirement,
@@ -51,6 +52,7 @@ import {
 } from './render';
 import type {
   AnswerStatus,
+  EarlierLetter,
   GatherResult,
   GatheredEvidence,
   GatheredQuestion,
@@ -354,6 +356,57 @@ export async function vaultPassages(
   };
 }
 
+/** Shorter than this, a stored letter is a placeholder such as "TO DRAFT". */
+const LETTER_MIN = 200;
+/** At most this many earlier letters to the same company. */
+export const EARLIER_LETTER_CAP = 3;
+
+/**
+ * The cover letters on their other applications to the company, newest
+ * first. Placeholders are skipped, and each letter is cut so one long letter
+ * cannot fill the part.
+ */
+async function earlierLetters(
+  jobs: JobsClient,
+  userId: string,
+  companyId: string | null,
+  applicationId: string,
+): Promise<{ ok: true; letters: EarlierLetter[] } | { ok: false; error: string }> {
+  if (!companyId) return { ok: true, letters: [] };
+  const { data: roles, error: rolesError } = await jobs
+    .from('roles')
+    .select('id, title')
+    .eq('company_id', companyId)
+    .eq('user_id', userId);
+  if (rolesError) return { ok: false, error: rolesError.message };
+  const titles = new Map(((roles ?? []) as Row[]).map((row) => [row.id as string, str(row.title) ?? 'earlier']));
+  if (titles.size === 0) return { ok: true, letters: [] };
+
+  const { data, error } = await jobs
+    .from('applications')
+    .select('id, role_id, cover_letter, updated_at')
+    .eq('user_id', userId)
+    .in('role_id', [...titles.keys()])
+    .neq('id', applicationId)
+    .not('cover_letter', 'is', null);
+  if (error) return { ok: false, error: error.message };
+
+  const letters = ((data ?? []) as Row[])
+    .filter((row) => (str(row.cover_letter)?.trim().length ?? 0) >= LETTER_MIN)
+    .sort((a, b) => byNewest(str(a.updated_at), str(b.updated_at)))
+    .slice(0, EARLIER_LETTER_CAP)
+    .map(
+      (row): EarlierLetter => ({
+        roleTitle: titles.get(row.role_id as string) ?? 'earlier',
+        text: cutText(row.cover_letter as string, BUDGETS.earlierLetter),
+      }),
+    );
+  return {
+    ok: true,
+    letters: fitToBudget(letters, (letter) => renderEarlierLetter(letter).length + 9, BUDGETS.earlierLetters).kept,
+  };
+}
+
 /** Everything one application's drafts draw on, cut to budget. */
 export async function gather(deps: GatherDeps, input: GatherInput): Promise<GatherResult> {
   const { jobs } = deps;
@@ -518,6 +571,9 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
   const companyName = str(companyRow?.name);
   const title = (role.title as string) ?? '';
 
+  const letters = await earlierLetters(jobs, userId, companyId, applicationId);
+  if (!letters.ok) return { ok: false, error: letters.error };
+
   const vault = await vaultPassages(
     deps,
     userId,
@@ -551,6 +607,7 @@ export async function gather(deps: GatherDeps, input: GatherInput): Promise<Gath
         perspective: companyRow
           ? cutOptional(perspectiveText(perspectiveOf(companyRow), PERSPECTIVE_FOR_DRAFTS), BUDGETS.perspective)
           : null,
+        earlierLetters: letters.letters,
         researchWriteUp: writeUp ? cutOptional(researchText(researchFromRow(writeUp)), BUDGETS.researchWriteUp) : null,
         notes: fittedNotes,
       },

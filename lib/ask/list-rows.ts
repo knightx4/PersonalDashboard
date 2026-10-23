@@ -1,6 +1,6 @@
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { SOURCES } from '@/lib/sources/catalogue';
-import type { Source } from '@/lib/sources/types';
+import { readableName, type Source } from '@/lib/sources/types';
 import { AskInputError, clip, matchedNote, optionalString, type AskContext, type AskSchema, type AskToolResult } from './db';
 
 /**
@@ -113,7 +113,7 @@ export async function listRowsLookup(ctx: AskContext, input: Record<string, unkn
   const pageSize = words.length > 0 ? SCAN_PAGE : READ_ROWS;
   const page = (from: number, count: boolean) =>
     client
-      .from(name)
+      .from(readableName(source))
       .select(columns.join(', '), count ? { count: 'exact' } : undefined)
       .eq(owner, ctx.userId)
       .order(source.newest ?? 'created_at', { ascending: false })

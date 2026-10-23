@@ -3,8 +3,8 @@
  *
  * The runner has no DOM, so the press itself is not exercised here (it was
  * checked in a browser at phone and laptop width). What is pinned is what each
- * state renders: the note at rest with its Edit button, the editor posting the
- * three fields `saveNoteEdit` reads, and the two refusals that each carry a way
+ * state renders: the note at rest with its Edit button, the editor that saves
+ * itself with no Save button, and the two refusals that each carry a way
  * forward.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -13,9 +13,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
-vi.mock('@/app/vault/n/[...path]/actions', () => ({ saveNoteEdit: async () => ({}) }));
+vi.mock('@/app/vault/n/[...path]/actions', () => ({
+  saveNoteEdit: async () => ({}),
+  saveNoteDraft: async () => ({ ok: true }),
+  sendNoteDraft: async () => ({}),
+  dropNoteDraft: async () => ({}),
+}));
 
-const { NoteEdit, EditForm, SaveError } = await import('@/app/vault/n/[...path]/note-edit');
+const { NoteEdit, EditForm, SaveError, SaveStatusText } = await import('@/app/vault/n/[...path]/note-edit');
 
 const nothing = () => {};
 
@@ -45,22 +50,30 @@ describe('the editor', () => {
     <EditForm
       notePath="Work/Close.md"
       body="The close took six hours."
-      blobSha="abc"
       onDone={nothing}
       onReload={nothing}
     />,
   );
 
-  it('holds the note body and posts the fields the save action reads', () => {
-    // The live-preview editor draws in the browser; the text it holds is posted from this field.
-    expect(html).toContain('name="text" value="The close took six hours."');
-    expect(html).toContain('name="notePath" value="Work/Close.md"');
-    expect(html).toContain('name="blobSha" value="abc"');
+  it('sits on the note\'s card in the note\'s type', () => {
+    expect(html).toContain('card-pad');
+    expect(html).toContain('vault-prose');
   });
 
-  it('offers Save and Cancel', () => {
-    expect(html).toMatch(/type="submit"[^>]*>Save</);
-    expect(html).toContain('Cancel');
+  it('saves itself, so it offers no Save or Cancel', () => {
+    expect(html).not.toContain('>Save<');
+    expect(html).not.toContain('Cancel');
+  });
+});
+
+describe('the save status', () => {
+  it.each([
+    ['unsaved', 'Edited'],
+    ['saving', 'Saving…'],
+    ['saved', 'Saved'],
+    ['failed', 'Not saved'],
+  ] as const)('reads %s as %s', (status, text) => {
+    expect(renderToStaticMarkup(<SaveStatusText status={status} />)).toContain(text);
   });
 });
 

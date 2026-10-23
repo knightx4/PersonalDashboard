@@ -187,6 +187,17 @@ describe('the Goals writes', () => {
       expect(histories).toEqual([{}]);
     });
 
+    it('marks a goal passive and active again, as its page does (plan #2503.2)', async () => {
+      const data = tables();
+      const passive = await made('change_goal', data, { change: 'edit', goal_ref: GOAL, activity: 'passive' });
+      expect(passive.after).toMatchObject({ activity: 'passive' });
+      expect(passive.summary).toBe('Dash changed the goal "Run a half marathon": marked it passive.');
+      expect(await refused('change_goal', data, { change: 'edit', goal_ref: GOAL, activity: 'passive' })).toMatch(/Nothing to change/);
+      expect(await refused('change_goal', data, { change: 'edit', goal_ref: GOAL, activity: 'idle' })).toMatch(/active or passive/);
+      const active = await made('change_goal', data, { change: 'edit', goal_ref: GOAL, activity: 'active' });
+      expect(active.after).toMatchObject({ activity: 'active' });
+    });
+
     it('refuses a practice for a title, an edit that changes nothing and a step', async () => {
       const data = tables();
       expect(await refused('change_goal', data, { change: 'edit', goal_ref: GOAL, title: 'Run every morning' })).toMatch(

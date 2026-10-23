@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { NewsChangeInput, NewsChangeKind } from '@/lib/ask/news-changes';
@@ -6,8 +7,10 @@ import type { ModuleId } from '@/lib/modules';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { queueNewsStory } from '@/lib/learn/tracks/news';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
-import { findSavedStory, resaveStoryById, saveStory, type SavedStoryRef } from '@/lib/news/saved/stories';
-import { findOpenStoryTasks } from '@/lib/todo/links/story';
+import { stopRunningWatch } from '@/lib/core/watches';
+import { markUnread } from '@/lib/news/issues/read';
+import { findSavedStory, removeSavedStoryById, resaveStoryById, saveStory, type SavedStoryRef } from '@/lib/news/saved/stories';
+import { findOpenStoryTasks, makeStoryTask } from '@/lib/todo/links/story';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -57,6 +60,8 @@ export type NewsMade = {
 
 export type NewsWrite = {
   name: NewsChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** The workspaces that must be switched on for the change. */
   modules: readonly ModuleId[];
   /** Without the line each surface adds on where the change shows. */
@@ -108,14 +113,9 @@ async function markIssueUnread(env: NewsWriteEnv, args: Args): Promise<NewsMade>
   const id = idOf(args, 'issue_ref', 'newsletter issue');
   const before = await ownRow(env.news, 'issues', id, env.userId, 'newsletter issue');
   if (before.read_at === null || before.read_at === undefined) throw new NewsRefused('That newsletter is unread already.');
-  const { data, error } = await env.news
-    .from('issues')
-    .update({ read_at: null })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Marking the newsletter unread failed: ${error?.message ?? 'no row'}`);
+  // The issue page's own write, by id alone: whose issue it is was checked just above.
+  await markUnread(asNews(env), id);
+  const data = await ownRow(env.news, 'issues', id, env.userId, 'newsletter issue');
 
   const title = named(before.subject ?? before.title, 'the newsletter');
   const href = issueHref(id);
@@ -234,8 +234,7 @@ async function saveStoryTool(env: NewsWriteEnv, args: Args): Promise<NewsMade> {
   }
   if (before.unsaved_at != null) throw new NewsRefused('That story is not saved.');
   const id = before.id as string;
-  const { error: rpcError } = await env.news.rpc('unsave_story', { story_id: id });
-  if (rpcError) throw new Error(`Taking the story off Saved failed: ${rpcError.message}`);
+  await removeSavedStoryById(asNews(env), id);
   const { data: kept } = await env.news.from('saved_stories').select('*').eq('id', id).eq('user_id', env.userId).maybeSingle();
 
   const title = named(before.headline, 'the story');
@@ -283,30 +282,16 @@ async function sendStoryToLearn(env: NewsWriteEnv, args: Args): Promise<NewsMade
 // make_todo_from_story
 // ---------------------------------------------------------------------------
 
-const TITLE_MAX = 500;
-
 async function makeTodoFromStory(env: NewsWriteEnv, args: Args): Promise<NewsMade> {
   const { story } = await savedFor(env, storyTarget(args));
   const title = named(story.headline, 'the story');
   const existing = (await findOpenStoryTasks(env.todo as TodoSupabaseClient, [story.id])).get(story.id);
   if (existing) throw new NewsRefused(`"${title}" is an open todo already.`);
 
-  const { data: task, error } = await env.todo
-    .from('tasks')
-    .insert({ user_id: env.userId, title: story.headline.trim().slice(0, TITLE_MAX) })
-    .select('*')
-    .single();
-  if (error || !task) throw new Error(`Making that story a todo failed: ${error?.message ?? 'no row'}`);
-  const taskId = (task as Row).id as string;
-
-  // A link the database refuses drops the todo rather than leaving one that does not open the story.
-  const { error: linkError } = await env.todo
-    .from('task_links')
-    .insert({ task_id: taskId, relation: 'about', saved_story_id: story.id });
-  if (linkError) {
-    await env.todo.from('tasks').update({ status: 'dropped' }).eq('id', taskId).eq('user_id', env.userId);
-    throw new Error(`Making that story a todo failed: ${linkError.message}`);
-  }
+  // The button's own write: the todo and its link, and a refused link drops
+  // the todo. It has no due date, so the zone it is read in never matters.
+  const { taskId } = await makeStoryTask(env.todo as TodoSupabaseClient, env.userId, story, 'UTC');
+  const task = await ownRow(env.todo, 'tasks', taskId, env.userId, 'todo');
 
   const href = `/todo/all?status=all&focus=${taskId}`;
   return {
@@ -329,15 +314,9 @@ async function stopWatch(env: NewsWriteEnv, args: Args): Promise<NewsMade> {
   const id = idOf(args, 'watch_ref', 'watch');
   const before = await ownRow(env.core, 'watches', id, env.userId, 'watch');
   if (before.status !== 'running') throw new NewsRefused('That watch is not running any more.');
-  const { data, error } = await env.core
-    .from('watches')
-    .update({ status: 'stopped' })
-    .eq('id', id)
-    .eq('user_id', env.userId)
-    .eq('status', 'running')
-    .select('*')
-    .single();
-  if (error || !data) throw new Error(`Stopping the watch failed: ${error?.message ?? 'no row'}`);
+  const { row: data, error } = await stopRunningWatch(env.core, env.userId, id);
+  if (error) throw new Error(`Stopping the watch failed: ${error}`);
+  if (!data) throw new NewsRefused('That watch is not running any more.');
 
   const title = named(before.title, 'the watch');
   return {
@@ -370,6 +349,7 @@ const STORY_PROPERTIES = {
 export const NEWS_WRITES: readonly NewsWrite[] = [
   {
     name: 'mark_issue_unread',
+    runs: sameAs(['app/news/i/[id]/actions.ts#markIssueUnread', 'lib/news/issues/read.ts#markUnread']),
     modules: ['news'],
     description:
       'Put one newsletter back in the unread list, when they ask. Name it by the news.issues ref a lookup returned.',
@@ -383,6 +363,10 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'save_story',
+    runs: sameAs(
+      ['app/news/i/[id]/actions.ts#setStorySaved', 'lib/news/saved/stories.ts#saveStory'],
+      ['app/news/saved/actions.ts#removeSaved', 'lib/news/saved/stories.ts#removeSavedStoryById'],
+    ),
     modules: ['news'],
     description:
       'Save a story from a newsletter to the Saved list, or take one off it, when they ask. saved true saves; false takes it off. Name the story by issue_ref and headline, or by saved_story_ref when it is on Saved already.',
@@ -396,6 +380,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'send_story_to_learn',
+    runs: sameAs(['app/news/i/[id]/actions.ts#sendStoryToLearn', 'lib/learn/tracks/news.ts#queueNewsStory']),
     modules: ['news', 'learn'],
     description:
       "Put a newsletter story on Learn's From News reading list, when they ask. The story is saved first and stays on Saved. A story already on the queue is refused. Name it by issue_ref and headline, or by saved_story_ref.",
@@ -404,6 +389,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'make_todo_from_story',
+    runs: sameAs(['app/news/i/[id]/actions.ts#makeTodoFromStory', 'lib/todo/links/story.ts#makeStoryTask']),
     modules: ['news', 'todo'],
     description:
       'Make a todo titled with a newsletter story\'s headline that opens the story, when they ask. The story is saved first and stays on Saved. A story that has an open todo already is refused. Name it by issue_ref and headline, or by saved_story_ref.',
@@ -412,6 +398,7 @@ export const NEWS_WRITES: readonly NewsWrite[] = [
   },
   {
     name: 'stop_watch',
+    runs: sameAs(['app/home/actions.ts#stopWatch', 'lib/core/watches.ts#stopRunningWatch']),
     modules: [],
     description:
       "Stop a price watch that is running, when they ask. Name it by the core.watches ref a lookup returned. A stopped watch does not start again; starting a new one is a proposal they confirm.",
@@ -453,6 +440,7 @@ const ASK_NOTE =
 export const NEWS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = NEWS_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     const off = switchedOff(write, ctx.enabledModules);

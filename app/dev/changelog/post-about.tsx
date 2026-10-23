@@ -2,7 +2,7 @@
 
 import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState } from 'react';
-import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { suggestPostAbout, type PostsActionState } from '../posts/actions';
 
 /**
@@ -20,9 +20,9 @@ export function PostAbout({ number }: { number: number }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <input type="hidden" name="number" value={number} />
-      <Button type="submit" variant="ghost" size="sm" pending={pending} className="-ml-2.5">
+      <DashAction type="submit" variant="ghost" size="sm" pending={pending} className="-ml-2.5" routine="plan">
         {pending ? 'Sending…' : 'Post about this'}
-      </Button>
+      </DashAction>
       {state.message && (
         <p role="status" className="text-small text-ink-muted">
           {state.message}{' '}

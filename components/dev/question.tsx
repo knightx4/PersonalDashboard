@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
+import type { RoutineKey } from '@/lib/feedback/routine-names';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
@@ -217,6 +219,7 @@ export function AnswerBox({
   hint = false,
   error,
   extra,
+  routine,
 }: {
   id: string;
   detail: string | null;
@@ -235,6 +238,8 @@ export function AnswerBox({
    * question's id from the hidden field above.
    */
   extra?: React.ReactNode;
+  /** The routine the answer is then handed to, named in a $ beside the button (plan #2459.5). */
+  routine?: RoutineKey;
 }) {
   const field = `answer-${id}`;
   const options = planOptions(detail);
@@ -259,9 +264,15 @@ export function AnswerBox({
       />
       {hint && <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>}
       <div className="flex flex-wrap items-center gap-1">
-        <Button type="submit" size="sm" pending={pending}>
-          {resolution ? 'Record the new answer' : 'Answer'}
-        </Button>
+        {routine ? (
+          <DashAction type="submit" size="sm" pending={pending} routine={routine} what="Where the answer goes">
+            {resolution ? 'Record the new answer' : 'Answer'}
+          </DashAction>
+        ) : (
+          <Button type="submit" size="sm" pending={pending}>
+            {resolution ? 'Record the new answer' : 'Answer'}
+          </Button>
+        )}
         {onCancel && (
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
             Cancel

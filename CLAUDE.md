@@ -141,6 +141,22 @@ When you add one, decide which it is: a table that holds what the person
 wrote, wants, did or has is a source; settings, join rows and bookkeeping are
 not. Then run `npm run sources:write` so the goals routine reads the new list.
 
+## Dash is checked every day, and its cases monthly
+
+Every day, for no model spend, the last day of real Ask Dash answers is
+graded (`lib/dash/quality/health.ts`, migrations 0277 and 0279): fallbacks,
+failed lookups, thumbs down and replies that push back. Once a month the
+deployed Dash also answers the questions in `core.dash_eval_cases`. Each run
+is a row in `core.dash_eval_runs`, and anything wrong writes a Dev note. A
+daily session follows [.claude/skills/dash-quality/SKILL.md](.claude/skills/dash-quality/SKILL.md)
+to fix what it found, the person's thumbs down first.
+
+A Dash failure you fix gets a case, so it cannot come back unnoticed. Prove
+the fix after it deploys by re-asking that one case,
+`npx tsx scripts/sql.ts "select core.run_dash_quality('<case id>')"`, a few
+cents; asking every case costs about $1, which the person does not want spent
+on testing more than monthly.
+
 ## The assistant is Dash
 
 In anything the person reads, the assistant is **Dash**, never "Claude": labels,

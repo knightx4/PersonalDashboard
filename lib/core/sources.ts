@@ -130,6 +130,8 @@ export const coreSources: ModuleSources = {
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
     { table: 'core.ask_reply_checks', reason: 'Bookkeeping for the weekly check of Ask Dash replies that went badly: the week, what it flagged and the Dev note it wrote; the thumbs themselves are on core.conversation_turns.' },
+    { table: 'core.dash_eval_cases', reason: 'The questions the nightly Dash quality check asks and what a good answer must show; test fixtures, not something the person wrote.' },
+    { table: 'core.dash_eval_runs', reason: 'Bookkeeping for the nightly Dash quality check: each run, its graded answers, the day\'s health and the Dev note it wrote.' },
     { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },

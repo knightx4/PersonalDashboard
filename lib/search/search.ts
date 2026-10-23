@@ -6,6 +6,7 @@ import {
   TOTAL_LIMIT,
   type HitKind,
   type SearchHit,
+  type SearchListContext,
   type SearchSource,
 } from '@/lib/search/sources';
 import { inScope, type SearchScope } from '@/lib/search/scope';
@@ -71,6 +72,8 @@ export async function searchEverything(input: {
   kinds?: readonly HitKind[];
   perSourceLimit?: number;
   totalLimit?: number;
+  /** The clients to read through; absent, each source opens its own on the cookie. */
+  db?: SearchListContext['db'];
 }): Promise<SearchOutcome> {
   const query = input.query.trim();
   if (query.length < MIN_QUERY) return { hits: [], failed: [] };
@@ -88,7 +91,7 @@ export async function searchEverything(input: {
   );
 
   const settled = await Promise.allSettled(
-    active.map((source) => source.find({ userId: input.userId, query, limit: perSource })),
+    active.map((source) => source.find({ userId: input.userId, query, limit: perSource, db: input.db })),
   );
 
   const hits: SearchHit[] = [];

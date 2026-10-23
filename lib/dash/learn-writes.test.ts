@@ -31,8 +31,9 @@ function fakeLearn(tables: Record<string, Row[]>) {
     let op: 'select' | 'update' | 'insert' | 'delete' = 'select';
     let patch: Row = {};
     let order: string | null = null;
-    const filters: [string, unknown][] = [];
-    const matching = () => rows.filter((row) => filters.every(([column, value]) => (row[column] ?? null) === value));
+    const filters: [string, unknown, boolean?][] = [];
+    const matching = () =>
+      rows.filter((row) => filters.every(([column, value, not]) => ((row[column] ?? null) === value) !== Boolean(not)));
     const run = (): Row[] => {
       if (op === 'insert') {
         const row = { id: `new-${++ids}`, ...patch };
@@ -55,6 +56,7 @@ function fakeLearn(tables: Record<string, Row[]>) {
       delete: () => ((op = 'delete'), builder),
       eq: (column: string, value: unknown) => (filters.push([column, value]), builder),
       is: (column: string, value: unknown) => (filters.push([column, value]), builder),
+      neq: (column: string, value: unknown) => (filters.push([column, value, true]), builder),
       then: (resolve: (result: { data: Row[]; error: null }) => unknown) => resolve({ data: run(), error: null }),
       order: (column: string) => ((order = column), builder),
       limit: () => builder,

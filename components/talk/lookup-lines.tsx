@@ -1,4 +1,4 @@
-import { Check, CornerDownRight, X } from 'lucide-react';
+import { Check, CornerDownRight, Minus, X } from 'lucide-react';
 import { Disclosure } from '@/components/ui/disclosure';
 import { lookupOutcome, turnLookups, type LookupLine } from '@/lib/talk/lookups';
 import type { TalkToolCall } from '@/lib/talk/talk';
@@ -11,7 +11,7 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  */
 
 function LineMark({ state }: { state: LookupLine['state'] }) {
-  const Glyph = state === 'done' ? Check : state === 'failed' ? X : CornerDownRight;
+  const Glyph = state === 'done' ? Check : state === 'failed' ? X : state === 'skipped' ? Minus : CornerDownRight;
   return (
     <Glyph
       aria-hidden

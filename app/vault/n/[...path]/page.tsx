@@ -18,6 +18,7 @@ import {
   loadNote,
   loadNotes,
 } from '@/lib/vault/notes/load';
+import { loadNoteDraft } from '@/lib/vault/db/draft-ports';
 import { buildAttachmentIndex } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { folderOf, noteHref } from '@/lib/vault/paths';
@@ -106,8 +107,12 @@ export default async function NotePage({
     loadNotes(supabase, search ? { search } : {}),
     loadAttachments(supabase),
   ]);
+  // Edits made in the app wait as a draft before they are committed, and the
+  // page shows the draft meanwhile, so what was written is what is read.
+  const draft = await loadNoteDraft(supabase, note.id);
+  const body = draft?.body ?? note.body;
   const index = buildLinkIndex(targets);
-  const markdown = toStandardMarkdown(note.body, { index, hrefFor: noteHref });
+  const markdown = toStandardMarkdown(body, { index, hrefFor: noteHref });
 
   const groups = groupByFolder(notes);
   const folder = folderOf(note.path);
@@ -171,13 +176,15 @@ export default async function NotePage({
             )}
           </div>
 
-          {/* Edit swaps the rendered body for a text box in the same place
-              (#1425); the title and properties stay, since a save keeps the
-              frontmatter it opened with. */}
+          {/* Edit swaps the rendered body for a live-preview editor in the same
+              place (#1425), which saves as you write; the title and properties
+              stay, since a save keeps the frontmatter it opened with. */}
           <NoteEdit
             notePath={note.path}
-            body={note.body}
+            body={body}
             blobSha={note.blobSha}
+            draft={draft && { failure: draft.failure }}
+            linkPaths={targets.map((target) => target.path)}
             heading={
               <header>
                 <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">

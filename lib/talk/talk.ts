@@ -110,6 +110,13 @@ export type NewTalkTurn = {
   files?: readonly UploadedAttachment[];
 };
 
+/**
+ * What a lookup refused at one of an answer's limits returns (lib/dash/loop.ts).
+ * It never ran, so the thread shows it as not run rather than as broken
+ * (lib/talk/lookups.ts).
+ */
+export const LOOKUP_NOT_RUN = 'No lookups are left for this answer. Answer now with what you have.';
+
 /** The longest turn the table takes (conversation_turns_body_ck). */
 export const MAX_TURN = 8000;
 

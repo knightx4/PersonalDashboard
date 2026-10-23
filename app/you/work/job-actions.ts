@@ -7,6 +7,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { EDUCATION_HREF } from '@/lib/you/education';
 import { parseJob } from '@/lib/you/work-history';
+import { saveJob } from '@/lib/you/work-history-store';
 import { readResumeIntoWorkHistory } from '@/lib/you/work-history-run';
 
 /**
@@ -58,22 +59,18 @@ export async function saveJobAction(_prev: JobEditState, form: FormData): Promis
   });
   if (!read.ok) return { error: read.error, field: read.field };
 
-  const you = await createYouClient();
   const rawId = form.get('id');
+  let jobId: string | null = null;
   if (typeof rawId === 'string' && rawId !== '') {
-    const jobId = id.safeParse(rawId);
-    if (!jobId.success) return { error: 'That job could not be found.' };
-    const { data, error } = await you
-      .from('work_history')
-      .update({ ...read.job, edited: true })
-      .eq('id', jobId.data)
-      .eq('user_id', user.id)
-      .select('id');
-    if (error) return { error: 'The job was not saved. Try again.' };
-    if (!data || data.length === 0) return { error: 'That job could not be found.' };
-  } else {
-    const { error } = await you.from('work_history').insert({ ...read.job, user_id: user.id, edited: true });
-    if (error) return { error: 'The job was not added. Try again.' };
+    const parsed = id.safeParse(rawId);
+    if (!parsed.success) return { error: 'That job could not be found.' };
+    jobId = parsed.data;
+  }
+  try {
+    const saved = await saveJob(await createYouClient(), user.id, jobId, read.job);
+    if (!saved) return { error: 'That job could not be found.' };
+  } catch {
+    return { error: jobId ? 'The job was not saved. Try again.' : 'The job was not added. Try again.' };
   }
 
   revalidatePath(EDUCATION_HREF);

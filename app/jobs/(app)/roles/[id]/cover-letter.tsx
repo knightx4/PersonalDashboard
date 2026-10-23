@@ -21,6 +21,7 @@ import {
 } from './actions';
 import { DashQuestions } from './dash-questions';
 import { DraftPanel } from './draft-panel';
+import { LetterPdf } from './letter-pdf';
 
 const DRAFT_LETTER = 'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter';
 
@@ -38,6 +39,7 @@ const DRAFT_LETTER = 'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter';
 export function CoverLetter({
   applicationId,
   roleId,
+  companyName,
   initial,
   closed,
   initialDraft,
@@ -47,6 +49,8 @@ export function CoverLetter({
 }: {
   applicationId: string;
   roleId: string;
+  /** Heads the downloaded PDF, under the date. */
+  companyName: string;
   initial: string;
   /** The application has closed: the letter stays editable as a record, but Dash does not draft. */
   closed: boolean;
@@ -166,20 +170,23 @@ export function CoverLetter({
               </Button>
             </>
           ) : (
-            !closed && (
-              <DashAction
-                type="button"
-                size="sm"
-                variant="secondary"
-                pending={running}
-                disabled={running}
-                paid={DRAFT_LETTER}
-                what="Cost of drafting the letter"
-                onClick={() => void run().then(setRunError)}
-              >
-                {running ? 'Drafting…' : draft ? 'Draft again' : 'Draft a cover letter'}
-              </DashAction>
-            )
+            <>
+              {text.trim() && <LetterPdf text={text} company={companyName} />}
+              {!closed && (
+                <DashAction
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  pending={running}
+                  disabled={running}
+                  paid={DRAFT_LETTER}
+                  what="Cost of drafting the letter"
+                  onClick={() => void run().then(setRunError)}
+                >
+                  {running ? 'Drafting…' : draft ? 'Draft again' : 'Draft a cover letter'}
+                </DashAction>
+              )}
+            </>
           )}
           {saved && !running && <span className="text-small text-ink-muted">{saved}</span>}
         </div>

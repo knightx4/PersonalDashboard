@@ -55,6 +55,13 @@ export type Source = {
   /** The column a link to one row stores; `id` unless the table says otherwise. */
   ref?: string;
   /**
+   * A view in the same schema that Dash's lookups read in place of the
+   * table, when some of its rows must never be read: obsidian.notes is read
+   * through readable_notes, which leaves out notes holding credentials. Every
+   * lookup that reads a catalogued table by name goes through `readableName`.
+   */
+  readFrom?: string;
+  /**
    * How a row is tied to its owner, when it is not a `user_id` column: a
    * column name, or a sentence naming the join.
    */
@@ -190,3 +197,8 @@ export type ModuleSources = {
   sources: readonly Source[];
   notSources: readonly NotASource[];
 };
+
+/** The relation a lookup reads for a catalogued table: its `readFrom` view, or the table itself. */
+export function readableName(source: Pick<Source, 'table' | 'readFrom'>): string {
+  return source.readFrom ?? source.table.split('.')[1];
+}

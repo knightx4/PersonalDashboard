@@ -34,6 +34,12 @@ export const vaultActions: ModuleActions = {
     acceptMap: none('theirs'),
     askMaya: tool('ask_maya'),
     saveNoteEdit: tool('edit_vault_note'),
+    saveNoteDraft: none(
+      'page',
+      "The note editor's autosave, which keeps what is typed as a draft; Dash edits a note with edit_vault_note, which commits at once.",
+    ),
+    sendNoteDraft: none('theirs', 'Settles a refused draft the person wrote: keep their version, or try again.'),
+    dropNoteDraft: none('deletes'),
     renameNoteAction: tool('rename_vault_note'),
   },
   'app/vault/settings/actions.ts': {

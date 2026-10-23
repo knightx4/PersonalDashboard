@@ -495,6 +495,7 @@ export default async function GoalMapPage({
     today,
     numberFrom,
     sources,
+    undated: map.goal.activity === 'passive',
   };
   const help = {
     goalId: map.goal.id,

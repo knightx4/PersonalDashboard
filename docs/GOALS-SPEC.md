@@ -433,6 +433,35 @@ The week's focus is gone (plan #1742, decision #1741). The `focus` column on
 `goals.items` and `goals.visits.planned_week` stay in the database with what
 they held, and nothing reads or writes them.
 
+### Active and passive goals
+
+Plan #2503. A goal is active or passive, stored in `goals.items.activity`
+(null reads as active). A passive goal is one the person keeps in view
+without working on it now, so it asks for no attention:
+
+- None of its steps or rhythms appear in Do next, even when it has a due
+  date, and it is listed under Other goals (`homeLists` in
+  `lib/goals/home.ts`).
+- On Todo it keeps only the steps the person sent there. A step Dash sent
+  leaves Todo while the goal is passive, and Dash sends none
+  (`todoSteps` in `lib/goals/todo.ts`).
+- It gets no verdict: the morning brief leaves it out, its pace is not
+  read, and the pages show no older verdict on it (`reviewGoals` and
+  `standingReviews` in `lib/goals/reviews.ts`).
+- Questions, asks, flags and proposals waiting on approval still show in Do
+  next, since they hold up work.
+
+What is coming up under a passive goal is mentioned, and nothing more (plan
+#2503.5). A step of the person's due within seven days, and a suggestion
+nobody has answered that happens within seven days, is a mention
+(`passiveMentions` in `lib/goals/passive-mentions.ts`). The morning brief
+lists each one once, and Dash mentions it in the home's note as one line
+marked optional. The Goals home lists every mention not dismissed under
+"Coming up, optional", as a plain line with Decline. `goals.mentions` (goals
+migration 0087) records which the note has mentioned and which were
+dismissed, one row per step or suggestion, so a dismissed mention does not
+come back when its date moves.
+
 ## Todo
 
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown

@@ -6,6 +6,17 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
 import { insertInterview, insertInterviewRound } from '@/lib/jobs/interview/rounds';
+import {
+  addInterviewerRow,
+  gatherIntoRound,
+  interviewerContact,
+  linkRoundEmailRow,
+  moveInterviewToRound,
+  removeInterviewerRow,
+  saveInterviewEdit,
+  saveRoundEdit,
+  unlinkRoundEmailRow,
+} from '@/lib/jobs/interview/edit';
 
 /**
  * When a round is, in the three states it can actually be in: an hour, a day
@@ -75,13 +86,9 @@ export async function saveInterview(
     update.time_known = schedule.data.timeKnown;
   }
 
-  const { error } = await supabase
-    .from('interviews')
-    .update(update)
-    .eq('id', interviewId)
-    .eq('user_id', user.id);
+  const { error } = await saveInterviewEdit(supabase, user.id, interviewId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
@@ -200,16 +207,9 @@ export async function addInterviewer(input: {
     .maybeSingle();
   if (!contact) return { error: 'That contact no longer exists.' };
 
-  const { error } = await supabase.from('interview_participants').upsert(
-    {
-      interview_id: parsed.data.interviewId,
-      contact_id: parsed.data.contactId,
-      role: 'interviewer',
-    },
-    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
-  );
+  const { error } = await addInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
@@ -261,46 +261,12 @@ export async function addInterviewerByName(input: {
   // Someone of that name already on this company is the same person, not a
   // second copy of them: typing a name that is already in the list should
   // attach the record rather than fork it.
-  const byName = supabase
-    .from('contacts')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('full_name', parsed.data.name);
+  const { contact, error: contactError } = await interviewerContact(supabase, user.id, companyId, parsed.data.name);
+  if (contactError || !contact) return { error: contactError ?? 'Could not add that person.' };
 
-  const { data: existing } = await (
-    companyId ? byName.eq('company_id', companyId) : byName.is('company_id', null)
-  )
-    .limit(1)
-    .maybeSingle();
+  const { error } = await addInterviewerRow(supabase, parsed.data.interviewId, contact.id as string);
 
-  let contactId = (existing?.id as string | undefined) ?? null;
-
-  if (!contactId) {
-    const { data: created, error } = await supabase
-      .from('contacts')
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        full_name: parsed.data.name,
-        relationship: 'interviewer',
-      })
-      .select('id')
-      .single();
-
-    if (error || !created) return { error: error?.message ?? 'Could not add that person.' };
-    contactId = created.id as string;
-  }
-
-  const { error } = await supabase.from('interview_participants').upsert(
-    {
-      interview_id: parsed.data.interviewId,
-      contact_id: contactId,
-      role: 'interviewer',
-    },
-    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
-  );
-
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
@@ -319,13 +285,9 @@ export async function removeInterviewer(input: {
   await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_participants')
-    .delete()
-    .eq('interview_id', parsed.data.interviewId)
-    .eq('contact_id', parsed.data.contactId);
+  const { error } = await removeInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
@@ -348,6 +310,8 @@ const groupSchema = z.object({
  * Each of them was in a round of its own before this, so the rounds they leave
  * behind are swept up: an empty round the user never made and cannot see the
  * purpose of is litter, and the next visit would offer to gather it again.
+ * Their emails come into the new round first, and one left holding notes is
+ * kept (gatherIntoRound, which Dash's change_interview_round calls too).
  */
 // latency: pending
 export async function groupInterviews(input: {
@@ -361,77 +325,31 @@ export async function groupInterviews(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  // Noted before the move, because afterwards there is no way back to them.
-  const { data: leaving } = await supabase
-    .from('interviews')
-    .select('group_id')
-    .in('id', parsed.data.interviewIds)
-    .eq('application_id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  const vacated = [
-    ...new Set(
-      (leaving ?? [])
-        .map((row) => row.group_id as string | null)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-
-  const round = await roundForNewInterview(supabase, {
+  const round = await insertInterviewRound(supabase, {
     userId: user.id,
     applicationId: parsed.data.applicationId,
-    groupId: null,
+    label: parsed.data.label,
   });
-  if (!round.groupId) return { error: round.error };
+  if (!round.id) return { error: round.error };
 
-  if (parsed.data.label) {
-    await supabase
-      .from('interview_groups')
-      .update({ label: parsed.data.label })
-      .eq('id', round.groupId)
-      .eq('user_id', user.id);
-  }
+  const gathered = await gatherIntoRound(supabase, user.id, {
+    applicationId: parsed.data.applicationId,
+    groupId: round.id,
+    interviewIds: parsed.data.interviewIds,
+  });
 
-  const { error } = await supabase
-    .from('interviews')
-    .update({ group_id: round.groupId })
-    .in('id', parsed.data.interviewIds)
-    .eq('application_id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-
-  if (error) {
+  if (gathered.error) {
     // A round with nothing in it is litter, and the next visit would offer to
-    // make another one beside it.
-    await supabase.from('interview_groups').delete().eq('id', round.groupId).eq('user_id', user.id);
-    return { error: error.message };
+    // make another one beside it. Once an interview is in it, it stays: taking
+    // the round out would take the interview with it.
+    if (gathered.moved.length === 0) {
+      await supabase.from('interview_groups').delete().eq('id', round.id).eq('user_id', user.id);
+    }
+    return { error: gathered.error };
   }
-
-  await deleteEmptyRounds(supabase, { userId: user.id, groupIds: vacated });
 
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
-}
-
-/**
- * Drop the rounds among these that nothing is left in.
- *
- * Only ever called for rounds the app itself made a moment ago to hold one
- * interview. A round the user made and then emptied is theirs to keep or
- * remove; this is for the ones they never saw.
- */
-async function deleteEmptyRounds(
-  supabase: AppSupabaseClient,
-  opts: { userId: string; groupIds: readonly string[] },
-): Promise<void> {
-  for (const groupId of opts.groupIds) {
-    const { count } = await supabase
-      .from('interviews')
-      .select('id', { count: 'exact', head: true })
-      .eq('group_id', groupId);
-    if (count) continue;
-
-    await supabase.from('interview_groups').delete().eq('id', groupId).eq('user_id', opts.userId);
-  }
 }
 
 const newRoundSchema = z.object({
@@ -544,13 +462,9 @@ export async function saveInterviewGroup(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_groups')
-    .update(update)
-    .eq('id', parsed.data.groupId)
-    .eq('user_id', user.id);
+  const { error } = await saveRoundEdit(supabase, user.id, parsed.data.groupId, update);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -594,16 +508,9 @@ export async function linkRoundMessage(input: {
     .maybeSingle();
   if (!message) return { error: 'That message is no longer in the mailbox.' };
 
-  const { error } = await supabase.from('interview_group_messages').upsert(
-    {
-      user_id: user.id,
-      group_id: parsed.data.groupId,
-      message_id: parsed.data.messageId,
-    },
-    { onConflict: 'group_id,message_id' },
-  );
+  const { error } = await linkRoundEmailRow(supabase, user.id, parsed.data.groupId, parsed.data.messageId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -626,14 +533,9 @@ export async function unlinkRoundMessage(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('interview_group_messages')
-    .delete()
-    .eq('group_id', parsed.data.groupId)
-    .eq('message_id', parsed.data.messageId)
-    .eq('user_id', user.id);
+  const { error } = await unlinkRoundEmailRow(supabase, user.id, parsed.data.groupId, parsed.data.messageId);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -672,13 +574,9 @@ export async function ungroupInterview(interviewId: string): Promise<{ error: st
   });
   if (!round.groupId) return { error: round.error };
 
-  const { error } = await supabase
-    .from('interviews')
-    .update({ group_id: round.groupId, round: 1 })
-    .eq('id', parsed.data)
-    .eq('user_id', user.id);
+  const { error } = await moveInterviewToRound(supabase, user.id, parsed.data, round.groupId, 1);
 
-  if (error) return { error: error.message };
+  if (error) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };

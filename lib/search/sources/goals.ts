@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -24,7 +25,7 @@ import { areaHits, goalHits, type AreaRow, type GoalItemRow } from '@/lib/search
 type Read = SearchListContext & { query?: string };
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createGoalsClient();
+  const supabase = await sourceClient(ctx, 'goals', createGoalsClient);
   const [areas, items] = await Promise.all([
     supabase.from('areas').select('id, name').is('archived_at', null).order('position'),
     supabase

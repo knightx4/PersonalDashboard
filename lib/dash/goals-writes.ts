@@ -1,3 +1,4 @@
+import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { GoalsChangeInput, GoalsChangeKind } from '@/lib/ask/goals-changes';
@@ -7,6 +8,7 @@ import { DUE_PRECISIONS } from '@/lib/goals/due-precision';
 import {
   archiveArea,
   insertArea,
+  moveArea,
   moveGoal,
   renameArea,
   insertGoal,
@@ -36,13 +38,14 @@ import {
   deleteDependency,
   insertDependency,
   linkStep,
+  moveStep,
   setStepArchived,
   setStepQuestions,
   setStepStatus,
   unlinkStep,
   updateStep,
 } from '@/lib/goals/steps-store';
-import { parseAreaName, parseAreaNote, parseGoalFields, reorder } from '@/lib/goals/tree';
+import { parseAreaName, parseAreaNote, parseGoalFields, toGoalActivity } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CHANGE_GOAL_LIST } from './goal-lists-writes';
 import { GoalsRefused } from './goals-refused';
@@ -124,6 +127,8 @@ export type GoalsMade = {
 
 export type GoalsWrite = {
   name: GoalsChangeKind;
+  /** The buttons it does the same as, or why none does (./runs.ts). */
+  runs: DashWriteRuns;
   /** Without the line each surface adds on where the change shows. */
   description: string;
   input_schema: Anthropic.Tool['input_schema'];
@@ -196,37 +201,6 @@ async function findArea(env: GoalsWriteEnv, wanted: string, { archived = false }
   throw new GoalsRefused(
     areas.length > 0 ? `They have no area called "${wanted}". Their areas are ${names}.` : 'They have no areas yet.',
   );
-}
-
-/** One place up or down among the person's live areas, positions re-dealt in tens as the page does. */
-async function moveOwnArea(env: GoalsWriteEnv, id: string, direction: 'up' | 'down'): Promise<boolean> {
-  const { data, error } = await env.goals
-    .from('areas')
-    .select('id')
-    .eq('user_id', env.userId)
-    .is('archived_at', null)
-    .order('position', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(`Reading the areas failed: ${error.message}`);
-  const order = reorder(
-    ((data ?? []) as Row[]).map((row) => row.id as string),
-    id,
-    direction,
-  );
-  if (!order) return false;
-  const client = await env.write({});
-  const results = await Promise.all(
-    order.map((areaId, i) =>
-      client
-        .from('areas')
-        .update({ position: (i + 1) * 10 })
-        .eq('id', areaId)
-        .eq('user_id', env.userId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +276,7 @@ async function changeGoalArea(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'move_up':
     case 'move_down': {
       const direction = change === 'move_up' ? 'up' : 'down';
-      if (!(await moveOwnArea(env, id, direction))) {
+      if (!(await moveArea(await client(), env.userId, id, direction))) {
         throw new GoalsRefused(`That area is ${direction === 'up' ? 'first' : 'last'} already.`);
       }
       return changed('Moved', ` ${direction}`, `Dash moved the area ${title} ${direction} in Goals.`, MOVE_AREA_UNDO);
@@ -408,7 +382,7 @@ async function changeGoal(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
   }
 }
 
-/** A goal's wording, due date or area, any of them in one write, as the page's edit is. */
+/** A goal's wording, due date, area or whether it is active, any of them in one write, as the page's edit is. */
 async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<GoalsMade> {
   const id = before.id as string;
   const title = named(before.title, 'the goal');
@@ -418,6 +392,7 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
     if (key === 'title') return text(args, 'title') || undefined;
     if (key === 'due') return dueSent ? text(args, 'due_on') : undefined;
     if (key === 'duePrecision') return precision || undefined;
+    if (key === 'activity') return text(args, 'activity') || undefined;
     return undefined;
   });
   if (!parsed.ok) throw new GoalsRefused(parsed.error);
@@ -435,8 +410,9 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
     delete fields.dueOn;
     delete fields.duePrecision;
   }
+  if (fields.activity && fields.activity === toGoalActivity(before.activity)) delete fields.activity;
   if (Object.keys(fields).length === 0) {
-    throw new GoalsRefused('Nothing to change: give a new title, due_on or area, different from what the goal has.');
+    throw new GoalsRefused('Nothing to change: give a new title, due_on, area or activity, different from what the goal has.');
   }
   // An errand needs its date (goals 0061): clearing an errand's date is refused by the database too.
   if (before.errand === true && fields.dueOn === null) throw new GoalsRefused('That goal is an errand, which needs a date it is due by.');
@@ -447,6 +423,7 @@ async function editGoal(env: GoalsWriteEnv, before: Row, args: Args): Promise<Go
   if (fields.title) parts.push(`reworded it to "${fields.title}"`);
   if ('dueOn' in fields) parts.push(fields.dueOn ? `set it due by ${fields.dueOn}` : 'cleared its due date');
   if (area) parts.push(`moved it to ${named(area.name, 'another area')}`);
+  if (fields.activity) parts.push(`marked it ${fields.activity}`);
   const said = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
   return reportGoal(env, before, {
     verb: 'Changed',
@@ -543,40 +520,6 @@ async function goalAbove(env: GoalsWriteEnv, step: Row): Promise<Row> {
   throw new GoalsRefused('Dash could not find the goal that step sits under.');
 }
 
-/** One place up or down among the step's live siblings, every write narrowed to the person's rows. */
-async function moveOwnStep(env: GoalsWriteEnv, step: Row, direction: 'up' | 'down'): Promise<boolean> {
-  const { data, error } = await env.goals
-    .from('items')
-    .select('id, position, created_at')
-    .eq('user_id', env.userId)
-    .eq('parent_id', step.parent_id as string)
-    .is('archived_at', null)
-    .order('position', { ascending: true });
-  if (error) throw new Error(`Reading the steps failed: ${error.message}`);
-  const siblings = ((data ?? []) as Row[]).sort(
-    (a, b) => Number(a.position) - Number(b.position) || String(a.created_at).localeCompare(String(b.created_at)),
-  );
-  const order = reorder(
-    siblings.map((row) => row.id as string),
-    step.id as string,
-    direction,
-  );
-  if (!order) return false;
-  const client = await env.write({});
-  const results = await Promise.all(
-    order.map((stepId, i) =>
-      client
-        .from('items')
-        .update({ position: (i + 1) * 10 })
-        .eq('id', stepId)
-        .eq('user_id', env.userId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  return true;
-}
-
 /** The database's refusal as the sentence the model reads, for a write a trigger or check can turn down. */
 async function guarded<T>(what: string, write: () => Promise<T>): Promise<T> {
   try {
@@ -639,7 +582,7 @@ async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     case 'move_up':
     case 'move_down': {
       const direction = change === 'move_up' ? 'up' : 'down';
-      if (!(await moveOwnStep(env, before, direction))) {
+      if (!(await moveStep(await client(), env.userId, id, direction))) {
         throw new GoalsRefused(`That step is ${direction === 'up' ? 'first' : 'last'} among its siblings already.`);
       }
       return changed('Moved', ` ${direction}`, `Dash moved the step "${title}" ${direction} under its parent.`, MOVE_STEP_UNDO);
@@ -1830,6 +1773,12 @@ async function recordWent(env: GoalsWriteEnv, went: boolean, wanted: string): Pr
 export const GOALS_WRITES: readonly GoalsWrite[] = [
   {
     name: 'change_goal_area',
+    runs: sameAs(
+      ['app/goals/actions.ts#renameAreaAction', 'lib/goals/store.ts#renameArea'],
+      ['app/goals/actions.ts#setAreaNoteAction', 'lib/goals/store.ts#setAreaNote'],
+      ['app/goals/actions.ts#moveAreaAction', 'lib/goals/store.ts#moveArea'],
+      ['app/goals/actions.ts#archiveAreaAction', 'lib/goals/store.ts#archiveArea'],
+    ),
     description:
       "Change one of the person's areas in Goals, when they ask: add a new area (change add, with name), rename one (rename, with name), write or clear what they want from it (note; an empty note clears it), move it up or down the list (move_up, move_down), archive it with the goals in it (archive), or bring an archived one back with them (restore). Name the area by its name as they have it, or by the goals.areas ref a lookup returned. A goal under an area is add_goal or change_goal.",
     input_schema: {
@@ -1847,8 +1796,14 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal',
+    runs: sameAs(
+      ['app/goals/actions.ts#editGoal', 'lib/goals/store.ts#updateGoal'],
+      ['app/goals/actions.ts#moveGoalAction', 'lib/goals/store.ts#moveGoal'],
+      ['app/goals/actions.ts#archiveGoalAction', 'lib/goals/store.ts#setGoalArchived'],
+      ['app/goals/actions.ts#settleGoalAction', 'lib/goals/store.ts#settleGoal'],
+    ),
     description:
-      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, or move it to another area (change edit, with any of title, due_on, due_precision and area), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
+      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, move it to another area, or mark it active or passive (change edit, with any of title, due_on, due_precision, area and activity), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1862,6 +1817,11 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
           description: 'For edit, with due_on: what the date is the end of, when they named a month, quarter, half or year. Default day.',
         },
         area: { type: 'string', description: 'For edit: the area to move it to, by its name or goals.areas ref.' },
+        activity: {
+          type: 'string',
+          enum: ['active', 'passive'],
+          description: 'For edit: active for a goal they are working on, passive for one only kept in view, which leaves Do next, Todo and the daily verdicts.',
+        },
       },
       required: ['change', 'goal_ref'],
       additionalProperties: false,
@@ -1870,6 +1830,21 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_step',
+    runs: sameAs(
+      ['app/goals/[goalId]/actions.ts#editStep', 'lib/goals/steps-store.ts#updateStep'],
+      ['app/goals/[goalId]/actions.ts#setStepStatusAction', 'lib/goals/steps-store.ts#setStepStatus'],
+      ['app/goals/[goalId]/actions.ts#moveStepAction', 'lib/goals/steps-store.ts#moveStep'],
+      ['app/goals/[goalId]/actions.ts#archiveStepAction', 'lib/goals/steps-store.ts#setStepArchived'],
+      ['app/goals/[goalId]/actions.ts#linkStepAction', 'lib/goals/steps-store.ts#linkStep'],
+      ['app/goals/[goalId]/actions.ts#unlinkStepAction', 'lib/goals/steps-store.ts#unlinkStep'],
+      ['app/goals/[goalId]/block-actions.ts#setGoalStepStatus', 'lib/goals/steps-store.ts#setStepStatus'],
+      ['app/goals/[goalId]/block-actions.ts#blockGoalStep', 'lib/goals/steps-store.ts#blockStep'],
+      ['app/goals/[goalId]/block-actions.ts#addGoalStepDependency', 'lib/goals/steps-store.ts#insertDependency'],
+      ['app/goals/[goalId]/block-actions.ts#removeGoalStepDependency', 'lib/goals/steps-store.ts#deleteDependency'],
+      ['app/goals/home-actions.ts#setAsideAction', 'lib/core/snooze-days.ts#snoozeDay'],
+      ['app/goals/home-actions.ts#restoreAsideAction', 'lib/goals/steps-store.ts#updateStep'],
+      ['app/goals/home-actions.ts#bringBackAction', 'lib/goals/steps-store.ts#updateStep'],
+    ),
     description:
       "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), bring a set-aside step back now (bring_back), or make it its own errand, due on due_on or the step's own date, in area or the goal's, and archive the step (make_errand). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
     input_schema: {
@@ -1913,6 +1888,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_number',
+    runs: sameAs(
+      ['app/goals/[goalId]/reading-actions.ts#setMeasureAction', 'lib/goals/readings-store.ts#setGoalMeasure'],
+      ['app/goals/[goalId]/reading-actions.ts#setNumberFromAction', 'lib/goals/readings-store.ts#setNumberFrom'],
+    ),
     description:
       "Change how one of the person's goals is measured, when they ask: set the unit and the target it aims for (change measure, with unit and target; an empty unit stops measuring it by a number), or work its number out from a collection serving it, or go back to readings typed in (number_from, with from naming the choice, such as \"Total balance of Loans\", or \"Number of Events with status Went\" to count only the rows of a list holding one option; empty for typed readings). Name the goal by the goals.items ref a lookup returned. A wrong from is refused with the choices the goal has.",
     input_schema: {
@@ -1931,6 +1910,12 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_link',
+    runs: sameAs(
+      ['app/goals/[goalId]/link-actions.ts#linkAimAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#linkJobSearchAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#linkRowAction', 'lib/goals/links-store.ts#linkTarget'],
+      ['app/goals/[goalId]/link-actions.ts#unlinkAction', 'lib/goals/links-store.ts#unlinkTarget'],
+    ),
     description:
       "Link one of the person's goals to one of their Learn goals or to their job search, or unlink it, when they ask (change link_aim or unlink_aim, with aim; link_job_search or unlink_job_search). Or list one of their readings, calendar events, saved products or contacts on the goal, or take it off (link_row or unlink_row, with kind and target, and list for the list's name, such as \"Pantries to compare\"; a row already listed moves to the list named). Give step_ref to list the row on one of the goal's steps instead: a saved product listed on a step closes that step when it is bought. Name the goal by the goals.items ref a lookup returned, the Learn goal by its name as they have it, and the row by its ref or its name. The goal points at the row rather than copying it, and nothing in Learn, Todo, Shopping or the job search is changed.",
     input_schema: {
@@ -1961,6 +1946,12 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goal_form',
+    runs: sameAs(
+      ['app/goals/[goalId]/document-actions.ts#saveDocumentKindAction', 'lib/goals/document-kinds-store.ts#editKind'],
+      ['app/goals/[goalId]/document-actions.ts#forgetDocumentKindAction', 'lib/goals/document-kinds-store.ts#forgetKind'],
+      ['app/goals/[goalId]/information-actions.ts#archiveRecordAction', 'lib/goals/collections-store.ts#archiveRecord'],
+      ['app/goals/[goalId]/information-actions.ts#saveQuestionsAction', 'lib/goals/steps-store.ts#setStepQuestions'],
+    ),
     description:
       "Change the form on one of the person's steps that gathers information, or a collection serving a goal, when they ask: set the questions it asks (change set_questions, with questions as the whole list; a wording kept keeps its answer, and an empty list clears them), add a row with the values they give (add_record, with values by field label) or change one (edit_record, with record and the values that change), on a step's form by step_ref or on a list serving a goal by goal_ref and collection (its name, such as the spaces list), archive one of its rows or bring an archived one back (archive_record, restore_record, with record as words from the row such as its name), change a kind of document it has learned to read (edit_document_kind, with document_kind and any of name, recognise, senders and skipped), or forget one so the next is read as new (forget_document_kind). Name the step by the goals.items ref a lookup returned. A row or kind that does not match is refused with the ones there are.",
     input_schema: {
@@ -1990,6 +1981,11 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
   },
   {
     name: 'change_goals_inbox',
+    runs: sameAs(
+      ['app/goals/suggestion-actions.ts#recordAttendedAction', 'lib/goals/suggestions-store.ts#recordAttended'],
+      ['app/goals/inbox/actions.ts#snoozeInboxRowAction', 'lib/core/snooze-days.ts#snoozeDay'],
+      ['app/goals/inbox/actions.ts#unsnoozeInboxRowAction', 'lib/core/inbox-snooze-store.ts#unsnoozeRow'],
+    ),
     description:
       "Change a row on the person's Goals Inbox, when they ask: snooze a goal or step there until a day (change snooze, with row_ref and until) or bring a snoozed one back (unsnooze, with row_ref), or record whether they went to an event they said they were going to (went, did_not_go, with event in their words). Name the goal or step by the goals.items ref a lookup returned. An event that does not match is refused with the ones waiting for an answer. Putting a step off on Goals itself, so it leaves Up next, is change_goal_step set_aside.",
     input_schema: {
@@ -2031,6 +2027,7 @@ const ASK_NOTE =
 export const GOALS_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = GOALS_WRITES.map((write) => ({
   name: write.name,
   kind: 'write' as const,
+  runs: write.runs,
   definition: { name: write.name, description: `${write.description} ${ASK_NOTE}`, input_schema: write.input_schema },
   apply: async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     if (!ctx.enabledModules.includes('goals')) {

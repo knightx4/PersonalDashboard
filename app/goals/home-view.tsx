@@ -26,10 +26,13 @@ import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import type { RunListing } from '@/lib/goals/runs';
 import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
 import { goalInboxCount } from '@/lib/goals/inbox';
+import { toGoalActivity } from '@/lib/goals/tree';
 import type { RunQuestion } from '@/lib/core/run-questions';
 import { AskDash } from './ask-dash';
 import { FoldLine } from './fold-line';
 import { GoalLanes } from './goal-lanes';
+import { PassiveMentions } from './passive-mentions';
+import type { PassiveMention } from '@/lib/goals/passive-mentions';
 import { MainRail } from '@/components/patterns/main-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
@@ -39,9 +42,10 @@ import { PageColumn } from '@/components/shell/page-width';
  * column, in the order you act on it:
  *
  * 1. Dash's card: one sentence on where the goals stand, the first paragraph
- *    of Dash's morning note (goals.briefs) with More for the rest, and Ask
- *    Dash, which goes to a goal or starts a new goal or errand
- *    (ask-dash.tsx).
+ *    of Dash's morning note (goals.briefs) with More for the rest, what is
+ *    coming up under a passive goal as optional lines (passive-mentions.tsx,
+ *    plan #2503.5), and Ask Dash, which goes to a goal or starts a new goal
+ *    or errand (ask-dash.tsx).
  * 2. A button to each area's page (note d79a0005), directly above
  * 3. Do next: at most five things on you from Todo and from goals with a
  *    due date, with Dash's
@@ -91,6 +95,10 @@ export type HomeViewProps = {
   filesToRead?: FileListing[] | null;
   /** What Dash did today in Goals, the fold every Now carries (plan #1964.4). */
   dashToday?: React.ReactNode;
+  /** What is coming up within a week under a passive goal, not declined (plan #2503.5). */
+  mentions?: PassiveMention[];
+  /** The gallery's way in: Passive goals drawn open. */
+  passiveOpen?: boolean;
 };
 
 export function HomeView({
@@ -110,6 +118,8 @@ export function HomeView({
   waitingRuns = [],
   filesToRead = [],
   dashToday,
+  mentions = [],
+  passiveOpen = false,
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -125,10 +135,13 @@ export function HomeView({
     );
   }
 
-  const summary = homeSummary(goals);
+  // Passive goals get no status (plan #2503.3), so the sentence counts the active ones.
+  const summary = homeSummary(
+    goals.filter((line) => toGoalActivity(line.goal.activity) === 'active'),
+  );
   const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
   const { errands } = splitErrands(goals);
-  const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
+  const { doNext, otherGoals, passiveGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
     <MainRail
@@ -150,8 +163,8 @@ export function HomeView({
                 <div className="voice-dash space-y-3 px-3 py-2">
                   {away !== null && (
                     <p className="text-body text-ink">
-                      Welcome back. You were away {away} days. What Dash did today is below, and every
-                      run it made while you were gone is on Every run.
+                      Welcome back. You were away {away} days. What Dash did today is below, and
+                      every run it made while you were gone is on Every run.
                     </p>
                   )}
                   {summary && <p className="text-body text-ink">{summary}</p>}
@@ -171,6 +184,7 @@ export function HomeView({
                   )}
                 </div>
               )}
+              <PassiveMentions mentions={mentions} />
               <AskDash
                 goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
                 areas={areas}
@@ -185,6 +199,8 @@ export function HomeView({
             doNext={doNext}
             inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
             otherGoals={otherGoals}
+            passiveGoals={passiveGoals}
+            passiveOpen={passiveOpen}
             todayOn={todayOn}
             preparable={preparable}
             dash={dash}

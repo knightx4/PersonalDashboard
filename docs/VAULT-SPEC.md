@@ -54,8 +54,11 @@ stays safe. Let it overrule an order record and it becomes a liability.
 Listing these because they will otherwise get invented.
 
 - **An editor for existing notes only.** Since plan #1422 a note's page has an
-  Edit button: the body is edited as markdown and saved as a commit to the
-  vault repository (`saveNoteEdit`), with the frontmatter kept as it was and a
+  Edit button: the body is edited in a live-preview editor and saved as you
+  write to a draft (`obsidian.note_drafts`), which the page shows. The draft
+  goes to the vault repository as one commit once it has sat ten minutes
+  untouched (`/api/cron/note-drafts`, every five minutes), with the
+  frontmatter kept as it was and a
   note changed in Obsidian since it was opened refused rather than overwritten.
   That needs a token with `Contents: Read and write`. Creating, renaming and
   deleting notes stay out: the vault is the master copy, and other notes link

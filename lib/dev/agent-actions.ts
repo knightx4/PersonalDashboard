@@ -75,7 +75,7 @@ export const devActions: ModuleActions = {
   },
   'app/dev/posts/actions.ts': {
     suggestPosts: none('spends', DEV_SPENDS),
-    suggestPostAbout: tool('suggest_post'),
+    suggestPostAbout: none('spends', DEV_SPENDS),
     editPostBody: tool('rewrite_post'),
     markPostPosted: none('theirs', 'Says the person posted it; Dash never posts.'),
     promotePost: none('theirs', 'Moving a post between suggested and planned is the person deciding to write it.'),

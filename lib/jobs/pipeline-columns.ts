@@ -1,9 +1,8 @@
-import type { PipelineRow } from '@/lib/jobs/applications/load';
-import { isLive } from '@/lib/jobs/pipeline';
 import {
   EXCITEMENT_MINIMUMS,
   PIPELINE_STAGES,
   pipelineHref,
+  type PipelineCounts,
   type PipelineParams,
   type PipelineState,
 } from '@/lib/jobs/pipeline-view';
@@ -35,16 +34,16 @@ const SENT_CHOICES = [7, 30, 90] as const;
 export function pipelineColumnFilters(
   params: PipelineParams,
   state: PipelineState,
-  /** The rows in scope, which the counts are taken from. */
-  scoped: readonly PipelineRow[],
-  /** Every row, for the status counts, which span live and closed. */
-  rows: readonly PipelineRow[],
+  /**
+   * What each choice would show given every other filter already set
+   * (note d7af5bd8), from pipelineCounts.
+   */
+  counts: PipelineCounts,
   scored: boolean,
 ): Record<string, ColumnFilter> {
   // The table is where these menus are, so every link stays on it.
   const href = (changes: Partial<Record<keyof PipelineParams, string | undefined>>) =>
     pipelineHref(params, { view: 'table', ...changes });
-  const live = rows.filter((row) => isLive(row.status));
 
   const status: FilterColumn<PipelineParams> = {
     id: 'status',
@@ -52,34 +51,35 @@ export function pipelineColumnFilters(
     options: [
       {
         id: 'live',
-        label: `Live · ${live.length}`,
+        label: `Live · ${counts.status.live}`,
         changes: { status: undefined, stage: undefined },
         current: state.scope === 'live' && !state.stage,
       },
       ...PIPELINE_STAGES.map((stage) => ({
         id: `stage-${stage.key}`,
-        label: `${stage.label} · ${live.filter((row) => (stage.statuses as readonly string[]).includes(row.status)).length}`,
+        label: `${stage.label} · ${counts.status.stages[stage.key]}`,
         changes: { status: undefined, stage: stage.key },
         current: state.scope === 'live' && state.stage?.key === stage.key,
       })),
       {
         id: 'closed',
-        label: `Closed · ${rows.length - live.length}`,
+        label: `Closed · ${counts.status.closed}`,
         changes: { status: 'closed', stage: undefined },
         current: state.scope === 'closed',
       },
       {
         id: 'all',
-        label: `All · ${rows.length}`,
+        label: `All · ${counts.status.all}`,
         changes: { status: 'all', stage: undefined },
         current: state.scope === 'all',
       },
     ],
   };
 
-  // The companies with the most applications in scope, then by name.
+  // The companies with the most applications the other filters let through,
+  // then by name.
   const companies = commonValues(
-    scoped,
+    counts.companyRows,
     (row) => row.companySlug,
     (row) => row.companyName,
     COLUMN_COMPANY_LIMIT,
@@ -141,8 +141,8 @@ export function pipelineColumnFilters(
         current: state.ready === null ? null : state.ready ? 'yes' : 'no',
         anyLabel: 'Ready or not',
         choices: [
-          { value: 'yes', label: `Ready to apply · ${scoped.filter((row) => row.readyToApply).length}` },
-          { value: 'no', label: `Not ready · ${scoped.filter((row) => !row.readyToApply).length}` },
+          { value: 'yes', label: `Ready to apply · ${counts.marks.ready}` },
+          { value: 'no', label: `Not ready · ${counts.marks.notReady}` },
         ],
       }),
       choiceColumn({
@@ -151,8 +151,8 @@ export function pipelineColumnFilters(
         current: state.questions === null ? null : state.questions ? 'yes' : 'no',
         anyLabel: 'Any questions',
         choices: [
-          { value: 'yes', label: `All questions added · ${scoped.filter((row) => row.allQuestionsAdded).length}` },
-          { value: 'no', label: `Not all added · ${scoped.filter((row) => !row.allQuestionsAdded).length}` },
+          { value: 'yes', label: `All questions added · ${counts.marks.questions}` },
+          { value: 'no', label: `Not all added · ${counts.marks.noQuestions}` },
         ],
       }),
     ],

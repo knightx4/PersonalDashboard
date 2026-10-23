@@ -13,7 +13,9 @@ import type { FetchOutcome } from '@/lib/jobs/ats';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import type { ModuleId } from '@/lib/modules';
 import { PAID_TOOLS } from './paid-tools';
+import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
+import type { CreateNotePorts } from '@/lib/vault/notes/create';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -108,7 +110,7 @@ export type DashWriteContext = AskContext & {
    */
   goals: ChangeDeps['goals'];
   /** createTask from lib/todo/tasks/write.ts. */
-  createTask: ChangeDeps['createTask'];
+  createTask: NonNullable<ChangeDeps['createTask']>;
   /**
    * What the thread's own tools do, bound by the thread to the row it hangs
    * from (lib/dash/thread.ts). Absent outside a thread, where those tools are
@@ -121,18 +123,15 @@ export type DashWriteContext = AskContext & {
    */
   readPosting?: (url: string) => Promise<FetchOutcome>;
   /**
-   * Writes a quick note into the vault's Inbox, for add_quick_note (plan
-   * #1894.2): fileVaultNote from lib/capture/vault.ts on the person's session,
-   * or the connector's service-role write for the person its token names.
-   * Absent: the note is refused.
+   * The note-create ports on the person's vault, embedding each note once
+   * the reply has gone, for add_quick_note (plan #1894.2): sessionInboxPorts
+   * from lib/capture/vault.ts on the person's session, or the connector's
+   * service-role ports for the person its token names. The tool calls
+   * createCapturedNote on them, as the Vault page's quick note does (plan
+   * #2473.5). Absent: the note is refused.
    */
-  fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
+  quickNotePorts?: () => Promise<CreateNotePorts>;
 };
-
-/** A quick note written to the vault, or the sentence saying why not. */
-export type QuickNoteFiled =
-  | { ok: true; noteId: string; path: string; title: string; blobSha: string }
-  | { ok: false; error: string };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */
 export type DashThreadActs = (name: string, input: unknown) => Promise<DashRecordedWrite | { ok: false; error: string }>;
@@ -187,6 +186,12 @@ export type DashWriteResult =
 
 export type DashWriteTool<R = DashWriteResult | DashRecordedWrite> = DashToolBase & {
   kind: 'write';
+  /**
+   * The buttons it does the same as, and the function each button's action
+   * and this tool should both call; or why no page offers it (./runs.ts,
+   * plan #2473.1). lib/dash/runs.test.ts follows both through the code.
+   */
+  runs: DashWriteRuns;
   /** Validates the input, makes the change, and says what it changed. Never throws. */
   apply: (ctx: DashWriteContext, input: unknown) => Promise<R | { ok: false; error: string }>;
   /**

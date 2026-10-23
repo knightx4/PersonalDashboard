@@ -1,4 +1,5 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { isRoleKind, type RoleKind } from '@/lib/jobs/role-kind';
 import {
   highWaterFromRejectionStage,
   requirementCoverage,
@@ -35,6 +36,8 @@ export interface PipelineRow {
   companyDomains: string[];
   companyWebsite: string | null;
   roleTitle: string;
+  /** What kind of opening it is: a job, or an accelerator, fellowship or grant. */
+  roleKind: RoleKind;
   location: string | null;
   workMode: string | null;
   status: ApplicationStatus;
@@ -47,6 +50,8 @@ export interface PipelineRow {
   allQuestionsAdded: boolean;
   /** true has a cover letter, false has none, null not answered. */
   hasCoverLetter: boolean | null;
+  /** At least one application question has been added to it. */
+  hasQuestions: boolean;
   createdBy: string;
   submittedAt: string | null;
   confirmationReceivedAt: string | null;
@@ -95,10 +100,11 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
+    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
-  interviews ( kind, scheduled_at, time_known )
+  interviews ( kind, scheduled_at, time_known ),
+  application_answers ( count )
 `;
 
 type RawRow = {
@@ -125,6 +131,7 @@ type RawRow = {
   roles: {
     id: string;
     title: string;
+    kind: string | null;
     location: string | null;
     work_mode: string | null;
     comp_min_cents: number | null;
@@ -140,6 +147,7 @@ type RawRow = {
     };
   };
   interviews: { kind: string; scheduled_at: string | null; time_known: boolean | null }[] | null;
+  application_answers: { count: number }[] | null;
 };
 
 export async function loadPipeline(
@@ -183,6 +191,7 @@ export async function loadPipeline(
     companyDomains: row.roles.companies.domains ?? [],
     companyWebsite: row.roles.companies.website,
     roleTitle: row.roles.title,
+    roleKind: isRoleKind(row.roles.kind) ? row.roles.kind : 'job',
     location: row.roles.location,
     workMode: row.roles.work_mode,
     status: row.status,
@@ -193,6 +202,7 @@ export async function loadPipeline(
     readyToApply: row.ready_to_apply === true,
     allQuestionsAdded: row.all_questions_added === true,
     hasCoverLetter: row.has_cover_letter ?? null,
+    hasQuestions: (row.application_answers?.[0]?.count ?? 0) > 0,
     createdBy: row.created_by,
     submittedAt: row.submitted_at,
     confirmationReceivedAt: row.confirmation_received_at,

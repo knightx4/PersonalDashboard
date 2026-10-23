@@ -29,6 +29,7 @@ import { QUERY_OPS, QUERY_ROWS_MAX, queryRowsLookup } from './query';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { postPicturesLookup } from '@/lib/dash/post-pictures';
+import { dashModelLookup } from '@/lib/dash/model-lookup';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
@@ -71,6 +72,7 @@ export const ASK_TOOL_NAMES = [
   'read_dev_row',
   'find_dev_text',
   'post_pictures',
+  'dash_model',
   'search_mail',
   'read_mail',
   'read_job_board',
@@ -82,8 +84,10 @@ export const ASK_TOOL_NAMES = [
  * and read in Gmail as the person, which a connector token cannot do, and
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
+ * The model Dash answers with is the app's own setting (plan #2458.4), and a
+ * connector client is not Dash.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart', 'dash_model'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -103,7 +107,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'search',
     description:
-      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path) and courses from saved transcripts (by title, code, term and school); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals, goal steps and files (what Dash wrote for a goal, and what the person gave it). Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
+      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies (by name or industry), roles (by title or kind, such as accelerator) and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path) and courses from saved transcripts (by title, code, term and school); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals, goal steps and files (what Dash wrote for a goal, and what the person gave it). Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -143,12 +147,17 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'open_row',
-    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
+    description: `Read one row in full: its title and the text columns worth reading, the newest comments under it, with the link to its page. Long text comes in parts of about 8,000 characters with its line breaks kept; when the answer says there are more, call again with part 2, 3 and so on before saying what the row holds. The comments are where Dash answers a comment tagged @dash and a Prepare with Dash press on a role, so open the row to say whether that reply came and what it said. Use the table and ref another tool returned. A row found by search is named by its id, which is accepted for every table. The tables that can be opened: ${openableList()}.`,
     input_schema: {
       type: 'object',
       properties: {
         table: { type: 'string', enum: OPENABLE.map((s) => s.table) },
         ref: { type: 'string', description: 'The ref another tool returned for the row.' },
+        part: {
+          type: 'integer',
+          minimum: 1,
+          description: 'For a long note or other long text, which part to read: 1 (the default) is the start. The answer says how many parts there are.',
+        },
       },
       required: ['table', 'ref'],
       additionalProperties: false,
@@ -278,7 +287,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'job_applications',
     description:
-      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched; lists the newest 50, each linking to its role. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), or to sent applications that never had a reply (no_reply).',
+      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched; lists the newest 50, each linking to its role. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
     input_schema: {
       type: 'object',
       properties: {
@@ -298,6 +307,11 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
           type: 'boolean',
           description: 'Only sent applications the company never replied to, an automatic confirmation aside, whatever their status now.',
         },
+        changed_status: {
+          type: 'boolean',
+          description:
+            'Only applications whose status changed between from and to (from defaults to six days ago, to to today), by hand or from mail, with what it was before (status_before) and after (status_after). from and to then date the change, not the day sent, and status filters status_after. For "what did I move to submitted this week that wasn\'t before", changed_status with status submitted and acknowledged, since a sent one whose confirmation came is acknowledged.',
+        },
       },
       additionalProperties: false,
     },
@@ -305,7 +319,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'application_answers',
     description:
-      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the first words of the answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
+      "Every answer on one job application, each with the question it answers: the answer ref, the question, its status (draft, approved or submitted), the word limit, the whole answer and a link to the role. Name the application with application_ref, or the role with role_ref for its latest application. Use it for \"the two answers on the Sent role\" or \"which questions on that application are still drafts\", to reuse an answer from one application on another (read it here, then save_answer), and to get the answer_ref that save_answer takes. It lists only that one application's answers; for the questions across every application use list_rows on job_search.questions.",
     input_schema: {
       type: 'object',
       properties: {
@@ -512,6 +526,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'dash_model',
+    description:
+      'Say which model Dash is answering with: Haiku, Sonnet or Opus, as they last picked it on the Dash page or asked you to set it, or the default (Sonnet) when they never chose. Use it for "which model are you using?" or "what am I on?" and read the answer from here; do not guess from what you know about yourself. To change it, call set_dash_model.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'search_mail',
     description:
       'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
@@ -595,6 +615,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   read_dev_row: { run: readDevRowLookup, module: null },
   find_dev_text: { run: findDevTextLookup, module: null },
   post_pictures: { run: postPicturesLookup, module: null },
+  // Reads the account's own setting; no workspace has to be on.
+  dash_model: { run: dashModelLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },

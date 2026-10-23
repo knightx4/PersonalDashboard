@@ -151,6 +151,11 @@ export const SPEND_OPERATIONS = {
     // past 300,000 characters, from the Monday ask-reply-check cron; none on a
     // week without chats.
     'check-ask-replies',
+    // The nightly Dash quality check (supabase/migrations/0277): each active
+    // case in core.dash_eval_cases asked as Ask asks it, with the person's
+    // chosen model and read tools only. About ten answers a night, each a few
+    // calls that read Dash's rules from the cache; background.
+    'check-dash-quality',
     // Embedding passages of what the person wrote or did across the modules,
     // so Dash can find them by meaning (plan #1247). Voyage; background, from
     // the five-minute memory sweep, which is also the backfill. A row is

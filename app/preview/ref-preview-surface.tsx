@@ -30,11 +30,14 @@ const GONE: RefPreview = { title: 'no longer there', missing: true, move: null }
 
 const REF = cn('comment-ref', linkVariants());
 
+/** Dash's turns take the recessed ground, as the thread draws them (components/thread/thread.tsx). */
 function Said({ who, room, children }: { who: string; room: string; children: React.ReactNode }) {
   return (
-    <div className={cn('flex flex-col gap-1', room)}>
-      <span className="text-small font-semibold text-ink">{who}</span>
-      <p className="comment-prose text-body text-ink">{children}</p>
+    <div className={room}>
+      <div className={cn('flex flex-col gap-1', who === 'Dash' ? 'voice-dash -mx-2 px-2 py-1.5' : 'voice-you')}>
+        <span className="text-small font-semibold text-ink">{who}</span>
+        <p className="comment-prose text-body text-ink">{children}</p>
+      </div>
     </div>
   );
 }

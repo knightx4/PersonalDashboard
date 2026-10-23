@@ -1,3 +1,4 @@
+import { noButton, sameAsVia, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { CAPTURE_MOVE_TOOLS } from '@/lib/goals/capture';
 import type { DashTool, DashWriteTool } from './registry';
@@ -29,10 +30,17 @@ const CAPTURE_ONLY = 'That can only be done from the capture box. Answer in word
 
 type Schema = Anthropic.Tool['input_schema'];
 
-function move(name: string, description: string, properties: Schema['properties'], required: string[]): DashWriteTool {
+function move(
+  name: string,
+  runs: DashWriteRuns,
+  description: string,
+  properties: Schema['properties'],
+  required: string[],
+): DashWriteTool {
   return {
     name,
     kind: 'write',
+    runs,
     subjects: [CAPTURE_TABLE],
     definition: {
       name,
@@ -69,12 +77,14 @@ const TOTAL = {
 export const CAPTURE_TOOLS: readonly DashTool[] = [
   move(
     CAPTURE_MOVE_TOOLS.close,
+    sameAsVia('lib/goals/capture-store.ts#applyCaptureAction', ['app/goals/[goalId]/actions.ts#setStepStatusAction', 'lib/goals/steps-store.ts#setStepStatus']),
     'The whole of a step is finished. Only for steps marked mine or claude, never a rhythm. Part of a step\'s work is progress, never a close.',
     { step: STEP },
     ['step'],
   ),
   move(
     CAPTURE_MOVE_TOOLS.count,
+    sameAsVia('lib/goals/capture-store.ts#applyCaptureAction', ['app/goals/[goalId]/actions.ts#countRhythmAction', 'lib/goals/rhythms-store.ts#countTowards']),
     'The sentence reports occurrences of a rhythm step, such as "went to an event" against a rhythm of one event a week. Only for steps marked rhythm with a period open.',
     {
       step: STEP,
@@ -88,18 +98,21 @@ export const CAPTURE_TOOLS: readonly DashTool[] = [
   ),
   move(
     CAPTURE_MOVE_TOOLS.progress,
+    noButton('No Goals page logs progress against a step by hand; the capture box is the only place progress is filed.'),
     'Part of the work, done without finishing it. Name the deepest step the sentence fits; when no step fits, give the goal instead, but only when the work belongs to the goal as a whole. A distinct piece of work the tree has no step for is an add carrying the progress.',
     { step: STEP, goal: GOAL, text: TEXT, quantity: QUANTITY, unit: UNIT, day: DAY, total: TOTAL },
     ['text'],
   ),
   move(
     CAPTURE_MOVE_TOOLS.reading,
+    sameAsVia('lib/goals/capture-store.ts#applyCaptureAction', ['app/goals/[goalId]/reading-actions.ts#addReadingAction', 'lib/goals/readings-store.ts#addReading']),
     'The sentence gives the current value of a goal\'s number, such as a balance or a weight. Only for goals marked "measured in".',
     { goal: GOAL, value: { type: 'number', description: "The number alone, in the goal's unit." } },
     ['goal', 'value'],
   ),
   move(
     CAPTURE_MOVE_TOOLS.add,
+    sameAsVia('lib/goals/capture-store.ts#applyCaptureAction', ['app/goals/[goalId]/actions.ts#addStep', 'lib/goals/steps-store.ts#insertStep']),
     'A follow-up step the sentence implies, or work already done on something no step covers. Work the sentence says is finished ("cleaned the bathroom") is added with done true, so the step goes in already closed. Work begun but not finished is added under the nearest step it fits (or the goal) with text, quantity, unit and day as for progress, so it starts under way. Never also log the same work as a separate progress move.',
     {
       parent: { type: 'string', description: 'The goal or step it goes under, by its ref (g1 or s4).' },

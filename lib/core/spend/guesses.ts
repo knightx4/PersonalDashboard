@@ -410,6 +410,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A week of Ask Dash chats, the person's turns whole and Dash's cut to 600
   // characters, about 70,000 characters; a short list of flags out.
   'check-ask-replies': background(run(HAIKU, 20_000, 600)),
+  // About ten Ask Dash answers, each around four calls of a 75,000-token
+  // prompt that is mostly read from the cache; a few hundred tokens out each.
+  'check-dash-quality': background(run(SONNET, 400_000, 6_000)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.

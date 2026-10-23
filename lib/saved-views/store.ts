@@ -56,26 +56,53 @@ export async function savedViewsFor(
 }
 
 /**
+ * The saved view on a list that a name would replace, if there is one.
+ *
+ * Names are compared without case, the same way the unique index on
+ * `lower(name)` compares them: "Recent" and "recent" are one name to the
+ * person typing them.
+ */
+export function viewNamed<T extends { name: string }>(
+  views: readonly T[],
+  name: string,
+): T | null {
+  const wanted = name.toLowerCase();
+  return views.find((view) => view.name.toLowerCase() === wanted) ?? null;
+}
+
+/**
  * Save the arrangement as it stands.
  *
  * Saving under a name already on this list replaces that view rather than
- * making a second one with the same name -- which is the unique index doing
- * the deciding, not this.
+ * making a second one with the same name. This is a lookup and then an update
+ * or an insert rather than an upsert: the unique index is on `lower(name)`,
+ * and PostgREST's `onConflict` can only name plain columns, so an upsert has
+ * no constraint to land on and Postgres refuses it.
  */
 export async function saveView(
   supabase: CoreSupabaseClient,
   userId: string,
   view: { list: string; name: string; query: string },
 ): Promise<void> {
-  const { error } = await supabase.from('saved_views').upsert(
-    {
-      user_id: userId,
-      list: view.list,
-      name: view.name,
-      query: view.query,
-    },
-    { onConflict: 'user_id, list, name' },
-  );
+  const { data, error: readError } = await supabase
+    .from('saved_views')
+    .select('id, name')
+    .eq('user_id', userId)
+    .eq('list', view.list);
+  if (readError) throw fail('Saving the view', readError);
+
+  const existing = viewNamed((data ?? []) as { id: string; name: string }[], view.name);
+  const { error } = existing
+    ? await supabase
+        .from('saved_views')
+        .update({ name: view.name, query: view.query })
+        .eq('id', existing.id)
+    : await supabase.from('saved_views').insert({
+        user_id: userId,
+        list: view.list,
+        name: view.name,
+        query: view.query,
+      });
 
   if (error) throw fail('Saving the view', error);
 }

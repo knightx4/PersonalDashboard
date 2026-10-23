@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -49,7 +50,7 @@ function readingHit(row: ReadingRow): SearchHit {
 }
 
 async function read(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createLearnClient();
+  const supabase = await sourceClient(ctx, 'learn', createLearnClient);
   const pattern = ctx.query ? `%${escapeLike(ctx.query)}%` : null;
 
   let readingsRead = supabase.from('readings').select('id, title, status, sources(title, author)');

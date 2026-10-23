@@ -116,6 +116,28 @@ describe('waitingOnYou', () => {
     expect(row.ask).toBe('what still stands.');
   });
 
+  // Note f11b600a: a question's title alone did not say what it was about.
+  it('names the feature a question sits under, however deep', () => {
+    const feature = item({ id: 'feat', title: 'Add a business topic pack', status: 'in_progress' });
+    const middle = item({ id: 'mid', parentId: 'feat', status: 'in_progress' });
+    const question = item({
+      id: 'q',
+      parentId: 'mid',
+      kind: 'decision',
+      title: 'Draft the other areas now?',
+      detail: 'A. Now. B. Later.',
+    });
+    const found = rows([feature, middle, question]).find((row) => row.id === 'q');
+
+    expect(found?.feature).toEqual({ number: feature.number, title: 'Add a business topic pack' });
+  });
+
+  it('names no feature on a feature itself', () => {
+    const [row] = rows([item({ id: 'top', status: 'blocked', blockAsk: 'Which one?' })]);
+
+    expect(row.feature).toBeNull();
+  });
+
   // Dash draws the thread on the row, so the row has to arrive carrying it.
   it('carries the step thread through to the row', () => {
     const [row] = rows([

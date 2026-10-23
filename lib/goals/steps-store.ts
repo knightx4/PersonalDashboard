@@ -39,7 +39,7 @@ import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
-import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
+import { nextPosition, reorder, toGoalActivity, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
@@ -97,6 +97,7 @@ type ItemRow = {
   estimated_total?: number | string | null;
   total_unit?: string | null;
   notify_on_done?: boolean | null;
+  activity?: string | null;
 };
 
 type LinkRow = { id: string; item_id: string; goal_id: string };
@@ -126,7 +127,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, activity';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -185,6 +186,7 @@ const toGoal = (row: ItemRow): Goal => ({
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
+  activity: toGoalActivity(row.activity),
   createdAt: row.created_at ?? null,
   closedAt: row.closed_at ?? null,
 });
@@ -555,9 +557,15 @@ export async function moveStepToGoal(
   return { unlinked: (unlinked ?? []).length > 0 };
 }
 
-/** One place up or down among its siblings. False when already at that end. */
+/**
+ * One place up or down among its live siblings. The goal page's arrows and
+ * Dash's change_goal_step both call it (plan #2473.5), so every read and
+ * write is narrowed to the user, as the connector's service role needs.
+ * False when already at that end, or when it is no live step of theirs.
+ */
 export async function moveStep(
   client: GoalsSupabaseClient,
+  userId: string,
   id: string,
   direction: 'up' | 'down',
 ): Promise<boolean> {
@@ -565,6 +573,7 @@ export async function moveStep(
     .from('items')
     .select('parent_id')
     .eq('id', id)
+    .eq('user_id', userId)
     .eq('level', 'step')
     .is('archived_at', null)
     .maybeSingle();
@@ -574,6 +583,7 @@ export async function moveStep(
   const { data: siblings, error } = await client
     .from('items')
     .select('id')
+    .eq('user_id', userId)
     .eq('parent_id', step.parent_id as string)
     .is('archived_at', null)
     .order('position')
@@ -591,7 +601,8 @@ export async function moveStep(
       client
         .from('items')
         .update({ position: (i + 1) * 10 })
-        .eq('id', sid),
+        .eq('id', sid)
+        .eq('user_id', userId),
     ),
   );
   const failed = results.find((result) => result.error);

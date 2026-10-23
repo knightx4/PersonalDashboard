@@ -1,5 +1,5 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
-import type { TalkToolCall, TalkTurn } from './talk';
+import { LOOKUP_NOT_RUN, type TalkToolCall, type TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
@@ -11,6 +11,7 @@ import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
+import { MODEL_CHANGE_KINDS } from '@/lib/ask/model-changes';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -28,11 +29,15 @@ import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
  * browser imports it.
  */
 
-/** One lookup as the thread draws it. `found` is null while it runs or when the result says no count. */
+/**
+ * One lookup as the thread draws it. `found` is null while it runs or when
+ * the result says no count. 'skipped': refused at one of the answer's limits
+ * without running, which is not a lookup that broke.
+ */
 export type LookupLine = {
   id: string;
   label: string;
-  state: 'running' | 'done' | 'failed';
+  state: 'running' | 'done' | 'failed' | 'skipped';
   found: number | null;
 };
 
@@ -45,7 +50,19 @@ export type LookupWire = {
   input: unknown;
   ok?: boolean;
   found?: number | null;
+  /** Refused at a limit without running. */
+  skipped?: boolean;
 };
+
+/** Whether a kept result is a lookup refused at a limit, which never ran. */
+function wasSkipped(result: unknown): boolean {
+  return !!result && typeof result === 'object' && (result as { error?: unknown }).error === LOOKUP_NOT_RUN;
+}
+
+/** A finished lookup's state from its result. */
+function finishedState(ok: boolean, skipped: boolean): LookupLine['state'] {
+  return ok ? 'done' : skipped ? 'skipped' : 'failed';
+}
 
 /**
  * One line of the stream: a lookup starting or finishing, a piece of the
@@ -91,6 +108,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
   ...POST_CHANGE_KINDS,
+  ...MODEL_CHANGE_KINDS,
 ];
 
 /**
@@ -208,6 +226,8 @@ export function lookupLabel(name: string, input: unknown): string {
     }
     case 'post_pictures':
       return 'Looking at the post pictures';
+    case 'dash_model':
+      return 'Checking which model Dash is using';
     case 'search_mail': {
       const from = quoted(field(input, 'from'));
       const words = quoted(field(input, 'words'));
@@ -240,6 +260,7 @@ export function foundCount(result: unknown): number | null {
 /** What follows a finished line: how many it found, or that it did not work. */
 export function lookupOutcome(line: Pick<LookupLine, 'state' | 'found'>): string | null {
   if (line.state === 'failed') return 'did not work';
+  if (line.state === 'skipped') return 'not run';
   if (line.state === 'running' || line.found === null) return null;
   return line.found === 0 ? 'nothing found' : `${line.found} found`;
 }
@@ -249,7 +270,16 @@ export function lookupWire(event: AskLookupEvent): LookupWire | null {
   if (!isShownLookup(event.name)) return null;
   const { phase, id, index, name, input } = event;
   if (event.phase === 'started') return { phase, id, index, name, input };
-  return { phase, id, index, name, input, ok: event.ok, found: event.ok ? foundCount(event.result) : null };
+  return {
+    phase,
+    id,
+    index,
+    name,
+    input,
+    ok: event.ok,
+    found: event.ok ? foundCount(event.result) : null,
+    ...(!event.ok && wasSkipped(event.result) ? { skipped: true } : {}),
+  };
 }
 
 /**
@@ -264,7 +294,7 @@ export function heardLookup(lines: readonly LookupLine[], wire: LookupWire): Loo
       : {
           id: wire.id,
           label: lookupLabel(wire.name, wire.input),
-          state: wire.ok ? 'done' : 'failed',
+          state: finishedState(!!wire.ok, !!wire.skipped),
           found: wire.ok ? (wire.found ?? null) : null,
         };
   const at = lines.findIndex((line) => line.id === wire.id);
@@ -281,7 +311,7 @@ export function turnLookups(calls: readonly TalkToolCall[] | undefined): LookupL
       return {
         id: String(i),
         label: lookupLabel(call.name, call.input),
-        state: ok ? 'done' : 'failed',
+        state: finishedState(ok, wasSkipped(call.result)),
         found: ok ? foundCount(call.result) : null,
       };
     });

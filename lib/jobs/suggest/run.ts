@@ -149,7 +149,7 @@ async function loadApplications(supabase: AppSupabaseClient, userId: string): Pr
 async function loadPast(supabase: AppSupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from('suggestions')
-    .select('kind, status, origin, dismiss_reason, headline, contact_id, company_id, company_name, person_name, url, created_at, acted_at')
+    .select('kind, status, origin, dismiss_reason, dismiss_text, headline, contact_id, company_id, company_name, person_name, url, created_at, acted_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(500);
@@ -270,6 +270,7 @@ async function runApply(
       headline: (row.headline as string | null) ?? null,
       companyName: (row.company_name as string | null) ?? null,
       dismissReason: (row.dismiss_reason as string | null) ?? null,
+      dismissText: (row.dismiss_text as string | null) ?? null,
     })),
   );
   const taken = {

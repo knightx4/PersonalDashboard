@@ -4,9 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { addContact, addTouch, BEFORE_CONTACTED_AGAIN, markContacted, suggestedContact } from '@/lib/jobs/contacts/edit';
 import { detectPosting } from '@/lib/jobs/ats';
 import { startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
-import { isDismissReason } from '@/lib/jobs/suggest/feedback';
+import { declineText } from '@/lib/jobs/suggest/decline-text';
 
 /**
  * Dash's recommendations (job_search.suggestions, 0028): the roles and the
@@ -88,7 +89,7 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
   const supabase = await createClient();
   const { error } = await supabase
     .from('suggestions')
-    .update({ status: 'open', acted_at: null, dismiss_reason: null })
+    .update({ status: 'open', acted_at: null, dismiss_reason: null, dismiss_text: null })
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .eq('status', 'dismissed');
@@ -97,11 +98,25 @@ export async function reopenSuggestion(id: string): Promise<{ error: string | nu
   return { error: null };
 }
 
-/** Turn a recommended role down, saying why. */
+/**
+ * Turn a recommended role down, with whatever the person typed in the box
+ * (plan #2504.3), or nothing. The typed text goes in dismiss_text; the fixed
+ * reason is left empty, which the feedback reads as "no reason given", so the
+ * declines made from the old menu keep their reasons and still read the same.
+ * With "Never this company" ticked (plan #2504.5) the fixed reason is the
+ * company one Not this company set: openingsTaken reads it to keep that
+ * company out of every later search, and nothing else changes.
+ */
 // latency: pending -- should be optimistic: a dismiss that waits for the round trip
-export async function dismissOpening(id: string, reason: string): Promise<{ error: string | null }> {
-  if (!isDismissReason(reason)) return { error: 'Choose a reason.' };
-  return closeSuggestion(id, 'dismissed', { dismiss_reason: reason });
+export async function dismissOpening(
+  id: string,
+  text: string,
+  neverCompany = false,
+): Promise<{ error: string | null }> {
+  return closeSuggestion(id, 'dismissed', {
+    dismiss_reason: neverCompany === true ? 'company' : null,
+    dismiss_text: declineText(text),
+  });
 }
 
 /**
@@ -130,40 +145,20 @@ export async function markSuggestionSent(id: string): Promise<{ error: string | 
   if (!contactId && row.person_name) {
     const company = row.company_name ? await ensureCompany(supabase, user.id, row.company_name as string) : null;
     if (company?.error) return { error: company.error };
-    const source = (row.source_url as string | null) ?? null;
-    const { data: contact, error: contactError } = await supabase
-      .from('contacts')
-      .insert({
-        user_id: user.id,
-        company_id: company?.id ?? null,
-        full_name: row.person_name,
-        title: row.person_title,
-        linkedin_url: source && /linkedin\.com\/in\//.test(source) ? source : null,
-        relationship: 'cold',
-        status: 'contacted',
-        notes: source ? `Found by Dash: ${source}` : 'Found by Dash.',
-      })
-      .select('id')
-      .single();
-    if (contactError || !contact) return { error: contactError?.message ?? 'Could not add them as a contact.' };
+    const { row: contact, error: contactError } = await addContact(supabase, user.id, suggestedContact(row, company?.id ?? null));
+    if (contactError || !contact) return { error: contactError ?? 'Could not add them as a contact.' };
     contactId = contact.id as string;
   }
 
   if (contactId) {
-    const { error: touchError } = await supabase.from('contact_touches').insert({
-      user_id: user.id,
+    const { error: touchError } = await addTouch(supabase, user.id, {
       contact_id: contactId,
-      channel: row.channel ?? 'other',
+      channel: (row.channel as string | null) ?? 'other',
       direction: 'outbound',
-      message: row.message,
+      message: (row.message as string | null) ?? null,
     });
-    if (touchError) return { error: touchError.message };
-    await supabase
-      .from('contacts')
-      .update({ status: 'contacted' })
-      .eq('id', contactId)
-      .eq('user_id', user.id)
-      .in('status', ['to_contact', 'dormant']);
+    if (touchError) return { error: touchError };
+    await markContacted(supabase, user.id, contactId, BEFORE_CONTACTED_AGAIN);
     revalidatePath('/jobs/contacts');
   }
   return closeSuggestion(parsed.data, 'done', contactId ? { contact_id: contactId } : {});

@@ -120,7 +120,7 @@ export function ShapeIdea({ idea }: { idea: IdeaRow }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={idea.id} />
-      <DashAction type="submit" size="sm" variant="secondary" pending={pending}>
+      <DashAction type="submit" size="sm" variant="secondary" pending={pending} routine="plan">
         {pending ? 'Sending…' : 'Shape this into a plan'}
       </DashAction>
       {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"

@@ -5,7 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
-import { MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
+import { LOOKUP_NOT_RUN, MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
@@ -56,8 +56,19 @@ import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
  * and token budgets below still bound the answer.
  */
 export const MAX_LOOKUPS = 12;
-/** Input tokens across the calls of one answer, cached and not, before it must answer. */
+/**
+ * Input tokens across the calls of one answer before it must answer, with a
+ * cache read counted at a tenth, as it is priced (budgetTokens). Counted in
+ * full, the rules and tools alone, about 76,000 tokens by October 2026,
+ * spent the budget in two calls: "what roles have I applied to at
+ * Concourse" was told to answer after three lookups, with nothing found yet.
+ */
 export const INPUT_BUDGET = 150_000;
+
+/** What one call spends of INPUT_BUDGET: fresh input and cache writes in full, cache reads at a tenth. */
+export function budgetTokens(usage: { inputTokens: number; cachedInputTokens: number; cacheWriteTokens: number }): number {
+  return usage.inputTokens + usage.cacheWriteTokens + Math.ceil(usage.cachedInputTokens / 10);
+}
 /**
  * Time spent looking before it must answer. Ask runs in app/api/ask/route.ts,
  * whose maxDuration is 300 seconds (plan #1438). Forty seconds fits five rounds of lookups (the
@@ -284,8 +295,16 @@ export const LOOK_FIRST =
  */
 const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them now, in words, from what you have found.';
 
+/**
+ * Sent beside the refused lookups when the model was told to answer and
+ * looked something up instead. With the tool results alone, the call after
+ * them came back with a single token and no words (the Concourse question,
+ * 21 October 2026).
+ */
+const ANSWER_IN_WORDS = 'Write your answer to them now, in words, from what you have found. Say plainly what you could not check.';
+
 /** Said to the model when a limit is reached, in place of any further lookup. */
-const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
+const LIMIT_REACHED = LOOKUP_NOT_RUN;
 
 /**
  * Why the answer stopped. 'unfinished': the model wrote nothing usable, and
@@ -960,7 +979,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
-    inputTokens += usage.inputTokens + usage.cachedInputTokens + usage.cacheWriteTokens;
+    inputTokens += budgetTokens(usage);
     if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
@@ -1110,43 +1129,54 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             { role: 'assistant', content: response.content },
             {
               role: 'user',
-              content: uses.map((use, i) => {
+              content: (uses.map((use, i) => {
                 const result = keptResult({ ok: false, error: LIMIT_REACHED });
                 toolCalls.push({ name: use.name, input: use.input, result });
                 hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
                 return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
-              }),
+              }) as Anthropic.ContentBlockParam[]).concat({ type: 'text', text: ANSWER_IN_WORDS }),
             },
           );
         }
-        let prose: Anthropic.Message;
-        try {
-          prose = await callModel(
-            client,
-            {
-              model,
-              max_tokens: maxTokens,
-              system,
-              tools,
-              tool_choice: { type: 'none' },
-              messages: withRollingBreakpoint(messages),
-            },
-            onText,
-            finishName,
-            signal,
-          );
-        } catch (error) {
-          if (signal?.aborted) return stoppedAnswer();
-          return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
+        // Two tries: a call with no tool allowed has still come back empty,
+        // and asked again it writes the answer from what is already found.
+        let prose: Anthropic.Message | null = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (prose) {
+            if (prose.content.length > 0) messages.push({ role: 'assistant', content: prose.content });
+            messages.push({ role: 'user', content: WRITE_IT_OUT });
+          }
+          try {
+            prose = await callModel(
+              client,
+              {
+                model,
+                max_tokens: maxTokens,
+                system,
+                tools,
+                tool_choice: { type: 'none' },
+                messages: withRollingBreakpoint(messages),
+              },
+              onText,
+              finishName,
+              signal,
+            );
+          } catch (error) {
+            if (signal?.aborted) return stoppedAnswer();
+            return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
+          }
+          input.onSpend?.({ model, usage: usageFrom(prose.usage) });
+          const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
+          if (said && prose.stop_reason !== 'max_tokens') {
+            const stop: DashStop = limit ?? (empty ? 'answered' : 'lookups');
+            const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
+            return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
+          }
+          // Widened: the installed SDK's type may predate the reason.
+          const ended: string | null = prose.stop_reason;
+          if (ended === 'max_tokens' || ended === 'refusal') break;
         }
-        input.onSpend?.({ model, usage: usageFrom(prose.usage) });
-        const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
-        if (said && prose.stop_reason !== 'max_tokens') {
-          const stop: DashStop = limit ?? (empty ? 'answered' : 'lookups');
-          const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
-          return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
-        }
-        return fail(whyNoReport(prose), stoppedInWords(prose));
+        return fail(whyNoReport(prose!), stoppedInWords(prose!));
       }
       return fail(whyNoReport(response), stoppedInWords(response));
     }

@@ -239,10 +239,18 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
   };
 }
 
+/** The rows a relation holds; obsidian.readable_notes is the live notes that hold no credentials, as the view is. */
+function relationRows(tables: Tables, schema: AskSchema, table: string): Row[] {
+  if (schema === 'obsidian' && table === 'readable_notes') {
+    return (tables['obsidian.notes'] ?? []).filter((row) => row.voice !== 'secret' && !row.deleted_at);
+  }
+  return tables[`${schema}.${table}`] ?? [];
+}
+
 function fakeDb(tables: Tables, calls: RpcCall[] = [], owner = false): AskDb {
   return async (schema: AskSchema) =>
     ({
-      from: (table: string) => new FakeQuery(tables[`${schema}.${table}`] ?? [], tables, schema),
+      from: (table: string) => new FakeQuery(relationRows(tables, schema, table), tables, schema),
       rpc: fakeRpc(tables, calls, owner),
     }) as unknown as SchemaClient;
 }
@@ -358,6 +366,43 @@ describe('open_row', () => {
       href: '/vault/n/Work/Leaving.md',
       detail: { body: 'Thinking about leaving my job.' },
     });
+  });
+
+  it('never opens a note that holds credentials, by path or by id', async () => {
+    const secret: Tables = {
+      'obsidian.notes': [
+        { id: '33333333-3333-4333-8333-333333333333', user_id: ME, path: 'Keys.md', title: 'Keys', body: 'password: hunter2', voice: 'secret' },
+      ],
+    };
+    for (const ref of ['Keys.md', '33333333-3333-4333-8333-333333333333']) {
+      const result = await executeAskTool('open_row', { table: 'obsidian.notes', ref }, context(secret));
+      expect(result.ok && result.rows).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain('hunter2');
+    }
+    const listed = await executeAskTool('list_rows', { table: 'obsidian.notes' }, context(secret));
+    expect(JSON.stringify(listed)).not.toContain('hunter2');
+  });
+
+  it('reads a long note in parts with its line breaks, and says how to read on', async () => {
+    const line = 'Checked the master comparison tab against each source and the counts agree. ';
+    const body = Array.from({ length: 300 }, (_, i) => `${i}. ${line}`).join('\n');
+    const long: Tables = {
+      'obsidian.notes': [{ id: '44444444-4444-4444-8444-444444444444', user_id: ME, path: 'respark take home.md', title: 'respark take home', body }],
+    };
+    const first = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md' }, context(long));
+    if (!first.ok) throw new Error(first.error);
+    const firstBody = String(first.rows[0].detail?.body);
+    expect(firstBody.length).toBeGreaterThan(6000);
+    expect(firstBody).toContain('\n1. ');
+    expect(first.note).toMatch(/body is part 1 of 4\. Call open_row with the same table and ref and part 2 to read on\./);
+
+    const last = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md', part: 4 }, context(long));
+    if (!last.ok) throw new Error(last.error);
+    expect(String(last.rows[0].detail?.body)).toContain('299. ');
+    expect(last.note).toContain('This is the last part.');
+
+    const past = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'respark take home.md', part: 9 }, context(long));
+    expect(past).toMatchObject({ ok: false });
   });
 
   it('opens a row by the id search gave it, and points a task at itself on the list', async () => {
@@ -515,7 +560,7 @@ describe('application_answers', () => {
       { id: 'n1', user_id: ME, application_id: 'a1', question_id: 'q1', answer: 'Because the work matters. '.repeat(20), status: 'draft', word_limit: 150, created_at: '2026-09-01T10:00:00Z' },
       { id: 'n2', user_id: ME, application_id: 'a1', question_id: 'q2', answer: null, status: 'approved', word_limit: null, created_at: '2026-09-01T11:00:00Z' },
       { id: 'n0', user_id: ME, application_id: 'a1-old', question_id: 'q3', answer: 'Old attempt', status: 'submitted', word_limit: null, created_at: '2026-08-01T10:00:00Z' },
-      { id: 'n3', user_id: ME, application_id: 'a2', question_id: 'q3', answer: 'Negotiable', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
+      { id: 'n3', user_id: ME, application_id: 'a2', question_id: 'q3', answer: 'Negotiable,\r\n\n\n\nwithin reason', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
       { id: 'n4', user_id: THEM, application_id: 'a4', question_id: 'q4', answer: 'Theirs', status: 'draft', word_limit: null, created_at: '2026-09-02T10:00:00Z' },
     ],
   };
@@ -527,13 +572,16 @@ describe('application_answers', () => {
     expect(rows.map((r) => r.title)).toEqual(['Why do you want to work here?', 'Describe a hard deadline.']);
     expect(rows[0]).toMatchObject({ table: 'job_search.application_answers', href: '/jobs/roles/r1' });
     expect(rows[0].detail).toMatchObject({ status: 'draft', word_limit: 150 });
-    expect(String(rows[0].detail?.opening).length).toBeLessThanOrEqual(160);
-    expect(rows[1].detail).toMatchObject({ status: 'approved', opening: null });
+    // The whole answer, so it can be reused on another application (22 October 2026).
+    expect(rows[0].detail?.answer).toBe('Because the work matters. '.repeat(20).trim());
+    expect(rows[1].detail).toMatchObject({ status: 'approved', answer: null });
+    expect(result.ok && result.note).not.toContain('open_row');
   });
 
   it('reads one application by its ref, with the table prefix accepted', async () => {
     const result = await executeAskTool('application_answers', { application_ref: 'job_search.applications:a2' }, context(tables));
     expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['n3']);
+    expect(expectLinkedRows(result)[0].detail?.answer).toBe('Negotiable,\n\nwithin reason');
   });
 
   it("refuses another person's role and application, and a call that names neither", async () => {
@@ -635,6 +683,35 @@ describe('job_applications', () => {
       context(tables),
     );
     expect(expectLinkedRows(result).map((r) => r.ref).sort()).toEqual(['a1', 'a2']);
+  });
+
+  it('finds what moved to a status in a period, with what it was before (note 4056ed9d)', async () => {
+    const lead = (id: string, role: string, created: string) =>
+      app(id, ME, role, 'lead', created, { submitted_at: null, created_at: `${created}T09:00:00Z` });
+    const moved: Tables = {
+      ...tables,
+      'job_search.applications': [
+        // Moved by hand from lead to acknowledged this week.
+        { ...lead('m1', 'r1', '2026-10-01'), status: 'acknowledged', status_manual_override: 'acknowledged' },
+        // Already sent last month: not a change this week.
+        app('m2', ME, 'r2', 'acknowledged', '2026-09-10'),
+        // Still a lead.
+        lead('m3', 'r3', '2026-10-01'),
+      ],
+      'job_search.application_events': [
+        { application_id: 'm1', user_id: ME, kind: 'status_override', source: 'manual', payload: { status: 'acknowledged' }, occurred_at: '2026-10-20T18:00:00Z' },
+        { application_id: 'm2', user_id: ME, kind: 'submitted', source: 'email', payload: null, occurred_at: '2026-09-10T10:00:00Z' },
+        { application_id: 'm2', user_id: ME, kind: 'confirmation', source: 'email', payload: null, occurred_at: '2026-09-10T11:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool(
+      'job_applications',
+      { changed_status: true, from: '2026-10-16', to: '2026-10-22', status: ['submitted', 'acknowledged'] },
+      context(moved, { today: '2026-10-22' }),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.ref)).toEqual(['m1']);
+    expect(rows[0].detail).toMatchObject({ status_before: 'lead', status_after: 'acknowledged' });
   });
 });
 

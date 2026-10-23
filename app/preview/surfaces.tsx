@@ -129,7 +129,8 @@ import { RecommendedRoles } from '@/app/jobs/(app)/find/sections';
 import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
-import type { PipelineRow } from '@/lib/jobs/applications/load';
+import { toFunnelApplications, type PipelineRow } from '@/lib/jobs/applications/load';
+import { funnelMetrics } from '@/lib/jobs/pipeline';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { CompaniesPage } from '@/components/jobs/companies/companies-page';
@@ -137,7 +138,7 @@ import type { CompanyRow } from '@/lib/jobs/companies-view';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
-import { summariseSearch } from '@/lib/jobs/home/summary';
+import { buildFunnel } from '@/lib/jobs/home/funnel';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
@@ -379,6 +380,8 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
+import { DashAction } from '@/components/ui/dash-action';
+import { ROUTINE_KEYS, ROUTINE_LABELS } from '@/lib/feedback/routine-names';
 import { Tooltip } from '@/components/ui/tooltip';
 import { IconButton } from '@/components/ui/icon-button';
 import { Chip } from '@/components/ui/chip';
@@ -718,6 +721,7 @@ const rolePanels: PanelProps = {
   jdLookupAt: '2026-10-01T08:00:00Z',
   jdUrl: 'https://example.com/jobs/quant-dev',
   location: 'London, hybrid three days a week',
+  kind: 'job',
   atsJobId: 'REQ-4471',
   compMinCents: 18000000,
   compMaxCents: 24000000,
@@ -869,6 +873,7 @@ const pipelineRow = (
   companyLogoUrl: null,
   companyDomains: [],
   companyWebsite: null,
+  roleKind: 'job',
   location: 'London',
   workMode: 'hybrid',
   source: 'portal',
@@ -878,6 +883,7 @@ const pipelineRow = (
   readyToApply: false,
   allQuestionsAdded: false,
   hasCoverLetter: null,
+  hasQuestions: false,
   createdBy: 'user',
   submittedAt: '2026-08-14T09:00:00.000Z',
   confirmationReceivedAt: '2026-08-14T09:04:00.000Z',
@@ -993,6 +999,7 @@ const pipelineRows: PipelineRow[] = [
     readyToApply: true,
     allQuestionsAdded: true,
     hasCoverLetter: false,
+    hasQuestions: true,
     daysSinceActivity: 3,
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
@@ -1357,6 +1364,49 @@ const allRoles: SearchableRole[] = pipelineRows.map((row) => ({
   status: row.status,
   everSubmitted: row.submittedAt !== null,
 }));
+
+/**
+ * The Jobs Inbox's review items (plan #2502.2): the queue above with one more
+ * message, its subject as long as recruiters write them, and nine waiting in
+ * all, so the first five show and "Open all 9 in Review" follows them.
+ */
+const inboxReview = {
+  rows: [
+    ...reviewRows,
+    {
+      kind: 'message' as const,
+      id: 'r5',
+      subject:
+        'RE: Next steps for the Staff Software Engineer, Real-Time Risk & Settlement Infrastructure (London or Remote, UK) role',
+      fromAddress: 'Priya Ramanathan <priya.ramanathan@halloran-achterberg.example>',
+      threadId: 'thread-halloran',
+      replyToAddress: null,
+      roleHint: 'Staff Software Engineer, Real-Time Risk & Settlement Infrastructure',
+      receivedAt: '2026-09-07T10:12:00.000Z',
+      classification: 'interview_invite',
+      reason: 'Two pursuits at this company could be the one it means.',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/12',
+      candidates: [
+        {
+          applicationId: 'p1',
+          label: 'Larkspur Vane · Quantitative Developer, Systematic Strategies',
+          reason: 'Same recruiter wrote about it before',
+          confidence: 0.48,
+        },
+        {
+          applicationId: 'p3',
+          label: 'Tallow · Backend Engineer, Payments',
+          reason: 'Recent pursuit',
+          confidence: null,
+        },
+      ],
+      sortAt: '2026-09-07T10:12:00.000Z',
+    },
+  ] satisfies ReviewRow[],
+  counts: { all: 9, messages: 5, applications: 2, events: 2 },
+  companyNames: [...new Set(pipelineRows.map((row) => row.companyName))].sort(),
+  allRoles,
+};
 
 /**
  * Settings for somebody three weeks in: one inbox connected and scanned, one
@@ -1824,6 +1874,59 @@ const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
       ? { ...row, status: 'final_round', lastTurnEvent: 'interview_scheduled' }
       : row,
 );
+/**
+ * The funnel over the same rows: five suggestions still open, a month of
+ * suggestions taken, dismissed and left to expire, and two interviews held.
+ */
+const todayPageFunnel = buildFunnel({
+  now: todayPageNow,
+  // Closures under five stages at once, as a real search has them, so the
+  // labels on the floor are drawn crowded the way they will be.
+  applications: [
+    ...todayPageRows,
+    ...(
+      [
+        ['role_closed', null, null, 6],
+        ['role_closed', null, null, 5],
+        ['withdrawn', null, null, 4],
+        ['rejected', null, null, 2],
+        ['ghosted', '2026-08-01T09:00:00.000Z', null, 0],
+        ['ghosted', '2026-08-02T09:00:00.000Z', null, 0],
+        ['rejected', '2026-08-03T09:00:00.000Z', null, 0],
+        ['role_closed', '2026-08-04T09:00:00.000Z', null, 0],
+        ['ghosted', '2026-07-20T09:00:00.000Z', '2026-08-01T09:00:00.000Z', 0],
+        ['withdrawn', '2026-07-20T09:00:00.000Z', '2026-08-01T09:00:00.000Z', 0],
+        ['rejected', '2026-07-10T09:00:00.000Z', '2026-07-20T09:00:00.000Z', 2],
+      ] as const
+    ).map(([status, submittedAt, firstHumanResponseAt, interviews], i) =>
+      pipelineRow({
+        applicationId: `fc${i}`,
+        companyName: `Closed ${i + 1}`,
+        roleTitle: 'Analyst',
+        status,
+        submittedAt,
+        firstHumanResponseAt,
+        closedAt: `2026-09-0${1 + (i % 7)}T12:00:00.000Z`,
+        interviewKinds: Array.from({ length: interviews }, () => 'technical'),
+      }),
+    ),
+  ],
+  suggestions: [
+    { id: 'fs1', name: 'Wrenfield', headline: 'Platform Engineer, Payments', status: 'open', createdAt: '2026-09-08T07:00:00.000Z', actedAt: null },
+    { id: 'fs2', name: 'Osier Labs', headline: 'Backend Engineer, Risk', status: 'open', createdAt: '2026-09-08T07:00:00.000Z', actedAt: null },
+    { id: 'fs3', name: 'Coldharbour', headline: 'Write to Priya Raman, head of engineering', status: 'open', createdAt: '2026-09-07T07:00:00.000Z', actedAt: null },
+    { id: 'fs4', name: 'Tamsin & Hale', headline: 'Software Engineer, Trading Tools', status: 'open', createdAt: '2026-09-05T07:00:00.000Z', actedAt: null },
+    { id: 'fs5', name: 'Fintech Builders', headline: 'Meetup in Shoreditch, 17 September', status: 'open', createdAt: '2026-09-04T07:00:00.000Z', actedAt: null },
+    ...Array.from({ length: 9 }, (_, i) => ({ id: `fd${i}`, name: 'Taken', headline: '', status: 'done', createdAt: '2026-08-20T07:00:00.000Z', actedAt: `2026-08-${String(21 + i).padStart(2, '0')}T09:00:00.000Z` })),
+    ...Array.from({ length: 14 }, (_, i) => ({ id: `fx${i}`, name: 'Passed', headline: '', status: i < 10 ? 'dismissed' : 'expired', createdAt: `2026-08-${String(12 + i).padStart(2, '0')}T07:00:00.000Z`, actedAt: null })),
+  ],
+  interviewsHeld: [
+    { applicationId: 'p1', scheduledAt: '2026-09-02T14:00:00.000Z' },
+    { applicationId: 'p2', scheduledAt: '2026-08-28T10:00:00.000Z' },
+  ],
+  watched: 48,
+  replyRate: funnelMetrics(toFunnelApplications(todayPageRows), { now: todayPageNow }).responseRate,
+});
 const todayPageSince: SinceView = {
   state: 'loaded',
   hint: 'Since 8 Sept, 6:40 PM BST',
@@ -3527,6 +3630,33 @@ function CostHintRows() {
   );
 }
 
+/* A button that hands work to a routine (plan #2459.1), one per routine, each
+ * with its $ open on the routine's name. Alternate rows hang the hint from the
+ * right edge, as a button at a row's end does. */
+function RoutineHintRows() {
+  return (
+    <div className="space-y-20 pb-20">
+      {ROUTINE_KEYS.map((routine, index) => {
+        const end = index % 2 === 1;
+        return (
+          <div key={routine} className={cn('flex items-center', end && 'justify-end')}>
+            <DashAction
+              routine={routine}
+              variant="secondary"
+              size="sm"
+              align={end ? 'end' : 'start'}
+              what={`Send to the ${ROUTINE_LABELS[routine]} routine`}
+              hintOpen
+            >
+              Send to Dash
+            </DashAction>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* The spend page's estimates against the ledger, from ranges shaped like the
  * live ledger's in September 2026: one measured row, uncertain rows with and
  * without runs, a per-item row, and two background ones. */
@@ -3925,16 +4055,7 @@ function JobsTodaySurface({ board = todayBoard }: { board?: TodayBoard }) {
   return (
     <TodayPage
       board={board}
-      summary={summariseSearch(
-        todayPageRows,
-        board.interviews.map((interview) => ({
-          id: interview.id,
-          scheduledAt: interview.scheduledAt,
-          timeKnown: interview.timeKnown,
-          groupId: interview.groupId,
-        })),
-        todayPageNow,
-      )}
+      funnel={todayPageFunnel}
       since={todayPageSince}
       timezone="Europe/London"
     />
@@ -4448,7 +4569,8 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Pipeline narrowed to the roles with all their questions added (plan
-     * #2196.2): the one chip set, the rest of the line unchanged. */
+     * #2196.2): the one chip set, the rest of the line unchanged, with the
+     * questions-or-letter chip after the cover letter's (note 732901e4). */
     id: 'jobs-pipeline-marks',
     label: 'Pipeline · All questions added filter',
     module: 'jobs',
@@ -5205,6 +5327,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsHomeSurface />,
   },
   {
+    /* The Goals home with Passive goals open (plan #2503.4): the passive
+     * goals under their areas, apart from Other goals, and the way to them
+     * on All goals. */
+    id: 'goals-home-passive',
+    label: 'Goals · home, passive goals open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsHomeSurface passiveOpen />,
+  },
+  {
     /* Everything on you in Goals, grouped as the Inbox in Dev is. */
     id: 'goals-inbox',
     label: 'Goals · Inbox',
@@ -5237,7 +5369,36 @@ export const SURFACES: readonly Surface[] = [
     label: 'Job search · Inbox',
     module: 'jobs',
     width: 'page',
-    render: () => <JobsInboxSurface />,
+    render: () => <JobsInboxSurface review={inboxReview} />,
+  },
+  /* The Jobs Inbox's hidden parts (plan #2502.2): a held message with its
+   * "some other role" search open, the same with the new-role form open, and
+   * a row whose press failed, saying why under it. */
+  {
+    id: 'jobs-inbox-other-role',
+    label: 'Job search · Inbox, other role open',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface review={inboxReview} open={{ 'message-r1': 'other-role' }} />,
+  },
+  {
+    id: 'jobs-inbox-new-role',
+    label: 'Job search · Inbox, new role open',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsInboxSurface review={inboxReview} open={{ 'message-r1': 'new-role' }} />,
+  },
+  {
+    id: 'jobs-inbox-error',
+    label: 'Job search · Inbox, a press failed',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <JobsInboxSurface
+        review={inboxReview}
+        failed={{ 'application-r3': 'Could not confirm it: the application was removed in another tab.' }}
+      />
+    ),
   },
   {
     id: 'todo-inbox',
@@ -5274,6 +5435,31 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* All goals holding passive goals (plan #2503.4): the kind chips beside
+     * the views, and each passive goal saying so on its row. */
+    id: 'goals-all-kinds',
+    label: 'Goals · all goals, active and passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes passive />,
+  },
+  {
+    /* All goals narrowed to Passive (plan #2503.4). */
+    id: 'goals-all-passive',
+    label: 'Goals · all goals, passive only',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes passive kind="passive" />,
+  },
+  {
+    /* Passive asked for with no passive goal: the empty state (plan #2503.4). */
+    id: 'goals-all-passive-empty',
+    label: 'Goals · all goals, no passive goals',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAllSurface notes kind="passive" />,
   },
   {
     /* A goal's row menu on All goals, open: Later and Drop (plans #2097.1, #1957.8). */
@@ -5349,6 +5535,33 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* A passive goal's page (plan #2503.2): the switch in the header on
+     * Passive, the line under the title saying so, and no Due. */
+    id: 'goals-page-top-passive',
+    label: 'Goal · marked passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTopSurface frameOnly passive />,
+  },
+  {
+    /* The switch mid-save: both segments held until the write returns. */
+    id: 'goals-page-top-passive-saving',
+    label: 'Goal · saving active or passive',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalTopSurface frameOnly passive activityDrawn={{ saving: true }} />,
+  },
+  {
+    /* The save refused: the switch back where it was and a line saying why. */
+    id: 'goals-page-top-passive-error',
+    label: 'Goal · active or passive not saved',
+    module: 'goals',
+    width: 'page',
+    render: () => (
+      <GoalTopSurface frameOnly activityDrawn={{ error: 'Could not make this goal passive. Try again.' }} />
+    ),
   },
   {
     /* The same frame on its Steps tab: the step tree and its stages. */
@@ -5982,6 +6195,25 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Not for me pressed on the first role (plan #2504.3): the box for why,
+     * open and empty, with the Decline that sends it as it is. */
+    id: 'jobs-recommended-roles-decline',
+    label: 'Find · Recommended roles · Not for me',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <ToastProvider>
+        <RecommendedRoles
+          suggestions={recommendedRoles}
+          stats={recommendedStats}
+          searchCostMicros={4_200_000}
+          searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
+          declining={recommendedRoles[0].id}
+        />
+      </ToastProvider>
+    ),
+  },
+  {
     /* The same page on its table view, which was the Roles page (plan #1590),
      * still on the live applications. */
     id: 'jobs-roles-table',
@@ -6281,7 +6513,11 @@ export const SURFACES: readonly Surface[] = [
     label: 'Note · Editing, and a refused save',
     module: 'vault',
     width: 'narrow',
-    render: () => <NoteEditingPreview body={noteMarkdown} />,
+    render: () => (
+      <NoteEditingPreview
+        body={`Written after the [[Nightly close]] went from six hours to forty minutes. See [[Postgres vacuum|vacuum notes]] and [[Not a note yet]].\n\n${noteMarkdown}`}
+      />
+    ),
   },
   {
     /* Renaming a note (note 69c302f1): the file's name in a box where the
@@ -7877,6 +8113,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet
+     * and Opus, each with a line on speed and cost, Sonnet ticked. */
+    id: 'ask-dash-new-models',
+    label: 'Ask Dash · Choosing the model',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="open">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* A pick the save refused: the old model back on the chip and a short
+     * line beside it saying so. */
+    id: 'ask-dash-new-model-failed',
+    label: 'Ask Dash · A model choice not saved',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open modelStart="failed">
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* The same list open on the Dash page, in an open chat's docked box. */
+    id: 'ask-page-models',
+    label: 'Dash · Choosing the model in a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <DashPageSurface listOpen={false} usedOpen={false} modelStart="open" />,
+  },
+  {
     /* The list searched for "Catan" (plan #1899.6): two chats found by what
      * was said in them, one only in Dash's answer, each with the words
      * around it. On a phone the list is the page. */
@@ -8753,6 +9023,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-insights-reread',
+    label: 'You · Insights, full re-read hint open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ reread: true }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-evidence',
     label: 'You · Insights, evidence open',
     module: 'you',
@@ -9271,6 +9552,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CostHintRows />,
+  },
+  {
+    /* The same $ beside a button that hands work to a routine (plan #2459.1),
+     * once for each routine, open so the shot shows the name. In the app it
+     * opens on hover or focus as a peek and on a press as pinned, as the
+     * priced hint does. */
+    id: 'core-routine-hint',
+    label: 'Spend · The $ hint beside a routine button',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <RoutineHintRows />,
   },
   {
     /* The shared Tooltip on an icon button, a badge with a long tip and an

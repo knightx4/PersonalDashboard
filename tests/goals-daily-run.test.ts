@@ -132,7 +132,7 @@ describe('runGoalsDaily', () => {
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
 
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 1, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0, mentions: 0 });
     expect(writes[0]).toMatchObject({
       table: 'runs',
       op: 'insert',
@@ -153,7 +153,7 @@ describe('runGoalsDaily', () => {
     const { client } = fakeClient({ items: [GOAL, worked] });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 0, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0, mentions: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.reviews');
@@ -245,7 +245,7 @@ describe('runGoalsDaily', () => {
     });
     const fetch = okFetch();
     const result = await runGoalsDaily({ client, routine, now: NOW, fetch });
-    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0 });
+    expect(result).toEqual({ started: true, runId: 'run-1', reviewed: 1, steps: 0, held: 0, answers: 1, stale: 0, unjudged: 0, stalled: 0, finished: 0, evidence: null, statements: 0, mentions: 0 });
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('"List the loans" (goals.items id s2)');
@@ -338,6 +338,40 @@ describe('runGoalsDaily', () => {
       '"Move the bags" (goals.items id s8), under the goal "Get fit": 10 of about 10 bags, the estimate reached;',
     );
     expect(text).not.toContain('Moving a step');
+  });
+
+  it('asks the home note to mention a dated step under a passive goal once (plan #2503.5)', async () => {
+    const passive = item({ id: 'p', level: 'goal', area_id: 'area', title: 'Learn pottery', activity: 'passive' });
+    const dated = item({ id: 'p1', level: 'step', parent_id: 'p', kind: 'mine', title: 'Open day', due_on: '2026-09-26' });
+    const activeDated = item({ id: 's2', level: 'step', parent_id: 'g', kind: 'mine', title: 'Book a class', due_on: '2026-09-26' });
+    const { client } = fakeClient({ items: [GOAL, READY, activeDated, passive, dated] });
+    const fetch = okFetch();
+    const seen: string[][] = [];
+    const marked: string[][] = [];
+    const result = await runGoalsDaily({
+      client,
+      routine,
+      now: NOW,
+      fetch,
+      mentions: async (input) => {
+        seen.push(input.goals.map((g) => g.id));
+        const { passiveMentions } = await import('@/lib/goals/passive-mentions');
+        return passiveMentions({ goals: input.goals, byGoal: input.byGoal, today: input.today });
+      },
+      markMentioned: async (_client, _user, mentions) => {
+        marked.push(mentions.map((m) => m.ref));
+      },
+    });
+    expect(result).toMatchObject({ started: true, mentions: 1 });
+    // Only the passive goal is read for mentions, on its own path.
+    expect(seen).toEqual([['p']]);
+    expect(marked).toEqual([['step:p1']]);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const text = (JSON.parse(init.body as string) as { text: string }).text;
+    expect(text).toContain('marked passive');
+    expect(text).toContain('"Open day" on 2026-09-26, under the passive goal "Learn pottery" (step p1)');
+    // The passive goal is still left out of the verdicts.
+    expect(text).not.toContain('Goal "Learn pottery" (goals.items id p)');
   });
 
   it('runs once a morning, however often the cron fires', async () => {

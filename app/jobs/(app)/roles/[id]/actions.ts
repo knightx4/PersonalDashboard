@@ -4,74 +4,34 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { fileJobNote, type JobNoteInput } from '@/lib/jobs/notes';
+import { saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { COVER_LETTER_MAX, saveApplicationEdit, saveCoverLetterText, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
 
-/**
- * Notes attach to exactly one parent, enforced by a check constraint in the
- * database rather than by this code path remembering to.
- */
-const noteSchema = z
-  .object({
-    body: z.string().trim().min(1, 'A note needs some text.'),
-    companyId: z.string().uuid().optional(),
-    roleId: z.string().uuid().optional(),
-    applicationId: z.string().uuid().optional(),
-    contactId: z.string().uuid().optional(),
-    interviewId: z.string().uuid().optional(),
-  })
-  .refine(
-    (value) =>
-      [
-        value.companyId,
-        value.roleId,
-        value.applicationId,
-        value.contactId,
-        value.interviewId,
-      ].filter(Boolean).length === 1,
-    { message: 'A note attaches to exactly one thing.' },
-  );
-
 // latency: pending
-export async function addNote(input: {
-  body: string;
-  companyId?: string;
-  roleId?: string;
-  applicationId?: string;
-  contactId?: string;
-  interviewId?: string;
-}): Promise<{ error: string | null }> {
-  const parsed = noteSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
+export async function addNote(input: JobNoteInput): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('notes').insert({
-    user_id: user.id,
-    body: parsed.data.body,
-    company_id: parsed.data.companyId ?? null,
-    role_id: parsed.data.roleId ?? null,
-    application_id: parsed.data.applicationId ?? null,
-    contact_id: parsed.data.contactId ?? null,
-    interview_id: parsed.data.interviewId ?? null,
-  });
+  // The same write as Dash's change_company `note` (plan #2473.8).
+  const { note, error } = await fileJobNote(supabase, user.id, input);
+  if (error !== null) return { error };
 
-  if (error) return { error: error.message };
-
-  if (parsed.data.roleId) revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
-  if (parsed.data.companyId) revalidatePath('/jobs/companies');
-  if (parsed.data.contactId) revalidatePath('/jobs/contacts');
+  if (note.roleId) revalidatePath(`/jobs/roles/${note.roleId}`);
+  if (note.companyId) revalidatePath('/jobs/companies');
+  if (note.contactId) revalidatePath('/jobs/contacts');
 
   // A note on a round is read on the role page, which is two joins away from
   // the id the note carries. Worth one lookup: without it the note is written
   // and the page it was written on does not show it.
-  if (parsed.data.interviewId) {
+  if (note.interviewId) {
     const { data: interview } = await supabase
       .from('interviews')
       .select('applications!inner ( role_id )')
-      .eq('id', parsed.data.interviewId)
+      .eq('id', note.interviewId)
       .eq('user_id', user.id)
       .maybeSingle<{ applications: { role_id: string } }>();
     if (interview) revalidatePath(`/jobs/roles/${interview.applications.role_id}`);
@@ -100,7 +60,7 @@ export async function saveCoverLetter(input: {
     .object({
       applicationId: z.string().uuid(),
       roleId: z.string().uuid(),
-      body: z.string().trim().max(20_000, 'A cover letter is at most 20,000 characters.'),
+      body: z.string().trim().max(COVER_LETTER_MAX, 'A cover letter is at most 20,000 characters.'),
       fromDraft: z.boolean().optional(),
     })
     .safeParse(input);
@@ -110,17 +70,8 @@ export async function saveCoverLetter(input: {
   const supabase = await createClient();
 
   const marking = Boolean(parsed.data.fromDraft && parsed.data.body);
-  const patch: { cover_letter: string | null; has_cover_letter?: boolean } = {
-    cover_letter: parsed.data.body || null,
-  };
-  if (marking) patch.has_cover_letter = true;
-
-  const { error } = await supabase
-    .from('applications')
-    .update(patch)
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveCoverLetterText(supabase, user.id, parsed.data.applicationId, parsed.data.body, marking);
+  if (error) return { error };
 
   // Best effort: the letter is saved, and a draft left behind only offers
   // itself again on the next visit.
@@ -236,21 +187,13 @@ export async function saveApplicationMarks(input: {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const patch: {
-    ready_to_apply?: boolean;
-    all_questions_added?: boolean;
-    has_cover_letter?: boolean | null;
-  } = {};
+  const patch: ApplicationEdit = {};
   if (parsed.data.readyToApply !== undefined) patch.ready_to_apply = parsed.data.readyToApply;
   if (parsed.data.allQuestionsAdded !== undefined) patch.all_questions_added = parsed.data.allQuestionsAdded;
   if (parsed.data.hasCoverLetter !== undefined) patch.has_cover_letter = parsed.data.hasCoverLetter;
 
-  const { error } = await supabase
-    .from('applications')
-    .update(patch)
-    .eq('id', parsed.data.applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveApplicationEdit(supabase, user.id, parsed.data.applicationId, patch);
+  if (error) return { error };
 
   revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
   revalidatePath('/jobs');
@@ -275,11 +218,7 @@ export async function renameRole(roleId: string, title: string): Promise<{ error
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('roles')
-    .update({ title: parsed.data.title })
-    .eq('id', parsed.data.roleId)
-    .eq('user_id', user.id);
+  const { error } = await saveRoleEdit(supabase, user.id, parsed.data.roleId, { title: parsed.data.title });
 
   if (error) return { error: error.message };
 
@@ -321,23 +260,10 @@ export async function moveRoleToCompany(
   const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
   if (company.error) return { error: company.error, slug: null };
 
-  const { error } = await supabase
-    .from('roles')
-    .update({ company_id: company.id })
-    .eq('id', parsed.data.roleId)
-    .eq('user_id', user.id);
-
-  if (error) {
-    // (user_id, company_id, jd_hash) is unique: the same posting is already
-    // filed under the company being moved to.
-    return {
-      error:
-        error.code === '23505'
-          ? 'That company already has this same posting. Merge the two from the company page instead.'
-          : error.message,
-      slug: null,
-    };
-  }
+  // (user_id, company_id, jd_hash) is unique: the same posting already filed
+  // under the company being moved to comes back as SAME_POSTING.
+  const { error } = await saveRoleEdit(supabase, user.id, parsed.data.roleId, { company_id: company.id });
+  if (error) return { error: error.message, slug: null };
 
   const { data: moved } = await supabase
     .from('companies')

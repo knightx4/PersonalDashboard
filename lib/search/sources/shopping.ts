@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@/lib/auth/server';
+import { sourceClient } from '@/lib/search/sources/client';
 import type {
   SearchContext,
   SearchHit,
@@ -59,7 +60,7 @@ function orderHits(rows: OrderRow[]): SearchHit[] {
 }
 
 async function findOrders(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'public', createClient);
 
   // Nothing to match against, so the two reads below are one read.
   if (!ctx.query) {
@@ -110,7 +111,7 @@ async function findOrders(ctx: Read): Promise<SearchHit[]> {
 }
 
 async function findInventory(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'public', createClient);
   let read = supabase.from('inventory_items').select('id, name, variant, status');
   if (ctx.query) read = read.ilike('name', contains(ctx.query));
 
@@ -127,7 +128,7 @@ async function findInventory(ctx: Read): Promise<SearchHit[]> {
 }
 
 async function findSaved(ctx: Read): Promise<SearchHit[]> {
-  const supabase = await createClient();
+  const supabase = await sourceClient(ctx, 'public', createClient);
   let read = supabase.from('saved_items').select('id, title, status, merchants(name)');
   if (ctx.query) read = read.ilike('title', contains(ctx.query));
 

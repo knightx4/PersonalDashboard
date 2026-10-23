@@ -164,6 +164,32 @@ describe('gather', () => {
     expect(renderQuestions(m.questions)).toContain('limit: 150 words');
   });
 
+  it('reads their earlier letters to the same company, newest first, skipping placeholders', async () => {
+    const tables = fixture();
+    const letter = (why: string) => `Dear Acme Hiring Team:\n\n${why} ${'More of the letter. '.repeat(12)}`;
+    tables['job_search.roles'].push(
+      { id: 'r-acme-old', user_id: ME, title: 'Finance Associate', company_id: COMPANY },
+      { id: 'r-acme-new', user_id: ME, title: 'Strategic Finance Lead', company_id: COMPANY },
+      { id: 'r-elsewhere', user_id: ME, title: 'Analyst', company_id: 'c-other' },
+      { id: 'r-theirs', user_id: THEM, title: 'Analyst', company_id: COMPANY },
+    );
+    tables['job_search.applications'].push(
+      { id: 'a-old', user_id: ME, role_id: 'r-acme-old', cover_letter: letter('I care about local business.'), updated_at: '2026-06-14' },
+      { id: 'a-new', user_id: ME, role_id: 'r-acme-new', cover_letter: 'TO DRAFT', updated_at: '2026-10-01' },
+      { id: 'a-else', user_id: ME, role_id: 'r-elsewhere', cover_letter: letter('Another company.'), updated_at: '2026-09-01' },
+      { id: 'a-theirs', user_id: THEM, role_id: 'r-theirs', cover_letter: letter('Not mine.'), updated_at: '2026-09-02' },
+    );
+    // This application's own letter is the one being drafted, not an earlier one.
+    Object.assign(tables['job_search.applications'][0], { cover_letter: letter('This one.'), updated_at: '2026-10-20' });
+
+    const result = await gather(deps(tables), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    const earlier = result.material.role.earlierLetters;
+    expect(earlier.map((l) => l.roleTitle)).toEqual(['Finance Associate']);
+    expect(earlier[0].text).toContain('I care about local business.');
+    expect(renderMaterial(result.material)).toContain('Cover letters they wrote to this company before');
+  });
+
   it('reads their Perspective answers and the newest finished research run on the company', async () => {
     const tables = fixture();
     Object.assign(tables['job_search.companies'][0], {

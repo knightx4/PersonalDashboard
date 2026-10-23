@@ -30,10 +30,22 @@ export type GatheredRole = {
   research: string | null;
   /** Their answers on the company's Perspective tab, as "label: answer" paragraphs, cut to budget. */
   perspective: string | null;
+  /**
+   * Cover letters on their other applications to the same company, newest
+   * first and cut to budget: where an earlier reason for wanting to work
+   * there is most often written down.
+   */
+  earlierLetters: EarlierLetter[];
   /** The newest finished job_search.company_research write-up: summary and sections, cut to budget. */
   researchWriteUp: string | null;
   /** job_search.notes on the company, the role or this application, pinned first. */
   notes: string[];
+};
+
+export type EarlierLetter = {
+  /** The title of the role the letter was written for. */
+  roleTitle: string;
+  text: string;
 };
 
 export type GatheredEvidence = {

@@ -1,6 +1,5 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
-import { CardSection } from '@/components/ui/card';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -37,9 +36,7 @@ export function CompanyRoles({
 }) {
   return (
     <div className="space-y-6">
-      <CardSection title="Roles here, across cycles">
-        <RolesList companyId={companyId} timezone={timezone} roles={roles} />
-      </CardSection>
+      <RolesList companyId={companyId} timezone={timezone} roles={roles} />
 
       {/* One section, not two. The company's own tasks and the to-dos sitting
           on its roles answer the same question -- what is outstanding here --
@@ -54,23 +51,26 @@ export function CompanyRoles({
           todos.length > 0 ? (
             <ul className="mt-2 divide-y divide-border">
               {todos.map((todo) => (
-                <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-ui">
-                  <span className="tabular shrink-0 text-ink-muted">
-                    {formatDate(todo.dueAt, timezone)}
-                  </span>
-                  <span className="text-ink">{todo.body}</span>
-                  {/* Which pursuit it belongs to, and the way to it: the to-do is
-                      the role's, and everything you would do with it beyond
-                      finishing it is done there. */}
-                  {todo.role && (
-                    <Link
-                      href={`/jobs/roles/${todo.role.id}`}
-                      className={cn(linkVariants({ tone: 'quiet' }), 'press-area text-small')}
-                    >
-                      {todo.role.title}
-                    </Link>
-                  )}
-                  <ReminderActions id={todo.id} title={todo.body} />
+                <li key={todo.id} className="py-2 text-ui">
+                  {/* The words take the full line; the date, the pursuit it belongs
+                      to and the actions share the one under them, so a to-do reads
+                      in two or three lines on a phone. */}
+                  <p className="text-ink">{todo.body}</p>
+                  <div className="mt-1 flex items-center gap-x-3 text-small text-ink-muted">
+                    <span className="tabular shrink-0">{formatDate(todo.dueAt, timezone)}</span>
+                    {/* Which pursuit it belongs to, and the way to it: the to-do is
+                        the role's, and everything you would do with it beyond
+                        finishing it is done there. */}
+                    {todo.role && (
+                      <Link
+                        href={`/jobs/roles/${todo.role.id}`}
+                        className={cn(linkVariants({ tone: 'quiet' }), 'press-area min-w-0 truncate')}
+                      >
+                        {todo.role.title}
+                      </Link>
+                    )}
+                    <ReminderActions id={todo.id} title={todo.body} />
+                  </div>
                 </li>
               ))}
             </ul>

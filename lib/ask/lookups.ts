@@ -11,7 +11,7 @@ import type { ModuleId } from '@/lib/modules';
 import { searchEverything } from '@/lib/search/search';
 import { HIT_KINDS, type HitKind } from '@/lib/search/sources';
 import { SOURCES } from '@/lib/sources/catalogue';
-import type { Source } from '@/lib/sources/types';
+import { readableName, type Source } from '@/lib/sources/types';
 import { noteHref } from '@/lib/vault/paths';
 import { transcriptHref } from '@/lib/you/education';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
@@ -43,6 +43,7 @@ import {
   type AskToolResult,
 } from './db';
 import { devAccess, devRecallHrefs } from './dev';
+import { deriveApplicationState, type ApplicationStatus, type PipelineEvent } from '@/lib/jobs/pipeline';
 import { stepHref } from '@/lib/goals/all-goals';
 
 /**
@@ -111,6 +112,7 @@ export async function searchLookup(ctx: AskContext, input: Input): Promise<AskTo
     kinds: kinds && kinds.length > 0 ? kinds : undefined,
     perSourceLimit: 8,
     totalLimit: 20,
+    db: ctx.db,
   });
 
   return {
@@ -170,10 +172,45 @@ export function openableSource(table: string): Source | null {
   return OPENABLE.find((s) => s.table === table) ?? null;
 }
 
+/**
+ * How much of one long text column open_row returns at a time. Before, every
+ * column was flattened onto one line and cut at 1,500 characters, with no way
+ * to read on: asked where they left off on a take-home exercise, Dash could
+ * only see the opening of the note and said so (21 October 2026).
+ */
+export const OPEN_PART_CHARS = 8000;
+
+/**
+ * Text as a person wrote it, line breaks kept and runs of blank lines and
+ * spaces closed up, split into parts of about OPEN_PART_CHARS at a line
+ * break where one is near.
+ */
+export function textParts(text: string, size: number = OPEN_PART_CHARS): string[] {
+  const tidy = text
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  const parts: string[] = [];
+  let rest = tidy;
+  while (rest.length > size) {
+    const window = rest.slice(0, size);
+    const at = Math.max(window.lastIndexOf('\n'), window.lastIndexOf('. ') + 1);
+    const cut = at > size / 2 ? at : size;
+    parts.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
 export async function openLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const table = optionalString(input, 'table');
   const ref = optionalString(input, 'ref');
   if (!table || !ref) throw new AskInputError('Give both table and ref.');
+  const part = input.part === undefined || input.part === null ? 1 : Number(input.part);
+  if (!Number.isInteger(part) || part < 1) throw new AskInputError('part is a whole number from 1.');
   const source = openableSource(table);
   if (!source) throw new AskInputError(`${table} is not a table that can be opened.`);
 
@@ -189,7 +226,7 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
 
   const client = await ctx.db(schema);
   const { data, error } = await client
-    .from(name)
+    .from(readableName(source))
     .select(columns.join(', '))
     .eq(owner, ctx.userId)
     .eq(byId ? 'id' : refColumn, ref)
@@ -201,12 +238,34 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   const canonical = String(row[refColumn] ?? row.id ?? ref);
   const href = (BETTER_HREFS[table] ?? source.href!)(canonical);
   const detail: Record<string, string | null> = {};
-  for (const column of [...source.search, ...(source.facts ?? [])]) detail[column] = clip(asText(row[column]), 1500);
-  const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
-  if (comments) detail.comments = comments;
+  const longer: string[] = [];
+  let more = false;
+  for (const column of source.search) {
+    const text = asText(row[column]);
+    const parts = text ? textParts(text) : [];
+    if (part > Math.max(parts.length, 1)) continue;
+    detail[column] = parts[part - 1] ?? null;
+    if (parts.length > 1) longer.push(`${column} is part ${part} of ${parts.length}`);
+    if (parts.length > part) more = true;
+  }
+  if (part > 1 && Object.keys(detail).length === 0) {
+    throw new AskInputError(`${table} row ${ref} has no part ${part}: its text is shorter than that.`);
+  }
+  if (part === 1) {
+    for (const column of source.facts ?? []) detail[column] = clip(asText(row[column]), 1500);
+    const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
+    if (comments) detail.comments = comments;
+  }
+  const note =
+    longer.length === 0
+      ? undefined
+      : more
+        ? `Long text: ${longer.join('; ')}. Call open_row with the same table and ref and part ${part + 1} to read on.`
+        : `Long text: ${longer.join('; ')}. This is the last part.`;
 
   return {
     ok: true,
+    ...(note ? { note } : {}),
     rows: [
       {
         table,
@@ -499,6 +558,41 @@ export const APPLICATION_STATUSES = [
 /** The most applications read before filtering. */
 const APPLICATIONS_READ = 1000;
 
+type EventRow = {
+  application_id: string;
+  kind: string;
+  occurred_at: string;
+  source: PipelineEvent['source'];
+  payload: PipelineEvent['payload'];
+};
+
+/**
+ * An application's status as it stood at `at`, folded from its events up to
+ * then, the way the status itself is folded (lib/jobs/pipeline.ts). A move by
+ * hand is a status_override event carrying the status it moved to, so the
+ * latest one before `at` is the override that held then (note 4056ed9d).
+ * Going quiet is not a change anybody made, so it never reads as ghosted.
+ */
+export function statusAt(events: readonly EventRow[], at: Date): ApplicationStatus {
+  const before = events
+    .filter((event) => new Date(event.occurred_at) < at)
+    .map((event) => ({
+      kind: event.kind as PipelineEvent['kind'],
+      occurredAt: new Date(event.occurred_at),
+      source: event.source,
+      payload: event.payload,
+    }));
+  const override = before
+    .filter((event) => event.kind === 'status_override' && event.payload?.status)
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
+    .at(-1)?.payload?.status;
+  return deriveApplicationState(before, {
+    manualOverride: override ?? null,
+    now: at,
+    ghostThresholdDays: Number.POSITIVE_INFINITY,
+  }).status;
+}
+
 export async function applicationsLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const from = optionalDate(input, 'from');
   const to = optionalDate(input, 'to');
@@ -510,6 +604,11 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
       ? Math.floor(input.quiet_for_days)
       : null;
   const noReply = input.no_reply === true;
+  // Dated by a change of status rather than by the day sent: "what did I move
+  // to submitted this week that wasn't before" (note 4056ed9d).
+  const changed = input.changed_status === true;
+  const changedFrom = from ?? daysBefore(ctx.today, 6);
+  const changedTo = to ?? ctx.today;
 
   const db = await ctx.db('job_search');
   const query = db
@@ -542,10 +641,10 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     roles.map((r) => r.company_id).filter((id): id is string => id !== null),
     ctx.userId,
   );
-  const events = await readIn<{ application_id: string; kind: string; occurred_at: string }>(
+  const events = await readIn<EventRow>(
     db,
     'application_events',
-    'application_id, kind, occurred_at',
+    'application_id, kind, occurred_at, source, payload',
     'application_id',
     applications.map((a) => a.id),
     ctx.userId,
@@ -564,14 +663,36 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   const statusOf = (a: ApplicationRow) => a.status_manual_override ?? a.status;
   const sentOn = (a: ApplicationRow) => (a.submitted_at ?? a.created_at).slice(0, 10);
 
+  // Its status when the period began and when it ended, for changed_status.
+  const moves = new Map<string, { before: string; after: string }>();
+  if (changed) {
+    const eventsOf = new Map<string, EventRow[]>();
+    for (const event of events) {
+      eventsOf.set(event.application_id, [...(eventsOf.get(event.application_id) ?? []), event]);
+    }
+    const start = new Date(`${changedFrom}T00:00:00Z`);
+    const end = new Date(`${nextDay(changedTo)}T00:00:00Z`);
+    for (const a of applications) {
+      const own = eventsOf.get(a.id) ?? [];
+      // By its events, not by when the row was added: an import added this
+      // week can carry a send from last month.
+      const before = statusAt(own, start);
+      const after = statusAt(own, end);
+      if (new Date(a.created_at) < end && before !== after) moves.set(a.id, { before, after });
+    }
+    applications = applications.filter((a) => moves.has(a.id));
+  }
+
   // Dated by when it was sent; one never sent is dated by when it was added.
-  if (from || to) {
+  if (!changed && (from || to)) {
     applications = applications.filter((a) => {
       const day = sentOn(a);
       return (!from || day >= from) && (!to || day <= to);
     });
   }
-  if (statuses.length > 0) applications = applications.filter((a) => statuses.includes(statusOf(a)));
+  // With changed_status, the status it changed to in the period.
+  const statusFor = (a: ApplicationRow) => moves.get(a.id)?.after ?? statusOf(a);
+  if (statuses.length > 0) applications = applications.filter((a) => statuses.includes(statusFor(a)));
   // Sent, and nothing from a person since: an automatic confirmation is not a reply.
   if (noReply) applications = applications.filter((a) => a.submitted_at !== null && !replied.has(a.id));
   if (quietDays !== null) {
@@ -586,7 +707,7 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   const byStatus: Record<string, number> = {};
   const rejectedAt: Record<string, number> = {};
   for (const a of applications) {
-    const status = statusOf(a);
+    const status = statusFor(a);
     byStatus[status] = (byStatus[status] ?? 0) + 1;
     if (status === 'rejected') {
       const stage = a.rejection_stage_override ?? a.rejection_stage ?? 'unknown';
@@ -614,6 +735,9 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
           status === 'rejected' ? (a.rejection_stage_override ?? a.rejection_stage ?? 'unknown') : null,
         next_action: a.next_action,
         next_action_due: a.next_action_due,
+        ...(changed
+          ? { status_before: moves.get(a.id)?.before, status_after: statusFor(a) }
+          : {}),
       },
     };
   });
@@ -625,6 +749,9 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     note:
       (noReply
         ? 'Sent applications with no reply from the company: no reply, screen, assessment, interview, offer or rejection, an automatic confirmation aside. '
+        : '') +
+      (changed
+        ? `Applications whose status changed between ${changedFrom} and ${changedTo}: status_before is what it was when the period began, status_after what it was at the end. `
         : '') +
       (quietDays !== null
         ? `Open applications with nothing heard from the company in the ${quietDays} days before ${ctx.today}; last heard is the newest reply, screen, interview, offer or rejection, or the day it was sent when nothing came back. `
@@ -807,8 +934,9 @@ export async function vaultLookup(ctx: AskContext, input: Input): Promise<AskToo
   if (!from && !to && !query) throw new AskInputError('Give a period (from, to), a query, or both.');
 
   const client = await ctx.db('obsidian');
+  // readable_notes leaves out the notes that hold credentials.
   let read = client
-    .from('notes')
+    .from('readable_notes')
     .select('id, path, title, body, git_updated_at', { count: 'exact' })
     .eq('user_id', ctx.userId)
     .is('deleted_at', null);

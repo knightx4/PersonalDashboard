@@ -7,6 +7,7 @@ import { isJobsChangeKind, type JobsChangeKind } from './jobs-changes';
 import { isYouChangeKind, type YouChangeKind } from './you-changes';
 import { isInterviewChangeKind, type InterviewChangeKind } from './interview-changes';
 import { isPostChangeKind, type PostChangeKind } from './post-changes';
+import { isModelChangeKind, type ModelChangeKind } from './model-changes';
 
 /**
  * The Todo changes Dash makes straight away (plan #1894.9.1), beyond add,
@@ -40,11 +41,11 @@ export function isTodoChangeKind(kind: string): kind is TodoChangeKind {
 }
 
 /** The kinds whose card reads back the sentence its tool wrote: Learn's, Todo's and You's. */
-export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind | JobsChangeKind | InterviewChangeKind | PostChangeKind;
+export type WrittenCardKind = LearnChangeKind | TodoChangeKind | YouChangeKind | NewsChangeKind | GoalsChangeKind | ShoppingChangeKind | VaultChangeKind | JobsChangeKind | InterviewChangeKind | PostChangeKind | ModelChangeKind;
 
 /** Whether a kept change is one whose card reads back what its tool wrote. */
 export function isWrittenCard<C extends { kind: string; input: unknown }>(
   change: C,
 ): change is Extract<C, { kind: WrittenCardKind }> {
-  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind) || isJobsChangeKind(change.kind) || isInterviewChangeKind(change.kind) || isPostChangeKind(change.kind);
+  return isTodoChangeKind(change.kind) || isLearnChangeKind(change.kind) || isYouChangeKind(change.kind) || isNewsChangeKind(change.kind) || isGoalsChangeKind(change.kind) || isShoppingChangeKind(change.kind) || isVaultChangeKind(change.kind) || isJobsChangeKind(change.kind) || isInterviewChangeKind(change.kind) || isPostChangeKind(change.kind) || isModelChangeKind(change.kind);
 }

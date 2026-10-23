@@ -4,7 +4,9 @@ import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { insertMadeChange, type MadeDashChange } from '@/lib/talk/changes';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { VaultReadOnlyError, type VaultSource } from '@/lib/vault/providers/types';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
+import { fakeVaultNotes } from '../../tests/stubs/fake-vault-notes';
 import type { DashWriteContext, DashWriteResult } from './registry';
 import { WRITE_TOOLS, writeJobLead } from './writes';
 
@@ -319,6 +321,17 @@ describe('add_job_lead', () => {
     expect(tables['job_search.companies']).toEqual([expect.objectContaining({ priority: 'target' })]);
   });
 
+  it('saves an accelerator they apply to as a founder with its kind', async () => {
+    ok(await apply('add_job_lead', { title: 'Founder', company: 'Antler', kind: 'accelerator' }));
+    expect(tables['job_search.roles']).toContainEqual(expect.objectContaining({ title: 'Founder', kind: 'accelerator' }));
+  });
+
+  it('refuses a kind that is not one, and saves nothing', async () => {
+    const result = await apply('add_job_lead', { title: 'Founder', company: 'Antler', kind: 'club' });
+    expect(!result.ok && result.error).toContain('kind must be one of');
+    expect(tables['job_search.roles'].some((r) => r.title === 'Founder')).toBe(false);
+  });
+
   it('refuses a priority that is not one, and saves nothing', async () => {
     const result = await apply('add_job_lead', { title: 'Data analyst', company: 'Acme', company_priority: 'dream' });
     expect(!result.ok && result.error).toContain('company_priority must be one of');
@@ -410,18 +423,17 @@ describe('add_idea', () => {
 });
 
 describe('add_quick_note', () => {
-  const NOTE = '00000000-0000-4000-8000-000000000d01';
+  /** The first note the fake vault stores, and the blob its commit makes. */
+  const NOTE = '00000000-0000-4000-8000-000000000100';
+  const SHA = 'n1';
   const PATH = 'Inbox/AI and the death of software.md';
   const thought = 'AI and the death of software.\nSoftware may become largely open source.';
 
-  /** Writes the note as fileVaultNote would, into the fake obsidian.notes. */
+  /** Writes the note through createCapturedNote into the fake obsidian.notes, as fileVaultNote would. */
   function filing(): DashWriteContext {
     return {
       ...context(['vault']),
-      fileQuickNote: async (text) => {
-        tables['obsidian.notes'].push({ id: NOTE, user_id: ME, path: PATH, title: 'AI and the death of software', body: text, blob_sha: 'sha-1', deleted_at: null });
-        return { ok: true, noteId: NOTE, path: PATH, title: 'AI and the death of software', blobSha: 'sha-1' };
-      },
+      quickNotePorts: async () => fakeVaultNotes(tables['obsidian.notes'], ME).ports.create,
     };
   }
 
@@ -431,13 +443,14 @@ describe('add_quick_note', () => {
 
   it('saves the thought word for word in the vault Inbox, keeps the blob SHA, and Undo takes the file back out', async () => {
     const result = ok(await apply('add_quick_note', { text: thought }, filing()));
-    expect(tables['obsidian.notes']).toEqual([expect.objectContaining({ body: thought, path: PATH })]);
+    expect(tables['obsidian.notes']).toEqual([expect.objectContaining({ path: PATH, blob_sha: SHA })]);
+    expect(String(tables['obsidian.notes'][0].body).trim()).toBe(thought);
     expect(result).toMatchObject({
       kind: 'add_quick_note',
       op: 'insert',
       subjectRef: `obsidian.notes:${NOTE}`,
       input: { noteId: NOTE, path: PATH, body: thought },
-      undo: { vault_blob_sha: 'sha-1' },
+      undo: { vault_blob_sha: SHA },
       row: { table: 'obsidian.notes', ref: NOTE, href: '/vault/n/Inbox/AI%20and%20the%20death%20of%20software.md' },
       summary: 'Dash saved the quick note "AI and the death of software." to your vault\'s Inbox.',
     });
@@ -451,16 +464,26 @@ describe('add_quick_note', () => {
       return { ok: true };
     });
     expect(undone.ok).toBe(true);
-    expect(removed).toEqual([expect.objectContaining({ subjectRef: `obsidian.notes:${NOTE}`, undo: { vault_blob_sha: 'sha-1' } })]);
+    expect(removed).toEqual([expect.objectContaining({ subjectRef: `obsidian.notes:${NOTE}`, undo: { vault_blob_sha: SHA } })]);
   });
 
   it('says why when the vault cannot write, and saves nothing', async () => {
     const ctx: DashWriteContext = {
       ...context(['vault']),
-      fileQuickNote: async () => ({ ok: false, error: 'Your vault token can read notes but not write them.' }),
+      quickNotePorts: async () => ({
+        openSource: async () =>
+          ({
+            createNote: async () => {
+              throw new VaultReadOnlyError('read only');
+            },
+          }) as unknown as VaultSource,
+        storeNote: async () => 'unused',
+        afterSave: () => {},
+      }),
     };
     const result = await apply('add_quick_note', { text: thought }, ctx);
-    expect(!result.ok && result.error).toBe('Your vault token can read notes but not write them.');
+    expect(!result.ok && result.error).toContain('Your vault token can read notes but not write them.');
+    expect(tables['obsidian.notes']).toEqual([]);
   });
 
   it('refuses while the Vault is switched off', async () => {
@@ -490,10 +513,13 @@ describe('add_todo', () => {
     const someday = ok(await apply('add_todo', { title: 'Learn the banjo', tags: ['music'] }));
     expect(someday.input).toMatchObject({ tags: ['eventually', 'music'] });
     expect(someday.summary).toBe('Dash added the todo "Learn the banjo", tagged eventually and music.');
-    expect(tables['todo.tasks'].map((t) => [t.title, t.tags]).slice(-2)).toEqual([
-      ['Call the bank', ['now']],
-      ['Learn the banjo', ['eventually', 'music']],
-    ]);
+    // Written by insertTask, as the add bar writes them (plan #2473.3).
+    const tagsOf = (title: string) => {
+      const task = tables['todo.tasks'].find((t) => t.title === title);
+      return (tables['todo.task_tags'] ?? []).filter((tag) => tag.task_id === task?.id).map((tag) => tag.tag);
+    };
+    expect(tagsOf('Call the bank')).toEqual(['now']);
+    expect(tagsOf('Learn the banjo')).toEqual(['eventually', 'music']);
   });
 });
 

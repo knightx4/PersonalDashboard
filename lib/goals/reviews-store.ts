@@ -8,6 +8,7 @@ import {
   goalActivity,
   latestByGoal,
   pacedGoalIds,
+  passiveGoalIds,
   REVIEW_COLUMNS,
   standingReviews,
   toReview,
@@ -51,36 +52,37 @@ export async function loadLatestReviews(
     .select(REVIEW_COLUMNS)
     .gte('created_at', new Date(now - REVIEWS_SHOWN_FOR_DAYS * 24 * 60 * 60 * 1000).toISOString());
   if (userId) query = query.eq('user_id', userId);
-  const [{ data, error }, paced] = await Promise.all([
+  const [{ data, error }, kinds] = await Promise.all([
     query.order('created_at', { ascending: false }),
-    loadPacedGoalIds(client, userId),
+    loadGoalKinds(client, userId),
   ]);
   if (error) throw new Error(`Could not read goal reviews: ${error.message}`);
   const reviews = ((data ?? []) as ReviewRow[])
     .map(toReview)
     .filter((r): r is GoalReview => r !== null);
   const latest = latestByGoal(reviews);
-  return paced ? standingReviews(latest, paced) : latest;
+  return kinds ? standingReviews(latest, kinds.paced, kinds.passive) : latest;
 }
 
 /**
- * The goals judged on their pace (pacedGoalIds), or null when the items
- * cannot be read, which leaves every review standing rather than failing
- * the page.
+ * The goals judged on their pace (pacedGoalIds) and the passive ones
+ * (passiveGoalIds; plan #2503), or null when the items cannot be read, which
+ * leaves every review standing rather than failing the page.
  */
-async function loadPacedGoalIds(
+async function loadGoalKinds(
   client: GoalsSupabaseClient,
   userId: string | undefined,
-): Promise<Set<string> | null> {
+): Promise<{ paced: Set<string>; passive: Set<string> } | null> {
   try {
     let query = client
       .from('items')
-      .select('id, parent_id, level, status, due_on, errand, on_todo')
+      .select('id, parent_id, level, status, due_on, errand, on_todo, activity')
       .is('archived_at', null);
     if (userId) query = query.eq('user_id', userId);
     const { data, error } = await query;
     if (error || !Array.isArray(data)) return null;
-    return pacedGoalIds(data as unknown as PaceItemRow[]);
+    const rows = data as unknown as PaceItemRow[];
+    return { paced: pacedGoalIds(rows), passive: passiveGoalIds(rows) };
   } catch {
     return null;
   }

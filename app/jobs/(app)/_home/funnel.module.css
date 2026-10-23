@@ -1,0 +1,381 @@
+/*
+ * The funnel on Now (funnel.tsx). Every colour is a theme token, every corner
+ * follows --radius-card and every duration is a motion token, so the funnel
+ * follows the theme and stands still under reduced motion.
+ *
+ * Each stage sets --tone on the elements it draws; the rules below mix it.
+ */
+
+.stage {
+  position: relative;
+  overflow: hidden;
+}
+
+/*
+ * The dot grid, on a layer of its own. On the card itself its tile size
+ * reached the glass themes' own gradient on .sheet and tiled it into squares.
+ */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(color-mix(in oklab, var(--c-ink) 7%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.canvas {
+  position: relative;
+  height: 600px;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+/*
+ * The name in the sentence over the funnel. In the stage's colour where the
+ * sentence is large; on a phone, where it is not, the colour falls under
+ * 4.5:1 on the page, so the name keeps the ink and the colour underlines it.
+ */
+.warm {
+  color: var(--tone);
+}
+
+@media (max-width: 39.99rem) {
+  .warm {
+    color: var(--c-ink);
+    text-decoration: underline 3px color-mix(in oklab, var(--tone) 70%, transparent);
+    text-underline-offset: 5px;
+  }
+}
+
+/* -- tubes ---------------------------------------------------------------- */
+
+.tube {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--c-ink) 14%, transparent);
+  border-radius: min(calc(var(--radius-card) * 2), var(--half));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--c-ink) 5%, transparent), color-mix(in oklab, var(--c-ink) 1%, transparent)),
+    var(--c-surface);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--c-ink) 6%, transparent),
+    0 10px 30px -16px color-mix(in oklab, var(--c-ink) 40%, transparent);
+  transition:
+    border-color var(--motion-move) var(--ease-out-soft),
+    box-shadow var(--motion-move) var(--ease-out-soft);
+}
+
+.tubeOpen {
+  border-color: color-mix(in oklab, var(--tone) 60%, transparent);
+  border-radius: var(--radius-pane);
+  background:
+    linear-gradient(color-mix(in oklab, var(--tone) 7%, transparent), color-mix(in oklab, var(--tone) 7%, transparent)),
+    var(--c-surface);
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--tone) 10%, transparent),
+    0 24px 60px -12px color-mix(in oklab, var(--tone) 35%, transparent);
+}
+
+.hit {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  cursor: pointer;
+  transition: background-color var(--motion-quick) var(--ease-out-soft);
+}
+
+.hit:hover {
+  background-color: color-mix(in oklab, var(--c-ink) 4%, transparent);
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--c-ink);
+  outline-offset: 3px;
+}
+
+.liquid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, color-mix(in oklab, var(--tone) 36%, transparent), color-mix(in oklab, var(--tone) 6%, transparent));
+}
+
+.meniscus {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--tone) 75%, transparent);
+  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--tone) 60%, transparent);
+  animation: shimmer calc(var(--motion-moment) * 5) var(--ease-sway) infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.bead {
+  position: absolute;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--tone);
+  border: 1.5px solid var(--tone);
+}
+
+.beadStale,
+.dot.beadStale {
+  background: transparent;
+  border: 1.5px solid var(--c-caution);
+}
+
+.chip {
+  position: absolute;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  color: var(--c-surface);
+  background: var(--tone);
+  border: 1.5px solid var(--tone);
+}
+
+.chipStale {
+  border-color: var(--c-caution);
+  box-shadow: 0 0 0 1.5px var(--c-surface) inset;
+}
+
+.more {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--text-micro);
+  color: var(--c-ink-muted);
+}
+
+.breathe {
+  animation: breathe calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--tone) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 30px 2px color-mix(in oklab, var(--tone) 30%, transparent);
+  }
+}
+
+/* -- what moves --------------------------------------------------------- */
+
+.particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--tone), white 70%);
+  box-shadow: 0 0 10px 3px var(--tone);
+  pointer-events: none;
+  offset-rotate: 0deg;
+  animation: flow calc(var(--motion-moment) * 5.5) linear infinite;
+  animation-delay: calc(var(--motion-moment) * -5.5 * var(--i) / var(--n));
+}
+
+@keyframes flow {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.drip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: var(--radius-pill);
+  background: var(--c-ink-ghost);
+  pointer-events: none;
+  offset-rotate: 0deg;
+  animation: drip calc(var(--motion-moment) * 4) var(--ease-sway) infinite;
+  animation-delay: calc(var(--motion-moment) * -4 * var(--i) / var(--n));
+}
+
+@keyframes drip {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  85% {
+    opacity: 0.5;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.drift {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--tone);
+  opacity: 0;
+  pointer-events: none;
+  animation: drift calc(var(--motion-moment) * 12) linear infinite;
+  animation-delay: calc(var(--motion-moment) * -2 * var(--i));
+}
+
+@keyframes drift {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(150px);
+    opacity: 0;
+  }
+}
+
+/* -- the open stage's list ------------------------------------------------ */
+
+.list {
+  scrollbar-width: thin;
+}
+
+.listFades {
+  mask-image: linear-gradient(180deg, black 82%, transparent);
+}
+
+.row {
+  transition: background-color var(--motion-quick) var(--ease-out-soft);
+}
+
+.row:hover {
+  background-color: color-mix(in oklab, var(--c-ink) 5%, transparent);
+}
+
+.dot {
+  flex: none;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--tone);
+  border: 1.5px solid var(--tone);
+}
+
+/* -- the phone's column ---------------------------------------------------- */
+
+.rail {
+  position: relative;
+  width: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--tone) 70%, transparent), color-mix(in oklab, var(--next) 70%, transparent));
+}
+
+.railEmpty {
+  width: 0;
+  border-left: 1.5px dashed color-mix(in oklab, var(--tone) 60%, transparent);
+  background: none;
+}
+
+.fall {
+  position: absolute;
+  left: 1px;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--tone), white 70%);
+  box-shadow: 0 0 6px 2px var(--tone);
+  animation: fall calc(var(--motion-moment) * 3) linear infinite;
+  animation-delay: calc(var(--motion-moment) * -3 * var(--i) / var(--n));
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(64px);
+    opacity: 0;
+  }
+}
+
+.node {
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  background: var(--tone);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--tone) 18%, transparent);
+}
+
+.nodeEmpty {
+  background: var(--c-surface);
+  border: 1.5px dashed var(--tone);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particle,
+  .drip,
+  .drift,
+  .fall {
+    display: none;
+  }
+  .meniscus,
+  .breathe {
+    animation: none;
+  }
+}

@@ -1,4 +1,4 @@
-import { escapeLike } from '@/lib/search/sources/map';
+import { ilikeAnyFilter } from '@/lib/search/sources/map';
 
 /**
  * The pure half of the files search source: what a file is looked for by
@@ -12,14 +12,9 @@ export const LIST_TEXT_CHARS = 3000;
 /** How much text either side of the first match a server answer carries. */
 const SNIPPET_AROUND = 80;
 
-/**
- * An `or` filter matching the title, summary or body, for PostgREST. The
- * pattern is quoted so a comma or bracket in the query is not read as filter
- * syntax, and the backslashes escapeLike adds are doubled for the quotes.
- */
+/** An `or` filter matching the title, summary or body, for PostgREST. */
 export function fileTextFilter(query: string): string {
-  const pattern = `%${escapeLike(query)}%`.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return ['title', 'summary', 'body'].map((column) => `${column}.ilike."${pattern}"`).join(',');
+  return ilikeAnyFilter(['title', 'summary', 'body'], query);
 }
 
 /** The text around the first place the query appears, or '' when it is nowhere. */

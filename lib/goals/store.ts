@@ -6,6 +6,7 @@ import { toDuePrecision } from '@/lib/goals/due-precision';
 import {
   nextPosition,
   reorder,
+  toGoalActivity,
   type Area,
   type Goal,
   type GoalFields,
@@ -36,6 +37,7 @@ type GoalRow = {
   due_on: string | null;
   due_precision?: string | null;
   errand: boolean;
+  activity?: string | null;
   archived_at?: string | null;
 };
 
@@ -59,6 +61,7 @@ const toGoal = (row: GoalRow): Goal => ({
   dueOn: row.due_on,
   duePrecision: toDuePrecision(row.due_precision),
   errand: row.errand,
+  activity: toGoalActivity(row.activity),
   archivedAt: row.archived_at ?? null,
 });
 
@@ -85,7 +88,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, status, position, unit, target, due_on, due_precision, errand, archived_at')
+    .select('id, area_id, title, acceptance, status, position, unit, target, due_on, due_precision, errand, activity, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');
@@ -99,14 +102,16 @@ async function writeOrder(
   client: GoalsSupabaseClient,
   table: 'areas' | 'items',
   order: string[],
+  userId?: string,
 ): Promise<void> {
   const results = await Promise.all(
-    order.map((id, i) =>
-      client
+    order.map((id, i) => {
+      const write = client
         .from(table)
         .update({ position: (i + 1) * 10 })
-        .eq('id', id),
-    ),
+        .eq('id', id);
+      return userId ? write.eq('user_id', userId) : write;
+    }),
   );
   const failed = results.find((result) => result.error);
   if (failed?.error) throw new Error(failed.error.message);
@@ -168,20 +173,35 @@ export async function setAreaNote(
   return (data ?? []).length > 0;
 }
 
-/** False when it is already at that end. */
+/**
+ * One place up or down among the person's live areas, positions re-dealt in
+ * tens. The Goals page's arrows and Dash's change_goal_area both call it
+ * (plan #2473.5), so every read and write is narrowed to the user: the
+ * connector's service-role client sees every account's areas. False when it
+ * is already at that end.
+ */
 export async function moveArea(
   client: GoalsSupabaseClient,
+  userId: string,
   id: string,
   direction: 'up' | 'down',
 ): Promise<boolean> {
-  const areas = await loadAreas(client);
+  const { data, error } = await client
+    .from('areas')
+    .select('id')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .order('position')
+    .order('created_at');
+  assertSchemaExposed(error, GOALS_SCHEMA);
+  if (error) throw new Error(`Could not read areas: ${error.message}`);
   const order = reorder(
-    areas.map((area) => area.id),
+    ((data ?? []) as { id: string }[]).map((area) => area.id),
     id,
     direction,
   );
   if (!order) return false;
-  await writeOrder(client, 'areas', order);
+  await writeOrder(client, 'areas', order, userId);
   return true;
 }
 

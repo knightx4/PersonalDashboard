@@ -40,6 +40,8 @@ import { stepHref } from '@/lib/goals/all-goals';
  *   rest of what is on you is on the Inbox tab, which Do next links to.
  * - Other goals: the goals that are not this week's, one line each, under
  *   their areas.
+ * - Passive goals: the goals kept in view without being worked (plan
+ *   #2503.4), drawn as Other goals are, with a link to them on All goals.
  *
  * Moves show at once: a step set aside leaves Do next, a step handed to Dash
  * joins Dash's line, and one brought back leaves Later. The server's redraw
@@ -53,6 +55,10 @@ export type GoalLanesProps = {
   inboxCount: number;
   /** The goals Do next leaves out, errands first. */
   otherGoals: HomeGoal[];
+  /** The passive goals, under their own heading after Other goals. */
+  passiveGoals?: HomeGoal[];
+  /** The gallery's way in: Passive goals drawn open. */
+  passiveOpen?: boolean;
   /** YYYY-MM-DD in the account's zone. */
   todayOn?: string;
   preparable: string[];
@@ -85,6 +91,8 @@ export function GoalLanes({
   doNext,
   inboxCount,
   otherGoals,
+  passiveGoals = [],
+  passiveOpen = false,
   todayOn,
   preparable,
   dash,
@@ -154,7 +162,10 @@ export function GoalLanes({
           {inboxCount > 0 && (
             <Link
               href="/goals/inbox"
-              className={cn('press-area text-small max-sm:inline-flex max-sm:min-h-11 max-sm:items-center', linkVariants())}
+              className={cn(
+                'press-area text-small max-sm:inline-flex max-sm:min-h-11 max-sm:items-center',
+                linkVariants(),
+              )}
             >
               All {inboxCount} in Inbox
             </Link>
@@ -245,39 +256,65 @@ export function GoalLanes({
 
         {otherGoals.length > 0 && (
           <FoldLine title="Other goals" meta={String(otherGoals.length)}>
-            {/* By area, each area's name opening its page (note b4595cb6). */}
-            {byArea(otherGoals).map((group) => (
-              <section key={group.areaId} aria-label={group.areaName} className="space-y-1">
-                <Link
-                  href={areaHref(group.areaId)}
-                  className={cn(
-                    'inline-flex items-baseline gap-2 px-1 text-small font-medium max-sm:min-h-11 max-sm:items-center',
-                    linkVariants({ tone: 'quiet' }),
-                  )}
-                >
-                  {group.areaName}
-                  <span className="font-normal text-ink-ghost">{group.goals.length}</span>
-                </Link>
-                <Card>
-                  <ul className="divide-y divide-border">
-                    {group.goals.map((line) => (
-                      <OtherGoalRow key={line.goal.id} line={line} today={todayOn} />
-                    ))}
-                  </ul>
-                </Card>
-              </section>
-            ))}
+            <GoalsByArea lines={otherGoals} today={todayOn} />
             <Link
               href="/goals/all"
-              className={cn('inline-flex items-center px-1 text-small max-sm:min-h-11', linkVariants())}
+              className={cn(
+                'inline-flex items-center px-1 text-small max-sm:min-h-11',
+                linkVariants(),
+              )}
             >
               All goals
+            </Link>
+          </FoldLine>
+        )}
+
+        {passiveGoals.length > 0 && (
+          <FoldLine
+            title="Passive goals"
+            meta={String(passiveGoals.length)}
+            defaultOpen={passiveOpen}
+          >
+            <GoalsByArea lines={passiveGoals} today={todayOn} />
+            <Link
+              href="/goals/all?kind=passive"
+              className={cn(
+                'inline-flex items-center px-1 text-small max-sm:min-h-11',
+                linkVariants(),
+              )}
+            >
+              Passive goals on All goals
             </Link>
           </FoldLine>
         )}
       </div>
     </div>
   );
+}
+
+/** Goals one line each under their areas, each area's name opening its page (note b4595cb6). */
+function GoalsByArea({ lines, today }: { lines: HomeGoal[]; today?: string }) {
+  return byArea(lines).map((group) => (
+    <section key={group.areaId} aria-label={group.areaName} className="space-y-1">
+      <Link
+        href={areaHref(group.areaId)}
+        className={cn(
+          'inline-flex items-baseline gap-2 px-1 text-small font-medium max-sm:min-h-11 max-sm:items-center',
+          linkVariants({ tone: 'quiet' }),
+        )}
+      >
+        {group.areaName}
+        <span className="font-normal text-ink-ghost">{group.goals.length}</span>
+      </Link>
+      <Card>
+        <ul className="divide-y divide-border">
+          {group.goals.map((line) => (
+            <OtherGoalRow key={line.goal.id} line={line} today={today} />
+          ))}
+        </ul>
+      </Card>
+    </section>
+  ));
 }
 
 /**

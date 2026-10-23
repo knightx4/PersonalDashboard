@@ -20,7 +20,7 @@ export function BilledPress({
   hintFirst,
   wrapperClassName,
   ...props
-}: DashActionProps & { billed: boolean }) {
+}: DashActionProps & { billed: boolean; routine?: undefined }) {
   if (!billed) return <Button {...props} />;
   return (
     <DashAction

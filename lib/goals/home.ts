@@ -14,7 +14,7 @@ import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
-import type { Goal } from '@/lib/goals/tree';
+import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 
 /** One open goal as its line on the home reads it. */
 export type HomeGoal = {
@@ -212,8 +212,10 @@ export type HomeLists = {
   doNext: TodayItem[];
   /** The rest of it, in the same order, folded under Later. */
   rest: TodayItem[];
-  /** The goals Do next leaves out, errands first, each shown as one line. */
+  /** The goals Do next leaves out, errands first, each shown as one line. Passive goals are not among them. */
   otherGoals: HomeGoal[];
+  /** The passive goals, under their own heading (plan #2503.4), in the order given. */
+  passiveGoals: HomeGoal[];
 };
 
 /**
@@ -223,23 +225,44 @@ export type HomeLists = {
  * that belongs to a goal with a due date, and anything of ANY_GOAL_KINDS.
  * Other goals is every goal with no due date, plus an errand with no row in
  * Do next, so a dated errand always shows somewhere.
+ *
+ * A passive goal (plan #2503) asks for nothing: its due date does not bring
+ * its steps or rhythms in, and only a step you sent to Todo yourself and the
+ * ANY_GOAL_KINDS rows, which hold up work, are kept from it. Passive goals
+ * are listed apart from Other goals, under a heading of their own (plan
+ * #2503.4), errand or not.
  */
 export function homeLists(
   ranked: readonly TodayItem[],
   goals: readonly HomeGoal[],
   cap: number,
 ): HomeLists {
-  const dated = new Set(goals.filter((line) => line.goal.dueOn).map((line) => line.goal.id));
+  const passive = new Set(
+    goals
+      .filter((line) => toGoalActivity(line.goal.activity) === 'passive')
+      .map((line) => line.goal.id),
+  );
+  const dated = new Set(
+    goals
+      .filter((line) => line.goal.dueOn && !passive.has(line.goal.id))
+      .map((line) => line.goal.id),
+  );
   const kept = ranked.filter(
-    (item) => ANY_GOAL_KINDS.has(item.kind) || item.onTodo === true || dated.has(item.goalId),
+    (item) =>
+      ANY_GOAL_KINDS.has(item.kind) ||
+      (item.onTodo === true && !(passive.has(item.goalId) && item.sentByDash === true)) ||
+      dated.has(item.goalId),
   );
   const doNext = kept.slice(0, cap);
   const listed = new Set(doNext.map((item) => item.goalId));
   const { errands, others } = splitErrands(goals);
   const otherGoals = [...errands, ...others].filter(
-    (line) => !dated.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
+    (line) =>
+      !passive.has(line.goal.id) &&
+      (!dated.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id))),
   );
-  return { doNext, rest: kept.slice(cap), otherGoals };
+  const passiveGoals = goals.filter((line) => passive.has(line.goal.id));
+  return { doNext, rest: kept.slice(cap), otherGoals, passiveGoals };
 }
 
 /**
@@ -274,4 +297,3 @@ export function preparedExcerpt(text: string, lines = EXCERPT_LINES): string {
     .slice(0, lines)
     .join('\n');
 }
-

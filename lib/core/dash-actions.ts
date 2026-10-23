@@ -10,6 +10,7 @@ import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS, JOBS_MANY_ROW_KINDS } from '@/lib/ask/jobs-changes';
 import { INTERVIEW_CHANGE_KINDS } from '@/lib/ask/interview-changes';
 import { POST_CHANGE_KINDS } from '@/lib/ask/post-changes';
+import { MODEL_CHANGE_KINDS } from '@/lib/ask/model-changes';
 
 /**
  * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
@@ -190,6 +191,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...JOBS_CHANGE_KINDS,
   ...INTERVIEW_CHANGE_KINDS,
   ...POST_CHANGE_KINDS,
+  ...MODEL_CHANGE_KINDS,
 ];
 
 /**

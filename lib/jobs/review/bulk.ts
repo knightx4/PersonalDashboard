@@ -5,6 +5,29 @@ export function reviewRowKey(row: Pick<ReviewRow, 'kind' | 'id'>): string {
   return `${row.kind}-${row.id}`;
 }
 
+/** What the row is, in a few words: the tick box's name, the toast's and the Inbox row's. */
+export function reviewRowLabel(row: ReviewRow): string {
+  if (row.kind === 'message') return row.subject?.trim() || 'message without a subject';
+  if (row.kind === 'application') return `${row.companyName} · ${row.roleTitle}`;
+  return row.summary?.trim() || `${row.eventKind} at ${row.companyName}`;
+}
+
+/** How many review items the Jobs Inbox lists before it opens the rest in Review. */
+export const INBOX_REVIEW_LIMIT = 5;
+
+/**
+ * The head of the review queue the Jobs Inbox lists (plan #2502.2), and how
+ * many it leaves for Review. `total` is the queue's own count, so the rest
+ * is right even when the loader hands over fewer rows than it counted.
+ */
+export function inboxReviewHead<T>(
+  rows: readonly T[],
+  total: number,
+): { shown: T[]; rest: number } {
+  const shown = rows.slice(0, INBOX_REVIEW_LIMIT);
+  return { shown, rest: Math.max(total - shown.length, 0) };
+}
+
 /**
  * What each verb in the jobs review queue's action bar would touch.
  *
