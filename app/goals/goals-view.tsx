@@ -4,7 +4,8 @@ import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { ChevronDown, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { toggleChipClass } from '@/components/ui/chip';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -229,20 +230,21 @@ export function GoalsView({
   const showKinds =
     kind !== 'both' ||
     counted.some((area) => area.goals.some((goal) => goal.activity === 'passive'));
+  const kindCounts: Partial<Record<GoalKindFilter, number>> = {
+    active: countAllGoalsView(counted, view, onYou, 'active'),
+    passive: countAllGoalsView(counted, view, onYou, 'passive'),
+  };
   const chips = counted.length > 0 && (
-    <div className={cn('flex gap-2', showKinds ? 'items-start' : 'items-center')}>
-      <ListFilter
-        className={cn('size-3.5 shrink-0 text-ink-muted', showKinds && 'mt-2')}
-        strokeWidth={1.75}
-        aria-hidden
-      />
-      {/* The view, then which kind of goal (plan #2503.4); on a phone the kinds wrap under. */}
-      <div
-        className={cn('min-w-0 flex-1', showKinds && 'flex flex-wrap items-center gap-x-3 gap-y-2')}
-      >
+    <div className="flex items-center gap-2">
+      <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      {/* The view, then which kind of goal (plan #2503.4). With the kinds
+          shown, Everything and the kinds share one More chip at the row's
+          end, so the filters stay on one line on a phone. */}
+      <div className="flex min-w-0 flex-1 items-center gap-x-1">
         <ViewChips
+          className="flex-nowrap"
           view={view}
-          chips={ALL_GOALS_VIEWS}
+          chips={showKinds ? ALL_GOALS_VIEWS.filter((v) => v !== 'all') : ALL_GOALS_VIEWS}
           labels={VIEW_LABEL}
           hrefOf={(candidate) => allGoalsHref(path, candidate, kind)}
           counts={{
@@ -252,19 +254,51 @@ export function GoalsView({
           scroll={false}
         />
         {showKinds && (
-          <ViewChips
-            label="Kind of goal"
-            // A line of its own on a phone, so neither row breaks inside.
-            className="max-sm:basis-full"
-            view={kind}
-            chips={GOAL_KIND_FILTERS}
-            labels={GOAL_KIND_LABEL}
-            hrefOf={(candidate) => allGoalsHref(path, view, candidate)}
-            counts={{
-              active: countAllGoalsView(counted, view, onYou, 'active'),
-              passive: countAllGoalsView(counted, view, onYou, 'passive'),
-            }}
-            scroll={false}
+          // Quiet while it narrows nothing; once picked it names what it holds.
+          <ActionMenu
+            label="More views"
+            align="end"
+            trigger={
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                {view !== 'all' && kind === 'both' ? (
+                  'More'
+                ) : (
+                  <>
+                    {[
+                      view === 'all' ? VIEW_LABEL.all : null,
+                      kind !== 'both' ? GOAL_KIND_LABEL[kind] : null,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                    {kind !== 'both' && kindCounts[kind] ? (
+                      <span className="tabular">{kindCounts[kind]}</span>
+                    ) : null}
+                  </>
+                )}
+                <ChevronDown strokeWidth={1.75} aria-hidden />
+              </span>
+            }
+            // The trigger is a word, so it takes its width from the word.
+            triggerClassName={cn(toggleChipClass(view === 'all' || kind !== 'both'), 'w-auto')}
+            items={[
+              {
+                id: 'view-all',
+                label: VIEW_LABEL.all,
+                href: allGoalsHref(path, view === 'all' ? 'open' : 'all', kind),
+                current: view === 'all',
+              },
+              ...GOAL_KIND_FILTERS.map((candidate) => ({
+                id: `kind-${candidate}`,
+                label:
+                  candidate === 'both'
+                    ? 'Active and passive'
+                    : kindCounts[candidate]
+                      ? `${GOAL_KIND_LABEL[candidate]} ${kindCounts[candidate]}`
+                      : GOAL_KIND_LABEL[candidate],
+                href: allGoalsHref(path, view, candidate),
+                current: candidate === kind,
+              })),
+            ]}
           />
         )}
       </div>
@@ -721,7 +755,8 @@ function SettleProposedGoal({
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
       {/* Dash's suggestion, which approving keeps; it is changed from the goal's page. */}
-      <span className="text-small text-ink-muted">
+      {/* A line of its own, so Approve and Decline keep the row's left edge. */}
+      <span className="basis-full text-small text-ink-muted">
         {activity === 'passive'
           ? 'Dash suggests passive: kept in view, not asked about'
           : 'Dash suggests active: something you work on'}
