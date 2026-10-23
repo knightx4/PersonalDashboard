@@ -331,7 +331,9 @@ const BUILT_LINE = /^Built \d{4}-\d{2}-\d{2}\b/;
  * not ask is the check that let this through.
  *
  * A step that changed a screen closes only once each surface it touched
- * has passed the design critic (plan #1534). Git that cannot read the
+ * has passed the design critic (plan #1534). A feature counts the rounds
+ * recorded on its steps beneath it, since that is where the critic writes
+ * them. Git that cannot read the
  * step's files refuses too: a guard that cannot look does not wave the
  * close through. Shared by `done` and `land`.
  */
@@ -357,7 +359,16 @@ async function doneRefusal(
   const checks = inputs.surfaces.length
     ? await sql<CheckRound[]>`
         select surface, round, verdict from ui_checks
-        where user_id = ${userId} and step = ${number}`
+        where user_id = ${userId}
+          and step in (
+            with recursive below as (
+              select number, id from plan_items where user_id = ${userId} and number = ${number}
+              union all
+              select c.number, c.id from plan_items c join below b on c.parent_id = b.id
+              where c.user_id = ${userId}
+            )
+            select number from below
+          )`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
 }
