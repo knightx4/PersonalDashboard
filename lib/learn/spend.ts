@@ -67,6 +67,9 @@ export const LEARN_OPERATIONS = [
   'grade-quiz-answer',
   'write-applied-case',
   'grade-applied-answer',
+  // Reading the reasoning given with a right multiple-choice pick (plan
+  // #2522.3): one Haiku call, only when reasoning was written.
+  'check-picked-reasoning',
   // Grading an explanation against the levels of a topic (LEARN-LEVELS-SPEC,
   // "How answers are graded"; plan #2138.5): one Haiku call per answer, reading
   // the asked cell, its neighbours and the cells it requires.

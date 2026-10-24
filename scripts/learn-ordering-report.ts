@@ -25,6 +25,7 @@ import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
 import {
   CANNOT_TELL,
+  confidenceCalibration,
   exportRow,
   followOffers,
   followTracks,
@@ -161,8 +162,13 @@ async function main() {
   console.log(
     `   filled: predicted strength ${filled('predicted_strength')}, predicted status ${filled('predicted_status')}, ` +
       `seconds ${filled('seconds_shown_to_answered')}, outcome ${filled('outcome')}, ` +
-      `grader 1 ${filled('grader_1')}, grader 2 ${filled('grader_2')}`,
+      `confidence ${filled('confidence')}, grader 1 ${filled('grader_1')}, grader 2 ${filled('grader_2')}`,
   );
+  // Calibration by how sure you said you were (plan #2522.3).
+  for (const step of confidenceCalibration(harness.rows)) {
+    if (step.answers === 0) continue;
+    console.log(`   ${step.label.padEnd(12)} ${step.right} of ${step.answers} right`);
+  }
   console.log('   Probes keep a predicted strength and one verdict; cell questions keep a predicted status and level, and up to two graders.');
   const file = arg('--export');
   if (file) {

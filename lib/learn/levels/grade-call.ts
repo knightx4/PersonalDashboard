@@ -6,6 +6,7 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { GraderCell, RawVerdict } from '@/lib/learn/levels/grade';
+import { readReasoning, signalLines, withReasoningRule, type AnswerSignals } from '@/lib/learn/confidence';
 
 /**
  * The grading call for an explanation (docs/LEARN-LEVELS-SPEC.md, "How
@@ -66,6 +67,19 @@ Call ${TOOL} once, with one entry per cell.`;
 const SYSTEM = system('cell');
 const COURSE_SYSTEM = system('course');
 
+/**
+ * The system prompt with the reasoning rule after it, for an answer that came
+ * with reasoning (plan #2522.3). Here a wrong answer is a not_met on C1, and
+ * the reason is the sentence saying which part of the reasoning does not hold.
+ */
+export function gradeSystem(scope: 'cell' | 'course', reasoning: boolean): string {
+  const base = scope === 'course' ? COURSE_SYSTEM : SYSTEM;
+  if (!reasoning) return base;
+  return `${withReasoningRule(base)}
+Here, grading it wrong means not_met on C1, with no quote, and a reason that
+names the part of the reasoning that does not hold.`;
+}
+
 const gradeSchema = z.object({
   grades: z.array(
     z.object({
@@ -89,6 +103,8 @@ export function gradePrompt(input: {
   expected?: string | null;
   /** A figure question's figure and answer, written out (plan #2321.5); graded on the asked cell alone. */
   figure?: string | null;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
 }): string {
   const lines: string[] = ['The cells:', ''];
   for (const cell of input.cells) {
@@ -125,7 +141,10 @@ export function gradePrompt(input: {
       '',
     );
   }
-  lines.push('Their answer:', input.answer, '', `Call ${TOOL}.`);
+  lines.push('Their answer:', input.answer, '');
+  const extra = signalLines(input.signals);
+  if (extra.length > 0) lines.push(...extra, '');
+  lines.push(`Call ${TOOL}.`);
   return lines.join('\n');
 }
 
@@ -145,6 +164,8 @@ export async function gradeCellAnswer(input: {
   model?: string;
   /** 'course' for a prompt about a whole course, whose cells are all its topics' levels (plan #2172.4.2). */
   scope?: 'cell' | 'course';
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
 }): Promise<LevelGradeResult> {
   const model = input.model ?? LEVEL_GRADE_MODEL;
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
@@ -154,7 +175,7 @@ export async function gradeCellAnswer(input: {
     response = await client.messages.create({
       model,
       max_tokens: 400 + 200 * input.cells.length,
-      system: input.scope === 'course' ? COURSE_SYSTEM : SYSTEM,
+      system: gradeSystem(input.scope ?? 'cell', readReasoning(input.signals?.reasoning) !== null),
       tools: [
         {
           name: TOOL,

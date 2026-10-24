@@ -5,6 +5,7 @@ import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
   applyGradeRules,
   explainQuestion,
+  holdGuessedMets,
   graderCells,
   linkReviewsFor,
   type GraderCell,
@@ -30,6 +31,7 @@ import {
   type FigureQuestionView,
   type StoredFigureQuestion,
 } from '@/lib/learn/figures/question';
+import { cleanSignals, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
 import { pageResolveContext } from '@/lib/learn/figures/resolve';
 import { writeFigureQuestion } from '@/lib/learn/levels/figure-question-call';
 
@@ -262,6 +264,16 @@ export type AnswerCellResult =
       moved: Moved;
       /** A figure question's answer in words, shown once it is graded (plan #2321.5). */
       answer?: string;
+      /**
+       * Right on the asked cell, but given at Guessing, so no met was written
+       * and the ladder did not move (plan #2522.3).
+       */
+      guessed?: boolean;
+      /**
+       * Wrong on the asked cell at Fairly sure or Certain: written to the row's
+       * miss_kind as 'misconception' for the next step to name (plan #2522.3).
+       */
+      misconceptionCandidate?: boolean;
     }
   | { ok: false; error: string };
 
@@ -275,8 +287,16 @@ export const FIGURE_EXACT_GRADER = 'exact';
 export async function answerCell(
   learn: LearnSupabaseClient,
   userId: string,
-  input: { questionId: string; response: string; anthropicApiKey: string; onSpend?: SpendSink },
+  input: {
+    questionId: string;
+    response: string;
+    anthropicApiKey: string;
+    onSpend?: SpendSink;
+    /** How sure they were and how they reasoned, when given (plan #2522.3). */
+    signals?: AnswerSignals | null;
+  },
 ): Promise<AnswerCellResult> {
+  const signals = cleanSignals(input.signals);
   const raw = input.response.trim();
   if (raw === '') return { ok: false, error: 'Write an answer first.' };
 
@@ -319,11 +339,17 @@ export async function answerCell(
   if (!cells) return { ok: false, error: 'That level is on a topic that is not approved.' };
 
   const graded = figure
-    ? await gradeFigure(figure, raw, response, cells, question.question, input)
-    : await gradeTwice(cells, question.question, question.expected, response, input);
+    ? await gradeFigure(figure, raw, response, cells, question.question, input, signals)
+    : await gradeTwice(cells, question.question, question.expected, response, input, signals);
   if (!graded) return { ok: false, error: 'Dash could not grade this answer just now.' };
 
-  const { write } = applyGradeRules({ cells, answer: response, verdicts: graded.verdicts });
+  const ruled = applyGradeRules({ cells, answer: response, verdicts: graded.verdicts });
+  // Right means a met on the asked cell survived the rules; the guess rule
+  // then keeps every met back at Guessing.
+  const askedMet = ruled.write.some((w) => w.cellId === question.cell_id && w.verdict === 'met');
+  const { write, held } = holdGuessedMets(ruled.write, signals.confidence);
+  const guessed = held.some((w) => w.cellId === question.cell_id);
+  const signalled = signalColumns(signals, askedMet);
   const keyToCell = new Map(cells.map((c) => [c.key, c.cellId]));
   const now = new Date().toISOString();
 
@@ -337,6 +363,7 @@ export async function answerCell(
       grade: storedGrade(graded.verdicts, keyToCell),
       grade_second: graded.second ? storedGrade(graded.second, keyToCell) : null,
       model_second: graded.second ? LEVEL_GRADE_SECOND_MODEL : null,
+      ...signalled,
     })
     .eq('user_id', userId)
     .eq('id', question.id)
@@ -404,6 +431,8 @@ export async function answerCell(
     ok: true,
     moved: whatMoved({ map, askedCellId: question.cell_id, before, after, written: write, reviews }),
     ...(figure ? { answer: figureAnswerLabel(figure) } : {}),
+    ...(guessed ? { guessed: true } : {}),
+    ...(signalled.miss_kind === 'misconception' ? { misconceptionCandidate: true } : {}),
   };
 }
 
@@ -421,8 +450,9 @@ async function gradeTwice(
   expected: string | null,
   answer: string,
   key: GradeKey,
+  signals: CleanSignals,
 ): Promise<Graded | null> {
-  const gradeInput = { cells, question, expected, answer, anthropicApiKey: key.anthropicApiKey, onSpend: key.onSpend };
+  const gradeInput = { cells, question, expected, answer, signals, anthropicApiKey: key.anthropicApiKey, onSpend: key.onSpend };
   const [grade, second] = await Promise.all([
     gradeCellAnswer(gradeInput),
     gradeCellAnswer({ ...gradeInput, model: LEVEL_GRADE_SECOND_MODEL }),
@@ -447,9 +477,12 @@ async function gradeFigure(
   cells: GraderCell[],
   question: string,
   key: GradeKey,
+  signals: CleanSignals,
 ): Promise<Graded | null> {
   const asked = cells[0];
-  const exact = gradeFigureQuestion(figure, raw);
+  // Reasoning needs reading, which the exact grader cannot do, so an answer
+  // that came with reasoning goes to the model (plan #2522.3).
+  const exact = signals.reasoning === null ? gradeFigureQuestion(figure, raw) : null;
   if (exact) {
     return {
       verdicts: [
@@ -469,6 +502,7 @@ async function gradeFigure(
     question,
     figure: figureForGrader(figure),
     answer: response,
+    signals,
     anthropicApiKey: key.anthropicApiKey,
     onSpend: key.onSpend,
   });

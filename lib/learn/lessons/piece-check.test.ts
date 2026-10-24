@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EARLIER_NAMED, passedState, pieceCheckPrompt, pieceLines, toPieceCheck, type PieceForCheck } from './piece-check';
+import { EARLIER_NAMED, passedState, pieceCheckPrompt, pieceLines, toCellPieceCheck, toPieceCheck, type PieceForCheck } from './piece-check';
 
 const piece: PieceForCheck = {
   trackName: 'SaaS metrics',
@@ -85,5 +85,27 @@ describe('toPieceCheck', () => {
       correct: false,
       why: 'It missed what is left.',
     });
+  });
+});
+
+describe('a cell check answered at Guessing (plan #2522.3)', () => {
+  const cell = { topicId: 't', topicName: 'Rates', level: 3 };
+  const row = (confidence: number | null) => ({
+    id: 'q',
+    cell_id: 'c',
+    question: 'Why?',
+    response: 'Because.',
+    answered_at: '2026-10-24T10:00:00Z',
+    grade: [{ cell_id: 'c', verdict: 'met', reason: 'Right.' }],
+    confidence,
+  });
+
+  it('reads as right though no met was written', () => {
+    expect(toCellPieceCheck(row(0.25), cell, false).correct).toBe(true);
+  });
+
+  it('reads as the evidence says otherwise', () => {
+    expect(toCellPieceCheck(row(0.75), cell, false).correct).toBe(false);
+    expect(toCellPieceCheck(row(null), cell, true).correct).toBe(true);
   });
 });

@@ -27,6 +27,7 @@ import { answerCell, askCell } from '@/lib/learn/levels/answer-store';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { pieceCheckCell } from '@/lib/learn/lessons/piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from '@/lib/learn/lessons/piece-cells-store';
+import { cleanSignals, isGuess, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
 
 /**
  * The presses on a piece's page (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -182,8 +183,11 @@ export async function answerPieceCheck(
   pieceId: string,
   checkId: string,
   response: string,
+  /** How sure they were and how they reasoned, when the page asks (plan #2522.3). */
+  answerSignals?: AnswerSignals | null,
 ): Promise<AnswerResult> {
   const user = await requireUser();
+  const signals = cleanSignals(answerSignals);
   const ids = z.tuple([Id, Id, Id]).safeParse([subjectId, pieceId, checkId]);
   if (!ids.success) return { error: 'Could not tell which question that was.' };
   const answer = AnswerText.safeParse(response);
@@ -193,7 +197,7 @@ export async function answerPieceCheck(
 
   try {
     const cellCheck = await loadCellCheck(learn, user.id, pieceIdValue, checkIdValue);
-    if (cellCheck) return await answerCellCheck(learn, user.id, subject, pieceIdValue, cellCheck, answer.data);
+    if (cellCheck) return await answerCellCheck(learn, user.id, subject, pieceIdValue, cellCheck, answer.data, signals);
 
     const { data, error } = await learn
       .from('piece_checks')
@@ -220,6 +224,7 @@ export async function answerPieceCheck(
       question: row.question,
       expected: row.expected,
       response: answer.data,
+      signals,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -233,6 +238,7 @@ export async function answerPieceCheck(
         correct: grade.correct,
         marked_why: grade.why,
         answered_at: new Date().toISOString(),
+        ...signalColumns(signals, grade.correct),
       })
       .eq('id', checkIdValue)
       .eq('user_id', user.id)
@@ -244,6 +250,9 @@ export async function answerPieceCheck(
     if (!saved) return { error: 'That question has been answered already.' };
 
     if (!grade.correct) return { check: toPieceCheck(saved) };
+    // Right, but a guess (plan #2522.3): recorded as right, and the ideas and
+    // the piece stay where they were. Another question settles it.
+    if (isGuess(signals.confidence)) return { check: toPieceCheck(saved) };
 
     // A right answer shows the ideas are known, whatever the practice says;
     // the piece itself passes only once its practice has too.
@@ -275,6 +284,7 @@ async function answerCellCheck(
   pieceId: string,
   check: PieceCheck,
   response: string,
+  signals: CleanSignals,
 ): Promise<AnswerResult> {
   // Answered already, in another tab: show that mark rather than paying for another.
   if (check.correct !== null) return { check };
@@ -288,6 +298,7 @@ async function answerCellCheck(
   const graded = await answerCell(learn, userId, {
     questionId: check.id,
     response,
+    signals,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
@@ -298,6 +309,8 @@ async function answerCellCheck(
   if (!marked) return { error: 'That question is no longer there.' };
   revalidatePath(`/learn/topics/${marked.cell?.topicId ?? ''}`);
   if (!marked.correct) return { check: marked };
+  // Right, but a guess: no met was written, so the ideas and the piece stay put.
+  if (graded.guessed) return { check: marked };
 
   const tested = await markPieceIdeasTested(learn, userId, loaded.conceptIds);
   const standing = await passPieceIfDone(learn, userId, pieceId, loaded.passedAt);

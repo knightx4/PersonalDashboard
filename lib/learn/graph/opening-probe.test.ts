@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { gradeOpeningAnswer, writeOpeningQuestions } from './opening-probe';
 import { givesAwayAnswer, toWrittenQuestion } from './opening-payload';
+import { REASONING_RULE } from '@/lib/learn/confidence';
 
 /**
  * Ten questions from ten claims, and the grading of what somebody writes back.
@@ -279,5 +280,56 @@ describe('the check a question has to pass', () => {
   it('reports the model saying the claim is unusable', () => {
     const result = toWrittenQuestion({ question: 'q', expected: 'a', unusable: true });
     expect(result).toEqual({ ok: false, reason: 'unusable' });
+  });
+});
+
+describe('confidence and reasoning reach the written-answer grader (plan #2522.3)', () => {
+  function recording() {
+    const calls: { system: string; messages: { content: string }[] }[] = [];
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (args: { system: string; messages: { content: string }[] }) => {
+          calls.push(args);
+          return {
+            content: [{ type: 'tool_use', name: 'report_grade', input: { why: 'The reasoning does not hold.', correct: false } }],
+            usage: { input_tokens: 200, output_tokens: 40 },
+          };
+        }),
+      },
+    };
+    return { calls, client: client as never };
+  }
+
+  it('reads the reasoning with the answer, under the reasoning rule', async () => {
+    const { calls, client } = recording();
+    const result = await gradeOpeningAnswer({
+      claim: CLAIMS[0],
+      question: GOOD.question,
+      expected: GOOD.expected,
+      response: 'They barely move.',
+      signals: { confidence: 0.95, reasoning: 'Because prices fall first.' },
+      anthropicApiKey: 'test',
+      client,
+    });
+
+    expect(result.ok && result.why).toBe('The reasoning does not hold.');
+    expect(calls[0].system).toContain(REASONING_RULE);
+    expect(calls[0].messages[0].content).toContain('Because prices fall first.');
+    expect(calls[0].messages[0].content).toContain('Certain');
+  });
+
+  it('sends the prompt it always sent when nothing came with the answer', async () => {
+    const { calls, client } = recording();
+    await gradeOpeningAnswer({
+      claim: CLAIMS[0],
+      question: GOOD.question,
+      expected: GOOD.expected,
+      response: 'They barely move.',
+      anthropicApiKey: 'test',
+      client,
+    });
+
+    expect(calls[0].system).not.toContain(REASONING_RULE);
+    expect(calls[0].messages[0].content).not.toContain('Their reasoning');
   });
 });

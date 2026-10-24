@@ -1,5 +1,6 @@
 import 'server-only';
 
+import type { AnswerSignals } from '@/lib/learn/confidence';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
@@ -136,6 +137,8 @@ export function markPractice(input: {
   points: readonly string[];
   worked: string;
   handIn: HandIn;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -146,6 +149,7 @@ export function markPractice(input: {
     points: input.points,
     reference: input.worked,
     handIn: input.handIn,
+    signals: input.signals,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,

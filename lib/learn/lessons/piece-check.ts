@@ -1,4 +1,5 @@
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import { isGuess, readConfidence } from '@/lib/learn/confidence';
 
 /**
  * The check at the end of a piece (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -116,6 +117,8 @@ export type CellCheckRow = {
   answered_at: string | null;
   /** The first grader's verdicts, [{cell_id, verdict, quote, reason}]. */
   grade: unknown;
+  /** How sure they said they were, 0 to 1 (plan #2522.3). */
+  confidence?: number | string | null;
 };
 
 /**
@@ -130,15 +133,20 @@ export function toCellPieceCheck(
   met: boolean,
 ): PieceCheck {
   const answered = row.answered_at !== null;
-  const verdicts = Array.isArray(row.grade) ? (row.grade as { cell_id?: unknown; reason?: unknown }[]) : [];
+  const verdicts = Array.isArray(row.grade)
+    ? (row.grade as { cell_id?: unknown; verdict?: unknown; reason?: unknown }[])
+    : [];
   const own = verdicts.find((v) => v.cell_id === row.cell_id);
   const reason = typeof own?.reason === 'string' && own.reason.trim() !== '' ? own.reason.trim() : null;
+  // A right answer given at Guessing writes no met (plan #2522.3), but it was
+  // still right: the grader's own verdict says so.
+  const guessedRight = isGuess(readConfidence(row.confidence)) && own?.verdict === 'met';
   return {
     id: row.id,
     question: row.question,
     expected: null,
     response: row.response,
-    correct: answered ? met : null,
+    correct: answered ? met || guessedRight : null,
     why: answered ? reason : null,
     cell,
   };

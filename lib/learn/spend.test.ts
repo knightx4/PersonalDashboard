@@ -67,6 +67,7 @@ describe('the operation names', () => {
       'grade-quiz-answer',
       'write-applied-case',
       'grade-applied-answer',
+      'check-picked-reasoning',
       'grade-cell-answer',
       'write-cell-case',
       'write-goal-case',
