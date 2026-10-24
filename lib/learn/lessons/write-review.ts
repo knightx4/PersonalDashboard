@@ -30,8 +30,12 @@ no long calculations.
 
 DO NOT PUT THE ANSWER IN THE QUESTION.
 
-WHEN EARLIER QUESTIONS ARE LISTED, ASK A DIFFERENT ONE: a different situation
-or a different consequence, not the same question reworded.
+WHEN EARLIER QUESTIONS ARE LISTED, PUT THE IDEA IN A DIFFERENT SETTING. Each
+earlier question is set somewhere: a business, a person, a place, a piece of
+equipment. Name that setting for yourself, then set yours in a different one,
+with different things in it. A new angle on the same setting is not enough, and
+neither is the same question reworded. Report the setting you chose in setting,
+a few words.
 
 WRITE THE ANSWER YOU EXPECT, in one or two sentences. It is what a written
 answer is marked against and it is shown afterwards, so it has to stand on its
@@ -85,6 +89,7 @@ export async function writeReviewQuestion(input: {
             properties: {
               question: { type: 'string' },
               expected: { type: 'string' },
+              setting: { type: 'string', description: 'The situation the question is set in, in a few words.' },
               unusable: { type: 'boolean' },
             },
             required: ['question', 'expected'],

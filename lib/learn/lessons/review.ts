@@ -127,7 +127,11 @@ export function reviewPrompt(idea: IdeaForReview, asked: readonly string[], tool
   return [
     ...reviewLines(idea),
     ...(earlier.length > 0
-      ? ['', 'Already asked about this idea, so ask something else:', ...earlier.map((question) => `- ${question}`)]
+      ? [
+          '',
+          'Already asked about this idea. Work out the situation each one was set in, and set yours in a different one:',
+          ...earlier.map((question) => `- ${question}`),
+        ]
       : []),
     '',
     `Call ${tool}.`,
@@ -204,10 +208,28 @@ export function pickDue(
   for (const piece of [...pieces].sort((a, b) => a.passedAt.localeCompare(b.passedAt))) {
     for (const conceptId of piece.conceptIds) if (!firstPiece.has(conceptId)) firstPiece.set(conceptId, piece);
   }
-  return [...due]
+  const ordered = [...due]
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.conceptId.localeCompare(b.conceptId))
     .filter((candidate) => !options.subjectId || candidate.subjectId === options.subjectId)
     .filter((candidate) => !options.skip?.has(candidate.conceptId))
-    .slice(0, options.limit)
     .map((candidate) => ({ ...candidate, piece: firstPiece.get(candidate.conceptId) ?? null }));
+  return spreadPieces(ordered).slice(0, options.limit);
+}
+
+/**
+ * Reorder a due list, already in due order, so two ideas from one piece never
+ * sit side by side while another piece has one due (plan #2522.8). Each place
+ * takes the earliest idea left whose piece differs from the one before; only
+ * when every idea left is from that piece does it follow itself. Ideas no
+ * piece taught have no piece to repeat.
+ */
+export function spreadPieces<T extends { piece: { id: string } | null }>(ordered: readonly T[]): T[] {
+  const left = [...ordered];
+  const out: T[] = [];
+  while (left.length > 0) {
+    const last = out.length > 0 ? out[out.length - 1].piece?.id : undefined;
+    const at = left.findIndex((entry) => !entry.piece || entry.piece.id !== last);
+    out.push(...left.splice(at === -1 ? 0 : at, 1));
+  }
+  return out;
 }

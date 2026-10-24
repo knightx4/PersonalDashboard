@@ -447,10 +447,13 @@ the idea is marked tested. An idea already on the schedule from an earlier
 piece keeps the gap it has.
 
 Due questions show in two places. Learn now lists up to five above the deck,
-most overdue first, each naming the plan and piece it came from. A piece's
+most overdue first across all plans, never two from one piece side by side
+while another piece has one due (`pickDue`), each naming the plan and piece it came from. A piece's
 page opens with up to two from the same plan, leaving out the piece's own
 ideas. A row starts with the idea's name and Ask me. Haiku writes one question
-from the idea's claim, told the questions already asked on it, and marks the
+from the idea's claim, told the questions already asked on it and required to
+set the idea in a different situation from each of them (plan #2522.8), so a
+missed idea, back the next day, arrives in a new setting; it marks the
 answer as a piece's check is marked (`lib/learn/lessons/write-review.ts`). The
 spend kinds are `write-review-question` and `mark-review-question`. A question
 asked and not answered is shown again rather than written twice.

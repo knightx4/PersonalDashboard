@@ -7,6 +7,7 @@ import {
   nextDueLine,
   nextInterval,
   pickDue,
+  spreadPieces,
   REVIEW_MAX_DAYS,
   REVIEW_STEPS as STEPS,
   reviewedState,
@@ -155,6 +156,36 @@ describe('pickDue', () => {
       ['z', null],
       ['b', null],
     ]);
+  });
+});
+
+describe('mixing the due list (plan #2522.8)', () => {
+  const pieces = [
+    { id: 'p1', subjectId: 's1', title: 'One', conceptIds: ['a', 'b', 'c'], passedAt: '2026-09-10T00:00:00Z' },
+    { id: 'p2', subjectId: 's2', title: 'Two', conceptIds: ['d'], passedAt: '2026-09-11T00:00:00Z' },
+  ];
+
+  it('never puts two ideas from one piece side by side while another piece has one due', () => {
+    const due = [
+      { conceptId: 'a', dueOn: '2026-09-01', subjectId: 's1' },
+      { conceptId: 'b', dueOn: '2026-09-02', subjectId: 's1' },
+      { conceptId: 'c', dueOn: '2026-09-03', subjectId: 's1' },
+      { conceptId: 'd', dueOn: '2026-09-04', subjectId: 's2' },
+    ];
+    expect(pickDue(due, pieces, { limit: 5 }).map((e) => e.conceptId)).toEqual(['a', 'd', 'b', 'c']);
+  });
+
+  it('lets a piece follow itself only when nothing else is due', () => {
+    const due = [
+      { conceptId: 'a', dueOn: '2026-09-01', subjectId: 's1' },
+      { conceptId: 'b', dueOn: '2026-09-02', subjectId: 's1' },
+    ];
+    expect(pickDue(due, pieces, { limit: 5 }).map((e) => e.conceptId)).toEqual(['a', 'b']);
+  });
+
+  it('does not treat ideas no piece taught as one piece', () => {
+    const rows = [{ piece: null }, { piece: null }];
+    expect(spreadPieces(rows)).toEqual(rows);
   });
 });
 
