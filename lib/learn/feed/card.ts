@@ -36,6 +36,9 @@ export type FeedCardRow = {
   example?: string | null;
   check_question?: string | null;
   check_answer?: string | null;
+  /** A lesson's opening guess and what is true (plan #2522.6). Both or neither; null on older lessons. */
+  predict_question?: string | null;
+  predict_answer?: string | null;
   /** The ideas the card mentions, as the writer stored them (plan #1056). */
   mentions?: unknown;
   /** A teach-back's exchange once marked (plan #1054). Null until then. */
@@ -127,6 +130,12 @@ export type FeedCard = {
   question: string | null;
   answer: string | null;
   /**
+   * The guess a lesson opens with (plan #2522.6): the body shows once it is
+   * answered or skipped. Absent or null on every card but a lesson written
+   * since, which therefore reads as it always did.
+   */
+  predict?: LessonPredict | null;
+  /**
    * Other ideas the card leans on, underlined where they first appear
    * (plan #1056). Empty on cards written before, lessons and checks.
    */
@@ -178,6 +187,16 @@ export type FeedCard = {
   /** How often teach-backs come, for the setting on a teach card. Attached at load. */
   teachEvery?: number;
 };
+
+/** A lesson's opening question and what is true, both set (plan #2522.6). */
+export type LessonPredict = { question: string; answer: string };
+
+/** The stored pair as a prediction, or null when either half is missing. */
+export function lessonPredict(question: string | null | undefined, answer: string | null | undefined): LessonPredict | null {
+  const q = question?.trim();
+  const a = answer?.trim();
+  return q && a ? { question: q, answer: a } : null;
+}
 
 /** A clip shown on a card: the video, and the span of it that matched. */
 export type FeedVideo = {
@@ -476,6 +495,7 @@ function toLessonCard(row: FeedCardRow): FeedCard | null {
     example: row.example?.trim() || null,
     question: row.check_question && row.check_answer ? row.check_question : null,
     answer: row.check_question && row.check_answer ? row.check_answer : null,
+    predict: lessonPredict(row.predict_question, row.predict_answer),
     depth: null,
     difficulty: isCardDifficulty(row.difficulty) ? row.difficulty : null,
     returning: row.status === 'review' || row.status === 'skipped' ? row.status : null,

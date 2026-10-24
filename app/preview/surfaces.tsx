@@ -1,4 +1,5 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { GuessedAlready } from './lesson-predict-seed';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import { FigureQuestionPreview } from './figure-question-surface';
@@ -232,6 +233,7 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnPiecePredictSurface,
   LearnFigureSurface,
   LearnExplorableSurface,
   LearnMapSurface,
@@ -3323,6 +3325,19 @@ const triageCrumbs = [
   { label: 'Vault', href: '/vault' },
   { label: 'Quick note triage', href: '/vault/triage' },
 ];
+
+/**
+ * The deck's lesson written with a prediction (plan #2522.6), asked or
+ * already guessed. Each its own card, so the two drawings keep apart.
+ */
+const PREDICT = {
+  question: 'If a city caps rents below what flats now let for, will there be more flats to rent in ten years, or fewer?',
+  answer:
+    'Fewer. Landlords sell up or let to friends, and builders put up offices instead, so the number of flats on offer shrinks while more people want one.',
+};
+function predictLesson(id: string): FeedCard {
+  return { ...deckCards[0]!, id, predict: PREDICT };
+}
 
 /**
  * Three Learn now cards for the deck: a lesson from a track that cites no
@@ -7209,6 +7224,27 @@ export const SURFACES: readonly Surface[] = [
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} />
     ),
   },
+  /* A lesson that opens on a guess (plan #2522.6), and its hidden parts: the
+   * lesson under it hidden until it is guessed or skipped, and the guess set
+   * beside what is true. A lesson with no prediction is learn-now-deck. */
+  {
+    id: 'learn-now-deck-predict',
+    label: 'Cards · A lesson asking for a guess first',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowFeed first={[predictLesson('00000000-0000-4000-8000-000000000013'), ...deckCards.slice(1)]} />,
+  },
+  {
+    id: 'learn-now-deck-predict-answered',
+    label: 'Cards · A lesson after the guess',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <GuessedAlready id="00000000-0000-4000-8000-000000000014" guess="More, because the cap makes renting cheaper.">
+        <LearnNowFeed first={[predictLesson('00000000-0000-4000-8000-000000000014'), ...deckCards.slice(1)]} />
+      </GuessedAlready>
+    ),
+  },
   /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
    * (plan #2164.5), and its hidden parts: the check as the last turn, the
    * finished thread, an answer being marked, a mark that failed, and a goal
@@ -10785,6 +10821,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnPieceCheckAskedSurface />,
+  },
+  {
+    /* A piece's lesson that opens on a guess (plan #2522.6), and the guess set
+     * beside what is true. A lesson with none is learn-piece. */
+    id: 'learn-piece-predict',
+    label: 'Plan · A lesson asking for a guess first',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPiecePredictSurface />,
+  },
+  {
+    id: 'learn-piece-predict-answered',
+    label: 'Plan · A lesson after the guess',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPiecePredictSurface answered />,
   },
   {
     /* A piece the placement found held (plan #2292.5): lessons folded to

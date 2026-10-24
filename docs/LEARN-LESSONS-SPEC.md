@@ -123,8 +123,9 @@ A lesson teaches one concept. Its parts are the parts an idea card has now:
 | Part | What it is |
 |---|---|
 | Title | The concept's name. The track and unit are named under it. |
+| Guess first | A question about where the idea goes, asked before the lesson says it, with a box and a Skip. |
 | Takeaway | The concept's claim, in one plain sentence. |
-| Context | Only what the claim needs to be followed. |
+| Context | Only what the claim needs to be followed. It opens with the guess, or the question when it was skipped, beside what is true. |
 | Evidence | A number, case or result that supports it. |
 | Why it holds | The mechanism, in two or three sentences. |
 | In practice | The idea applied to one specific case. |
@@ -137,6 +138,15 @@ the call, the catalogue is searched for the concept's claim (the search in
 is passed in. The call checks the lesson against that text and takes its
 evidence from it where it can. A lesson whose claim the source contradicts is
 not served, and the contradiction is kept on the row.
+
+The guess comes first (plan #2522.6). A lesson written with one opens on
+its question; the takeaway and everything under it open once the person has
+guessed or pressed Skip. The question can be answered by a guess without
+knowing the idea, and the writer stores it with what is true, in
+`feed_cards.predict_question` and `predict_answer`. The guess is not marked,
+not stored and moves no state, so it costs nothing to get wrong. Try this
+stays at the end as the check. A lesson written before this, or one whose
+prediction the writer left out, opens as it always did.
 
 ## What a swipe does
 
