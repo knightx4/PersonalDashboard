@@ -23,7 +23,7 @@ import {
 } from '@/lib/learn/graph/session';
 import { APPLIED_MODEL, gradeAppliedAnswer, writeAppliedCase } from '@/lib/learn/graph/applied';
 import { splitCase } from '@/lib/learn/graph/applied-payload';
-import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
+import { misconceptionBasis, nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
 import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { declareConceptKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
@@ -73,7 +73,7 @@ export type AskState = {
     expected?: string;
     /** How far this answer moved the bar. Zero when it repeated a miss. */
     weight: number;
-    /** Named only when the same wrong answer has now been picked twice. */
+    /** Named when the wrong answer was sure or reasoned, or picked twice. */
     misconception?: string;
     /** True when this claim has nothing under it, so the floor can be looked for. */
     couldGoDeeper?: boolean;
@@ -400,21 +400,36 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   let misconception: string | undefined;
   const repeated = outcome.correct ? null : repeatedWrongAnswer(probes);
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  // One confident or reasoned wrong answer is enough (plan #2522.4); with
+  // neither, the same wrong option twice is still the rule.
+  const basis = misconceptionBasis({
+    correct: outcome.correct,
+    confidence: signals.confidence,
+    reasoning: signals.reasoning,
+    repeated: repeated !== null,
+  });
+  const pickedNow = answeredRow?.chosenIndex != null ? answeredRow.options?.[answeredRow.chosenIndex] : undefined;
+  const wrongAnswer = basis === 'repeated' ? repeated?.option : pickedNow;
 
-  if (repeated && concept && apiKey) {
+  if (basis && wrongAnswer && concept && apiKey) {
     const spend = collectSpend();
     const named = await nameMisconception({
       concept: concept.name,
       claim: concept.claim,
-      wrongAnswer: repeated.option,
-      questions: probes
-        .filter(
-          (probe) =>
-            probe.chosenIndex !== null &&
-            probe.options?.[probe.chosenIndex]?.trim().toLowerCase() ===
-              repeated.option.trim().toLowerCase(),
-        )
-        .map((probe) => probe.question),
+      wrongAnswer,
+      questions:
+        basis === 'repeated'
+          ? probes
+              .filter(
+                (probe) =>
+                  probe.chosenIndex !== null &&
+                  probe.options?.[probe.chosenIndex]?.trim().toLowerCase() ===
+                    wrongAnswer.trim().toLowerCase(),
+              )
+              .map((probe) => probe.question)
+          : [answeredRow?.question ?? ''],
+      reasoning: signals.reasoning ? [signals.reasoning] : undefined,
+      basis,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -531,6 +546,37 @@ async function answerApplied(input: {
     });
   }
 
+  // A typed wrong answer that was sure or reasoned is named as a picked one
+  // is (plan #2522.4). There is no option to repeat, so nothing else counts.
+  let misconception: string | undefined;
+  const basis = misconceptionBasis({
+    correct: outcome.correct,
+    confidence: input.signals.confidence,
+    reasoning: input.signals.reasoning,
+  });
+  if (basis) {
+    const nameSpend = collectSpend();
+    const named = await nameMisconception({
+      concept: input.concept.name,
+      claim: input.concept.claim,
+      wrongAnswer: parsed.data.response,
+      questions: [input.probe.question],
+      reasoning: input.signals.reasoning ? [input.signals.reasoning] : undefined,
+      basis,
+      anthropicApiKey: apiKey,
+      onSpend: nameSpend.sink,
+    });
+    await recordLearnSpend(input.userId, 'name-misconception', nameSpend.reports);
+    if (named.ok) {
+      try {
+        await setMisconception(input.supabase, input.userId, input.concept.id, named.misconception);
+        misconception = named.misconception;
+      } catch {
+        // The answer is recorded; failing to name the belief loses a sentence only.
+      }
+    }
+  }
+
   const weight = await answeredWeight(
     input.supabase,
     input.graph.concepts.map((c) => c.id),
@@ -552,6 +598,7 @@ async function answerApplied(input: {
       weight: outcome.weight,
       response: parsed.data.response,
       expected: input.probe.expected ?? undefined,
+      misconception,
       couldGoDeeper: !outcome.correct && prerequisites.length === 0,
     },
   };
