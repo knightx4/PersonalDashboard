@@ -3312,7 +3312,15 @@ const youDetails: Details = {
   race: 'White',
   gender: 'Man',
   sexuality: 'Straight',
-  custom_fields: [],
+  custom_fields: [
+    { id: 'own-passport', label: 'Passport number', value: 'PA4471982' },
+    { id: 'own-shirt', label: 'Shirt size', value: '' },
+    {
+      id: 'own-diet',
+      label: 'Dietary needs and allergies to mention when booking a team dinner',
+      value: 'Vegetarian, no tree nuts, and a severe sesame allergy, so ask the kitchen before ordering anything fried',
+    },
+  ],
 };
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */
@@ -9220,7 +9228,8 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DetailsView details={EMPTY_DETAILS} />,
   },
   {
-    /* Edit details turns the list into its six fields in place. Two not set. */
+    /* Edit details turns the list into its fields in place: the six, then
+     * their own, each name a box of its own (plan #2531.2). Two not set. */
     id: 'you-details-edit',
     label: 'You · Details, being edited',
     module: 'you',
@@ -9228,7 +9237,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DetailsView details={{ ...youDetails, race: null, sexuality: null }} editing />,
   },
   {
-    /* A save that did not go through keeps what was typed and says why. */
+    /* Add a field opens a name box under their own fields. */
+    id: 'you-details-edit-adding',
+    label: 'You · Details, naming a new field',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} editing adding />,
+  },
+  {
+    /* An own field pointed at shows its remove button and the tip. */
+    id: 'you-details-edit-remove',
+    label: 'You · Details, a field to remove',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} editing revealRemove="own-shirt" />,
+  },
+  {
+    /* A save refused because one of their own fields is too long and one
+     * has no name: what was typed stays, and each says why under it. */
     id: 'you-details-error',
     label: 'You · Details, a save that did not go through',
     module: 'you',
@@ -9238,7 +9264,6 @@ export const SURFACES: readonly Surface[] = [
         details={youDetails}
         editing
         state={{
-          error: 'The connection dropped before your details saved. What you typed is still here: press Save to try again.',
           values: {
             phone: '+353 87 555 0199',
             linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
@@ -9247,6 +9272,15 @@ export const SURFACES: readonly Surface[] = [
             gender: 'Man',
             sexuality: '',
           },
+          fields: [
+            { id: 'own-passport', label: 'Passport number', value: 'PA4471982' },
+            { id: 'own-shirt', label: '', value: 'Medium' },
+            {
+              id: 'own-diet',
+              label: 'Dietary needs',
+              value: 'Vegetarian, no tree nuts and a severe sesame allergy. '.repeat(10),
+            },
+          ],
         }}
       />
     ),
