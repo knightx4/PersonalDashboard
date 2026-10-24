@@ -2,6 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import type { AnswerSignals } from '@/lib/learn/confidence';
 import { gradeWrittenAnswer, OPENING_MODEL, type WrittenGrade } from '@/lib/learn/graph/opening-probe';
 import { openingQuestionSchema, toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
@@ -122,6 +123,8 @@ export function markPieceCheck(input: {
   question: string;
   expected: string;
   response: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -132,6 +135,7 @@ export function markPieceCheck(input: {
     question: input.question,
     expected: input.expected,
     response: input.response,
+    signals: input.signals,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,

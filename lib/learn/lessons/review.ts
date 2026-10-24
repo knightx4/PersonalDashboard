@@ -57,6 +57,15 @@ export function nextInterval(current: number | null, correct: boolean): number {
   return next ?? Math.min(current * 2, REVIEW_MAX_DAYS);
 }
 
+/**
+ * The gap after a right answer given at Guessing (plan #2522.3): the gap the
+ * idea was already on, so it is neither pushed out nor pulled back. A guess
+ * that lands shows nothing either way.
+ */
+export function heldInterval(current: number | null): number {
+  return current === null || current < 1 ? REVIEW_STEPS[0] : current;
+}
+
 /** Today as a UTC date, `YYYY-MM-DD`. */
 export function reviewToday(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);

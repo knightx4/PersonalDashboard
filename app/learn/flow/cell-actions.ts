@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { answerCell } from '@/lib/learn/levels/answer-store';
+import { readAnswerSignals } from '@/lib/learn/confidence';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import type { CellAnswerState } from '@/components/learn/cell-answer-view';
 
@@ -32,6 +33,8 @@ export async function answerCellQuestion(prev: CellAnswerState, formData: FormDa
   const result = await answerCell(learn, user.id, {
     questionId: parsed.data.questionId,
     response: parsed.data.response,
+    // How sure they were and how they reasoned (plan #2522.3); nulls from a form that does not ask yet.
+    signals: readAnswerSignals(formData),
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });

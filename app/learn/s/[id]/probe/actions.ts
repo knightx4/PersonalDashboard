@@ -33,6 +33,8 @@ import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 import { loadEvidenceForTargets } from '@/lib/learn/evidence/links';
 import { evidenceStrength } from '@/lib/learn/strength';
+import { readAnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { checkPickedReasoning } from '@/lib/learn/graph/reasoning-check';
 
 /**
  * Asking, and answering.
@@ -286,8 +288,13 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   );
   if (!askedRow) return { ...prev, error: 'That question is not there any more.' };
 
+  // How sure they were and how they reasoned (plan #2522.3); nulls from a
+  // form that does not ask yet.
+  const signals = readAnswerSignals(formData);
+
   if (askedRow.rung !== 'recognise') {
     return answerApplied({
+      signals,
       prev,
       userId: user.id,
       supabase,
@@ -312,6 +319,35 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   // whether the concept as a whole was settled decides nothing.
   const wasSettled = concept !== undefined && concept.mastery.length === 0 && isSettled(concept);
 
+  // A right pick that came with reasoning has the reasoning read (plan
+  // #2522.3): reasoning that contradicts the pick makes it a wrong answer.
+  // A check that fails to come back leaves the pick as it was.
+  let reasoningWrong: string | null = null;
+  const apiKeyForCheck = process.env.ANTHROPIC_API_KEY;
+  if (
+    parsed &&
+    signals.reasoning !== null &&
+    concept &&
+    apiKeyForCheck &&
+    askedRow.chosenIndex === null &&
+    parsed.data.chosenIndex === askedRow.correctIndex
+  ) {
+    const spend = collectSpend();
+    const checked = await checkPickedReasoning({
+      concept: concept.name,
+      claim: concept.claim,
+      question: askedRow.question,
+      picked: askedRow.options?.[parsed.data.chosenIndex] ?? '',
+      reason: askedRow.reason ?? '',
+      reasoning: signals.reasoning,
+      anthropicApiKey: apiKeyForCheck,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'check-picked-reasoning', spend.reports);
+    if (checked.ok && !checked.holds) reasoningWrong = checked.why;
+    if (!checked.ok) console.error('[learn] reading the reasoning', checked.detail);
+  }
+
   let outcome;
   try {
     outcome = parsed
@@ -321,6 +357,8 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
           chosenIndex: parsed.data.chosenIndex,
           wasSettled,
           graph,
+          signals,
+          reasoningWrong,
         })
       : await recordDontKnow(supabase, user.id, {
           probeId: asked.data.probeId,
@@ -437,6 +475,7 @@ async function answerApplied(input: {
   probe: ProbeRow;
   subjectId: string;
   typed: FormDataEntryValue | null;
+  signals: CleanSignals;
 }): Promise<AskState> {
   const parsed = TypedAnswer.safeParse({ response: input.typed });
   if (!parsed.success) return { ...input.prev, error: 'Write an answer first.' };
@@ -454,6 +493,7 @@ async function answerApplied(input: {
     question,
     expected: input.probe.expected ?? '',
     response: parsed.data.response,
+    signals: input.signals,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
@@ -474,6 +514,7 @@ async function answerApplied(input: {
       // with the check this case aimed at.
       wasSettled: input.concept.mastery.length === 0 && isSettled(input.concept),
       graph: input.graph,
+      signals: input.signals,
     });
   } catch (error) {
     return {

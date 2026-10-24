@@ -16,7 +16,8 @@ import {
 import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
 import { predictedStrength } from '@/lib/learn/predicted';
-import { EVIDENCE_CEILING } from '@/lib/learn/strength';
+import { EVIDENCE_CEILING, stateAfterAnswer } from '@/lib/learn/strength';
+import { cleanSignals, signalColumns, type AnswerSignals } from '@/lib/learn/confidence';
 
 /**
  * Evidence worth half the ceiling or more puts an untested idea first in line
@@ -657,10 +658,20 @@ export type AnswerOutcome = {
   correct: boolean;
   reason: string;
   weight: number;
-  /** Where the answer left the concept. Which rung it came from decides. */
-  state: SettledState;
+  /**
+   * Where the answer left the concept. Which rung it came from decides. Null
+   * when a right guess left it where it was (plan #2522.3).
+   */
+  state: SettledState | null;
   /** How many nodes underneath were marked known by inference. */
   inferred: number;
+  /** Right, but given at Guessing: recorded as right, the concept not moved (plan #2522.3). */
+  guessed: boolean;
+  /**
+   * Wrong at Fairly sure or Certain: written to the row's miss_kind as
+   * 'misconception' for the next step to name (plan #2522.3).
+   */
+  misconceptionCandidate: boolean;
   /**
    * Whether this was the first answer to this question. False when the row had
    * already been answered, which earns no weight and is not a second thing
@@ -734,8 +745,17 @@ export async function recordAnswer(
     wasSettled: boolean;
     /** The subject's graph, so a correct answer can settle what is under it. */
     graph?: Graph;
+    /** How sure they were and how they reasoned, when given (plan #2522.3). */
+    signals?: AnswerSignals | null;
+    /**
+     * The grader's sentence when the reasoning given contradicts a right pick
+     * (`checkPickedReasoning`): the answer is then recorded as wrong, with
+     * this as the reason. Null or absent when the reasoning holds or none was given.
+     */
+    reasoningWrong?: string | null;
   },
 ): Promise<AnswerOutcome> {
+  const signals = cleanSignals(input.signals);
   const { data, error } = await supabase
     .from('probes')
     .select('correct_index, reason, chosen_index, dont_know, mastery_check')
@@ -756,7 +776,9 @@ export async function recordAnswer(
   // Said you did not know it already: the answer is on the screen, and a pick
   // made after reading it is not an answer.
   if (probe.dont_know) throw new Error('You already said you did not know this one.');
-  const correct = probe.correct_index === input.chosenIndex;
+  // A right pick whose reasoning contradicts it is a wrong answer (plan #2522.3).
+  const reasoningWrong = input.reasoningWrong?.trim() || null;
+  const correct = probe.correct_index === input.chosenIndex && reasoningWrong === null;
 
   // Where the check this question aimed at stood before the answer, from the
   // other questions asked about the same concept: they carry the check they
@@ -784,20 +806,31 @@ export async function recordAnswer(
       chosen_index: input.chosenIndex,
       answered_at: new Date().toISOString(),
       weight,
+      ...(first && signalColumns(signals, correct)),
     })
     .eq('id', input.probeId);
 
   assertSchemaExposed(answerError, LEARN_SCHEMA);
   if (answerError) throw fail('Saving the answer', answerError);
 
-  const { state, inferred } = await settleConcept(supabase, userId, {
+  const { state, inferred, guessed } = await settleConcept(supabase, userId, {
     conceptId: input.conceptId,
     rung: 'recognise',
     correct,
+    confidence: signals.confidence,
     graph: input.graph,
   });
 
-  return { correct, reason: probe.reason ?? '', weight, state, inferred, first };
+  return {
+    correct,
+    reason: reasoningWrong ?? probe.reason ?? '',
+    weight,
+    state,
+    inferred,
+    first,
+    guessed,
+    misconceptionCandidate: signalColumns(signals, correct).miss_kind === 'misconception',
+  };
 }
 
 /**
@@ -860,7 +893,16 @@ export async function recordDontKnow(
     correct: false,
   });
 
-  return { correct: false, reason: probe.reason ?? '', weight, state, inferred, first };
+  return {
+    correct: false,
+    reason: probe.reason ?? '',
+    weight,
+    state,
+    inferred,
+    first,
+    guessed: false,
+    misconceptionCandidate: false,
+  };
 }
 
 /** What an answer can leave a concept in. Never `unknown` or `misconception`. */
@@ -898,13 +940,21 @@ export function settledStateFor(rung: Rung, correct: boolean): SettledState {
  * right moves it to what that rung can show, which is #401: a picked answer
  * stops meaning known, and the applied case starts meaning it. Both say they
  * were established by testing, which is the claim the basis column carries.
+ *
+ * A right answer given at Guessing writes nothing (plan #2522.3,
+ * `stateAfterAnswer`): the concept stays where it was, its date is not
+ * refreshed, and nothing underneath is inferred from it.
  */
 async function settleConcept(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { conceptId: string; rung: Rung; correct: boolean; graph?: Graph },
-): Promise<{ state: SettledState; inferred: number }> {
-  const state = settledStateFor(input.rung, input.correct);
+  input: { conceptId: string; rung: Rung; correct: boolean; confidence?: number | null; graph?: Graph },
+): Promise<{ state: SettledState | null; inferred: number; guessed: boolean }> {
+  const earned = settledStateFor(input.rung, input.correct);
+  if (stateAfterAnswer(earned, { correct: input.correct, confidence: input.confidence }) === null) {
+    return { state: null, inferred: 0, guessed: true };
+  }
+  const state = earned;
   const { error } = await supabase.from('concept_state').upsert(
     {
       concept_id: input.conceptId,
@@ -935,7 +985,7 @@ async function settleConcept(
       ? await markInferred(supabase, userId, state, inferredFrom(input.graph, input.conceptId))
       : 0;
 
-  return { state, inferred };
+  return { state, inferred, guessed: false };
 }
 
 /**
@@ -967,8 +1017,11 @@ export async function recordWrittenAnswer(
     /** Read only for a concept with no checks, the same as a picked answer. */
     wasSettled: boolean;
     graph?: Graph;
+    /** How sure they were and how they reasoned, when given; the grader has read both (plan #2522.3). */
+    signals?: AnswerSignals | null;
   },
 ): Promise<AnswerOutcome> {
+  const signals = cleanSignals(input.signals);
   const { data, error } = await supabase
     .from('probes')
     .select('response, mastery_check, rung')
@@ -1006,18 +1059,29 @@ export async function recordWrittenAnswer(
       grade_reason: input.why,
       answered_at: new Date().toISOString(),
       weight,
+      ...(first && signalColumns(signals, input.correct)),
     })
     .eq('id', input.probeId);
 
   assertSchemaExposed(answerError, LEARN_SCHEMA);
   if (answerError) throw fail('Saving the answer', answerError);
 
-  const { state, inferred } = await settleConcept(supabase, userId, {
+  const { state, inferred, guessed } = await settleConcept(supabase, userId, {
     conceptId: input.conceptId,
     rung: probe.rung,
     correct: input.correct,
+    confidence: signals.confidence,
     graph: input.graph,
   });
 
-  return { correct: input.correct, reason: input.why, weight, state, inferred, first };
+  return {
+    correct: input.correct,
+    reason: input.why,
+    weight,
+    state,
+    inferred,
+    first,
+    guessed,
+    misconceptionCandidate: signalColumns(signals, input.correct).miss_kind === 'misconception',
+  };
 }

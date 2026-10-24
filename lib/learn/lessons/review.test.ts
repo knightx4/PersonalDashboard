@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   firstReviewDays,
+  heldInterval,
   isReviewable,
   nextDueLine,
   nextInterval,
   pickDue,
   REVIEW_MAX_DAYS,
+  REVIEW_STEPS as STEPS,
   reviewedState,
   reviewLines,
   reviewPrompt,
@@ -153,5 +155,13 @@ describe('pickDue', () => {
       ['z', null],
       ['b', null],
     ]);
+  });
+});
+
+describe('a right guess in review (plan #2522.3)', () => {
+  it('keeps the gap the idea was on', () => {
+    expect(heldInterval(7)).toBe(7);
+    expect(heldInterval(null)).toBe(STEPS[0]);
+    expect(heldInterval(0)).toBe(STEPS[0]);
   });
 });

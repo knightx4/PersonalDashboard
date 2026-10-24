@@ -1,5 +1,6 @@
 import { KIND_CEILING, type EvidenceKind } from '@/lib/learn/evidence/kinds';
 import type { KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
+import { isGuess } from '@/lib/learn/confidence';
 
 /**
  * How well you know an idea on a given day, from 0 to 1 (plan #1997.1).
@@ -94,6 +95,25 @@ export function strength(row: StrengthInput, on: Date): number {
   const level = LEVEL_WEIGHT[row.state];
   if (level === 0) return 0;
   return level * EVIDENCE_WEIGHT[row.established] * memory(row, on);
+}
+
+/**
+ * Where an answer leaves an idea once how sure you were is read (plan
+ * #2522.3). `earned` is what the answer would set on its own: the rung's state
+ * when right, shaky when wrong.
+ *
+ * A right answer given as a guess returns null: leave the idea where it was.
+ * Nothing moves above recognised, a shaky idea stays shaky, an untested one
+ * stays untested and a named misconception stays named, because a guess that
+ * lands shows nothing about what you hold. A wrong answer moves the idea
+ * whatever the confidence; a miss at Guessing is still a miss.
+ */
+export function stateAfterAnswer(
+  earned: KnowledgeState,
+  answer: { correct: boolean; confidence: number | null | undefined },
+): KnowledgeState | null {
+  if (answer.correct && isGuess(answer.confidence)) return null;
+  return earned;
 }
 
 /** A misconception is flagged on its own, never as a low score. */

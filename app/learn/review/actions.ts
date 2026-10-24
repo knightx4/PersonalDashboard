@@ -12,6 +12,7 @@ import {
 } from '@/lib/learn/lessons/review-store';
 import { markReviewQuestion, REVIEW_MODEL, writeReviewQuestion } from '@/lib/learn/lessons/write-review';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { cleanSignals, isGuess, signalColumns, type AnswerSignals } from '@/lib/learn/confidence';
 
 /**
  * The presses on a review question (plan #1145), from Learn now and from the
@@ -99,8 +100,14 @@ export type AnswerReviewResult = {
  * brings it back tomorrow (`nextInterval`).
  */
 // latency: pending
-export async function answerReview(questionId: string, response: string): Promise<AnswerReviewResult> {
+export async function answerReview(
+  questionId: string,
+  response: string,
+  /** How sure they were and how they reasoned, when the page asks (plan #2522.3). */
+  answerSignals?: AnswerSignals | null,
+): Promise<AnswerReviewResult> {
   const user = await requireUser();
+  const signals = cleanSignals(answerSignals);
   const id = Id.safeParse(questionId);
   if (!id.success) return { error: 'Could not tell which question that was.' };
   const answer = AnswerText.safeParse(response);
@@ -132,6 +139,7 @@ export async function answerReview(questionId: string, response: string): Promis
       question: row.question,
       expected: row.expected,
       response: answer.data,
+      signals,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -145,6 +153,7 @@ export async function answerReview(questionId: string, response: string): Promis
         correct: grade.correct,
         marked_why: grade.why,
         answered_at: new Date().toISOString(),
+        ...signalColumns(signals, grade.correct),
       })
       .eq('id', id.data)
       .eq('user_id', user.id)
@@ -155,7 +164,15 @@ export async function answerReview(questionId: string, response: string): Promis
     const saved = (marked ?? [])[0] as ReviewQuestionRow | undefined;
     if (!saved) return { error: 'That question has been answered already.' };
 
-    const nextInDays = await recordReview(learn, user.id, row.concept_id, target, grade.correct);
+    const nextInDays = await recordReview(
+      learn,
+      user.id,
+      row.concept_id,
+      target,
+      grade.correct,
+      new Date(),
+      isGuess(signals.confidence),
+    );
     return { question: toReviewQuestion(saved), nextInDays };
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };

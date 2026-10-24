@@ -24,16 +24,27 @@ export function probeOutcome(r: Record<string, unknown>): string | null {
   return r.chosen_index === r.correct_index ? 'right' : 'wrong';
 }
 
+/** Whether a cell question's first grader met the cell it asked about; null when it gave no verdict on it. */
+export function askedCellMet(grade: unknown, cellId: unknown): boolean | null {
+  if (!Array.isArray(grade)) return null;
+  const own = grade.find((g) => g && typeof g === 'object' && (g as { cell_id?: unknown }).cell_id === cellId) as
+    | { verdict?: unknown }
+    | undefined;
+  if (!own || own.verdict === 'not_touched' || own.verdict === undefined) return null;
+  return own.verdict === 'met';
+}
+
 export async function loadHarnessExport(sql: Sql, user: string | null): Promise<HarnessExport> {
   const probeRows = (await sql`
     select id, shown_at, answered_at, answer_seconds, predicted_strength, dont_know,
-           response_correct, chosen_index, correct_index
+           response_correct, chosen_index, correct_index, confidence
     from learn.probes
     where answered_at is not null and discarded_at is null
       and (${user}::uuid is null or user_id = ${user}::uuid)
     order by answered_at`) as unknown as Rows;
   const cellRows = (await sql`
-    select id, shown_at, answered_at, answer_seconds, predicted_status, predicted_level, grade, grade_second
+    select id, cell_id, shown_at, answered_at, answer_seconds, predicted_status, predicted_level, grade, grade_second,
+           confidence
     from learn.cell_questions
     where answered_at is not null and grade is not null
       and (${user}::uuid is null or user_id = ${user}::uuid)
@@ -53,6 +64,7 @@ export async function loadHarnessExport(sql: Sql, user: string | null): Promise<
         outcome: probeOutcome(r),
         grade: typeof r.response_correct === 'boolean' ? r.response_correct : null,
         gradeSecond: null,
+        confidence: num(r.confidence),
       }),
     ),
     ...cellRows.map(
@@ -68,6 +80,8 @@ export async function loadHarnessExport(sql: Sql, user: string | null): Promise<
         outcome: null,
         grade: r.grade,
         gradeSecond: r.grade_second,
+        confidence: num(r.confidence),
+        right: askedCellMet(r.grade, r.cell_id),
       }),
     ),
   ];

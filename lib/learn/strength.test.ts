@@ -9,6 +9,7 @@ import {
   strength,
   strengthWithEvidence,
   type StrengthInput,
+  stateAfterAnswer,
 } from './strength';
 
 const T0 = '2026-01-01T00:00:00Z';
@@ -174,5 +175,21 @@ describe('evidence', () => {
   it('keeps a misconception at nought', () => {
     const wrong = { ...tested('misconception'), established: 'inferred' as const, tested_at: null };
     expect(strengthWithEvidence(wrong, [{ kind: 'work', ceiling: 1, similarity: 0.9 }], day(0))).toBe(0);
+  });
+});
+
+describe('where an answer leaves an idea, read with how sure you were (plan #2522.3)', () => {
+  it('leaves the idea where it was on a right guess', () => {
+    expect(stateAfterAnswer('recognised', { correct: true, confidence: 0.25 })).toBeNull();
+    expect(stateAfterAnswer('known', { correct: true, confidence: 0.25 })).toBeNull();
+  });
+
+  it('moves the idea on a right answer given with any other confidence, or none', () => {
+    expect(stateAfterAnswer('recognised', { correct: true, confidence: 0.5 })).toBe('recognised');
+    expect(stateAfterAnswer('known', { correct: true, confidence: null })).toBe('known');
+  });
+
+  it('counts a miss at Guessing as a miss', () => {
+    expect(stateAfterAnswer('shaky', { correct: false, confidence: 0.25 })).toBe('shaky');
   });
 });

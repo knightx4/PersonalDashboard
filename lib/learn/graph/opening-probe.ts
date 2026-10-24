@@ -11,6 +11,7 @@ import {
   type OpeningQuestionRejection,
 } from '@/lib/learn/graph/opening-payload';
 import { MODELS } from '@/lib/core/models';
+import { readReasoning, signalLines, withReasoningRule, type AnswerSignals } from '@/lib/learn/confidence';
 
 /**
  * The question asked about each of the ten claims, and the grading of what
@@ -258,10 +259,16 @@ export async function gradeWrittenAnswer(input: {
   question: string;
   expected: string;
   response: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
 }): Promise<WrittenGrade> {
+  // The reasoning rule is added only when there is reasoning to read, so a
+  // prompt without it is the prompt it always was.
+  const extra = signalLines(input.signals);
+  const system = readReasoning(input.signals?.reasoning) ? withReasoningRule(input.system) : input.system;
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
@@ -269,7 +276,7 @@ export async function gradeWrittenAnswer(input: {
     response = await client.messages.create({
       model: OPENING_MODEL,
       max_tokens: 512,
-      system: input.system,
+      system,
       tools: [
         {
           name: GRADE_TOOL,
@@ -295,6 +302,7 @@ export async function gradeWrittenAnswer(input: {
             `Answer expected: ${input.expected}`,
             '',
             `What they wrote: ${input.response}`,
+            ...(extra.length > 0 ? ['', ...extra] : []),
             '',
             `Call ${GRADE_TOOL}.`,
           ].join('\n'),
@@ -324,6 +332,7 @@ export async function gradeOpeningAnswer(input: {
   question: string;
   expected: string;
   response: string;
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

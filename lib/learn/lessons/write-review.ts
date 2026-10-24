@@ -5,6 +5,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { gradeWrittenAnswer, OPENING_MODEL, type WrittenGrade } from '@/lib/learn/graph/opening-probe';
 import { openingQuestionSchema, toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import type { AnswerSignals } from '@/lib/learn/confidence';
 import { reviewLines, reviewPrompt, type IdeaForReview } from './review';
 
 /**
@@ -116,6 +117,8 @@ export function markReviewQuestion(input: {
   question: string;
   expected: string;
   response: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -126,6 +129,7 @@ export function markReviewQuestion(input: {
     question: input.question,
     expected: input.expected,
     response: input.response,
+    signals: input.signals,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,
