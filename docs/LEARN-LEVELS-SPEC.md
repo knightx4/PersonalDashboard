@@ -278,6 +278,22 @@ position for a stated reason. The rule for writing that objection is the
 graph spec's open question on the defence rung, and this spec does not
 settle it.
 
+### One hint before the answer
+
+Plan #2522.7. A written answer to an explanation or a case that misses the
+asked cell is held the first time, not recorded. The first grader is asked
+for a hint and a kind of miss beside its grades when no hint has been given,
+and the row keeps `hints_used`, `miss_kind` and the first try with its
+verdicts in `first_try`; no evidence is written. The screen shows the hint,
+the first answer back in the box, Check again and Show the answer, and opens
+there again if the question is left. The retry is graded as any answer is,
+with the first try and the hint in the prompt. Right after a hint writes no
+`met`, as a right guess does, so the ladder does not climb; its `not met`s
+still count. Show the answer records the first try from its kept verdicts
+without grading again. Once a question that had a hint is recorded, a case
+shows the answer it expected. A figure question is answered on its figure
+and gets no hint.
+
 ## Choosing the next question
 
 ### Placement

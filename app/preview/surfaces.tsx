@@ -1,4 +1,5 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { GuessedAlready } from './lesson-predict-seed';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import { FigureQuestionPreview } from './figure-question-surface';
@@ -232,10 +233,14 @@ import {
   LearnPieceSurface,
   LearnPieceCellCheckSurface,
   LearnPieceHeldSurface,
+  LearnPiecePredictSurface,
   LearnFigureSurface,
   LearnExplorableSurface,
   LearnMapSurface,
   LearnProbeSurface,
+  LearnPieceCheckAskedSurface,
+  LearnPieceCheckHintSurface,
+  LearnProbeHintSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
   LearnExternalSurface,
@@ -3322,6 +3327,19 @@ const triageCrumbs = [
   { label: 'Vault', href: '/vault' },
   { label: 'Quick note triage', href: '/vault/triage' },
 ];
+
+/**
+ * The deck's lesson written with a prediction (plan #2522.6), asked or
+ * already guessed. Each its own card, so the two drawings keep apart.
+ */
+const PREDICT = {
+  question: 'If a city caps rents below what flats now let for, will there be more flats to rent in ten years, or fewer?',
+  answer:
+    'Fewer. Landlords sell up or let to friends, and builders put up offices instead, so the number of flats on offer shrinks while more people want one.',
+};
+function predictLesson(id: string): FeedCard {
+  return { ...deckCards[0]!, id, predict: PREDICT };
+}
 
 /**
  * Three Learn now cards for the deck: a lesson from a track that cites no
@@ -7191,6 +7209,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReviewListSurface folded />,
   },
   {
+    /* One hint before the answer (plan #2522.7): a row with its hint up, a
+     * row right after a hint, and a row where the answer was shown. */
+    id: 'learn-review-list-hint',
+    label: 'Now · Due for review, a hint after a miss',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface hinted />,
+  },
+  {
     /* Cards, the deck of cards written before Now led with today's piece
      * (plan #2313.1): one card, the three swipes at its foot. Nothing here is
      * recorded; the swipes only reach the server from the real page. */
@@ -7206,6 +7233,27 @@ export const SURFACES: readonly Surface[] = [
     // On its second card (plan #1931.5): the first is passed, so Previous shows.
     render: () => (
       <LearnNowFeed first={deckCards.slice(1)} earlier={deckCards.slice(0, 1)} />
+    ),
+  },
+  /* A lesson that opens on a guess (plan #2522.6), and its hidden parts: the
+   * lesson under it hidden until it is guessed or skipped, and the guess set
+   * beside what is true. A lesson with no prediction is learn-now-deck. */
+  {
+    id: 'learn-now-deck-predict',
+    label: 'Cards · A lesson asking for a guess first',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnNowFeed first={[predictLesson('00000000-0000-4000-8000-000000000013'), ...deckCards.slice(1)]} />,
+  },
+  {
+    id: 'learn-now-deck-predict-answered',
+    label: 'Cards · A lesson after the guess',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <GuessedAlready id="00000000-0000-4000-8000-000000000014" guess="More, because the cap makes renting cheaper.">
+        <LearnNowFeed first={[predictLesson('00000000-0000-4000-8000-000000000014'), ...deckCards.slice(1)]} />
+      </GuessedAlready>
     ),
   },
   /* Today's piece, which leads the deck (plan #2164.4) as a thread with Dash
@@ -7470,6 +7518,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
+    /* The case missed once (plan #2522.7): the hint, the first answer back in
+     * the box to change, how sure as it was said, Show the answer beside
+     * Check again. */
+    id: 'learn-cell-answer-case-hint',
+    label: 'Practice Flow · Work a case, a hint after a miss',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-hint" />,
+  },
+  {
+    /* Right after the hint: counted, the ladder left where it was, and the
+     * answer the case expected. */
+    id: 'learn-cell-answer-case-after-hint',
+    label: 'Practice Flow · Work a case, right after a hint',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-after-hint" />,
+  },
+  {
+    /* Show the answer pressed after the hint: the first try recorded, what was
+     * written, and the answer expected. */
+    id: 'learn-cell-answer-case-revealed',
+    label: 'Practice Flow · Work a case, answer shown after a hint',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-revealed" />,
   },
   {
     /* A question Practice Flow picked (plan #2138.6), with the reason it was
@@ -10777,6 +10853,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPieceCellCheckSurface />,
   },
   {
+    /* The check asked and waiting: the answer box, how sure, and Check my
+     * answer (plan #2522.2). */
+    id: 'learn-piece-check-asked',
+    label: 'Plan · One piece, its check asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCheckAskedSurface />,
+  },
+  {
+    /* A piece's lesson that opens on a guess (plan #2522.6), and the guess set
+     * beside what is true. A lesson with none is learn-piece. */
+    id: 'learn-piece-predict',
+    label: 'Plan · A lesson asking for a guess first',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPiecePredictSurface />,
+  },
+  {
+    id: 'learn-piece-predict-answered',
+    label: 'Plan · A lesson after the guess',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPiecePredictSurface answered />,
+  },
+  {
+    /* The check missed once (plan #2522.7): the hint, the first answer in
+     * the box, Check again and Show the answer. */
+    id: 'learn-piece-check-hint',
+    label: 'Plan · One piece, a hint after a missed check',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCheckHintSurface />,
+  },
+  {
     /* A piece the placement found held (plan #2292.5): lessons folded to
      * their takeaways, the check one level above what was shown. */
     id: 'learn-piece-held',
@@ -10910,6 +11020,40 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnProbeSurface />,
+  },
+  {
+    /* A question on screen: the options, how sure you are under them, and
+     * Check my answer or I don't know (plan #2522.2). */
+    id: 'learn-probe-question',
+    label: 'Subject · Questions, one asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="asked" />,
+  },
+  {
+    /* Answered: the marks, Right, and what was said about how sure. */
+    id: 'learn-probe-answered',
+    label: 'Subject · Questions, one answered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="answered" />,
+  },
+  {
+    /* Answered with I don't know: nothing about how sure is asked or shown. */
+    id: 'learn-probe-dont-know',
+    label: 'Subject · Questions, answered I don’t know',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="dont-know" />,
+  },
+  {
+    /* An applied case missed once (plan #2522.7): the hint, the first answer
+     * in the box, Check again and Show the answer. */
+    id: 'learn-probe-hint',
+    label: 'Subject · Questions, a hint after a missed case',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeHintSurface />,
   },
   {
     id: 'learn-videos',
@@ -11540,6 +11684,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FigureQuestionPreview form="pick" />,
+  },
+  {
+    /* The same pick with Unsure chosen and the folded box for how you got
+     * there opened (plan #2522.2). */
+    id: 'learn-cell-answer-figure-pick-reasoning',
+    label: 'Practice Flow · Pick the figure, how you got there open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" reasoning />,
   },
   {
     /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */

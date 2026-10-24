@@ -11,6 +11,8 @@ import {
   type OpeningQuestionRejection,
 } from '@/lib/learn/graph/opening-payload';
 import { MODELS } from '@/lib/core/models';
+import { readReasoning, signalLines, withReasoningRule, type AnswerSignals, type MissKind } from '@/lib/learn/confidence';
+import { HINT_TOOL_PROPERTIES, readHint, readMissKind, retryLines, withHintRule, type FirstTry } from '@/lib/learn/hint';
 
 /**
  * The question asked about each of the ten claims, and the grading of what
@@ -233,7 +235,18 @@ export async function writeOpeningQuestions(input: {
 }
 
 export type WrittenGrade =
-  | { ok: true; correct: boolean; why: string }
+  | {
+      ok: true;
+      correct: boolean;
+      why: string;
+      /**
+       * On a wrong answer graded with `hint` asked for (plan #2522.7): one
+       * hint toward the answer, null when none usable came back, and the kind
+       * of miss.
+       */
+      hint?: string | null;
+      missKind?: MissKind | null;
+    }
   | { ok: false; detail: string };
 
 /** The sweep's own name for it, kept so its callers read the same as before. */
@@ -258,10 +271,21 @@ export async function gradeWrittenAnswer(input: {
   question: string;
   expected: string;
   response: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
+  /** Ask for a hint and a kind of miss beside a wrong verdict (plan #2522.7). */
+  hint?: boolean;
+  /** The first try and its hint, when this answer is the retry after it. */
+  retry?: FirstTry | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
 }): Promise<WrittenGrade> {
+  // The reasoning rule and the hint rule are added only when they apply, so a
+  // prompt without them is the prompt it always was.
+  const extra = [...signalLines(input.signals), ...retryLines(input.retry ?? null)];
+  const reasoned = readReasoning(input.signals?.reasoning) ? withReasoningRule(input.system) : input.system;
+  const system = input.hint ? withHintRule(reasoned) : reasoned;
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
@@ -269,7 +293,7 @@ export async function gradeWrittenAnswer(input: {
     response = await client.messages.create({
       model: OPENING_MODEL,
       max_tokens: 512,
-      system: input.system,
+      system,
       tools: [
         {
           name: GRADE_TOOL,
@@ -279,6 +303,7 @@ export async function gradeWrittenAnswer(input: {
             properties: {
               why: { type: 'string' },
               correct: { type: 'boolean' },
+              ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
             },
             required: ['why', 'correct'],
           },
@@ -295,6 +320,7 @@ export async function gradeWrittenAnswer(input: {
             `Answer expected: ${input.expected}`,
             '',
             `What they wrote: ${input.response}`,
+            ...(extra.length > 0 ? ['', ...extra] : []),
             '',
             `Call ${GRADE_TOOL}.`,
           ].join('\n'),
@@ -315,7 +341,15 @@ export async function gradeWrittenAnswer(input: {
   const safe = openingGradeSchema.safeParse(block.input);
   if (!safe.success) return { ok: false, detail: 'The grade came back malformed.' };
 
-  return { ok: true, correct: safe.data.correct, why: safe.data.why };
+  if (!input.hint || safe.data.correct) return { ok: true, correct: safe.data.correct, why: safe.data.why };
+  const raw = block.input as { hint?: unknown; miss_kind?: unknown };
+  return {
+    ok: true,
+    correct: false,
+    why: safe.data.why,
+    hint: readHint(raw.hint, input.expected),
+    missKind: readMissKind(raw.miss_kind),
+  };
 }
 
 /** Grade one answer from the opening sweep, against the claim it was asked about. */
@@ -324,6 +358,7 @@ export async function gradeOpeningAnswer(input: {
   question: string;
   expected: string;
   response: string;
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

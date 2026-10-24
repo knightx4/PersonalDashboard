@@ -89,7 +89,7 @@ export async function PracticeFlow({
     return (
       <div className="mt-6">
         {asked.ok ? (
-          <CellAnswer key={asked.asked.questionId} asked={{ ...asked.asked, why: asked.asked.role ? roleWhy(asked.asked.role) : undefined }} nextHref={practiceHref()} />
+          <CellAnswer key={asked.asked.questionId} asked={{ ...asked.asked, why: asked.asked.role ? roleWhy(asked.asked.role) : undefined }} nextHref={practiceHref()} holdForward />
         ) : (
           <EmptyState
             icon={Target}

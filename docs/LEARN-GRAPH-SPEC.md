@@ -255,11 +255,21 @@ put and abandoned is not put again and settles nothing.
   without appealing back to the question, the question is thrown away and
   rewritten — that check is the cheapest verification available and it catches
   most of the bad items.
-- **A specific wrong answer picked twice becomes a named misconception**, stored
-  on the node, and it is the most valuable thing the whole system produces. It
-  is a distinct state from "does not know": not knowing is a gap, and a
-  misconception is something actively steering you wrong that you will not find
-  by reading more.
+- **A named misconception is stored on the node**, and it is the most valuable
+  thing the whole system produces. It is a distinct state from "does not know":
+  not knowing is a gap, and a misconception is something actively steering you
+  wrong that you will not find by reading more. Three things name one:
+  a wrong answer given at Fairly sure or Certain, a wrong answer with the
+  person's own reasoning beside it, and the same wrong option picked twice. The
+  first two stand alone, since being sure and wrong, or showing the thought
+  that led there, is a position where a single bare miss is a slip. Reasoning
+  given at Guessing does not count. An answer with neither signal follows the
+  twice-picked rule, as before. The reasoning goes to the namer, so the
+  sentence describes what they wrote. This holds for picked answers, applied
+  cases and cell questions alike; a typed answer has no option to repeat, so
+  only the first two reach it. A cell question stores the sentence on the
+  cell's idea when the cell has exactly one, and shows it without storing it
+  when there are several.
 
 ### Writing an applied case
 
@@ -282,6 +292,17 @@ put and abandoned is not put again and settles nothing.
 - **The grader writes its sentence before its verdict**, and both are stored on
   the question beside what was typed. A concept page read a month later has the
   case, the answer expected, the answer given, and why it was marked as it was.
+- **A first miss earns one hint before the answer** (plan #2522.7). The grader
+  that marks it wrong also writes a hint aimed at where the answer went off and
+  labels the miss (`cue`, `wrong_idea`, `slip`, `careless`, `misconception`;
+  a wrong answer at Fairly sure or Certain is always `misconception`). The
+  case stays unanswered, with `hints_used` at 1 and the first try in
+  `first_try`, and the screen shows the hint, the first answer back in the box,
+  Check again and Show the answer. The retry is graded with the first try and
+  the hint in view; right after a hint counts as right and leaves the concept
+  at its rung. Show the answer records the first try as it was graded, without
+  a second call. A hint that repeats the expected answer is dropped and the
+  miss is recorded straight away. The rules are in `lib/learn/hint.ts`.
 - **A case about something you are already sure of can be waved through.** A
   button beside the answer box marks the concept `known`, established
   `declared`, and no model is called because nothing is typed and nothing is
@@ -480,7 +501,7 @@ Model per operation, chosen rather than defaulted:
 | grade a multiple-choice answer | none | the answer is a stored index; grading is a comparison |
 | write one applied case | Haiku | one claim and one check in, one situation and the answer it expects out |
 | grade an applied answer | Haiku | there is no index to compare; a typed answer has to be read |
-| name a misconception | Haiku | only fires on the same wrong option twice |
+| name a misconception | Haiku | only fires on a sure or reasoned wrong answer, or the same wrong option twice |
 | extract concepts from a note | Haiku | extraction, not judgment |
 | rebuild a graph you said was wrong | Opus | rare, and you asked for it |
 
@@ -605,7 +626,7 @@ Each slice is useless without the one above it, same as everywhere else here.
    approval step is not politeness — it is the cheapest possible check on a
    generated graph, and a wrong graph is worse than no graph.
 4. **Probing and the bar.** One question per call, the reason check,
-   misconception naming on the second repeat.
+   misconception naming on a sure or reasoned miss, or the second repeat.
 5. **Growth from probing.** Triggers 2 and 3 — the graph starts changing shape
    because of how you answer.
 6. **Joined to the queue.** Gap to reading, reading note to concepts.

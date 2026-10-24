@@ -14,7 +14,11 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
 import type { Moved, ReachedCell, ReachedHow } from '@/lib/learn/levels/grade';
 import type { FigureQuestionView } from '@/lib/learn/figures/question';
+import type { HowSure } from '@/lib/learn/how-sure';
+import type { HintView } from '@/lib/learn/hint';
 import { FigureAnswer } from './figure-answer';
+import { HowSureGiven, HowSureInput } from './how-sure';
+import { HintedNote, HintLine, RetryBox, RETRY_LABEL, REVEAL_LABEL } from './hint-retry';
 
 /**
  * An explain question about one level of a topic, and the answer screen
@@ -51,6 +55,8 @@ export type AskedCellView = {
   why?: string;
   /** Where the question sits in a placement, such as "Question 3 of up to 8" (plan #2292.2). */
   step?: string;
+  /** A question left open with its hint up, to open where it was left (plan #2522.7). */
+  resume?: { hint: HintView; howSure: HowSure };
 };
 
 export type CellAnswerState = {
@@ -60,6 +66,17 @@ export type CellAnswerState = {
   response?: string;
   /** A figure question's answer in words, shown once it is graded. */
   answer?: string;
+  /** How sure the person said they were and how they got there (plan #2522.2), kept across an error and shown once graded. */
+  howSure?: HowSure;
+  /**
+   * After a first wrong answer (plan #2522.7): the hint and the first try.
+   * The question stays open, with a box to try again and Show the answer.
+   */
+  hint?: HintView;
+  /** Answered after the hint: whether it was right, and whether Show the answer recorded it. */
+  afterHint?: { right: boolean; revealed?: boolean };
+  /** A case's expected answer, shown once a question that had a hint is answered. */
+  expected?: string;
 };
 
 /**
@@ -152,13 +169,36 @@ function ReachedRow({ cell, open }: { cell: ReachedCell; open?: boolean }) {
   );
 }
 
-function SendButton({ pending: drawnPending }: { pending?: boolean }) {
+function SendButton({ pending: drawnPending, retry }: { pending?: boolean; retry?: boolean }) {
   const status = useFormStatus();
-  const pending = drawnPending ?? status.pending;
+  const revealing = status.pending && status.data?.get('reveal') === '1';
+  const pending = drawnPending ?? (status.pending && !revealing);
   return (
-    <DashAction type="submit" size="lg" pending={pending} paid={ANSWER_CELL_PAID} what="Cost of grading">
-      {pending ? 'Reading your answer…' : 'Check my answer'}
+    <DashAction type="submit" size="lg" pending={pending} disabled={revealing} paid={ANSWER_CELL_PAID} what="Cost of grading">
+      {pending ? 'Reading your answer…' : retry ? RETRY_LABEL : 'Check my answer'}
     </DashAction>
+  );
+}
+
+/**
+ * Show the answer, beside Check again once a hint is up (plan #2522.7). It
+ * posts `reveal`, records the first try as it was graded and costs nothing,
+ * so it skips the box's own check that something is written.
+ */
+function RevealButton() {
+  const status = useFormStatus();
+  const revealing = status.pending && status.data?.get('reveal') === '1';
+  return (
+    <button
+      type="submit"
+      name="reveal"
+      value="1"
+      formNoValidate
+      disabled={status.pending}
+      className={buttonVariants({ variant: 'ghost', size: 'lg' })}
+    >
+      {revealing ? 'Showing…' : REVEAL_LABEL}
+    </button>
   );
 }
 
@@ -247,6 +287,7 @@ export function CellAnswerView({
   pending,
   openFirstQuote,
   openWhy,
+  reasoningOpen,
 }: {
   asked: AskedCellView;
   state: CellAnswerState;
@@ -268,6 +309,8 @@ export function CellAnswerView({
   openFirstQuote?: boolean;
   /** Draws the reason open, for the gallery. */
   openWhy?: boolean;
+  /** Draws a pick's box for how you got there open, for the gallery. */
+  reasoningOpen?: boolean;
 }) {
   const head = (
     <>
@@ -301,18 +344,42 @@ export function CellAnswerView({
       <div data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
         <Card padding="standard">
           {head}
-          <p className="mt-4 text-ui font-semibold text-ink">{movedSummary(moved, asked)}</p>
+          {/* Right after a hint wrote nothing on the ladder (plan #2522.7), so
+            * what moved would read as a miss: the line says what it was. */}
+          {state.afterHint?.right ? (
+            <HintedNote correct hintsUsed={1} lead className="mt-4 font-semibold text-ink" />
+          ) : (
+            <>
+              <p className="mt-4 text-ui font-semibold text-ink">{movedSummary(moved, asked)}</p>
+              {state.afterHint && (
+                <HintedNote correct={false} hintsUsed={1} revealed={state.afterHint.revealed} className="mt-1" />
+              )}
+            </>
+          )}
+          {state.expected && <p className="mt-2 text-ui text-ink">The answer it expected: {state.expected}</p>}
+          {/* After a hint, what was written stands beside the answer expected:
+            * the retry when it was marked, the first try when the answer was shown. */}
+          {state.afterHint && state.response && (
+            <p className="mt-2 text-ui text-ink-muted">You wrote: {state.response}</p>
+          )}
           {state.answer && (
             <p className="mt-1 text-ui text-ink">
               The answer: {state.answer}
               {given && given !== state.answer && <span className="text-ink-muted"> · you said {given}</span>}
             </p>
           )}
+          <HowSureGiven howSure={state.howSure} className="mt-2" />
           {asked.figure && <FigureAnswer questionId={asked.questionId} question={asked.figure} answered />}
         </Card>
         {/* A figure question reaches the asked level alone, and the line above
           * already says how; the list shows only when it adds to that. */}
-        {(asked.figure ? moved.reached.length > 1 || moved.doubted.length > 0 : moved.reached.length > 0 || moved.doubted.length > 0) && (
+        {/* After a hint, a list holding only the asked level not reached says
+          * again what the line above says, so it shows only when it adds. */}
+        {(asked.figure
+          ? moved.reached.length > 1 || moved.doubted.length > 0
+          : state.afterHint
+            ? moved.reached.some((r) => !(r.asked && r.how === 'missed')) || moved.doubted.length > 0
+            : moved.reached.length > 0 || moved.doubted.length > 0) && (
           <Card padding="none" className="mt-3 overflow-hidden">
             <ul className="divide-y divide-border">
               {moved.reached.map((cell, i) => (
@@ -335,6 +402,38 @@ export function CellAnswerView({
           </Link>
         </ForwardRow>
       </div>
+    );
+  }
+
+  if (state.hint) {
+    // A first miss (plan #2522.7): the hint, the first answer back in a box
+    // to change, and how sure, kept from the first try.
+    return (
+      <form action={action} data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
+        <input type="hidden" name="questionId" value={asked.questionId} />
+        <Card padding="standard">
+          {head}
+          <HintLine hint={state.hint.hint} />
+          <RetryBox
+            id={asked.questionId}
+            firstAnswer={state.hint.response}
+            disabled={pending}
+            rows={5}
+            describedBy={state.error ? `answer-error-${asked.questionId}` : undefined}
+          />
+          <HowSureInput id={asked.questionId} kind="written" defaultValue={state.howSure} disabled={pending} />
+          {state.error && !pending && (
+            <p id={`answer-error-${asked.questionId}`} role="alert" className="mt-2 text-ui text-danger">
+              {state.error} Your answer is still here to send again.
+            </p>
+          )}
+        </Card>
+        {holdForward && <div className="flex-1" aria-hidden />}
+        <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
+          <RevealButton />
+          <SendButton pending={pending} retry />
+        </ForwardRow>
+      </form>
     );
   }
 
@@ -375,6 +474,14 @@ export function CellAnswerView({
         />
         </>
         )}
+        {/* A pick folds the box for how you got there; a written answer opens it. */}
+        <HowSureInput
+          id={asked.questionId}
+          kind={asked.figure ? 'choice' : 'written'}
+          defaultValue={state.howSure}
+          disabled={pending}
+          reasoningOpen={reasoningOpen}
+        />
         {state.error && !pending && (
           <p id={`answer-error-${asked.questionId}`} role="alert" className="mt-2 text-ui text-danger">
             {state.error} Your answer is still here to send again.

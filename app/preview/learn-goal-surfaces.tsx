@@ -93,12 +93,19 @@ export function LearnGoalsPreview() {
   );
 }
 
-/** The filter with Goals only chosen, and the line a goal's Practise link opens on. */
+/**
+ * The filter with Goals only chosen, and, as a separate state, the line a
+ * focused flow opens on. The page draws one or the other, never both
+ * (app/learn/flow/practice.tsx), and the focus line's link is its only way
+ * back, labelled as the page labels it.
+ */
 export function FlowScopePreview() {
   return (
     <>
       <ScopeFilter filter="goals" />
-      <FlowFocus name="Financial modeling in Excel for operators" back="Everything" />
+      <div className="mt-12">
+        <FlowFocus name="Financial modeling in Excel for operators" back="All subjects" />
+      </div>
     </>
   );
 }

@@ -6,6 +6,7 @@ import type { KnowledgeState } from '@/lib/learn/graph/model';
 import {
   addDays,
   firstReviewDays,
+  heldInterval,
   nextInterval,
   pickDue,
   REVIEWABLE_STATES,
@@ -27,7 +28,8 @@ import {
 
 type PassedPieceRow = { id: string; subject_id: string; title: string; concept_ids: string[]; passed_at: string };
 
-export const REVIEW_QUESTION_COLUMNS = 'id, concept_id, question, expected, response, correct, marked_why';
+export const REVIEW_QUESTION_COLUMNS =
+  'id, concept_id, question, expected, response, correct, marked_why, confidence, reasoning, hints_used, first_try';
 
 /**
  * Put ideas on the review schedule the first time they are tested or
@@ -265,7 +267,21 @@ export async function recordReview(
   target: Pick<ReviewTarget, 'interval' | 'state'>,
   correct: boolean,
   now: Date = new Date(),
+  /** Right, but given at Guessing (plan #2522.3) or after a hint (plan #2522.7): the idea stays where it was. */
+  guessed = false,
 ): Promise<number> {
+  if (correct && guessed) {
+    // Only the next date moves, on the gap it was already on: the state, its
+    // basis and its tested date stay as they were.
+    const held = heldInterval(target.interval);
+    const { error } = await learn
+      .from('concept_state')
+      .update({ review_interval_days: held, review_due_on: addDays(reviewToday(now), held) })
+      .eq('user_id', userId)
+      .eq('concept_id', conceptId);
+    if (error) throw new Error(`Recording the review failed: ${error.message}`);
+    return held;
+  }
   const days = nextInterval(target.interval, correct);
   const { error } = await learn
     .from('concept_state')

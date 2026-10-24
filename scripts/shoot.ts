@@ -34,7 +34,7 @@
  * phone by being designed at 1280.
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatTheme, parseTheme, type Theme } from '../lib/theme';
 import { themeExpression } from '../lib/preview/theme-expression';
@@ -53,7 +53,30 @@ import {
   type Interaction,
 } from '../lib/preview/interaction';
 
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+/**
+ * The Chromium Playwright installed. Its folder carries the build number,
+ * which moves with every image (1194 was written here and 1243 is what a
+ * later image has), so the newest one present is taken, unless SHOOT_CHROME
+ * names one.
+ */
+function findChrome(): string {
+  if (process.env.SHOOT_CHROME) return process.env.SHOOT_CHROME;
+  const root = '/opt/pw-browsers';
+  const builds = existsSync(root)
+    ? readdirSync(root)
+        .filter((name) => /^chromium-\d+$/.test(name))
+        .sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]))
+    : [];
+  for (const build of builds) {
+    for (const dir of ['chrome-linux64', 'chrome-linux']) {
+      const path = join(root, build, dir, 'chrome');
+      if (existsSync(path)) return path;
+    }
+  }
+  return join(root, 'chromium-1194', 'chrome-linux', 'chrome');
+}
+
+const CHROME = findChrome();
 const PORT = process.env.PREVIEW_PORT ?? '3400';
 const OUT = join(process.cwd(), '.preview-shots');
 const PROBE = process.env.SHOOT_PROBE_PORT ? Number(process.env.SHOOT_PROBE_PORT) : 9500;

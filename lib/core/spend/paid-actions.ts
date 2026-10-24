@@ -126,7 +126,7 @@ export const PAID_ACTIONS = {
   'app/learn/review/actions.ts#askReview': ['write-review-question'],
   'app/learn/review/actions.ts#answerReview': ['mark-review-question'],
   'app/learn/s/[id]/probe/actions.ts#askQuestion': ['write-probe', 'write-applied-case'],
-  'app/learn/s/[id]/probe/actions.ts#answerQuestion': ['name-misconception', 'grade-applied-answer'],
+  'app/learn/s/[id]/probe/actions.ts#answerQuestion': ['name-misconception', 'grade-applied-answer', 'check-picked-reasoning'],
   'app/learn/s/[id]/probe/actions.ts#findFloor': ['propose-floor'],
   'app/learn/s/[id]/probe/actions.ts#approveFloor': ['place-track'],
   // Learn: an explanation graded against the levels of a topic (plan #2138.5)

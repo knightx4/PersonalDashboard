@@ -18,12 +18,13 @@ import {
   recordDontKnow,
   recordProbe,
   recordWrittenAnswer,
+  holdWrittenAnswer,
   setMisconception,
   type ProbeRow,
 } from '@/lib/learn/graph/session';
 import { APPLIED_MODEL, gradeAppliedAnswer, writeAppliedCase } from '@/lib/learn/graph/applied';
 import { splitCase } from '@/lib/learn/graph/applied-payload';
-import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
+import { misconceptionBasis, nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
 import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { declareConceptKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
@@ -33,6 +34,9 @@ import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 import { loadEvidenceForTargets } from '@/lib/learn/evidence/links';
 import { evidenceStrength } from '@/lib/learn/strength';
+import { readAnswerSignals, type CleanSignals, type MissKind } from '@/lib/learn/confidence';
+import { earnsHint, wantsHint, type HintView } from '@/lib/learn/hint';
+import { checkPickedReasoning } from '@/lib/learn/graph/reasoning-check';
 
 /**
  * Asking, and answering.
@@ -57,6 +61,13 @@ export type AskState = {
   options?: string[];
   /** Where the bar stood before this question. */
   percent?: number;
+  /**
+   * After a first wrong answer to a case (plan #2522.7): the hint and the
+   * first try, with the case still open to try again or Show the answer.
+   */
+  hint?: HintView;
+  /** What was said with the first try, kept for the retry. */
+  retryHowSure?: CleanSignals;
   /** Filled in once answered, by the answer action. */
   answered?: {
     correct: boolean;
@@ -71,10 +82,15 @@ export type AskState = {
     expected?: string;
     /** How far this answer moved the bar. Zero when it repeated a miss. */
     weight: number;
-    /** Named only when the same wrong answer has now been picked twice. */
+    /** Named when the wrong answer was sure or reasoned, or picked twice. */
     misconception?: string;
     /** True when this claim has nothing under it, so the floor can be looked for. */
     couldGoDeeper?: boolean;
+    /** How sure they said they were and how they got there, shown on the answer (plan #2522.2). None after I don't know. */
+    howSure?: CleanSignals;
+    /** Hints given before this answer, and whether Show the answer recorded it (plan #2522.7). Applied only. */
+    hintsUsed?: number;
+    revealed?: boolean;
   };
 };
 
@@ -286,8 +302,14 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   );
   if (!askedRow) return { ...prev, error: 'That question is not there any more.' };
 
+  // How sure they were and how they reasoned (plan #2522.3); nulls from a
+  // form that does not ask yet.
+  const signals = readAnswerSignals(formData);
+
   if (askedRow.rung !== 'recognise') {
     return answerApplied({
+      reveal: formData.get('reveal') === '1',
+      signals,
       prev,
       userId: user.id,
       supabase,
@@ -312,6 +334,35 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   // whether the concept as a whole was settled decides nothing.
   const wasSettled = concept !== undefined && concept.mastery.length === 0 && isSettled(concept);
 
+  // A right pick that came with reasoning has the reasoning read (plan
+  // #2522.3): reasoning that contradicts the pick makes it a wrong answer.
+  // A check that fails to come back leaves the pick as it was.
+  let reasoningWrong: string | null = null;
+  const apiKeyForCheck = process.env.ANTHROPIC_API_KEY;
+  if (
+    parsed &&
+    signals.reasoning !== null &&
+    concept &&
+    apiKeyForCheck &&
+    askedRow.chosenIndex === null &&
+    parsed.data.chosenIndex === askedRow.correctIndex
+  ) {
+    const spend = collectSpend();
+    const checked = await checkPickedReasoning({
+      concept: concept.name,
+      claim: concept.claim,
+      question: askedRow.question,
+      picked: askedRow.options?.[parsed.data.chosenIndex] ?? '',
+      reason: askedRow.reason ?? '',
+      reasoning: signals.reasoning,
+      anthropicApiKey: apiKeyForCheck,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'check-picked-reasoning', spend.reports);
+    if (checked.ok && !checked.holds) reasoningWrong = checked.why;
+    if (!checked.ok) console.error('[learn] reading the reasoning', checked.detail);
+  }
+
   let outcome;
   try {
     outcome = parsed
@@ -321,6 +372,8 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
           chosenIndex: parsed.data.chosenIndex,
           wasSettled,
           graph,
+          signals,
+          reasoningWrong,
         })
       : await recordDontKnow(supabase, user.id, {
           probeId: asked.data.probeId,
@@ -362,21 +415,36 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   let misconception: string | undefined;
   const repeated = outcome.correct ? null : repeatedWrongAnswer(probes);
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  // One confident or reasoned wrong answer is enough (plan #2522.4); with
+  // neither, the same wrong option twice is still the rule.
+  const basis = misconceptionBasis({
+    correct: outcome.correct,
+    confidence: signals.confidence,
+    reasoning: signals.reasoning,
+    repeated: repeated !== null,
+  });
+  const pickedNow = answeredRow?.chosenIndex != null ? answeredRow.options?.[answeredRow.chosenIndex] : undefined;
+  const wrongAnswer = basis === 'repeated' ? repeated?.option : pickedNow;
 
-  if (repeated && concept && apiKey) {
+  if (basis && wrongAnswer && concept && apiKey) {
     const spend = collectSpend();
     const named = await nameMisconception({
       concept: concept.name,
       claim: concept.claim,
-      wrongAnswer: repeated.option,
-      questions: probes
-        .filter(
-          (probe) =>
-            probe.chosenIndex !== null &&
-            probe.options?.[probe.chosenIndex]?.trim().toLowerCase() ===
-              repeated.option.trim().toLowerCase(),
-        )
-        .map((probe) => probe.question),
+      wrongAnswer,
+      questions:
+        basis === 'repeated'
+          ? probes
+              .filter(
+                (probe) =>
+                  probe.chosenIndex !== null &&
+                  probe.options?.[probe.chosenIndex]?.trim().toLowerCase() ===
+                    wrongAnswer.trim().toLowerCase(),
+              )
+              .map((probe) => probe.question)
+          : [answeredRow?.question ?? ''],
+      reasoning: signals.reasoning ? [signals.reasoning] : undefined,
+      basis,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -414,6 +482,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       dontKnow: parsed === null || undefined,
       misconception,
       couldGoDeeper,
+      howSure: parsed ? signals : undefined,
     },
   };
 }
@@ -437,29 +506,66 @@ async function answerApplied(input: {
   probe: ProbeRow;
   subjectId: string;
   typed: FormDataEntryValue | null;
+  signals: CleanSignals;
+  /** Show the answer after a hint (plan #2522.7): the first try is recorded as it was graded. */
+  reveal: boolean;
 }): Promise<AskState> {
-  const parsed = TypedAnswer.safeParse({ response: input.typed });
+  const first = input.probe.firstTry ?? null;
+  const hintsUsed = input.probe.hintsUsed ?? 0;
+  if (input.reveal && !first) return { ...input.prev, error: 'There is no hint on this case to show the answer after.' };
+  const parsed = input.reveal && first
+    ? ({ success: true, data: { response: first.response } } as const)
+    : TypedAnswer.safeParse({ response: input.typed });
   if (!parsed.success) return { ...input.prev, error: 'Write an answer first.' };
   if (!input.concept) return { ...input.prev, error: 'That idea is not in this subject.' };
+  // Show the answer records what was said with the first try, off the row.
+  const signals: CleanSignals = input.reveal
+    ? { confidence: input.probe.confidence ?? null, reasoning: input.probe.reasoning ?? null }
+    : input.signals;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { ...input.prev, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
 
-  const { situation, question } = splitCase(input.probe.question);
-  const spend = collectSpend();
-  const grade = await gradeAppliedAnswer({
-    concept: input.concept.name,
-    claim: input.concept.claim,
-    situation,
-    question,
-    expected: input.probe.expected ?? '',
-    response: parsed.data.response,
-    anthropicApiKey: apiKey,
-    onSpend: spend.sink,
-  });
-  await recordLearnSpend(input.userId, 'grade-applied-answer', spend.reports);
+  let grade: { correct: boolean; why: string; hint?: string | null; missKind?: MissKind | null };
+  if (input.reveal && first) {
+    grade = { correct: false, why: first.why ?? '', missKind: first.kind };
+  } else {
+    const { situation, question } = splitCase(input.probe.question);
+    const spend = collectSpend();
+    const graded = await gradeAppliedAnswer({
+      concept: input.concept.name,
+      claim: input.concept.claim,
+      situation,
+      question,
+      expected: input.probe.expected ?? '',
+      response: parsed.data.response,
+      signals,
+      // One hint before the answer (plan #2522.7): asked for until one is given.
+      hint: wantsHint(hintsUsed),
+      retry: first,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(input.userId, 'grade-applied-answer', spend.reports);
+    if (!graded.ok) return { ...input.prev, error: graded.detail };
+    grade = graded;
+  }
 
-  if (!grade.ok) return { ...input.prev, error: grade.detail };
+  // A first miss with a hint to give: hold it, and ask again.
+  const hint = grade.hint ?? null;
+  if (!input.reveal && earnsHint({ correct: grade.correct, hintsUsed, hint }) && hint) {
+    try {
+      await holdWrittenAnswer(input.supabase, {
+        probeId: input.probe.id,
+        firstTry: { response: parsed.data.response, why: grade.why, hint, kind: grade.missKind ?? null },
+        signals,
+        hintsUsed,
+      });
+    } catch (error) {
+      return { ...input.prev, error: error instanceof Error ? error.message : 'Could not save that.' };
+    }
+    return { ...input.prev, error: undefined, hint: { hint, response: parsed.data.response }, retryHowSure: signals };
+  }
 
   let outcome;
   try {
@@ -474,6 +580,10 @@ async function answerApplied(input: {
       // with the check this case aimed at.
       wasSettled: input.concept.mastery.length === 0 && isSettled(input.concept),
       graph: input.graph,
+      signals,
+      hintsUsed,
+      missKind: grade.correct ? (first?.kind ?? null) : (grade.missKind ?? first?.kind ?? null),
+      revealed: input.reveal ? first : null,
     });
   } catch (error) {
     return {
@@ -490,6 +600,37 @@ async function answerApplied(input: {
     });
   }
 
+  // A typed wrong answer that was sure or reasoned is named as a picked one
+  // is (plan #2522.4). There is no option to repeat, so nothing else counts.
+  let misconception: string | undefined;
+  const basis = misconceptionBasis({
+    correct: outcome.correct,
+    confidence: signals.confidence,
+    reasoning: signals.reasoning,
+  });
+  if (basis) {
+    const nameSpend = collectSpend();
+    const named = await nameMisconception({
+      concept: input.concept.name,
+      claim: input.concept.claim,
+      wrongAnswer: parsed.data.response,
+      questions: [input.probe.question],
+      reasoning: signals.reasoning ? [signals.reasoning] : undefined,
+      basis,
+      anthropicApiKey: apiKey,
+      onSpend: nameSpend.sink,
+    });
+    await recordLearnSpend(input.userId, 'name-misconception', nameSpend.reports);
+    if (named.ok) {
+      try {
+        await setMisconception(input.supabase, input.userId, input.concept.id, named.misconception);
+        misconception = named.misconception;
+      } catch {
+        // The answer is recorded; failing to name the belief loses a sentence only.
+      }
+    }
+  }
+
   const weight = await answeredWeight(
     input.supabase,
     input.graph.concepts.map((c) => c.id),
@@ -504,6 +645,8 @@ async function answerApplied(input: {
   return {
     ...input.prev,
     error: undefined,
+    hint: undefined,
+    retryHowSure: undefined,
     percent: barPercent(weight),
     answered: {
       correct: outcome.correct,
@@ -511,7 +654,11 @@ async function answerApplied(input: {
       weight: outcome.weight,
       response: parsed.data.response,
       expected: input.probe.expected ?? undefined,
+      misconception,
       couldGoDeeper: !outcome.correct && prerequisites.length === 0,
+      howSure: signals,
+      ...(hintsUsed > 0 ? { hintsUsed } : {}),
+      ...(input.reveal ? { revealed: true } : {}),
     },
   };
 }

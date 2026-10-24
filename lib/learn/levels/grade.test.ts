@@ -8,6 +8,7 @@ import {
   type GradeCell,
   type GradeEvidence,
   type GradeMap,
+  holdGuessedMets,
 } from './grade';
 import { readCells } from './model';
 
@@ -197,5 +198,24 @@ describe('explainQuestion', () => {
     expect(explainQuestion('DCF', 2)).toBe('In your own words, what is DCF?');
     for (const level of [1, 3, 7, 8, 9]) expect(explainQuestion('DCF', level)).toContain('DCF');
     for (const level of [4, 5, 6, 10]) expect(explainQuestion('DCF', level)).toBeNull();
+  });
+});
+
+describe('the guess rule (plan #2522.3)', () => {
+  const write = [
+    { cellId: 'asked', verdict: 'met' as const, quote: 'x' },
+    { cellId: 'below', verdict: 'met' as const, quote: 'y' },
+    { cellId: 'other', verdict: 'not_met' as const, quote: null },
+  ];
+
+  it('writes no met at Guessing, keeps the not met, and says what it held back', () => {
+    const { write: kept, held } = holdGuessedMets(write, 0.25);
+    expect(kept.map((w) => w.cellId)).toEqual(['other']);
+    expect(held.map((w) => w.cellId)).toEqual(['asked', 'below']);
+  });
+
+  it('changes nothing above Guessing or with no confidence', () => {
+    expect(holdGuessedMets(write, 0.5).write).toEqual(write);
+    expect(holdGuessedMets(write, null).held).toEqual([]);
   });
 });

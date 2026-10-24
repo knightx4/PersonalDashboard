@@ -128,8 +128,17 @@ const missed: Moved = {
   doubted: [],
 };
 
-export function FigureQuestionPreview({ form, graded = false }: { form: Form; graded?: boolean }) {
-  const state: CellAnswerState = graded ? { moved: missed, error: null, response: '£360', answer: '£324' } : { moved: null, error: null };
+export function FigureQuestionPreview({ form, graded = false, reasoning = false }: { form: Form; graded?: boolean; reasoning?: boolean }) {
+  // With `reasoning`, a choice made and the box for how you got there opened (plan #2522.2).
+  const state: CellAnswerState = graded
+    ? { moved: missed, error: null, response: '£360', answer: '£324' }
+    : reasoning
+      ? {
+          moved: null,
+          error: null,
+          howSure: { confidence: 0.5, reasoning: 'B, since takings should go up when the price does.' },
+        }
+      : { moved: null, error: null };
   return (
     <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>
       <CellAnswerView asked={ASKED[form]} state={state} nextHref={NEXT} />

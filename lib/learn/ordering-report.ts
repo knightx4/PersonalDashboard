@@ -1,4 +1,5 @@
 import { trackWeights, INTEREST_WINDOW_DAYS, type TrackActivity } from '@/lib/learn/flow/interest';
+import { CONFIDENCE, confidenceWords } from '@/lib/learn/confidence';
 
 /**
  * The reading behind scripts/learn-ordering-report.ts (plan #2154.1).
@@ -179,6 +180,13 @@ export type ExportInput = {
   /** The first grader's verdicts: a probe's response_correct, or a cell question's grade. */
   grade: unknown;
   gradeSecond: unknown;
+  /** How sure they said they were, 0 to 1; null when not asked or not given (plan #2522.3). */
+  confidence: number | null;
+  /**
+   * Whether the answer was right: a probe's outcome, or a met on the asked
+   * cell for a cell question. Null when it cannot be told (plan #2522.3).
+   */
+  right?: boolean | null;
 };
 
 export type ExportRow = {
@@ -191,6 +199,7 @@ export type ExportRow = {
   predicted_status: string;
   predicted_level: string;
   outcome: string;
+  confidence: string;
   grader_1: string;
   grader_2: string;
 };
@@ -231,6 +240,7 @@ export function exportRow(row: ExportInput): ExportRow {
     predicted_status: cell(row.predictedStatus),
     predicted_level: cell(row.predictedLevel),
     outcome: cell(row.outcome),
+    confidence: cell(row.confidence),
     grader_1: verdictText(row.grade),
     grader_2: verdictText(row.gradeSecond),
   };
@@ -246,9 +256,47 @@ const EXPORT_COLUMNS: (keyof ExportRow)[] = [
   'predicted_status',
   'predicted_level',
   'outcome',
+  'confidence',
   'grader_1',
   'grader_2',
 ];
+
+/** Whether an exported answer was right: its `right`, else its outcome. Null when neither tells. */
+export function wasRight(row: Pick<ExportInput, 'right' | 'outcome'>): boolean | null {
+  if (typeof row.right === 'boolean') return row.right;
+  if (row.outcome === 'right') return true;
+  if (row.outcome === 'wrong' || row.outcome === 'dont_know') return false;
+  return null;
+}
+
+/** One confidence step as answered: how many, and how many right. */
+export type ConfidenceStep = { label: string; confidence: number; answers: number; right: number };
+
+/**
+ * Calibration by stated confidence (plan #2522.3): for each of the four
+ * steps, how many answers gave it and how many of those were right. A
+ * well-calibrated person is right about as often as they said they would be:
+ * a quarter of guesses, nearly all of Certain. Rows with no confidence or no
+ * known result are left out; steps nobody used are kept, at zero.
+ */
+export function confidenceCalibration(rows: readonly Pick<ExportInput, 'confidence' | 'right' | 'outcome'>[]): ConfidenceStep[] {
+  const steps: ConfidenceStep[] = [
+    { label: 'Guessing', confidence: CONFIDENCE.guessing, answers: 0, right: 0 },
+    { label: 'Unsure', confidence: CONFIDENCE.unsure, answers: 0, right: 0 },
+    { label: 'Fairly sure', confidence: CONFIDENCE.fairlySure, answers: 0, right: 0 },
+    { label: 'Certain', confidence: CONFIDENCE.certain, answers: 0, right: 0 },
+  ];
+  for (const row of rows) {
+    if (row.confidence === null) continue;
+    const right = wasRight(row);
+    if (right === null) continue;
+    const step = steps.find((s) => s.label === confidenceWords(row.confidence as number));
+    if (!step) continue;
+    step.answers += 1;
+    if (right) step.right += 1;
+  }
+  return steps;
+}
 
 /** Comma-separated text with a header line; fields with commas, quotes or newlines are quoted. */
 export function toCsv(rows: readonly ExportRow[]): string {

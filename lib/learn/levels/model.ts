@@ -59,6 +59,12 @@ export type CellEvidence = {
   observedAt: string;
   /** The span of the answer that met the cell, verbatim, where the loader read it (plan #2187.5). */
   quote?: string | null;
+  /**
+   * How sure the person said they were, 0 to 1 (0.25 Guessing, 0.5 Unsure,
+   * 0.75 Fairly sure, 0.95 Certain; plan #2522). Null or absent behaves as
+   * before confidence was asked.
+   */
+  confidence?: number | null;
 };
 
 export type TopicMap = {
@@ -401,7 +407,7 @@ export function nextQuestion(map: TopicMap, readings: Readings, topicId: string)
   const lowestMiss = missedAbove.length > 0 ? Math.min(...missedAbove) : ceiling + 1;
   if (lowestMiss - level > 1) {
     const upper = lowestMiss - 1;
-    const mid = Math.ceil((level + upper) / 2);
+    const mid = confidentStep(map, topicId, level, upper) ?? Math.ceil((level + upper) / 2);
     const candidates = [...levels.values()]
       .filter((c) => c.level > level && c.level <= upper && !isHeld(readings.get(c.id)?.status ?? 'open'))
       .sort((a, b) => Math.abs(a.level - mid) - Math.abs(b.level - mid) || a.level - b.level);
@@ -411,6 +417,32 @@ export function nextQuestion(map: TopicMap, readings: Readings, topicId: string)
   // After placement: the not-held cell whose smaller count is largest.
   const best = mostSettling(ix, readings, [...levels.values()]);
   return best ? at(best, 'settle') : null;
+}
+
+/** At or above this a right answer is sure enough to jump two levels. */
+export const CONFIDENT_FROM = 0.75;
+
+/**
+ * Where to ask next when the topic's latest answer was a right one on the
+ * level it now stands at and carried a confidence (plan #2522.5): two levels
+ * up at Fairly sure or Certain, one at Guessing or Unsure, never past the
+ * lowest miss. Null when there is no such answer, so the bisection decides.
+ */
+function confidentStep(
+  map: TopicMap,
+  topicId: string,
+  level: number,
+  upper: number,
+): number | null {
+  const topicCells = new Map(map.cells.filter((c) => c.topicId === topicId).map((c) => [c.id, c]));
+  let latest: CellEvidence | null = null;
+  for (const row of map.evidence) {
+    if (!topicCells.has(row.cellId)) continue;
+    if (!latest || row.observedAt >= latest.observedAt) latest = row;
+  }
+  if (!latest || latest.verdict !== 'met' || latest.confidence == null) return null;
+  if (topicCells.get(latest.cellId)?.level !== level) return null;
+  return Math.min(level + (latest.confidence >= CONFIDENT_FROM ? 2 : 1), upper);
 }
 
 /**

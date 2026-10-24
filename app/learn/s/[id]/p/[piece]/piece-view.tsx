@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
+import { Button } from '@/components/ui/button';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import type { PieceCheck } from '@/lib/learn/lessons/piece-check';
@@ -27,6 +28,10 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Figures } from '@/components/learn/figure';
+import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
+import { HintedNote, HintLine, RetryBox, RETRY_LABEL, REVEAL_LABEL } from '@/components/learn/hint-retry';
+import { NO_HOW_SURE, type HowSure } from '@/lib/learn/how-sure';
+import { LessonPredict } from '@/components/learn/lesson-predict';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -143,19 +148,25 @@ export function LessonCard({
       <h2 className="mt-0.5 font-display text-title tracking-tight break-words text-ink">{idea.name}</h2>
 
       {lesson ? (
-        <>
-          <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
-            <h3 className="text-small font-semibold text-accent">The takeaway</h3>
-            <p className="mt-1 text-body font-medium text-ink">{lesson.takeaway}</p>
-          </section>
-          {folded ? (
-            <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
-              <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
-            </Disclosure>
-          ) : (
-            <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
+        // A lesson written with a prediction opens on it (plan #2522.6). A
+        // piece read short, which a placement found held, skips it.
+        <LessonPredict id={idea.conceptId} predict={folded ? null : lesson.predict}>
+          {(predicted) => (
+            <>
+              <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
+                <h3 className="text-small font-semibold text-accent">The takeaway</h3>
+                <p className="mt-1 text-body font-medium text-ink">{lesson.takeaway}</p>
+              </section>
+              {folded ? (
+                <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
+                  <LessonBody lesson={lesson} figuresOpen={figuresOpen} predicted={predicted} />
+                </Disclosure>
+              ) : (
+                <LessonBody lesson={lesson} figuresOpen={figuresOpen} predicted={predicted} />
+              )}
+            </>
           )}
-        </>
+        </LessonPredict>
       ) : (
         <>
           <p className="mt-2 text-body text-ink">{idea.claim}</p>
@@ -175,9 +186,19 @@ export function LessonCard({
 }
 
 /** A written lesson below its takeaway: the context, the hook, the example, its figures and Try this. */
-function LessonBody({ lesson, figuresOpen }: { lesson: NonNullable<PieceIdea['lesson']>; figuresOpen: boolean }) {
+function LessonBody({
+  lesson,
+  figuresOpen,
+  predicted,
+}: {
+  lesson: NonNullable<PieceIdea['lesson']>;
+  figuresOpen: boolean;
+  /** The guess beside what is true, which opens the context (plan #2522.6). */
+  predicted: ReactNode;
+}) {
   return (
     <>
+          {predicted}
           {lesson.context && <p className="mt-3 text-body text-ink">{lesson.context}</p>}
           {lesson.hook && <p className="mt-3 text-body font-semibold text-ink">{lesson.hook}</p>}
           {lesson.summary && <p className="mt-2 text-body text-ink">{lesson.summary}</p>}
@@ -526,10 +547,13 @@ function PieceCheckCard({
 }) {
   const [check, setCheck] = useState(initialCheck);
   const [tested, setTested] = useState<number | null>(null);
-  const [response, setResponse] = useState('');
+  // A check left with its hint up opens on it, with the first try in the box (plan #2522.7).
+  const [response, setResponse] = useState(initialCheck?.hint?.response ?? '');
+  const [howSure, setHowSure] = useState<HowSure>(initialCheck?.hint ? (initialCheck.howSure ?? NO_HOW_SURE) : NO_HOW_SURE);
   const [error, setError] = useState<string | null>(null);
   const [asking, startAsking] = useTransition();
   const [marking, startMarking] = useTransition();
+  const [revealing, startRevealing] = useTransition();
 
   const ask = () =>
     startAsking(async () => {
@@ -540,6 +564,7 @@ function PieceCheckCard({
       if (result.check) {
         setCheck(result.check);
         setResponse('');
+        setHowSure(NO_HOW_SURE);
       } else setError(result.error ?? 'Could not write a question.');
     });
 
@@ -547,14 +572,30 @@ function PieceCheckCard({
     startMarking(async () => {
       if (!check) return;
       setError(null);
-      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, response).catch(() => ({
+      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, response, howSure).catch(() => ({
         error: 'Could not mark that. Check your connection.',
       }));
       if (result.check) {
         setCheck(result.check);
+        // A first miss comes back open with its hint: the first try stays in the box.
+        if (result.check.hint) setResponse(result.check.hint.response);
         if (result.tested !== undefined) setTested(result.tested);
         onAnswered(result);
       } else setError(result.error ?? 'Could not mark that.');
+    });
+
+  // Show the answer after the hint: the first try is marked as it was.
+  const reveal = () =>
+    startRevealing(async () => {
+      if (!check) return;
+      setError(null);
+      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, '', null, true).catch(() => ({
+        error: 'Could not show the answer. Check your connection.',
+      }));
+      if (result.check) {
+        setCheck(result.check);
+        onAnswered(result);
+      } else setError(result.error ?? 'Could not show the answer.');
     });
 
   const answered = check !== null && check.correct !== null;
@@ -587,7 +628,31 @@ function PieceCheckCard({
         </p>
       )}
 
-      {check && !answered && (
+      {check && !answered && check.hint && (
+        <>
+          <HintLine hint={check.hint.hint} />
+          <RetryBox id={check.id} firstAnswer={check.hint.response} value={response} onChange={setResponse} disabled={marking || revealing} />
+          <HowSureInput key={`${check.id}-retry`} id={check.id} kind="written" defaultValue={howSure} onChange={setHowSure} disabled={marking || revealing} />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={answer}
+              pending={marking}
+              disabled={response.trim() === '' || revealing}
+              paid="app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck"
+              what="Cost of marking the answer"
+            >
+              {marking ? 'Marking…' : RETRY_LABEL}
+            </DashAction>
+            <Button type="button" variant="ghost" onClick={reveal} disabled={marking || revealing}>
+              {revealing ? 'Showing…' : REVEAL_LABEL}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {check && !answered && !check.hint && (
         <>
           <Field label="Your answer" id={`piece-check-${check.id}`} hint="A sentence or two, from memory.">
             <Textarea
@@ -599,6 +664,7 @@ function PieceCheckCard({
               disabled={marking}
             />
           </Field>
+          <HowSureInput key={check.id} id={check.id} kind="written" onChange={setHowSure} disabled={marking} />
           <DashAction
             type="button"
             variant="primary"
@@ -617,6 +683,7 @@ function PieceCheckCard({
       {check && answered && (
         <div className="mt-3 space-y-2" aria-live="polite">
           {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
+          <HowSureGiven howSure={check.howSure} />
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', check.correct ? 'text-ink' : 'text-ink-muted')}>
             {check.correct ? (
               <Check className="size-4" strokeWidth={1.75} aria-hidden />
@@ -625,6 +692,7 @@ function PieceCheckCard({
             )}
             {check.correct ? 'Right.' : 'Not yet.'}
           </p>
+          <HintedNote correct={check.correct} hintsUsed={check.hintsUsed} revealed={check.revealed} />
           {check.why && <p className="text-ui text-ink">{check.why}</p>}
           {check.expected && <p className="text-ui text-ink-muted">Expected: {check.expected}</p>}
           {check.cell && (

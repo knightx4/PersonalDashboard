@@ -29,6 +29,7 @@ const probe = (over: Partial<ExportInput>): ExportInput => ({
   answeredAt: at('2026-10-01T10:00:00Z'),
   answerSeconds: null,
   predictedStrength: 0.5,
+  confidence: null,
   predictedStatus: null,
   predictedLevel: null,
   outcome: 'right',

@@ -123,8 +123,9 @@ A lesson teaches one concept. Its parts are the parts an idea card has now:
 | Part | What it is |
 |---|---|
 | Title | The concept's name. The track and unit are named under it. |
+| Guess first | A question about where the idea goes, asked before the lesson says it, with a box and a Skip. |
 | Takeaway | The concept's claim, in one plain sentence. |
-| Context | Only what the claim needs to be followed. |
+| Context | Only what the claim needs to be followed. It opens with the guess, or the question when it was skipped, beside what is true. |
 | Evidence | A number, case or result that supports it. |
 | Why it holds | The mechanism, in two or three sentences. |
 | In practice | The idea applied to one specific case. |
@@ -137,6 +138,15 @@ the call, the catalogue is searched for the concept's claim (the search in
 is passed in. The call checks the lesson against that text and takes its
 evidence from it where it can. A lesson whose claim the source contradicts is
 not served, and the contradiction is kept on the row.
+
+The guess comes first (plan #2522.6). A lesson written with one opens on
+its question; the takeaway and everything under it open once the person has
+guessed or pressed Skip. The question can be answered by a guess without
+knowing the idea, and the writer stores it with what is true, in
+`feed_cards.predict_question` and `predict_answer`. The guess is not marked,
+not stored and moves no state, so it costs nothing to get wrong. Try this
+stays at the end as the check. A lesson written before this, or one whose
+prediction the writer left out, opens as it always did.
 
 ## What a swipe does
 
@@ -267,6 +277,22 @@ piece's `passed_at` only when the practice is passed too (plan #1142). A wrong a
 answer expected, and offers another question, written knowing the ones already
 asked so it is not the same one reworded. Nothing on the page marks a piece
 passed any other way.
+
+A first wrong answer is not marked yet (plan #2522.7). The marker writes a
+hint beside its verdict, aimed at where the answer or its reasoning went off,
+and labels the kind of miss: a missed cue, the wrong idea, a slip, a careless
+answer, or a misconception. The hint points somewhere to look and never states
+the answer; one that repeats the expected answer is thrown away, and the miss
+is then marked as it is. The card shows the hint, the first answer back in the
+box to change, Check again, and Show the answer beside it. The row keeps
+`hints_used`, `miss_kind` and the first try in `first_try` (learn 0191), so a
+page opened again shows the hint where it was left. The second answer is
+marked as any answer is, except that right after a hint leaves the ideas and
+the piece where they were, as a right guess does; another question settles
+it. Show the answer marks the first try as it was marked, with no second
+call. The expected answer appears only once the question is marked. The same
+hold applies to a piece's check asked as a cell question
+(docs/LEARN-LEVELS-SPEC.md, "One hint before the answer").
 
 ### A piece names the cells it teaches
 
@@ -447,13 +473,22 @@ the idea is marked tested. An idea already on the schedule from an earlier
 piece keeps the gap it has.
 
 Due questions show in two places. Learn now lists up to five above the deck,
-most overdue first, each naming the plan and piece it came from. A piece's
+most overdue first across all plans, never two from one piece side by side
+while another piece has one due (`pickDue`), each naming the plan and piece it came from. A piece's
 page opens with up to two from the same plan, leaving out the piece's own
 ideas. A row starts with the idea's name and Ask me. Haiku writes one question
-from the idea's claim, told the questions already asked on it, and marks the
+from the idea's claim, told the questions already asked on it and required to
+set the idea in a different situation from each of them (plan #2522.8), so a
+missed idea, back the next day, arrives in a new setting; it marks the
 answer as a piece's check is marked (`lib/learn/lessons/write-review.ts`). The
 spend kinds are `write-review-question` and `mark-review-question`. A question
 asked and not answered is shown again rather than written twice.
+
+A wrong review answer gets one hint and a retry before the expected answer,
+exactly as a piece's check does (plan #2522.7), with the shared steps in
+`lib/learn/hint-turn.ts`. Right after the hint keeps the idea on the gap it
+was on (`heldInterval`), the same as a right guess; a miss after the hint, or
+Show the answer, brings it back tomorrow as any miss does.
 
 The schedule is two columns on `learn.concept_state`: `review_interval_days`
 and `review_due_on`, a UTC date. The questions are rows in

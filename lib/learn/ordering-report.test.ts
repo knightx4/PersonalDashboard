@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { askedCellMet } from './harness-export';
 import {
+  confidenceCalibration,
   exportRow,
   followOffers,
   followTracks,
@@ -94,8 +96,46 @@ describe('the export', () => {
       outcome: 'right',
       grade: null,
       gradeSecond: null,
+      confidence: 0.75,
     });
     expect(out.seconds_shown_to_answered).toBe('12');
+    expect(out.confidence).toBe('0.75');
     expect(toCsv([{ ...out, id: 'a,b' }])).toContain('"a,b"');
+  });
+});
+
+describe('calibration by how sure you said you were (plan #2522.3)', () => {
+  const row = (confidence: number | null, outcome: string | null, right?: boolean | null) => ({ confidence, outcome, right });
+
+  it('counts answers and right answers at each step', () => {
+    const steps = confidenceCalibration([
+      row(0.25, 'right'),
+      row(0.25, 'wrong'),
+      row(0.95, 'right'),
+      row(0.95, null, false),
+      row(0.75, 'dont_know'),
+    ]);
+    expect(steps.map((s) => [s.label, s.right, s.answers])).toEqual([
+      ['Guessing', 1, 2],
+      ['Unsure', 0, 0],
+      ['Fairly sure', 0, 1],
+      ['Certain', 1, 2],
+    ]);
+  });
+
+  it('leaves out rows with no confidence or no known result', () => {
+    const steps = confidenceCalibration([row(null, 'right'), row(0.5, null)]);
+    expect(steps.reduce((n, s) => n + s.answers, 0)).toBe(0);
+  });
+
+  it('reads a cell question as right from the met on its asked cell', () => {
+    const grade = [
+      { cell_id: 'a', verdict: 'met' },
+      { cell_id: 'b', verdict: 'not_met' },
+    ];
+    expect(askedCellMet(grade, 'a')).toBe(true);
+    expect(askedCellMet(grade, 'b')).toBe(false);
+    expect(askedCellMet(grade, 'c')).toBeNull();
+    expect(askedCellMet(null, 'a')).toBeNull();
   });
 });

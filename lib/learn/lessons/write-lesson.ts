@@ -55,6 +55,8 @@ const MAX_SUMMARY_CHARS = 900;
 const MAX_EXAMPLE_CHARS = 1_000;
 const MAX_QUESTION_CHARS = 400;
 const MAX_ANSWER_CHARS = 800;
+const MAX_PREDICT_CHARS = 300;
+const MAX_PREDICT_ANSWER_CHARS = 500;
 /** One sentence about the source. */
 const MAX_SOURCE_NOTE_CHARS = 400;
 
@@ -91,10 +93,18 @@ export type LessonSourceUsed = {
 /** What the model said about the source it was given. */
 export type SourceVerdict = 'supports' | 'contradicts' | 'unrelated';
 
+/**
+ * The question a lesson opens with (plan #2522.6): about where the idea goes,
+ * asked before the lesson says it, so a guess is the way in. Not graded.
+ */
+export type LessonPrediction = { question: string; answer: string };
+
 export type LessonReport =
   | {
       verdict: 'ready';
       card: Omit<IdeaCard, 'name'>;
+      /** Null when the model gave none, or one too long to show. */
+      predict: LessonPrediction | null;
       /** The figures that parsed, at most one (plan #2321.1). */
       figures: FigureBlock[];
       /** Null when no source was given. */
@@ -117,7 +127,13 @@ export type LessonReport =
  * named and the reason is the model's sentence on the contradiction.
  */
 export type LessonResult =
-  | { outcome: 'ready'; card: IdeaCard; figures: FigureBlock[]; source: LessonSourceUsed | null }
+  | {
+      outcome: 'ready';
+      card: IdeaCard;
+      predict: LessonPrediction | null;
+      figures: FigureBlock[];
+      source: LessonSourceUsed | null;
+    }
   | { outcome: 'dropped'; reason: string; contradicted: boolean; source: LessonSourceUsed | null }
   | { outcome: 'failed'; detail: string };
 
@@ -130,6 +146,8 @@ You are given the track, the unit the concept sits in when there is one, the con
 2. When a source section is given, read it and say which of three it is. "supports": it is about this claim and agrees with it, or gives facts it rests on. "contradicts": it is about this claim and says the opposite, or gives facts that show the claim is wrong. "unrelated": it is about something else, or only mentions the subject in passing. A source that is only about a neighbouring subject is unrelated. Give one sentence on what it says about the claim.
 
 3. Write the lesson. The person reads its parts in this order and must be able to follow it without the source.
+
+predict and predict_answer: The lesson opens by asking the person to guess before it teaches anything, because a guess, right or wrong, makes the explanation that follows stick. predict is one short question about what happens, which way something moves, or which of two things is larger, that someone who has not met the idea can still have a go at from everyday sense. It must not need the claim's terms to be understood, and it must not give the claim away in how it is asked. predict_answer says in one or two sentences what is in fact the case, in plain words, so it can be set beside their guess. It should agree with the claim and may be a little surprising.
 
 claim: The concept's claim as one plain sentence, keeping its meaning: the thing to remember if they read nothing else. Everyday words, no jargon, no names the reader would have to look up.
 
@@ -144,7 +162,7 @@ example: Two to four sentences applying the idea to one specific situation: a re
 figures: At most one figure, and only when the idea compares things, orders them, quantifies a change or locates something, so that a grid says it faster than sentences can, or when it is a process, a loop, a hierarchy, a trade-off or a sequence in time, so that a diagram does. Choose the kind by the idea's shape before its numbers: an idea about an era or a period, what happened when and in what order, is a timeline even when it has numbers, a chain of causes or steps is a flow, a loop is a cycle, a whole and its parts is a tree, and a trade-off on two qualities is a two_by_two; a table or a comparison is for figures and things side by side. A diagram takes only its labels and links: the app lays it out. When the idea needs a figure and none of the kinds below can draw it, because the app has no such figure, data source, model or map layer, give a wanted figure saying what it needs rather than forcing a kind that does not fit or leaving it out. Most ideas need none, and then figures is an empty list. A figure lays out facts the evidence or the example already uses, or ones as well established; never a figure you are unsure of. caption is one sentence saying what the figure shows. The kinds, and the spec each takes:
 ${figureWriterLines()}
 
-question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. When checks are given, ask for one of them. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
+question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. When checks are given, ask for one of them. Never ask them to recall a definition, a figure or a date, and never ask the predict question again: this one checks the idea once it has been taught. The answer is two or three sentences, and says why.
 
 Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the source", "the section", "the text", "the track" or "the lesson". Do not address the reader as "you" outside the question.
 
@@ -189,6 +207,8 @@ const payloadSchema = z.object({
   example: text.optional(),
   question: text.optional(),
   answer: text.optional(),
+  predict: text.optional(),
+  predict_answer: text.optional(),
   /** Read kind by kind in `readWrittenFigures`; anything else is no figures. */
   figures: z.unknown().optional(),
 });
@@ -263,8 +283,18 @@ export function readLessonReport(input: unknown, hasSource: boolean, offered: re
   const asked =
     question && answer && question.length <= MAX_QUESTION_CHARS && answer.length <= MAX_ANSWER_CHARS;
 
+  const predictQuestion = clean(data.predict);
+  const predictAnswer = clean(data.predict_answer);
+  // A lesson without a usable prediction is still served, opening as before.
+  const predicts =
+    predictQuestion &&
+    predictAnswer &&
+    predictQuestion.length <= MAX_PREDICT_CHARS &&
+    predictAnswer.length <= MAX_PREDICT_ANSWER_CHARS;
+
   return {
     verdict: 'ready',
+    predict: predicts ? { question: predictQuestion, answer: predictAnswer } : null,
     card: {
       takeaway,
       context,
@@ -382,6 +412,8 @@ export async function writeLesson(input: {
               evidence: part('Concrete support: a number, a case or a result.'),
               why: part('Why the claim holds, in two or three sentences.'),
               example: part('The idea applied to one specific case or a worked number.'),
+              predict: part('A short question, asked before the lesson, that a guess can answer.'),
+              predict_answer: part('What is in fact the case, in one or two sentences.'),
               question: part('One question that makes them use the idea.'),
               answer: part('The answer, with why, in two or three sentences.'),
               figures: {
@@ -404,6 +436,8 @@ export async function writeLesson(input: {
               'fit',
               'source_verdict',
               'source_note',
+              'predict',
+              'predict_answer',
               'claim',
               'context',
               'evidence',
@@ -448,6 +482,7 @@ export async function writeLesson(input: {
   return {
     outcome: 'ready',
     card: { name, ...report.card },
+    predict: report.predict,
     figures: report.figures,
     source: source && report.source?.verdict === 'supports' ? sourceUsed(source) : null,
   };

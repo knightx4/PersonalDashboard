@@ -103,3 +103,17 @@ describe('readPointMarks', () => {
     expect(readPointMarks('nope')).toEqual([]);
   });
 });
+
+describe('confidence and reasoning reach the point marker (plan #2522.3)', () => {
+  const base = { context: [], task: 'Value it.', points: ['A figure'], reference: '34', handIn: { answer: 'About 34.', figures: [] }, tool: 'report_marks' };
+
+  it('carries the reasoning after the hand-in', () => {
+    const text = markPointsPrompt({ ...base, signals: { confidence: 0.95, reasoning: 'Discounted at 8%.' } });
+    expect(text.indexOf('Discounted at 8%.')).toBeGreaterThan(text.indexOf('About 34.'));
+    expect(text).toContain('Certain');
+  });
+
+  it('is unchanged when nothing came with it', () => {
+    expect(markPointsPrompt({ ...base, signals: null })).toBe(markPointsPrompt(base));
+  });
+});

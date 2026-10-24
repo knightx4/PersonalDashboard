@@ -23,6 +23,7 @@
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
 import { loadHarnessExport } from '../lib/learn/harness-export';
+import { confidenceCalibration } from '../lib/learn/ordering-report';
 import {
   BAND_EDGES,
   HELD_OUT_SHARE,
@@ -147,6 +148,15 @@ async function main() {
     console.log(`   ${b.label}  ${b.right} of ${b.answers} right (${pct(b.right, b.answers)})${mean}`);
   }
   console.log(`   Bands are ${BAND_EDGES.length - 1} equal widths of the strength score, 0 to 1.`);
+  // The same question asked of you rather than of Learn (plan #2522.3): how
+  // often you were right at each step of how sure you said you were.
+  const stated = confidenceCalibration(harness.rows);
+  const statedCount = stated.reduce((n, s) => n + s.answers, 0);
+  console.log(`   By how sure you said you were (${statedCount} answers gave it):`);
+  for (const s of stated) {
+    const share = s.answers === 0 ? 'none yet' : `${s.right} of ${s.answers} right (${pct(s.right, s.answers)})`;
+    console.log(`   ${s.label.padEnd(12)} ${share}, said ${pct(s.confidence, 1)}`);
+  }
   printCannot(cannot.calibration);
 
   console.log(`\n3. Grader agreement (${agreed.answers} answers with two verdicts, ${agreed.pairs} cells both judged)`);
