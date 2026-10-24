@@ -38,6 +38,7 @@ export function HowSureInput({
   kind: 'choice' | 'written';
   defaultValue?: HowSure;
   onChange?: (value: HowSure) => void;
+  /** While the answer is being marked: shows what was said, read-only. */
   disabled?: boolean;
   /** Draws a pick's box open, for the gallery. */
   reasoningOpen?: boolean;
@@ -57,18 +58,35 @@ export function HowSureInput({
   };
 
   const boxId = `how-${id}`;
+
+  // While the answer is being marked nothing here can change, so the empty
+  // controls give way to what was said, as the answered question shows it,
+  // and to nothing when nothing was said.
+  if (disabled) {
+    return (
+      <>
+        <input type="hidden" name="confidence" value={confidence ?? ''} />
+        <input type="hidden" name="reasoning" value={reasoning} />
+        <HowSureGiven howSure={{ confidence, reasoning }} className={cn('mt-3', className)} />
+      </>
+    );
+  }
+
   return (
     <div className={cn('mt-4', className)}>
       <p id={`${boxId}-label`} className="text-small text-ink-muted">
         How sure are you?
       </p>
       <input type="hidden" name="confidence" value={confidence ?? ''} />
-      <span role="group" aria-labelledby={`${boxId}-label`} className={cn(segmentedFrame, 'mt-1.5 flex w-full')}>
+      <span
+        role="group"
+        aria-labelledby={`${boxId}-label`}
+        className={cn(segmentedFrame, 'mt-1.5 flex w-full border-border')}
+      >
         {HOW_SURE.map((choice) => (
           <button
             key={choice.key}
             type="button"
-            disabled={disabled}
             aria-pressed={confidence === choice.value}
             onClick={() => pick(choice.value)}
             className={cn(segmentClass(confidence === choice.value), 'min-w-0 flex-1 justify-center px-1 whitespace-nowrap')}
@@ -91,14 +109,13 @@ export function HowSureInput({
               setReasoning(event.target.value);
               tell({ confidence, reasoning: event.target.value });
             }}
-            readOnly={disabled}
             autoFocus={kind === 'choice' && !reasoningOpen && !defaultValue.reasoning}
             placeholder="Optional. What made you think so?"
             className="mt-1"
           />
         </div>
       ) : (
-        <Button type="button" variant="ghost" size="sm" className="mt-2 -ml-2.5" onClick={() => setOpen(true)} disabled={disabled}>
+        <Button type="button" variant="ghost" size="sm" className="mt-2 -ml-2.5" onClick={() => setOpen(true)}>
           <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
           How you got there
         </Button>
@@ -131,7 +148,12 @@ export function HowSureGiven({ howSure, className }: { howSure: Partial<HowSure>
   return (
     <div className={cn('text-ui text-ink-muted', className)}>
       {line && <p>{line}</p>}
-      {reasoning && <p className={line ? 'mt-0.5' : undefined}>How you got there: {reasoning}</p>}
+      {reasoning && (
+        <div className={line ? 'mt-2' : undefined}>
+          <p className="text-small">How you got there</p>
+          <blockquote className="mt-1 border-l-2 border-border pl-3 text-body text-ink">{reasoning}</blockquote>
+        </div>
+      )}
     </div>
   );
 }
