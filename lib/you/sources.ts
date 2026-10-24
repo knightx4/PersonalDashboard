@@ -101,10 +101,12 @@ export const youSources: ModuleSources = {
     {
       table: 'you.details',
       module: 'You',
-      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.',
+      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.',
       weight: 'record',
       search: ['title', 'phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
       title: 'title',
+      // custom_fields is read as the JSON list, so Dash can answer from them.
+      facts: ['custom_fields'],
       newest: 'updated_at',
       ref: 'user_id',
       owner: 'user_id',
