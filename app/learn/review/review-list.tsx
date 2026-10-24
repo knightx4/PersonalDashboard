@@ -240,7 +240,12 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
 
       {question && answered && (
         <div className="mt-2 space-y-1" aria-live="polite">
-          {question.response && <p className="text-ui text-ink-muted">You wrote: {question.response}</p>}
+          {question.response && (
+            <div>
+              <p className="text-small text-ink-muted">You wrote</p>
+              <blockquote className="mt-1 border-l-2 border-border pl-3 text-body text-ink">{question.response}</blockquote>
+            </div>
+          )}
           <HowSureGiven howSure={question.howSure} />
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', question.correct ? 'text-ink' : 'text-ink-muted')}>
             {question.correct ? (
