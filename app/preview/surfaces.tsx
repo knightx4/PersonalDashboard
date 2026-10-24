@@ -239,6 +239,8 @@ import {
   LearnMapSurface,
   LearnProbeSurface,
   LearnPieceCheckAskedSurface,
+  LearnPieceCheckHintSurface,
+  LearnProbeHintSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
   LearnExternalSurface,
@@ -7207,6 +7209,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReviewListSurface folded />,
   },
   {
+    /* One hint before the answer (plan #2522.7): a row with its hint up, a
+     * row right after a hint, and a row where the answer was shown. */
+    id: 'learn-review-list-hint',
+    label: 'Now · Due for review, a hint after a miss',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnReviewListSurface hinted />,
+  },
+  {
     /* Cards, the deck of cards written before Now led with today's piece
      * (plan #2313.1): one card, the three swipes at its foot. Nothing here is
      * recorded; the swipes only reach the server from the real page. */
@@ -7507,6 +7518,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CellAnswerPreview state="case-reached" />,
+  },
+  {
+    /* The case missed once (plan #2522.7): the hint, the first answer back in
+     * the box to change, how sure as it was said, Show the answer beside
+     * Check again. */
+    id: 'learn-cell-answer-case-hint',
+    label: 'Practice Flow · Work a case, a hint after a miss',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-hint" />,
+  },
+  {
+    /* Right after the hint: counted, the ladder left where it was, and the
+     * answer the case expected. */
+    id: 'learn-cell-answer-case-after-hint',
+    label: 'Practice Flow · Work a case, right after a hint',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-after-hint" />,
+  },
+  {
+    /* Show the answer pressed after the hint: the first try recorded, what was
+     * written, and the answer expected. */
+    id: 'learn-cell-answer-case-revealed',
+    label: 'Practice Flow · Work a case, answer shown after a hint',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <CellAnswerPreview state="case-revealed" />,
   },
   {
     /* A question Practice Flow picked (plan #2138.6), with the reason it was
@@ -10839,6 +10878,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPiecePredictSurface answered />,
   },
   {
+    /* The check missed once (plan #2522.7): the hint, the first answer in
+     * the box, Check again and Show the answer. */
+    id: 'learn-piece-check-hint',
+    label: 'Plan · One piece, a hint after a missed check',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCheckHintSurface />,
+  },
+  {
     /* A piece the placement found held (plan #2292.5): lessons folded to
      * their takeaways, the check one level above what was shown. */
     id: 'learn-piece-held',
@@ -10997,6 +11045,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnProbeSurface state="dont-know" />,
+  },
+  {
+    /* An applied case missed once (plan #2522.7): the hint, the first answer
+     * in the box, Check again and Show the answer. */
+    id: 'learn-probe-hint',
+    label: 'Subject · Questions, a hint after a missed case',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeHintSurface />,
   },
   {
     id: 'learn-videos',

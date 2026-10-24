@@ -11,6 +11,7 @@ import {
 import { gradeWrittenAnswer, type WrittenGrade } from '@/lib/learn/graph/opening-probe';
 import { MODELS } from '@/lib/core/models';
 import type { AnswerSignals } from '@/lib/learn/confidence';
+import type { FirstTry } from '@/lib/learn/hint';
 
 /**
  * The second rung of #386: a situation somebody has not seen, answered in
@@ -223,6 +224,9 @@ export async function gradeAppliedAnswer(input: {
   response: string;
   /** How sure they were and how they reasoned, when given (plan #2522.3). */
   signals?: AnswerSignals | null;
+  /** Ask for a hint beside a wrong verdict, and the first try when this is the retry (plan #2522.7). */
+  hint?: boolean;
+  retry?: FirstTry | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -239,6 +243,8 @@ export async function gradeAppliedAnswer(input: {
     expected: input.expected,
     response: input.response,
     signals: input.signals,
+    hint: input.hint,
+    retry: input.retry,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,

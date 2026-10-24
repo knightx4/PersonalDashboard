@@ -1,4 +1,5 @@
 import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
+import { rowHint, type HintView } from '@/lib/learn/hint';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 
 /**
@@ -150,6 +151,12 @@ export type ReviewQuestion = {
   why: string | null;
   /** How sure the person said they were and how they got there (plan #2522.2). */
   howSure?: HowSure;
+  /** While a retry is open after a first miss: the hint and the first try (plan #2522.7). */
+  hint?: HintView | null;
+  /** Hints given before the answer: 1 once a hint was shown. */
+  hintsUsed?: number;
+  /** Recorded by Show the answer after the hint. */
+  revealed?: boolean;
 };
 
 /** The row as stored in learn.review_questions. */
@@ -164,6 +171,9 @@ export type ReviewQuestionRow = {
   /** 0 to 1, null when not given (learn_0190). */
   confidence?: number | string | null;
   reasoning?: string | null;
+  /** Hints given, and the first try while its hint is on screen (learn_0190, learn_0191). */
+  hints_used?: number | string | null;
+  first_try?: unknown;
 };
 
 /** The row as the page is given it, with the expected answer held back until answered. */
@@ -177,6 +187,7 @@ export function toReviewQuestion(row: ReviewQuestionRow): ReviewQuestion {
     correct: row.correct,
     why: row.marked_why,
     howSure: rowHowSure(row),
+    ...rowHint(row, answered),
   };
 }
 

@@ -1270,6 +1270,71 @@ export function LearnPieceCheckAskedSurface() {
   );
 }
 
+/**
+ * An applied case missed once (plan #2522.7): the hint, the first answer back
+ * in the box, how sure as it was said, then Check again and Show the answer.
+ */
+export function LearnProbeHintSurface() {
+  const first =
+    'They fall. Fewer people are buying tickets, so the cinema takes in less money overall even at the higher price.';
+  const initial: AskState = {
+    percent: 38,
+    probeId: '00000000-0000-4000-8000-000000002527',
+    conceptId: '00000000-0000-4000-8000-000000002523',
+    conceptName: 'Price elasticity of demand',
+    situation:
+      'A small cinema in a market town puts its evening ticket price up from £10 to £11. Over the next month it sells 4% fewer evening tickets than the month before, with the same films showing.',
+    question: 'What happens to its takings from evening tickets, and why?',
+    hint: {
+      hint: 'You have looked at how many tickets were sold. Now set that against how much more each ticket brings in: which of the two changes is bigger?',
+      response: first,
+    },
+    retryHowSure: { confidence: 0.75, reasoning: 'Fewer tickets means less money.' },
+  };
+  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} initial={initial} />;
+}
+
+/**
+ * A piece's check missed once (plan #2522.7): the hint, the first answer in
+ * the box to change, then Check again and Show the answer.
+ */
+export function LearnPieceCheckHintSurface() {
+  const first = 'Elasticity is 0.5 so demand is elastic, and takings fell because they sold 30 fewer seats.';
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          check: {
+            id: '00000000-0000-4000-8000-000000002528',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response: null,
+            correct: null,
+            why: null,
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+            howSure: { confidence: 0.5, reasoning: null },
+            hint: {
+              hint: 'Your elasticity figure is right. Check what a figure below one says about demand, then work out the takings on each night rather than counting seats.',
+              response: first,
+            },
+            hintsUsed: 1,
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
+  );
+}
+
 // ---- Videos ---------------------------------------------------------------------------
 
 function listVideo(over: Partial<ListVideo> & Pick<ListVideo, 'videoId' | 'title'>): ListVideo {

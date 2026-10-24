@@ -278,6 +278,22 @@ answer expected, and offers another question, written knowing the ones already
 asked so it is not the same one reworded. Nothing on the page marks a piece
 passed any other way.
 
+A first wrong answer is not marked yet (plan #2522.7). The marker writes a
+hint beside its verdict, aimed at where the answer or its reasoning went off,
+and labels the kind of miss: a missed cue, the wrong idea, a slip, a careless
+answer, or a misconception. The hint points somewhere to look and never states
+the answer; one that repeats the expected answer is thrown away, and the miss
+is then marked as it is. The card shows the hint, the first answer back in the
+box to change, Check again, and Show the answer beside it. The row keeps
+`hints_used`, `miss_kind` and the first try in `first_try` (learn 0191), so a
+page opened again shows the hint where it was left. The second answer is
+marked as any answer is, except that right after a hint leaves the ideas and
+the piece where they were, as a right guess does; another question settles
+it. Show the answer marks the first try as it was marked, with no second
+call. The expected answer appears only once the question is marked. The same
+hold applies to a piece's check asked as a cell question
+(docs/LEARN-LEVELS-SPEC.md, "One hint before the answer").
+
 ### A piece names the cells it teaches
 
 Plan #2138.13. A piece also names the cells of its goal's territory that it
@@ -467,6 +483,12 @@ missed idea, back the next day, arrives in a new setting; it marks the
 answer as a piece's check is marked (`lib/learn/lessons/write-review.ts`). The
 spend kinds are `write-review-question` and `mark-review-question`. A question
 asked and not answered is shown again rather than written twice.
+
+A wrong review answer gets one hint and a retry before the expected answer,
+exactly as a piece's check does (plan #2522.7), with the shared steps in
+`lib/learn/hint-turn.ts`. Right after the hint keeps the idea on the gap it
+was on (`heldInterval`), the same as a right guess; a miss after the hint, or
+Show the answer, brings it back tomorrow as any miss does.
 
 The schedule is two columns on `learn.concept_state`: `review_interval_days`
 and `review_due_on`, a UTC date. The questions are rows in

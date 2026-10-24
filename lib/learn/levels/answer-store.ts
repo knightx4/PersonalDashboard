@@ -31,7 +31,18 @@ import {
   type FigureQuestionView,
   type StoredFigureQuestion,
 } from '@/lib/learn/figures/question';
-import { cleanSignals, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { cleanSignals, signalColumns, type AnswerSignals, type CleanSignals, type MissKind } from '@/lib/learn/confidence';
+import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
+import {
+  earnsHint,
+  hintView,
+  missKindOf,
+  readFirstTry,
+  readHintsUsed,
+  wantsHint,
+  type FirstTry,
+  type HintView,
+} from '@/lib/learn/hint';
 import { misconceptionBasis, nameMisconception } from '@/lib/learn/graph/misconception';
 import { setMisconception } from '@/lib/learn/graph/session';
 import { pageResolveContext } from '@/lib/learn/figures/resolve';
@@ -65,6 +76,11 @@ export type AskedCell = {
   figure?: FigureQuestionView;
   /** The requirement line of a role you pursued that this topic serves, when one is near (plan #2184.2). */
   role?: RoleLine | null;
+  /**
+   * A question left open with its hint up (plan #2522.7): the hint, the first
+   * try and what was said with it, so the page opens where it was left.
+   */
+  resume?: { hint: HintView; howSure: HowSure };
 };
 
 export type AskCellResult = { ok: true; asked: AskedCell } | { ok: false; error: string };
@@ -112,7 +128,7 @@ export async function askCell(
   const figuresAllowed = format === 'explain' && options?.figures !== false;
   const openQuery = learn
     .from('cell_questions')
-    .select('id, question, format, figure')
+    .select('id, question, format, figure, first_try, confidence, reasoning')
     .eq('user_id', userId)
     .eq('cell_id', cellId)
     .in('format', figuresAllowed ? [format, 'figure'] : [format])
@@ -121,9 +137,22 @@ export async function askCell(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  const reuse = open as { id: string; question: string; format: string; figure: unknown } | null;
+  const reuse = open as {
+    id: string;
+    question: string;
+    format: string;
+    figure: unknown;
+    first_try: unknown;
+    confidence: number | string | null;
+    reasoning: string | null;
+  } | null;
   const role = findRole ? await findRole(row.topic.name) : null;
-  const asked = (questionId: string, question: string, figure?: FigureQuestionView | null): AskCellResult => ({
+  const asked = (
+    questionId: string,
+    question: string,
+    figure?: FigureQuestionView | null,
+    resume?: AskedCell['resume'],
+  ): AskCellResult => ({
     ok: true,
     asked: {
       questionId,
@@ -134,10 +163,14 @@ export async function askCell(
       format: figure ? 'figure' : format,
       ...(figure ? { figure } : {}),
       role,
+      ...(resume ? { resume } : {}),
     },
   });
   if (reuse) {
-    if (reuse.format !== 'figure') return asked(reuse.id, reuse.question);
+    if (reuse.format !== 'figure') {
+      const held = hintView(readFirstTry(reuse.first_try));
+      return asked(reuse.id, reuse.question, null, held ? { hint: held, howSure: rowHowSure(reuse) } : undefined);
+    }
     // A figure question whose form the app no longer has is left open and a new one asked.
     const stored = readStoredFigureQuestion(reuse.figure);
     const view = stored ? figureQuestionView(stored) : null;
@@ -263,7 +296,24 @@ async function writeCellFigure(
 export type AnswerCellResult =
   | {
       ok: true;
+      /**
+       * A first written miss (plan #2522.7): nothing is recorded yet, and the
+       * page shows the hint and a box to try again.
+       */
+      hint: HintView;
+      moved?: undefined;
+    }
+  | {
+      ok: true;
+      hint?: undefined;
       moved: Moved;
+      /**
+       * Answered after a hint (plan #2522.7): whether it was right, which then
+       * moved nothing up, and whether Show the answer recorded it.
+       */
+      afterHint?: { right: boolean; revealed: boolean };
+      /** A case's expected answer, shown once a question that had a hint is recorded. */
+      expected?: string;
       /** A figure question's answer in words, shown once it is graded (plan #2321.5). */
       answer?: string;
       /**
@@ -298,15 +348,16 @@ export async function answerCell(
     onSpend?: SpendSink;
     /** How sure they were and how they reasoned, when given (plan #2522.3). */
     signals?: AnswerSignals | null;
+    /**
+     * Show the answer (plan #2522.7): record the first try held with its hint,
+     * as it was graded, without grading again. `response` is not read.
+     */
+    reveal?: boolean;
   },
 ): Promise<AnswerCellResult> {
-  const signals = cleanSignals(input.signals);
-  const raw = input.response.trim();
-  if (raw === '') return { ok: false, error: 'Write an answer first.' };
-
   const { data: q, error: qError } = await learn
     .from('cell_questions')
-    .select('id, cell_id, question, expected, format, figure, answered_at')
+    .select('id, cell_id, question, expected, format, figure, answered_at, hints_used, first_try, confidence, reasoning')
     .eq('user_id', userId)
     .eq('id', input.questionId)
     .maybeSingle();
@@ -319,9 +370,21 @@ export async function answerCell(
     format: string;
     figure: unknown;
     answered_at: string | null;
+    hints_used: number | string | null;
+    first_try: unknown;
+    confidence: number | string | null;
+    reasoning: string | null;
   } | null;
   if (!question) return { ok: false, error: 'That question is not one of yours.' };
   if (question.answered_at) return { ok: false, error: 'That question has been answered already.' };
+
+  const hintsUsed = readHintsUsed(question.hints_used);
+  const first = readFirstTry(question.first_try);
+  if (input.reveal && !first) return { ok: false, error: 'There is no hint on this question to show the answer after.' };
+  // Show the answer reads what was given with the first try off the row.
+  const signals = input.reveal ? rowHowSure(question) : cleanSignals(input.signals);
+  const raw = input.reveal && first ? first.response : input.response.trim();
+  if (raw === '') return { ok: false, error: 'Write an answer first.' };
 
   // A figure question keeps what was picked by its label, so the quote under
   // a met reads as the answer given (plan #2321.5).
@@ -342,19 +405,68 @@ export async function answerCell(
   const cells = allCells && (question.expected || figure) ? allCells.slice(0, 1) : allCells;
   if (!cells) return { ok: false, error: 'That level is on a topic that is not approved.' };
 
-  const graded = figure
-    ? await gradeFigure(figure, raw, response, cells, question.question, input, signals)
-    : await gradeTwice(cells, question.question, question.expected, response, input, signals);
+  const keyToCell = new Map(cells.map((c) => [c.key, c.cellId]));
+  // A written answer that has had no hint yet asks the grader for one beside
+  // a miss (plan #2522.7); a figure question is answered on its figure and
+  // has none.
+  const hintWanted = !figure && wantsHint(hintsUsed);
+  const graded =
+    input.reveal && first
+      ? revealedGrade(first, cells)
+      : figure
+        ? await gradeFigure(figure, raw, response, cells, question.question, input, signals)
+        : await gradeTwice(cells, question.question, question.expected, response, input, signals, {
+            hint: hintWanted,
+            retry: first,
+          });
   if (!graded) return { ok: false, error: 'Dash could not grade this answer just now.' };
 
   const ruled = applyGradeRules({ cells, answer: response, verdicts: graded.verdicts });
-  // Right means a met on the asked cell survived the rules; the guess rule
-  // then keeps every met back at Guessing.
+  // Right means a met on the asked cell survived the rules.
   const askedMet = ruled.write.some((w) => w.cellId === question.cell_id && w.verdict === 'met');
-  const { write, held } = holdGuessedMets(ruled.write, signals.confidence);
-  const guessed = held.some((w) => w.cellId === question.cell_id);
+
+  // A first miss with a hint to give is held, not recorded: the row keeps the
+  // first try and the page asks again.
+  const hint = graded.hint ?? null;
+  if (!input.reveal && earnsHint({ correct: askedMet, hintsUsed, hint }) && hint) {
+    const own = graded.verdicts.find((v) => v.cell === cells[0].key);
+    const kind = missKindOf({ correct: false, confidence: signals.confidence, graderKind: graded.missKind ?? null });
+    const firstTry: FirstTry = {
+      response,
+      why: own?.reason ?? null,
+      hint,
+      kind,
+      grade: storedGrade(graded.verdicts, keyToCell),
+    };
+    const { data: kept, error: holdError } = await learn
+      .from('cell_questions')
+      .update({
+        hints_used: hintsUsed + 1,
+        miss_kind: kind,
+        first_try: firstTry,
+        ...(signals.confidence !== null && { confidence: signals.confidence }),
+        ...(signals.reasoning !== null && { reasoning: signals.reasoning }),
+      })
+      .eq('user_id', userId)
+      .eq('id', question.id)
+      .is('answered_at', null)
+      .select('id');
+    if (holdError) return { ok: false, error: `Saving your answer failed: ${holdError.message}` };
+    if (!kept || kept.length === 0) return { ok: false, error: 'That question has been answered already.' };
+    return { ok: true, hint: { hint, response } };
+  }
+
+  // The guess rule keeps every met back at Guessing, and so does a hint: right
+  // after one counts as right and leaves the ladder where it was.
+  const hinted = hintsUsed > 0;
+  const { write, held } = holdGuessedMets(ruled.write, signals.confidence, hinted);
+  const guessed = !hinted && held.some((w) => w.cellId === question.cell_id);
   const signalled = signalColumns(signals, askedMet);
-  const keyToCell = new Map(cells.map((c) => [c.key, c.cellId]));
+  // The row's kind of miss: this answer's when it missed, else the first
+  // try's, so a right answer after a hint still says what the miss was.
+  const missKind = askedMet
+    ? (first?.kind ?? null)
+    : missKindOf({ correct: false, confidence: signals.confidence, graderKind: graded.missKind ?? first?.kind ?? null });
   const now = new Date().toISOString();
 
   // Claimed first, so two presses cannot both write evidence.
@@ -368,6 +480,8 @@ export async function answerCell(
       grade_second: graded.second ? storedGrade(graded.second, keyToCell) : null,
       model_second: graded.second ? LEVEL_GRADE_SECOND_MODEL : null,
       ...signalled,
+      miss_kind: missKind,
+      ...(input.reveal && first && { first_try: { ...first, revealed: true } }),
     })
     .eq('user_id', userId)
     .eq('id', question.id)
@@ -448,7 +562,36 @@ export async function answerCell(
     ...(figure ? { answer: figureAnswerLabel(figure) } : {}),
     ...(guessed ? { guessed: true } : {}),
     ...(signalled.miss_kind === 'misconception' ? { misconceptionCandidate: true } : {}),
+    ...(hinted ? { afterHint: { right: askedMet, revealed: input.reveal === true } } : {}),
+    // A case's expected answer is shown once a question that had a hint is
+    // recorded, the way a piece's check and review show theirs.
+    ...(hinted && question.expected ? { expected: question.expected } : {}),
   };
+}
+
+/**
+ * The first try's grade, read back for Show the answer: the verdicts it kept
+ * by cell id, turned back into the grader's keys. The asked cell keeps a not
+ * met whatever else could not be matched.
+ */
+function revealedGrade(first: FirstTry, cells: readonly GraderCell[]): Graded {
+  const cellToKey = new Map(cells.map((c) => [c.cellId, c.key]));
+  const kept = Array.isArray(first.grade) ? (first.grade as Array<Record<string, unknown>>) : [];
+  const verdicts: RawVerdict[] = [];
+  for (const v of kept) {
+    const key = typeof v.cell_id === 'string' ? cellToKey.get(v.cell_id) : undefined;
+    if (!key || (v.verdict !== 'met' && v.verdict !== 'not_met' && v.verdict !== 'not_touched')) continue;
+    verdicts.push({
+      cell: key,
+      verdict: v.verdict,
+      quote: typeof v.quote === 'string' ? v.quote : null,
+      reason: typeof v.reason === 'string' ? v.reason : null,
+    });
+  }
+  if (!verdicts.some((v) => v.cell === cells[0].key)) {
+    verdicts.push({ cell: cells[0].key, verdict: 'not_met', quote: null, reason: first.why });
+  }
+  return { verdicts, model: LEVEL_GRADE_MODEL, second: null };
 }
 
 /**
@@ -503,7 +646,14 @@ async function nameCellMisconception(
   }
 }
 
-type Graded = { verdicts: RawVerdict[]; model: string; second: RawVerdict[] | null };
+type Graded = {
+  verdicts: RawVerdict[];
+  model: string;
+  second: RawVerdict[] | null;
+  /** The first grader's hint and kind of miss, when one was asked for (plan #2522.7). */
+  hint?: string | null;
+  missKind?: MissKind | null;
+};
 type GradeKey = { anthropicApiKey: string; onSpend?: SpendSink };
 
 /**
@@ -518,17 +668,34 @@ async function gradeTwice(
   answer: string,
   key: GradeKey,
   signals: CleanSignals,
+  /** A hint asked of the first grader, and the first try on a retry (plan #2522.7). */
+  turn: { hint: boolean; retry: FirstTry | null } = { hint: false, retry: null },
 ): Promise<Graded | null> {
-  const gradeInput = { cells, question, expected, answer, signals, anthropicApiKey: key.anthropicApiKey, onSpend: key.onSpend };
+  const gradeInput = {
+    cells,
+    question,
+    expected,
+    answer,
+    signals,
+    retry: turn.retry,
+    anthropicApiKey: key.anthropicApiKey,
+    onSpend: key.onSpend,
+  };
   const [grade, second] = await Promise.all([
-    gradeCellAnswer(gradeInput),
+    gradeCellAnswer({ ...gradeInput, hint: turn.hint }),
     gradeCellAnswer({ ...gradeInput, model: LEVEL_GRADE_SECOND_MODEL }),
   ]);
   if (!grade.ok) {
     console.error('[learn levels] grading', grade.detail);
     return null;
   }
-  return { verdicts: grade.verdicts, model: LEVEL_GRADE_MODEL, second: second.ok ? second.verdicts : null };
+  return {
+    verdicts: grade.verdicts,
+    model: LEVEL_GRADE_MODEL,
+    second: second.ok ? second.verdicts : null,
+    hint: grade.hint ?? null,
+    missKind: grade.missKind ?? null,
+  };
 }
 
 /**

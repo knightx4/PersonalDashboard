@@ -27,7 +27,10 @@ import { answerCell, askCell } from '@/lib/learn/levels/answer-store';
 import { roleLineFinder } from '@/lib/learn/levels/role-match';
 import { pieceCheckCell } from '@/lib/learn/lessons/piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from '@/lib/learn/lessons/piece-cells-store';
-import { cleanSignals, isGuess, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { cleanSignals, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { rowHowSure } from '@/lib/learn/how-sure';
+import { holdsRung, readFirstTry, readHintsUsed } from '@/lib/learn/hint';
+import { finalMissKind, holdColumns, markTurn } from '@/lib/learn/hint-turn';
 
 /**
  * The presses on a piece's page (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -176,6 +179,12 @@ export type AnswerResult = {
  * its practice is passed too; a wrong one keeps the mark and the sentence on
  * what was missing, and changes nothing else. Marking the piece yourself is
  * not a thing this page offers.
+ *
+ * A first wrong answer is not marked yet (plan #2522.7): the marker's hint
+ * comes back with the question still open, to try again. The retry is marked
+ * as any answer is, except that right after a hint leaves the ideas and the
+ * piece where they were. Show the answer (`reveal`) marks the first try as it
+ * was marked, without marking it again.
  */
 // latency: pending
 export async function answerPieceCheck(
@@ -185,19 +194,23 @@ export async function answerPieceCheck(
   response: string,
   /** How sure they were and how they reasoned, when the page asks (plan #2522.3). */
   answerSignals?: AnswerSignals | null,
+  /** Show the answer after a hint: `response` and the signals are not read. */
+  reveal?: boolean,
 ): Promise<AnswerResult> {
   const user = await requireUser();
   const signals = cleanSignals(answerSignals);
   const ids = z.tuple([Id, Id, Id]).safeParse([subjectId, pieceId, checkId]);
   if (!ids.success) return { error: 'Could not tell which question that was.' };
-  const answer = AnswerText.safeParse(response);
+  const answer = reveal ? ({ success: true, data: '' } as const) : AnswerText.safeParse(response);
   if (!answer.success) return { error: 'Write an answer first, in a sentence or two.' };
   const [subject, pieceIdValue, checkIdValue] = ids.data;
   const learn = await createLearnClient();
 
   try {
     const cellCheck = await loadCellCheck(learn, user.id, pieceIdValue, checkIdValue);
-    if (cellCheck) return await answerCellCheck(learn, user.id, subject, pieceIdValue, cellCheck, answer.data, signals);
+    if (cellCheck) {
+      return await answerCellCheck(learn, user.id, subject, pieceIdValue, cellCheck, answer.data, signals, reveal === true);
+    }
 
     const { data, error } = await learn
       .from('piece_checks')
@@ -215,30 +228,58 @@ export async function answerPieceCheck(
     const loaded = await loadPieceForCheck(learn, user.id, subject, pieceIdValue);
     if (!loaded) return { error: 'This piece is no longer there.' };
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { error: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
-
-    const spend = collectSpend();
-    const grade = await markPieceCheck({
-      piece: loaded.piece,
-      question: row.question,
-      expected: row.expected,
-      response: answer.data,
-      signals,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
+    const hintsUsed = readHintsUsed(row.hints_used);
+    const first = readFirstTry(row.first_try);
+    const turn = await markTurn({
+      reveal: reveal === true,
+      first,
+      hintsUsed,
+      mark: async (wantHint) => {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) return { ok: false, detail: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
+        const spend = collectSpend();
+        const grade = await markPieceCheck({
+          piece: loaded.piece,
+          question: row.question,
+          expected: row.expected,
+          response: answer.data,
+          signals,
+          hint: wantHint,
+          retry: first,
+          anthropicApiKey: apiKey,
+          onSpend: spend.sink,
+        });
+        await recordLearnSpend(user.id, 'mark-piece-check', spend.reports);
+        return grade;
+      },
     });
-    await recordLearnSpend(user.id, 'mark-piece-check', spend.reports);
-    if (!grade.ok) return { error: `Marking failed: ${grade.detail}` };
+    if (!turn.ok) return { error: turn.error };
+    const given = reveal ? rowHowSure(row) : signals;
+
+    if (turn.hold) {
+      const { data: held, error: holdError } = await learn
+        .from('piece_checks')
+        .update(holdColumns(turn.hold, answer.data, given, hintsUsed))
+        .eq('id', checkIdValue)
+        .eq('user_id', user.id)
+        .is('response', null)
+        .select(PIECE_CHECK_COLUMNS);
+      if (holdError) return { error: `Saving the answer failed: ${holdError.message}` };
+      const kept = (held ?? [])[0] as PieceCheckRow | undefined;
+      return kept ? { check: toPieceCheck(kept) } : { error: 'That question has been answered already.' };
+    }
+    const grade = turn.grade;
 
     const { data: marked, error: markError } = await learn
       .from('piece_checks')
       .update({
-        response: answer.data,
+        response: reveal && first ? first.response : answer.data,
         correct: grade.correct,
         marked_why: grade.why,
         answered_at: new Date().toISOString(),
-        ...signalColumns(signals, grade.correct),
+        ...signalColumns(given, grade.correct),
+        miss_kind: finalMissKind(grade, given.confidence, first),
+        ...(reveal && first && { first_try: { ...first, revealed: true } }),
       })
       .eq('id', checkIdValue)
       .eq('user_id', user.id)
@@ -250,9 +291,10 @@ export async function answerPieceCheck(
     if (!saved) return { error: 'That question has been answered already.' };
 
     if (!grade.correct) return { check: toPieceCheck(saved) };
-    // Right, but a guess (plan #2522.3): recorded as right, and the ideas and
-    // the piece stay where they were. Another question settles it.
-    if (isGuess(signals.confidence)) return { check: toPieceCheck(saved) };
+    // Right, but a guess (plan #2522.3) or after a hint (plan #2522.7):
+    // recorded as right, and the ideas and the piece stay where they were.
+    // Another question settles it.
+    if (holdsRung({ correct: true, confidence: given.confidence, hintsUsed })) return { check: toPieceCheck(saved) };
 
     // A right answer shows the ideas are known, whatever the practice says;
     // the piece itself passes only once its practice has too.
@@ -285,6 +327,7 @@ async function answerCellCheck(
   check: PieceCheck,
   response: string,
   signals: CleanSignals,
+  reveal: boolean,
 ): Promise<AnswerResult> {
   // Answered already, in another tab: show that mark rather than paying for another.
   if (check.correct !== null) return { check };
@@ -299,6 +342,7 @@ async function answerCellCheck(
     questionId: check.id,
     response,
     signals,
+    reveal,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
@@ -306,11 +350,14 @@ async function answerCellCheck(
   if (!graded.ok) return { error: graded.error };
 
   const marked = await loadCellCheck(learn, userId, pieceId, check.id);
+  // A first miss (plan #2522.7): the check comes back open, with its hint.
+  if (graded.hint) return marked ? { check: marked } : { error: 'That question is no longer there.' };
   if (!marked) return { error: 'That question is no longer there.' };
   revalidatePath(`/learn/topics/${marked.cell?.topicId ?? ''}`);
   if (!marked.correct) return { check: marked };
-  // Right, but a guess: no met was written, so the ideas and the piece stay put.
-  if (graded.guessed) return { check: marked };
+  // Right, but a guess or after a hint: no met was written, so the ideas and
+  // the piece stay put.
+  if (graded.guessed || graded.afterHint) return { check: marked };
 
   const tested = await markPieceIdeasTested(learn, userId, loaded.conceptIds);
   const standing = await passPieceIfDone(learn, userId, pieceId, loaded.passedAt);

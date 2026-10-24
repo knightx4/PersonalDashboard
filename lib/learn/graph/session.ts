@@ -18,7 +18,8 @@ import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/l
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
 import { predictedStrength } from '@/lib/learn/predicted';
 import { EVIDENCE_CEILING, stateAfterAnswer } from '@/lib/learn/strength';
-import { cleanSignals, signalColumns, type AnswerSignals } from '@/lib/learn/confidence';
+import { cleanSignals, signalColumns, type AnswerSignals, type MissKind } from '@/lib/learn/confidence';
+import { missKindOf, readFirstTry, readHintsUsed, type FirstTry } from '@/lib/learn/hint';
 
 /**
  * Evidence worth half the ceiling or more puts an untested idea first in line
@@ -76,6 +77,9 @@ export type ProbeRow = {
    * there now -- which is what #382 settled, and it needs no write of its own.
    */
   askedAt: string;
+  /** Hints given before the answer, and the first try while its hint is on screen (plan #2522.7). Absent where not read. */
+  hintsUsed?: number;
+  firstTry?: FirstTry | null;
 };
 
 function fail(action: string, error: { message: string }): Error {
@@ -177,7 +181,7 @@ export async function probesFor(
     .select(
       'id, concept_id, question, options, correct_index, reason, chosen_index, dont_know, ' +
         'expected, response, response_correct, grade_reason, rung, weight, mastery_check, ' +
-        'confidence, reasoning, created_at',
+        'confidence, reasoning, hints_used, first_try, created_at',
     )
     .eq('concept_id', conceptId)
     // Not a question Practice Flow has written ahead and not yet shown. It
@@ -207,6 +211,8 @@ export async function probesFor(
     mastery_check: string | null;
     confidence: number | string | null;
     reasoning: string | null;
+    hints_used: number | string | null;
+    first_try: unknown;
     created_at: string;
   }[]).map((row) => ({
     ...rowHowSure(row),
@@ -226,6 +232,8 @@ export async function probesFor(
     weight: Number(row.weight),
     masteryCheck: row.mastery_check,
     askedAt: row.created_at,
+    hintsUsed: readHintsUsed(row.hints_used),
+    firstTry: readFirstTry(row.first_try),
   }));
 }
 
@@ -955,9 +963,18 @@ export function settledStateFor(rung: Rung, correct: boolean): SettledState {
 async function settleConcept(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { conceptId: string; rung: Rung; correct: boolean; confidence?: number | null; graph?: Graph },
+  input: {
+    conceptId: string;
+    rung: Rung;
+    correct: boolean;
+    confidence?: number | null;
+    graph?: Graph;
+    /** Right only after a hint (plan #2522.7): the concept stays at its rung. */
+    hinted?: boolean;
+  },
 ): Promise<{ state: SettledState | null; inferred: number; guessed: boolean }> {
   const earned = settledStateFor(input.rung, input.correct);
+  if (input.correct && input.hinted) return { state: null, inferred: 0, guessed: false };
   if (stateAfterAnswer(earned, { correct: input.correct, confidence: input.confidence }) === null) {
     return { state: null, inferred: 0, guessed: true };
   }
@@ -1026,9 +1043,19 @@ export async function recordWrittenAnswer(
     graph?: Graph;
     /** How sure they were and how they reasoned, when given; the grader has read both (plan #2522.3). */
     signals?: AnswerSignals | null;
+    /**
+     * Hints given before this answer (plan #2522.7). Right after one counts
+     * as right and leaves the concept at its rung.
+     */
+    hintsUsed?: number;
+    /** The kind of miss the grader named, or the first try's (plan #2522.7). */
+    missKind?: MissKind | null;
+    /** Set by Show the answer: the first try to mark as shown. */
+    revealed?: FirstTry | null;
   },
 ): Promise<AnswerOutcome> {
   const signals = cleanSignals(input.signals);
+  const hinted = (input.hintsUsed ?? 0) > 0;
   const { data, error } = await supabase
     .from('probes')
     .select('response, mastery_check, rung')
@@ -1067,6 +1094,13 @@ export async function recordWrittenAnswer(
       answered_at: new Date().toISOString(),
       weight,
       ...(first && signalColumns(signals, input.correct)),
+      ...(first &&
+        (input.missKind !== undefined || hinted) && {
+          miss_kind: input.correct
+            ? (input.missKind ?? null)
+            : missKindOf({ correct: false, confidence: signals.confidence, graderKind: input.missKind ?? null }),
+        }),
+      ...(input.revealed && { first_try: { ...input.revealed, revealed: true } }),
     })
     .eq('id', input.probeId);
 
@@ -1079,6 +1113,7 @@ export async function recordWrittenAnswer(
     correct: input.correct,
     confidence: signals.confidence,
     graph: input.graph,
+    hinted,
   });
 
   return {
@@ -1091,4 +1126,30 @@ export async function recordWrittenAnswer(
     guessed,
     misconceptionCandidate: signalColumns(signals, input.correct).miss_kind === 'misconception',
   };
+}
+
+/**
+ * Hold a first wrong answer to a case while its hint is on screen (plan
+ * #2522.7): the row keeps the first try, one hint used and the kind of miss,
+ * and stays unanswered, so nothing about the concept moves yet.
+ */
+export async function holdWrittenAnswer(
+  supabase: LearnSupabaseClient,
+  input: { probeId: string; firstTry: FirstTry; signals?: AnswerSignals | null; hintsUsed: number },
+): Promise<void> {
+  const signals = cleanSignals(input.signals);
+  const kind = missKindOf({ correct: false, confidence: signals.confidence, graderKind: input.firstTry.kind });
+  const { error } = await supabase
+    .from('probes')
+    .update({
+      hints_used: input.hintsUsed + 1,
+      miss_kind: kind,
+      first_try: { ...input.firstTry, kind },
+      ...(signals.confidence !== null && { confidence: signals.confidence }),
+      ...(signals.reasoning !== null && { reasoning: signals.reasoning }),
+    })
+    .eq('id', input.probeId)
+    .is('response', null);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Saving the answer', error);
 }

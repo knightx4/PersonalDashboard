@@ -18,6 +18,7 @@ import {
   recordDontKnow,
   recordProbe,
   recordWrittenAnswer,
+  holdWrittenAnswer,
   setMisconception,
   type ProbeRow,
 } from '@/lib/learn/graph/session';
@@ -33,7 +34,8 @@ import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 import { loadEvidenceForTargets } from '@/lib/learn/evidence/links';
 import { evidenceStrength } from '@/lib/learn/strength';
-import { readAnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { readAnswerSignals, type CleanSignals, type MissKind } from '@/lib/learn/confidence';
+import { earnsHint, wantsHint, type HintView } from '@/lib/learn/hint';
 import { checkPickedReasoning } from '@/lib/learn/graph/reasoning-check';
 
 /**
@@ -59,6 +61,13 @@ export type AskState = {
   options?: string[];
   /** Where the bar stood before this question. */
   percent?: number;
+  /**
+   * After a first wrong answer to a case (plan #2522.7): the hint and the
+   * first try, with the case still open to try again or Show the answer.
+   */
+  hint?: HintView;
+  /** What was said with the first try, kept for the retry. */
+  retryHowSure?: CleanSignals;
   /** Filled in once answered, by the answer action. */
   answered?: {
     correct: boolean;
@@ -79,6 +88,9 @@ export type AskState = {
     couldGoDeeper?: boolean;
     /** How sure they said they were and how they got there, shown on the answer (plan #2522.2). None after I don't know. */
     howSure?: CleanSignals;
+    /** Hints given before this answer, and whether Show the answer recorded it (plan #2522.7). Applied only. */
+    hintsUsed?: number;
+    revealed?: boolean;
   };
 };
 
@@ -296,6 +308,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
 
   if (askedRow.rung !== 'recognise') {
     return answerApplied({
+      reveal: formData.get('reveal') === '1',
       signals,
       prev,
       userId: user.id,
@@ -494,30 +507,65 @@ async function answerApplied(input: {
   subjectId: string;
   typed: FormDataEntryValue | null;
   signals: CleanSignals;
+  /** Show the answer after a hint (plan #2522.7): the first try is recorded as it was graded. */
+  reveal: boolean;
 }): Promise<AskState> {
-  const parsed = TypedAnswer.safeParse({ response: input.typed });
+  const first = input.probe.firstTry ?? null;
+  const hintsUsed = input.probe.hintsUsed ?? 0;
+  if (input.reveal && !first) return { ...input.prev, error: 'There is no hint on this case to show the answer after.' };
+  const parsed = input.reveal && first
+    ? ({ success: true, data: { response: first.response } } as const)
+    : TypedAnswer.safeParse({ response: input.typed });
   if (!parsed.success) return { ...input.prev, error: 'Write an answer first.' };
   if (!input.concept) return { ...input.prev, error: 'That idea is not in this subject.' };
+  // Show the answer records what was said with the first try, off the row.
+  const signals: CleanSignals = input.reveal
+    ? { confidence: input.probe.confidence ?? null, reasoning: input.probe.reasoning ?? null }
+    : input.signals;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { ...input.prev, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
 
-  const { situation, question } = splitCase(input.probe.question);
-  const spend = collectSpend();
-  const grade = await gradeAppliedAnswer({
-    concept: input.concept.name,
-    claim: input.concept.claim,
-    situation,
-    question,
-    expected: input.probe.expected ?? '',
-    response: parsed.data.response,
-    signals: input.signals,
-    anthropicApiKey: apiKey,
-    onSpend: spend.sink,
-  });
-  await recordLearnSpend(input.userId, 'grade-applied-answer', spend.reports);
+  let grade: { correct: boolean; why: string; hint?: string | null; missKind?: MissKind | null };
+  if (input.reveal && first) {
+    grade = { correct: false, why: first.why ?? '', missKind: first.kind };
+  } else {
+    const { situation, question } = splitCase(input.probe.question);
+    const spend = collectSpend();
+    const graded = await gradeAppliedAnswer({
+      concept: input.concept.name,
+      claim: input.concept.claim,
+      situation,
+      question,
+      expected: input.probe.expected ?? '',
+      response: parsed.data.response,
+      signals,
+      // One hint before the answer (plan #2522.7): asked for until one is given.
+      hint: wantsHint(hintsUsed),
+      retry: first,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(input.userId, 'grade-applied-answer', spend.reports);
+    if (!graded.ok) return { ...input.prev, error: graded.detail };
+    grade = graded;
+  }
 
-  if (!grade.ok) return { ...input.prev, error: grade.detail };
+  // A first miss with a hint to give: hold it, and ask again.
+  const hint = grade.hint ?? null;
+  if (!input.reveal && earnsHint({ correct: grade.correct, hintsUsed, hint }) && hint) {
+    try {
+      await holdWrittenAnswer(input.supabase, {
+        probeId: input.probe.id,
+        firstTry: { response: parsed.data.response, why: grade.why, hint, kind: grade.missKind ?? null },
+        signals,
+        hintsUsed,
+      });
+    } catch (error) {
+      return { ...input.prev, error: error instanceof Error ? error.message : 'Could not save that.' };
+    }
+    return { ...input.prev, error: undefined, hint: { hint, response: parsed.data.response }, retryHowSure: signals };
+  }
 
   let outcome;
   try {
@@ -532,7 +580,10 @@ async function answerApplied(input: {
       // with the check this case aimed at.
       wasSettled: input.concept.mastery.length === 0 && isSettled(input.concept),
       graph: input.graph,
-      signals: input.signals,
+      signals,
+      hintsUsed,
+      missKind: grade.correct ? (first?.kind ?? null) : (grade.missKind ?? first?.kind ?? null),
+      revealed: input.reveal ? first : null,
     });
   } catch (error) {
     return {
@@ -554,8 +605,8 @@ async function answerApplied(input: {
   let misconception: string | undefined;
   const basis = misconceptionBasis({
     correct: outcome.correct,
-    confidence: input.signals.confidence,
-    reasoning: input.signals.reasoning,
+    confidence: signals.confidence,
+    reasoning: signals.reasoning,
   });
   if (basis) {
     const nameSpend = collectSpend();
@@ -564,7 +615,7 @@ async function answerApplied(input: {
       claim: input.concept.claim,
       wrongAnswer: parsed.data.response,
       questions: [input.probe.question],
-      reasoning: input.signals.reasoning ? [input.signals.reasoning] : undefined,
+      reasoning: signals.reasoning ? [signals.reasoning] : undefined,
       basis,
       anthropicApiKey: apiKey,
       onSpend: nameSpend.sink,
@@ -594,6 +645,8 @@ async function answerApplied(input: {
   return {
     ...input.prev,
     error: undefined,
+    hint: undefined,
+    retryHowSure: undefined,
     percent: barPercent(weight),
     answered: {
       correct: outcome.correct,
@@ -603,7 +656,9 @@ async function answerApplied(input: {
       expected: input.probe.expected ?? undefined,
       misconception,
       couldGoDeeper: !outcome.correct && prerequisites.length === 0,
-      howSure: input.signals,
+      howSure: signals,
+      ...(hintsUsed > 0 ? { hintsUsed } : {}),
+      ...(input.reveal ? { revealed: true } : {}),
     },
   };
 }

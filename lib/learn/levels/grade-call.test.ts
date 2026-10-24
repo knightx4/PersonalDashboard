@@ -37,6 +37,43 @@ describe('gradeCellAnswer', () => {
   });
 });
 
+describe('a hint beside a C1 not met (plan #2522.7)', () => {
+  it('asks for the hint under the hint rule and hands it back with the kind', async () => {
+    const calls: { system: string; tools: { input_schema: { properties: Record<string, unknown> } }[] }[] = [];
+    const fake = {
+      messages: {
+        create: async (args: (typeof calls)[number]) => {
+          calls.push(args);
+          return {
+            usage: { input_tokens: 1, output_tokens: 1 },
+            content: [
+              {
+                type: 'tool_use',
+                name: 'report_grades',
+                input: {
+                  grades: [{ cell: 'C1', verdict: 'not_met', reason: 'Wrong cause.' }],
+                  hint: 'Think about when the contract was signed.',
+                  miss_kind: 'wrong_idea',
+                },
+              },
+            ],
+          };
+        },
+      },
+    } as never;
+    const base = { cells: [], question: 'Why do wages lag?', answer: 'Greed.', anthropicApiKey: 'k', client: fake };
+    const hinted = await gradeCellAnswer({ ...base, hint: true });
+    expect(hinted.ok && hinted.hint).toBe('Think about when the contract was signed.');
+    expect(hinted.ok && hinted.missKind).toBe('wrong_idea');
+    expect(calls[0].system).toContain('Here the answer is wrong when C1 is not met.');
+    expect(calls[0].tools[0].input_schema.properties).toHaveProperty('miss_kind');
+
+    const plain = await gradeCellAnswer(base);
+    expect(plain.ok && 'hint' in plain).toBe(false);
+    expect(calls[1].system).not.toContain('ALSO WRITE ONE HINT');
+  });
+});
+
 describe('confidence and reasoning reach the cell grader (plan #2522.3)', () => {
   it('puts the reasoning and the confidence after the answer', () => {
     const text = gradePrompt({
