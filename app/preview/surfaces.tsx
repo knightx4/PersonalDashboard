@@ -3312,6 +3312,7 @@ const youDetails: Details = {
   race: 'White',
   gender: 'Man',
   sexuality: 'Straight',
+  custom_fields: [],
 };
 
 /** The sections app/you/layout.tsx passes, copied for the same reason. */

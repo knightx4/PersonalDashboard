@@ -10,8 +10,19 @@ export const DETAIL_KEYS = ['phone', 'linkedin_url', 'citizenship', 'race', 'gen
 
 export type DetailKey = (typeof DETAIL_KEYS)[number];
 
-/** The six details; null is one they have not given. */
-export type Details = Record<DetailKey, string | null>;
+/** One field of their own: a name and a value they chose (plan #2531.1). */
+export type CustomField = { id: string; label: string; value: string };
+
+export const CUSTOM_FIELDS_MAX = 30;
+export const CUSTOM_LABEL_MAX = 80;
+export const CUSTOM_VALUE_MAX = 500;
+export const CUSTOM_ID_MAX = 64;
+
+/** The six details, null for one they have not given, and the fields of their own. */
+export type Details = Record<DetailKey, string | null> & { custom_fields: CustomField[] };
+
+/** The six as the form sends them. */
+export type SixDetails = Record<DetailKey, string | null>;
 
 /** What the Details tab calls each one, in the order it lists them. */
 export const DETAIL_LABELS: Record<DetailKey, string> = {
@@ -36,7 +47,7 @@ export function linkedinHref(value: string): string {
 }
 
 /** The columns a row is read with. */
-export const DETAIL_COLUMNS = DETAIL_KEYS.join(', ');
+export const DETAIL_COLUMNS = `${DETAIL_KEYS.join(', ')}, custom_fields`;
 
 /** The most characters each detail may hold, matching the table's checks. */
 export const DETAIL_MAX: Record<DetailKey, number> = {
@@ -49,6 +60,7 @@ export const DETAIL_MAX: Record<DetailKey, number> = {
 };
 
 export const EMPTY_DETAILS: Details = {
+  custom_fields: [],
   phone: null,
   linkedin_url: null,
   citizenship: null,
@@ -58,12 +70,56 @@ export const EMPTY_DETAILS: Details = {
 };
 
 /** A row as stored; any column may be missing from a partial read. */
-export type DetailsRow = Partial<Record<DetailKey, string | null>>;
+export type DetailsRow = Partial<Record<DetailKey, string | null>> & { custom_fields?: unknown };
+
+/** What a save may carry: any of the six, and the whole list of own fields. */
+export type DetailsPatch = Partial<Record<DetailKey, string | null>> & { custom_fields?: unknown };
 
 export function detailsFromRow(row: DetailsRow | null | undefined): Details {
-  const out = { ...EMPTY_DETAILS };
+  const out: Details = { ...EMPTY_DETAILS, custom_fields: [] };
   for (const key of DETAIL_KEYS) out[key] = cleanDetail(row?.[key]);
+  out.custom_fields = readCustomFields(row?.custom_fields);
   return out;
+}
+
+/**
+ * A stored list read for display: entries that are not {id, label, value}
+ * text are skipped rather than thrown on, so one bad entry cannot hide the page.
+ */
+export function readCustomFields(raw: unknown): CustomField[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CustomField[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const { id, label, value } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || typeof label !== 'string' || typeof value !== 'string') continue;
+    out.push({ id, label: label.trim(), value: value.trim() });
+  }
+  return out;
+}
+
+/** The list with every label and value trimmed; call after checkCustomFields passes. */
+export function cleanCustomFields(raw: unknown): CustomField[] {
+  return readCustomFields(raw);
+}
+
+/** What is wrong with a list of own fields, or null when it can be saved. */
+export function checkCustomFields(raw: unknown): string | null {
+  if (!Array.isArray(raw)) return 'Your own fields must be a list.';
+  if (raw.length > CUSTOM_FIELDS_MAX) return `You can keep at most ${CUSTOM_FIELDS_MAX} fields of your own.`;
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return 'Each of your own fields needs an id, a name and a value.';
+    const { id, label, value } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || id.length < 1 || id.length > CUSTOM_ID_MAX) return 'Each of your own fields needs an id.';
+    if (seen.has(id)) return 'Two of your own fields share an id.';
+    seen.add(id);
+    if (typeof label !== 'string' || label.trim() === '') return 'Each of your own fields needs a name.';
+    if (label.trim().length > CUSTOM_LABEL_MAX) return `A field name can be at most ${CUSTOM_LABEL_MAX} characters.`;
+    if (typeof value !== 'string') return 'Each of your own fields needs a value.';
+    if (value.trim().length > CUSTOM_VALUE_MAX) return `A field value can be at most ${CUSTOM_VALUE_MAX} characters.`;
+  }
+  return null;
 }
 
 /** Trims a value; blank or not text is null, so an emptied field clears the detail. */
@@ -74,13 +130,14 @@ export function cleanDetail(value: unknown): string | null {
 }
 
 /** What is wrong with a set of details, or null when they can be saved. */
-export function checkDetails(patch: Partial<Record<DetailKey, string | null>>): string | null {
+export function checkDetails(patch: DetailsPatch): string | null {
   for (const key of DETAIL_KEYS) {
     const value = cleanDetail(patch[key]);
     if (value !== null && value.length > DETAIL_MAX[key]) {
       return `${key.replace('_', ' ')} is longer than ${DETAIL_MAX[key]} characters.`;
     }
   }
+  if (patch.custom_fields !== undefined) return checkCustomFields(patch.custom_fields);
   return null;
 }
 

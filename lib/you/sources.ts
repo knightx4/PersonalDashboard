@@ -112,7 +112,7 @@ export const youSources: ModuleSources = {
       section: DETAILS,
       // One row per person, with no id to name it by.
       page: null,
-      note: 'A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
+      note: 'custom_fields is a jsonb list of {id, label, value}, the fields they named themselves (at most 30). A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
     },
     {
       table: 'you.places',
