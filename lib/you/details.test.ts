@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { linkedinHref, whyNotSaved } from './details';
+import { customFieldErrors, linkedinHref, whyNotSaved } from './details';
+
+describe('customFieldErrors', () => {
+  it('passes named fields, an empty value included', () => {
+    expect(customFieldErrors([{ id: 'a', label: 'Shirt size', value: '' }])).toEqual({});
+  });
+
+  it('asks for a name, and says which limit a long name or value passes', () => {
+    expect(
+      customFieldErrors([
+        { id: 'a', label: '  ', value: 'x' },
+        { id: 'b', label: 'n'.repeat(81), value: '' },
+        { id: 'c', label: 'Notes', value: 'v'.repeat(501) },
+      ]),
+    ).toEqual({
+      a: 'Give this field a name, or remove it.',
+      b: 'A name can be at most 80 characters.',
+      c: 'A value can be at most 500 characters.',
+    });
+  });
+});
 
 describe('linkedinHref', () => {
   it('keeps an address typed with http or https', () => {

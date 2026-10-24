@@ -122,6 +122,25 @@ export function checkCustomFields(raw: unknown): string | null {
   return null;
 }
 
+/**
+ * What is wrong with each of their own fields as the Details form holds them,
+ * by field id, in words to show under that field (plan #2531.2). An empty
+ * result means every field can be saved; checkCustomFields still guards the
+ * list as a whole.
+ */
+export function customFieldErrors(fields: CustomField[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const field of fields) {
+    const label = field.label.trim();
+    if (label === '') errors[field.id] = 'Give this field a name, or remove it.';
+    else if (label.length > CUSTOM_LABEL_MAX) errors[field.id] = `A name can be at most ${CUSTOM_LABEL_MAX} characters.`;
+    else if (field.value.trim().length > CUSTOM_VALUE_MAX) {
+      errors[field.id] = `A value can be at most ${CUSTOM_VALUE_MAX} characters.`;
+    }
+  }
+  return errors;
+}
+
 /** Trims a value; blank or not text is null, so an emptied field clears the detail. */
 export function cleanDetail(value: unknown): string | null {
   if (typeof value !== 'string') return null;
