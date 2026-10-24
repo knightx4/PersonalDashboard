@@ -62,7 +62,12 @@ const reported = {
   example: 'Carmakers idled plants in 2021 for want of microcontrollers made on old lines.',
   question: 'Why did the 2021 shortage hit carmakers harder than phone makers?',
   answer: 'Cars use older chips, whose lines had no spare capacity and got no new investment.',
+  predict: 'When demand for chips jumps, which run short first: the newest chips or old, cheap ones?',
+  predict_answer: 'The old, cheap ones. Their lines already run flat out and nobody builds new ones for them.',
 };
+
+/** The prediction as the report carries it (plan #2522.6). */
+const predict = { question: reported.predict, answer: reported.predict_answer };
 
 /** The same lesson as the feed stores it. */
 const stored = {
@@ -80,6 +85,7 @@ describe('reading the lesson report', () => {
   it('reads a lesson in the column shape, without a name', () => {
     expect(readLessonReport(reported, true)).toEqual({
       verdict: 'ready',
+      predict,
       card: {
         takeaway: stored.takeaway,
         context: stored.context,
@@ -148,6 +154,17 @@ describe('reading the lesson report', () => {
       verdict: 'dropped',
       reason: 'The lesson was not usable: a reason why of 901 characters.',
     });
+  });
+
+  it('leaves the prediction off when half of it is missing or it is too long, and still serves the lesson', () => {
+    for (const changed of [
+      { predict_answer: null },
+      { predict: ' ' },
+      { predict: 'x'.repeat(301) },
+      { predict_answer: 'x'.repeat(501) },
+    ]) {
+      expect(readLessonReport({ ...reported, ...changed }, true)).toMatchObject({ verdict: 'ready', predict: null });
+    }
   });
 
   it('leaves the question off when its answer is missing', () => {
@@ -256,6 +273,7 @@ describe('writing a lesson', () => {
     expect(result).toEqual({
       outcome: 'ready',
       card: stored,
+      predict,
       figures: [],
       source: { segmentId: 'seg-1', itemTitle: 'CHIPS and Science Act', heading: 'Manufacturing' },
     });

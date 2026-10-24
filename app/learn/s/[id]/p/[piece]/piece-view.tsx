@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Figures } from '@/components/learn/figure';
+import { LessonPredict } from '@/components/learn/lesson-predict';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -143,19 +144,25 @@ export function LessonCard({
       <h2 className="mt-0.5 font-display text-title tracking-tight break-words text-ink">{idea.name}</h2>
 
       {lesson ? (
-        <>
-          <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
-            <h3 className="text-small font-semibold text-accent">The takeaway</h3>
-            <p className="mt-1 text-body font-medium text-ink">{lesson.takeaway}</p>
-          </section>
-          {folded ? (
-            <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
-              <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
-            </Disclosure>
-          ) : (
-            <LessonBody lesson={lesson} figuresOpen={figuresOpen} />
+        // A lesson written with a prediction opens on it (plan #2522.6). A
+        // piece read short, which a placement found held, skips it.
+        <LessonPredict id={idea.conceptId} predict={folded ? null : lesson.predict}>
+          {(predicted) => (
+            <>
+              <section className="mt-3 rounded-control border-l-2 border-accent bg-accent-tint px-3 py-2.5">
+                <h3 className="text-small font-semibold text-accent">The takeaway</h3>
+                <p className="mt-1 text-body font-medium text-ink">{lesson.takeaway}</p>
+              </section>
+              {folded ? (
+                <Disclosure title="Open the lesson" className="mt-3" bodyClassName="">
+                  <LessonBody lesson={lesson} figuresOpen={figuresOpen} predicted={predicted} />
+                </Disclosure>
+              ) : (
+                <LessonBody lesson={lesson} figuresOpen={figuresOpen} predicted={predicted} />
+              )}
+            </>
           )}
-        </>
+        </LessonPredict>
       ) : (
         <>
           <p className="mt-2 text-body text-ink">{idea.claim}</p>
@@ -175,9 +182,19 @@ export function LessonCard({
 }
 
 /** A written lesson below its takeaway: the context, the hook, the example, its figures and Try this. */
-function LessonBody({ lesson, figuresOpen }: { lesson: NonNullable<PieceIdea['lesson']>; figuresOpen: boolean }) {
+function LessonBody({
+  lesson,
+  figuresOpen,
+  predicted,
+}: {
+  lesson: NonNullable<PieceIdea['lesson']>;
+  figuresOpen: boolean;
+  /** The guess beside what is true, which opens the context (plan #2522.6). */
+  predicted: ReactNode;
+}) {
   return (
     <>
+          {predicted}
           {lesson.context && <p className="mt-3 text-body text-ink">{lesson.context}</p>}
           {lesson.hook && <p className="mt-3 text-body font-semibold text-ink">{lesson.hook}</p>}
           {lesson.summary && <p className="mt-2 text-body text-ink">{lesson.summary}</p>}

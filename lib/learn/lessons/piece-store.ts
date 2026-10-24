@@ -8,6 +8,7 @@ import { pieceCheckCell, type PieceCellView } from './piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from './piece-cells-store';
 import { readStoredFigures } from '@/lib/learn/figures/registry';
 import type { FigureBlock } from '@/lib/learn/figures/types';
+import { lessonPredict, type LessonPredict } from '@/lib/learn/feed/card';
 import { needsResolving, pageResolveContext, resolveFigures } from '@/lib/learn/figures/resolve';
 
 /**
@@ -25,6 +26,8 @@ export type LessonView = {
   example: string | null;
   question: string | null;
   answer: string | null;
+  /** The guess the lesson opens with (plan #2522.6). Null on lessons written before, which open as they did. */
+  predict?: LessonPredict | null;
   /** Drawn after the example, each by its kind (plan #2321.1). Empty for none. */
   figures: FigureBlock[];
 };
@@ -99,6 +102,8 @@ type LessonRow = {
   example: string | null;
   check_question: string | null;
   check_answer: string | null;
+  predict_question: string | null;
+  predict_answer: string | null;
   drop_reason: string | null;
   figures: unknown;
 };
@@ -154,7 +159,7 @@ export async function loadLessons(
   if (conceptIds.length === 0) return found;
   const { data, error } = await learn
     .from('feed_cards')
-    .select('concept_id, status, takeaway, context, hook, summary, example, check_question, check_answer, drop_reason, figures')
+    .select('concept_id, status, takeaway, context, hook, summary, example, check_question, check_answer, predict_question, predict_answer, drop_reason, figures')
     .eq('user_id', userId)
     .eq('reason', 'lesson')
     .in('concept_id', [...conceptIds]);
@@ -173,6 +178,7 @@ export async function loadLessons(
         example: row.example,
         question: row.check_question,
         answer: row.check_answer,
+        predict: lessonPredict(row.predict_question, row.predict_answer),
         figures: readStoredFigures(row.figures),
       },
       dropped: null,

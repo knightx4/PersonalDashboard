@@ -17,6 +17,7 @@ import { ExternalChecksView } from '@/app/learn/settings/external/external-view'
 import { ExternalItemView, ExternalScoreView } from '@/app/learn/settings/external/sit-view';
 import { ReadingView } from '@/app/learn/r/[id]/reading-view';
 import { SetTab } from './set-tab';
+import { GuessedAlready } from './lesson-predict-seed';
 import { PiecePageView } from '@/app/learn/s/[id]/p/[piece]/piece-page-view';
 import { ProbeView } from '@/app/learn/s/[id]/probe/probe-view';
 import { VideosView } from '@/app/learn/videos/videos-view';
@@ -889,6 +890,51 @@ export function LearnPieceSurface() {
         reviews={reviews}
       />
     </PaidCostsProvider>
+  );
+}
+
+/**
+ * A lesson that opens on a guess (plan #2522.6): asked, with the lesson under
+ * it hidden, or guessed, with the guess beside what is true where the context
+ * starts. The answered one is kept under its own id, so the two drawings do
+ * not share a guess.
+ */
+export function LearnPiecePredictSurface({ answered = false }: { answered?: boolean }) {
+  const idea = piecePage.ideas[0]!;
+  const conceptId = answered ? `${idea.conceptId}-guessed` : idea.conceptId;
+  const page: PiecePage = {
+    ...piecePage,
+    ideas: [
+      {
+        ...idea,
+        conceptId,
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          predict: {
+            question: 'A café puts its coffee up by a tenth and sells a few fewer cups. Does it now take more money or less?',
+            answer:
+              'More, as long as the share of cups it loses is smaller than the tenth it added to the price. Most cafés lose far fewer than that, because regulars keep coming.',
+          },
+        },
+      },
+    ],
+  };
+  const view = (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView page={page} practice={practice} standing={{ practicePassed: false, checkPassed: false }} reviews={reviews} />
+    </PaidCostsProvider>
+  );
+  return answered ? (
+    <GuessedAlready id={conceptId} guess="Less, because some people will go somewhere cheaper.">
+      {view}
+    </GuessedAlready>
+  ) : (
+    view
   );
 }
 
