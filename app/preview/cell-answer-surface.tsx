@@ -161,6 +161,34 @@ const caseMoved: Moved = {
   doubted: [],
 };
 
+/** A first try at the case that forgot the debt (plan #2522.7). */
+const caseFirstTry =
+  'Discount each of the five years at 9%, then add a terminal value of year-five cash flow times 1.02 over 0.07, discounted back five years. ' +
+  'Enterprise value comes to about $1.9bn, and divided by 50m shares that gives about $38 a share.';
+
+const caseHint =
+  'Your discounting holds up. Look again at the step from the value of the whole firm to one share: who is paid before the shareholders are?';
+
+const caseExpected =
+  'Enterprise value of about $1.9bn, less $200m of net debt, leaves about $1.7bn of equity: about $34 a share.';
+
+/** What moved when the case is marked after the hint and Show the answer: the asked level, not reached. */
+const caseMissed: Moved = {
+  reached: [
+    {
+      cellId: 'dcf4',
+      topicName: 'Discounted cash flow',
+      level: 4,
+      how: 'missed',
+      asked: true,
+      quote: null,
+      via: null,
+      descriptor: check('Can build a DCF from given projections', 'Can move from enterprise value to a value per share'),
+    },
+  ],
+  doubted: [],
+};
+
 const NEXT = '/learn/now?practice=1';
 const RUN = '2026-10-15T09:00:00.000Z';
 const END = `/learn/now?practice=1&end=${encodeURIComponent(RUN)}`;
@@ -250,15 +278,37 @@ export function CellAnswerPreview({
   openFirstQuote,
   openWhy,
 }: {
-  state: 'asked' | 'loading' | 'error' | 'reached' | 'quote' | 'case' | 'case-reached';
+  state: 'asked' | 'loading' | 'error' | 'reached' | 'quote' | 'case' | 'case-reached' | 'case-hint' | 'case-after-hint' | 'case-revealed';
   pending?: boolean;
   openFirstQuote?: boolean;
   /** Draws the question as Practice Flow picks it, with its reason opened. */
   openWhy?: boolean;
 }) {
-  const isCase = state === 'case' || state === 'case-reached';
+  const isCase = state.startsWith('case');
+  const firstHowSure = { confidence: 0.75, reasoning: 'Value of the firm over the number of shares.' };
   const drawn: CellAnswerState =
-    state === 'case'
+    state === 'case-hint'
+      ? { moved: null, error: null, response: caseFirstTry, howSure: firstHowSure, hint: { hint: caseHint, response: caseFirstTry } }
+      : state === 'case-after-hint'
+        ? {
+            // Right after the hint: nothing written on the ladder (plan #2522.7).
+            moved: { reached: [], doubted: [] },
+            error: null,
+            response: caseAnswer,
+            howSure: { confidence: 0.75, reasoning: 'The debt holders are paid first, so it comes off before dividing.' },
+            afterHint: { right: true },
+            expected: caseExpected,
+          }
+        : state === 'case-revealed'
+          ? {
+              moved: caseMissed,
+              error: null,
+              response: caseFirstTry,
+              howSure: firstHowSure,
+              afterHint: { right: false, revealed: true },
+              expected: caseExpected,
+            }
+    : state === 'case'
       ? { moved: null, error: null }
       : state === 'case-reached'
         ? { moved: caseMoved, error: null, response: caseAnswer }
@@ -287,6 +337,8 @@ export function CellAnswerPreview({
         state={drawn}
         nextHref={NEXT}
         endHref={openWhy ? END : undefined}
+        // Practice holds its forward row at the foot (plan #2522.7); drawn so on the states that step added.
+        holdForward={state === 'case-hint' || state === 'case-after-hint' || state === 'case-revealed'}
         openWhy={openWhy}
         pending={pending ?? state === 'loading'}
         openFirstQuote={openFirstQuote ?? state === 'quote'}

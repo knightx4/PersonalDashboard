@@ -6,6 +6,7 @@ import { gradeWrittenAnswer, OPENING_MODEL, type WrittenGrade } from '@/lib/lear
 import { openingQuestionSchema, toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { AnswerSignals } from '@/lib/learn/confidence';
+import type { FirstTry } from '@/lib/learn/hint';
 import { reviewLines, reviewPrompt, type IdeaForReview } from './review';
 
 /**
@@ -124,6 +125,9 @@ export function markReviewQuestion(input: {
   response: string;
   /** How sure they were and how they reasoned, when given (plan #2522.3). */
   signals?: AnswerSignals | null;
+  /** Ask for a hint beside a wrong verdict, and the first try when this is the retry (plan #2522.7). */
+  hint?: boolean;
+  retry?: FirstTry | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -135,6 +139,8 @@ export function markReviewQuestion(input: {
     expected: input.expected,
     response: input.response,
     signals: input.signals,
+    hint: input.hint,
+    retry: input.retry,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,

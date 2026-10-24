@@ -28,7 +28,8 @@ import {
 
 type PassedPieceRow = { id: string; subject_id: string; title: string; concept_ids: string[]; passed_at: string };
 
-export const REVIEW_QUESTION_COLUMNS = 'id, concept_id, question, expected, response, correct, marked_why, confidence, reasoning';
+export const REVIEW_QUESTION_COLUMNS =
+  'id, concept_id, question, expected, response, correct, marked_why, confidence, reasoning, hints_used, first_try';
 
 /**
  * Put ideas on the review schedule the first time they are tested or
@@ -266,7 +267,7 @@ export async function recordReview(
   target: Pick<ReviewTarget, 'interval' | 'state'>,
   correct: boolean,
   now: Date = new Date(),
-  /** Right, but given at Guessing (plan #2522.3): the idea stays where it was. */
+  /** Right, but given at Guessing (plan #2522.3) or after a hint (plan #2522.7): the idea stays where it was. */
   guessed = false,
 ): Promise<number> {
   if (correct && guessed) {

@@ -6,7 +6,8 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { GraderCell, RawVerdict } from '@/lib/learn/levels/grade';
-import { readReasoning, signalLines, withReasoningRule, type AnswerSignals } from '@/lib/learn/confidence';
+import { readReasoning, signalLines, withReasoningRule, type AnswerSignals, type MissKind } from '@/lib/learn/confidence';
+import { HINT_TOOL_PROPERTIES, readHint, readMissKind, retryLines, withHintRule, type FirstTry } from '@/lib/learn/hint';
 
 /**
  * The grading call for an explanation (docs/LEARN-LEVELS-SPEC.md, "How
@@ -92,8 +93,24 @@ const gradeSchema = z.object({
 });
 
 export type LevelGradeResult =
-  | { ok: true; verdicts: RawVerdict[] }
+  | {
+      ok: true;
+      verdicts: RawVerdict[];
+      /** With `hint` asked for and C1 not met (plan #2522.7): one hint, null when none usable came back, and the kind of miss. */
+      hint?: string | null;
+      missKind?: MissKind | null;
+    }
   | { ok: false; detail: string };
+
+/**
+ * The hint rule as the cell grader reads it: the answer is wrong when C1 is
+ * not met, and the hint and the kind go beside the grades, once.
+ */
+export function withCellHintRule(system: string): string {
+  return `${withHintRule(system)}
+Here the answer is wrong when C1 is not met. Put the hint and the kind of miss
+beside the grades, once, about C1.`;
+}
 
 /** The prompt: each cell with its key and checks, then the question and the answer. */
 export function gradePrompt(input: {
@@ -105,6 +122,8 @@ export function gradePrompt(input: {
   figure?: string | null;
   /** How sure they were and how they reasoned, when given (plan #2522.3). */
   signals?: AnswerSignals | null;
+  /** The first try and its hint, when this answer is the retry after it (plan #2522.7). */
+  retry?: FirstTry | null;
 }): string {
   const lines: string[] = ['The cells:', ''];
   for (const cell of input.cells) {
@@ -142,7 +161,7 @@ export function gradePrompt(input: {
     );
   }
   lines.push('Their answer:', input.answer, '');
-  const extra = signalLines(input.signals);
+  const extra = [...signalLines(input.signals), ...retryLines(input.retry ?? null)];
   if (extra.length > 0) lines.push(...extra, '');
   lines.push(`Call ${TOOL}.`);
   return lines.join('\n');
@@ -166,8 +185,13 @@ export async function gradeCellAnswer(input: {
   scope?: 'cell' | 'course';
   /** How sure they were and how they reasoned, when given (plan #2522.3). */
   signals?: AnswerSignals | null;
+  /** Ask for a hint beside a C1 not met (plan #2522.7). */
+  hint?: boolean;
+  /** The first try and its hint, when this answer is the retry after it. */
+  retry?: FirstTry | null;
 }): Promise<LevelGradeResult> {
   const model = input.model ?? LEVEL_GRADE_MODEL;
+  const base = gradeSystem(input.scope ?? 'cell', readReasoning(input.signals?.reasoning) !== null);
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
@@ -175,7 +199,7 @@ export async function gradeCellAnswer(input: {
     response = await client.messages.create({
       model,
       max_tokens: 400 + 200 * input.cells.length,
-      system: gradeSystem(input.scope ?? 'cell', readReasoning(input.signals?.reasoning) !== null),
+      system: input.hint ? withCellHintRule(base) : base,
       tools: [
         {
           name: TOOL,
@@ -199,6 +223,7 @@ export async function gradeCellAnswer(input: {
                   required: ['cell', 'verdict'],
                 },
               },
+              ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
             },
             required: ['grades'],
           },
@@ -219,8 +244,13 @@ export async function gradeCellAnswer(input: {
   const parsed = gradeSchema.safeParse(block.input);
   if (!parsed.success) return { ok: false, detail: 'The grade came back malformed.' };
 
+  const verdicts = parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null }));
+  if (!input.hint) return { ok: true, verdicts };
+  const raw = block.input as { hint?: unknown; miss_kind?: unknown };
   return {
     ok: true,
-    verdicts: parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null })),
+    verdicts,
+    hint: readHint(raw.hint, input.expected ?? null),
+    missKind: readMissKind(raw.miss_kind),
   };
 }

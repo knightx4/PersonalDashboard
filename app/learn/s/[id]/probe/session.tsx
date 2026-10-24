@@ -9,6 +9,7 @@ import { KindBadge } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { WrittenAnswer } from '@/components/learn/written-answer';
+import { HintedNote, HintLine, RetryBox, RETRY_LABEL, REVEAL_LABEL } from '@/components/learn/hint-retry';
 import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
 import {
   answerQuestion,
@@ -206,6 +207,34 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
   );
 }
 
+/** Check again, after the hint on a case (plan #2522.7). */
+function RetryButton() {
+  const { pending, data } = useFormStatus();
+  const revealing = pending && data?.get('reveal') === '1';
+  return (
+    <DashAction
+      type="submit"
+      pending={pending && !revealing}
+      disabled={revealing}
+      paid="app/learn/s/[id]/probe/actions.ts#answerQuestion"
+      what="Cost of marking the answer"
+    >
+      {pending && !revealing ? 'Marking…' : RETRY_LABEL}
+    </DashAction>
+  );
+}
+
+/** Show the answer: records the first try as it was marked, at no cost. */
+function RevealButton() {
+  const { pending, data } = useFormStatus();
+  const revealing = pending && data?.get('reveal') === '1';
+  return (
+    <Button type="submit" name="reveal" value="1" formNoValidate variant="ghost" disabled={pending}>
+      {revealing ? 'Showing…' : REVEAL_LABEL}
+    </Button>
+  );
+}
+
 export function ProbeSession({
   subjectId,
   startingPercent,
@@ -228,7 +257,7 @@ export function ProbeSession({
   // The answer action carries the question forward, so whichever ran last is
   // the live one. An answer that could not be graded counts: the question is
   // still on screen and the reason it was not graded belongs under it.
-  const live = answerState.answered || answerState.error ? answerState : state;
+  const live = answerState.answered || answerState.error || answerState.hint ? answerState : state;
   const percent = live.percent ?? startingPercent;
   // Keyed on the question rather than on a flag, so asking for another one
   // brings the answer box back instead of leaving the last wave-through on
@@ -266,6 +295,23 @@ export function ProbeSession({
                       </div>
                     </>
                   )}
+                </>
+              ) : live.hint && !live.answered ? (
+                // A first miss on a case (plan #2522.7): the hint, the first
+                // answer back in the box, then Check again or Show the answer.
+                <>
+                  <HintLine hint={live.hint.hint} className="mt-0" />
+                  <RetryBox id={live.probeId ?? 'probe'} firstAnswer={live.hint.response} />
+                  <HowSureInput
+                    key={`${live.probeId}-retry`}
+                    id={live.probeId ?? 'probe'}
+                    kind="written"
+                    defaultValue={live.retryHowSure}
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <RetryButton />
+                    <RevealButton />
+                  </div>
                 </>
               ) : (
                 <WrittenAnswer
@@ -305,6 +351,12 @@ export function ProbeSession({
               <p className="text-ui font-semibold text-ink">
                 {live.answered.correct ? 'Right.' : live.answered.dontKnow ? 'You said you did not know.' : 'Not this time.'}
               </p>
+              <HintedNote
+                correct={live.answered.correct}
+                hintsUsed={live.answered.hintsUsed}
+                revealed={live.answered.revealed}
+                className="mt-1"
+              />
               <HowSureGiven howSure={live.answered.howSure} className="mt-1" />
               {/* Written when the question was, not in response to what was
                   picked. That is what makes it worth reading. On the applied

@@ -292,6 +292,17 @@ put and abandoned is not put again and settles nothing.
 - **The grader writes its sentence before its verdict**, and both are stored on
   the question beside what was typed. A concept page read a month later has the
   case, the answer expected, the answer given, and why it was marked as it was.
+- **A first miss earns one hint before the answer** (plan #2522.7). The grader
+  that marks it wrong also writes a hint aimed at where the answer went off and
+  labels the miss (`cue`, `wrong_idea`, `slip`, `careless`, `misconception`;
+  a wrong answer at Fairly sure or Certain is always `misconception`). The
+  case stays unanswered, with `hints_used` at 1 and the first try in
+  `first_try`, and the screen shows the hint, the first answer back in the box,
+  Check again and Show the answer. The retry is graded with the first try and
+  the hint in view; right after a hint counts as right and leaves the concept
+  at its rung. Show the answer records the first try as it was graded, without
+  a second call. A hint that repeats the expected answer is dropped and the
+  miss is recorded straight away. The rules are in `lib/learn/hint.ts`.
 - **A case about something you are already sure of can be waved through.** A
   button beside the answer box marks the concept `known`, established
   `declared`, and no model is called because nothing is typed and nothing is

@@ -6,6 +6,7 @@ import { Check, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
+import { Button } from '@/components/ui/button';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
 import type { PieceCheck } from '@/lib/learn/lessons/piece-check';
@@ -28,6 +29,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Figures } from '@/components/learn/figure';
 import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
+import { HintedNote, HintLine, RetryBox, RETRY_LABEL, REVEAL_LABEL } from '@/components/learn/hint-retry';
 import { NO_HOW_SURE, type HowSure } from '@/lib/learn/how-sure';
 
 /**
@@ -528,11 +530,13 @@ function PieceCheckCard({
 }) {
   const [check, setCheck] = useState(initialCheck);
   const [tested, setTested] = useState<number | null>(null);
-  const [response, setResponse] = useState('');
-  const [howSure, setHowSure] = useState<HowSure>(NO_HOW_SURE);
+  // A check left with its hint up opens on it, with the first try in the box (plan #2522.7).
+  const [response, setResponse] = useState(initialCheck?.hint?.response ?? '');
+  const [howSure, setHowSure] = useState<HowSure>(initialCheck?.hint ? (initialCheck.howSure ?? NO_HOW_SURE) : NO_HOW_SURE);
   const [error, setError] = useState<string | null>(null);
   const [asking, startAsking] = useTransition();
   const [marking, startMarking] = useTransition();
+  const [revealing, startRevealing] = useTransition();
 
   const ask = () =>
     startAsking(async () => {
@@ -556,9 +560,25 @@ function PieceCheckCard({
       }));
       if (result.check) {
         setCheck(result.check);
+        // A first miss comes back open with its hint: the first try stays in the box.
+        if (result.check.hint) setResponse(result.check.hint.response);
         if (result.tested !== undefined) setTested(result.tested);
         onAnswered(result);
       } else setError(result.error ?? 'Could not mark that.');
+    });
+
+  // Show the answer after the hint: the first try is marked as it was.
+  const reveal = () =>
+    startRevealing(async () => {
+      if (!check) return;
+      setError(null);
+      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, '', null, true).catch(() => ({
+        error: 'Could not show the answer. Check your connection.',
+      }));
+      if (result.check) {
+        setCheck(result.check);
+        onAnswered(result);
+      } else setError(result.error ?? 'Could not show the answer.');
     });
 
   const answered = check !== null && check.correct !== null;
@@ -591,7 +611,31 @@ function PieceCheckCard({
         </p>
       )}
 
-      {check && !answered && (
+      {check && !answered && check.hint && (
+        <>
+          <HintLine hint={check.hint.hint} />
+          <RetryBox id={check.id} firstAnswer={check.hint.response} value={response} onChange={setResponse} disabled={marking || revealing} />
+          <HowSureInput key={`${check.id}-retry`} id={check.id} kind="written" defaultValue={howSure} onChange={setHowSure} disabled={marking || revealing} />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <DashAction
+              type="button"
+              variant="primary"
+              onClick={answer}
+              pending={marking}
+              disabled={response.trim() === '' || revealing}
+              paid="app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck"
+              what="Cost of marking the answer"
+            >
+              {marking ? 'Marking…' : RETRY_LABEL}
+            </DashAction>
+            <Button type="button" variant="ghost" onClick={reveal} disabled={marking || revealing}>
+              {revealing ? 'Showing…' : REVEAL_LABEL}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {check && !answered && !check.hint && (
         <>
           <Field label="Your answer" id={`piece-check-${check.id}`} hint="A sentence or two, from memory.">
             <Textarea
@@ -631,6 +675,7 @@ function PieceCheckCard({
             )}
             {check.correct ? 'Right.' : 'Not yet.'}
           </p>
+          <HintedNote correct={check.correct} hintsUsed={check.hintsUsed} revealed={check.revealed} />
           {check.why && <p className="text-ui text-ink">{check.why}</p>}
           {check.expected && <p className="text-ui text-ink-muted">Expected: {check.expected}</p>}
           {check.cell && (
