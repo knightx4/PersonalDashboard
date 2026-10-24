@@ -6,6 +6,8 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { GraderCell, RawVerdict } from '@/lib/learn/levels/grade';
+import { readReasoning, signalLines, withReasoningRule, type AnswerSignals, type MissKind } from '@/lib/learn/confidence';
+import { HINT_TOOL_PROPERTIES, readHint, readMissKind, retryLines, withHintRule, type FirstTry } from '@/lib/learn/hint';
 
 /**
  * The grading call for an explanation (docs/LEARN-LEVELS-SPEC.md, "How
@@ -66,6 +68,19 @@ Call ${TOOL} once, with one entry per cell.`;
 const SYSTEM = system('cell');
 const COURSE_SYSTEM = system('course');
 
+/**
+ * The system prompt with the reasoning rule after it, for an answer that came
+ * with reasoning (plan #2522.3). Here a wrong answer is a not_met on C1, and
+ * the reason is the sentence saying which part of the reasoning does not hold.
+ */
+export function gradeSystem(scope: 'cell' | 'course', reasoning: boolean): string {
+  const base = scope === 'course' ? COURSE_SYSTEM : SYSTEM;
+  if (!reasoning) return base;
+  return `${withReasoningRule(base)}
+Here, grading it wrong means not_met on C1, with no quote, and a reason that
+names the part of the reasoning that does not hold.`;
+}
+
 const gradeSchema = z.object({
   grades: z.array(
     z.object({
@@ -78,8 +93,24 @@ const gradeSchema = z.object({
 });
 
 export type LevelGradeResult =
-  | { ok: true; verdicts: RawVerdict[] }
+  | {
+      ok: true;
+      verdicts: RawVerdict[];
+      /** With `hint` asked for and C1 not met (plan #2522.7): one hint, null when none usable came back, and the kind of miss. */
+      hint?: string | null;
+      missKind?: MissKind | null;
+    }
   | { ok: false; detail: string };
+
+/**
+ * The hint rule as the cell grader reads it: the answer is wrong when C1 is
+ * not met, and the hint and the kind go beside the grades, once.
+ */
+export function withCellHintRule(system: string): string {
+  return `${withHintRule(system)}
+Here the answer is wrong when C1 is not met. Put the hint and the kind of miss
+beside the grades, once, about C1.`;
+}
 
 /** The prompt: each cell with its key and checks, then the question and the answer. */
 export function gradePrompt(input: {
@@ -89,6 +120,10 @@ export function gradePrompt(input: {
   expected?: string | null;
   /** A figure question's figure and answer, written out (plan #2321.5); graded on the asked cell alone. */
   figure?: string | null;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
+  /** The first try and its hint, when this answer is the retry after it (plan #2522.7). */
+  retry?: FirstTry | null;
 }): string {
   const lines: string[] = ['The cells:', ''];
   for (const cell of input.cells) {
@@ -125,7 +160,10 @@ export function gradePrompt(input: {
       '',
     );
   }
-  lines.push('Their answer:', input.answer, '', `Call ${TOOL}.`);
+  lines.push('Their answer:', input.answer, '');
+  const extra = [...signalLines(input.signals), ...retryLines(input.retry ?? null)];
+  if (extra.length > 0) lines.push(...extra, '');
+  lines.push(`Call ${TOOL}.`);
   return lines.join('\n');
 }
 
@@ -145,8 +183,15 @@ export async function gradeCellAnswer(input: {
   model?: string;
   /** 'course' for a prompt about a whole course, whose cells are all its topics' levels (plan #2172.4.2). */
   scope?: 'cell' | 'course';
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
+  /** Ask for a hint beside a C1 not met (plan #2522.7). */
+  hint?: boolean;
+  /** The first try and its hint, when this answer is the retry after it. */
+  retry?: FirstTry | null;
 }): Promise<LevelGradeResult> {
   const model = input.model ?? LEVEL_GRADE_MODEL;
+  const base = gradeSystem(input.scope ?? 'cell', readReasoning(input.signals?.reasoning) !== null);
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
@@ -154,7 +199,7 @@ export async function gradeCellAnswer(input: {
     response = await client.messages.create({
       model,
       max_tokens: 400 + 200 * input.cells.length,
-      system: input.scope === 'course' ? COURSE_SYSTEM : SYSTEM,
+      system: input.hint ? withCellHintRule(base) : base,
       tools: [
         {
           name: TOOL,
@@ -178,6 +223,7 @@ export async function gradeCellAnswer(input: {
                   required: ['cell', 'verdict'],
                 },
               },
+              ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
             },
             required: ['grades'],
           },
@@ -198,8 +244,13 @@ export async function gradeCellAnswer(input: {
   const parsed = gradeSchema.safeParse(block.input);
   if (!parsed.success) return { ok: false, detail: 'The grade came back malformed.' };
 
+  const verdicts = parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null }));
+  if (!input.hint) return { ok: true, verdicts };
+  const raw = block.input as { hint?: unknown; miss_kind?: unknown };
   return {
     ok: true,
-    verdicts: parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null })),
+    verdicts,
+    hint: readHint(raw.hint, input.expected ?? null),
+    missKind: readMissKind(raw.miss_kind),
   };
 }

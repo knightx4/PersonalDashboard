@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { gradeOpeningAnswer, writeOpeningQuestions } from './opening-probe';
+import { gradeOpeningAnswer, gradeWrittenAnswer, writeOpeningQuestions } from './opening-probe';
 import { givesAwayAnswer, toWrittenQuestion } from './opening-payload';
+import { REASONING_RULE } from '@/lib/learn/confidence';
 
 /**
  * Ten questions from ten claims, and the grading of what somebody writes back.
@@ -279,5 +280,106 @@ describe('the check a question has to pass', () => {
   it('reports the model saying the claim is unusable', () => {
     const result = toWrittenQuestion({ question: 'q', expected: 'a', unusable: true });
     expect(result).toEqual({ ok: false, reason: 'unusable' });
+  });
+});
+
+describe('confidence and reasoning reach the written-answer grader (plan #2522.3)', () => {
+  function recording() {
+    const calls: { system: string; messages: { content: string }[] }[] = [];
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (args: { system: string; messages: { content: string }[] }) => {
+          calls.push(args);
+          return {
+            content: [{ type: 'tool_use', name: 'report_grade', input: { why: 'The reasoning does not hold.', correct: false } }],
+            usage: { input_tokens: 200, output_tokens: 40 },
+          };
+        }),
+      },
+    };
+    return { calls, client: client as never };
+  }
+
+  it('reads the reasoning with the answer, under the reasoning rule', async () => {
+    const { calls, client } = recording();
+    const result = await gradeOpeningAnswer({
+      claim: CLAIMS[0],
+      question: GOOD.question,
+      expected: GOOD.expected,
+      response: 'They barely move.',
+      signals: { confidence: 0.95, reasoning: 'Because prices fall first.' },
+      anthropicApiKey: 'test',
+      client,
+    });
+
+    expect(result.ok && result.why).toBe('The reasoning does not hold.');
+    expect(calls[0].system).toContain(REASONING_RULE);
+    expect(calls[0].messages[0].content).toContain('Because prices fall first.');
+    expect(calls[0].messages[0].content).toContain('Certain');
+  });
+
+  it('sends the prompt it always sent when nothing came with the answer', async () => {
+    const { calls, client } = recording();
+    await gradeOpeningAnswer({
+      claim: CLAIMS[0],
+      question: GOOD.question,
+      expected: GOOD.expected,
+      response: 'They barely move.',
+      anthropicApiKey: 'test',
+      client,
+    });
+
+    expect(calls[0].system).not.toContain(REASONING_RULE);
+    expect(calls[0].messages[0].content).not.toContain('Their reasoning');
+  });
+});
+
+describe('a hint beside a wrong verdict (plan #2522.7)', () => {
+  type Call = { system: string; tools: { input_schema: { properties: Record<string, unknown> } }[]; messages: { content: string }[] };
+  function replying(input: Record<string, unknown>) {
+    const calls: Call[] = [];
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (args: Call) => {
+          calls.push(args);
+          return { content: [{ type: 'tool_use', name: 'report_grade', input }], usage: { input_tokens: 200, output_tokens: 40 } };
+        }),
+      },
+    };
+    return { calls, client: client as never };
+  }
+  const base = {
+    system: 'MARK',
+    context: [],
+    question: 'What happens to the price?',
+    expected: 'It falls.',
+    anthropicApiKey: 'test',
+  };
+
+  it('asks for a hint and a kind, and hands both back on a miss', async () => {
+    const { calls, client } = replying({ why: 'Wrong way.', correct: false, hint: 'Who has more to sell?', miss_kind: 'wrong_idea' });
+    const result = await gradeWrittenAnswer({ ...base, response: 'It rises.', hint: true, client });
+    expect(result).toEqual({ ok: true, correct: false, why: 'Wrong way.', hint: 'Who has more to sell?', missKind: 'wrong_idea' });
+    expect(calls[0].system).toContain('WHEN THE ANSWER IS WRONG, ALSO WRITE ONE HINT');
+    expect(Object.keys(calls[0].tools[0].input_schema.properties)).toEqual(['why', 'correct', 'hint', 'miss_kind']);
+  });
+
+  it('drops a hint that hands over the expected answer', async () => {
+    const { client } = replying({ why: 'Wrong way.', correct: false, hint: 'Remember: it falls.', miss_kind: 'slip' });
+    const result = await gradeWrittenAnswer({ ...base, response: 'It rises.', hint: true, client });
+    expect(result.ok && result.hint).toBeNull();
+  });
+
+  it('puts the first try and its hint in a retry, and asks nothing new of a plain grade', async () => {
+    const { calls, client } = replying({ why: 'Right.', correct: true });
+    await gradeWrittenAnswer({
+      ...base,
+      response: 'It falls, more sellers.',
+      retry: { response: 'It rises.', why: null, hint: 'Who has more to sell?', kind: null },
+      client,
+    });
+    expect(calls[0].messages[0].content).toContain('This is their second try.');
+    expect(calls[0].system).toBe('MARK');
+    expect(Object.keys(calls[0].tools[0].input_schema.properties)).toEqual(['why', 'correct']);
   });
 });

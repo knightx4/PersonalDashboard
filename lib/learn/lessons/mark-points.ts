@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReasoning, withReasoningRule, type AnswerSignals } from '@/lib/learn/confidence';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { OPENING_MODEL } from '@/lib/learn/graph/opening-probe';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
@@ -49,6 +50,8 @@ export async function markAgainstPoints(input: {
   reference: string;
   handIn: HandIn;
   system?: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -60,7 +63,10 @@ export async function markAgainstPoints(input: {
     response = await client.messages.create({
       model: MARK_POINTS_MODEL,
       max_tokens: 1024,
-      system: input.system ?? MARK_POINTS_SYSTEM,
+      // The reasoning rule is added only when there is reasoning to read.
+      system: readReasoning(input.signals?.reasoning)
+        ? withReasoningRule(input.system ?? MARK_POINTS_SYSTEM)
+        : (input.system ?? MARK_POINTS_SYSTEM),
       tools: [
         {
           name: TOOL,
@@ -96,6 +102,7 @@ export async function markAgainstPoints(input: {
             reference: input.reference,
             handIn: input.handIn,
             tool: TOOL,
+            signals: input.signals,
           }),
         },
       ],

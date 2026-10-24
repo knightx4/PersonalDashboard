@@ -158,6 +158,14 @@ describe('a lesson', () => {
     expect(card.track).toEqual({ id: 'track-1', name: 'Economics' });
   });
 
+  it('opens on its prediction when it was written with one, and as before when not (plan #2522.6)', () => {
+    expect(
+      toFeedCard(lesson({ predict_question: ' Does a cap on rents mean more flats or fewer? ', predict_answer: 'Fewer.' }))!.predict,
+    ).toEqual({ question: 'Does a cap on rents mean more flats or fewer?', answer: 'Fewer.' });
+    expect(toFeedCard(lesson())!.predict).toBeNull();
+    expect(toFeedCard(lesson({ predict_question: 'A question with no answer?', predict_answer: ' ' }))!.predict).toBeNull();
+  });
+
   it('has no link and nothing to fold when it cites no section', () => {
     const card = toFeedCard(lesson())!;
     expect(card.link).toBeNull();

@@ -12,6 +12,10 @@ import {
 } from '@/lib/learn/lessons/review-store';
 import { markReviewQuestion, REVIEW_MODEL, writeReviewQuestion } from '@/lib/learn/lessons/write-review';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { cleanSignals, signalColumns, type AnswerSignals } from '@/lib/learn/confidence';
+import { rowHowSure } from '@/lib/learn/how-sure';
+import { holdsRung, readFirstTry, readHintsUsed } from '@/lib/learn/hint';
+import { finalMissKind, holdColumns, markTurn } from '@/lib/learn/hint-turn';
 
 /**
  * The presses on a review question (plan #1145), from Learn now and from the
@@ -97,13 +101,26 @@ export type AnswerReviewResult = {
  * Check my answer. Haiku marks what was written against the answer expected.
  * A right answer moves the idea's next question further out and a miss
  * brings it back tomorrow (`nextInterval`).
+ *
+ * A first wrong answer is not marked yet (plan #2522.7): the marker's hint
+ * comes back with the question still open, to try again. Right after a hint
+ * keeps the idea on the gap it was on, as a right guess does. Show the answer
+ * (`reveal`) marks the first try as it was marked, without marking it again.
  */
 // latency: pending
-export async function answerReview(questionId: string, response: string): Promise<AnswerReviewResult> {
+export async function answerReview(
+  questionId: string,
+  response: string,
+  /** How sure they were and how they reasoned, when the page asks (plan #2522.3). */
+  answerSignals?: AnswerSignals | null,
+  /** Show the answer after a hint: `response` and the signals are not read. */
+  reveal?: boolean,
+): Promise<AnswerReviewResult> {
   const user = await requireUser();
+  const signals = cleanSignals(answerSignals);
   const id = Id.safeParse(questionId);
   if (!id.success) return { error: 'Could not tell which question that was.' };
-  const answer = AnswerText.safeParse(response);
+  const answer = reveal ? ({ success: true, data: '' } as const) : AnswerText.safeParse(response);
   if (!answer.success) return { error: 'Write an answer first, in a sentence or two.' };
   const learn = await createLearnClient();
 
@@ -123,28 +140,59 @@ export async function answerReview(questionId: string, response: string): Promis
     const target = await loadReviewTarget(learn, user.id, row.concept_id);
     if (!target) return { error: 'This idea is no longer on the review schedule.' };
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { error: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
-
-    const spend = collectSpend();
-    const grade = await markReviewQuestion({
-      idea: target.idea,
-      question: row.question,
-      expected: row.expected,
-      response: answer.data,
-      anthropicApiKey: apiKey,
-      onSpend: spend.sink,
+    const hintsUsed = readHintsUsed(row.hints_used);
+    const first = readFirstTry(row.first_try);
+    const turn = await markTurn({
+      reveal: reveal === true,
+      first,
+      hintsUsed,
+      mark: async (wantHint) => {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) return { ok: false, detail: 'Marking an answer needs ANTHROPIC_API_KEY to be set.' };
+        const spend = collectSpend();
+        const grade = await markReviewQuestion({
+          idea: target.idea,
+          question: row.question,
+          expected: row.expected,
+          response: answer.data,
+          signals,
+          hint: wantHint,
+          retry: first,
+          anthropicApiKey: apiKey,
+          onSpend: spend.sink,
+        });
+        await recordLearnSpend(user.id, 'mark-review-question', spend.reports);
+        return grade;
+      },
     });
-    await recordLearnSpend(user.id, 'mark-review-question', spend.reports);
-    if (!grade.ok) return { error: `Marking failed: ${grade.detail}` };
+    if (!turn.ok) return { error: turn.error };
+    // Show the answer records what was said with the first try, off the row.
+    const given = reveal ? rowHowSure(row) : signals;
+
+    if (turn.hold) {
+      const { data: held, error: holdError } = await learn
+        .from('review_questions')
+        .update(holdColumns(turn.hold, answer.data, given, hintsUsed))
+        .eq('id', id.data)
+        .eq('user_id', user.id)
+        .is('response', null)
+        .select(REVIEW_QUESTION_COLUMNS);
+      if (holdError) return { error: `Saving the answer failed: ${holdError.message}` };
+      const kept = (held ?? [])[0] as ReviewQuestionRow | undefined;
+      return kept ? { question: toReviewQuestion(kept) } : { error: 'That question has been answered already.' };
+    }
+    const grade = turn.grade;
 
     const { data: marked, error: markError } = await learn
       .from('review_questions')
       .update({
-        response: answer.data,
+        response: reveal && first ? first.response : answer.data,
         correct: grade.correct,
         marked_why: grade.why,
         answered_at: new Date().toISOString(),
+        ...signalColumns(given, grade.correct),
+        miss_kind: finalMissKind(grade, given.confidence, first),
+        ...(reveal && first && { first_try: { ...first, revealed: true } }),
       })
       .eq('id', id.data)
       .eq('user_id', user.id)
@@ -155,7 +203,16 @@ export async function answerReview(questionId: string, response: string): Promis
     const saved = (marked ?? [])[0] as ReviewQuestionRow | undefined;
     if (!saved) return { error: 'That question has been answered already.' };
 
-    const nextInDays = await recordReview(learn, user.id, row.concept_id, target, grade.correct);
+    const nextInDays = await recordReview(
+      learn,
+      user.id,
+      row.concept_id,
+      target,
+      grade.correct,
+      new Date(),
+      // Right at Guessing or after a hint: the idea keeps the gap it was on.
+      holdsRung({ correct: grade.correct, confidence: given.confidence, hintsUsed }),
+    );
     return { question: toReviewQuestion(saved), nextInDays };
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Could not mark that.' };

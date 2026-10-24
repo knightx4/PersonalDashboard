@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nameMisconception, repeatedWrongAnswer } from './misconception';
+import { misconceptionBasis, nameMisconception, repeatedWrongAnswer } from './misconception';
 import type { ProbeRow } from './session';
 
 /**
@@ -152,5 +152,52 @@ describe('naming it', () => {
     const result = await ask(broken);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('error');
+  });
+});
+
+describe('when one answer is enough', () => {
+  it('fires on a wrong answer given at Fairly sure or Certain', () => {
+    expect(misconceptionBasis({ correct: false, confidence: 0.75 })).toBe('confident');
+    expect(misconceptionBasis({ correct: false, confidence: 0.95 })).toBe('confident');
+  });
+
+  it('fires on a wrong answer with reasoning beside it', () => {
+    expect(misconceptionBasis({ correct: false, confidence: 0.5, reasoning: 'It must stay.' })).toBe('reasoned');
+    expect(misconceptionBasis({ correct: false, reasoning: 'It must stay.' })).toBe('reasoned');
+  });
+
+  it('does not take reasoning given at Guessing as a position', () => {
+    expect(misconceptionBasis({ correct: false, confidence: 0.25, reasoning: 'no idea' })).toBeNull();
+  });
+
+  it('keeps the twice-picked rule for an answer with neither signal', () => {
+    expect(misconceptionBasis({ correct: false, confidence: 0.5, reasoning: '  ' })).toBeNull();
+    expect(misconceptionBasis({ correct: false })).toBeNull();
+    expect(misconceptionBasis({ correct: false, repeated: true })).toBe('repeated');
+  });
+
+  it('never fires on a right answer', () => {
+    expect(misconceptionBasis({ correct: true, confidence: 0.95, reasoning: 'x', repeated: true })).toBeNull();
+  });
+
+  it('passes the reasoning to the namer', async () => {
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: 'tool_use', name: 'name_misconception', input: { misconception: 'Believes it is permanent.' } }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const result = await nameMisconception({
+      concept: 'Phillips curve',
+      claim: 'The trade-off depends on expectations.',
+      wrongAnswer: 'It stays high',
+      questions: ['What happens?'],
+      reasoning: ['Because workers never adjust.'],
+      basis: 'reasoned',
+      anthropicApiKey: 'k',
+      client: { messages: { create } } as never,
+    });
+    expect(result.ok).toBe(true);
+    const content = create.mock.calls[0][0].messages[0].content as string;
+    expect(content).toContain('Because workers never adjust.');
+    expect(content).not.toContain('picked twice');
   });
 });

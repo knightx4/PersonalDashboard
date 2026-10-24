@@ -29,7 +29,7 @@ import { goalTrackIds, notPlanLessons } from './plan-lessons';
  */
 
 export const CARD_SELECT =
-  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, mentions, teach_back, depth, difficulty, ' +
+  'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, predict_question, predict_answer, mentions, teach_back, depth, difficulty, ' +
   'track_name, unit_title, subject_id, video_id, video_start_seconds, video_end_seconds, clip_note_segment_id, clip_said, clip_why, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +

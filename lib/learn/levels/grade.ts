@@ -20,6 +20,7 @@
  * (grade.test.ts).
  */
 
+import { isGuess } from '@/lib/learn/confidence';
 import {
   isHeld,
   questionFormat,
@@ -177,6 +178,27 @@ export function applyGradeRules(input: {
     }
   }
   return { write, dropped };
+}
+
+/**
+ * The guess rule (plan #2522.3), after the three above: an answer given at
+ * Guessing writes no met. A guess that lands shows nothing about what is
+ * held, so the ladder stays where it was; a not met still counts, because a
+ * miss at Guessing is still a miss. A right answer after a hint is held the
+ * same way (plan #2522.7): it counts as right, and the ladder does not climb. `held` is what was kept back, so the
+ * caller can still say the answer itself was right.
+ */
+export function holdGuessedMets(
+  write: readonly EvidenceToWrite[],
+  confidence: number | null | undefined,
+  /** Answered after a hint (plan #2522.7): its mets are held back the same way. */
+  hinted = false,
+): { write: EvidenceToWrite[]; held: EvidenceToWrite[] } {
+  if (!isGuess(confidence) && !hinted) return { write: [...write], held: [] };
+  return {
+    write: write.filter((w) => w.verdict !== 'met'),
+    held: write.filter((w) => w.verdict === 'met'),
+  };
 }
 
 /** A link to put up for review, with the evidence on both sides of it. */

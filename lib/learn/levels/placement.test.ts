@@ -72,6 +72,45 @@ describe('pickPlacement', () => {
     expect(topics.length).toBeLessThanOrEqual(PLACEMENT_QUESTIONS);
   });
 
+  describe('with confidence on the last answer (plan #2522.5)', () => {
+    const second = (verdict: Verdict, confidence: number | null | undefined, level = 4) => {
+      const ev: CellEvidence = { cellId: `rent${level}`, verdict, observedAt: '2026-10-01T10:00:00Z', confidence };
+      return pickPlacement(map([RENT], [ev]), { order: ['rent'], now: NOW, asked: 1 });
+    };
+
+    it('asks the first question at the middle', () => {
+      expect(pickPlacement(map([RENT]), { order: ['rent'], now: NOW, asked: 0 })).toMatchObject({ level: 4 });
+    });
+
+    it('jumps two levels on a right answer at Certain and at Fairly sure', () => {
+      expect(second('met', 0.95)).toMatchObject({ level: 6 });
+      expect(second('met', 0.75)).toMatchObject({ level: 6 });
+    });
+
+    it('moves one level on a right answer at Unsure and at Guessing', () => {
+      expect(second('met', 0.5)).toMatchObject({ level: 5 });
+      expect(second('met', 0.25)).toMatchObject({ level: 5 });
+    });
+
+    it('bisects without a confidence, and steps one level at Unsure from level 2', () => {
+      expect(second('met', null)).toMatchObject({ level: 6 });
+      expect(second('met', undefined)).toMatchObject({ level: 6 });
+      expect(second('met', 0.5, 2)).toMatchObject({ level: 3 });
+    });
+
+    it('does not jump past the lowest miss', () => {
+      const m = map([RENT], [
+        { cellId: 'rent4', verdict: 'met', observedAt: '2026-10-01T10:00:00Z', confidence: 0.95 },
+        { cellId: 'rent6', verdict: 'not_met', observedAt: '2026-10-01T09:00:00Z' },
+      ]);
+      expect(pickPlacement(m, { order: ['rent'], now: NOW, asked: 2 })).toMatchObject({ level: 5 });
+    });
+
+    it('narrows down on a miss whatever the confidence', () => {
+      expect(second('not_met', 0.95)).toMatchObject({ level: 2 });
+    });
+  });
+
   it('stops at eight questions', () => {
     expect(pickPlacement(map([RENT]), { order: ['rent'], now: NOW, asked: PLACEMENT_QUESTIONS })).toBeNull();
     expect(pickPlacement(map([RENT]), { order: ['rent'], now: NOW, asked: PLACEMENT_QUESTIONS - 1 })).not.toBeNull();

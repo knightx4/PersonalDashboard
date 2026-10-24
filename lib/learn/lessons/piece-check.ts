@@ -1,4 +1,7 @@
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
+import { isGuess, readConfidence } from '@/lib/learn/confidence';
+import { rowHint, type HintView } from '@/lib/learn/hint';
 
 /**
  * The check at the end of a piece (plan #1141, LEARN-LESSONS-SPEC "A piece is
@@ -78,7 +81,19 @@ export type PieceCheck = {
    * written before its goal had a territory, whose check is its own question.
    */
   cell: { topicId: string; topicName: string; level: number } | null;
+  /** How sure the person said they were and how they got there (plan #2522.2). */
+  howSure?: HowSure;
+  /** While a retry is open after a first miss: the hint and the first try (plan #2522.7). */
+  hint?: HintView | null;
+  /** Hints given before the answer: 1 once a hint was shown. */
+  hintsUsed?: number;
+  /** Recorded by Show the answer after the hint. */
+  revealed?: boolean;
 };
+
+/** The columns of learn.piece_checks the page reads. */
+export const PIECE_CHECK_COLUMNS =
+  'id, question, expected, response, correct, marked_why, confidence, reasoning, hints_used, first_try';
 
 /** The row as stored in learn.piece_checks. */
 export type PieceCheckRow = {
@@ -88,6 +103,12 @@ export type PieceCheckRow = {
   response: string | null;
   correct: boolean | null;
   marked_why: string | null;
+  /** 0 to 1, null when not given (learn_0190). */
+  confidence?: number | string | null;
+  reasoning?: string | null;
+  /** Hints given, and the first try while its hint is on screen (learn_0190, learn_0191). */
+  hints_used?: number | string | null;
+  first_try?: unknown;
 };
 
 /**
@@ -104,6 +125,8 @@ export function toPieceCheck(row: PieceCheckRow): PieceCheck {
     correct: row.correct,
     why: row.marked_why,
     cell: null,
+    howSure: rowHowSure(row),
+    ...rowHint(row, answered),
   };
 }
 
@@ -116,6 +139,14 @@ export type CellCheckRow = {
   answered_at: string | null;
   /** The first grader's verdicts, [{cell_id, verdict, quote, reason}]. */
   grade: unknown;
+  /** How sure they said they were, 0 to 1 (plan #2522.3). */
+  confidence?: number | string | null;
+  reasoning?: string | null;
+  /** Hints given, and the first try while its hint is on screen (learn_0190, learn_0191). */
+  hints_used?: number | string | null;
+  first_try?: unknown;
+  /** A case's expected answer: shown once a question that had a hint is answered (plan #2522.7). */
+  expected?: string | null;
 };
 
 /**
@@ -130,16 +161,29 @@ export function toCellPieceCheck(
   met: boolean,
 ): PieceCheck {
   const answered = row.answered_at !== null;
-  const verdicts = Array.isArray(row.grade) ? (row.grade as { cell_id?: unknown; reason?: unknown }[]) : [];
+  const verdicts = Array.isArray(row.grade)
+    ? (row.grade as { cell_id?: unknown; verdict?: unknown; reason?: unknown }[])
+    : [];
   const own = verdicts.find((v) => v.cell_id === row.cell_id);
   const reason = typeof own?.reason === 'string' && own.reason.trim() !== '' ? own.reason.trim() : null;
+  // A right answer given at Guessing writes no met (plan #2522.3), but it was
+  // still right: the grader's own verdict says so.
+  const guessedRight = isGuess(readConfidence(row.confidence)) && own?.verdict === 'met';
+  const hint = rowHint(row, answered);
+  // Right after a hint wrote no met either (plan #2522.7), and was right.
+  const hintedRight = hint.hintsUsed > 0 && own?.verdict === 'met';
   return {
     id: row.id,
     question: row.question,
-    expected: null,
+    // A case's expected answer is shown only once a question that had a hint
+    // is answered; before that, and for a question with none, it stays with
+    // the grader.
+    expected: answered && hint.hintsUsed > 0 ? (row.expected ?? null) : null,
     response: row.response,
-    correct: answered ? met : null,
+    correct: answered ? met || guessedRight || hintedRight : null,
     why: answered ? reason : null,
     cell,
+    howSure: rowHowSure(row),
+    ...hint,
   };
 }

@@ -21,6 +21,7 @@ import {
 import { CardNotes } from '@/components/learn/card-notes';
 import { Thread } from '@/components/thread/thread';
 import { ClipPlayer } from '@/components/learn/clip-player';
+import { LessonPredict } from '@/components/learn/lesson-predict';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { Card } from '@/components/ui/card';
@@ -700,6 +701,12 @@ function DeckCard({
             </p>
           )}
 
+          {/* A lesson written with a prediction opens on it (plan #2522.6):
+              the body below shows once it is guessed or skipped, and the
+              guess sits beside what is true where the context starts. */}
+          <LessonPredict id={card.id} predict={card.kind === 'lesson' ? card.predict : null}>
+          {(predicted) => (
+          <>
           {/* The one thing to remember, first, for someone who reads no
               further (note 125f60f2). Older cards have none. */}
           {card.takeaway && (
@@ -715,6 +722,7 @@ function DeckCard({
               has to stand on its own for someone who never saw the source. */}
           {/* The ideas the card leans on are underlined where they first
               appear, and a tap explains one (plan #1056). */}
+          {predicted}
           {card.context && (
             <p className="mt-3 text-body text-ink">
               <Mentioned parts={marked[1]} onTap={phrases.explain} />
@@ -849,6 +857,9 @@ function DeckCard({
               {card.licence ? ` · ${card.licence}` : ''}
             </p>
           )}
+          </>
+          )}
+          </LessonPredict>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {/* A brief's source is on the brief's reading list already, and
@@ -933,10 +944,9 @@ function DeckCard({
                 onClick={() => rate('too_hard')}
                 aria-label="Too hard"
                 aria-pressed={difficulty === 'too_hard'}
-                className={cn(
-                  'text-danger hover:bg-danger-tint hover:text-danger',
-                  difficulty === 'too_hard' && 'bg-danger-tint',
-                )}
+                // Coloured only once pressed (law 4): before that neither
+                // rating has been chosen, so neither claims a fault or a success.
+                className={cn(difficulty === 'too_hard' && 'bg-danger-tint text-danger hover:bg-danger-tint hover:text-danger')}
               >
                 {difficulty === 'too_hard' ? (
                   <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -953,10 +963,7 @@ function DeckCard({
                 onClick={() => rate('too_easy')}
                 aria-label="Too easy"
                 aria-pressed={difficulty === 'too_easy'}
-                className={cn(
-                  'text-positive hover:bg-positive-tint hover:text-positive',
-                  difficulty === 'too_easy' && 'bg-positive-tint',
-                )}
+                className={cn(difficulty === 'too_easy' && 'bg-positive-tint text-positive hover:bg-positive-tint hover:text-positive')}
               >
                 {difficulty === 'too_easy' ? (
                   <Check className="size-3.5" strokeWidth={1.75} aria-hidden />

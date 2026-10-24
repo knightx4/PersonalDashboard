@@ -9,6 +9,10 @@ import { Field, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import { nextDueLine, type DueReview, type ReviewQuestion } from '@/lib/learn/lessons/review';
+import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
+import { DashSays, HintedNote, HintLine, RetryBox, RETRY_LABEL, REVEAL_LABEL } from '@/components/learn/hint-retry';
+import { Button } from '@/components/ui/button';
+import { NO_HOW_SURE, type HowSure } from '@/lib/learn/how-sure';
 import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult } from './actions';
 
 /**
@@ -92,10 +96,13 @@ export function ReviewList({
 function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean }) {
   const [question, setQuestion] = useState<ReviewQuestion | null>(review.open);
   const [nextInDays, setNextInDays] = useState<number | null>(null);
-  const [response, setResponse] = useState('');
+  // A question left with its hint up opens on it, with the first try in the box (plan #2522.7).
+  const [response, setResponse] = useState(review.open?.hint?.response ?? '');
+  const [howSure, setHowSure] = useState<HowSure>(review.open?.hint ? (review.open.howSure ?? NO_HOW_SURE) : NO_HOW_SURE);
   const [error, setError] = useState<string | null>(null);
   const [asking, startAsking] = useTransition();
   const [marking, startMarking] = useTransition();
+  const [revealing, startRevealing] = useTransition();
 
   const ask = () =>
     startAsking(async () => {
@@ -106,6 +113,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
       if (result.question) {
         setQuestion(result.question);
         setResponse('');
+        setHowSure(NO_HOW_SURE);
       } else setError(result.error ?? 'Could not write a question.');
     });
 
@@ -113,13 +121,29 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
     startMarking(async () => {
       if (!question) return;
       setError(null);
-      const result: AnswerReviewResult = await answerReview(question.id, response).catch(() => ({
+      const result: AnswerReviewResult = await answerReview(question.id, response, howSure).catch(() => ({
         error: 'Could not mark that. Check your connection.',
       }));
       if (result.question) {
         setQuestion(result.question);
+        // A first miss comes back open with its hint: the first try stays in the box.
+        if (result.question.hint) setResponse(result.question.hint.response);
         if (result.nextInDays !== undefined) setNextInDays(result.nextInDays);
       } else setError(result.error ?? 'Could not mark that.');
+    });
+
+  // Show the answer after the hint: the first try is marked as it was.
+  const reveal = () =>
+    startRevealing(async () => {
+      if (!question) return;
+      setError(null);
+      const result: AnswerReviewResult = await answerReview(question.id, '', null, true).catch(() => ({
+        error: 'Could not show the answer. Check your connection.',
+      }));
+      if (result.question) {
+        setQuestion(result.question);
+        if (result.nextInDays !== undefined) setNextInDays(result.nextInDays);
+      } else setError(result.error ?? 'Could not show the answer.');
     });
 
   const answered = question !== null && question.correct !== null;
@@ -145,7 +169,47 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
         </p>
       )}
 
-      {question && !answered && (
+      {question && !answered && question.hint && (
+        <>
+          <HintLine hint={question.hint.hint} className="mt-3" />
+          <RetryBox
+            id={question.id}
+            firstAnswer={question.hint.response}
+            value={response}
+            onChange={setResponse}
+            disabled={marking || revealing}
+            rows={2}
+          />
+          <HowSureInput
+            key={`${question.id}-retry`}
+            id={question.id}
+            kind="written"
+            defaultValue={howSure}
+            onChange={setHowSure}
+            disabled={marking || revealing}
+            className="mt-3"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <DashAction
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={answer}
+              pending={marking}
+              disabled={response.trim() === '' || revealing}
+              paid="app/learn/review/actions.ts#answerReview"
+              what="Cost of marking the answer"
+            >
+              {marking ? 'Marking…' : RETRY_LABEL}
+            </DashAction>
+            <Button type="button" variant="ghost" size="sm" onClick={reveal} disabled={marking || revealing}>
+              {revealing ? 'Showing…' : REVEAL_LABEL}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {question && !answered && !question.hint && (
         <>
           <Field label="Your answer" id={fieldId} hint="A sentence or two, from memory.">
             <Textarea
@@ -157,6 +221,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
               disabled={marking}
             />
           </Field>
+          <HowSureInput key={question.id} id={question.id} kind="written" onChange={setHowSure} disabled={marking} className="mt-3" />
           <DashAction
             type="button"
             variant="primary"
@@ -175,7 +240,13 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
 
       {question && answered && (
         <div className="mt-2 space-y-1" aria-live="polite">
-          {question.response && <p className="text-ui text-ink-muted">You wrote: {question.response}</p>}
+          {question.response && (
+            <div>
+              <p className="text-small text-ink-muted">You wrote</p>
+              <blockquote className="mt-1 border-l-2 border-border pl-3 text-body text-ink">{question.response}</blockquote>
+            </div>
+          )}
+          <HowSureGiven howSure={question.howSure} />
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', question.correct ? 'text-ink' : 'text-ink-muted')}>
             {question.correct ? (
               <Check className="size-4" strokeWidth={1.75} aria-hidden />
@@ -184,7 +255,8 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
             )}
             {question.correct ? 'Right.' : 'Not this time.'}
           </p>
-          {question.why && <p className="text-ui text-ink">{question.why}</p>}
+          <HintedNote correct={question.correct} hintsUsed={question.hintsUsed} revealed={question.revealed} />
+          {question.why && <DashSays>{question.why}</DashSays>}
           {question.expected && <p className="text-ui text-ink-muted">Expected: {question.expected}</p>}
           {nextInDays !== null && <p className="text-small text-ink-muted">{nextDueLine(nextInDays)}</p>}
         </div>

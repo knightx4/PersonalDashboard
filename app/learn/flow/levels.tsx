@@ -188,6 +188,9 @@ export async function LevelsFlow({
       asked={{ ...asked.asked, why: [whyLine(picked, now), asked.asked.role ? roleWhy(asked.asked.role) : null].filter(Boolean).join(' ') }}
       nextHref={practiceHref({ ...scopeHref, run: runStart, after: asked.asked.questionId })}
       endHref={practiceHref({ ...scopeHref, end: runStart })}
+      // The forward row in one place on every item, as a placement holds it:
+      // a hint and its retry make an item taller than the question was (plan #2522.7).
+      holdForward
     />
   );
 }

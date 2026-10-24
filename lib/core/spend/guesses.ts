@@ -136,6 +136,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'grade-quiz-answer': run(HAIKU, 1_500, 200),
   'write-applied-case': run(HAIKU, 2_000, 500),
   'grade-applied-answer': run(HAIKU, 2_000, 300),
+  'check-picked-reasoning': run(HAIKU, 1_200, 80),
   'grade-cell-answer': run(HAIKU, 3_000, 600),
   // An explanation of one course against levels 1 to 3 of up to eight topics
   // (plan #2172.4.2): twenty-four cells in, a verdict on each out.

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { signalLines, type AnswerSignals } from '@/lib/learn/confidence';
 
 /**
  * Marking a piece of work point by point (plan #1142). Pure, so the prompt and
@@ -50,7 +51,10 @@ export function markPointsPrompt(input: {
   reference: string;
   handIn: HandIn;
   tool: string;
+  /** How sure they were and how they reasoned, when given (plan #2522.3). */
+  signals?: AnswerSignals | null;
 }): string {
+  const extra = signalLines(input.signals);
   return [
     ...input.context,
     ...(input.context.length > 0 ? [''] : []),
@@ -64,6 +68,7 @@ export function markPointsPrompt(input: {
     input.reference.trim(),
     '',
     ...handInLines(input.handIn),
+    ...(extra.length > 0 ? ['', ...extra] : []),
     '',
     `Call ${input.tool} with a mark for every point, by its number.`,
   ].join('\n');

@@ -240,7 +240,7 @@ export async function loadPieceCellsAndLadder(
 }
 
 const CELL_CHECK_COLUMNS =
-  'id, cell_id, question, response, answered_at, grade, cell:topic_cells(level, topic:topics(id, name))';
+  'id, cell_id, question, expected, response, answered_at, grade, confidence, reasoning, hints_used, first_try, cell:topic_cells(level, topic:topics(id, name))';
 
 type CellCheckJoined = CellCheckRow & {
   cell: { level: number; topic: { id: string; name: string } | null } | null;

@@ -5,6 +5,7 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ProbeRow } from '@/lib/learn/graph/session';
 import { MODELS } from '@/lib/core/models';
+import { GUESS_MAX, isMisconceptionCandidate } from '@/lib/learn/confidence';
 
 /**
  * The same wrong answer, twice.
@@ -16,15 +17,22 @@ import { MODELS } from '@/lib/core/models';
  * read straight past the part that contradicts you, because you already know
  * what that part says.
  *
- * It fires on a repeat, never on a single miss. Once is a slip, a misread
- * question, a mis-click. Twice on the same option is a position.
+ * Without anything else to go on it fires on a repeat, never on a single miss.
+ * Once is a slip, a misread question, a mis-click. Twice on the same option is
+ * a position. An answer can carry more than the option, though (plan #2522.4):
+ * a wrong answer given at Fairly sure or Certain is a position held with
+ * confidence, and a wrong answer with the person's own reasoning beside it
+ * shows what they were thinking. Either is enough alone, and the reasoning goes
+ * to the namer, so the sentence is about what they wrote rather than a guess
+ * from the option.
  */
 
 const MODEL = MODELS.learnMisconception;
 const TOOL_NAME = 'name_misconception';
 
-const SYSTEM = `Somebody has answered questions about one idea and picked the same
-wrong answer twice. Name what they appear to believe.
+const SYSTEM = `Somebody has answered a question about one idea wrongly. It is either the
+same wrong answer picked twice, one wrong answer they were sure of, or one wrong
+answer with their reasoning written beside it. Name what they appear to believe.
 
 ONE SENTENCE, in the second person, describing the belief itself rather than
 the mistake: "Believes the trade-off is permanent rather than expectations-
@@ -39,10 +47,40 @@ the one thing to look for.
 DO NOT SCOLD, and do not soften. This is a note somebody reads about
 themselves, months later, next to a claim they are trying to learn.
 
-IF THE TWO WRONG ANSWERS DO NOT ADD UP to a coherent belief -- they look like
+WHEN THEIR REASONING IS GIVEN, NAME THE BELIEF IT SHOWS, in their terms, rather
+than the belief the wrong option would suggest on its own.
+
+IF THE WRONG ANSWERS DO NOT ADD UP to a coherent belief -- they look like
 carelessness rather than a position -- set unclear true and name nothing. A
 made-up misconception is worse than none: it is a sentence about somebody's
 mind that they will believe.`;
+
+/** Why an answer is worth naming a misconception from. */
+export type MisconceptionBasis = 'confident' | 'reasoned' | 'repeated';
+
+/**
+ * Whether this answer is worth a naming call, and on what ground. Pure.
+ *
+ * Only a wrong answer ever is. A wrong answer at Fairly sure or Certain
+ * stands alone (`confident`). One with reasoning beside it stands alone too
+ * (`reasoned`) unless it was given as a guess, since a guess says nothing
+ * about what is believed. Anything else needs the same wrong option twice
+ * (`repeated`), which is the rule an answer with neither signal has always
+ * followed.
+ */
+export function misconceptionBasis(input: {
+  correct: boolean;
+  confidence?: number | null;
+  reasoning?: string | null;
+  repeated?: boolean;
+}): MisconceptionBasis | null {
+  if (input.correct) return null;
+  if (isMisconceptionCandidate({ correct: false, confidence: input.confidence })) return 'confident';
+  const guessed = typeof input.confidence === 'number' && input.confidence <= GUESS_MAX;
+  if (!guessed && (input.reasoning ?? '').trim() !== '') return 'reasoned';
+  if (input.repeated) return 'repeated';
+  return null;
+}
 
 export type MisconceptionResult =
   | { ok: true; misconception: string }
@@ -95,6 +133,10 @@ export async function nameMisconception(input: {
   wrongAnswer: string;
   /** The questions where it was picked, so the shape of the error is visible. */
   questions: string[];
+  /** What they wrote beside the wrong answer(s), when they wrote anything. */
+  reasoning?: string[];
+  /** Why this is being named; read by the prompt only to word the opening line. */
+  basis?: MisconceptionBasis;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -130,10 +172,15 @@ export async function nameMisconception(input: {
             '',
             `The claim: ${input.claim}`,
             '',
-            `The answer they picked twice: ${input.wrongAnswer}`,
+            input.basis && input.basis !== 'repeated'
+              ? `The wrong answer they gave${input.basis === 'confident' ? ' while sure of it' : ''}: ${input.wrongAnswer}`
+              : `The answer they picked twice: ${input.wrongAnswer}`,
             '',
-            'The questions where they picked it:',
+            'The questions where they gave it:',
             ...input.questions.map((question) => `- ${question}`),
+            ...(input.reasoning && input.reasoning.length > 0
+              ? ['', 'Their reasoning, written beside the answer:', ...input.reasoning.map((r) => `- ${r}`)]
+              : []),
             '',
             `Call ${TOOL_NAME}.`,
           ].join('\n'),
@@ -160,7 +207,7 @@ export async function nameMisconception(input: {
     return {
       ok: false,
       reason: 'unclear',
-      detail: 'Those two answers do not add up to a belief worth naming.',
+      detail: 'Those answers do not add up to a belief worth naming.',
     };
   }
 

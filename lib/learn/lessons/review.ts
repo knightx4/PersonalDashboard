@@ -1,3 +1,5 @@
+import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
+import { rowHint, type HintView } from '@/lib/learn/hint';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 
 /**
@@ -55,6 +57,15 @@ export function nextInterval(current: number | null, correct: boolean): number {
   if (!correct || current === null || current < 1) return REVIEW_STEPS[0];
   const next = REVIEW_STEPS.find((step) => step > current);
   return next ?? Math.min(current * 2, REVIEW_MAX_DAYS);
+}
+
+/**
+ * The gap after a right answer given at Guessing (plan #2522.3): the gap the
+ * idea was already on, so it is neither pushed out nor pulled back. A guess
+ * that lands shows nothing either way.
+ */
+export function heldInterval(current: number | null): number {
+  return current === null || current < 1 ? REVIEW_STEPS[0] : current;
 }
 
 /** Today as a UTC date, `YYYY-MM-DD`. */
@@ -118,7 +129,11 @@ export function reviewPrompt(idea: IdeaForReview, asked: readonly string[], tool
   return [
     ...reviewLines(idea),
     ...(earlier.length > 0
-      ? ['', 'Already asked about this idea, so ask something else:', ...earlier.map((question) => `- ${question}`)]
+      ? [
+          '',
+          'Already asked about this idea. Work out the situation each one was set in, and set yours in a different one:',
+          ...earlier.map((question) => `- ${question}`),
+        ]
       : []),
     '',
     `Call ${tool}.`,
@@ -134,6 +149,14 @@ export type ReviewQuestion = {
   response: string | null;
   correct: boolean | null;
   why: string | null;
+  /** How sure the person said they were and how they got there (plan #2522.2). */
+  howSure?: HowSure;
+  /** While a retry is open after a first miss: the hint and the first try (plan #2522.7). */
+  hint?: HintView | null;
+  /** Hints given before the answer: 1 once a hint was shown. */
+  hintsUsed?: number;
+  /** Recorded by Show the answer after the hint. */
+  revealed?: boolean;
 };
 
 /** The row as stored in learn.review_questions. */
@@ -145,6 +168,12 @@ export type ReviewQuestionRow = {
   response: string | null;
   correct: boolean | null;
   marked_why: string | null;
+  /** 0 to 1, null when not given (learn_0190). */
+  confidence?: number | string | null;
+  reasoning?: string | null;
+  /** Hints given, and the first try while its hint is on screen (learn_0190, learn_0191). */
+  hints_used?: number | string | null;
+  first_try?: unknown;
 };
 
 /** The row as the page is given it, with the expected answer held back until answered. */
@@ -157,6 +186,8 @@ export function toReviewQuestion(row: ReviewQuestionRow): ReviewQuestion {
     response: row.response,
     correct: row.correct,
     why: row.marked_why,
+    howSure: rowHowSure(row),
+    ...rowHint(row, answered),
   };
 }
 
@@ -195,10 +226,28 @@ export function pickDue(
   for (const piece of [...pieces].sort((a, b) => a.passedAt.localeCompare(b.passedAt))) {
     for (const conceptId of piece.conceptIds) if (!firstPiece.has(conceptId)) firstPiece.set(conceptId, piece);
   }
-  return [...due]
+  const ordered = [...due]
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.conceptId.localeCompare(b.conceptId))
     .filter((candidate) => !options.subjectId || candidate.subjectId === options.subjectId)
     .filter((candidate) => !options.skip?.has(candidate.conceptId))
-    .slice(0, options.limit)
     .map((candidate) => ({ ...candidate, piece: firstPiece.get(candidate.conceptId) ?? null }));
+  return spreadPieces(ordered).slice(0, options.limit);
+}
+
+/**
+ * Reorder a due list, already in due order, so two ideas from one piece never
+ * sit side by side while another piece has one due (plan #2522.8). Each place
+ * takes the earliest idea left whose piece differs from the one before; only
+ * when every idea left is from that piece does it follow itself. Ideas no
+ * piece taught have no piece to repeat.
+ */
+export function spreadPieces<T extends { piece: { id: string } | null }>(ordered: readonly T[]): T[] {
+  const left = [...ordered];
+  const out: T[] = [];
+  while (left.length > 0) {
+    const last = out.length > 0 ? out[out.length - 1].piece?.id : undefined;
+    const at = left.findIndex((entry) => !entry.piece || entry.piece.id !== last);
+    out.push(...left.splice(at === -1 ? 0 : at, 1));
+  }
+  return out;
 }

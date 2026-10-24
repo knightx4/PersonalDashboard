@@ -1,3 +1,4 @@
+import type { AskState } from '@/app/learn/s/[id]/probe/actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { tableKind } from '@/lib/learn/figures/kinds/table';
 import { figureKind } from '@/lib/learn/figures/registry';
@@ -17,6 +18,7 @@ import { ExternalChecksView } from '@/app/learn/settings/external/external-view'
 import { ExternalItemView, ExternalScoreView } from '@/app/learn/settings/external/sit-view';
 import { ReadingView } from '@/app/learn/r/[id]/reading-view';
 import { SetTab } from './set-tab';
+import { GuessedAlready } from './lesson-predict-seed';
 import { PiecePageView } from '@/app/learn/s/[id]/p/[piece]/piece-page-view';
 import { ProbeView } from '@/app/learn/s/[id]/probe/probe-view';
 import { VideosView } from '@/app/learn/videos/videos-view';
@@ -892,6 +894,51 @@ export function LearnPieceSurface() {
   );
 }
 
+/**
+ * A lesson that opens on a guess (plan #2522.6): asked, with the lesson under
+ * it hidden, or guessed, with the guess beside what is true where the context
+ * starts. The answered one is kept under its own id, so the two drawings do
+ * not share a guess.
+ */
+export function LearnPiecePredictSurface({ answered = false }: { answered?: boolean }) {
+  const idea = piecePage.ideas[0]!;
+  const conceptId = answered ? `${idea.conceptId}-guessed` : idea.conceptId;
+  const page: PiecePage = {
+    ...piecePage,
+    ideas: [
+      {
+        ...idea,
+        conceptId,
+        lesson: idea.lesson && {
+          ...idea.lesson,
+          predict: {
+            question: 'A café puts its coffee up by a tenth and sells a few fewer cups. Does it now take more money or less?',
+            answer:
+              'More, as long as the share of cups it loses is smaller than the tenth it added to the price. Most cafés lose far fewer than that, because regulars keep coming.',
+          },
+        },
+      },
+    ],
+  };
+  const view = (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#askPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView page={page} practice={practice} standing={{ practicePassed: false, checkPassed: false }} reviews={reviews} />
+    </PaidCostsProvider>
+  );
+  return answered ? (
+    <GuessedAlready id={conceptId} guess="Less, because some people will go somewhere cheaper.">
+      {view}
+    </GuessedAlready>
+  ) : (
+    view
+  );
+}
+
 /** The piece's check asked on one of its cells and answered right (plan #2138.13). */
 export function LearnPieceCellCheckSurface() {
   return (
@@ -915,6 +962,7 @@ export function LearnPieceCellCheckSurface() {
             correct: true,
             why: 'The answer works out both percentage changes, gets 0.5 and ties the inelastic reading to the rise in takings.',
             cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+            howSure: { confidence: 0.95, reasoning: null },
           },
         }}
         practice={practice}
@@ -1132,8 +1180,159 @@ export function LearnMapSurface({ undated = false, pressed }: { undated?: boolea
 
 // ---- Questions on a subject ---------------------------------------------------------
 
-export function LearnProbeSurface() {
-  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} />;
+const probeAsked: AskState = {
+  percent: 38,
+  probeId: '00000000-0000-4000-8000-000000002522',
+  conceptId: '00000000-0000-4000-8000-000000002523',
+  conceptName: 'Price elasticity of demand',
+  question: 'A cinema raises ticket prices by 10% and sells 4% fewer tickets. What happens to its takings?',
+  options: [
+    'They rise, because demand is inelastic at this price',
+    'They fall, because fewer tickets are sold',
+    'They stay the same, because the two changes cancel out',
+    'It cannot be said without knowing the cost of each screening',
+  ],
+};
+
+/**
+ * Questions on a subject (plan #1602), and with a question on screen (plan
+ * #2522.2): the options, how sure you are under them, then Check my answer
+ * or I don't know; once answered, what you said beside the mark.
+ */
+export function LearnProbeSurface({ state }: { state?: 'asked' | 'answered' | 'dont-know' } = {}) {
+  const initial: AskState | undefined =
+    state === 'asked'
+      ? probeAsked
+      : state === 'answered'
+        ? {
+            ...probeAsked,
+            percent: 44,
+            answered: {
+              correct: true,
+              reason: 'Price rose more than quantity fell, so each lost sale is outweighed by the dearer tickets: demand is inelastic here.',
+              correctIndex: 0,
+              chosenIndex: 0,
+              weight: 1,
+              howSure: {
+                confidence: 0.75,
+                reasoning: 'Ten per cent more on every ticket against four per cent fewer tickets, so the price side wins.',
+              },
+            },
+          }
+        : state === 'dont-know'
+          ? {
+              ...probeAsked,
+              answered: {
+                correct: false,
+                reason: 'Price rose more than quantity fell, so each lost sale is outweighed by the dearer tickets: demand is inelastic here.',
+                correctIndex: 0,
+                dontKnow: true,
+                weight: 1,
+                howSure: { confidence: null, reasoning: null },
+              },
+            }
+          : undefined;
+  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} initial={initial} />;
+}
+
+/**
+ * The piece's check asked and not yet answered (plan #2522.2): the box for
+ * the answer, then how sure you are and how you got there, then Check my
+ * answer.
+ */
+export function LearnPieceCheckAskedSurface() {
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          check: {
+            id: '00000000-0000-4000-8000-000000002524',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response: null,
+            correct: null,
+            why: null,
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
+  );
+}
+
+/**
+ * An applied case missed once (plan #2522.7): the hint, the first answer back
+ * in the box, how sure as it was said, then Check again and Show the answer.
+ */
+export function LearnProbeHintSurface() {
+  const first =
+    'They fall. Fewer people are buying tickets, so the cinema takes in less money overall even at the higher price.';
+  const initial: AskState = {
+    percent: 38,
+    probeId: '00000000-0000-4000-8000-000000002527',
+    conceptId: '00000000-0000-4000-8000-000000002523',
+    conceptName: 'Price elasticity of demand',
+    situation:
+      'A small cinema in a market town puts its evening ticket price up from £10 to £11. Over the next month it sells 4% fewer evening tickets than the month before, with the same films showing.',
+    question: 'What happens to its takings from evening tickets, and why?',
+    hint: {
+      hint: 'You have looked at how many tickets were sold. Now set that against how much more each ticket brings in: which of the two changes is bigger?',
+      response: first,
+    },
+    retryHowSure: { confidence: 0.75, reasoning: 'Fewer tickets means less money.' },
+  };
+  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} initial={initial} />;
+}
+
+/**
+ * A piece's check missed once (plan #2522.7): the hint, the first answer in
+ * the box to change, then Check again and Show the answer.
+ */
+export function LearnPieceCheckHintSurface() {
+  const first = 'Elasticity is 0.5 so demand is elastic, and takings fell because they sold 30 fewer seats.';
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          check: {
+            id: '00000000-0000-4000-8000-000000002528',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response: null,
+            correct: null,
+            why: null,
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+            howSure: { confidence: 0.5, reasoning: null },
+            hint: {
+              hint: 'Your elasticity figure is right. Check what a figure below one says about demand, then work out the takings on each night rather than counting seats.',
+              response: first,
+            },
+            hintsUsed: 1,
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
+  );
 }
 
 // ---- Videos ---------------------------------------------------------------------------
