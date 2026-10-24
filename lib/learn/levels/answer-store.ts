@@ -32,6 +32,8 @@ import {
   type StoredFigureQuestion,
 } from '@/lib/learn/figures/question';
 import { cleanSignals, signalColumns, type AnswerSignals, type CleanSignals } from '@/lib/learn/confidence';
+import { misconceptionBasis, nameMisconception } from '@/lib/learn/graph/misconception';
+import { setMisconception } from '@/lib/learn/graph/session';
 import { pageResolveContext } from '@/lib/learn/figures/resolve';
 import { writeFigureQuestion } from '@/lib/learn/levels/figure-question-call';
 
@@ -274,6 +276,8 @@ export type AnswerCellResult =
        * miss_kind as 'misconception' for the next step to name (plan #2522.3).
        */
       misconceptionCandidate?: boolean;
+      /** What the answer showed they believe, when it was wrong and sure or reasoned (plan #2522.4). */
+      misconception?: string;
     }
   | { ok: false; error: string };
 
@@ -427,13 +431,76 @@ export async function answerCell(
   }
 
   const after = readCells({ ...map, evidence: [...map.evidence, ...written] });
+  const misconception = askedMet
+    ? undefined
+    : await nameCellMisconception(learn, userId, {
+        cell: cells[0],
+        question: question.question,
+        response,
+        signals,
+        anthropicApiKey: input.anthropicApiKey,
+        onSpend: input.onSpend,
+      });
   return {
     ok: true,
     moved: whatMoved({ map, askedCellId: question.cell_id, before, after, written: write, reviews }),
+    ...(misconception ? { misconception } : {}),
     ...(figure ? { answer: figureAnswerLabel(figure) } : {}),
     ...(guessed ? { guessed: true } : {}),
     ...(signalled.miss_kind === 'misconception' ? { misconceptionCandidate: true } : {}),
   };
+}
+
+/**
+ * Name what a wrong answer to a cell question shows, when it was given sure
+ * or with reasoning (plan #2522.4). A cell question has no repeat to wait for.
+ * The sentence is kept on the cell's claim when the cell has exactly one idea
+ * on it; with several there is no telling which one it is about, so it is
+ * handed back for the page and stored nowhere. Never throws: the answer is
+ * already saved, and a belief that could not be named loses a sentence only.
+ */
+async function nameCellMisconception(
+  learn: LearnSupabaseClient,
+  userId: string,
+  input: {
+    cell: { cellId: string; topicName: string; level: number; descriptor: readonly string[] };
+    question: string;
+    response: string;
+    signals: CleanSignals;
+    anthropicApiKey: string;
+    onSpend?: SpendSink;
+  },
+): Promise<string | undefined> {
+  const basis = misconceptionBasis({
+    correct: false,
+    confidence: input.signals.confidence,
+    reasoning: input.signals.reasoning,
+  });
+  if (!basis) return undefined;
+  try {
+    const named = await nameMisconception({
+      concept: `${input.cell.topicName}, level ${input.cell.level}`,
+      claim: input.cell.descriptor.join(' '),
+      wrongAnswer: input.response,
+      questions: [input.question],
+      reasoning: input.signals.reasoning ? [input.signals.reasoning] : undefined,
+      basis,
+      anthropicApiKey: input.anthropicApiKey,
+      onSpend: input.onSpend,
+    });
+    if (!named.ok) return undefined;
+    const claims = await learn
+      .from('cell_claims')
+      .select('concept_id')
+      .eq('user_id', userId)
+      .eq('cell_id', input.cell.cellId)
+      .not('concept_id', 'is', null);
+    const ids = ((claims.data ?? []) as Array<{ concept_id: string }>).map((r) => r.concept_id);
+    if (ids.length === 1) await setMisconception(learn, userId, ids[0], named.misconception);
+    return named.misconception;
+  } catch {
+    return undefined;
+  }
 }
 
 type Graded = { verdicts: RawVerdict[]; model: string; second: RawVerdict[] | null };
