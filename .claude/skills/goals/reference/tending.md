@@ -182,7 +182,12 @@ touched in seven days or more (`lib/goals/stale-steps.ts`): its own row has
 not changed, nothing beneath it has been added or changed, and the person
 has not commented on it. A step that is blocked, waits on another step or a
 question, has open sub-steps, or has a start date still ahead is not listed.
-Neither is a rhythm, which repeats.
+Neither is a rhythm, which repeats. Only the steps on the person's Inbox are
+listed: one with a date, one on Todo, one another step waits on, and the
+first plain step of each goal. The plain steps after it are the goal's
+backlog and are left to sit. A goal with a step already waiting on an
+unanswered question gets no move for its plain steps until the answer, so
+the Inbox holds one "Do you still want…?" per goal at most.
 
 Give each listed step one move, after closing from evidence and merging (a
 step you just closed or merged needs none) and before the verdicts, so the

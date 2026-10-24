@@ -94,7 +94,7 @@ describe('touchTimes', () => {
 
 describe('staleSteps', () => {
   it('leaves out a step under way, which the progress nudge looks after instead', () => {
-    const list = stale([goal('g')], [step('a', 'g'), step('b', 'g')], { a: 20, b: 20 }, {
+    const list = stale([goal('g'), goal('h')], [step('a', 'g'), step('b', 'h')], { a: 20, b: 20 }, {
       underWay: ['a'],
     });
     expect(list.map((s) => s.id)).toEqual(['b']);
@@ -116,7 +116,11 @@ describe('staleSteps', () => {
   it('lists a step of yours untouched for a week, longest first', () => {
     const list = stale(
       [goal('g')],
-      [step('a', 'g'), step('b', 'g'), step('c', 'g')],
+      [
+        step('a', 'g', { dueOn: '2026-10-10' }),
+        step('b', 'g', { dueOn: '2026-10-11' }),
+        step('c', 'g', { onTodo: true }),
+      ],
       { a: STALE_AFTER_DAYS, b: STALE_AFTER_DAYS - 1, c: 15 },
     );
     expect(list.map((s) => [s.id, s.idleDays])).toEqual([
@@ -173,6 +177,46 @@ describe('staleSteps', () => {
       { claude: 10, q: 10, rhythm: 10, done: 10, proposed: 10, elsewhere: 10 },
     );
     expect(list).toEqual([]);
+  });
+
+  it("moves only a goal's first plain step, leaving the backlog after it to sit", () => {
+    const list = stale(
+      [goal('g'), goal('h')],
+      [step('first', 'g'), step('second', 'g'), step('third', 'g'), step('other', 'h')],
+      { first: 20, second: 20, third: 20, other: 9 },
+    );
+    expect(list.map((s) => s.id)).toEqual(['first', 'other']);
+  });
+
+  it('still moves a backlog step that is dated, on Todo or frees another', () => {
+    const list = stale(
+      [goal('g')],
+      [
+        step('first', 'g'),
+        step('dated', 'g', { dueOn: '2026-10-20' }),
+        step('todo', 'g', { onTodo: true }),
+        step('frees', 'g'),
+        step('waits', 'g'),
+      ],
+      { first: 9, dated: 10, todo: 11, frees: 12, waits: 1 },
+      { deps: [['waits', 'frees']] },
+    );
+    expect(list.map((s) => s.id)).toEqual(['frees', 'todo', 'dated', 'first']);
+  });
+
+  it("gives a goal's plain steps no move while a question asked beside one is unanswered", () => {
+    const steps = [
+      step('q', 'g', { kind: 'decision', position: 5 }),
+      step('asked', 'g'),
+      step('next', 'g', { position: 20 }),
+      step('dated', 'g', { position: 30, dueOn: '2026-10-20' }),
+    ];
+    const touched = { q: 3, asked: 20, next: 20, dated: 20 };
+    const deps: [string, string][] = [['asked', 'q']];
+    expect(stale([goal('g')], steps, touched, { deps }).map((s) => s.id)).toEqual(['dated']);
+
+    const answered = steps.map((s) => (s.id === 'q' ? { ...s, status: 'done' as const, resolution: 'Keep it' } : s));
+    expect(stale([goal('g')], answered, touched, { deps }).map((s) => s.id)).toEqual(['asked', 'dated']);
   });
 
   it('leaves a step with no known time off the list rather than calling it untouched', () => {
