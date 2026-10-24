@@ -236,6 +236,7 @@ import {
   LearnExplorableSurface,
   LearnMapSurface,
   LearnProbeSurface,
+  LearnPieceCheckAskedSurface,
   LearnQuizSurface,
   LearnQuizTakeSurface,
   LearnExternalSurface,
@@ -10777,6 +10778,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnPieceCellCheckSurface />,
   },
   {
+    /* The check asked and waiting: the answer box, how sure, and Check my
+     * answer (plan #2522.2). */
+    id: 'learn-piece-check-asked',
+    label: 'Plan · One piece, its check asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceCheckAskedSurface />,
+  },
+  {
     /* A piece the placement found held (plan #2292.5): lessons folded to
      * their takeaways, the check one level above what was shown. */
     id: 'learn-piece-held',
@@ -10910,6 +10920,31 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnProbeSurface />,
+  },
+  {
+    /* A question on screen: the options, how sure you are under them, and
+     * Check my answer or I don't know (plan #2522.2). */
+    id: 'learn-probe-question',
+    label: 'Subject · Questions, one asked',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="asked" />,
+  },
+  {
+    /* Answered: the marks, Right, and what was said about how sure. */
+    id: 'learn-probe-answered',
+    label: 'Subject · Questions, one answered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="answered" />,
+  },
+  {
+    /* Answered with I don't know: nothing about how sure is asked or shown. */
+    id: 'learn-probe-dont-know',
+    label: 'Subject · Questions, answered I don’t know',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface state="dont-know" />,
   },
   {
     id: 'learn-videos',
@@ -11540,6 +11575,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <FigureQuestionPreview form="pick" />,
+  },
+  {
+    /* The same pick with Unsure chosen and the folded box for how you got
+     * there opened (plan #2522.2). */
+    id: 'learn-cell-answer-figure-pick-reasoning',
+    label: 'Practice Flow · Pick the figure, how you got there open',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FigureQuestionPreview form="pick" reasoning />,
   },
   {
     /* The bid-rent model on a lesson on the shape of the city, a rail line moved out (plan #2321.8). */

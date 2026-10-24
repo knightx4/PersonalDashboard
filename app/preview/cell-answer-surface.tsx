@@ -272,7 +272,14 @@ export function CellAnswerPreview({
                   error: 'Dash could not grade this answer just now.',
                   response: answer,
                 }
-              : { moved, error: null };
+              : {
+                  moved,
+                  error: null,
+                  howSure: {
+                    confidence: 0.75,
+                    reasoning: 'I remembered that a steeper bid-rent curve wins the land nearest the centre.',
+                  },
+                };
   return (
     <PaidCostsProvider costs={{ [ANSWER_CELL_PAID]: gradeCost }}>
       <CellAnswerView

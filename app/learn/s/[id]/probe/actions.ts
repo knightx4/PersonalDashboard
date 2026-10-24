@@ -77,6 +77,8 @@ export type AskState = {
     misconception?: string;
     /** True when this claim has nothing under it, so the floor can be looked for. */
     couldGoDeeper?: boolean;
+    /** How sure they said they were and how they got there, shown on the answer (plan #2522.2). None after I don't know. */
+    howSure?: CleanSignals;
   };
 };
 
@@ -467,6 +469,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       dontKnow: parsed === null || undefined,
       misconception,
       couldGoDeeper,
+      howSure: parsed ? signals : undefined,
     },
   };
 }
@@ -600,6 +603,7 @@ async function answerApplied(input: {
       expected: input.probe.expected ?? undefined,
       misconception,
       couldGoDeeper: !outcome.correct && prerequisites.length === 0,
+      howSure: input.signals,
     },
   };
 }

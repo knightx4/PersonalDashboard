@@ -3,7 +3,7 @@ import 'server-only';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import { scheduleIdeas } from './review-store';
-import { passedState, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
+import { passedState, PIECE_CHECK_COLUMNS, toPieceCheck, type PieceCheck, type PieceCheckRow, type PieceForCheck } from './piece-check';
 import { pieceCheckCell, type PieceCellView } from './piece-cells';
 import { loadCellCheck, loadPieceCellsAndLadder } from './piece-cells-store';
 import { readStoredFigures } from '@/lib/learn/figures/registry';
@@ -225,7 +225,7 @@ async function loadLatestCheck(
 ): Promise<PieceCheckRow | null> {
   const { data, error } = await learn
     .from('piece_checks')
-    .select('id, question, expected, response, correct, marked_why')
+    .select(PIECE_CHECK_COLUMNS)
     .eq('user_id', userId)
     .eq('piece_id', pieceId)
     .order('created_at', { ascending: false })

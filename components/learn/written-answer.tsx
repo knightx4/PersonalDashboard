@@ -33,12 +33,15 @@ export function WrittenAnswer({
   response,
   paid,
   beside,
+  under,
 }: {
   response?: string | null;
   /** The server action that marks the answer, for the cost beside the button. */
   paid?: PaidAction;
   /** Anything else that can be done with this case, shown next to Answer. */
   beside?: ReactNode;
+  /** Between the box and the button: how sure you are (plan #2522.2). */
+  under?: ReactNode;
 }) {
   const answered = typeof response === 'string';
 
@@ -63,6 +66,8 @@ export function WrittenAnswer({
           autoFocus={!answered}
         />
       </Field>
+
+      {under}
 
       {!answered && (
         <div className="mt-3 flex flex-wrap items-center gap-3">

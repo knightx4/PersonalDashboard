@@ -1,3 +1,4 @@
+import type { AskState } from '@/app/learn/s/[id]/probe/actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { tableKind } from '@/lib/learn/figures/kinds/table';
 import { figureKind } from '@/lib/learn/figures/registry';
@@ -915,6 +916,7 @@ export function LearnPieceCellCheckSurface() {
             correct: true,
             why: 'The answer works out both percentage changes, gets 0.5 and ties the inelastic reading to the rise in takings.',
             cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+            howSure: { confidence: 0.95, reasoning: null },
           },
         }}
         practice={practice}
@@ -1132,8 +1134,94 @@ export function LearnMapSurface({ undated = false, pressed }: { undated?: boolea
 
 // ---- Questions on a subject ---------------------------------------------------------
 
-export function LearnProbeSurface() {
-  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} />;
+const probeAsked: AskState = {
+  percent: 38,
+  probeId: '00000000-0000-4000-8000-000000002522',
+  conceptId: '00000000-0000-4000-8000-000000002523',
+  conceptName: 'Price elasticity of demand',
+  question: 'A cinema raises ticket prices by 10% and sells 4% fewer tickets. What happens to its takings?',
+  options: [
+    'They rise, because demand is inelastic at this price',
+    'They fall, because fewer tickets are sold',
+    'They stay the same, because the two changes cancel out',
+    'It cannot be said without knowing the cost of each screening',
+  ],
+};
+
+/**
+ * Questions on a subject (plan #1602), and with a question on screen (plan
+ * #2522.2): the options, how sure you are under them, then Check my answer
+ * or I don't know; once answered, what you said beside the mark.
+ */
+export function LearnProbeSurface({ state }: { state?: 'asked' | 'answered' | 'dont-know' } = {}) {
+  const initial: AskState | undefined =
+    state === 'asked'
+      ? probeAsked
+      : state === 'answered'
+        ? {
+            ...probeAsked,
+            percent: 44,
+            answered: {
+              correct: true,
+              reason: 'Price rose more than quantity fell, so each lost sale is outweighed by the dearer tickets: demand is inelastic here.',
+              correctIndex: 0,
+              chosenIndex: 0,
+              weight: 1,
+              howSure: {
+                confidence: 0.75,
+                reasoning: 'Ten per cent more on every ticket against four per cent fewer tickets, so the price side wins.',
+              },
+            },
+          }
+        : state === 'dont-know'
+          ? {
+              ...probeAsked,
+              answered: {
+                correct: false,
+                reason: 'Price rose more than quantity fell, so each lost sale is outweighed by the dearer tickets: demand is inelastic here.',
+                correctIndex: 0,
+                dontKnow: true,
+                weight: 1,
+                howSure: { confidence: null, reasoning: null },
+              },
+            }
+          : undefined;
+  return <ProbeView subject={SUBJECT} ideas={14} percent={38} namedConcept={null} initial={initial} />;
+}
+
+/**
+ * The piece's check asked and not yet answered (plan #2522.2): the box for
+ * the answer, then how sure you are and how you got there, then Check my
+ * answer.
+ */
+export function LearnPieceCheckAskedSurface() {
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/s/[id]/p/[piece]/actions.ts#handInPractice': PIECE_RUN,
+        'app/learn/s/[id]/p/[piece]/actions.ts#answerPieceCheck': PIECE_RUN,
+      }}
+    >
+      <PiecePageView
+        page={{
+          ...piecePage,
+          check: {
+            id: '00000000-0000-4000-8000-000000002524',
+            question:
+              'A theatre sells 300 seats a night at £20. It raises the price to £24 and sells 270. Work out the elasticity and say whether takings rose.',
+            expected: null,
+            response: null,
+            correct: null,
+            why: null,
+            cell: { topicId: 'tp1', topicName: 'Price elasticity of demand', level: 4 },
+          },
+        }}
+        practice={practice}
+        standing={{ practicePassed: false, checkPassed: false }}
+        reviews={[]}
+      />
+    </PaidCostsProvider>
+  );
 }
 
 // ---- Videos ---------------------------------------------------------------------------

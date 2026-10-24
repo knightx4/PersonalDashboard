@@ -51,6 +51,25 @@ const REVIEWS: DueReview[] = [
     dueOn: '2026-10-12',
     open: null,
   },
+  {
+    // Answered, with what was said about how sure (plan #2522.2).
+    conceptId: 'c4',
+    name: 'Marginal cost',
+    subjectId: 's2',
+    trackName: 'Economics',
+    pieceId: null,
+    pieceTitle: null,
+    dueOn: '2026-10-11',
+    open: {
+      id: 'q4',
+      question: 'A bakery already makes 200 loaves a day. What does the 201st loaf cost it?',
+      expected: 'Only the extra flour, energy and time for that one loaf, not a share of the oven or the rent.',
+      response: 'Just the ingredients and baking for one more loaf, since the oven is paid for anyway.',
+      correct: true,
+      why: 'The answer separates the cost of one more loaf from the costs already fixed.',
+      howSure: { confidence: 0.75, reasoning: 'The oven is there whether or not it bakes one more.' },
+    },
+  },
 ];
 
 export function LearnReviewListSurface({ folded = false }: { folded?: boolean }) {

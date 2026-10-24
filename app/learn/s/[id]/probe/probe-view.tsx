@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import type { Subject } from '@/lib/learn/graph/load';
 import { ProbeSession } from './session';
+import type { AskState } from './actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageColumn } from '@/components/shell/page-width';
 import type { Subject as PageSubject } from '@/components/shell/page-header';
@@ -15,10 +16,12 @@ export type ProbeViewProps = {
   namedConcept: { id: string; name: string | null } | null;
   /** The path to this page, from the page (rowSubject); the gallery passes none. */
   path?: PageSubject;
+  /** A question already on screen, for the gallery. */
+  initial?: AskState;
 };
 
 /** Questions on one subject, from what its page read (plan #1602). */
-export function ProbeView({ subject, ideas, percent, namedConcept, path }: ProbeViewProps) {
+export function ProbeView({ subject, ideas, percent, namedConcept, path, initial }: ProbeViewProps) {
   return (
     <PageColumn>
       <PageHeader subject={path} title={`Questions on ${subject.name}`} />
@@ -35,6 +38,7 @@ export function ProbeView({ subject, ideas, percent, namedConcept, path }: Probe
           startingPercent={percent}
           startConceptId={namedConcept?.id ?? null}
           startConceptName={namedConcept?.name ?? null}
+          initial={initial}
         />
       )}
     </PageColumn>

@@ -1,3 +1,4 @@
+import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 
 /**
@@ -147,6 +148,8 @@ export type ReviewQuestion = {
   response: string | null;
   correct: boolean | null;
   why: string | null;
+  /** How sure the person said they were and how they got there (plan #2522.2). */
+  howSure?: HowSure;
 };
 
 /** The row as stored in learn.review_questions. */
@@ -158,6 +161,9 @@ export type ReviewQuestionRow = {
   response: string | null;
   correct: boolean | null;
   marked_why: string | null;
+  /** 0 to 1, null when not given (learn_0190). */
+  confidence?: number | string | null;
+  reasoning?: string | null;
 };
 
 /** The row as the page is given it, with the expected answer held back until answered. */
@@ -170,6 +176,7 @@ export function toReviewQuestion(row: ReviewQuestionRow): ReviewQuestion {
     response: row.response,
     correct: row.correct,
     why: row.marked_why,
+    howSure: rowHowSure(row),
   };
 }
 

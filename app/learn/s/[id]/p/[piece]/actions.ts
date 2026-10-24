@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { writePieceLesson, type PieceLessonResult } from '@/inngest/learn/piece-lesson';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { toPieceCheck, type PieceCheck, type PieceCheckRow } from '@/lib/learn/lessons/piece-check';
+import { PIECE_CHECK_COLUMNS, toPieceCheck, type PieceCheck, type PieceCheckRow } from '@/lib/learn/lessons/piece-check';
 import {
   loadAskedQuestions,
   loadPieceForCheck,
@@ -92,7 +92,7 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
 
     const { data: open, error: openError } = await learn
       .from('piece_checks')
-      .select('id, question, expected, response, correct, marked_why')
+      .select(PIECE_CHECK_COLUMNS)
       .eq('user_id', user.id)
       .eq('piece_id', pieceIdValue)
       .is('response', null)
@@ -126,7 +126,7 @@ export async function askPieceCheck(subjectId: string, pieceId: string): Promise
         expected: written.expected,
         write_model: PIECE_CHECK_MODEL,
       })
-      .select('id, question, expected, response, correct, marked_why')
+      .select(PIECE_CHECK_COLUMNS)
       .single();
     if (error) return { error: `Saving the question failed: ${error.message}` };
     return { check: toPieceCheck(row as PieceCheckRow) };
@@ -201,7 +201,7 @@ export async function answerPieceCheck(
 
     const { data, error } = await learn
       .from('piece_checks')
-      .select('id, question, expected, response, correct, marked_why')
+      .select(PIECE_CHECK_COLUMNS)
       .eq('id', checkIdValue)
       .eq('piece_id', pieceIdValue)
       .eq('user_id', user.id)
@@ -243,7 +243,7 @@ export async function answerPieceCheck(
       .eq('id', checkIdValue)
       .eq('user_id', user.id)
       .is('response', null)
-      .select('id, question, expected, response, correct, marked_why');
+      .select(PIECE_CHECK_COLUMNS);
     if (markError) return { error: `Recording the answer failed: ${markError.message}` };
     // Another press got there first and recorded its own mark.
     const saved = (marked ?? [])[0] as PieceCheckRow | undefined;

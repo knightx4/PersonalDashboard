@@ -1,4 +1,5 @@
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import { rowHowSure, type HowSure } from '@/lib/learn/how-sure';
 import { isGuess, readConfidence } from '@/lib/learn/confidence';
 
 /**
@@ -79,7 +80,12 @@ export type PieceCheck = {
    * written before its goal had a territory, whose check is its own question.
    */
   cell: { topicId: string; topicName: string; level: number } | null;
+  /** How sure the person said they were and how they got there (plan #2522.2). */
+  howSure?: HowSure;
 };
+
+/** The columns of learn.piece_checks the page reads. */
+export const PIECE_CHECK_COLUMNS = 'id, question, expected, response, correct, marked_why, confidence, reasoning';
 
 /** The row as stored in learn.piece_checks. */
 export type PieceCheckRow = {
@@ -89,6 +95,9 @@ export type PieceCheckRow = {
   response: string | null;
   correct: boolean | null;
   marked_why: string | null;
+  /** 0 to 1, null when not given (learn_0190). */
+  confidence?: number | string | null;
+  reasoning?: string | null;
 };
 
 /**
@@ -105,6 +114,7 @@ export function toPieceCheck(row: PieceCheckRow): PieceCheck {
     correct: row.correct,
     why: row.marked_why,
     cell: null,
+    howSure: rowHowSure(row),
   };
 }
 
@@ -119,6 +129,7 @@ export type CellCheckRow = {
   grade: unknown;
   /** How sure they said they were, 0 to 1 (plan #2522.3). */
   confidence?: number | string | null;
+  reasoning?: string | null;
 };
 
 /**
@@ -149,5 +160,6 @@ export function toCellPieceCheck(
     correct: answered ? met || guessedRight : null,
     why: answered ? reason : null,
     cell,
+    howSure: rowHowSure(row),
   };
 }

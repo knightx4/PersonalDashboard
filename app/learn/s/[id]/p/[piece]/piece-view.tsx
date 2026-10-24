@@ -27,6 +27,8 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Figures } from '@/components/learn/figure';
+import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
+import { NO_HOW_SURE, type HowSure } from '@/lib/learn/how-sure';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -527,6 +529,7 @@ function PieceCheckCard({
   const [check, setCheck] = useState(initialCheck);
   const [tested, setTested] = useState<number | null>(null);
   const [response, setResponse] = useState('');
+  const [howSure, setHowSure] = useState<HowSure>(NO_HOW_SURE);
   const [error, setError] = useState<string | null>(null);
   const [asking, startAsking] = useTransition();
   const [marking, startMarking] = useTransition();
@@ -540,6 +543,7 @@ function PieceCheckCard({
       if (result.check) {
         setCheck(result.check);
         setResponse('');
+        setHowSure(NO_HOW_SURE);
       } else setError(result.error ?? 'Could not write a question.');
     });
 
@@ -547,7 +551,7 @@ function PieceCheckCard({
     startMarking(async () => {
       if (!check) return;
       setError(null);
-      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, response).catch(() => ({
+      const result: AnswerResult = await answerPieceCheck(subjectId, pieceId, check.id, response, howSure).catch(() => ({
         error: 'Could not mark that. Check your connection.',
       }));
       if (result.check) {
@@ -599,6 +603,7 @@ function PieceCheckCard({
               disabled={marking}
             />
           </Field>
+          <HowSureInput key={check.id} id={check.id} kind="written" onChange={setHowSure} disabled={marking} />
           <DashAction
             type="button"
             variant="primary"
@@ -617,6 +622,7 @@ function PieceCheckCard({
       {check && answered && (
         <div className="mt-3 space-y-2" aria-live="polite">
           {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
+          <HowSureGiven howSure={check.howSure} />
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', check.correct ? 'text-ink' : 'text-ink-muted')}>
             {check.correct ? (
               <Check className="size-4" strokeWidth={1.75} aria-hidden />

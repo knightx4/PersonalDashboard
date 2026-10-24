@@ -14,7 +14,9 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
 import type { Moved, ReachedCell, ReachedHow } from '@/lib/learn/levels/grade';
 import type { FigureQuestionView } from '@/lib/learn/figures/question';
+import type { HowSure } from '@/lib/learn/how-sure';
 import { FigureAnswer } from './figure-answer';
+import { HowSureGiven, HowSureInput } from './how-sure';
 
 /**
  * An explain question about one level of a topic, and the answer screen
@@ -60,6 +62,8 @@ export type CellAnswerState = {
   response?: string;
   /** A figure question's answer in words, shown once it is graded. */
   answer?: string;
+  /** How sure the person said they were and how they got there (plan #2522.2), kept across an error and shown once graded. */
+  howSure?: HowSure;
 };
 
 /**
@@ -247,6 +251,7 @@ export function CellAnswerView({
   pending,
   openFirstQuote,
   openWhy,
+  reasoningOpen,
 }: {
   asked: AskedCellView;
   state: CellAnswerState;
@@ -268,6 +273,8 @@ export function CellAnswerView({
   openFirstQuote?: boolean;
   /** Draws the reason open, for the gallery. */
   openWhy?: boolean;
+  /** Draws a pick's box for how you got there open, for the gallery. */
+  reasoningOpen?: boolean;
 }) {
   const head = (
     <>
@@ -308,6 +315,7 @@ export function CellAnswerView({
               {given && given !== state.answer && <span className="text-ink-muted"> · you said {given}</span>}
             </p>
           )}
+          <HowSureGiven howSure={state.howSure} className="mt-2" />
           {asked.figure && <FigureAnswer questionId={asked.questionId} question={asked.figure} answered />}
         </Card>
         {/* A figure question reaches the asked level alone, and the line above
@@ -375,6 +383,14 @@ export function CellAnswerView({
         />
         </>
         )}
+        {/* A pick folds the box for how you got there; a written answer opens it. */}
+        <HowSureInput
+          id={asked.questionId}
+          kind={asked.figure ? 'choice' : 'written'}
+          defaultValue={state.howSure}
+          disabled={pending}
+          reasoningOpen={reasoningOpen}
+        />
         {state.error && !pending && (
           <p id={`answer-error-${asked.questionId}`} role="alert" className="mt-2 text-ui text-danger">
             {state.error} Your answer is still here to send again.

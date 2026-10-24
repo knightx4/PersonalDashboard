@@ -9,6 +9,8 @@ import { Field, Textarea } from '@/components/ui/field';
 import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import { nextDueLine, type DueReview, type ReviewQuestion } from '@/lib/learn/lessons/review';
+import { HowSureGiven, HowSureInput } from '@/components/learn/how-sure';
+import { NO_HOW_SURE, type HowSure } from '@/lib/learn/how-sure';
 import { answerReview, askReview, type AnswerReviewResult, type AskReviewResult } from './actions';
 
 /**
@@ -93,6 +95,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
   const [question, setQuestion] = useState<ReviewQuestion | null>(review.open);
   const [nextInDays, setNextInDays] = useState<number | null>(null);
   const [response, setResponse] = useState('');
+  const [howSure, setHowSure] = useState<HowSure>(NO_HOW_SURE);
   const [error, setError] = useState<string | null>(null);
   const [asking, startAsking] = useTransition();
   const [marking, startMarking] = useTransition();
@@ -106,6 +109,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
       if (result.question) {
         setQuestion(result.question);
         setResponse('');
+        setHowSure(NO_HOW_SURE);
       } else setError(result.error ?? 'Could not write a question.');
     });
 
@@ -113,7 +117,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
     startMarking(async () => {
       if (!question) return;
       setError(null);
-      const result: AnswerReviewResult = await answerReview(question.id, response).catch(() => ({
+      const result: AnswerReviewResult = await answerReview(question.id, response, howSure).catch(() => ({
         error: 'Could not mark that. Check your connection.',
       }));
       if (result.question) {
@@ -157,6 +161,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
               disabled={marking}
             />
           </Field>
+          <HowSureInput key={question.id} id={question.id} kind="written" onChange={setHowSure} disabled={marking} className="mt-3" />
           <DashAction
             type="button"
             variant="primary"
@@ -176,6 +181,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
       {question && answered && (
         <div className="mt-2 space-y-1" aria-live="polite">
           {question.response && <p className="text-ui text-ink-muted">You wrote: {question.response}</p>}
+          <HowSureGiven howSure={question.howSure} />
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', question.correct ? 'text-ink' : 'text-ink-muted')}>
             {question.correct ? (
               <Check className="size-4" strokeWidth={1.75} aria-hidden />

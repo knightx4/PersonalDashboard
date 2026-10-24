@@ -23,10 +23,13 @@ const Answer = z.object({
 export async function answerCellQuestion(prev: CellAnswerState, formData: FormData): Promise<CellAnswerState> {
   const user = await requireUser();
   const parsed = Answer.safeParse({ questionId: formData.get('questionId'), response: formData.get('response') });
-  if (!parsed.success) return { ...prev, error: 'Write an answer first.' };
+  // How sure they were and how they reasoned (plan #2522.3), kept on the
+  // screen across an error and shown once graded (plan #2522.2).
+  const howSure = readAnswerSignals(formData);
+  if (!parsed.success) return { ...prev, howSure, error: 'Write an answer first.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ...prev, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
+  if (!apiKey) return { ...prev, howSure, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
 
   const learn = await createLearnClient();
   const spend = collectSpend();
@@ -34,12 +37,18 @@ export async function answerCellQuestion(prev: CellAnswerState, formData: FormDa
     questionId: parsed.data.questionId,
     response: parsed.data.response,
     // How sure they were and how they reasoned (plan #2522.3); nulls from a form that does not ask yet.
-    signals: readAnswerSignals(formData),
+    signals: howSure,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
   await recordLearnSpend(user.id, 'grade-cell-answer', spend.reports);
 
-  if (!result.ok) return { ...prev, error: result.error, response: parsed.data.response };
-  return { moved: result.moved, error: null, response: parsed.data.response, ...(result.answer ? { answer: result.answer } : {}) };
+  if (!result.ok) return { ...prev, error: result.error, response: parsed.data.response, howSure };
+  return {
+    moved: result.moved,
+    error: null,
+    response: parsed.data.response,
+    howSure,
+    ...(result.answer ? { answer: result.answer } : {}),
+  };
 }

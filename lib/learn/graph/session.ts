@@ -1,4 +1,5 @@
 import 'server-only';
+import { rowHowSure } from '@/lib/learn/how-sure';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
@@ -66,6 +67,9 @@ export type ProbeRow = {
   weight: number;
   /** The check it was written against, or null for a concept with none. */
   masteryCheck: string | null;
+  /** How sure the person said they were, 0 to 1, and how they got there (plan #2522.2). Absent where not read. */
+  confidence?: number | null;
+  reasoning?: string | null;
   /**
    * When the question was written. Read against the concept's
    * `claimRewrittenAt` to say whether it was asked about the wording that is
@@ -173,7 +177,7 @@ export async function probesFor(
     .select(
       'id, concept_id, question, options, correct_index, reason, chosen_index, dont_know, ' +
         'expected, response, response_correct, grade_reason, rung, weight, mastery_check, ' +
-        'created_at',
+        'confidence, reasoning, created_at',
     )
     .eq('concept_id', conceptId)
     // Not a question Practice Flow has written ahead and not yet shown. It
@@ -201,8 +205,11 @@ export async function probesFor(
     rung: Rung;
     weight: number | string;
     mastery_check: string | null;
+    confidence: number | string | null;
+    reasoning: string | null;
     created_at: string;
   }[]).map((row) => ({
+    ...rowHowSure(row),
     id: row.id,
     conceptId: row.concept_id,
     question: row.question,

@@ -28,7 +28,7 @@ import {
 
 type PassedPieceRow = { id: string; subject_id: string; title: string; concept_ids: string[]; passed_at: string };
 
-export const REVIEW_QUESTION_COLUMNS = 'id, concept_id, question, expected, response, correct, marked_why';
+export const REVIEW_QUESTION_COLUMNS = 'id, concept_id, question, expected, response, correct, marked_why, confidence, reasoning';
 
 /**
  * Put ideas on the review schedule the first time they are tested or

@@ -1,4 +1,5 @@
 import 'server-only';
+import { rowHowSure } from '@/lib/learn/how-sure';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
@@ -77,6 +78,23 @@ export async function listTopics(client: Client): Promise<TopicRow[]> {
   return [...rows.filter((r) => r.status === 'draft'), ...rows.filter((r) => r.status === 'approved')];
 }
 
+type Confident = { confidence: number | string | null } | null;
+
+type EvidenceRow = {
+  cell_id: string;
+  verdict: Verdict;
+  observed_at: string;
+  quote?: string | null;
+  probe?: Confident | Confident[];
+  question?: Confident | Confident[];
+};
+
+/** The confidence on the answer a row of evidence came from, or null. */
+export function evidenceConfidence(row: Pick<EvidenceRow, 'probe' | 'question'>): number | null {
+  const one = (source: Confident | Confident[] | undefined) => (Array.isArray(source) ? source[0] : source) ?? null;
+  return rowHowSure(one(row.question) ?? one(row.probe) ?? {}).confidence;
+}
+
 /**
  * The whole map as lib/learn/levels/model.ts reads it: topics, cells, links
  * and evidence, reduced to the columns its rules use. Drafts are included and
@@ -93,9 +111,14 @@ export async function loadTopicMap(
   const topicRead = client.from('topics').select('id, name, ceiling, status');
   const cellRead = client.from('topic_cells').select('id, topic_id, level');
   const linkRead = client.from('cell_links').select('requiring_cell_id, required_cell_id');
+  // How sure the person said they were comes from the answer the evidence
+  // came from, a probe or a cell question (plan #2522.2); placement reads it.
   const evidenceRead = client
     .from('cell_evidence')
-    .select(options.quotes ? 'cell_id, verdict, observed_at, quote' : 'cell_id, verdict, observed_at');
+    .select(
+      `cell_id, verdict, observed_at, ${options.quotes ? 'quote, ' : ''}` +
+        'probe:probes(confidence), question:cell_questions(confidence)',
+    );
   const [topics, cells, links, evidence] = await Promise.all(
     userId
       ? [
@@ -125,14 +148,13 @@ export async function loadTopicMap(
       requiringCellId: l.requiring_cell_id,
       requiredCellId: l.required_cell_id,
     })),
-    evidence: (evidence.data ?? []).map(
-      (e: { cell_id: string; verdict: Verdict; observed_at: string; quote?: string | null }): CellEvidence => ({
-        cellId: e.cell_id,
-        verdict: e.verdict,
-        observedAt: e.observed_at,
-        ...(options.quotes ? { quote: e.quote ?? null } : {}),
-      }),
-    ),
+    evidence: (evidence.data ?? []).map((e: EvidenceRow): CellEvidence => ({
+      cellId: e.cell_id,
+      verdict: e.verdict,
+      observedAt: e.observed_at,
+      ...(options.quotes ? { quote: e.quote ?? null } : {}),
+      confidence: evidenceConfidence(e),
+    })),
   };
 }
 
