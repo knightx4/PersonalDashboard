@@ -17,7 +17,9 @@
  * The pick runs at most once a day and only when there are new postings that
  * pass pickBoardCandidates (board-pick.ts). One model call, no web search,
  * chooses among them (model.ts pickNewBoardOpenings), and each role it keeps
- * says in its found-in line when it appeared.
+ * says in its found-in line when it appeared. The new postings on followed
+ * investors' portfolio boards (portfolios.ts) join the same pick, and their
+ * found-in line names the investor.
  *
  * A board that fails to load is skipped until the next day: it is somebody
  * else's undocumented endpoint. companies.board_tried_at spaces the tries and
@@ -29,7 +31,7 @@ import { fetchBoard, isBoardVendor, type BoardVendor } from '@/lib/jobs/ats/boar
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { Admitter } from './admit';
-import { diffBoard, newOnBoardLine, pickDue, readCutoff, type ReadPosting, type StoredPosting } from './board-diff';
+import { diffBoard, newOnBoardLine, newOnPortfolioLine, pickDue, readCutoff, type ReadPosting, type StoredPosting } from './board-diff';
 import { pickBoardCandidates, type BoardPosting } from './board-pick';
 import { openingFeedback } from './feedback';
 import { pickNewBoardOpenings } from './model';
@@ -234,12 +236,24 @@ export type BoardPickOutcome = {
 
 const NOT_RUN: BoardPickOutcome = { ran: false, headlines: [], error: null };
 
-type NewPosting = BoardPosting & { id: string; firstSeenAt: string };
+/**
+ * A new posting from a followed company's board, or from a followed
+ * investor's portfolio board (portfolios.ts), which names the investor.
+ */
+type NewPosting = BoardPosting & {
+  id: string;
+  firstSeenAt: string;
+  table: 'board_postings' | 'portfolio_postings';
+  investor: string | null;
+};
 
-async function markOffered(supabase: AppSupabaseClient, userId: string, ids: readonly string[], at: string): Promise<void> {
-  for (const part of chunks(ids)) {
-    const { error } = await supabase.from('board_postings').update({ offered_at: at }).eq('user_id', userId).in('id', part);
-    if (error) console.error('[jobs boards] offered', error.message);
+async function markOffered(supabase: AppSupabaseClient, userId: string, postings: readonly NewPosting[], at: string): Promise<void> {
+  for (const table of ['board_postings', 'portfolio_postings'] as const) {
+    const ids = postings.filter((posting) => posting.table === table).map((posting) => posting.id);
+    for (const part of chunks(ids)) {
+      const { error } = await supabase.from(table).update({ offered_at: at }).eq('user_id', userId).in('id', part);
+      if (error) console.error('[jobs boards] offered', table, error.message);
+    }
   }
 }
 
@@ -261,27 +275,55 @@ export async function pickNewBoardPostings(
   const p = (profile.data ?? {}) as Row;
   if (!pickDue((p.boards_picked_at as string | null) ?? null, now)) return NOT_RUN;
 
-  const fresh = await supabase
-    .from('board_postings')
-    .select('id, title, url, location, first_seen_at, companies ( name, industry )')
-    .eq('user_id', userId)
-    .is('offered_at', null)
-    .is('gone_at', null)
-    .order('first_seen_at', { ascending: true })
-    .limit(500);
+  const [fresh, portfolio] = await Promise.all([
+    supabase
+      .from('board_postings')
+      .select('id, title, url, location, first_seen_at, companies ( name, industry )')
+      .eq('user_id', userId)
+      .is('offered_at', null)
+      .is('gone_at', null)
+      .order('first_seen_at', { ascending: true })
+      .limit(500),
+    supabase
+      .from('portfolio_postings')
+      .select('id, title, url, location, company_name, first_seen_at, followed_investors ( name )')
+      .eq('user_id', userId)
+      .is('offered_at', null)
+      .order('first_seen_at', { ascending: true })
+      .limit(2000),
+  ]);
   if (fresh.error) throw new Error(`Reading the new board postings failed: ${fresh.error.message}`);
-  const postings: NewPosting[] = ((fresh.data ?? []) as Row[]).map((row) => {
-    const company = one(row.companies as Row | Row[] | null);
-    return {
-      id: row.id as string,
-      company: (company?.name as string | undefined) ?? 'Unknown company',
-      industry: (company?.industry as string | null | undefined) ?? null,
-      title: row.title as string,
-      url: row.url as string,
-      location: (row.location as string | null) ?? null,
-      firstSeenAt: row.first_seen_at as string,
-    };
-  });
+  if (portfolio.error) throw new Error(`Reading the new portfolio postings failed: ${portfolio.error.message}`);
+  const postings: NewPosting[] = [
+    ...((fresh.data ?? []) as Row[]).map((row): NewPosting => {
+      const company = one(row.companies as Row | Row[] | null);
+      return {
+        id: row.id as string,
+        company: (company?.name as string | undefined) ?? 'Unknown company',
+        industry: (company?.industry as string | null | undefined) ?? null,
+        title: row.title as string,
+        url: row.url as string,
+        location: (row.location as string | null) ?? null,
+        firstSeenAt: row.first_seen_at as string,
+        table: 'board_postings',
+        investor: null,
+      };
+    }),
+    ...((portfolio.data ?? []) as Row[]).map((row): NewPosting => {
+      const investor = one(row.followed_investors as Row | Row[] | null);
+      return {
+        id: row.id as string,
+        company: row.company_name as string,
+        industry: null,
+        title: row.title as string,
+        url: row.url as string,
+        location: (row.location as string | null) ?? null,
+        firstSeenAt: row.first_seen_at as string,
+        table: 'portfolio_postings',
+        investor: (investor?.name as string | undefined) ?? 'an investor',
+      };
+    }),
+  ];
   if (postings.length === 0) return NOT_RUN;
 
   const [seeker, taken, past, responded] = await Promise.all([
@@ -328,11 +370,11 @@ export async function pickNewBoardPostings(
           taken: { urls: taken.urls, roles: taken.roles, companies },
           excludedWords: exclusionWords(seeker.excludedIndustries),
         });
-  const chosen = new Set(candidates.map((posting) => posting.id));
+  const chosen = new Set(candidates);
   await markOffered(
     supabase,
     userId,
-    postings.filter((posting) => !chosen.has(posting.id)).map((posting) => posting.id),
+    postings.filter((posting) => !chosen.has(posting)),
     at,
   );
   if (candidates.length === 0) return NOT_RUN;
@@ -344,13 +386,15 @@ export async function pickNewBoardPostings(
   const picked = await supabase.from('profiles').update({ boards_picked_at: at }).eq('id', userId);
   if (picked.error) console.error('[jobs boards] picked at', picked.error.message);
   if (!result.ok) return { ran: true, headlines: [], error: result.error };
-  await markOffered(supabase, userId, [...chosen], at);
+  await markOffered(supabase, userId, candidates, at);
 
   const timeZone = (p.timezone as string | null) ?? 'UTC';
   const origins: BoardOrigin[] = candidates.map((posting) => ({
     url: posting.url,
     company: posting.company,
-    foundIn: newOnBoardLine(posting.company, posting.firstSeenAt, timeZone),
+    foundIn: posting.investor
+      ? newOnPortfolioLine(posting.investor, posting.firstSeenAt, timeZone)
+      : newOnBoardLine(posting.company, posting.firstSeenAt, timeZone),
   }));
   const headlines = await storeOpenings(supabase, userId, result.suggestions, origins, options.admitter ?? null);
   return { ran: true, headlines, error: null };

@@ -617,9 +617,9 @@ const OPENINGS_SCHEMA: Anthropic.Tool['input_schema'] = {
 // ---------------------------------------------------------------------------
 
 const BOARD_PICK_SYSTEM = `You choose, from postings that went up on the job boards of companies
-someone follows since the last check, the ones worth applying for. Every
-posting is open now (read from the company's own board today), so there is
-nothing to search for.
+someone follows, or on the portfolio job boards of investors they follow, since
+the last check, the ones worth applying for. Every posting is open now (read
+from a job board today), so there is nothing to search for.
 
 Rules:
 - Only from the list given, with its link exactly as given.
@@ -668,7 +668,7 @@ export async function pickNewBoardOpenings(
     listed('Suggested roles they saved (more like these)', input.feedback.saved, 30) +
     listed('Suggested roles they turned down, and why', input.feedback.dismissed, 30) +
     listed(
-      'New on the boards of companies they follow (title | company | location | link)',
+      'New on the boards of companies and investors they follow (title | company | location | link)',
       input.candidates.map((p) => `${p.title} | ${p.company} | ${p.location ?? 'location not given'} | ${p.url}`),
       40,
     ) +

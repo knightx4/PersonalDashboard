@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffBoard, newOnBoardLine, pickDue, postingKey, readCutoff } from './board-diff';
+import { diffBoard, newOnBoardLine, newOnPortfolioLine, pickDue, postingKey, readCutoff } from './board-diff';
 
 const post = (url: string, title = 'Strategy Associate') => ({ title, url, location: null });
 
@@ -63,5 +63,12 @@ describe('newOnBoardLine', () => {
     expect(newOnBoardLine('Clay', '2026-10-24T09:00:00Z')).toBe("New on Clay's board, first seen 24 Oct");
     expect(newOnBoardLine('Clay', '2026-10-24T23:30:00Z', 'Europe/London')).toBe("New on Clay's board, first seen 25 Oct");
     expect(newOnBoardLine('Clay', '2026-10-24T09:00:00Z', 'Not/AZone')).toBe("New on Clay's board, first seen 24 Oct");
+  });
+});
+
+describe('newOnPortfolioLine', () => {
+  it('names the investor whose board it was on', () => {
+    expect(newOnPortfolioLine('RRE Ventures', '2026-10-24T09:00:00Z')).toBe("New on RRE Ventures' portfolio board, first seen 24 Oct");
+    expect(newOnPortfolioLine('Antler', '2026-10-24T23:30:00Z', 'Europe/London')).toBe("New on Antler's portfolio board, first seen 25 Oct");
   });
 });

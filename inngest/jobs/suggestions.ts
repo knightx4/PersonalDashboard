@@ -12,6 +12,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { openingAdmitter, runSuggestionsFor } from '@/lib/jobs/suggest/run';
 import { pickNewBoardPostings, readDueBoards } from '@/lib/jobs/suggest/boards';
+import { readDuePortfolios } from '@/lib/jobs/suggest/portfolios';
 import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
 import { recordRuns } from '@/lib/jobs/suggest/search-runs';
 import { collectSearchBatches } from '@/lib/jobs/suggest/search-batch';
@@ -268,8 +269,8 @@ export async function runSearchBatches(now: Date = new Date()): Promise<SearchBa
 }
 
 /**
- * The daily read of followed boards and the pick of what is new on them
- * (lib/jobs/suggest/boards.ts), in whatever time the batches left. Each tick
+ * The daily read of followed boards and investors' portfolio boards, and the
+ * pick of what is new on them (lib/jobs/suggest/boards.ts, portfolios.ts), in whatever time the batches left. Each tick
  * reads the boards not tried in the last day, a few dozen at most per
  * person, so every board is read once a day across the ten-minute ticks; the
  * pick asks Dash at most once a day, and only when something new fits. One
@@ -293,6 +294,10 @@ async function watchBoards(
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
       const read = await readDueBoards(jobs, userId, { now: options.now, deadline: options.deadline - 90_000 });
       summary.boardsRead += read.read;
+      if (Date.now() < options.deadline - 90_000) {
+        const portfolios = await readDuePortfolios(jobs, userId, { now: options.now, deadline: options.deadline - 90_000 });
+        summary.boardsRead += portfolios.read;
+      }
       if (Date.now() > options.deadline - 60_000) continue;
 
       const spend: SpendReport[] = [];
