@@ -11,6 +11,7 @@
  */
 
 import { isTimeZone, whenDate } from '@/lib/core/when';
+import { possessive } from '@/lib/jobs/ats/portfolio-parse';
 
 /** A board is read again this long after its last try: once a day, with slack for the ten-minute cron. */
 export const READ_EVERY_HOURS = 20;
@@ -80,4 +81,10 @@ export function pickDue(pickedAt: string | null, now: Date): boolean {
 export function newOnBoardLine(company: string, firstSeenAt: string, timeZone = 'UTC'): string {
   const zone = isTimeZone(timeZone) ? timeZone : 'UTC';
   return `New on ${company}'s board, first seen ${whenDate(firstSeenAt, { timeZone: zone, year: 'never' })}`;
+}
+
+/** The found-in line of a role from an investor's portfolio board (plan #2535.4): "New on RRE Ventures' portfolio board, first seen 24 Oct". */
+export function newOnPortfolioLine(investor: string, firstSeenAt: string, timeZone = 'UTC'): string {
+  const zone = isTimeZone(timeZone) ? timeZone : 'UTC';
+  return `New on ${possessive(investor)} portfolio board, first seen ${whenDate(firstSeenAt, { timeZone: zone, year: 'never' })}`;
 }

@@ -279,6 +279,19 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.board_postings = boardPosting.id;
 
+  // An investor followed and a posting its portfolio board showed (job_search 0073).
+  const [investor] = await admin<{ id: string }[]>`
+    insert into followed_investors (user_id, name, host, token)
+    values (${userId}, ${`${tag} Ventures`}, 'getro', ${tag})
+    returning id`;
+  ids.followed_investors = investor.id;
+  const [portfolioPosting] = await admin<{ id: string }[]>`
+    insert into portfolio_postings (user_id, investor_id, posting_key, company_name, title, url)
+    values (${userId}, ${investor.id}, ${`https://example.com/p/${tag}`}, ${`${tag} Co`}, ${`${tag} Analyst`},
+            ${`https://example.com/p/${tag}`})
+    returning id`;
+  ids.portfolio_postings = portfolioPosting.id;
+
   return ids;
 }
 
