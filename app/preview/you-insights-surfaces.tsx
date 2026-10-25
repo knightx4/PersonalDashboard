@@ -19,6 +19,8 @@ const actions: InsightsActions = {
     saved: { verdict, note: note ?? null, decidedAt: new Date(NOW).toISOString() },
   }),
   lookAgain: async () => ({ error: null }),
+  answer: async (_id, answer) => ({ error: null, saved: { answer, answeredAt: new Date(NOW).toISOString() } }),
+  saveNow: async (body) => ({ error: null, saved: { body, updatedAt: new Date(NOW).toISOString() } }),
 };
 
 const waiting: Insight[] = [
@@ -70,6 +72,9 @@ const waiting: Insight[] = [
     verdict: null,
     fired: [],
     check: null,
+    question: 'Which of the projects you dropped would you still pick up if nobody would ever see it?',
+    answer: null,
+    answeredAt: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -92,6 +97,9 @@ const waiting: Insight[] = [
     verdict: null,
     fired: [],
     check: null,
+    question: null,
+    answer: null,
+    answeredAt: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -111,6 +119,9 @@ const waiting: Insight[] = [
     verdict: null,
     fired: [],
     check: null,
+    question: null,
+    answer: null,
+    answeredAt: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000006',
@@ -135,6 +146,9 @@ const waiting: Insight[] = [
       note: 'Rejected by Northwind on 8 October; four nights past midnight on the build pages by the 12th, and the next application went out on the 16th.',
       checkedAt: '2026-10-17T21:10:00Z',
     },
+    question: null,
+    answer: null,
+    answeredAt: null,
   },
 ];
 
@@ -158,6 +172,9 @@ const marked: Insight[] = [
     },
     fired: [],
     check: null,
+    question: null,
+    answer: null,
+    answeredAt: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
@@ -174,6 +191,9 @@ const marked: Insight[] = [
     verdict: { verdict: 'not_quite', note: 'Both matter; the team decides between two good products.', decidedAt: '2026-10-11T08:05:00Z' },
     fired: [],
     check: null,
+    question: null,
+    answer: null,
+    answeredAt: null,
   },
 ];
 
@@ -278,6 +298,10 @@ export function YouInsightsPreview({
       run={insightRunState(empty && state === 'ready' ? null : latest, NOW)}
       runWhen="Today, 9:40 AM BST"
       available
+      now={{
+        body: 'Low on money, so contract work comes first for a few weeks. Not applying to city roles any more.',
+        updatedAt: '2026-10-20T09:00:00Z',
+      }}
       timezone="Europe/London"
       actions={actions}
       open={open}

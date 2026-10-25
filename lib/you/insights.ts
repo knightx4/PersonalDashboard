@@ -71,6 +71,10 @@ export type Insight = {
   fired: FiredTripwire[];
   /** For a prediction that has been checked, the result; null otherwise. */
   check: PredictionCheck | null;
+  /** The question the run ended the card with, and what they wrote back (you 0018). */
+  question: string | null;
+  answer: string | null;
+  answeredAt: string | null;
 };
 
 export type InsightRun = {
@@ -86,7 +90,7 @@ export type InsightRun = {
 
 export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
-  'check_on, outcome, outcome_note, checked_at, ' +
+  'check_on, outcome, outcome_note, checked_at, question, answer, answered_at, ' +
   'insight_verdicts(verdict, note, decided_at), ' +
   'insight_tripwires(kind, last_fired_at, fired_evidence)';
 
@@ -185,6 +189,9 @@ export function insightFromRow(row: Record<string, unknown>): Insight | null {
     verdict: verdictOf(row.insight_verdicts),
     fired: firedFrom(row.insight_tripwires),
     check: checkOf(row),
+    question: textOrNull(row.question),
+    answer: textOrNull(row.answer),
+    answeredAt: textOrNull(row.answered_at),
   };
 }
 
@@ -286,6 +293,65 @@ export async function saveVerdict(
   const saved = verdictOf(data);
   if (error || !saved) throw new Error(`Saving your mark failed: ${error?.message ?? 'no row'}`);
   return saved;
+}
+
+/** The most an answer to a card's question holds. */
+export const MAX_ANSWER = 4000;
+
+/**
+ * Saves what they wrote back to a card's question, replacing any earlier
+ * answer; a blank answer clears it. Returns the answer as saved.
+ */
+export async function saveAnswer(
+  client: YouSupabaseClient,
+  userId: string,
+  insightId: string,
+  answer: string,
+): Promise<{ answer: string | null; answeredAt: string | null }> {
+  const cleaned = textOrNull(answer);
+  if (cleaned && cleaned.length > MAX_ANSWER)
+    throw new Error('An answer holds at most 4,000 characters.');
+  const { data, error } = await client
+    .from('insights')
+    .update({ answer: cleaned, answered_at: cleaned ? new Date().toISOString() : null })
+    .eq('id', insightId)
+    .eq('user_id', userId)
+    .select('answer, answered_at')
+    .single();
+  if (error || !data) throw new Error(`Saving your answer failed: ${error?.message ?? 'no row'}`);
+  const row = data as Record<string, unknown>;
+  return { answer: textOrNull(row.answer), answeredAt: textOrNull(row.answered_at) };
+}
+
+// ---------------------------------------------------------------------------
+// Where they are now (you.now, you 0018).
+// ---------------------------------------------------------------------------
+
+/** The most the note on where they are now holds. */
+export const MAX_NOW = 4000;
+
+export type NowNote = { body: string; updatedAt: string | null };
+
+/** Their note on where they are now, empty before they first write one. */
+export async function loadNow(client: YouSupabaseClient, userId: string): Promise<NowNote> {
+  const { data, error } = await client.from('now').select('body, updated_at').eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(`Reading where you are now failed: ${error.message}`);
+  const row = (data ?? {}) as Record<string, unknown>;
+  return { body: text(row.body), updatedAt: textOrNull(row.updated_at) };
+}
+
+/** Saves their note on where they are now; the one row is made the first time. */
+export async function saveNow(client: YouSupabaseClient, userId: string, body: string): Promise<NowNote> {
+  const cleaned = body.trim();
+  if (cleaned.length > MAX_NOW) throw new Error('This note holds at most 4,000 characters.');
+  const { data, error } = await client
+    .from('now')
+    .upsert({ user_id: userId, body: cleaned }, { onConflict: 'user_id' })
+    .select('body, updated_at')
+    .single();
+  if (error || !data) throw new Error(`Saving where you are now failed: ${error?.message ?? 'no row'}`);
+  const row = data as Record<string, unknown>;
+  return { body: text(row.body), updatedAt: textOrNull(row.updated_at) };
 }
 
 // ---------------------------------------------------------------------------

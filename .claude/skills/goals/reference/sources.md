@@ -561,6 +561,16 @@ Their own details, one row: phone, LinkedIn address, citizenship, race, gender a
 - Opens at `/you/details`
 - custom_fields is a jsonb list of {id, label, value}, the fields they named themselves (at most 30). A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).
 
+### `you.now` (You)
+
+Where they are at the moment, one row in their own words: money, what they are focused on, what they have decided against.
+
+- Search: `body`
+- Name a row by `body`; link it by `user_id`
+- Scoped to the person by `user_id`, not user_id
+- Opens at `/you/insights`
+- Written on the Insights tab (you 0018). Every insights run reads it first; it is their current situation, so it outranks older notes on the same subject.
+
 ### `you.places` (You)
 
 The places they have lived, with when they moved in and out.

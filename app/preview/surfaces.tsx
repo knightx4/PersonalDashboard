@@ -9141,6 +9141,18 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // Where they are now, folded open above the deck (you 0018).
+    id: 'you-insights-now',
+    label: 'You · Insights, where you are now open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ now: true }} />
+      </div>
+    ),
+  },
+  {
     // A prediction reaches the deck only once a run has checked it, so it
     // always shows the result under the claim.
     id: 'you-insights-prediction',

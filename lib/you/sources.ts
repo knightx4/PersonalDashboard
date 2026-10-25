@@ -8,6 +8,7 @@ const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
 const DETAILS: Section = { href: '/you/details', label: 'Details' };
 const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
+const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -115,6 +116,22 @@ export const youSources: ModuleSources = {
       // One row per person, with no id to name it by.
       page: null,
       note: 'custom_fields is a jsonb list of {id, label, value}, the fields they named themselves (at most 30). A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
+    },
+    {
+      table: 'you.now',
+      module: 'You',
+      holds: 'Where they are at the moment, one row in their own words: money, what they are focused on, what they have decided against.',
+      weight: 'record',
+      search: ['body'],
+      title: 'body',
+      newest: 'updated_at',
+      ref: 'user_id',
+      owner: 'user_id',
+      href: () => '/you/insights',
+      section: INSIGHTS,
+      // One row per person, with no id to name it by.
+      page: null,
+      note: 'Written on the Insights tab (you 0018). Every insights run reads it first; it is their current situation, so it outranks older notes on the same subject.',
     },
     {
       table: 'you.places',
