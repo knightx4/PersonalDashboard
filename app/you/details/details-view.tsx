@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useId, useState } from 'react';
 import { X } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { PageHeader } from '@/components/shell/page-header';
@@ -12,12 +12,11 @@ import { IconButton } from '@/components/ui/icon-button';
 import { linkVariants } from '@/components/ui/link';
 import { Stat } from '@/components/ui/stat';
 import { Tooltip } from '@/components/ui/tooltip';
-import { ValueList, ValueRow } from '@/components/ui/value-row';
+import { ValueList } from '@/components/ui/value-row';
 import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
   CUSTOM_FIELDS_MAX,
-  CUSTOM_LABEL_MAX,
   customFieldErrors,
   DETAIL_KEYS,
   DETAIL_LABELS,
@@ -47,13 +46,14 @@ const INPUT_PROPS: Partial<Record<DetailKey, React.ComponentProps<'input'>>> = {
  * person added of their own (plan #2531.2). One Edit turns the list into
  * fields in the same place (law 14), where an own field's name can be
  * changed where it stands and the field removed; Save puts the answers back.
- * Add a field opens a name box under the list, in the form. The rail says how
- * many of the six are set and who reads them.
+ * Add a field puts a new row in the form with the caret in its name. The rail
+ * says how many of the six are set and who reads them, once any is.
  *
  * `save` is the server action, passed in so the gallery can draw the tab
- * without one; `editing`, `adding`, `revealRemove` and `state` let it draw the
- * form open, the name box open, a remove button held as on hover, and a
- * refused save. A refused save keeps what was typed and says why under it.
+ * without one; `editing`, `adding`, `revealRemove`, `renaming` and `state` let
+ * it draw the form open, a new row just added, a remove button held as on
+ * hover, a name being changed, and a refused save. A refused save keeps what
+ * was typed and says why under it.
  */
 export function DetailsView({
   details,
@@ -61,6 +61,7 @@ export function DetailsView({
   editing: startEditing = false,
   adding: startAdding = false,
   revealRemove,
+  renaming,
   state: startState = {},
 }: {
   details: Details;
@@ -69,6 +70,8 @@ export function DetailsView({
   adding?: boolean;
   /** The id of an own field whose remove button shows as if pointed at. For the gallery. */
   revealRemove?: string;
+  /** The id of an own field whose name box is open. For the gallery. */
+  renaming?: string;
   state?: DetailsFormState;
 }) {
   const [state, action, pending] = useActionState(
@@ -87,7 +90,11 @@ export function DetailsView({
   }
 
   const shown = state.saved ?? details;
-  const setCount = DETAIL_KEYS.filter((key) => shown[key] !== null).length;
+  // A refused save draws what was typed, so the count follows that, not the
+  // stored row the form no longer shows.
+  const setCount = DETAIL_KEYS.filter((key) =>
+    state.values ? state.values[key].trim() !== '' : shown[key] !== null,
+  ).length;
   const canAdd = shown.custom_fields.length < CUSTOM_FIELDS_MAX;
 
   const header = (
@@ -117,8 +124,8 @@ export function DetailsView({
                 action={action}
                 pending={pending}
                 adding={adding}
-                setAdding={setAdding}
                 revealRemove={revealRemove}
+                renaming={renaming}
                 onCancel={() => {
                   setEditing(false);
                   setAdding(false);
@@ -128,19 +135,20 @@ export function DetailsView({
               <div className="space-y-4">
                 <ValueList className="space-y-3">
                   {DETAIL_KEYS.map((key) => (
-                    <ValueRow
+                    <DetailRow
                       key={key}
                       label={DETAIL_LABELS[key]}
                       value={readValue(key, shown[key])}
                     />
                   ))}
                   {shown.custom_fields.map((field) => (
-                    <ValueRow key={field.id} label={field.label} value={field.value} />
+                    <DetailRow key={field.id} label={field.label} value={field.value} />
                   ))}
                 </ValueList>
                 {canAdd ? (
                   <AddTrigger
                     label="Add a field"
+                    className={ADD_FIELD}
                     onClick={() => {
                       setEditing(true);
                       setAdding(true);
@@ -154,13 +162,43 @@ export function DetailsView({
       }
       rail={
         <Card padding="standard" className="space-y-3">
-          <Stat value={`${setCount} of ${DETAIL_KEYS.length}`} label="details set" />
+          {/* No "0 of 6" while none is set (law 1): the sentence says it alone. */}
+          {setCount > 0 ? (
+            <Stat value={`${setCount} of ${DETAIL_KEYS.length}`} label="details set" />
+          ) : null}
           <p className="text-small text-ink-muted">
             Dash reads all six, and any fields you add, when it answers you or works on your goals.
           </p>
         </Card>
       }
     />
+  );
+}
+
+/**
+ * Add a field in ink, at a link's weight: on this tab it is the one way to
+ * grow the list, so it is not left in ghost beside the "Not set" values.
+ */
+const ADD_FIELD = 'font-medium text-ink hover:text-ink';
+
+/**
+ * One detail, read: its name and its value on one line at every width, the
+ * name in a column that wraps a long one, so six facts take six lines on a
+ * phone rather than twelve. ValueRow stacks them below 448px, which suits a
+ * long value under a short name but doubles a list of short answers.
+ */
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  const empty =
+    value === null || value === undefined || (typeof value === 'string' && !value.trim());
+  return (
+    <div className="flex items-baseline gap-3">
+      <dt className="w-28 shrink-0 text-small text-ink-muted [overflow-wrap:anywhere] @md:w-40">
+        {label}
+      </dt>
+      <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] text-ui leading-relaxed text-ink">
+        {empty ? <span className="text-ink-ghost">Not set</span> : value}
+      </dd>
+    </div>
   );
 }
 
@@ -188,8 +226,8 @@ function DetailsForm({
   action,
   pending,
   adding,
-  setAdding,
   revealRemove,
+  renaming,
   onCancel,
 }: {
   details: Details;
@@ -197,8 +235,8 @@ function DetailsForm({
   action: (form: FormData) => void;
   pending: boolean;
   adding: boolean;
-  setAdding: (adding: boolean) => void;
   revealRemove?: string;
+  renaming?: string;
   onCancel: () => void;
 }) {
   const errors = state.errors ?? {};
@@ -225,8 +263,8 @@ function DetailsForm({
       <OwnFields
         initial={state.fields ?? details.custom_fields}
         adding={adding}
-        setAdding={setAdding}
         revealRemove={revealRemove}
+        renaming={renaming}
       />
       <p className="text-small text-ink-muted">Leave a field empty to clear it.</p>
       <FieldError>{state.error}</FieldError>
@@ -261,46 +299,49 @@ function DetailsForm({
  * The list travels as one hidden `custom_fields` JSON value, so a Save
  * replaces the stored list with exactly what the form shows. An error shows
  * under the field it is about as soon as it is true.
+ *
+ * Add a field puts a new row at the end with the caret in its name, in one
+ * press, so the form's own Save and Cancel are the only buttons it has. A new
+ * row left with no name and no value is not an error: it is left out of the
+ * list Save sends, as if it had never been added.
  */
 function OwnFields({
   initial,
   adding,
-  setAdding,
   revealRemove,
+  renaming,
 }: {
   initial: CustomField[];
   adding: boolean;
-  setAdding: (adding: boolean) => void;
   revealRemove?: string;
+  renaming?: string;
 }) {
-  const [fields, setFields] = useState<CustomField[]>(initial);
-  const [name, setName] = useState('');
-  const errors = customFieldErrors(fields);
-  const nameTooLong = name.trim().length > CUSTOM_LABEL_MAX;
+  // useId, not a random id, for the row added before the form first draws:
+  // the gallery renders it on the server, and the two ids must agree.
+  const firstNew = `new${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const [fields, setFields] = useState<CustomField[]>(() =>
+    adding && initial.length < CUSTOM_FIELDS_MAX
+      ? [...initial, { id: firstNew, label: '', value: '' }]
+      : initial,
+  );
+  const [fresh, setFresh] = useState<string | undefined>(adding ? firstNew : undefined);
+  const kept = fields.filter((field) => field.label.trim() || field.value.trim());
+  const errors = customFieldErrors(kept);
   const canAdd = fields.length < CUSTOM_FIELDS_MAX;
 
   const change = (id: string, patch: Partial<CustomField>) =>
     setFields((list) => list.map((field) => (field.id === id ? { ...field, ...patch } : field)));
 
   const add = () => {
-    const label = name.trim();
-    if (!label || nameTooLong || !canAdd) return;
+    if (!canAdd) return;
     const id = crypto.randomUUID();
-    setFields((list) => [...list, { id, label, value: '' }]);
-    setName('');
-    setAdding(false);
-    // The new field's box takes the caret, so the value is typed next.
-    requestAnimationFrame(() => document.getElementById(`own-${id}`)?.focus());
-  };
-
-  const closeNameBox = () => {
-    setName('');
-    setAdding(false);
+    setFields((list) => [...list, { id, label: '', value: '' }]);
+    setFresh(id);
   };
 
   return (
     <div className={cn('space-y-5', fields.length > 0 && 'border-t border-border pt-5')}>
-      <input type="hidden" name="custom_fields" value={JSON.stringify(fields)} />
+      <input type="hidden" name="custom_fields" value={JSON.stringify(kept)} />
       {fields.length > 0 ? (
         <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2">
           {fields.map((field) => {
@@ -314,6 +355,7 @@ function OwnFields({
                     id={`own-${field.id}-name`}
                     label={field.label}
                     invalid={Boolean(error) && !field.label.trim()}
+                    startRenaming={field.id === fresh || field.id === renaming}
                     describedBy={errorId}
                     onChange={(label) => change(field.id, { label })}
                   />
@@ -321,7 +363,7 @@ function OwnFields({
                     label="Remove this field"
                     align="end"
                     defaultOpen={shown}
-                    className="shrink-0"
+                    className="ml-auto shrink-0"
                   >
                     <IconButton
                       size="sm"
@@ -357,53 +399,8 @@ function OwnFields({
           })}
         </div>
       ) : null}
-      {adding && canAdd ? (
-        // In the same two columns as the fields above, so the box is as wide as theirs.
-        <div className="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
-          <div>
-            <Field
-              id="own-new-name"
-              label="Name of the new field"
-              error={
-                nameTooLong ? `A name can be at most ${CUSTOM_LABEL_MAX} characters.` : undefined
-              }
-            >
-              <Input
-                id="own-new-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    add();
-                  } else if (event.key === 'Escape') {
-                    event.preventDefault();
-                    closeNameBox();
-                  }
-                }}
-                placeholder="Such as Frequent flyer number"
-                autoComplete="off"
-                autoFocus
-              />
-            </Field>
-            <div className="mt-2 flex items-center gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={add}
-                disabled={!name.trim() || nameTooLong}
-              >
-                Add field
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={closeNameBox}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : canAdd ? (
-        <AddTrigger label="Add a field" onClick={() => setAdding(true)} />
+      {canAdd ? (
+        <AddTrigger label="Add a field" className={ADD_FIELD} onClick={add} />
       ) : (
         <p className="text-small text-ink-muted">
           You can keep at most {CUSTOM_FIELDS_MAX} fields of your own.
@@ -415,26 +412,30 @@ function OwnFields({
 
 /**
  * An own field's name, which renames the field where it stands. At rest it is
- * text set as the six labels are, wrapping when long; pressed, it becomes a
- * box holding the name, 16px on a phone so iOS does not zoom the page, and
- * Enter, Escape or leaving it puts the text back. A field with no name shows
- * "Add a name" in the box's place, in the danger colour while that is what
- * stops the save.
+ * text set as the six labels are, wrapping when long, over a dashed underline
+ * the six do not have, so it reads as something that can be changed; pressed,
+ * it becomes a box holding the name, 16px on a phone so iOS does not zoom the
+ * page, and Enter, Escape or leaving it puts the text back. A field with no
+ * name shows "Add a name" in the box's place, drawn as a box with a danger
+ * outline while that is what stops the save.
  */
 function OwnFieldName({
   id,
   label,
   invalid,
+  startRenaming = false,
   describedBy,
   onChange,
 }: {
   id: string;
   label: string;
   invalid: boolean;
+  /** Open with the name box showing and the caret in it: a row just added. */
+  startRenaming?: boolean;
   describedBy?: string;
   onChange: (label: string) => void;
 }) {
-  const [renaming, setRenaming] = useState(false);
+  const [renaming, setRenaming] = useState(startRenaming);
   if (renaming) {
     return (
       <div className="relative min-w-0 flex-1">
@@ -451,10 +452,13 @@ function OwnFieldName({
             }
           }}
           aria-label="Name of this field"
+          placeholder="Name, such as Passport number"
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           autoFocus
-          className="relative -ml-1 font-medium text-ink-muted sm:text-small"
+          // Drawn focused for as long as it is open, since leaving it closes
+          // it: the value boxes' focus outline and ring, the name in ink.
+          className="relative border-accent bg-surface px-2 py-1 font-medium text-ink ring-1 ring-accent/40 hover:bg-surface sm:text-small"
         />
       </div>
     );
@@ -467,9 +471,12 @@ function OwnFieldName({
       aria-describedby={describedBy}
       className={cn(
         PRESS_AREA,
-        'press -mx-1 min-w-0 flex-1 rounded-control px-1 text-left text-small font-medium [overflow-wrap:anywhere]',
+        'press min-w-0 text-left text-small font-medium [overflow-wrap:anywhere]',
         'transition-colors duration-quick hover:bg-sunken',
-        invalid ? 'text-danger' : label.trim() ? 'text-ink-muted' : 'text-ink-ghost',
+        invalid
+          ? 'flex-1 rounded-control border border-danger px-2 py-1 text-danger'
+          : 'rounded-control underline decoration-border-strong decoration-dashed underline-offset-4',
+        !invalid && (label.trim() ? 'text-ink-muted' : 'text-ink-ghost'),
       )}
     >
       {label.trim() || 'Add a name'}
