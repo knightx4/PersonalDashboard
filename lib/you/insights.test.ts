@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import {
   insightFromRow,
+  linkText,
   layersOf,
   listInsights,
   receiptsOf,
@@ -178,5 +179,43 @@ describe('the store', () => {
       { onConflict: 'insight_id' },
     );
     await expect(saveVerdict(client, 'user-1', 'i1', 'meh' as never)).rejects.toThrow('Unknown verdict');
+  });
+});
+
+describe('linkText', () => {
+  const receipts = [
+    { source: 'Pending/Learning Tool Idea.md', rowId: null, quote: 'Helping create connection is a big part of the value', link: '/vault/n/Pending/Learning%20Tool%20Idea.md' },
+    { source: 'Bulk/Bulk - Ideas/GN.md', rowId: null, quote: 'short', link: '/vault/n/GN.md' },
+    { source: 'job_search.applications', rowId: 'a1', quote: '296 sent', link: null },
+  ];
+
+  it('links the first quote of a receipt, ignoring case', () => {
+    const parts = linkText("It says 'helping create connection is a big part of the value'.", receipts);
+    expect(parts).toEqual([
+      { text: "It says '", link: null },
+      { text: 'helping create connection is a big part of the value', link: '/vault/n/Pending/Learning%20Tool%20Idea.md' },
+      { text: "'.", link: null },
+    ]);
+  });
+
+  it('links a note named as whole words, once', () => {
+    const parts = linkText('The GN note, unlike GNU, and the GN note again.', receipts);
+    expect(parts.filter((p) => p.link)).toEqual([{ text: 'GN', link: '/vault/n/GN.md' }]);
+    expect(parts.map((p) => p.text).join('')).toBe('The GN note, unlike GNU, and the GN note again.');
+  });
+
+  it('keeps links a run wrote and drops an unsafe one to its words', () => {
+    const parts = linkText('See [the journal](/vault/n/Me/Journal.md) and [this](javascript:alert(1)).', []);
+    expect(parts).toEqual([
+      { text: 'See ', link: null },
+      { text: 'the journal', link: '/vault/n/Me/Journal.md' },
+      { text: ' and ', link: null },
+      { text: 'this', link: null },
+      { text: ').', link: null },
+    ]);
+  });
+
+  it('leaves text with nothing to link alone', () => {
+    expect(linkText('Nothing here.', receipts)).toEqual([{ text: 'Nothing here.', link: null }]);
   });
 });
