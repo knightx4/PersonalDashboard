@@ -33,6 +33,11 @@
  * October 2026. A goal with a step already waiting on an open question has
  * had its ask: its plain steps get no move until the answer comes.
  *
+ * A goal at rest gets no moves at all (`resting`): one offered for parking,
+ * where the park row on the Inbox is the one question about it, and one
+ * whose question went unanswered lately (RESTING_AFTER_DEFAULT_DAYS), which
+ * the person has just said nothing to.
+ *
  * Pure. The reads are in lib/goals/stale-steps-store.ts.
  */
 import { waitsOnNothing } from '@/lib/goals/dependencies';
@@ -44,6 +49,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A step of yours untouched this many days gets a move from the morning run. */
 export const STALE_AFTER_DAYS = 7;
+
+/** How long a goal is left alone after one of its questions closed unanswered. */
+export const RESTING_AFTER_DEFAULT_DAYS = 21;
 
 /** More than this many and the rest wait for tomorrow, so one run stays one sitting. */
 export const STALE_STEP_LIMIT = 10;
@@ -131,7 +139,7 @@ function waitsOnAQuestion(node: StepNode, nodes: ReadonlyMap<string, StepNode>):
 /**
  * Every step of yours that is on you and has sat for STALE_AFTER_DAYS or
  * more, longest first. `underWay` holds the steps with a progress entry,
- * which are left out.
+ * which are left out, and `resting` the goals left alone (see above).
  */
 export function staleSteps(
   goals: Goal[],
@@ -139,11 +147,12 @@ export function staleSteps(
   touched: Map<string, number>,
   now: number,
   underWay: ReadonlySet<string> = new Set(),
+  resting: ReadonlySet<string> = new Set(),
 ): StaleStep[] {
   const nodes = index(stepsByGoal);
   const stale: StaleStep[] = [];
   for (const goal of goals) {
-    if (goal.status !== 'open') continue;
+    if (goal.status !== 'open' || resting.has(goal.id)) continue;
     const roots = stepsByGoal.get(goal.id) ?? [];
     const askedAlready = (list: StepNode[]): boolean =>
       list.some(
@@ -183,6 +192,50 @@ export function staleSteps(
   }
   return stale.sort((a, b) => b.idleDays - a.idleDays);
 }
+
+/**
+ * The goals whose questions closed unanswered (goals.items.defaulted_at) in
+ * the last RESTING_AFTER_DEFAULT_DAYS, from the ids and times of those
+ * questions, found in the trees by id.
+ */
+export function restingAfterDefault(
+  stepsByGoal: Map<string, StepNode[]>,
+  defaulted: readonly { id: string; defaultedAt: string }[],
+  now: number,
+): Set<string> {
+  const recent = new Set(
+    defaulted
+      .filter((q) => now - Date.parse(q.defaultedAt) < RESTING_AFTER_DEFAULT_DAYS * DAY_MS)
+      .map((q) => q.id),
+  );
+  const out = new Set<string>();
+  if (recent.size === 0) return out;
+  const holds = (list: StepNode[]): boolean =>
+    list.some((node) => recent.has(node.id) || holds(node.children));
+  for (const [goalId, roots] of stepsByGoal) if (holds(roots)) out.add(goalId);
+  return out;
+}
+
+/**
+ * The open questions waiting on the person across every goal, as the cap in
+ * goals.cap_open_questions (migrations-goals/0088) counts them.
+ */
+export function openQuestionCount(stepsByGoal: Map<string, StepNode[]>): number {
+  let count = 0;
+  const walk = (list: StepNode[]) => {
+    for (const node of list) {
+      if (node.kind === 'decision' && node.status === 'open' && node.resolution === null && !node.dismissedAt) {
+        count += 1;
+      }
+      walk(node.children);
+    }
+  };
+  for (const roots of stepsByGoal.values()) walk(roots);
+  return count;
+}
+
+/** The most open questions the Inbox holds, as goals.open_question_cap() says. */
+export const OPEN_QUESTION_CAP = 5;
 
 /** One step's line in the morning brief. */
 export function staleLine(step: StaleStep): string {

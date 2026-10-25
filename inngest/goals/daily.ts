@@ -30,10 +30,18 @@ import { passiveMentions, unmentioned, type PassiveMention } from '@/lib/goals/p
 import type { Suggestion } from '@/lib/goals/suggestions';
 import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
-import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
+import { goalProposals } from '@/lib/goals/goal-proposals';
+import {
+  OPEN_QUESTION_CAP,
+  RESTING_AFTER_DEFAULT_DAYS,
+  STALE_STEP_LIMIT,
+  openQuestionCount,
+  restingAfterDefault,
+  staleSteps,
+} from '@/lib/goals/stale-steps';
 import { statementLines, type StatementSource } from '@/lib/goals/statements';
 import { loadStatementSources } from '@/lib/goals/statements-store';
-import { loadStepTouches } from '@/lib/goals/stale-steps-store';
+import { loadDefaultedQuestions, loadStepTouches } from '@/lib/goals/stale-steps-store';
 import { accountTimeZone, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
@@ -313,14 +321,33 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   );
   // A step of the person's untouched for a week gets a move (plan #1083).
   // Only an open goal has one, so the review above already starts the run.
-  // A step under way is left to the nudge above.
+  // A step under way is left to the nudge above. A goal offered for parking,
+  // or whose question just went unanswered, is left alone: the Inbox already
+  // holds the one question about it.
+  const defaulted = await loadDefaultedQuestions(
+    client,
+    userId,
+    new Date(now - RESTING_AFTER_DEFAULT_DAYS * 86_400_000).toISOString(),
+  ).catch(() => []);
+  const resting = restingAfterDefault(byGoal, defaulted, now);
+  for (const p of goalProposals({
+    goals: goals.map((g) => g.goal),
+    reviews: latest,
+    activity,
+    now,
+  })) {
+    if (p.kind === 'park') resting.add(p.goalId);
+  }
   const sitting = staleSteps(
     goals.map((g) => g.goal),
     byGoal,
     touched,
     now,
     new Set(Object.keys(progress)),
+    resting,
   ).slice(0, STALE_STEP_LIMIT);
+  // The questions the run may still add before the Inbox is at its cap.
+  const asksLeft = Math.max(0, OPEN_QUESTION_CAP - openQuestionCount(byGoal));
   // A step of the person's not judged yet for a Dash prep step, ten a morning,
   // newest first (plan #1217). One listed above as stale gets only that move,
   // since preparing it is one of those moves.
@@ -376,6 +403,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         answers,
         review,
         stale: sitting,
+        asksLeft,
         underWay,
         unjudged,
         evidence: evidence?.lines ?? null,

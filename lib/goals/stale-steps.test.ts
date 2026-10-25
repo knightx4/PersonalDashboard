@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { dailyRunText } from './daily-run';
 import { attachDependencies } from './dependencies';
-import { STALE_AFTER_DAYS, staleLine, staleSteps, touchTimes } from './stale-steps';
+import {
+  STALE_AFTER_DAYS,
+  openQuestionCount,
+  restingAfterDefault,
+  staleLine,
+  staleSteps,
+  touchTimes,
+} from './stale-steps';
 import { buildForest, markStartDates, type Step } from './steps';
 import type { Goal } from './tree';
 
@@ -49,7 +56,7 @@ function stale(
   goals: Goal[],
   steps: Step[],
   touched: Record<string, number>,
-  options: { deps?: [string, string][]; today?: string; underWay?: string[] } = {},
+  options: { deps?: [string, string][]; today?: string; underWay?: string[]; resting?: string[] } = {},
 ) {
   const { byGoal, nodes } = buildForest(
     goals.map((g) => g.id),
@@ -62,7 +69,7 @@ function stale(
   );
   if (options.today) markStartDates(byGoal, options.today);
   const times = new Map(Object.entries(touched).map(([id, days]) => [id, NOW - days * DAY]));
-  return staleSteps(goals, byGoal, times, NOW, new Set(options.underWay ?? []));
+  return staleSteps(goals, byGoal, times, NOW, new Set(options.underWay ?? []), new Set(options.resting ?? []));
 }
 
 describe('touchTimes', () => {
@@ -219,6 +226,16 @@ describe('staleSteps', () => {
     expect(stale([goal('g')], answered, touched, { deps }).map((s) => s.id)).toEqual(['asked', 'dated']);
   });
 
+  it('gives a goal at rest no moves at all', () => {
+    const list = stale(
+      [goal('g'), goal('h')],
+      [step('a', 'g', { dueOn: '2026-10-10' }), step('b', 'h')],
+      { a: 20, b: 20 },
+      { resting: ['g'] },
+    );
+    expect(list.map((s) => s.id)).toEqual(['b']);
+  });
+
   it('leaves a step with no known time off the list rather than calling it untouched', () => {
     expect(stale([goal('g')], [step('a', 'g')], {})).toEqual([]);
   });
@@ -229,6 +246,47 @@ describe('staleSteps', () => {
     expect(staleLine(line)).toBe(
       '- "a" (goals.items id a), under the goal "Goal g": untouched 8 days, already prepared once',
     );
+  });
+});
+
+describe('restingAfterDefault', () => {
+  it('rests a goal whose question closed unanswered in the last three weeks', () => {
+    const { byGoal } = buildForest(
+      ['g', 'h', 'k'],
+      [
+        step('qg', 'g', { kind: 'decision', status: 'done' }),
+        step('phase', 'h'),
+        step('qh', 'phase', { kind: 'decision', status: 'done' }),
+        step('qk', 'k', { kind: 'decision', status: 'done' }),
+      ],
+    );
+    const resting = restingAfterDefault(
+      byGoal,
+      [
+        { id: 'qg', defaultedAt: daysAgo(2) },
+        { id: 'qh', defaultedAt: daysAgo(20) },
+        { id: 'qk', defaultedAt: daysAgo(22) },
+      ],
+      NOW,
+    );
+    expect([...resting].sort()).toEqual(['g', 'h']);
+  });
+});
+
+describe('openQuestionCount', () => {
+  it('counts the open questions not put aside, as the database cap does', () => {
+    const { byGoal } = buildForest(
+      ['g'],
+      [
+        step('open', 'g', { kind: 'decision' }),
+        step('phase', 'g'),
+        step('under', 'phase', { kind: 'decision' }),
+        step('aside', 'g', { kind: 'decision', dismissedAt: daysAgo(1) }),
+        step('answered', 'g', { kind: 'decision', status: 'done', resolution: 'A' }),
+        step('mine', 'g'),
+      ],
+    );
+    expect(openQuestionCount(byGoal)).toBe(2);
   });
 });
 
@@ -256,7 +314,22 @@ describe('the morning brief', () => {
     const moves = text.indexOf('"Book a trial class" (goals.items id s)');
     expect(moves).toBeGreaterThan(text.indexOf('Closing a step from evidence'));
     expect(moves).toBeLessThan(text.indexOf('goals.reviews'));
-    expect(text).toContain('"Moving a step\nthat has sat for a week"');
+    expect(text).toContain('"Moving a step that has sat for a week"');
+  });
+
+  it('tells the run how many questions it has left, and to decide when none are', () => {
+    const base = {
+      userId: 'u',
+      runId: 'r',
+      steps: [],
+      review: [
+        { id: 'g', title: 'Home', acceptance: null, lastDoneAt: null, quietDays: 9, stalled: false, last: null },
+      ],
+      stale: [{ id: 's', title: 'Clear the desk', goalId: 'g', goalTitle: 'Home', idleDays: 9, prepared: false }],
+    };
+    expect(dailyRunText({ ...base, asksLeft: 2 })).toContain('Questions left: 2, across this whole run.');
+    expect(dailyRunText({ ...base, asksLeft: 0 })).toContain('Questions left: none.');
+    expect(dailyRunText(base)).not.toContain('Questions left');
   });
 
   it('says nothing about moves when no step has sat', () => {

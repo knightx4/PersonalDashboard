@@ -19,7 +19,7 @@ import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 import { loadMentionStates } from '@/lib/goals/mentions-store';
 import { passiveMentions, type MentionState, type PassiveMention } from '@/lib/goals/passive-mentions';
-import { todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
+import { suggestedItems, todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
 import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
 import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
@@ -51,6 +51,8 @@ export type Home = {
   waitingRuns: RunQuestion[];
   /** What is coming up within a week under a passive goal, not dismissed (plan #2503.5). */
   mentions: PassiveMention[];
+  /** The weekly run's suggestions to react to, soonest first: offers, kept off the Inbox. */
+  suggested: TodayItem[];
 };
 
 /** How far back the home reads runs: past QUIET_DAYS, so a quiet goal is told from one never worked. */
@@ -107,6 +109,7 @@ export async function loadHome(
     dash: dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
     waitingRuns,
+    suggested: suggestedItems({ goals: tree.goals, byGoal: tree.byGoal, suggestions: input.suggestions }),
     mentions: mentionStates
       ? passiveMentions({
           goals: tree.goals.map((g) => g.goal),

@@ -68,6 +68,9 @@ export async function runGoalsReshape(deps?: Partial<GoalsReshapeDeps>): Promise
     .eq('table_name', 'items')
     .eq('action', 'update')
     .not('new_values->resolution', 'is', null)
+    // A question closed with the default (no answer in five days, or Leave
+    // them as they are) is not an answer to work in (migrations-goals/0088).
+    .is('new_values->>defaulted_at', null)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(ANSWER_LIMIT);

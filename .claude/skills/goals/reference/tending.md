@@ -187,7 +187,9 @@ listed: one with a date, one on Todo, one another step waits on, and the
 first plain step of each goal. The plain steps after it are the goal's
 backlog and are left to sit. A goal with a step already waiting on an
 unanswered question gets no move for its plain steps until the answer, so
-the Inbox holds one "Do you still want…?" per goal at most.
+the Inbox holds one "Do you still want…?" per goal at most. A goal offered
+for parking is not listed (the park row is the one question about it), nor
+is one whose question closed unanswered in the last three weeks.
 
 Give each listed step one move, after closing from evidence and merging (a
 step you just closed or merged needs none) and before the verdicts, so the
@@ -214,8 +216,22 @@ goal, then take the first that fits:
    names it is done and carries a `result`. While that `claude` step is still
    open, the prep is on its way: split the step or ask, rather than
    preparing it a second time.
-3. **Ask whether they still want it** when neither fits, or when the goal
-   has moved on and the step may no longer matter. Add a question beside it
+3. **Set it for later** when the step still makes sense but nothing about it
+   is pressing, or the goal's work is elsewhere this month. Set `starts_on`
+   two to four weeks out and add one line to the step's `detail` saying why
+   ("Set for 15 November: the resume work comes first"). The step leaves the
+   Inbox for the Later list, the Goals home shows the change with an Undo,
+   and it comes back on its day. This is the move for most backlog that has
+   sat, and it asks nothing of the person.
+4. **Ask whether they still want it** only when you cannot tell from what
+   you can read, and the answer would change what you do. The brief says how
+   many questions you have left this run ("Questions left"); the Inbox holds
+   five open questions at most, and past that the database refuses the
+   insert (`goals.cap_open_questions`, `migrations-goals/0088`). When it
+   refuses, or none are left, take move 3 instead. A question goes five
+   days without an answer and closes by itself with the step left as it
+   was (`defaulted_at`), so ask only what is worth one of the five places.
+   Add a question beside it
    (same parent, just before it) and make the step wait on the question:
 
    ```sql

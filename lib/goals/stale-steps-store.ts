@@ -52,3 +52,27 @@ export async function loadStepTouches(
     (progress.data ?? []) as ProgressTouch[],
   );
 }
+
+/**
+ * The owner's questions closed unanswered (goals.items.defaulted_at,
+ * migrations-goals/0088) since `since`, for the goals left alone after one
+ * (restingAfterDefault). A failed read, such as before that migration is
+ * applied, reads as none, which only leaves the morning run as it was.
+ */
+export async function loadDefaultedQuestions(
+  client: GoalsSupabaseClient,
+  userId: string,
+  since: string,
+): Promise<{ id: string; defaultedAt: string }[]> {
+  const { data, error } = await client
+    .from('items')
+    .select('id, defaulted_at')
+    .eq('user_id', userId)
+    .eq('kind', 'decision')
+    .gte('defaulted_at', since);
+  if (error) return [];
+  return ((data ?? []) as { id: string; defaulted_at: string }[]).map((row) => ({
+    id: row.id,
+    defaultedAt: row.defaulted_at,
+  }));
+}

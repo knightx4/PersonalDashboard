@@ -3,8 +3,10 @@
  * most five, each with one action (plan #1075, under #1072).
  *
  * It draws from what the home already reads: questions, approvals, your
- * ready steps, rhythms behind for the period, flags, suggestions and "Did you
- * go?". A Claude step blocked on a question to you (its Needs line asks
+ * ready steps, rhythms behind for the period, flags and "Did you go?". The
+ * weekly run's suggestions are offers rather than things on you, so they are
+ * kept apart (suggestedItems). A question under a goal offered for parking
+ * is left out, since the park row asks about the goal. A Claude step blocked on a question to you (its Needs line asks
  * something) is on you as well, since answering it is what frees the step.
  * Results to read are left out: they are what Dash did, which the home lists
  * separately (plan #1076). A proposal to close a goal whose done-when is met,
@@ -264,6 +266,11 @@ export function todayCandidates(input: TodayInput): Candidate[] {
   for (const item of daily.waiting) {
     if (item.kind === 'question') questions.add(item.id);
   }
+  // A goal offered for parking is asked about once, by the park row: its
+  // questions wait off the list, and close by themselves if never answered.
+  const parking = new Set(
+    (input.proposals ?? []).filter((p) => p.kind === 'park').map((p) => p.goalId),
+  );
 
   for (const { goal } of goals) {
     if (goal.status !== 'open') continue;
@@ -273,6 +280,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         if (node.status === 'proposed' || node.waitsUntil) continue;
         const base = { id: node.id, goalId: goal.id, goalTitle: goal.title };
         if (questions.has(node.id)) {
+          if (parking.has(goal.id)) continue;
           const unblocks = unblockedBy(node, nodes);
           add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
         } else if (node.kind === 'claude' && isStepBlocked(node) && node.blockKind === 'outside') {
@@ -380,17 +388,7 @@ export function todayCandidates(input: TodayInput): Candidate[] {
     });
   }
 
-  const goalTitles = new Map(goals.map(({ goal }) => [goal.id, goal.title]));
-  const goalOf = (s: Suggestion): { goalId: string; goalTitle: string } | null => {
-    if (!s.itemId) return null;
-    const direct = goalTitles.get(s.itemId);
-    if (direct !== undefined) return { goalId: s.itemId, goalTitle: direct };
-    // A suggestion made for a rhythm step names the step; find its goal.
-    for (const [goalId, roots] of byGoal) {
-      if (contains(roots, s.itemId)) return { goalId, goalTitle: goalTitles.get(goalId) ?? '' };
-    }
-    return null;
-  };
+  const goalOf = suggestionGoal(input);
   for (const s of input.didYouGo) {
     const owner = goalOf(s);
     if (!owner) continue;
@@ -404,22 +402,6 @@ export function todayCandidates(input: TodayInput): Candidate[] {
       on: today,
     });
   }
-  for (const s of input.suggestions) {
-    if (s.reaction === 'going') continue; // already said yes; it is on Todo on its day
-    const owner = goalOf(s);
-    if (!owner) continue;
-    add({
-      kind: 'suggestion',
-      id: s.id,
-      title: s.title,
-      detail: s.place,
-      ...owner,
-      unblocks: 0,
-      on: s.happensOn,
-      ...(s.url ? { url: s.url } : {}),
-    });
-  }
-
   for (const p of input.proposals ?? []) {
     const base = { id: p.goalId, goalId: p.goalId, goalTitle: p.goalTitle, unblocks: 0, on: null };
     if (p.kind === 'close') {
@@ -434,6 +416,52 @@ export function todayCandidates(input: TodayInput): Candidate[] {
     }
   }
 
+  return out;
+}
+
+/** The goal a suggestion was made for, found by the goal or by one of its steps. */
+function suggestionGoal(
+  input: Pick<TodayInput, 'goals' | 'byGoal'>,
+): (s: Suggestion) => { goalId: string; goalTitle: string } | null {
+  const goalTitles = new Map(input.goals.map(({ goal }) => [goal.id, goal.title]));
+  return (s) => {
+    if (!s.itemId) return null;
+    const direct = goalTitles.get(s.itemId);
+    if (direct !== undefined) return { goalId: s.itemId, goalTitle: direct };
+    // A suggestion made for a rhythm step names the step; find its goal.
+    for (const [goalId, roots] of input.byGoal) {
+      if (contains(roots, s.itemId)) return { goalId, goalTitle: goalTitles.get(goalId) ?? '' };
+    }
+    return null;
+  };
+}
+
+/**
+ * The weekly run's suggestions still to react to, soonest first, as rows of
+ * their own. They are offers, not things on you: the Inbox and Do next leave
+ * them out (October 2026, when eight sat among 63 rows), and the Goals home
+ * lists them under Suggested for you. One already marked going is on Todo
+ * on its day, so it is not listed.
+ */
+export function suggestedItems(input: Pick<TodayInput, 'goals' | 'byGoal' | 'suggestions'>): TodayItem[] {
+  const goalOf = suggestionGoal(input);
+  const out: TodayItem[] = [];
+  for (const s of input.suggestions) {
+    if (s.reaction === 'going') continue;
+    const owner = goalOf(s);
+    if (!owner) continue;
+    out.push({
+      kind: 'suggestion',
+      id: s.id,
+      title: s.title,
+      detail: s.place,
+      ...owner,
+      action: TODAY_ACTIONS.suggestion,
+      unblocks: 0,
+      on: s.happensOn,
+      ...(s.url ? { url: s.url } : {}),
+    });
+  }
   return out;
 }
 
