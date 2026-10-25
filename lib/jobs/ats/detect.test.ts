@@ -140,6 +140,12 @@ describe('detectPosting', () => {
     );
     expect(result.tier).toBe(3);
     expect(result.reason).toMatch(/paste/i);
+    // The posting is not read from its link, but its board is named.
+    expect(result).toMatchObject({
+      vendor: 'workday',
+      boardToken: 'acme/wd1/careers',
+      jobId: 'New-York/Analyst_JR-284917',
+    });
   });
 
   it('treats an unknown careers page as tier 2 rather than giving up', () => {

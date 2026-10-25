@@ -15,13 +15,15 @@
  *
  * Any of the vendors in lib/jobs/ats/board.ts counts, since the roles search
  * reads all of them (lib/jobs/suggest/boards.ts); in practice the links found
- * are Ashby, Greenhouse and Lever.
+ * are Ashby, Greenhouse and Lever. A Workday career site link
+ * (`citi.wd5.myworkdayjobs.com/en-US/2`) counts too, as `citi/wd5/2`.
  */
 import 'server-only';
 
 import { fetchBoard } from '@/lib/jobs/ats/board';
 import { detectPosting, isBoardVendor, type BoardVendor } from '@/lib/jobs/ats/detect';
 import { safeFetch } from '@/lib/jobs/ats/ssrf';
+import { workdayFromUrl, workdayToken } from '@/lib/jobs/ats/workday-token';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 
 /** A startup whose board was looked for and not found waits this long before the next look. */
@@ -84,6 +86,10 @@ export function boardFromLink(href: string): { vendor: BoardVendor; token: strin
     if (host === 'api.ashbyhq.com') found = { vendor: 'ashby', token: path.match(ASHBY_API)?.[1] ?? null };
     else if (host === 'jobs.ashbyhq.com') found = { vendor: 'ashby', token: detectPosting(url.toString()).boardToken };
     else return null;
+  } else if (/(^|\.)myworkdayjobs\.com$/.test(host)) {
+    // Its token is tenant/wdN/site, which the slug check below would refuse.
+    const board = workdayFromUrl(url)?.board;
+    return board ? { vendor: 'workday', token: workdayToken(board) } : null;
   } else {
     const detected = detectPosting(url.toString());
     if (!isBoardVendor(detected.vendor)) return null;

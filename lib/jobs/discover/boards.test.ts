@@ -44,6 +44,23 @@ describe('boardFromLink', () => {
     expect(boardFromLink('https://api.lever.co/v0/postings/acme?mode=json')).toEqual({ vendor: 'lever', token: 'acme' });
   });
 
+  it('reads a Workday career site link as tenant, data centre and site', () => {
+    expect(boardFromLink('https://citi.wd5.myworkdayjobs.com/en-US/2')).toEqual({ vendor: 'workday', token: 'citi/wd5/2' });
+    expect(boardFromLink('https://acme.wd1.myworkdayjobs.com/External_Careers/job/New-York/Analyst_JR-1')).toEqual({
+      vendor: 'workday',
+      token: 'acme/wd1/External_Careers',
+    });
+    expect(boardFromLink('https://acme.wd1.myworkdayjobs.com/wday/cxs/acme/Careers/jobs')).toEqual({ vendor: 'workday', token: 'acme/wd1/Careers' });
+    expect(boardsOnPage(['https://acme.com/about', 'https://citi.wd5.myworkdayjobs.com/2'])).toEqual([{ vendor: 'workday', token: 'citi/wd5/2' }]);
+  });
+
+  it('does not read a Workday page that names no career site', () => {
+    expect(boardFromLink('https://citi.wd5.myworkdayjobs.com/')).toBeNull();
+    expect(boardFromLink('https://citi.wd5.myworkdayjobs.com/en-US')).toBeNull();
+    expect(boardFromLink('https://www.workday.com/en-us/products/talent-management.html')).toBeNull();
+    expect(boardFromLink('https://www.myworkday.com/acme/d/home.htmld')).toBeNull();
+  });
+
   it('does not read the vendors own sites as boards', () => {
     expect(boardFromLink('https://www.greenhouse.io/careers')).toBeNull();
     expect(boardFromLink('https://www.lever.co/jobs')).toBeNull();

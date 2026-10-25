@@ -9,6 +9,7 @@ import * as recruitee from './recruitee';
 import * as breezy from './breezy';
 import * as bamboohr from './bamboohr';
 import * as rippling from './rippling';
+import * as workday from './workday';
 import { type BoardVendor } from './detect';
 import type { FetchedPosting } from './types';
 
@@ -23,7 +24,7 @@ import type { FetchedPosting } from './types';
  * Seven of the nine already fetched the board and threw all but one posting
  * away. This exposes what they were already doing.
  *
- * Two of them (SmartRecruiters, BambooHR) keep the description on a per-posting
+ * Three of them (SmartRecruiters, BambooHR, Workday) keep the description on a per-posting
  * endpoint, so their listings come back with an empty `text`. That is why
  * `hydrate` exists and why callers must go through it rather than reading
  * `posting.text` straight off a board listing.
@@ -55,6 +56,8 @@ export async function fetchBoard(
       return bamboohr.fetchBoard(boardToken);
     case 'rippling':
       return rippling.fetchBoard(boardToken);
+    case 'workday':
+      return workday.fetchBoard(boardToken);
   }
 }
 
@@ -111,5 +114,7 @@ function fetchOne(
       return bamboohr.fetchPosting(boardToken, jobId);
     case 'rippling':
       return rippling.fetchPosting(boardToken, jobId);
+    case 'workday':
+      return workday.fetchPosting(boardToken, jobId);
   }
 }
