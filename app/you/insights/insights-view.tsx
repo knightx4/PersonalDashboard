@@ -25,10 +25,13 @@ import type {
   InsightDepth,
   InsightReceipt,
   InsightVerdict,
+  PredictionCheck,
+  PredictionOutcome,
   Verdict,
 } from '@/lib/you/insights';
+import { linkText } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { markInsight, startFullReread, startInsightRun, type MarkResult } from './actions';
+import { markInsight, startInsightRun, type MarkResult } from './actions';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -46,29 +49,27 @@ import { markInsight, startFullReread, startInsightRun, type MarkResult } from '
  * what happened and the evidence the nightly check recorded, folded. Marking
  * it again clears the line until the tripwire fires again.
  *
- * Look again starts a run (startInsightRun), one model call that writes in a
- * few minutes; while one is queued or running a banner takes the button's
- * place and the page looks again every minute. Under the deck, Full re-read
- * starts the slow session on the person's Claude plan (startFullReread).
+ * Look again starts a run (startInsightRun), a session on the goals routine
+ * that reads everything and takes a while; while one is queued or running a
+ * banner takes the button's place and the page looks again every minute.
  */
 
 export type InsightsActions = {
   mark: (insightId: string, verdict: Verdict, note?: string | null) => Promise<MarkResult>;
   lookAgain: () => Promise<{ error: string | null }>;
-  fullReread: () => Promise<{ error: string | null }>;
 };
 
-const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun, fullReread: startFullReread };
+const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun };
 
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
   evidence?: boolean;
-  why?: Exclude<Verdict, 'right'>;
+  why?: WhyVerdict;
   earlier?: boolean;
   /** The evidence under a card brought back by a tripwire. */
   fired?: boolean;
-  /** The hint on the Full re-read button, naming the routine. */
-  reread?: boolean;
+  /** The hint on the Look again button, naming the routine. */
+  lookAgain?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -87,25 +88,29 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   right: 'Right',
   not_quite: 'Not quite',
   wrong: 'Wrong',
+  knew_it: 'Knew it',
 };
 
 const VERDICT_TONES: Record<Verdict, ChipTone> = {
   right: 'positive',
   not_quite: 'caution',
   wrong: 'danger',
+  knew_it: 'neutral',
 };
 
-const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
+/** The marks that open a line of why before they save. */
+type WhyVerdict = Exclude<Verdict, 'right' | 'knew_it'>;
+
+const OUTCOME_LABELS: Record<PredictionOutcome, string> = {
+  happened: 'It happened',
+  did_not: 'It did not happen',
+  unclear: 'The records could not tell',
+};
+
+const WHY_PROMPTS: Record<WhyVerdict, string> = {
   not_quite: 'What is not quite right?',
   wrong: 'What makes it wrong?',
 };
-
-/**
- * Look again is one model call on the API; a run is refused before it starts
- * if it is estimated over two dollars (lib/you/insights-write.ts). No run has
- * been priced yet, so the figure is a guess and says so (law 16).
- */
-const LOOK_AGAIN_COST = 'Up to about $2, uncertain';
 
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
@@ -143,7 +148,6 @@ export function InsightsView({
   run,
   runWhen,
   available,
-  rereadAvailable = false,
   timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
@@ -153,17 +157,15 @@ export function InsightsView({
   run: InsightRunState;
   /** When the newest run was asked for, already written in their zone. */
   runWhen: string | null;
-  /** Whether the deployment can write a run (the API key is set). */
+  /** Whether the deployment can start a run (both goals routine variables set). */
   available: boolean;
-  /** Whether the deployment can start a full re-read (both routine variables set). */
-  rereadAvailable?: boolean;
   /** Their timezone, for the date on a card brought back. */
   timezone?: string;
   actions?: InsightsActions;
   open?: InsightsOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, InsightVerdict>>(new Map());
-  const [choosing, setChoosing] = useState<{ id: string; verdict: Exclude<Verdict, 'right'> } | null>(() => {
+  const [choosing, setChoosing] = useState<{ id: string; verdict: WhyVerdict } | null>(() => {
     const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict && !insight.fired.length);
     return open.why && first ? { id: first.id, verdict: open.why } : null;
   });
@@ -225,11 +227,6 @@ export function InsightsView({
       const result = await actions.lookAgain();
       setRunError(result.error);
     });
-  const fullReread = () =>
-    startTransition(async () => {
-      const result = await actions.fullReread();
-      setRunError(result.error);
-    });
 
   const showLookAgain = available && run.kind !== 'running' && run.kind !== 'failed';
   const lookAgainButton = (
@@ -238,9 +235,10 @@ export function InsightsView({
       variant="secondary"
       pending={starting}
       onClick={lookAgain}
-      costText={LOOK_AGAIN_COST}
+      routine="goals"
       what="Cost of looking again"
       align="end"
+      hintOpen={open.lookAgain}
     >
       {starting ? 'Starting…' : 'Look again'}
     </DashAction>
@@ -280,6 +278,9 @@ export function InsightsView({
         <div role="group" aria-label="Your mark" className="flex">
           <Button type="button" variant="secondary" className={MARK_CLASS} onClick={() => mark(insight, 'right')}>
             Right
+          </Button>
+          <Button type="button" variant="secondary" className={MARK_CLASS} onClick={() => mark(insight, 'knew_it')}>
+            Knew it
           </Button>
           {(['not_quite', 'wrong'] as const).map((verdict) => (
             <Button
@@ -340,7 +341,7 @@ export function InsightsView({
                   variant="secondary"
                   pending={starting}
                   onClick={lookAgain}
-                  costText={LOOK_AGAIN_COST}
+                  routine="goals"
                   what="Cost of trying again"
                 >
                   {starting ? 'Starting…' : 'Try again'}
@@ -355,8 +356,8 @@ export function InsightsView({
 
         {!available && (
           <p className="text-ui text-ink-muted">
-            Runs are not set up on this deployment yet. They need ANTHROPIC_API_KEY in the
-            project’s environment variables.
+            Runs are not set up on this deployment yet. They need CLAUDE_GOALS_ROUTINE_ID and
+            CLAUDE_GOALS_ROUTINE_TOKEN in the project’s environment variables.
           </p>
         )}
 
@@ -396,20 +397,6 @@ export function InsightsView({
               </Card>
             }
           />
-        )}
-
-        {rereadAvailable && !nothing && run.kind !== 'running' && (
-          <DashAction
-            type="button"
-            variant="link"
-            pending={starting}
-            onClick={fullReread}
-            routine="goals"
-            what="Cost of a full re-read"
-            hintOpen={open.reread}
-          >
-            Full re-read
-          </DashAction>
         )}
 
         {earlier.length > 0 && (
@@ -462,18 +449,26 @@ function InsightCard({
 
       {fired && <BroughtBack fired={fired} timezone={timezone} defaultOpen={firedOpen} />}
 
+      {insight.check && <Checked insight={insight} check={insight.check} timezone={timezone} />}
+
       {insight.layers.length > 0 && (
         <ol className="space-y-3">
           {insight.layers.map((layer, index) => (
             <li key={index} className="space-y-0.5">
               <p className="text-small font-medium text-ink-muted">{DEPTH_LABELS[layer.depth]}</p>
-              <p className="text-body text-ink [overflow-wrap:anywhere]">{layer.text}</p>
+              <p className="text-body text-ink [overflow-wrap:anywhere]">
+                <LinkedText text={layer.text} receipts={insight.receipts} />
+              </p>
             </li>
           ))}
         </ol>
       )}
 
-      {insight.liveRef && <p className="text-ui text-ink-muted">Tied to {insight.liveRef}</p>}
+      {insight.liveRef && (
+        <p className="text-ui text-ink-muted">
+          Tied to <LinkedText text={insight.liveRef} receipts={insight.receipts} />
+        </p>
+      )}
 
       {insight.receipts.length > 0 && (
         <Disclosure
@@ -491,6 +486,28 @@ function InsightCard({
 
       {why}
     </Card>
+  );
+}
+
+/**
+ * What a run found when it checked a prediction: the result, when Dash made
+ * the prediction and when it checked, and what the records showed. A
+ * prediction reaches the tab only once it has this.
+ */
+function Checked({ insight, check, timezone }: { insight: Insight; check: PredictionCheck; timezone: string }) {
+  const date = (iso: string | null) => (iso ? formatDateInline(iso, timezone) : '');
+  const when = [
+    insight.createdAt && `Predicted ${date(insight.createdAt)}`,
+    check.checkedAt && `checked ${date(check.checkedAt)}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return (
+    <div className="space-y-1" data-insight-checked>
+      <p className="text-body font-medium text-ink">{OUTCOME_LABELS[check.outcome]}</p>
+      {when && <p className="text-small text-ink-muted">{when}</p>}
+      {check.note && <p className="text-body text-ink [overflow-wrap:anywhere]">{check.note}</p>}
+    </div>
   );
 }
 
@@ -540,6 +557,30 @@ export function sourceName(source: string): string {
   }
   const table = (source.split('.').pop() ?? source).replace(/_/g, ' ').trim();
   return table ? table.charAt(0).toUpperCase() + table.slice(1) : source;
+}
+
+/**
+ * A layer's text with its links in place: the ones the run wrote, and the
+ * first place it quotes a piece of evidence or names a note it came from.
+ */
+function LinkedText({ text, receipts }: { text: string; receipts: readonly InsightReceipt[] }) {
+  return (
+    <>
+      {linkText(text, receipts).map((part, index) =>
+        !part.link ? (
+          <span key={index}>{part.text}</span>
+        ) : part.link.startsWith('/') ? (
+          <Link key={index} href={part.link} className={linkVariants()}>
+            {part.text}
+          </Link>
+        ) : (
+          <a key={index} href={part.link} target="_blank" rel="noreferrer noopener" className={linkVariants()}>
+            {part.text}
+          </a>
+        ),
+      )}
+    </>
+  );
 }
 
 function Receipt({ receipt }: { receipt: InsightReceipt }) {

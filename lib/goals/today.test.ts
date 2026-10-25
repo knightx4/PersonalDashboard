@@ -6,6 +6,7 @@ import type { Suggestion } from './suggestions';
 import {
   askedOfYou,
   rhythmBehind,
+  suggestedItems,
   TODAY_CAP,
   todayList,
   todayRanked,
@@ -252,19 +253,29 @@ describe('todayList on the goals as they stood on 26 September', () => {
     expect(list[2].detail).toBe('0 of 5 this week, 2 days left');
   });
 
-  it('puts an event suggested for this week, being dated, ahead of the rhythm', () => {
+  it('keeps a suggested event off the list, as an offer rather than something on you', () => {
     const ta = suggestion('ta', 'volunteer', {
       title: "Transportation Alternatives' volunteer info session",
       happensOn: '2026-09-28',
     });
-    const list = todayList(input(goals, steps, { deps, rhythms, suggestions: [ta] }));
-    expect(titles(list)).toEqual([
-      'Settle on your pay floor',
-      'Which community board is yours?',
+    const given = input(goals, steps, { deps, rhythms, suggestions: [ta] });
+    expect(titles(todayRanked(given))).not.toContain(
       "Transportation Alternatives' volunteer info session",
-      'Send 5 applications',
-      'Write down the people in the scene you already know',
+    );
+    expect(suggestedItems(given)).toMatchObject([
+      {
+        kind: 'suggestion',
+        id: 'ta',
+        title: "Transportation Alternatives' volunteer info session",
+        on: '2026-09-28',
+        action: 'Going',
+      },
     ]);
+  });
+
+  it('leaves a suggestion already marked going out of Suggested for you', () => {
+    const going = suggestion('ta', 'volunteer', { reaction: 'going' });
+    expect(suggestedItems(input(goals, steps, { suggestions: [going] }))).toEqual([]);
   });
 });
 
@@ -477,6 +488,23 @@ describe('proposals to close or park a goal (plan #1084)', () => {
       goalId: 'debt',
     });
     expect(list[3].title).toBe('Nothing done in 23 days: park the goal');
+  });
+
+  it('leaves out the questions on a goal offered for parking, which the park row asks about', () => {
+    const list = todayRanked(
+      input(
+        [debt, board],
+        [
+          step('q-board', 'board', { kind: 'decision', title: 'Do you still want to go?' }),
+          step('q-debt', 'debt', { kind: 'decision', title: 'Avalanche or snowball?' }),
+        ],
+        { proposals: [{ kind: 'park', goalId: 'board', goalTitle: board.goal.title, quietDays: 23 }] },
+      ),
+    );
+    expect(list.map((item) => [item.kind, item.id])).toEqual([
+      ['question', 'q-debt'],
+      ['park', 'board'],
+    ]);
   });
 });
 

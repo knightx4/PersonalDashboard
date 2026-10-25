@@ -6,6 +6,8 @@
  * between a one-paste role and a manual copy.
  */
 
+import { workdayFromUrl, workdayToken } from './workday-token';
+
 export type AtsVendor =
   | 'greenhouse'
   | 'lever'
@@ -28,9 +30,11 @@ export type AtsVendor =
 /**
  * The vendors that publish a whole board without a key.
  *
- * The same nine that `tier: 1` picks out above, named as a set because board
- * discovery reasons about vendors rather than about URLs: given only a company
- * and a guessed token, these are the doors worth knocking on.
+ * The nine that `tier: 1` picks out below, and Workday, whose boards are read
+ * (lib/jobs/ats/workday.ts) though a pasted Workday posting still goes to the
+ * paste box. Named as a set because board discovery reasons about vendors
+ * rather than about URLs. Workday's token (`tenant/wdN/site`) cannot be
+ * guessed from a name, so lib/jobs/ats/discover.ts never guesses one.
  */
 export const BOARD_VENDORS = [
   'greenhouse',
@@ -42,6 +46,7 @@ export const BOARD_VENDORS = [
   'breezy',
   'bamboohr',
   'rippling',
+  'workday',
 ] as const;
 
 export type BoardVendor = (typeof BOARD_VENDORS)[number];
@@ -73,12 +78,6 @@ const HOSTILE: Array<{ test: RegExp; vendor: AtsVendor; reason: string }> = [
     vendor: 'linkedin',
     reason:
       'LinkedIn blocks automated fetching of job pages. Paste the description instead — it takes about eight seconds.',
-  },
-  {
-    test: /(^|\.)(myworkday(jobs)?\.com|workday\.com)$/i,
-    vendor: 'workday',
-    reason:
-      'Workday renders postings through a session-bound script, so there is nothing to fetch. Paste the description instead.',
   },
   {
     test: /(^|\.)icims\.com$/i,
@@ -116,6 +115,20 @@ export function detectPosting(rawUrl: string): DetectedPosting {
 
   const parsed = new URL(url);
   const path = parsed.pathname;
+
+  // Workday: {tenant}.wdN.myworkdayjobs.com/{locale?}/{site}/job/{location}/{slug}
+  // The board is read through its API (lib/jobs/ats/workday.ts); a single
+  // pasted posting is not, so it still goes to the paste box.
+  if (/(^|\.)(myworkday(jobs)?\.com|workday\.com)$/i.test(host)) {
+    const found = workdayFromUrl(parsed);
+    return {
+      vendor: 'workday',
+      boardToken: found?.board ? workdayToken(found.board) : null,
+      jobId: found?.jobId ?? null,
+      tier: 3,
+      reason: 'A Workday posting cannot be read from its link. Paste the description instead.',
+    };
+  }
 
   for (const entry of HOSTILE) {
     if (entry.test.test(host)) {

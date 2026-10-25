@@ -16,8 +16,8 @@ function checklist(): string[] {
 
 describe('insightsBrief', () => {
   it('hands the session to the insights skill and names the run and the account', () => {
-    expect(insightsBrief({ runId: 'r1', userId: 'u1', reason: 'weekly' })).toBe(
-      'Follow .claude/skills/insights/SKILL.md\nInsight run r1\nuser_id u1\nweekly run',
+    expect(insightsBrief({ runId: 'r1', userId: 'u1', reason: 'monthly' })).toBe(
+      'Follow .claude/skills/insights/SKILL.md\nInsight run r1\nuser_id u1\nmonthly run',
     );
     expect(insightsBrief({ runId: 'r1', userId: 'u1', reason: 'look_again' }).split('\n')[3]).toBe(
       'started by Look again',
@@ -56,7 +56,7 @@ describe('the insights skill', () => {
     const steps = checklist();
     expect(steps).toHaveLength(7);
     const expected: Array<[string, string[]]> = [
-      ['Read what came before', ['verdict', 'already knows']],
+      ['Read what came before', ['verdict', 'knew it', 'prediction', 'already knows']],
       [
         'Read the core in full',
         ['Me/', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
@@ -72,9 +72,10 @@ describe('the insights skill', () => {
           'recurs without action',
           'unrelated interests',
           'precedes a low',
+          'what is missing',
         ],
       ],
-      ['Go down three layers, then one more', ['saw', 'deeper', 'further']],
+      ['Go down three layers, then one more', ['saw', 'deeper', 'further', 'outside search', 'self-description']],
       [
         'Filter hard',
         [
@@ -82,6 +83,7 @@ describe('the insights skill', () => {
           'two sources',
           'span of time',
           're-queried',
+          'surprise check',
           'hunches',
           'correct earlier cards',
           'relationships, health and family',
@@ -89,7 +91,7 @@ describe('the insights skill', () => {
       ],
       [
         'Write three to five cards',
-        ['layers', 'receipts', 'confidence', 'live', 'two-sentence summary'],
+        ['layers', 'receipts', 'confidence', 'live', 'hidden predictions', 'two-sentence summary'],
       ],
     ];
     expected.forEach(([title, words], index) => {

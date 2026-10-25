@@ -110,6 +110,9 @@ vi.mock('@/inngest/jobs/cron/sweep', () => ({
 vi.mock('@/inngest/jobs/cron/jd-backfill', () => ({
   runJdBackfill: vi.fn(async () => ({ companies: 1, filled: 2, ambiguous: 0, closed: 1, noBoard: 0 })),
 }));
+vi.mock('@/inngest/jobs/company-boards', () => ({
+  kickCompanyBoards: vi.fn(async () => ({ kicked: true })),
+}));
 vi.mock('@/inngest/vault/sync', () => ({
   runVaultSyncForAll: vi.fn(async () => ({
     connections: 1,
@@ -227,6 +230,7 @@ describe('the daily cron route', () => {
       closed: 1,
       noBoard: 0,
     });
+    expect(body.results['company-boards']).toEqual({ kicked: true });
     expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
 
     expect(runVaultSyncForAll).toHaveBeenCalled();

@@ -3,6 +3,7 @@ import { authorizeCron, requestOrigin } from '@/inngest/cron/authorize';
 import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
+import { kickCompanyBoards } from '@/inngest/jobs/company-boards';
 import { runRecurringReread } from '@/inngest/cron/recurring-reread';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
@@ -83,6 +84,10 @@ export async function GET(request: NextRequest) {
     { name: 'recurring-reread', run: () => runRecurringReread() },
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
+    // Kicks the look for the boards of companies on file, which runs in a
+    // function of its own so a slow careers page delays nothing here
+    // (plan #2535.2).
+    { name: 'company-boards', run: () => kickCompanyBoards(origin) },
     { name: 'vault', run: () => runVaultSyncForAll() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
@@ -90,11 +95,10 @@ export async function GET(request: NextRequest) {
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
     // The numbers insights start from are counted here in SQL with no model
     // call, after the goals stages have closed the morning's steps (plan
-    // #2413.7). The insights stage after it queues the one model call only
-    // when the last ready run is over 30 days old, and starts it in a
-    // function of its own (plan #2413.10).
+    // #2413.7). The insights stage after it fires the goals routine with the
+    // insights skill only when the last ready run is over 30 days old.
     { name: 'insight-signals', run: () => runInsightSignals() },
-    { name: 'insights-monthly', run: () => runInsightsTick(origin) },
+    { name: 'insights-monthly', run: () => runInsightsTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },

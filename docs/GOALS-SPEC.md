@@ -911,6 +911,34 @@ linked from the top of All goals and from the Files list under a goal's
 More. A goal page's back link names its area and opens that area's
 section on All goals.
 
+### What the Inbox holds
+
+The Inbox (`/goals/inbox`) is what is on you, and only that. On 24 October
+2026 it held 63 rows, of which 41 were questions from Dash and 7 were things
+to do. These rules keep it short:
+
+- **Offers are not on you.** The weekly run's readings and events are under
+  **Suggested for you** on the home and on each goal's page, not on the
+  Inbox or in Do next (`suggestedItems` in `lib/goals/today.ts`).
+- **One row per thing.** Two or more questions on one goal are one row,
+  which opens to answer them one by one and offers **Leave them as they
+  are**. Two or more goals offered for parking are one row too
+  (`bundleRows` in `lib/goals/inbox.ts`). A folded row counts once in the
+  badge. A goal offered for parking lists none of its questions: the park
+  row asks about the goal.
+- **No answer is an answer.** A question Dash asked closes by itself after
+  five days unanswered, and the step it was about stays as it was. Leave
+  them as they are makes the same close at once. Both set `defaulted_at`
+  and start no re-shape run (`migrations-goals/0088`).
+- **Five questions at most.** The database refuses a new open question from
+  Dash while five are waiting, and the run decides it itself.
+- **Dash moves only what the Inbox shows.** The morning run's moves for a
+  step that has sat a week go to steps the Inbox lists (a dated step, one on
+  Todo, one another step waits on, and each goal's first plain step), never
+  to the backlog behind them. It splits, prepares or sets a step for later
+  before it asks. It leaves alone a goal offered for parking and, for three
+  weeks, a goal whose question closed unanswered (`lib/goals/stale-steps.ts`).
+
 ### Coming back after time away
 
 After a gap, missed items collapse rather than pile up. Overdue `mine` steps

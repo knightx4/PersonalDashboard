@@ -115,7 +115,7 @@ describe('startInsightRun', () => {
 
   it('marks a stale run failed before it inserts', async () => {
     const { client, calls } = fakeYou();
-    await startInsightRun({ client, userId: 'u1', reason: 'full_reread', routine, now: NOW, fetch: okFetch() });
+    await startInsightRun({ client, userId: 'u1', reason: 'look_again', routine, now: NOW, fetch: okFetch() });
     expect(calls[0].op).toBe('update');
     expect((calls[0].values as { status: string }).status).toBe('failed');
   });
@@ -123,7 +123,7 @@ describe('startInsightRun', () => {
   it('does not fire when a run is already going', async () => {
     const { client } = fakeYou({ insertError: { code: '23505', message: 'duplicate' } });
     const fetch = okFetch();
-    const r = await startInsightRun({ client, userId: 'u1', reason: 'full_reread', routine, now: NOW, fetch });
+    const r = await startInsightRun({ client, userId: 'u1', reason: 'look_again', routine, now: NOW, fetch });
     expect(r).toMatchObject({ started: false, reason: 'running' });
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -131,7 +131,7 @@ describe('startInsightRun', () => {
   it('marks the row failed when the fire fails', async () => {
     const { client, calls } = fakeYou();
     const fetch = vi.fn(async () => new Response('nope', { status: 500 }));
-    const r = await startInsightRun({ client, userId: 'u1', reason: 'full_reread', routine, now: NOW, fetch });
+    const r = await startInsightRun({ client, userId: 'u1', reason: 'look_again', routine, now: NOW, fetch });
     expect(r).toMatchObject({ started: false, reason: 'error' });
     const failed = calls.filter((c) => c.op === 'update' && String((c.values as { error?: string }).error).startsWith('Dash could not start'));
     expect(failed).toHaveLength(1);
@@ -139,7 +139,7 @@ describe('startInsightRun', () => {
 
   it('starts nothing without the routine', async () => {
     const { client, calls } = fakeYou();
-    const r = await startInsightRun({ client, userId: 'u1', reason: 'full_reread', routine: { id: null, token: null }, now: NOW });
+    const r = await startInsightRun({ client, userId: 'u1', reason: 'look_again', routine: { id: null, token: null }, now: NOW });
     expect(r).toMatchObject({ started: false, reason: 'no_routine' });
     expect(calls).toHaveLength(0);
   });
@@ -161,35 +161,43 @@ describe('queueInsightRun', () => {
 });
 
 describe('runInsightsTick', () => {
-  const origin = 'https://example.test';
-
-  it('queues and kicks a run for an owner with no runs', async () => {
+  it('fires the routine with a monthly brief for an owner with no runs', async () => {
     const { client } = fakeYou();
-    const kick = vi.fn(async () => true);
-    const r = await runInsightsTick(origin, { you: client, userId: 'u1', now: NOW, kick });
+    const fetch = okFetch();
+    const r = await runInsightsTick({ you: client, userId: 'u1', now: NOW, routine, fetch });
     expect(r).toEqual({ started: true, runId: 'run-new' });
-    expect(kick).toHaveBeenCalledWith(origin, 'run-new');
+    const sent = JSON.parse((fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body).text as string;
+    expect(sent).toContain('Insight run run-new');
+    expect(sent.split('\n')[3]).toBe('monthly run');
   });
 
   it('starts nothing for a change: a ready run under a month old holds it off', async () => {
     const { client } = fakeYou({ rows: [{ status: 'ready', requested_at: hoursAgo(72), finished_at: hoursAgo(71) }] });
-    const kick = vi.fn(async () => true);
-    const r = await runInsightsTick(origin, { you: client, userId: 'u1', now: NOW, kick });
+    const fetch = okFetch();
+    const r = await runInsightsTick({ you: client, userId: 'u1', now: NOW, routine, fetch });
     expect(r).toMatchObject({ skipped: expect.any(String) });
-    expect(kick).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('skips while a run is going and kicks nothing', async () => {
+  it('skips while a run is going and fires nothing', async () => {
     const { client } = fakeYou({ rows: [{ status: 'running', requested_at: hoursAgo(1), finished_at: null }] });
-    const kick = vi.fn(async () => true);
-    const r = await runInsightsTick(origin, { you: client, userId: 'u1', now: NOW, kick });
+    const fetch = okFetch();
+    const r = await runInsightsTick({ you: client, userId: 'u1', now: NOW, routine, fetch });
     expect(r).toMatchObject({ skipped: expect.any(String) });
-    expect(kick).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('fails the queued run and raises when the function cannot be reached', async () => {
+  it('skips without the routine and queues nothing', async () => {
     const { client, calls } = fakeYou();
-    await expect(runInsightsTick(origin, { you: client, userId: 'u1', now: NOW, kick: async () => false })).rejects.toThrow();
+    const r = await runInsightsTick({ you: client, userId: 'u1', now: NOW, routine: { id: null, token: null } });
+    expect(r).toMatchObject({ skipped: expect.stringContaining('routine') });
+    expect(calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+
+  it('fails the queued run and raises when the routine refuses', async () => {
+    const { client, calls } = fakeYou();
+    const fetch = vi.fn(async () => new Response('nope', { status: 500 }));
+    await expect(runInsightsTick({ you: client, userId: 'u1', now: NOW, routine, fetch })).rejects.toThrow();
     expect(calls.some((c) => c.op === 'update' && (c.values as { error?: string }).error?.startsWith('Dash could not start'))).toBe(true);
   });
 });

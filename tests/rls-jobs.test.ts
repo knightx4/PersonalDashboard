@@ -271,6 +271,27 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.fact_origins = factOrigin.id;
 
+  // A posting the daily board read kept (job_search 0070).
+  const [boardPosting] = await admin<{ id: string }[]>`
+    insert into board_postings (user_id, company_id, posting_key, title, url)
+    values (${userId}, ${company.id}, ${`https://example.com/jobs/${tag}`}, ${`${tag} Associate`},
+            ${`https://example.com/jobs/${tag}`})
+    returning id`;
+  ids.board_postings = boardPosting.id;
+
+  // An investor followed and a posting its portfolio board showed (job_search 0073).
+  const [investor] = await admin<{ id: string }[]>`
+    insert into followed_investors (user_id, name, host, token)
+    values (${userId}, ${`${tag} Ventures`}, 'getro', ${tag})
+    returning id`;
+  ids.followed_investors = investor.id;
+  const [portfolioPosting] = await admin<{ id: string }[]>`
+    insert into portfolio_postings (user_id, investor_id, posting_key, company_name, title, url)
+    values (${userId}, ${investor.id}, ${`https://example.com/p/${tag}`}, ${`${tag} Co`}, ${`${tag} Analyst`},
+            ${`https://example.com/p/${tag}`})
+    returning id`;
+  ids.portfolio_postings = portfolioPosting.id;
+
   return ids;
 }
 

@@ -105,6 +105,12 @@ export function dailyRunText(input: {
   review?: ReviewGoal[];
   stale?: StaleStep[];
   /**
+   * How many questions the run may still add before the Inbox holds
+   * OPEN_QUESTION_CAP; the database refuses one past it. Absent reads as no
+   * limit given, for briefs written before the cap.
+   */
+  asksLeft?: number;
+  /**
    * The person's steps under way that have stalled, and those whose tally
    * reached its total (plan #1281; progressNudges in
    * lib/goals/progress-nudges.ts).
@@ -176,11 +182,19 @@ export function dailyRunText(input: {
           ...(sitting.length > 0
             ? [
                 'Then give each of these steps of the person\'s a move. Nothing has touched them in a',
-                'week or more. Split it into smaller sub-steps, prepare it for them, or ask beside it',
-                'whether they still want it and make it wait on that question. Leave one you just',
-                'closed from evidence or merged. Follow .claude/skills/goals/SKILL.md, "Moving a step',
-                'that has sat for a week".',
+                'week or more. Split it into smaller sub-steps, prepare it for them, or set it to start',
+                'later. Ask whether they still want it only when you cannot tell, and then only within',
+                'the questions you have left below. Leave one you just closed from evidence or merged.',
+                'Follow .claude/skills/goals/SKILL.md, "Moving a step that has sat for a week".',
                 '',
+                ...(input.asksLeft === undefined
+                  ? []
+                  : [
+                      input.asksLeft === 0
+                        ? 'Questions left: none. The Inbox already holds the most it takes, so decide every move yourself.'
+                        : `Questions left: ${input.asksLeft}, across this whole run. Decide the rest yourself.`,
+                      '',
+                    ]),
                 ...sitting.map(staleLine),
                 '',
               ]

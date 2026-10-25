@@ -8,7 +8,9 @@ export const maxDuration = 300;
 /**
  * Finishes the Recommended roles and People to meet searches that needed
  * more time than a request allows and went on as Message Batches
- * (lib/jobs/suggest/search-batch.ts).
+ * (lib/jobs/suggest/search-batch.ts), then, in the time left, reads the
+ * followed companies' job boards not read in the last day and suggests what
+ * is new on them (lib/jobs/suggest/boards.ts).
  *
  * Called every ten minutes by a pg_cron job through pg_net
  * (supabase/migrations/0133_job_search_batches_cron.sql). Most calls find

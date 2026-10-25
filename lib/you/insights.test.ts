@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import {
   insightFromRow,
+  linkText,
   layersOf,
   listInsights,
   receiptsOf,
@@ -65,6 +66,39 @@ describe('insightFromRow', () => {
     expect(verdictOf(mark)?.verdict).toBe('not_quite');
     expect(verdictOf({ verdict: 'maybe' })).toBeNull();
     expect(verdictOf(null)).toBeNull();
+  });
+});
+
+describe('predictions and knew it (you 0017)', () => {
+  it('reads a knew it mark', () => {
+    expect(verdictOf({ verdict: 'knew_it', note: null, decided_at: '2026-10-25T09:00:00Z' })?.verdict).toBe('knew_it');
+  });
+
+  it('reads the result of a checked prediction', () => {
+    const insight = insightFromRow(
+      row({
+        kind: 'prediction',
+        outcome: 'did_not',
+        outcome_note: 'Two applications went out that week.',
+        check_on: '2026-11-10',
+        checked_at: '2026-11-12T09:00:00Z',
+      }),
+    );
+    expect(insight?.check).toEqual({
+      checkOn: '2026-11-10',
+      outcome: 'did_not',
+      note: 'Two applications went out that week.',
+      checkedAt: '2026-11-12T09:00:00Z',
+    });
+  });
+
+  it('has no result for a card with no outcome or an unknown one', () => {
+    expect(insightFromRow(row())?.check).toBeNull();
+    expect(insightFromRow(row({ outcome: 'maybe' }))?.check).toBeNull();
+  });
+
+  it('reads a pending prediction as pending, which the tab never asks for', () => {
+    expect(insightFromRow(row({ kind: 'prediction', status: 'pending', check_on: '2026-11-10' }))?.status).toBe('pending');
   });
 });
 
@@ -145,5 +179,43 @@ describe('the store', () => {
       { onConflict: 'insight_id' },
     );
     await expect(saveVerdict(client, 'user-1', 'i1', 'meh' as never)).rejects.toThrow('Unknown verdict');
+  });
+});
+
+describe('linkText', () => {
+  const receipts = [
+    { source: 'Pending/Learning Tool Idea.md', rowId: null, quote: 'Helping create connection is a big part of the value', link: '/vault/n/Pending/Learning%20Tool%20Idea.md' },
+    { source: 'Bulk/Bulk - Ideas/GN.md', rowId: null, quote: 'short', link: '/vault/n/GN.md' },
+    { source: 'job_search.applications', rowId: 'a1', quote: '296 sent', link: null },
+  ];
+
+  it('links the first quote of a receipt, ignoring case', () => {
+    const parts = linkText("It says 'helping create connection is a big part of the value'.", receipts);
+    expect(parts).toEqual([
+      { text: "It says '", link: null },
+      { text: 'helping create connection is a big part of the value', link: '/vault/n/Pending/Learning%20Tool%20Idea.md' },
+      { text: "'.", link: null },
+    ]);
+  });
+
+  it('links a note named as whole words, once', () => {
+    const parts = linkText('The GN note, unlike GNU, and the GN note again.', receipts);
+    expect(parts.filter((p) => p.link)).toEqual([{ text: 'GN', link: '/vault/n/GN.md' }]);
+    expect(parts.map((p) => p.text).join('')).toBe('The GN note, unlike GNU, and the GN note again.');
+  });
+
+  it('keeps links a run wrote and drops an unsafe one to its words', () => {
+    const parts = linkText('See [the journal](/vault/n/Me/Journal.md) and [this](javascript:alert(1)).', []);
+    expect(parts).toEqual([
+      { text: 'See ', link: null },
+      { text: 'the journal', link: '/vault/n/Me/Journal.md' },
+      { text: ' and ', link: null },
+      { text: 'this', link: null },
+      { text: ').', link: null },
+    ]);
+  });
+
+  it('leaves text with nothing to link alone', () => {
+    expect(linkText('Nothing here.', receipts)).toEqual([{ text: 'Nothing here.', link: null }]);
   });
 });

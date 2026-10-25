@@ -9108,13 +9108,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'you-insights-reread',
-    label: 'You · Insights, full re-read hint open',
+    id: 'you-insights-look-again',
+    label: 'You · Insights, Look again hint open',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouInsightsPreview open={{ reread: true }} />
+        <YouInsightsPreview open={{ lookAgain: true }} />
       </div>
     ),
   },
@@ -9137,6 +9137,19 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <YouInsightsPreview open={{ why: 'not_quite' }} />
+      </div>
+    ),
+  },
+  {
+    // A prediction reaches the deck only once a run has checked it, so it
+    // always shows the result under the claim.
+    id: 'you-insights-prediction',
+    label: 'You · Insights, a checked prediction',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview prediction />
       </div>
     ),
   },

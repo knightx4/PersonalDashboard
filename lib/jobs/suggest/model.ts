@@ -582,30 +582,128 @@ export async function findOpenings(
     tool: {
       name: OPENINGS_TOOL,
       description: 'Report the open postings found, all in one call.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          openings: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                company: { type: 'string' },
-                industry: { type: 'string' },
-                title: { type: 'string' },
-                url: { type: 'string' },
-                location: { type: ['string', 'null'] },
-                why: { type: 'string' },
-                move: { type: 'string' },
-              },
-              required: ['company', 'industry', 'title', 'url', 'why', 'move'],
-            },
-          },
-        },
-        required: ['openings'],
-      },
+      input_schema: OPENINGS_SCHEMA,
     },
     parse: (raw) => parseOpeningsPayload(raw, input.taken, input.seeker.excludedIndustries),
     empty: 'The search ran but reported no postings.',
   });
+}
+
+const OPENINGS_SCHEMA: Anthropic.Tool['input_schema'] = {
+  type: 'object',
+  properties: {
+    openings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          company: { type: 'string' },
+          industry: { type: 'string' },
+          title: { type: 'string' },
+          url: { type: 'string' },
+          location: { type: ['string', 'null'] },
+          why: { type: 'string' },
+          move: { type: 'string' },
+        },
+        required: ['company', 'industry', 'title', 'url', 'why', 'move'],
+      },
+    },
+  },
+  required: ['openings'],
+};
+
+// ---------------------------------------------------------------------------
+// New postings on followed boards (plan #2535.3)
+// ---------------------------------------------------------------------------
+
+const BOARD_PICK_SYSTEM = `You choose, from postings that went up on the job boards of companies
+someone follows, or on the portfolio job boards of investors they follow, since
+the last check, the ones worth applying for. Every posting is open now (read
+from a job board today), so there is nothing to search for.
+
+Rules:
+- Only from the list given, with its link exactly as given.
+- Match what they wrote about the job they want, their target titles and
+  their CV. Where they have set what they want from a job (place, workplace,
+  pay floor, company stage), treat it as a rule.
+- Learn from what they did with earlier suggestions: more like the roles they
+  saved, none like the ones they turned down, for the reason they gave.
+- Weigh the newest career goals entry most.
+- Fewer, well matched, beat a padded list. An empty list is a fine answer.
+
+For each, give company, title, url, location (as listed, or null), the
+company's industry in a few words, why (one or two sentences on why it fits
+them, from what they wrote) and move (two or three short numbered steps: what
+to lead with, and who to look for at the company for a referral).
+
+Write why and move to the person, as "you". Never he, she or they for them,
+and never "the candidate". Write plainly, with no em dashes.`;
+
+export type BoardPickInput = {
+  seeker: SeekerContext;
+  /** Earlier suggestions they saved ("Title at Company") and turned down ("Title at Company (reason)"). */
+  feedback: { saved: readonly string[]; dismissed: readonly string[] };
+  /** New postings that passed pickBoardCandidates. */
+  candidates: readonly BoardPosting[];
+  taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies: ReadonlySet<string> };
+};
+
+/** How long the pick may take when the caller sets no deadline; it reads a short list and searches nothing. */
+const BOARD_PICK_MS = 120_000;
+
+/**
+ * The daily pick (board-watch.ts): one call, no web search, choosing among
+ * the new postings on followed boards. A posting that comes back is kept only
+ * when its link is one of the candidates', so the model cannot add one
+ * nobody read.
+ */
+export async function pickNewBoardOpenings(
+  options: SuggestOptions,
+  input: BoardPickInput,
+): Promise<SuggestResult<OpeningSuggestion>> {
+  if (input.candidates.length === 0) return { ok: true, suggestions: [] };
+  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
+  const prompt =
+    seekerText(input.seeker) +
+    listed('Suggested roles they saved (more like these)', input.feedback.saved, 30) +
+    listed('Suggested roles they turned down, and why', input.feedback.dismissed, 30) +
+    listed(
+      'New on the boards of companies and investors they follow (title | company | location | link)',
+      input.candidates.map((p) => `${p.title} | ${p.company} | ${p.location ?? 'location not given'} | ${p.url}`),
+      40,
+    ) +
+    `\n\nCall ${OPENINGS_TOOL} once with the ones worth applying for.`;
+  const budget = options.deadline ? Math.max(10_000, options.deadline - Date.now()) : BOARD_PICK_MS;
+  try {
+    const response = await client.messages
+      .stream(
+        {
+          model: SUGGEST_MODEL,
+          max_tokens: MAX_TOKENS,
+          system: BOARD_PICK_SYSTEM,
+          tools: [
+            {
+              name: OPENINGS_TOOL,
+              description: 'Report the postings worth applying for, all in one call.',
+              input_schema: OPENINGS_SCHEMA,
+            },
+          ],
+          messages: [{ role: 'user', content: prompt }],
+        },
+        { signal: AbortSignal.timeout(budget), timeout: budget, maxRetries: 0 },
+      )
+      .finalMessage();
+    options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
+    const call = response.content.find(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use' && block.name === OPENINGS_TOOL,
+    );
+    if (!call) return { ok: false, error: 'The pick of new board postings reported nothing.' };
+    const offered = new Set(input.candidates.map((p) => p.url));
+    const suggestions = parseOpeningsPayload(call.input, input.taken, input.seeker.excludedIndustries).filter(
+      (suggestion) => offered.has(suggestion.url),
+    );
+    return { ok: true, suggestions };
+  } catch (error) {
+    return failure(error);
+  }
 }

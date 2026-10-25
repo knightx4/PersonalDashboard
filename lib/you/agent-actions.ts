@@ -74,11 +74,7 @@ export const youActions: ModuleActions = {
     ),
     startInsightRun: none(
       'spends',
-      'Look again makes one long model call on the account, which spends money the person chooses to spend.',
-    ),
-    startFullReread: none(
-      'spends',
-      'Full re-read starts a long Dash session on the account, which spends money the person chooses to spend.',
+      'Look again starts a long Dash session on the account, which spends money the person chooses to spend.',
     ),
   },
   'app/you/details/actions.ts': {

@@ -6,7 +6,9 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { snoozeRow, unsnoozeRow } from '@/lib/core/inbox-snooze-store';
 import { dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
+import { createGoalsClient } from '@/lib/goals/auth/server';
 import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
+import { leaveQuestions } from '@/lib/goals/shaping-store';
 import type { TodayKind } from '@/lib/goals/today';
 import { formatDay } from '@/lib/goals/dates';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -61,4 +63,25 @@ export async function unsnoozeInboxRowAction(form: FormData): Promise<SnoozeStat
   if (outcome.error) return { error: outcome.error };
   revalidatePath('/goals', 'layout');
   return { message: 'Brought back.' };
+}
+
+/**
+ * Leave them as they are, on a goal's questions folded into one Inbox row:
+ * every one still unanswered closes with things staying as they were, and
+ * the row goes. The ids come from the row; the update only touches open
+ * questions the signed-in account owns.
+ */
+// latency: pending
+export async function leaveQuestionsAction(form: FormData): Promise<SnoozeState> {
+  await requireUser();
+  const ids = z.array(Id).min(1).max(100).safeParse(form.getAll('id'));
+  if (!ids.success) return { error: 'Could not tell which questions those were.' };
+  try {
+    const closed = await leaveQuestions(await createGoalsClient(), ids.data);
+    if (closed === 0) return { error: 'Those questions were already answered.' };
+    revalidatePath('/goals', 'layout');
+    return { message: closed === 1 ? 'Left 1 question as it was.' : `Left ${closed} questions as they were.` };
+  } catch {
+    return { error: 'Could not close those questions. Try again.' };
+  }
 }
