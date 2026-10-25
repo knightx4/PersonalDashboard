@@ -3,6 +3,7 @@ import { authorizeCron, requestOrigin } from '@/inngest/cron/authorize';
 import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
+import { kickCompanyBoards } from '@/inngest/jobs/company-boards';
 import { runRecurringReread } from '@/inngest/cron/recurring-reread';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
@@ -83,6 +84,10 @@ export async function GET(request: NextRequest) {
     { name: 'recurring-reread', run: () => runRecurringReread() },
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
+    // Kicks the look for the boards of companies on file, which runs in a
+    // function of its own so a slow careers page delays nothing here
+    // (plan #2535.2).
+    { name: 'company-boards', run: () => kickCompanyBoards(origin) },
     { name: 'vault', run: () => runVaultSyncForAll() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
