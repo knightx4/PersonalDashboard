@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Field, FieldError, InlineInput, Input, PressLabel } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import { linkVariants } from '@/components/ui/link';
+import { LinkedText } from '@/components/ui/linked-text';
 import { Stat } from '@/components/ui/stat';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ValueList } from '@/components/ui/value-row';
@@ -196,7 +197,13 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
         {label}
       </dt>
       <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] text-ui leading-relaxed text-ink">
-        {empty ? <span className="text-ink-ghost">Not set</span> : value}
+        {empty ? (
+          <span className="text-ink-ghost">Not set</span>
+        ) : typeof value === 'string' ? (
+          <LinkedText text={value} refs={false} />
+        ) : (
+          value
+        )}
       </dd>
     </div>
   );
@@ -436,7 +443,9 @@ function OwnFieldName({
   onChange: (label: string) => void;
 }) {
   const [renaming, setRenaming] = useState(startRenaming);
-  if (renaming) {
+  // A field with no name keeps its box open, outlined in the danger colour,
+  // so the place to type the name is where the error points.
+  if (renaming || invalid) {
     return (
       <div className="relative min-w-0 flex-1">
         <PressLabel htmlFor={id} />
@@ -444,6 +453,9 @@ function OwnFieldName({
           id={id}
           value={label}
           onChange={(event) => onChange(event.target.value)}
+          // Focus holds the box open, so naming a field with no name does not
+          // close it at the first letter, when it stops being an error.
+          onFocus={() => setRenaming(true)}
           onBlur={() => setRenaming(false)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === 'Escape') {
@@ -452,13 +464,18 @@ function OwnFieldName({
             }
           }}
           aria-label="Name of this field"
-          placeholder="Name, such as Passport number"
+          placeholder={invalid ? 'Add a name' : 'Name, such as Passport number'}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
-          autoFocus
-          // Drawn focused for as long as it is open, since leaving it closes
-          // it: the value boxes' focus outline and ring, the name in ink.
-          className="relative border-accent bg-surface px-2 py-1 font-medium text-ink ring-1 ring-accent/40 hover:bg-surface sm:text-small"
+          autoFocus={renaming}
+          className={cn(
+            'relative bg-surface px-2 py-1 font-medium text-ink hover:bg-surface sm:text-small',
+            // Drawn focused for as long as it is open by a press, since
+            // leaving it closes it: the value boxes' focus outline and ring.
+            renaming
+              ? 'border-accent ring-1 ring-accent/40'
+              : 'border-danger placeholder:text-danger',
+          )}
         />
       </div>
     );
@@ -471,12 +488,10 @@ function OwnFieldName({
       aria-describedby={describedBy}
       className={cn(
         PRESS_AREA,
-        'press min-w-0 text-left text-small font-medium [overflow-wrap:anywhere]',
-        'transition-colors duration-quick hover:bg-sunken',
-        invalid
-          ? 'flex-1 rounded-control border border-danger px-2 py-1 text-danger'
-          : 'rounded-control underline decoration-border-strong decoration-dashed underline-offset-4',
-        !invalid && (label.trim() ? 'text-ink-muted' : 'text-ink-ghost'),
+        linkVariants({ tone: 'quiet' }),
+        'press min-w-0 rounded-control text-left text-small font-medium [overflow-wrap:anywhere]',
+        'decoration-dashed hover:bg-sunken',
+        !label.trim() && 'text-ink-ghost',
       )}
     >
       {label.trim() || 'Add a name'}
