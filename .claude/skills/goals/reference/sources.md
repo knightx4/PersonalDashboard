@@ -553,13 +553,13 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 
 ### `you.details` (You)
 
-Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.
+Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.
 
 - Search: `title`, `phone`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
 - Name a row by `title`; link it by `user_id`
 - Scoped to the person by `user_id`, not user_id
 - Opens at `/you/details`
-- A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).
+- custom_fields is a jsonb list of {id, label, value}, the fields they named themselves (at most 30). A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).
 
 ### `you.places` (You)
 

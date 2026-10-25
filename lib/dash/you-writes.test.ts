@@ -149,4 +149,75 @@ describe('the You writes', () => {
       });
     });
   });
+
+  describe('set_detail', () => {
+    const FIELD = '33333333-3333-4333-8333-333333333333';
+    const mine = (custom_fields: unknown[]) => ({
+      'you.details': [{ user_id: ME, phone: '555 0100', custom_fields }],
+    });
+
+    it('adds a field when no field has that label, leaving the six details alone', async () => {
+      const tables = mine([{ id: FIELD, label: 'Shirt size', value: 'M' }]);
+      const result = await runYouWrite(write('set_detail'), env(tables), { label: 'Passport', value: ' X123 ' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(result.summary).toBe('Dash added the field "Passport".');
+      const row = tables['you.details'][0] as { phone: string; custom_fields: { id: string; label: string; value: string }[] };
+      expect(row.phone).toBe('555 0100');
+      expect(row.custom_fields).toHaveLength(2);
+      expect(row.custom_fields[0]).toEqual({ id: FIELD, label: 'Shirt size', value: 'M' });
+      expect(row.custom_fields[1]).toMatchObject({ label: 'Passport', value: 'X123' });
+      expect(row.custom_fields[1].id).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('creates their row when they have none yet', async () => {
+      const tables: FakeTables = { 'you.details': [] };
+      const result = await runYouWrite(write('set_detail'), env(tables), { label: 'Shirt size', value: 'L' });
+      expect('ok' in result).toBe(false);
+      expect(tables['you.details']).toHaveLength(1);
+      expect(tables['you.details'][0]).toMatchObject({ user_id: ME, custom_fields: [{ label: 'Shirt size', value: 'L' }] });
+    });
+
+    it('matches a label whatever its capitals, keeping the id and the label as they wrote it', async () => {
+      const tables = mine([{ id: FIELD, label: 'Shirt size', value: 'M' }]);
+      const result = await runYouWrite(write('set_detail'), env(tables), { label: 'shirt SIZE', value: 'L' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(result.summary).toBe('Dash set the field "Shirt size".');
+      expect((tables['you.details'][0] as { custom_fields: unknown }).custom_fields).toEqual([
+        { id: FIELD, label: 'Shirt size', value: 'L' },
+      ]);
+    });
+
+    it('clears a value but never removes the field', async () => {
+      const tables = mine([{ id: FIELD, label: 'Shirt size', value: 'M' }]);
+      await runYouWrite(write('set_detail'), env(tables), { label: 'Shirt size', value: '' });
+      expect((tables['you.details'][0] as { custom_fields: unknown }).custom_fields).toEqual([
+        { id: FIELD, label: 'Shirt size', value: '' },
+      ]);
+    });
+
+    it('refuses a missing label or value, and a thirty-first field', async () => {
+      const tables = mine([]);
+      expect(await runYouWrite(write('set_detail'), env(tables), { value: 'x' })).toEqual({
+        ok: false,
+        error: expect.stringMatching(/^label is missing/),
+      });
+      expect(await runYouWrite(write('set_detail'), env(tables), { label: 'x' })).toEqual({
+        ok: false,
+        error: expect.stringMatching(/^value is missing/),
+      });
+      const full = mine(Array.from({ length: 30 }, (_, i) => ({ id: `id-${i}`, label: `Field ${i}`, value: 'v' })));
+      expect(await runYouWrite(write('set_detail'), env(full), { label: 'One more', value: 'v' })).toEqual({
+        ok: false,
+        error: expect.stringContaining('the most'),
+      });
+    });
+
+    it('does not touch another person’s row', async () => {
+      const tables: FakeTables = { 'you.details': [{ user_id: OTHER, custom_fields: [{ id: FIELD, label: 'Shirt size', value: 'M' }] }] };
+      await runYouWrite(write('set_detail'), env(tables), { label: 'Shirt size', value: 'XL' });
+      expect(tables['you.details'].find((row) => row.user_id === OTHER)).toMatchObject({
+        custom_fields: [{ id: FIELD, label: 'Shirt size', value: 'M' }],
+      });
+    });
+  });
 });
