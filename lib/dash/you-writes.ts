@@ -8,6 +8,14 @@ import { jobDates, jobHref, parseJob, type Job } from '@/lib/you/work-history';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { insertPlace, updatePlace } from '@/lib/you/places-store';
 import { saveJob as writeJob } from '@/lib/you/work-history-store';
+import { getDetails, saveDetails } from '@/lib/you/details-store';
+import {
+  checkCustomFields,
+  CUSTOM_FIELDS_MAX,
+  CUSTOM_LABEL_MAX,
+  CUSTOM_VALUE_MAX,
+  type CustomField,
+} from '@/lib/you/details';
 import {
   checkPlace,
   draftOf,
@@ -25,6 +33,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   add_place     a place they have lived, with rough dates.
  *   change_place  one of those places changed: its name, where it is, the
  *                 dates or the note.
+ *   set_detail    one of the fields they named themselves on Details, set by
+ *                 its label, created when none has that label (plan #2531.3).
+ *                 Never touches the six fixed details (plan #2124.3) and never
+ *                 removes a field.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -228,6 +240,60 @@ async function saveJob(env: YouWriteEnv, args: Args): Promise<YouMade> {
   return madeJob(data, null, 'Added the job at', dates ? `, ${dates}` : '');
 }
 
+const DETAILS_PATHS = ['/you/details', '/home'];
+
+/** Why a detail change has no Undo: their details are one row with no id to restore it by. */
+const DETAIL_NO_UNDO =
+  'Your details are one row, so Dash cannot put one field back by itself. Change the field on the Details tab, or ask Dash to set it again.';
+
+async function setDetail(env: YouWriteEnv, args: Args): Promise<YouMade> {
+  const label = textArg(args, 'label')?.trim() ?? '';
+  const value = textArg(args, 'value')?.trim();
+  if (!label) throw new YouRefused('label is missing: give the name of the field.');
+  if (value === undefined) {
+    throw new YouRefused('value is missing: give what the field should say, or an empty value to clear it.');
+  }
+  if (label.length > CUSTOM_LABEL_MAX) throw new YouRefused(`label can be at most ${CUSTOM_LABEL_MAX} characters.`);
+  if (value.length > CUSTOM_VALUE_MAX) throw new YouRefused(`value can be at most ${CUSTOM_VALUE_MAX} characters.`);
+
+  const client = env.you as YouSupabaseClient;
+  const current = await getDetails(client, env.userId);
+  const list: CustomField[] = current.custom_fields.map((field) => ({ ...field }));
+  const at = list.findIndex((field) => field.label.toLowerCase() === label.toLowerCase());
+  const existing = at >= 0 ? list[at] : null;
+  if (existing) {
+    list[at] = { ...existing, value };
+  } else {
+    if (list.length >= CUSTOM_FIELDS_MAX) {
+      throw new YouRefused(`They already have ${CUSTOM_FIELDS_MAX} fields of their own, which is the most. Nothing was added.`);
+    }
+    list.push({ id: crypto.randomUUID(), label, value });
+  }
+  const problem = checkCustomFields(list);
+  if (problem) throw new YouRefused(problem);
+
+  const saved = await saveDetails(client, env.userId, { custom_fields: list });
+  const name = existing?.label ?? label;
+  const verb = existing ? 'Set the field' : 'Added the field';
+  const rest = value === '' ? ', now empty' : '';
+  return {
+    kind: 'set_detail',
+    input: { verb, what: name, rest, href: '/you/details', where: 'Open Details', paths: DETAILS_PATHS },
+    subjectRef: toRef('you.details', env.userId),
+    op: 'update',
+    before: { custom_fields: current.custom_fields },
+    after: { custom_fields: saved.custom_fields },
+    summary: `Dash ${verb.toLowerCase()} "${name}"${rest}.`,
+    row: {
+      table: 'you.details',
+      ref: env.userId,
+      title: name,
+      href: '/you/details',
+      detail: { label: name, value },
+    },
+  };
+}
+
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
 
 const FIELDS = {
@@ -299,6 +365,22 @@ export const YOU_WRITES: readonly YouWrite[] = [
     },
     run: saveJob,
   },
+  {
+    name: 'set_detail',
+    runs: noButton('The Details tab saves the whole list of their own fields at once; no button sets one by its name.'),
+    description:
+      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their phone, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'The field\'s name, as they call it, such as "Shirt size".' },
+        value: { type: 'string', description: 'What it should say. Empty to clear it.' },
+      },
+      required: ['label', 'value'],
+      additionalProperties: false,
+    },
+    run: setDetail,
+  },
 ];
 
 /** Runs one You write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -333,6 +415,11 @@ export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WR
     const env = { userId: ctx.userId, you: await ctx.db('you') };
     const result = await runYouWrite(write, env, input);
     if ('ok' in result) return result;
-    return { ok: true, ...result, input: result.input as unknown as Record<string, unknown>, undo: null };
+    return {
+      ok: true,
+      ...result,
+      input: result.input as unknown as Record<string, unknown>,
+      undo: result.kind === 'set_detail' ? { none: DETAIL_NO_UNDO } : null,
+    };
   },
 }));
