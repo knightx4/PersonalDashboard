@@ -17,10 +17,8 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CAPPED_ORIGINS, cadenceState, STALE_DAYS, suggestionDue, type SuggestionKind } from './cadence';
 import { findOpenings, findPeople, type SeekerContext } from './model';
-import { exclusionWords, personKey, roleKey } from './payload';
+import { personKey, roleKey } from './payload';
 import { openingFeedback } from './feedback';
-import { pickBoardCandidates } from './board-pick';
-import { loadFollowedBoardPostings } from './boards';
 import { suggestDiscoveredRoles } from '@/lib/jobs/discover/roles-run';
 import { readMinFitScore } from './fit-gate';
 import { loadScoringContext } from './score-run';
@@ -227,7 +225,7 @@ async function runReachOut(
  * daily scoring run would score it, from its title, company, place and
  * Dash's summary.
  */
-async function openingAdmitter(
+export async function openingAdmitter(
   supabase: AppSupabaseClient,
   userId: string,
   jev: { onSpend?: SpendSink },
@@ -307,15 +305,11 @@ async function runApply(
     written: outcome.written + discovered.headlines.length,
     headlines: [...outcome.headlines, ...discovered.headlines],
   });
-  const boards = await loadFollowedBoardPostings(supabase, userId);
-  const boardOpenings = pickBoardCandidates(boards.postings, {
-    targetTitles: seeker.targetTitles,
-    likedTitles,
-    taken,
-    excludedWords: exclusionWords(seeker.excludedIndustries),
-  });
-  const boardOrigins: BoardOrigin[] = boardOpenings.map((posting) => ({ url: posting.url, company: posting.company }));
-  await progress?.stage('apply', 'searching', { boards_read: boards.boardsRead, candidates: boardOpenings.length });
+  // The followed companies' boards are read daily and their new postings
+  // picked on their own (boards.ts), so the weekly search searches the web
+  // only.
+  const boardOrigins: BoardOrigin[] = [];
+  await progress?.stage('apply', 'searching', { boards_read: 0, candidates: 0 });
   const locations = new Map<string, number>();
   for (const app of applications.slice(0, 80)) {
     if (app.location) locations.set(app.location, (locations.get(app.location) ?? 0) + 1);
@@ -329,7 +323,7 @@ async function runApply(
       recent: applications.slice(0, 40).map(label),
       locations: [...locations.entries()].sort((a, b) => b[1] - a[1]).map(([place]) => place),
       feedback,
-      boardOpenings,
+      boardOpenings: [],
       taken,
     },
   );

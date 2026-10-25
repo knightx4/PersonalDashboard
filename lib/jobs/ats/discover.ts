@@ -4,6 +4,10 @@ import { BOARD_VENDORS, detectPosting, isBoardVendor, type BoardVendor } from '.
 import { fetchBoard } from './board';
 import { titleSimilarity, FUZZY_MIN } from './match';
 import type { FetchedPosting } from './types';
+import { parseWorkdayToken } from './workday-token';
+
+/** The vendors a token guessed from a name or a mail subdomain can be tried at. */
+const GUESSABLE_VENDORS: readonly BoardVendor[] = BOARD_VENDORS.filter((vendor) => vendor !== 'workday');
 
 /**
  * Finding a company's job board when nobody handed us a link to it.
@@ -90,7 +94,16 @@ export function boardCandidates(
   maxCandidates = 12,
 ): BoardCandidate[] {
   const vendor = isBoardVendor(identity.atsType) ? identity.atsType : null;
-  const vendorsFor = (): readonly BoardVendor[] => (vendor ? [vendor] : BOARD_VENDORS);
+  // A Workday token is tenant, data centre and site together, never a slug,
+  // so Workday is only tried with a token that reads as one and never guessed.
+  // A company recorded as on Workday has its guesses tried at the others, as
+  // it did before Workday boards could be read.
+  const guessVendors = (): readonly BoardVendor[] =>
+    vendor && vendor !== 'workday' ? [vendor] : GUESSABLE_VENDORS;
+  const knownVendors = (token: string): readonly BoardVendor[] => {
+    if (parseWorkdayToken(token)) return !vendor || vendor === 'workday' ? ['workday'] : [];
+    return guessVendors();
+  };
 
   const out: BoardCandidate[] = [];
   const seen = new Set<string>();
@@ -104,7 +117,7 @@ export function boardCandidates(
   // 1. A token we already proved. When the vendor is recorded too this is the
   //    only call the whole cascade makes.
   if (identity.boardToken) {
-    for (const v of vendorsFor()) push({ vendor: v, token: identity.boardToken, trust: 'known' });
+    for (const v of knownVendors(identity.boardToken)) push({ vendor: v, token: identity.boardToken, trust: 'known' });
   }
 
   // 2. The careers page, which on most sites is a thin wrapper over the board
@@ -120,12 +133,12 @@ export function boardCandidates(
   // 3. The ATS sending subdomain from mail — `ramp.greenhouse.io` is `ramp`.
   //    Strong, but still a guess about which board, so it has to be confirmed.
   if (identity.boardHint) {
-    for (const v of vendorsFor()) push({ vendor: v, token: identity.boardHint, trust: 'guess' });
+    for (const v of guessVendors()) push({ vendor: v, token: identity.boardHint, trust: 'guess' });
   }
 
   // 4. The company name.
   for (const slug of slugCandidates(identity.name)) {
-    for (const v of vendorsFor()) push({ vendor: v, token: slug, trust: 'guess' });
+    for (const v of guessVendors()) push({ vendor: v, token: slug, trust: 'guess' });
   }
 
   return out.slice(0, maxCandidates);

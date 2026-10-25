@@ -70,6 +70,30 @@ describe('boardCandidates', () => {
     expect(candidates.every((candidate) => candidate.vendor === 'greenhouse')).toBe(true);
   });
 
+  it('trusts a Workday careers URL and never guesses a Workday board', () => {
+    const fromLink = boardCandidates(
+      identity({ name: 'Citi', careersUrl: 'https://citi.wd5.myworkdayjobs.com/en-US/2' }),
+    );
+    expect(fromLink[0]).toEqual({ vendor: 'workday', token: 'citi/wd5/2', trust: 'known' });
+    expect(fromLink.slice(1).some((candidate) => candidate.vendor === 'workday')).toBe(false);
+
+    const onWorkday = boardCandidates(identity({ name: 'Citi', atsType: 'workday', boardHint: 'citi' }));
+    expect(onWorkday.length).toBeGreaterThan(0);
+    expect(onWorkday.some((candidate) => candidate.vendor === 'workday')).toBe(false);
+  });
+
+  it('tries a stored Workday token only at Workday', () => {
+    expect(boardCandidates(identity({ name: 'Citi', atsType: 'workday', boardToken: 'citi/wd5/2' }))[0]).toEqual({
+      vendor: 'workday',
+      token: 'citi/wd5/2',
+      trust: 'known',
+    });
+    const unrecorded = boardCandidates(identity({ name: 'Citi', boardToken: 'citi/wd5/2' }));
+    expect(unrecorded.filter((candidate) => candidate.trust === 'known')).toEqual([
+      { vendor: 'workday', token: 'citi/wd5/2', trust: 'known' },
+    ]);
+  });
+
   it('reads the board out of a careers URL and trusts it', () => {
     const candidates = boardCandidates(
       identity({ careersUrl: 'https://boards.greenhouse.io/acme' }),

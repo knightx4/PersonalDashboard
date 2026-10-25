@@ -65,7 +65,7 @@ export async function safeFetch(
   rawUrl: string,
   options: RequestInit & { maxBytes?: number } = {},
   depth = 0,
-): Promise<{ url: string; status: number; body: string; contentType: string }> {
+): Promise<{ url: string; status: number; body: string; contentType: string; cookies: string[] }> {
   if (depth > 3) throw new Error('Too many redirects.');
   const { maxBytes = MAX_BODY_BYTES, ...init } = options;
 
@@ -104,6 +104,9 @@ export async function safeFetch(
       status: response.status,
       body: new TextDecoder().decode(buffer),
       contentType,
+      // The `name=value` part of each cookie set, for a board that wants its
+      // session cookie sent back (Consider, portfolio.ts).
+      cookies: response.headers.getSetCookie().map((cookie) => cookie.split(';')[0]),
     };
   } finally {
     clearTimeout(timer);

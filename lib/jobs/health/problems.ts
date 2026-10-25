@@ -11,9 +11,11 @@ export type HealthInput = {
   /** The latest run of each search, as search-runs.ts reads it. */
   rolesRun: RunFact | null;
   peopleRun: RunFact | null;
-  /** Followed companies with a known board, and how many the run is allowed to read. */
-  followedBoards: number;
-  boardLimit: number;
+  /**
+   * Followed boards the daily read tried in the last two days, and how many
+   * of those loaded in that time (suggest/boards.ts).
+   */
+  boards: { tried: number; read: number };
   discovery: { stage: string; startedAt: string; offered: number; error: string | null } | null;
   jevOn: boolean;
   /** Open roles still unscored a day and a half after they were written. */
@@ -61,14 +63,13 @@ export function healthProblems(input: HealthInput): HealthProblem[] {
 
   // A board that fails to load is skipped without a word (suggest/boards.ts),
   // so a vendor changing its endpoint shows only as a falling count.
-  const expected = Math.min(input.followedBoards, input.boardLimit);
-  const run = input.rolesRun;
-  if (run && run.state === 'done' && within(run.startedAt, input.now, 3) && expected >= 4 && run.boardsRead < expected / 2) {
+  const { tried, read } = input.boards;
+  if (tried >= 4 && read < tried / 2) {
     problems.push({
       key: 'boards',
-      title: `Only ${run.boardsRead} of ${expected} followed job boards could be read`,
+      title: `Only ${read} of ${tried} followed job boards could be read`,
       detail:
-        'The latest roles search could not load most of the boards of companies you follow, so their openings are missing from Recommended roles. A job board site may have changed how it publishes.',
+        'The daily read of the boards of companies you follow could not load most of them, so their new openings are missing from Recommended roles. A job board site may have changed how it publishes.',
     });
   }
 
