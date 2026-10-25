@@ -344,3 +344,87 @@ export function insightsBrief(input: {
     why,
   ].join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// Links inside a card's text.
+// ---------------------------------------------------------------------------
+
+/** A run of a layer's text, linked or plain. */
+export type TextPart = { text: string; link: string | null };
+
+/** A link a run wrote into the text: [words](/vault/n/...) or [words](https://...). */
+const WRITTEN_LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+
+/** The shortest quote that is matched in the text; shorter ones match too loosely. */
+const MIN_QUOTE = 12;
+
+/** A note's title from its vault path, or null for a table or a web page. */
+function noteTitle(source: string): string | null {
+  if (/^https?:/i.test(source) || !(source.includes('/') || source.endsWith('.md'))) return null;
+  const title = (source.split('/').pop() ?? '').replace(/\.md$/, '').trim();
+  return title.length >= 2 ? title : null;
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A layer's text cut into runs, with links where the card has them: first
+ * the links a run wrote as [words](link), then, in what is left, the first
+ * place the text repeats a receipt's quote or names the note a receipt came
+ * from, linked to that receipt. Matching ignores case; a note's title has to
+ * stand as whole words. A link that is not an app path or a web page is
+ * shown as its words alone.
+ */
+export function linkText(text: string, receipts: readonly InsightReceipt[]): TextPart[] {
+  const parts: TextPart[] = [];
+  let at = 0;
+  for (const match of text.matchAll(WRITTEN_LINK)) {
+    const index = match.index ?? 0;
+    if (index > at) parts.push({ text: text.slice(at, index), link: null });
+    parts.push({ text: match[1], link: safeLink(match[2]) });
+    at = index + match[0].length;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at), link: null });
+
+  const candidates = receipts
+    .flatMap((receipt) => {
+      if (!receipt.link) return [];
+      const found: Array<{ pattern: RegExp; link: string; length: number }> = [];
+      const quote = receipt.quote?.trim();
+      if (quote && quote.length >= MIN_QUOTE) {
+        found.push({ pattern: new RegExp(escapeRegExp(quote), 'i'), link: receipt.link, length: quote.length });
+      }
+      const title = noteTitle(receipt.source);
+      if (title) {
+        found.push({
+          pattern: new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(title)}(?![\\p{L}\\p{N}])`, 'iu'),
+          link: receipt.link,
+          length: title.length,
+        });
+      }
+      return found;
+    })
+    // Longer phrases first, so a quote wins over a title inside it.
+    .sort((a, b) => b.length - a.length);
+
+  let result = parts;
+  for (const { pattern, link } of candidates) {
+    const next: TextPart[] = [];
+    let placed = false;
+    for (const part of result) {
+      const match = !placed && !part.link ? pattern.exec(part.text) : null;
+      if (!match) {
+        next.push(part);
+        continue;
+      }
+      placed = true;
+      const start = match.index;
+      const end = start + match[0].length;
+      if (start > 0) next.push({ text: part.text.slice(0, start), link: null });
+      next.push({ text: part.text.slice(start, end), link });
+      if (end < part.text.length) next.push({ text: part.text.slice(end), link: null });
+    }
+    result = next;
+  }
+  return result.filter((part) => part.text.length > 0);
+}

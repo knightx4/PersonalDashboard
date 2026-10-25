@@ -29,6 +29,7 @@ import type {
   PredictionOutcome,
   Verdict,
 } from '@/lib/you/insights';
+import { linkText } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
 import { markInsight, startInsightRun, type MarkResult } from './actions';
 
@@ -455,13 +456,19 @@ function InsightCard({
           {insight.layers.map((layer, index) => (
             <li key={index} className="space-y-0.5">
               <p className="text-small font-medium text-ink-muted">{DEPTH_LABELS[layer.depth]}</p>
-              <p className="text-body text-ink [overflow-wrap:anywhere]">{layer.text}</p>
+              <p className="text-body text-ink [overflow-wrap:anywhere]">
+                <LinkedText text={layer.text} receipts={insight.receipts} />
+              </p>
             </li>
           ))}
         </ol>
       )}
 
-      {insight.liveRef && <p className="text-ui text-ink-muted">Tied to {insight.liveRef}</p>}
+      {insight.liveRef && (
+        <p className="text-ui text-ink-muted">
+          Tied to <LinkedText text={insight.liveRef} receipts={insight.receipts} />
+        </p>
+      )}
 
       {insight.receipts.length > 0 && (
         <Disclosure
@@ -550,6 +557,30 @@ export function sourceName(source: string): string {
   }
   const table = (source.split('.').pop() ?? source).replace(/_/g, ' ').trim();
   return table ? table.charAt(0).toUpperCase() + table.slice(1) : source;
+}
+
+/**
+ * A layer's text with its links in place: the ones the run wrote, and the
+ * first place it quotes a piece of evidence or names a note it came from.
+ */
+function LinkedText({ text, receipts }: { text: string; receipts: readonly InsightReceipt[] }) {
+  return (
+    <>
+      {linkText(text, receipts).map((part, index) =>
+        !part.link ? (
+          <span key={index}>{part.text}</span>
+        ) : part.link.startsWith('/') ? (
+          <Link key={index} href={part.link} className={linkVariants()}>
+            {part.text}
+          </Link>
+        ) : (
+          <a key={index} href={part.link} target="_blank" rel="noreferrer noopener" className={linkVariants()}>
+            {part.text}
+          </a>
+        ),
+      )}
+    </>
+  );
 }
 
 function Receipt({ receipt }: { receipt: InsightReceipt }) {

@@ -420,6 +420,13 @@ Write each card in the person's own words where possible, to them as "you".
   `/jobs/roles/<id>`, a goal at `/goals/<id>`, a map theme at
   `/vault/map/<theme id>` (a position opens on its theme's page). A link that is not an app path or an https page is
   dropped when the tab reads it.
+- **Links in the text.** In the layers and `live_ref`, link what you cite
+  where you cite it, as `[words](link)` with the same link as its receipt:
+  "your [journal on 25 January 2025](/vault/n/Me/Journal.md) says ...".
+  Every note, role, goal or page a layer names gets a link the first time it
+  is named. Encode `(` and `)` in a link as `%28` and `%29`. The tab also
+  links a receipt's exact quote or note title where the text repeats it, but
+  write the links anyway; most mentions are paraphrased.
 - `confidence`: `high`, `medium` or `hunch`.
 - `live_ref`: the deadline, step or lead the further layer points at, in
   one line (at most 300 characters), or null.
