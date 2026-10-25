@@ -97,7 +97,7 @@ export function BundleRow({
         summaryClassName="py-1 max-sm:min-h-11"
         bodyClassName="mt-1"
       >
-        <ul className="divide-y divide-border rounded-md border border-border">
+        <ul className="divide-y divide-border border-t border-border">
           {items.map((item) => (
             <TodayRow
               key={keyOf(item)}
