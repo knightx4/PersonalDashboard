@@ -10,7 +10,8 @@ import { createServiceSupabase as createPublicServiceSupabase } from '@/inngest/
 import { checkSearchHealth } from '@/lib/jobs/health/check';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
-import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { openingAdmitter, runSuggestionsFor } from '@/lib/jobs/suggest/run';
+import { pickNewBoardPostings, readDueBoards } from '@/lib/jobs/suggest/boards';
 import { checkOpeningPostings } from '@/lib/jobs/suggest/posting';
 import { recordRuns } from '@/lib/jobs/suggest/search-runs';
 import { collectSearchBatches } from '@/lib/jobs/suggest/search-batch';
@@ -192,7 +193,15 @@ export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningU
   return summary;
 }
 
-export type SearchBatchesSummary = { checked: number; finished: number; failed: number; pending: number };
+export type SearchBatchesSummary = {
+  checked: number;
+  finished: number;
+  failed: number;
+  pending: number;
+  /** The daily board read (lib/jobs/suggest/boards.ts): boards loaded this tick, and roles the pick suggested. */
+  boardsRead: number;
+  boardRoles: number;
+};
 
 /** Everything the collector may take, inside its route's five minutes. */
 const BATCHES_BUDGET_MS = 240_000;
@@ -216,7 +225,7 @@ export async function runSearchBatches(now: Date = new Date()): Promise<SearchBa
   const jobs = createServiceSupabase();
 
   const runs = await collectSearchBatches(jobs, apiKey, { deadline: began + BATCHES_BUDGET_MS - 90_000, now });
-  const summary: SearchBatchesSummary = { checked: runs.length, finished: 0, failed: 0, pending: 0 };
+  const summary: SearchBatchesSummary = { checked: runs.length, finished: 0, failed: 0, pending: 0, boardsRead: 0, boardRoles: 0 };
   for (const run of runs) {
     if (run.state === 'pending' || run.state === 'follow_up') summary.pending += 1;
     if (run.state === 'failed') summary.failed += 1;
@@ -253,5 +262,65 @@ export async function runSearchBatches(now: Date = new Date()): Promise<SearchBa
       );
     }
   }
+
+  await watchBoards(core, jobs, apiKey, summary, { now, deadline: began + BATCHES_BUDGET_MS - 30_000 });
   return summary;
+}
+
+/**
+ * The daily read of followed boards and the pick of what is new on them
+ * (lib/jobs/suggest/boards.ts), in whatever time the batches left. Each tick
+ * reads the boards not tried in the last day, a few dozen at most per
+ * person, so every board is read once a day across the ten-minute ticks; the
+ * pick asks Dash at most once a day, and only when something new fits. One
+ * person's failure is logged and the rest go on.
+ */
+async function watchBoards(
+  core: ReturnType<typeof createCoreServiceSupabase>,
+  jobs: ReturnType<typeof createServiceSupabase>,
+  apiKey: string,
+  summary: SearchBatchesSummary,
+  options: { now: Date; deadline: number },
+): Promise<void> {
+  const { data, error } = await core.from('account_settings').select('user_id');
+  if (error) {
+    console.error('[jobs boards] accounts', error.message);
+    return;
+  }
+  for (const { user_id: userId } of (data ?? []) as { user_id: string }[]) {
+    if (Date.now() > options.deadline - 60_000) break;
+    try {
+      if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
+      const read = await readDueBoards(jobs, userId, { now: options.now, deadline: options.deadline - 90_000 });
+      summary.boardsRead += read.read;
+      if (Date.now() > options.deadline - 60_000) continue;
+
+      const spend: SpendReport[] = [];
+      const scoreSpend: SpendReport[] = [];
+      const admitter = (await jevEnabledFor(core, userId))
+        ? await openingAdmitter(jobs, userId, { onSpend: (report) => scoreSpend.push(report) })
+        : null;
+      const picked = await pickNewBoardPostings(jobs, userId, {
+        apiKey,
+        now: options.now,
+        deadline: options.deadline - 20_000,
+        admitter,
+        onSpend: (report) => spend.push(report),
+      });
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, spend);
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, scoreSpend);
+      if (picked.error) console.error('[jobs boards] pick', picked.error);
+      summary.boardRoles += picked.headlines.length;
+
+      const payload = suggestionsPayload({ people: [], roles: picked.headlines }, options.now.toISOString().slice(0, 10));
+      const push = payload ? pushPorts(core, userId) : null;
+      if (payload && push) {
+        await sendToPerson(push, userId, payload, options.now).catch((err) =>
+          console.error('[jobs suggestions] push', err instanceof Error ? err.message : err),
+        );
+      }
+    } catch (err) {
+      console.error('[jobs boards]', err instanceof Error ? err.message : err);
+    }
+  }
 }

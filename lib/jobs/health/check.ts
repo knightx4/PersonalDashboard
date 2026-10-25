@@ -9,7 +9,6 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { BOARD_LIMIT } from '@/lib/jobs/suggest/boards';
 import { loadLatestRun, type SearchRunView } from '@/lib/jobs/suggest/search-runs';
 import { HEALTH_SOURCE_PREFIX, healthProblems, healthSource, type RunFact } from './problems';
 
@@ -33,16 +32,19 @@ export async function checkSearchHealth(
   options: { jevOn: boolean; now?: Date },
 ): Promise<HealthOutcome> {
   const now = options.now ?? new Date();
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
   const staleBefore = new Date(now.getTime() - STALE_UNSCORED_HOURS * 60 * 60 * 1000).toISOString();
   const [rolesRun, peopleRun, boards, discovery, unscored, raised] = await Promise.all([
     loadLatestRun(jobs, userId, 'apply', now),
     loadLatestRun(jobs, userId, 'reach_out', now),
     jobs
       .from('companies')
-      .select('id', { count: 'exact', head: true })
+      .select('board_read_at')
       .eq('user_id', userId)
       .not('ats_board_token', 'is', null)
-      .or('priority.is.null,priority.neq.passed'),
+      .or('priority.is.null,priority.neq.passed')
+      .gte('board_tried_at', twoDaysAgo)
+      .limit(5000),
     jobs
       .from('discovery_runs')
       .select('stage, started_at, offered, error')
@@ -67,13 +69,16 @@ export async function checkSearchHealth(
   ]);
   if (raised.error) throw new Error(`Reading the open health raises failed: ${raised.error.message}`);
 
+  const tried = (boards.data ?? []) as { board_read_at: string | null }[];
   const d = discovery.data as { stage: string; started_at: string; offered: number; error: string | null } | null;
   const problems = healthProblems({
     now,
     rolesRun: fact(rolesRun),
     peopleRun: fact(peopleRun),
-    followedBoards: boards.count ?? 0,
-    boardLimit: BOARD_LIMIT,
+    boards: {
+      tried: tried.length,
+      read: tried.filter((row) => row.board_read_at && Date.parse(row.board_read_at) >= Date.parse(twoDaysAgo)).length,
+    },
     discovery: d ? { stage: d.stage, startedAt: d.started_at, offered: d.offered, error: d.error } : null,
     jevOn: options.jevOn,
     staleUnscored: unscored.count ?? 0,
