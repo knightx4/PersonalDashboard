@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { SectionFold } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import { formatDateInline } from '@/lib/jobs/applications/load';
+import { formatNumber } from '@/lib/money';
 import { chatBatches, readClaudeExport, type ChatLine, type ChatStats } from '@/lib/you/claude-chats';
 
 export type ChatsActions = {
@@ -51,14 +52,14 @@ export function ChatsFold({
         setProgress(`Saving ${index + 1} of ${batches.length}…`);
         const result = await actions.importBatch(batch);
         if (result.error) {
-          setError(`${result.error} ${added.toLocaleString()} new messages were saved before this.`);
+          setError(`${result.error} ${formatNumber(added)} new messages were saved before this.`);
           setProgress(null);
           return;
         }
         added += result.added ?? 0;
       }
       setProgress(
-        `Read ${lines.length.toLocaleString()} of your messages; ${added.toLocaleString()} were new.`,
+        `Read ${formatNumber(lines.length)} of your messages; ${formatNumber(added)} were new.`,
       );
       await actions.refresh();
     } catch (failure) {
@@ -72,7 +73,7 @@ export function ChatsFold({
 
   const hint =
     stats.imported > 0
-      ? `${stats.imported.toLocaleString()} messages${stats.lastImportedAt ? `, imported ${date(stats.lastImportedAt)}` : ''}`
+      ? `${formatNumber(stats.imported)} messages${stats.lastImportedAt ? `, imported ${date(stats.lastImportedAt)}` : ''}`
       : 'None imported yet';
 
   return (
@@ -84,7 +85,7 @@ export function ChatsFold({
           {stats.imported > 0 && stats.firstSaidAt && stats.lastSaidAt
             ? ` It has your messages from ${date(stats.firstSaidAt)} to ${date(stats.lastSaidAt)}.`
             : ''}
-          {stats.saved > 0 ? ` ${stats.saved.toLocaleString()} more were saved during chats.` : ''}
+          {stats.saved > 0 ? ` ${formatNumber(stats.saved)} more were saved during chats.` : ''}
         </p>
         <ol className="list-decimal space-y-1 pl-5 text-ui text-ink-muted">
           <li>On claude.ai, open Settings, then Privacy, and choose Export data.</li>
