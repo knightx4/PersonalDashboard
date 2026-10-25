@@ -28,7 +28,7 @@ import type {
   Verdict,
 } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { markInsight, startFullReread, startInsightRun, type MarkResult } from './actions';
+import { markInsight, startInsightRun, type MarkResult } from './actions';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -46,19 +46,17 @@ import { markInsight, startFullReread, startInsightRun, type MarkResult } from '
  * what happened and the evidence the nightly check recorded, folded. Marking
  * it again clears the line until the tripwire fires again.
  *
- * Look again starts a run (startInsightRun), one model call that writes in a
- * few minutes; while one is queued or running a banner takes the button's
- * place and the page looks again every minute. Under the deck, Full re-read
- * starts the slow session on the person's Claude plan (startFullReread).
+ * Look again starts a run (startInsightRun), a session on the goals routine
+ * that reads everything and takes a while; while one is queued or running a
+ * banner takes the button's place and the page looks again every minute.
  */
 
 export type InsightsActions = {
   mark: (insightId: string, verdict: Verdict, note?: string | null) => Promise<MarkResult>;
   lookAgain: () => Promise<{ error: string | null }>;
-  fullReread: () => Promise<{ error: string | null }>;
 };
 
-const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun, fullReread: startFullReread };
+const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun };
 
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
@@ -67,8 +65,8 @@ export type InsightsOpen = {
   earlier?: boolean;
   /** The evidence under a card brought back by a tripwire. */
   fired?: boolean;
-  /** The hint on the Full re-read button, naming the routine. */
-  reread?: boolean;
+  /** The hint on the Look again button, naming the routine. */
+  lookAgain?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -99,13 +97,6 @@ const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
   not_quite: 'What is not quite right?',
   wrong: 'What makes it wrong?',
 };
-
-/**
- * Look again is one model call on the API; a run is refused before it starts
- * if it is estimated over two dollars (lib/you/insights-write.ts). No run has
- * been priced yet, so the figure is a guess and says so (law 16).
- */
-const LOOK_AGAIN_COST = 'Up to about $2, uncertain';
 
 /** A mark in the joined group: shared edges, the pressed or focused one drawn on top. */
 const MARK_CLASS =
@@ -143,7 +134,6 @@ export function InsightsView({
   run,
   runWhen,
   available,
-  rereadAvailable = false,
   timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
@@ -153,10 +143,8 @@ export function InsightsView({
   run: InsightRunState;
   /** When the newest run was asked for, already written in their zone. */
   runWhen: string | null;
-  /** Whether the deployment can write a run (the API key is set). */
+  /** Whether the deployment can start a run (both goals routine variables set). */
   available: boolean;
-  /** Whether the deployment can start a full re-read (both routine variables set). */
-  rereadAvailable?: boolean;
   /** Their timezone, for the date on a card brought back. */
   timezone?: string;
   actions?: InsightsActions;
@@ -225,11 +213,6 @@ export function InsightsView({
       const result = await actions.lookAgain();
       setRunError(result.error);
     });
-  const fullReread = () =>
-    startTransition(async () => {
-      const result = await actions.fullReread();
-      setRunError(result.error);
-    });
 
   const showLookAgain = available && run.kind !== 'running' && run.kind !== 'failed';
   const lookAgainButton = (
@@ -238,9 +221,10 @@ export function InsightsView({
       variant="secondary"
       pending={starting}
       onClick={lookAgain}
-      costText={LOOK_AGAIN_COST}
+      routine="goals"
       what="Cost of looking again"
       align="end"
+      hintOpen={open.lookAgain}
     >
       {starting ? 'Starting…' : 'Look again'}
     </DashAction>
@@ -340,7 +324,7 @@ export function InsightsView({
                   variant="secondary"
                   pending={starting}
                   onClick={lookAgain}
-                  costText={LOOK_AGAIN_COST}
+                  routine="goals"
                   what="Cost of trying again"
                 >
                   {starting ? 'Starting…' : 'Try again'}
@@ -355,8 +339,8 @@ export function InsightsView({
 
         {!available && (
           <p className="text-ui text-ink-muted">
-            Runs are not set up on this deployment yet. They need ANTHROPIC_API_KEY in the
-            project’s environment variables.
+            Runs are not set up on this deployment yet. They need CLAUDE_GOALS_ROUTINE_ID and
+            CLAUDE_GOALS_ROUTINE_TOKEN in the project’s environment variables.
           </p>
         )}
 
@@ -396,20 +380,6 @@ export function InsightsView({
               </Card>
             }
           />
-        )}
-
-        {rereadAvailable && !nothing && run.kind !== 'running' && (
-          <DashAction
-            type="button"
-            variant="link"
-            pending={starting}
-            onClick={fullReread}
-            routine="goals"
-            what="Cost of a full re-read"
-            hintOpen={open.reread}
-          >
-            Full re-read
-          </DashAction>
         )}
 
         {earlier.length > 0 && (

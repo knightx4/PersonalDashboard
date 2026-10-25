@@ -1,6 +1,6 @@
 ---
 name: insights
-description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in Me/, the journal and daily notes in full, send three subagents to read what they did across jobs, goals, Learn, spending, app use and timing, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>", or the user says "write insights about me" or "look again".
+description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in Me/, the journal and daily notes in full, send three subagents to read what they did across jobs, goals, Learn, spending, app use and timing, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
 ---
 
 # Writing deep insights about the person
@@ -36,8 +36,8 @@ Work these in order. Each has its section below.
 2. **Read the core in full**: the private notes in Me/, the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: three subagents at once, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge.
-5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked.
-6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, or rests on numbers not re-queried in this run. Label hunches, correct earlier cards, leave out relationships, health and family.
+5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
+6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
 7. **Write three to five cards** with layers, linked receipts, a confidence and the live thing each points at, then finish the run row with a two-sentence summary.
 
 ## How you read and write
@@ -56,14 +56,19 @@ query that fails on a column name is fixed and sent again, not abandoned.
 ## 1. Read what came before
 
 The brief comes through the goals routine, Dash's general routine
-(`insightsBrief` in `lib/you/insights.ts`), and is:
+(`insightsBrief` in `lib/you/insights.ts`). The daily cron fires it once the
+last finished run is thirty days old, and the Look again button on the
+Insights tab fires it whenever the person presses it. It is:
 
 ```
 Follow .claude/skills/insights/SKILL.md
 Insight run <run id>
 user_id <uuid>
-weekly run | started by Look again | started by a change: <what changed>
+monthly run | started by Look again | started by a change: <what changed>
 ```
+
+This session is the whole run. Nothing else writes cards, so take the time
+the reading needs.
 
 ```sql
 select id, status, requested_at from you.insight_runs
@@ -289,6 +294,21 @@ Every card has three layers, saved in this order:
   something live this week where one exists: an open deadline, a goal step,
   a job lead, an essay in draft.
 
+**The deeper layer may not rest on their self-descriptions.** The list from
+step 1 (About me, Notes to Self, mantras, personality results) can be where
+a card starts or a receipt in the saw layer. It cannot be the mechanism.
+"You don't like waiting, so you build when waiting" hands their own line back
+to them, and they knew it already. The 19 October cards did this, and that is
+why they read as shallow.
+
+**Search outside for every deeper layer.** For each candidate that survives
+to this step, run at least one web search for what explains the pattern:
+research on the behaviour, a framework from psychology, economics or design,
+a historical figure or a place with the same structure. Read what you find,
+and use it only if it explains their case better than their notes do. Cite
+it as a receipt with its https link. A card whose deeper layer still has no
+outside source is a `hunch` at most.
+
 Before writing a card, ask what would make the deeper layer obvious to the
 person, and go past that. The further layers that worked:
 
@@ -310,7 +330,18 @@ Drop:
 - any card without two sources or a span of time;
 - any card whose numbers were not re-queried in this run. A number a
   subagent gave you is re-run by you before it goes on a card; a number
-  from an earlier insight is re-run too.
+  from an earlier insight is re-run too;
+- any card that fails the surprise check.
+
+**The surprise check.** Send one subagent the list from step 1 (their
+self-descriptions and personality results, in full) and the claims and
+deeper layers of every candidate still standing, and nothing else: none of
+your evidence. Ask it, for each card, whether someone who had read only
+those notes would already have said it, and to answer `obvious`,
+`partly` or `new` with one sentence of why. Drop every `obvious` card. A
+`partly` card stays only if its further layer is what the notes miss, and
+you rewrite it to lead with that. If fewer than three cards are `new`,
+go back to step 4 for more candidates before you write anything.
 
 Then:
 

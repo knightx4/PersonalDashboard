@@ -5,7 +5,7 @@ import { INSIGHT_RUN_STALE_AFTER_MS, STALE_RUN_ERROR } from '@/lib/you/insights-
 
 /**
  * Queue an insights run: a row the tab shows running at once (plan #2413.10).
- * Look again, the monthly tick and the Full re-read link all begin here. A run
+ * Look again and the monthly tick both begin here. A run
  * left queued or running past the stale mark is marked failed before the
  * check, so a session that died does not hold the next one; the partial
  * unique index allows one open run at a time.
@@ -39,10 +39,11 @@ export async function queueInsightRun(input: {
 }
 
 /**
- * Start one insights run on the goals routine (plan #2413.6): the Full re-read
- * link, which reads everything in a session on the person's plan. Look again
- * and the monthly tick write through the single API call instead
- * (inngest/you/insights-write.ts).
+ * Start one insights run on the goals routine (plan #2413.6): a session on the
+ * person's plan that follows the insights skill and reads everything. Look
+ * again and the monthly tick both start here. The single API call
+ * (inngest/you/insights-write.ts) wrote shallower cards from extracts and is
+ * no longer started by either.
  *
  * The run row is made first, queued, so the tab shows it at once; the goals
  * routine is then fired with the insights brief naming it. A run left queued
@@ -72,7 +73,7 @@ export async function startInsightRun(input: {
       started: false,
       reason: 'no_routine',
       error:
-        'A full re-read runs on the goals routine, which is not set up on this deployment: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
+        'Insights run on the goals routine, which is not set up on this deployment: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
     };
   }
   const queued = await queueInsightRun({ client, userId, now: input.now });

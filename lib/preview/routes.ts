@@ -404,7 +404,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-place-form': ['/you/places/[id]/edit'],
   'you-insights': ['/you/insights'],
   'you-insights-evidence': ['/you/insights'],
-  'you-insights-reread': ['/you/insights'],
+  'you-insights-look-again': ['/you/insights'],
   'you-insights-why': ['/you/insights'],
   'you-insights-fired': ['/you/insights'],
   'you-insights-fired-evidence': ['/you/insights'],

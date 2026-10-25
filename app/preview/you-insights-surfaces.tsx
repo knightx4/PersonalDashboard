@@ -19,7 +19,6 @@ const actions: InsightsActions = {
     saved: { verdict, note: note ?? null, decidedAt: new Date(NOW).toISOString() },
   }),
   lookAgain: async () => ({ error: null }),
-  fullReread: async () => ({ error: null }),
 };
 
 const waiting: Insight[] = [
@@ -239,7 +238,6 @@ export function YouInsightsPreview({
       run={insightRunState(empty && state === 'ready' ? null : latest, NOW)}
       runWhen="Today, 9:40 AM BST"
       available
-      rereadAvailable
       timezone="Europe/London"
       actions={actions}
       open={open}

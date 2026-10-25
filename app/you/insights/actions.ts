@@ -6,8 +6,7 @@ import { requireUser } from '@/lib/auth/server';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createYouClient } from '@/lib/you/auth/server';
 import { saveVerdict, VERDICTS, type InsightVerdict, type Verdict } from '@/lib/you/insights';
-import { kickInsightRunAfterResponse } from '@/lib/you/insights-kick';
-import { queueInsightRun, startInsightRun as startRun } from '@/lib/you/insights-start';
+import { startInsightRun as startRun } from '@/lib/you/insights-start';
 
 /** What a mark sends back: the verdict as saved, or why it was not. */
 export type MarkResult = { error: string | null; saved?: InsightVerdict };
@@ -31,45 +30,18 @@ export async function markInsight(insightId: string, verdict: Verdict, note?: st
 }
 
 /**
- * Look again: queue a run, which the tab shows running at once, and start the
- * single model call in a function of its own after the response (plan
- * #2413.10). The call takes minutes, so nothing here waits for it
- * (lib/you/insights-kick.ts, inngest/you/insights-write.ts).
+ * Look again: a whole session on the goals routine that follows the insights
+ * skill, reading every private note and sending readers across the person's
+ * history (.claude/skills/insights/SKILL.md). It spends their Claude plan, so
+ * besides the monthly tick it only starts here, when they press it.
  */
 // latency: pending
 export async function startInsightRun(): Promise<{ error: string | null }> {
   const user = await requireUser();
-  const client = await createYouClient();
-  const queued = await queueInsightRun({ client, userId: user.id });
-  if (!queued.queued) return { error: queued.error };
-  kickInsightRunAfterResponse(queued.runId, async () => {
-    await client
-      .from('insight_runs')
-      .update({
-        status: 'failed',
-        error: 'Dash could not start the run. Try again.',
-        finished_at: new Date().toISOString(),
-      })
-      .eq('id', queued.runId)
-      .eq('user_id', user.id);
-  });
-  revalidatePath('/you/insights');
-  return { error: null };
-}
-
-/**
- * Full re-read: the slow way, a whole session on the goals routine with the
- * insights skill, which reads every note and sends readers across the
- * person's history. It spends their Claude plan, so it only starts here,
- * when they choose it.
- */
-// latency: pending
-export async function startFullReread(): Promise<{ error: string | null }> {
-  const user = await requireUser();
   const result = await startRun({
     client: await createYouClient(),
     userId: user.id,
-    reason: 'full_reread',
+    reason: 'look_again',
     routine: goalsRoutine(),
   });
   revalidatePath('/you/insights');
