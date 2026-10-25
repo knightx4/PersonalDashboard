@@ -13,8 +13,12 @@ import { SUGGEST_MODEL } from './model';
 import { admitOpenings, scoredColumns, type Admission, type Admitter } from './admit';
 import { JEV_MODEL } from '@/lib/jev/wire';
 
-/** A followed-board posting offered to a search: a role found at this link came from that board. */
-export type BoardOrigin = { url: string; company: string };
+/**
+ * A followed-board posting offered to a search: a role found at this link
+ * came from that board. `foundIn` overrides the found-in line, as the daily
+ * pick of new postings does ("New on Clay's board, first seen 24 Oct").
+ */
+export type BoardOrigin = { url: string; company: string; foundIn?: string };
 
 type Row = Record<string, unknown>;
 
@@ -37,7 +41,7 @@ export async function storeOpenings(
   boards: readonly BoardOrigin[],
   admitter?: Admitter | null,
 ): Promise<string[]> {
-  const fromBoard = new Map(boards.map((board) => [board.url, board.company]));
+  const fromBoard = new Map(boards.map((board) => [board.url, board]));
   const admissions: Admission<OpeningSuggestion>[] = admitter
     ? await admitOpenings(
         openings,
@@ -59,7 +63,7 @@ export async function storeOpenings(
       user_id: userId,
       kind: 'apply',
       origin: board ? 'board' : 'search',
-      found_in: board ? `On ${board}'s own job board` : null,
+      found_in: board ? (board.foundIn ?? `On ${board.company}'s own job board`) : null,
       company_name: opening.company,
       headline: opening.title,
       why: opening.why,

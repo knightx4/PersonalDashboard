@@ -6,8 +6,7 @@ const healthy: HealthInput = {
   now,
   rolesRun: { state: 'done', startedAt: '2026-10-10T13:47:00Z', boardsRead: 48, error: null },
   peopleRun: { state: 'done', startedAt: '2026-10-09T13:47:00Z', boardsRead: 0, error: null },
-  followedBoards: 50,
-  boardLimit: 80,
+  boards: { tried: 50, read: 48 },
   discovery: { stage: 'done', startedAt: '2026-10-05T06:17:00Z', offered: 812, error: null },
   jevOn: true,
   staleUnscored: 0,
@@ -34,11 +33,11 @@ describe('healthProblems', () => {
     expect(keys({ ...healthy, rolesRun: { ...healthy.rolesRun!, state: 'failed', startedAt: '2026-10-01T00:00:00Z' } })).toEqual([]);
   });
 
-  it('raises a run that read under half the followed boards', () => {
-    const problems = healthProblems({ ...healthy, rolesRun: { ...healthy.rolesRun!, boardsRead: 10 } });
+  it('raises a daily read that loaded under half the followed boards', () => {
+    const problems = healthProblems({ ...healthy, boards: { tried: 50, read: 10 } });
     expect(problems.map((p) => p.key)).toEqual(['boards']);
     expect(problems[0].title).toBe('Only 10 of 50 followed job boards could be read');
-    expect(keys({ ...healthy, followedBoards: 3, rolesRun: { ...healthy.rolesRun!, boardsRead: 0 } })).toEqual([]);
+    expect(keys({ ...healthy, boards: { tried: 3, read: 0 } })).toEqual([]);
   });
 
   it('raises a failed or empty discovery week', () => {
