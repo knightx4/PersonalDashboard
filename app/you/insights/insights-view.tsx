@@ -32,7 +32,17 @@ import type {
 } from '@/lib/you/insights';
 import { linkText } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { answerInsight, markInsight, saveNowNote, startInsightRun, type MarkResult } from './actions';
+import {
+  answerInsight,
+  importClaudeChats,
+  markInsight,
+  refreshInsights,
+  saveNowNote,
+  startInsightRun,
+  type MarkResult,
+} from './actions';
+import { ChatsFold, type ChatsActions } from './chats-fold';
+import type { ChatStats } from '@/lib/you/claude-chats';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -60,6 +70,7 @@ export type InsightsActions = {
   lookAgain: () => Promise<{ error: string | null }>;
   answer: (insightId: string, answer: string) => Promise<AnswerResult>;
   saveNow: (body: string) => Promise<{ error: string | null; saved?: NowNote }>;
+  chats: ChatsActions;
 };
 
 type AnswerResult = { error: string | null; saved?: { answer: string | null; answeredAt: string | null } };
@@ -69,6 +80,7 @@ const REAL_ACTIONS: InsightsActions = {
   lookAgain: startInsightRun,
   answer: answerInsight,
   saveNow: saveNowNote,
+  chats: { importBatch: importClaudeChats, refresh: refreshInsights },
 };
 
 /** For the gallery: draw a hidden part open. */
@@ -82,6 +94,8 @@ export type InsightsOpen = {
   lookAgain?: boolean;
   /** The note on where they are now, folded open. */
   now?: boolean;
+  /** The chats import, folded open. */
+  chats?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -161,6 +175,7 @@ export function InsightsView({
   runWhen,
   available,
   now = { body: '', updatedAt: null },
+  chats = { imported: 0, saved: 0, firstSaidAt: null, lastSaidAt: null, lastImportedAt: null },
   timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
@@ -174,6 +189,8 @@ export function InsightsView({
   available: boolean;
   /** Their note on where they are now, which every run reads first. */
   now?: NowNote;
+  /** How much of their Claude chats the runs can read. */
+  chats?: ChatStats;
   /** Their timezone, for the date on a card brought back. */
   timezone?: string;
   actions?: InsightsActions;
@@ -420,6 +437,8 @@ export function InsightsView({
             }
           />
         )}
+
+        <ChatsFold stats={chats} timezone={timezone} actions={actions.chats} defaultOpen={open.chats} />
 
         {earlier.length > 0 && (
           <SectionFold title="Earlier" count={earlier.length} defaultOpen={open.earlier ?? false}>

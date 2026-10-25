@@ -9,6 +9,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { insertPlace, updatePlace } from '@/lib/you/places-store';
 import { saveJob as writeJob } from '@/lib/you/work-history-store';
 import { getDetails, saveDetails } from '@/lib/you/details-store';
+import { ABOUT_ME_MAX, ABOUT_ME_WHY_MAX } from '@/lib/you/claude-chats';
 import {
   checkCustomFields,
   CUSTOM_FIELDS_MAX,
@@ -37,6 +38,9 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 its label, created when none has that label (plan #2531.3).
  *                 Never touches the six fixed details (plan #2124.3) and never
  *                 removes a field.
+ *   save_about_me something they said about themselves in a chat with
+ *                 Claude, in their words, with why it was saved
+ *                 (you.claude_chats, you 0019), for the insights runs.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -294,6 +298,55 @@ async function setDetail(env: YouWriteEnv, args: Args): Promise<YouMade> {
   };
 }
 
+const INSIGHTS_PATHS = ['/you/insights', '/home'];
+
+/**
+ * Something they said about themselves in a chat, kept for the insights runs
+ * (you 0019). Their words, close to as they said them; why is the chat's one
+ * line on what it shows.
+ */
+async function saveAboutMe(env: YouWriteEnv, args: Args): Promise<YouMade> {
+  const said = (textArg(args, 'text') ?? '').trim();
+  const why = (textArg(args, 'why') ?? '').trim();
+  if (said.length < 10) throw new YouRefused('text is missing: give what they said, in their words.');
+  if (said.length > ABOUT_ME_MAX) throw new YouRefused(`Keep text under ${ABOUT_ME_MAX} characters: the moment, not the conversation.`);
+  if (why.length > ABOUT_ME_WHY_MAX) throw new YouRefused(`Keep why under ${ABOUT_ME_WHY_MAX} characters.`);
+  const client = env.you as unknown as YouSupabaseClient;
+  const { data, error } = await client
+    .from('claude_chats')
+    .insert({
+      user_id: env.userId,
+      origin: 'saved',
+      said_at: new Date().toISOString(),
+      body: said,
+      why: why || null,
+    })
+    .select('id, origin, said_at, body, why')
+    .single();
+  if (error || !data) throw new Error(error?.message ?? 'no row');
+  const row = data as Row;
+  const id = String(row.id);
+  const line = said.split('\n')[0];
+  const short = line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
+  return {
+    kind: 'save_about_me',
+    input: {
+      verb: 'Saved',
+      what: short,
+      rest: ' for your insights',
+      href: '/you/insights',
+      where: 'Open Insights',
+      paths: INSIGHTS_PATHS,
+    },
+    subjectRef: toRef('you.claude_chats', id),
+    op: 'insert',
+    before: null,
+    after: row,
+    summary: `Dash saved "${short}" for your insights.`,
+    row: { table: 'you.claude_chats', ref: id, title: short, href: '/you/insights', detail: { why: why || null } },
+  };
+}
+
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
 
 const FIELDS = {
@@ -364,6 +417,22 @@ export const YOU_WRITES: readonly YouWrite[] = [
       additionalProperties: false,
     },
     run: saveJob,
+  },
+  {
+    name: 'save_about_me',
+    runs: noButton('What they say about themselves in a chat is saved from the chat; the Insights tab imports a whole export instead.'),
+    description:
+      "Save something the person said about themselves in this conversation, so Dash's insights about them can read it: how they think or decide, what they want or fear, a decision and the real reason for it, what drains or energises them, something they have changed their mind about. Save it when they ask you to, or when their own instructions ask you to save such moments. Give their words, as close to how they said them as you can, not your summary; and in why, one line on what it shows about them. One moment per call, at most a few in a conversation. Not for facts with a place of their own (a todo, a goal, a job, a detail), which have tools of their own.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'What they said, in their words, close to verbatim.' },
+        why: { type: 'string', description: 'One line on what it shows about them.' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    run: saveAboutMe,
   },
   {
     name: 'set_detail',

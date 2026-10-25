@@ -150,6 +150,34 @@ describe('the You writes', () => {
     });
   });
 
+  describe('save_about_me', () => {
+    it('keeps what they said, in their words, for the insights runs', async () => {
+      const tables: FakeTables = { 'you.claude_chats': [] };
+      const result = await runYouWrite(write('save_about_me'), env(tables), {
+        text: 'I only really finish when someone else is waiting on the last bit.',
+        why: 'How they finish things.',
+      });
+      if ('ok' in result) throw new Error(result.error);
+      expect(result.op).toBe('insert');
+      expect(tables['you.claude_chats']).toEqual([
+        expect.objectContaining({
+          user_id: ME,
+          origin: 'saved',
+          body: 'I only really finish when someone else is waiting on the last bit.',
+          why: 'How they finish things.',
+        }),
+      ]);
+      expect(result.summary).toMatch(/^Dash saved "I only really finish/);
+    });
+
+    it('refuses a moment with no words of theirs', async () => {
+      const tables: FakeTables = { 'you.claude_chats': [] };
+      const result = await runYouWrite(write('save_about_me'), env(tables), { text: 'ok', why: 'x' });
+      expect(result).toEqual({ ok: false, error: expect.stringMatching(/text is missing/) });
+      expect(tables['you.claude_chats']).toHaveLength(0);
+    });
+  });
+
   describe('set_detail', () => {
     const FIELD = '33333333-3333-4333-8333-333333333333';
     const mine = (custom_fields: unknown[]) => ({

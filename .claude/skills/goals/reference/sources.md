@@ -571,6 +571,16 @@ Where they are at the moment, one row in their own words: money, what they are f
 - Opens at `/you/insights`
 - Written on the Insights tab (you 0018). Every insights run reads it first; it is their current situation, so it outranks older notes on the same subject.
 
+### `you.claude_chats` (You)
+
+What they wrote in their chats with Claude: their own messages from the claude.ai export, and things they said about themselves saved during a chat, with why.
+
+- Search: `body`, `conversation_title`, `why`
+- Name a row by `conversation_title`; link it by `id`
+- Scoped to the person by `user_id`, not user_id
+- Opens at `/you/insights`
+- origin is export (one of their messages from conversations.json, with conversation_title) or saved (saved by save_about_me during a chat, with why). Only their own messages are kept, never Claude's replies, so a message often answers something not shown. Much of it is asking for help with code or writing; the moments that say something about them are the minority.
+
 ### `you.places` (You)
 
 The places they have lived, with when they moved in and out.

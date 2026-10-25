@@ -1,6 +1,6 @@
 ---
 name: insights
-description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in Me/, the journal and daily notes in full, send three subagents to read what they did across jobs, goals, Learn, spending, app use and timing, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
+description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in Me/, the journal and daily notes in full, send four subagents to read what they did across jobs, goals, Learn, spending, app use and timing, and what they said in their chats with Claude, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
 ---
 
 # Writing deep insights about the person
@@ -35,7 +35,7 @@ Work these in order. Each has its section below.
 
 1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
 2. **Read the core in full**: the private notes in Me/, the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
-3. **Read what they did**: three subagents at once, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
+3. **Read what they did**: four subagents at once, one of them on their chats with Claude, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
 6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
@@ -260,6 +260,16 @@ Read, in full:
    run's reading links to.
 5. **The Inbox** (`path like 'Inbox/%'`): what they wrote most recently and
    have not filed.
+6. **What a chat saved about them.** Rows of `you.claude_chats` with
+   `origin = 'saved'` are moments from their chats with Claude that the
+   chat judged said something about them, in their words, with why. Read
+   every one. They are as unguarded as the journal and newer than most of
+   it.
+
+   ```sql
+   select said_at, body, why from you.claude_chats
+   where user_id = '<user_id>' and origin = 'saved' order by said_at desc;
+   ```
 
 Date a note by `first_written_at`, never `created_at`, which is when the
 sync first saw it. Where `first_written_at` is null, say the date is unknown
@@ -294,7 +304,7 @@ position held only in audience notes is a lead for a testable claim.
 
 ## 3. Read what they did
 
-Send three subagents in one message, so they run at the same time. Each
+Send four subagents in one message, so they run at the same time. Each
 gets the `user_id`, the rule that it runs owner-scoped selects through
 `npx tsx scripts/sql.ts` and nothing else (no inserts, no updates, no
 connector), the tables below as a starting point, and this request:
@@ -333,7 +343,26 @@ Then the same for each burst of building, taken from
 repository and `public.plan_items` by `updated_at`, and for each rejection:
 what came in the week after.
 
-If the session has no tool for subagents, do the three passes yourself in
+**(d) Their chats with Claude.** `you.claude_chats` with
+`origin = 'export'` holds every message they wrote on claude.ai (never
+Claude's replies), with `conversation_title` and `said_at`; there may be
+thousands. Most ask for help with code or writing. Ask this reader to find
+the minority where they think out loud about themselves: why they want or
+dropped something, how they decided, what they were worried about, how they
+describe their own work, what they argued with Claude about, and what they
+asked for help with at odd hours or more than once. Ask for the quotes with
+their dates and titles, how often a subject or worry comes back across
+months, and what they said in a chat that their notes never say. Have it
+page through by `said_at` in batches of a few hundred rather than search
+for words, since what matters is often phrased in ways no search would
+guess. A chat is where they are thinking before they have decided, so what
+they say there can differ from the note they wrote after; that difference
+is a lead.
+
+If `you.claude_chats` holds no export rows, skip this reader and say in the
+run's summary that the chats have not been imported.
+
+If the session has no tool for subagents, do the four passes yourself in
 turn, with the same request.
 
 ## 4. Find candidates

@@ -80,6 +80,11 @@ export const youActions: ModuleActions = {
       'theirs',
       'Where they are now is their own account of their situation; Dash reads it before every insights run and does not write it.',
     ),
+    importClaudeChats: none(
+      'theirs',
+      'Importing their claude.ai export is their choice of what Dash may read; the connector saves single moments with save_about_me instead.',
+    ),
+    refreshInsights: none('page'),
     startInsightRun: none(
       'spends',
       'Look again starts a long Dash session on the account, which spends money the person chooses to spend.',

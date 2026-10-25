@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createYouClient } from '@/lib/you/auth/server';
+import { BATCH_ROWS, CHAT_BODY_MAX, importChatLines } from '@/lib/you/claude-chats';
 import {
   saveAnswer,
   saveNow,
@@ -68,6 +69,43 @@ export async function saveNowNote(body: string): Promise<{ error: string | null;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your note was not saved. Try again.' };
   }
+}
+
+const chatBatchSchema = z
+  .array(
+    z.object({
+      messageId: z.string().min(1).max(100),
+      conversationId: z.string().max(100).nullable(),
+      conversationTitle: z.string().max(300).nullable(),
+      saidAt: z.string().refine((value) => !Number.isNaN(Date.parse(value))),
+      body: z.string().min(1).max(CHAT_BODY_MAX),
+    }),
+  )
+  .max(BATCH_ROWS);
+
+/**
+ * One batch of their own messages from the claude.ai export, read in their
+ * browser (lib/you/claude-chats.ts). A message already imported is skipped,
+ * so importing a newer export adds only what is new.
+ */
+// latency: pending
+export async function importClaudeChats(batch: unknown): Promise<{ error: string | null; added?: number }> {
+  const parsed = chatBatchSchema.safeParse(batch);
+  if (!parsed.success) return { error: 'Some of these messages could not be read, so none of this batch was saved.' };
+  const user = await requireUser();
+  try {
+    const added = await importChatLines(await createYouClient(), user.id, parsed.data);
+    return { error: null, added };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your chats were not saved. Try again.' };
+  }
+}
+
+/** Called once the last batch is in, so the counts on the tab are new. */
+// latency: pending
+export async function refreshInsights(): Promise<void> {
+  await requireUser();
+  revalidatePath('/you/insights');
 }
 
 /**

@@ -3,6 +3,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { createYouClient } from '@/lib/you/auth/server';
+import { chatStats } from '@/lib/you/claude-chats';
 import { latestInsightRun, listInsights, loadNow } from '@/lib/you/insights';
 import { insightRunState } from '@/lib/you/insights-run';
 import { InsightsView } from './insights-view';
@@ -19,11 +20,12 @@ export const dynamic = 'force-dynamic';
 export default async function Page() {
   const user = await requireUser();
   const you = await createYouClient();
-  const [all, run, settings, now] = await Promise.all([
+  const [all, run, settings, now, chats] = await Promise.all([
     listInsights(you, user.id, { statuses: ['shown', 'retired', 'superseded'] }),
     latestInsightRun(you, user.id),
     loadAccountSettings(user.id),
     loadNow(you, user.id),
+    chatStats(you, user.id),
   ]);
   const insights = all.filter((insight) => insight.status === 'shown' || insight.verdict);
   const routine = goalsRoutine();
@@ -34,6 +36,7 @@ export default async function Page() {
       runWhen={run ? formatDateTime(run.requestedAt, settings.timezone) : null}
       available={Boolean(routine.id && routine.token)}
       now={now}
+      chats={chats}
       timezone={settings.timezone}
     />
   );

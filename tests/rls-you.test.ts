@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -138,6 +138,43 @@ describe('personal details', () => {
 
   it('refuses a detail past its length', async () => {
     await expect(admin`update details set phone = ${'5'.repeat(201)} where user_id = ${userA}`).rejects.toThrow();
+  });
+});
+
+describe('chats with Claude', () => {
+  // migrations-you/0019_claude_chats.sql: their own messages, one row each.
+  it('keeps them to their owner and skips a message already imported', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into claude_chats (user_id, origin, message_id, said_at, body)
+                 values (${userA}, 'export', 'm1', now(), 'I keep starting over.')`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into claude_chats (user_id, origin, message_id, said_at, body)
+                 values (${userA}, 'export', 'm1', now(), 'Again')
+                 on conflict (user_id, message_id) do nothing`,
+    );
+    expect(await asUser(userA, (tx) => tx`select body from claude_chats`)).toEqual([{ body: 'I keep starting over.' }]);
+    expect(await asUser(userB, (tx) => tx`select id from claude_chats`)).toHaveLength(0);
+  });
+
+  it("does not let a user write or change another account's chats", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into claude_chats (user_id, origin, said_at, body) values (${userA}, 'saved', now(), 'Not yours')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update claude_chats set body = 'Not yours'`);
+    await asUser(userB, (tx) => tx`delete from claude_chats`);
+    expect(await admin`select body from claude_chats where user_id = ${userA}`).toEqual([{ body: 'I keep starting over.' }]);
+  });
+
+  it('refuses an unknown origin and an empty message', async () => {
+    await expect(
+      admin`insert into claude_chats (user_id, origin, said_at, body) values (${userA}, 'email', now(), 'x')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into claude_chats (user_id, origin, said_at, body) values (${userA}, 'saved', now(), '  ')`,
+    ).rejects.toThrow();
   });
 });
 

@@ -9153,6 +9153,18 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // The import of their claude.ai export, folded open (you 0019).
+    id: 'you-insights-chats',
+    label: 'You · Insights, your chats with Claude open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ chats: true }} />
+      </div>
+    ),
+  },
+  {
     // A prediction reaches the deck only once a run has checked it, so it
     // always shows the result under the claim.
     id: 'you-insights-prediction',

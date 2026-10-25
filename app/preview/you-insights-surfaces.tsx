@@ -21,6 +21,7 @@ const actions: InsightsActions = {
   lookAgain: async () => ({ error: null }),
   answer: async (_id, answer) => ({ error: null, saved: { answer, answeredAt: new Date(NOW).toISOString() } }),
   saveNow: async (body) => ({ error: null, saved: { body, updatedAt: new Date(NOW).toISOString() } }),
+  chats: { importBatch: async (batch) => ({ error: null, added: batch.length }), refresh: async () => {} },
 };
 
 const waiting: Insight[] = [
@@ -301,6 +302,13 @@ export function YouInsightsPreview({
       now={{
         body: 'Low on money, so contract work comes first for a few weeks. Not applying to city roles any more.',
         updatedAt: '2026-10-20T09:00:00Z',
+      }}
+      chats={{
+        imported: 4812,
+        saved: 3,
+        firstSaidAt: '2023-03-14T10:00:00Z',
+        lastSaidAt: '2026-10-19T22:00:00Z',
+        lastImportedAt: '2026-10-20T09:30:00Z',
       }}
       timezone="Europe/London"
       actions={actions}

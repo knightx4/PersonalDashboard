@@ -61,7 +61,7 @@ describe('the insights skill', () => {
         'Read the core in full',
         ['Me/', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
       ],
-      ['Read what they did', ['three subagents', 'owner-scoped selects', '10 to 20 findings']],
+      ['Read what they did', ['four subagents', 'chats with Claude', 'owner-scoped selects', '10 to 20 findings']],
       [
         'Find candidates',
         [
