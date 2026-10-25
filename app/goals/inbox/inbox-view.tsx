@@ -12,6 +12,7 @@ import { answerGoalRunAction } from '../runs/[runId]/actions';
 import { DashRow } from '../goal-lanes';
 import { bringBackAction } from '../home-actions';
 import { TodayRow } from '../today-list';
+import { BundleRow } from './bundle-row';
 
 const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
 
@@ -22,7 +23,9 @@ const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
  * off, shut under Later.
  *
  * The rows are the Home's own (TodayRow, DashRow), so a button here does what
- * it does under Do next, and Later on a row is the Inbox's put-off. Moves
+ * it does under Do next, and Later on a row is the Inbox's put-off. Rows that
+ * repeat one thing (a goal's questions, the goals offered for parking) come
+ * folded into one BundleRow each. Moves
  * show at once: a row put off or handed to Dash leaves the list, and the
  * server's redraw then puts each where it is.
  */
@@ -58,6 +61,16 @@ export function GoalsInboxView({
       move: { state: 'on_you' as const },
       card: <RunQuestionCard question={question} action={answerGoalRunAction} />,
     })),
+    // Then the rows that say one thing many times, folded into one each.
+    ...group.bundles
+      .filter((bundle) => !gone.has(bundle.key))
+      .map((bundle) => ({
+        ref: bundle.key,
+        section: group.key,
+        title: bundle.title,
+        move: { state: 'on_you' as const },
+        card: <BundleRow bundle={bundle} onGone={(hidden) => hide(bundle.key, hidden)} />,
+      })),
     ...group.items
       .filter((item) => !gone.has(keyOf(item)))
       .map((item) => ({

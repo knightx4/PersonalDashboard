@@ -99,6 +99,8 @@ export type HomeViewProps = {
   mentions?: PassiveMention[];
   /** The gallery's way in: Passive goals drawn open. */
   passiveOpen?: boolean;
+  /** The weekly run's suggestions to react to, under Suggested for you. */
+  suggested?: TodayItem[];
 };
 
 export function HomeView({
@@ -120,6 +122,7 @@ export function HomeView({
   dashToday,
   mentions = [],
   passiveOpen = false,
+  suggested = [],
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -208,6 +211,7 @@ export function HomeView({
             working={working}
             offers={offers}
             canRun={canRun}
+            suggested={suggested}
             since={<FilesLine files={filesToRead} timeZone={timeZone} />}
           />
         </div>

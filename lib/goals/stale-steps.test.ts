@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { dailyRunText } from './daily-run';
 import { attachDependencies } from './dependencies';
-import { STALE_AFTER_DAYS, staleLine, staleSteps, touchTimes } from './stale-steps';
+import {
+  STALE_AFTER_DAYS,
+  openQuestionCount,
+  restingAfterDefault,
+  staleLine,
+  staleSteps,
+  touchTimes,
+} from './stale-steps';
 import { buildForest, markStartDates, type Step } from './steps';
 import type { Goal } from './tree';
 
@@ -49,7 +56,7 @@ function stale(
   goals: Goal[],
   steps: Step[],
   touched: Record<string, number>,
-  options: { deps?: [string, string][]; today?: string; underWay?: string[] } = {},
+  options: { deps?: [string, string][]; today?: string; underWay?: string[]; resting?: string[] } = {},
 ) {
   const { byGoal, nodes } = buildForest(
     goals.map((g) => g.id),
@@ -62,7 +69,7 @@ function stale(
   );
   if (options.today) markStartDates(byGoal, options.today);
   const times = new Map(Object.entries(touched).map(([id, days]) => [id, NOW - days * DAY]));
-  return staleSteps(goals, byGoal, times, NOW, new Set(options.underWay ?? []));
+  return staleSteps(goals, byGoal, times, NOW, new Set(options.underWay ?? []), new Set(options.resting ?? []));
 }
 
 describe('touchTimes', () => {
@@ -94,7 +101,7 @@ describe('touchTimes', () => {
 
 describe('staleSteps', () => {
   it('leaves out a step under way, which the progress nudge looks after instead', () => {
-    const list = stale([goal('g')], [step('a', 'g'), step('b', 'g')], { a: 20, b: 20 }, {
+    const list = stale([goal('g'), goal('h')], [step('a', 'g'), step('b', 'h')], { a: 20, b: 20 }, {
       underWay: ['a'],
     });
     expect(list.map((s) => s.id)).toEqual(['b']);
@@ -116,7 +123,11 @@ describe('staleSteps', () => {
   it('lists a step of yours untouched for a week, longest first', () => {
     const list = stale(
       [goal('g')],
-      [step('a', 'g'), step('b', 'g'), step('c', 'g')],
+      [
+        step('a', 'g', { dueOn: '2026-10-10' }),
+        step('b', 'g', { dueOn: '2026-10-11' }),
+        step('c', 'g', { onTodo: true }),
+      ],
       { a: STALE_AFTER_DAYS, b: STALE_AFTER_DAYS - 1, c: 15 },
     );
     expect(list.map((s) => [s.id, s.idleDays])).toEqual([
@@ -175,6 +186,56 @@ describe('staleSteps', () => {
     expect(list).toEqual([]);
   });
 
+  it("moves only a goal's first plain step, leaving the backlog after it to sit", () => {
+    const list = stale(
+      [goal('g'), goal('h')],
+      [step('first', 'g'), step('second', 'g'), step('third', 'g'), step('other', 'h')],
+      { first: 20, second: 20, third: 20, other: 9 },
+    );
+    expect(list.map((s) => s.id)).toEqual(['first', 'other']);
+  });
+
+  it('still moves a backlog step that is dated, on Todo or frees another', () => {
+    const list = stale(
+      [goal('g')],
+      [
+        step('first', 'g'),
+        step('dated', 'g', { dueOn: '2026-10-20' }),
+        step('todo', 'g', { onTodo: true }),
+        step('frees', 'g'),
+        step('waits', 'g'),
+      ],
+      { first: 9, dated: 10, todo: 11, frees: 12, waits: 1 },
+      { deps: [['waits', 'frees']] },
+    );
+    expect(list.map((s) => s.id)).toEqual(['frees', 'todo', 'dated', 'first']);
+  });
+
+  it("gives a goal's plain steps no move while a question asked beside one is unanswered", () => {
+    const steps = [
+      step('q', 'g', { kind: 'decision', position: 5 }),
+      step('asked', 'g'),
+      step('next', 'g', { position: 20 }),
+      step('dated', 'g', { position: 30, dueOn: '2026-10-20' }),
+    ];
+    const touched = { q: 3, asked: 20, next: 20, dated: 20 };
+    const deps: [string, string][] = [['asked', 'q']];
+    expect(stale([goal('g')], steps, touched, { deps }).map((s) => s.id)).toEqual(['dated']);
+
+    const answered = steps.map((s) => (s.id === 'q' ? { ...s, status: 'done' as const, resolution: 'Keep it' } : s));
+    expect(stale([goal('g')], answered, touched, { deps }).map((s) => s.id)).toEqual(['asked', 'dated']);
+  });
+
+  it('gives a goal at rest no moves at all', () => {
+    const list = stale(
+      [goal('g'), goal('h')],
+      [step('a', 'g', { dueOn: '2026-10-10' }), step('b', 'h')],
+      { a: 20, b: 20 },
+      { resting: ['g'] },
+    );
+    expect(list.map((s) => s.id)).toEqual(['b']);
+  });
+
   it('leaves a step with no known time off the list rather than calling it untouched', () => {
     expect(stale([goal('g')], [step('a', 'g')], {})).toEqual([]);
   });
@@ -185,6 +246,47 @@ describe('staleSteps', () => {
     expect(staleLine(line)).toBe(
       '- "a" (goals.items id a), under the goal "Goal g": untouched 8 days, already prepared once',
     );
+  });
+});
+
+describe('restingAfterDefault', () => {
+  it('rests a goal whose question closed unanswered in the last three weeks', () => {
+    const { byGoal } = buildForest(
+      ['g', 'h', 'k'],
+      [
+        step('qg', 'g', { kind: 'decision', status: 'done' }),
+        step('phase', 'h'),
+        step('qh', 'phase', { kind: 'decision', status: 'done' }),
+        step('qk', 'k', { kind: 'decision', status: 'done' }),
+      ],
+    );
+    const resting = restingAfterDefault(
+      byGoal,
+      [
+        { id: 'qg', defaultedAt: daysAgo(2) },
+        { id: 'qh', defaultedAt: daysAgo(20) },
+        { id: 'qk', defaultedAt: daysAgo(22) },
+      ],
+      NOW,
+    );
+    expect([...resting].sort()).toEqual(['g', 'h']);
+  });
+});
+
+describe('openQuestionCount', () => {
+  it('counts the open questions not put aside, as the database cap does', () => {
+    const { byGoal } = buildForest(
+      ['g'],
+      [
+        step('open', 'g', { kind: 'decision' }),
+        step('phase', 'g'),
+        step('under', 'phase', { kind: 'decision' }),
+        step('aside', 'g', { kind: 'decision', dismissedAt: daysAgo(1) }),
+        step('answered', 'g', { kind: 'decision', status: 'done', resolution: 'A' }),
+        step('mine', 'g'),
+      ],
+    );
+    expect(openQuestionCount(byGoal)).toBe(2);
   });
 });
 
@@ -212,7 +314,22 @@ describe('the morning brief', () => {
     const moves = text.indexOf('"Book a trial class" (goals.items id s)');
     expect(moves).toBeGreaterThan(text.indexOf('Closing a step from evidence'));
     expect(moves).toBeLessThan(text.indexOf('goals.reviews'));
-    expect(text).toContain('"Moving a step\nthat has sat for a week"');
+    expect(text).toContain('"Moving a step that has sat for a week"');
+  });
+
+  it('tells the run how many questions it has left, and to decide when none are', () => {
+    const base = {
+      userId: 'u',
+      runId: 'r',
+      steps: [],
+      review: [
+        { id: 'g', title: 'Home', acceptance: null, lastDoneAt: null, quietDays: 9, stalled: false, last: null },
+      ],
+      stale: [{ id: 's', title: 'Clear the desk', goalId: 'g', goalTitle: 'Home', idleDays: 9, prepared: false }],
+    };
+    expect(dailyRunText({ ...base, asksLeft: 2 })).toContain('Questions left: 2, across this whole run.');
+    expect(dailyRunText({ ...base, asksLeft: 0 })).toContain('Questions left: none.');
+    expect(dailyRunText(base)).not.toContain('Questions left');
   });
 
   it('says nothing about moves when no step has sat', () => {

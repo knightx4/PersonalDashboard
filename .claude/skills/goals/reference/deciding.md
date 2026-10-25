@@ -92,6 +92,19 @@ answer is needed:
 - A question already on the goal with no options (written before this rule)
   gets them: update its `detail` to the lettered form. That is allowed on a
   question with no answer yet, and it is not asking it again.
+- **Five open questions at most, across every goal.** The Inbox is the
+  person's to-do list, and on 24 October 2026 it held 41 questions from
+  Dash. The database refuses a new open question from you while five are
+  waiting (`goals.cap_open_questions`, `migrations-goals/0088`). When it
+  refuses, the question did not pass: make the call on your recommendation,
+  write what you decided and why into the step it was for, and mark that
+  step provisional.
+- **A question with no answer in five days closes by itself** with
+  `defaulted_at` set and the resolution "No answer in 5 days, so it stays as
+  it was." Read that as no answer, not as a choice: leave things as they
+  were, and do not ask it again within three weeks. Neither this close nor
+  the person's Leave them as they are on a goal's questions starts a
+  re-shape run.
 
 ## Provisional steps
 

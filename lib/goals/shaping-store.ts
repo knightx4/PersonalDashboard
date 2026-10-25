@@ -294,6 +294,34 @@ export async function answerQuestion(
 }
 
 /**
+ * Leave them as they are, on a goal's questions folded on the Inbox: each
+ * still unanswered is closed with the default, things staying as they were,
+ * with `defaulted_at` set (migrations-goals/0088) so the re-shape tick does
+ * not read it as an answer to work in. The steps that waited on them are
+ * freed. Returns how many it closed.
+ */
+export async function leaveQuestions(client: GoalsSupabaseClient, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const { data, error } = await client
+    .from('items')
+    .update({
+      status: 'done',
+      resolution: 'You left it as it was.',
+      defaulted_at: new Date().toISOString(),
+      dismissed_at: null,
+    })
+    .in('id', [...ids])
+    .eq('level', 'step')
+    .eq('kind', 'decision')
+    .eq('status', 'open')
+    .is('resolution', null)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length;
+}
+
+/**
  * Put an unanswered question aside with Not now, or bring it back (plan
  * #956). It stays open and unanswered either way. False when it is not a
  * live, unanswered question.

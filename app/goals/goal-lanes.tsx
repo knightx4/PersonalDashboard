@@ -70,6 +70,8 @@ export type GoalLanesProps = {
   canRun?: boolean;
   /** The line for what Dash did since your last visit, drawn between Dash's line and Later. */
   since?: React.ReactNode;
+  /** The weekly run's suggestions to react to: offers, kept off Do next and the Inbox. */
+  suggested?: TodayItem[];
 };
 
 /** "today", "tomorrow", "in 6 days" or "3 days late", from today to a due date. */
@@ -101,6 +103,7 @@ export function GoalLanes({
   offers,
   canRun = false,
   since,
+  suggested = [],
 }: GoalLanesProps) {
   // Moves made on this page, shown before the server's redraw arrives.
   const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
@@ -250,6 +253,14 @@ export function GoalLanes({
                   />
                 ))}
               </ul>
+            </Card>
+          </FoldLine>
+        )}
+
+        {suggested.filter(shown).length > 0 && (
+          <FoldLine title="Suggested for you" meta={String(suggested.filter(shown).length)}>
+            <Card>
+              <ul className="divide-y divide-border">{suggested.filter(shown).map(row)}</ul>
             </Card>
           </FoldLine>
         )}
