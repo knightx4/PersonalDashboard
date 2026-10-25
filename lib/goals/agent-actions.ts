@@ -48,6 +48,7 @@ export const goalsActions: ModuleActions = {
   'app/goals/inbox/actions.ts': {
     snoozeInboxRowAction: tool('change_goals_inbox'),
     unsnoozeInboxRowAction: tool('change_goals_inbox'),
+    leaveQuestionsAction: none('theirs'),
   },
   'app/goals/[goalId]/learn-actions.ts': {
     setLearnDepth: none('setting'),
