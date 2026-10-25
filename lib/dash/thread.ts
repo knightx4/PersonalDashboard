@@ -64,7 +64,7 @@ move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note, change_video,
 add_to_brief and attach_vault_note, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event, change_agenda_row and add_todos, and in
-You add_place, change_place and save_job, and in News mark_issue_unread,
+You add_place, change_place, save_job and set_detail, and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
 change_goal_link, change_goal_form, change_goals_inbox and change_goal_list, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,

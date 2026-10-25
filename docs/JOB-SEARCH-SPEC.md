@@ -692,7 +692,9 @@ A separate daily call, `/api/cron/job-openings`, reads each open role's posting 
 
 ### Scoring and the fit gate
 
-For an account with Jev on, Jev answers ten fixed questions about each recommended role (`lib/jobs/suggest/scores.ts`): workplace, seniority, salary shown, fit, red flags, cover letter asked for, already on file, closeness to the roles applied to, a fit score from 0 to 100, and a chance of an interview from 0 to 100. It reads the posting, the evidence titles, the applications and the person's rules. An answer under the confidence floor is shown as unsure. Find sorts and filters on these answers. Open applications get the same fit and chance scores (`application-scores.ts`).
+For an account with Jev on, Jev answers ten fixed questions about each recommended role (`lib/jobs/suggest/scores.ts`): workplace, seniority, salary shown, fit, red flags, cover letter asked for, already on file, closeness to the roles applied to, a fit score from 0 to 100, and a chance of an interview as a percent. It reads the posting, the evidence titles, the applications and the person's rules. An answer under the confidence floor is shown as unsure. Find sorts and filters on these answers. Open applications get the same fit and chance scores (`application-scores.ts`).
+
+Chance starts from how the person's past applications sent the same way went: Easy Apply is compared with Easy Apply, and everything else, a lead included, with the applications sent directly (`channelOf` in `history.ts`). Jev reads the similar ones, the whole record and the last four months, then moves the rate for the role's fit, level, a referral or a cover letter. Every application is read, not the newest few hundred.
 
 Every source passes one gate (`lib/jobs/suggest/admit.ts`, `fit-gate.ts`): a role whose fit score is under `profiles.min_fit_score` is kept as expired with reason `low_fit`. Roles from discovered startups are scored before they are written, and one under the gate is never written. A role that could not be scored in time goes on unscored, and the daily scoring run applies the gate later.
 

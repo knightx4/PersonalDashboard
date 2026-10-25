@@ -79,6 +79,27 @@ describe('applicationState', () => {
     const state = applicationState(APP, CONTEXT);
     expect(state.your_history_overall).toEqual({ applied: 1, reached_an_interview: 1, still_waiting: 0 });
   });
+
+  it('says how it goes in and compares it with applications sent the same way', () => {
+    const history = [
+      ...CONTEXT.history,
+      { id: 'e1', title: 'FP&A Analyst', company: 'Plaid', status: 'ghosted', rejectionStage: null, hasInterview: false, source: 'linkedin' },
+    ];
+    const state = applicationState({ ...APP, referral: true }, { ...CONTEXT, history });
+    const role = state.role as Record<string, unknown>;
+    expect(role.how_it_goes_in).toEqual({
+      channel: 'sent directly, on the company\'s site or through a person',
+      referral: true,
+      cover_letter: false,
+    });
+    expect(state.your_history_overall).toEqual({ applied: 1, reached_an_interview: 1, still_waiting: 0 });
+    expect(state.your_history_sent_another_way).toMatchObject({ channel: 'LinkedIn Easy Apply', applied: 1 });
+  });
+
+  it('reads a lead found on LinkedIn as not sent yet', () => {
+    const role = applicationState({ ...APP, status: 'lead', source: 'linkedin' }, CONTEXT).role as Record<string, unknown>;
+    expect((role.how_it_goes_in as Record<string, unknown>).channel).toMatch(/^not sent yet/);
+  });
 });
 
 function jev() {
@@ -120,7 +141,7 @@ function fakeSupabase(rows: Record<string, unknown[]>) {
       calls.push({ table, method, args });
       return builder;
     };
-    for (const method of ['select', 'eq', 'not', 'is', 'order', 'limit', 'update', 'maybeSingle']) builder[method] = chain(method);
+    for (const method of ['select', 'eq', 'not', 'is', 'order', 'limit', 'range', 'update', 'maybeSingle']) builder[method] = chain(method);
     builder.then = (resolve: (value: unknown) => void) =>
       resolve({ data: table === 'profiles' ? null : (rows[table] ?? []), error: null });
     return builder;

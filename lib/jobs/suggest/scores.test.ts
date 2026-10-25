@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  chancePercent,
   duplicateByRule,
   NO_OPENING_FILTER,
   openingState,
@@ -113,7 +114,8 @@ describe('scoreOpening', () => {
     expect(result.scores.duplicate).toEqual({ value: true, confidence: 0.4 });
     expect(result.scores.closeness).toBeUndefined();
     expect(result.scores.fit_score).toEqual({ value: 65, confidence: 0.7 });
-    expect(result.scores.chance).toEqual({ value: 25, confidence: 0.9 });
+    // Level 1 of the chance levels is 5 to 15 in 100, stored as 10.
+    expect(result.scores.chance).toEqual({ value: 10, confidence: 0.9 });
     expect(spend).toHaveBeenCalledTimes(1);
   });
 
@@ -196,7 +198,7 @@ describe('sorting and filtering', () => {
 describe('fit and chance on the openings (plan #1206)', () => {
   const row = (id: string, createdAt: string, scores: OpeningScores | null) => ({ id, createdAt, scores });
   const rows = [
-    row('a', '2026-09-01', { fit_score: { value: 70, confidence: 0.5 }, chance: { value: 20, confidence: 0.9 } }),
+    row('a', '2026-09-01', { fit_score: { value: 70, confidence: 0.5 }, chance: { value: 8, confidence: 0.9 } }),
     row('b', '2026-09-02', { fit_score: { value: 45, confidence: 0.9 }, chance: { value: 40, confidence: 0.9 } }),
     row('c', '2026-09-03', null),
     row('d', '2026-09-04', { fit: { value: 'strong', confidence: 0.9 } }),
@@ -211,8 +213,18 @@ describe('fit and chance on the openings (plan #1206)', () => {
     const keep = (patch: Partial<typeof NO_OPENING_FILTER>) =>
       rows.filter((r) => passesFilter(r, { ...NO_OPENING_FILTER, ...patch })).map((r) => r.id);
     expect(keep({ minFit: 60 })).toEqual(['a', 'c', 'd']);
-    // Chance is chosen by band: 20 is low, 40 is high on the #1204 edges.
+    // Chance is chosen by band: 8 is low, 40 is high on the filter edges.
     expect(keep({ minChance: 'medium' })).toEqual(['b', 'c', 'd']);
     expect(keep({ minChance: 'high' })).toEqual(['b', 'c', 'd']);
+  });
+});
+
+describe('chancePercent', () => {
+  it('reads each level as its rate and a score between levels between their rates', () => {
+    expect([0, 1, 2, 3, 4].map(chancePercent)).toEqual([2, 10, 22, 40, 65]);
+    expect(chancePercent(1.5)).toBe(16);
+    expect(chancePercent(-1)).toBe(2);
+    expect(chancePercent(9)).toBe(65);
+    expect(chancePercent(Number.NaN)).toBe(0);
   });
 });

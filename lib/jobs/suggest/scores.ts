@@ -9,7 +9,7 @@ import {
   type JevScoreAnswer,
   type JevYesNoAnswer,
 } from '@/lib/jev/wire';
-import { summariseHistory, type PastApplication } from './history';
+import { CHANNEL_LABELS, summariseHistory, type Channel, type PastApplication } from './history';
 import { companyKey, titleKey } from './payload';
 import { POSTING_TEXT_FOR_SCORING } from './posting-text';
 import { preferenceState, type JobPreferences } from './preferences';
@@ -57,6 +57,52 @@ export type PercentScore = (typeof PERCENT_SCORES)[number];
 /** How the chance score is named wherever it shows (decided on #1201). */
 export const CHANCE_LABEL = 'Chance of an interview';
 export const FIT_SCORE_LABEL = 'Fit';
+
+/**
+ * How the chance questions weigh the history (24 October 2026). The history
+ * is a starting rate, not the answer: it counts only applications sent the
+ * same way, leans on recent months while the person's applications are
+ * improving, and the role itself moves the figure from there.
+ */
+export const CHANCE_METHOD =
+  'Start from how their comparable past applications went: your_history_with_similar_roles and ' +
+  'your_history_overall count only applications sent the same way as this one (history_compared_against). ' +
+  'your_history_by_month shows whether that rate is rising or falling; weigh the recent months most, ' +
+  'but a month with many still waiting is not finished and its low count says little yet. ' +
+  'your_history_sent_another_way is how applications sent another way went, such as Easy Apply, ' +
+  'and says little about this one. Then move up or down from that rate for this job: how much of what it ' +
+  'asks for the evidence covers, its level against the levels they have reached interviews at, and how ' +
+  'many people a posting like it likely draws.';
+
+/**
+ * The chance levels as interview rates, so the stored figure reads as one.
+ * The old levels ran from "almost no chance" to "very likely", scaled to 0
+ * to 100, so an even chance showed as 50 where the person's direct
+ * applications reach an interview about one time in ten.
+ */
+export const CHANCE_LEVELS = [
+  'Fewer than 5 in 100 like it reach an interview',
+  '5 to 15 in 100 reach an interview',
+  '15 to 30 in 100 reach an interview',
+  '30 to 50 in 100 reach an interview',
+  'More than 50 in 100 reach an interview',
+] as const;
+
+/** The rate each level stands for, in percent: about the middle of its range. */
+export const CHANCE_LEVEL_RATES = [2, 10, 22, 40, 65] as const;
+
+/**
+ * Jev's probability-weighted chance score (0 to 4, and it can fall between
+ * levels) as a percent, read straight between the rates of the levels either
+ * side of it.
+ */
+export function chancePercent(score: number): number {
+  if (!Number.isFinite(score)) return 0;
+  const at = Math.min(Math.max(score, 0), CHANCE_LEVEL_RATES.length - 1);
+  const low = Math.floor(at);
+  const high = Math.min(low + 1, CHANCE_LEVEL_RATES.length - 1);
+  return Math.round(CHANCE_LEVEL_RATES[low] + (CHANCE_LEVEL_RATES[high] - CHANCE_LEVEL_RATES[low]) * (at - low));
+}
 
 export const OPENING_QUESTIONS = {
   workplace: {
@@ -145,17 +191,8 @@ export const OPENING_QUESTIONS = {
   chance: {
     type: 'score',
     question:
-      'How likely is an application from this person to this opening to reach an interview? ' +
-      'Read how their past applications to similar roles went (your_history_with_similar_roles) against ' +
-      'their record as a whole (your_history_overall), and weigh how well their evidence matches the opening. ' +
-      'Few past interviews for similar roles is a reason to score low whatever the text says.',
-    levels: [
-      'Almost no chance of an interview',
-      'Unlikely to reach an interview',
-      'About an even chance of an interview',
-      'Likely to reach an interview',
-      'Very likely to reach an interview',
-    ],
+      'How likely is an application from this person to this opening to reach an interview? ' + CHANCE_METHOD,
+    levels: CHANCE_LEVELS,
   },
 } as const satisfies Record<string, JevQuestion>;
 
@@ -178,7 +215,7 @@ export type OpeningScores = {
   closeness?: Scored<number>;
   /** How well the evidence and target titles match the job, 0 to 100 (see `scaleScore`). */
   fit_score?: Scored<number>;
-  /** The chance of reaching an interview, 0 to 100 (see `scaleScore`). */
+  /** The chance of reaching an interview in percent (see `chancePercent`). */
   chance?: Scored<number>;
 };
 
@@ -264,14 +301,22 @@ export function openingState(opening: OpeningText, context: ScoringContext): Rec
 /**
  * The history fields of the state, under the names the chance question
  * reads. Exported for #1203, which asks the same question of an application.
+ * An opening is compared against direct applications, the way it would go in.
  */
 export function historyState(
   title: string,
   history: readonly PastApplication[],
-  options: { excludeId?: string } = {},
-): { your_history_with_similar_roles: unknown; your_history_overall: unknown } {
+  options: { excludeId?: string; channel?: Channel; now?: Date } = {},
+): Record<string, unknown> {
   const summary = summariseHistory(title, history, options);
-  return { your_history_with_similar_roles: summary.similar, your_history_overall: summary.all_applications };
+  const { channel: other, ...otherCounts } = summary.other_channel;
+  return {
+    history_compared_against: CHANNEL_LABELS[summary.channel],
+    your_history_with_similar_roles: summary.similar,
+    your_history_overall: summary.all_applications,
+    your_history_by_month: summary.by_month,
+    your_history_sent_another_way: { channel: CHANNEL_LABELS[other], ...otherCounts },
+  };
 }
 
 function choice<T extends string>(result: JevResult<JevChoiceAnswer>): Scored<T> | undefined {
@@ -302,6 +347,12 @@ export function scaleScore(score: number, levels: number): number {
 function percent(result: JevResult<JevScoreAnswer>, levels: number): Scored<number> | undefined {
   if (!result.ok) return undefined;
   return { value: scaleScore(result.answer.score, levels), confidence: round(result.answer.confidence) };
+}
+
+/** The chance answer as a percent (`chancePercent`). Exported for the application questions. */
+export function chanceScored(result: JevResult<JevScoreAnswer>): Scored<number> | undefined {
+  if (!result.ok) return undefined;
+  return { value: chancePercent(result.answer.score), confidence: round(result.answer.confidence) };
 }
 
 function round(value: number): number {
@@ -345,7 +396,7 @@ export async function scoreOpening(
     duplicate: duplicateByRule(input.opening, input.context) ?? yesNo(a.duplicate),
     closeness: level(a.closeness),
     fit_score: percent(a.fit_score, OPENING_QUESTIONS.fit_score.levels.length),
-    chance: percent(a.chance, OPENING_QUESTIONS.chance.levels.length),
+    chance: chanceScored(a.chance),
   };
   for (const key of OPENING_QUESTION_KEYS) if (scores[key] === undefined) delete scores[key];
   return { ok: true, scores };

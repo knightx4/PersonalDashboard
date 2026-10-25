@@ -77,4 +77,35 @@ describe('details store', () => {
     expect(detailsFromRow({ phone: '1' })).toEqual({ ...EMPTY_DETAILS, phone: '1' });
     expect(detailsFromRow(null)).toEqual(EMPTY_DETAILS);
   });
+
+  it('saves own fields, trims them, and leaves them alone when the six are saved', async () => {
+    const { client } = fakeClient();
+    const saved = await saveDetails(client, 'u1', {
+      custom_fields: [{ id: 'a', label: ' Pronouns ', value: ' she/her ' }, { id: 'b', label: 'Shirt', value: '' }],
+    });
+    expect(saved.custom_fields).toEqual([
+      { id: 'a', label: 'Pronouns', value: 'she/her' },
+      { id: 'b', label: 'Shirt', value: '' },
+    ]);
+    const after = await saveDetails(client, 'u1', { phone: '555' });
+    expect(after.phone).toBe('555');
+    expect(after.custom_fields).toEqual(saved.custom_fields);
+    expect((await saveDetails(client, 'u1', { custom_fields: [] })).custom_fields).toEqual([]);
+  });
+
+  it('refuses bad lists and writes nothing', async () => {
+    const { client, rows } = fakeClient();
+    const f = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `i${i}`, label: 'L', value: 'v' }));
+    expect(checkDetails({ custom_fields: f(30) })).toBeNull();
+    expect(checkDetails({ custom_fields: f(31) })).toMatch(/at most 30/);
+    expect(checkDetails({ custom_fields: 'x' })).toMatch(/list/);
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: '  ', value: '' }] })).toMatch(/name/);
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: 'x'.repeat(81), value: '' }] })).toMatch(/80/);
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: 'x'.repeat(80), value: 'y'.repeat(500) }] })).toBeNull();
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: 'x', value: 'y'.repeat(501) }] })).toMatch(/500/);
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: 'x', value: '' }, { id: 'a', label: 'y', value: '' }] })).toMatch(/share an id/);
+    expect(checkDetails({ custom_fields: [{ id: 'a', label: 'x' }] })).toMatch(/value/);
+    await expect(saveDetails(client, 'u1', { custom_fields: f(31) })).rejects.toThrow(/30/);
+    expect(rows.size).toBe(0);
+  });
 });

@@ -58,6 +58,7 @@ describe('runConnectorWrite', () => {
       'add_place',
       'change_place',
       'save_job',
+      'set_detail',
       'mark_issue_unread',
       'save_story',
       'send_story_to_learn',

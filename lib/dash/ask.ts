@@ -174,7 +174,7 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job. When they ask for one of their X post
+or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask for one of their X post
 drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
 with the whole new text. When they ask for a post about something that
 shipped, read what shipped, call post_pictures for a picture of that screen,

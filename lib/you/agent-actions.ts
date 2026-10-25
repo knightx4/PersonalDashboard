@@ -84,7 +84,7 @@ export const youActions: ModuleActions = {
   'app/you/details/actions.ts': {
     saveDetailsForm: none(
       'own',
-      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them.',
+      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
     ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).

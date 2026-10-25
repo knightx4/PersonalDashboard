@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   HISTORY_EXAMPLES,
+  channelOf,
+  recentMonths,
   isSimilarTitle,
   reachedInterview,
   summariseHistory,
@@ -94,5 +96,51 @@ describe('summariseHistory', () => {
     const summary = summariseHistory('Financial Analyst', many);
     expect(summary.similar.applied).toBe(20);
     expect(summary.similar.examples).toHaveLength(HISTORY_EXAMPLES);
+  });
+});
+
+describe('channelOf', () => {
+  it('reads a sent LinkedIn application as Easy Apply and a LinkedIn lead as direct', () => {
+    expect(channelOf({ status: 'ghosted', source: 'linkedin' })).toBe('easy_apply');
+    expect(channelOf({ status: 'lead', source: 'linkedin' })).toBe('direct');
+    expect(channelOf({ status: 'submitted', source: 'portal' })).toBe('direct');
+    expect(channelOf({ status: 'submitted' })).toBe('direct');
+  });
+});
+
+describe('summariseHistory by channel', () => {
+  const now = new Date('2026-10-24T12:00:00Z');
+  const history: PastApplication[] = [
+    ...Array.from({ length: 10 }, () =>
+      app({ title: 'Financial Analyst', source: 'linkedin', sentAt: '2026-10-02T00:00:00Z' }),
+    ),
+    app({ title: 'Financial Analyst', source: 'portal', hasInterview: true, sentAt: '2026-09-10T00:00:00Z' }),
+    app({ title: 'Financial Analyst', source: 'portal', sentAt: '2026-09-12T00:00:00Z' }),
+    app({ title: 'Financial Analyst', source: 'portal', status: 'submitted', sentAt: '2026-10-20T00:00:00Z' }),
+    app({ title: 'Financial Analyst', source: 'portal', sentAt: '2026-03-01T00:00:00Z' }),
+  ];
+
+  it('compares a direct application with the direct ones only', () => {
+    const summary = summariseHistory('Financial Analyst', history, { now });
+    expect(summary.channel).toBe('direct');
+    expect(summary.all_applications).toEqual({ applied: 4, reached_an_interview: 1, still_waiting: 1 });
+    expect(summary.other_channel).toEqual({ channel: 'easy_apply', applied: 10, reached_an_interview: 0, still_waiting: 0 });
+  });
+
+  it('compares an Easy Apply one with Easy Apply', () => {
+    const summary = summariseHistory('Financial Analyst', history, { now, channel: 'easy_apply' });
+    expect(summary.all_applications.applied).toBe(10);
+    expect(summary.other_channel.applied).toBe(4);
+  });
+
+  it('counts the last four months by when each went in', () => {
+    expect(recentMonths(now)).toEqual(['2026-07', '2026-08', '2026-09', '2026-10']);
+    const months = summariseHistory('Financial Analyst', history, { now }).by_month;
+    expect(months.map((m) => [m.month, m.applied, m.reached_an_interview, m.still_waiting])).toEqual([
+      ['2026-07', 0, 0, 0],
+      ['2026-08', 0, 0, 0],
+      ['2026-09', 2, 1, 0],
+      ['2026-10', 1, 0, 1],
+    ]);
   });
 });

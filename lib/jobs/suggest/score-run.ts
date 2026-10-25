@@ -31,6 +31,33 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
+/** Rows per page when reading every application; PostgREST serves at most 1,000 at a time. */
+export const HISTORY_PAGE = 1000;
+
+/**
+ * Every application, newest first, a page at a time. The history was once the
+ * newest 500, and LinkedIn's export of 460 Easy Apply applications pushed the
+ * ones with interviews out of it, so every chance came back in single figures.
+ */
+async function readAllApplications(supabase: AppSupabaseClient, userId: string): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let from = 0; ; from += HISTORY_PAGE) {
+    const { data, error } = await supabase
+      .from('applications')
+      .select(
+        'id, status, source, rejection_stage, rejection_stage_override, submitted_at, created_at, roles ( title, companies ( name ) ), interviews ( id )',
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + HISTORY_PAGE - 1);
+    if (error) throw new Error(`Reading the applications failed: ${error.message}`);
+    const page = (data ?? []) as Row[];
+    rows.push(...page);
+    if (page.length < HISTORY_PAGE) return rows;
+  }
+}
+
 /**
  * What Jev is told about the person: evidence titles, target titles, the
  * roles on file, and how each application went (for the chance question,
@@ -51,20 +78,12 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .select('target_titles, home_location, workplace_preferences, salary_floor_cents, company_stages')
       .eq('id', userId)
       .maybeSingle(),
-    supabase
-      .from('applications')
-      .select(
-        'id, status, rejection_stage, rejection_stage_override, created_at, roles ( title, companies ( name ) ), interviews ( id )',
-      )
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(500),
+    readAllApplications(supabase, userId),
   ]);
-  if (applications.error) throw new Error(`Reading the applications failed: ${applications.error.message}`);
 
   const roles: ScoringContext['roles'] = [];
   const history: PastApplication[] = [];
-  for (const row of (applications.data ?? []) as Row[]) {
+  for (const row of applications) {
     const role = one(row.roles as Row | Row[] | null);
     if (!role) continue;
     const company = one(role.companies as Row | Row[] | null);
@@ -80,6 +99,8 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       status: row.status as string,
       rejectionStage: ((row.rejection_stage_override ?? row.rejection_stage) as string | null) ?? null,
       hasInterview: ((row.interviews as Row[] | null) ?? []).length > 0,
+      source: (row.source as string | null) ?? null,
+      sentAt: ((row.submitted_at ?? row.created_at) as string | null) ?? null,
     });
   }
   return {
@@ -192,7 +213,7 @@ export async function scoreApplicationsFor(
   let query = supabase
     .from('applications')
     .select(
-      'id, status, roles ( title, seniority, location, work_mode, comp_min_cents, comp_max_cents, requirements, requirement_matches, jd_text, companies ( name ) )',
+      'id, status, source, referral_contact_id, cover_letter, cover_letter_id, has_cover_letter, roles ( title, seniority, location, work_mode, comp_min_cents, comp_max_cents, requirements, requirement_matches, jd_text, companies ( name ) )',
     )
     .eq('user_id', userId)
     .not('status', 'in', `(${CLOSED_APPLICATION_STATUSES.join(',')})`);
@@ -225,6 +246,12 @@ export async function scoreApplicationsFor(
           ? (role.requirement_matches as RequirementMatch[])
           : null,
         jdText: role.jd_text as string | null,
+        source: (row.source as string | null) ?? null,
+        referral: row.referral_contact_id != null,
+        coverLetter:
+          row.has_cover_letter === true ||
+          row.cover_letter_id != null ||
+          ((row.cover_letter as string | null) ?? '').trim().length > 0,
       },
       context,
       onSpend: options.onSpend,

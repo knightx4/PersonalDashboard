@@ -101,10 +101,12 @@ export const youSources: ModuleSources = {
     {
       table: 'you.details',
       module: 'You',
-      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them.',
+      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.',
       weight: 'record',
       search: ['title', 'phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
       title: 'title',
+      // custom_fields is read as the JSON list, so Dash can answer from them.
+      facts: ['custom_fields'],
       newest: 'updated_at',
       ref: 'user_id',
       owner: 'user_id',
@@ -112,7 +114,7 @@ export const youSources: ModuleSources = {
       section: DETAILS,
       // One row per person, with no id to name it by.
       page: null,
-      note: 'A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
+      note: 'custom_fields is a jsonb list of {id, label, value}, the fields they named themselves (at most 30). A null is a detail they have not given. They chose that Dash may read all six (plan #2124.3).',
     },
     {
       table: 'you.places',

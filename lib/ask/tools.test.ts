@@ -1269,6 +1269,7 @@ describe('list_rows on your details (plan #2124.5)', () => {
         race: 'Asian',
         gender: 'Woman',
         sexuality: 'Bisexual',
+        custom_fields: [{ id: 'f1', label: 'Shirt size', value: 'M' }],
         updated_at: '2026-10-10',
       },
       { user_id: THEM, title: 'Personal details', phone: '555 0199', linkedin_url: null, citizenship: null, race: null, gender: null, sexuality: null, updated_at: '2026-10-11' },
@@ -1286,6 +1287,7 @@ describe('list_rows on your details (plan #2124.5)', () => {
       race: 'Asian',
       gender: 'Woman',
       sexuality: 'Bisexual',
+      custom_fields: JSON.stringify([{ id: 'f1', label: 'Shirt size', value: 'M' }]),
     });
   });
 });
