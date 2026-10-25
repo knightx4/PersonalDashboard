@@ -22,7 +22,32 @@ export type PastApplication = {
   rejectionStage: string | null;
   /** Whether any interview row is on file for it. */
   hasInterview: boolean;
+  /** applications.source: `linkedin` on a sent application is Easy Apply. Absent reads as direct. */
+  source?: string | null;
+  /** When it went in: submitted_at, else created_at. Absent leaves it out of the months. */
+  sentAt?: string | null;
 };
+
+/**
+ * How an application went in. Easy Apply and a direct application are
+ * different bets: on 24 October 2026 the 460 Easy Apply ones LinkedIn's
+ * export brought in had no interviews, against 34 of 394 sent directly, so
+ * the chance of one is read against the others sent the same way.
+ */
+export type Channel = 'direct' | 'easy_apply';
+
+export const CHANNEL_LABELS: Record<Channel, string> = {
+  direct: 'sent directly, on the company\'s site or through a person',
+  easy_apply: 'LinkedIn Easy Apply',
+};
+
+/**
+ * The channel of a sent application. One not sent yet is taken as direct:
+ * LinkedIn on a lead says where it was found, not how it will go in.
+ */
+export function channelOf(app: Pick<PastApplication, 'status' | 'source'>): Channel {
+  return app.source === 'linkedin' && wasSent(app) ? 'easy_apply' : 'direct';
+}
 
 /** Statuses that mean nothing was sent, so they are not history. */
 const NOT_SENT = new Set(['lead', 'drafting']);
@@ -103,11 +128,25 @@ export type HistoryCounts = {
   still_waiting: number;
 };
 
-/** What Jev is told: the similar ones with a few examples, and the whole record for a baseline. */
+/** One calendar month of applications sent the same way, by when they went in. */
+export type MonthCounts = HistoryCounts & { month: string };
+
+/**
+ * What Jev is told. `similar` and `all_applications` count only the
+ * applications sent the same way as the one being scored, so a run of Easy
+ * Apply does not set the rate for a direct application. `by_month` shows
+ * whether that rate is moving, and `other_channel` how the rest went.
+ */
 export type HistorySummary = {
+  channel: Channel;
   similar: HistoryCounts & { examples: string[] };
   all_applications: HistoryCounts;
+  by_month: MonthCounts[];
+  other_channel: HistoryCounts & { channel: Channel };
 };
+
+/** How many recent months the trend covers, this one included. */
+export const HISTORY_MONTHS = 4;
 
 /** How many similar applications Jev reads by name. */
 export const HISTORY_EXAMPLES = 12;
@@ -129,26 +168,46 @@ function outcome(app: PastApplication): string {
   return app.status.replace(/_/g, ' ');
 }
 
+/** The last `HISTORY_MONTHS` calendar months as YYYY-MM, oldest first. */
+export function recentMonths(now: Date): string[] {
+  const months: string[] = [];
+  for (let back = HISTORY_MONTHS - 1; back >= 0; back -= 1) {
+    const at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
+    months.push(at.toISOString().slice(0, 7));
+  }
+  return months;
+}
+
 /**
- * The history for one title. `history` is newest first; the examples keep
- * that order and put the ones that reached an interview first, since those
- * are the few that say what worked.
+ * The history for one title, against the applications sent through
+ * `options.channel` (direct when absent). `history` is newest first; the
+ * examples keep that order and put the ones that reached an interview first,
+ * since those are the few that say what worked.
  */
 export function summariseHistory(
   title: string,
   history: readonly PastApplication[],
-  options: { excludeId?: string } = {},
+  options: { excludeId?: string; channel?: Channel; now?: Date } = {},
 ): HistorySummary {
+  const channel = options.channel ?? 'direct';
   const sent = history.filter((app) => wasSent(app) && app.id !== options.excludeId);
-  const similar = sent.filter((app) => isSimilarTitle(title, app.title));
+  const same = sent.filter((app) => channelOf(app) === channel);
+  const other = sent.filter((app) => channelOf(app) !== channel);
+  const similar = same.filter((app) => isSimilarTitle(title, app.title));
   const ordered = [...similar.filter(reachedInterview), ...similar.filter((app) => !reachedInterview(app))];
   return {
+    channel,
     similar: {
       ...counts(similar),
       examples: ordered
         .slice(0, HISTORY_EXAMPLES)
         .map((app) => `${app.title} at ${app.company ?? 'an unnamed company'}: ${outcome(app)}`),
     },
-    all_applications: counts(sent),
+    all_applications: counts(same),
+    by_month: recentMonths(options.now ?? new Date()).map((month) => ({
+      month,
+      ...counts(same.filter((app) => app.sentAt?.slice(0, 7) === month)),
+    })),
+    other_channel: { channel: channel === 'direct' ? 'easy_apply' : 'direct', ...counts(other) },
   };
 }

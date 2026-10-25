@@ -4,8 +4,10 @@ import { askJevAll, type JevFailure, type JevQuestion, type JevResult, type JevS
 import type { RequirementMatch } from '../evidence/match-payload';
 import type { Requirement } from '../jd/requirements';
 import { TERMINAL_STATUSES } from '../pipeline';
-import { titleLevel } from './history';
+import { CHANNEL_LABELS, channelOf, titleLevel } from './history';
 import {
+  CHANCE_METHOD,
+  chanceScored,
   OPENING_QUESTIONS,
   PERCENT_SCORES,
   SENIORITY_LABELS,
@@ -59,10 +61,8 @@ export const APPLICATION_QUESTIONS = {
   chance: {
     type: 'score',
     question:
-      'How likely is this application to reach an interview? Read how the person\'s past applications to ' +
-      'similar roles went (your_history_with_similar_roles) against their record as a whole ' +
-      '(your_history_overall), and weigh how well their evidence matches the role. ' +
-      'Few past interviews for similar roles is a reason to score low whatever the role says.',
+      'How likely is this application to reach an interview? ' + CHANCE_METHOD +
+      ' A referral or a cover letter on this application (role.how_it_goes_in) is a reason to score higher.',
     levels: OPENING_QUESTIONS.chance.levels,
   },
 } as const satisfies Record<PercentScore, JevQuestion>;
@@ -84,6 +84,12 @@ export type ApplicationText = {
   requirements: readonly Requirement[] | null;
   requirementMatches: readonly RequirementMatch[] | null;
   jdText: string | null;
+  /** applications.source; `linkedin` on a sent application is Easy Apply. */
+  source?: string | null;
+  /** Whether a referral contact is on the application. */
+  referral?: boolean;
+  /** Whether a cover letter is on the application or ticked as sent. */
+  coverLetter?: boolean;
 };
 
 function dollars(cents: number): string {
@@ -118,6 +124,16 @@ export function requirementsState(app: ApplicationText): { requirement: string; 
   return requirements.slice(0, APPLICATION_REQUIREMENT_LIMIT).map((req) => ({ requirement: req.text, kind: req.kind }));
 }
 
+/** How the application goes in, as Jev reads it beside the history it is compared against. */
+export function howItGoesIn(app: ApplicationText): Record<string, unknown> {
+  const sent = !['lead', 'drafting'].includes(app.status);
+  return {
+    channel: sent ? CHANNEL_LABELS[channelOf(app)] : `not sent yet; read as ${CHANNEL_LABELS.direct}`,
+    referral: app.referral ?? false,
+    cover_letter: app.coverLetter ?? false,
+  };
+}
+
 /** The state Jev reads for one application. */
 export function applicationState(app: ApplicationText, context: ScoringContext): Record<string, unknown> {
   const jd = app.jdText?.trim() ?? '';
@@ -131,12 +147,13 @@ export function applicationState(app: ApplicationText, context: ScoringContext):
       location: app.location ?? 'not given',
       pay: payLine(app.compMinCents, app.compMaxCents) ?? 'not given',
       stage: app.status.replace(/_/g, ' '),
+      how_it_goes_in: howItGoesIn(app),
       requirements: requirementsState(app) ?? 'none extracted; read the description',
       description_start: jd ? jd.slice(0, APPLICATION_JD_CHARS) : 'no description on file',
     },
     your_evidence: context.evidence,
     your_target_titles: context.targetTitles,
-    ...historyState(app.title, context.history, { excludeId: app.id }),
+    ...historyState(app.title, context.history, { excludeId: app.id, channel: channelOf(app) }),
   };
 }
 
@@ -168,10 +185,10 @@ export async function scoreApplication(
   });
   if (!asked.ok) return asked;
   const scores: ApplicationScores = {};
-  for (const key of PERCENT_SCORES) {
-    const scored = percent(asked.answers[key], APPLICATION_QUESTIONS[key].levels.length);
-    if (scored) scores[key] = scored;
-  }
+  const fit = percent(asked.answers.fit_score, APPLICATION_QUESTIONS.fit_score.levels.length);
+  const chance = chanceScored(asked.answers.chance);
+  if (fit) scores.fit_score = fit;
+  if (chance) scores.chance = chance;
   return { ok: true, scores };
 }
 

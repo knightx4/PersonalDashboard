@@ -1,5 +1,5 @@
 import type { RequirementMatch } from '../evidence/match-payload';
-import { summariseHistory, titleLevel, wasSent, type PastApplication } from './history';
+import { summariseHistory, titleLevel, wasSent, type Channel, type PastApplication } from './history';
 import {
   SCORE_CONFIDENCE_FLOOR,
   SENIORITIES,
@@ -41,6 +41,8 @@ export type ScoreReasonInput = {
   history: readonly PastApplication[];
   /** Applications: the application's own id, so it is not counted as its own history. */
   excludeId?: string;
+  /** How it goes in (`channelOf`), so the counts are of applications sent the same way. Direct when absent. */
+  channel?: Channel;
 };
 
 const LEVEL_RANK: Record<Seniority, number> = { entry: 0, mid: 1, senior: 2, executive: 3 };
@@ -167,7 +169,7 @@ function plural(count: number, one: string, many: string): string {
  */
 export function chanceReason(input: ScoreReasonInput): string | null {
   if (!input.scores.chance) return null;
-  const summary = summariseHistory(input.title, input.history, { excludeId: input.excludeId });
+  const summary = summariseHistory(input.title, input.history, { excludeId: input.excludeId, channel: input.channel });
   const similar = summary.similar;
 
   let lead: string | null = null;
