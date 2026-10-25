@@ -9141,6 +9141,19 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // A prediction reaches the deck only once a run has checked it, so it
+    // always shows the result under the claim.
+    id: 'you-insights-prediction',
+    label: 'You · Insights, a checked prediction',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview prediction />
+      </div>
+    ),
+  },
+  {
     /* A card brought back by a tripwire (plan #2413.11): first in the deck
      * with a dated line under the claim; a second comes back after its mark. */
     id: 'you-insights-fired',

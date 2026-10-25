@@ -56,7 +56,7 @@ describe('the insights skill', () => {
     const steps = checklist();
     expect(steps).toHaveLength(7);
     const expected: Array<[string, string[]]> = [
-      ['Read what came before', ['verdict', 'already knows']],
+      ['Read what came before', ['verdict', 'knew it', 'prediction', 'already knows']],
       [
         'Read the core in full',
         ['Me/', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
@@ -72,6 +72,7 @@ describe('the insights skill', () => {
           'recurs without action',
           'unrelated interests',
           'precedes a low',
+          'what is missing',
         ],
       ],
       ['Go down three layers, then one more', ['saw', 'deeper', 'further', 'outside search', 'self-description']],
@@ -90,7 +91,7 @@ describe('the insights skill', () => {
       ],
       [
         'Write three to five cards',
-        ['layers', 'receipts', 'confidence', 'live', 'two-sentence summary'],
+        ['layers', 'receipts', 'confidence', 'live', 'hidden predictions', 'two-sentence summary'],
       ],
     ];
     expected.forEach(([title, words], index) => {

@@ -19,14 +19,28 @@ export type InsightDepth = (typeof INSIGHT_DEPTHS)[number];
 export const INSIGHT_CONFIDENCES = ['high', 'medium', 'hunch'] as const;
 export type InsightConfidence = (typeof INSIGHT_CONFIDENCES)[number];
 
-export const INSIGHT_STATUSES = ['shown', 'retired', 'superseded'] as const;
+/** Pending is a prediction not yet checked; the tab never lists one. */
+export const INSIGHT_STATUSES = ['shown', 'retired', 'superseded', 'pending'] as const;
 export type InsightStatus = (typeof INSIGHT_STATUSES)[number];
 
-export const VERDICTS = ['right', 'not_quite', 'wrong'] as const;
+/** Knew it: true, and the person already knew it (you 0017). */
+export const VERDICTS = ['right', 'not_quite', 'wrong', 'knew_it'] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
 export const RUN_STATUSES = ['queued', 'running', 'ready', 'failed'] as const;
 export type InsightRunStatus = (typeof RUN_STATUSES)[number];
+
+/** What a run found when it checked a prediction (you 0017). */
+export const PREDICTION_OUTCOMES = ['happened', 'did_not', 'unclear'] as const;
+export type PredictionOutcome = (typeof PREDICTION_OUTCOMES)[number];
+
+/** A prediction as checked: what happened, what the records showed, and when. */
+export type PredictionCheck = {
+  checkOn: string | null;
+  outcome: PredictionOutcome;
+  note: string | null;
+  checkedAt: string | null;
+};
 
 export type InsightLayer = { depth: InsightDepth; text: string };
 
@@ -55,6 +69,8 @@ export type Insight = {
   verdict: InsightVerdict | null;
   /** Tripwires that have fired on it (plan #2413.11); firedSinceMark picks the one that brings it back. */
   fired: FiredTripwire[];
+  /** For a prediction that has been checked, the result; null otherwise. */
+  check: PredictionCheck | null;
 };
 
 export type InsightRun = {
@@ -70,6 +86,7 @@ export type InsightRun = {
 
 export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
+  'check_on, outcome, outcome_note, checked_at, ' +
   'insight_verdicts(verdict, note, decided_at), ' +
   'insight_tripwires(kind, last_fired_at, fired_evidence)';
 
@@ -167,6 +184,19 @@ export function insightFromRow(row: Record<string, unknown>): Insight | null {
     createdAt: text(row.created_at),
     verdict: verdictOf(row.insight_verdicts),
     fired: firedFrom(row.insight_tripwires),
+    check: checkOf(row),
+  };
+}
+
+/** The result of a checked prediction, or null when it has none. */
+export function checkOf(row: Record<string, unknown>): PredictionCheck | null {
+  const outcome = oneOf(PREDICTION_OUTCOMES, row.outcome);
+  if (!outcome) return null;
+  return {
+    checkOn: textOrNull(row.check_on),
+    outcome,
+    note: textOrNull(row.outcome_note),
+    checkedAt: textOrNull(row.checked_at),
   };
 }
 
@@ -225,7 +255,7 @@ export async function latestInsightRun(
 }
 
 /**
- * Marks one insight right, not quite or wrong, replacing any earlier mark.
+ * Marks one insight right, not quite, wrong or knew it, replacing any earlier mark.
  * A blank note is kept as none. Returns the verdict as saved.
  */
 export async function saveVerdict(
@@ -278,6 +308,8 @@ export const INSIGHT_KINDS = [
   { kind: 'unmet_want', label: 'A want that recurs' },
   { kind: 'shared_structure', label: 'One structure, many interests' },
   { kind: 'precursor', label: 'What comes before' },
+  { kind: 'absence', label: 'What is missing' },
+  { kind: 'prediction', label: 'A prediction, checked' },
   { kind: 'pattern', label: 'A pattern' },
 ] as const;
 export type InsightKind = (typeof INSIGHT_KINDS)[number]['kind'];

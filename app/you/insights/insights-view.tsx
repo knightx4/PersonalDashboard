@@ -25,6 +25,8 @@ import type {
   InsightDepth,
   InsightReceipt,
   InsightVerdict,
+  PredictionCheck,
+  PredictionOutcome,
   Verdict,
 } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
@@ -61,7 +63,7 @@ const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsig
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
   evidence?: boolean;
-  why?: Exclude<Verdict, 'right'>;
+  why?: WhyVerdict;
   earlier?: boolean;
   /** The evidence under a card brought back by a tripwire. */
   fired?: boolean;
@@ -85,15 +87,26 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   right: 'Right',
   not_quite: 'Not quite',
   wrong: 'Wrong',
+  knew_it: 'Knew it',
 };
 
 const VERDICT_TONES: Record<Verdict, ChipTone> = {
   right: 'positive',
   not_quite: 'caution',
   wrong: 'danger',
+  knew_it: 'neutral',
 };
 
-const WHY_PROMPTS: Record<Exclude<Verdict, 'right'>, string> = {
+/** The marks that open a line of why before they save. */
+type WhyVerdict = Exclude<Verdict, 'right' | 'knew_it'>;
+
+const OUTCOME_LABELS: Record<PredictionOutcome, string> = {
+  happened: 'It happened',
+  did_not: 'It did not happen',
+  unclear: 'The records could not tell',
+};
+
+const WHY_PROMPTS: Record<WhyVerdict, string> = {
   not_quite: 'What is not quite right?',
   wrong: 'What makes it wrong?',
 };
@@ -151,7 +164,7 @@ export function InsightsView({
   open?: InsightsOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, InsightVerdict>>(new Map());
-  const [choosing, setChoosing] = useState<{ id: string; verdict: Exclude<Verdict, 'right'> } | null>(() => {
+  const [choosing, setChoosing] = useState<{ id: string; verdict: WhyVerdict } | null>(() => {
     const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict && !insight.fired.length);
     return open.why && first ? { id: first.id, verdict: open.why } : null;
   });
@@ -264,6 +277,9 @@ export function InsightsView({
         <div role="group" aria-label="Your mark" className="flex">
           <Button type="button" variant="secondary" className={MARK_CLASS} onClick={() => mark(insight, 'right')}>
             Right
+          </Button>
+          <Button type="button" variant="secondary" className={MARK_CLASS} onClick={() => mark(insight, 'knew_it')}>
+            Knew it
           </Button>
           {(['not_quite', 'wrong'] as const).map((verdict) => (
             <Button
@@ -432,6 +448,8 @@ function InsightCard({
 
       {fired && <BroughtBack fired={fired} timezone={timezone} defaultOpen={firedOpen} />}
 
+      {insight.check && <Checked insight={insight} check={insight.check} timezone={timezone} />}
+
       {insight.layers.length > 0 && (
         <ol className="space-y-3">
           {insight.layers.map((layer, index) => (
@@ -461,6 +479,28 @@ function InsightCard({
 
       {why}
     </Card>
+  );
+}
+
+/**
+ * What a run found when it checked a prediction: the result, when Dash made
+ * the prediction and when it checked, and what the records showed. A
+ * prediction reaches the tab only once it has this.
+ */
+function Checked({ insight, check, timezone }: { insight: Insight; check: PredictionCheck; timezone: string }) {
+  const date = (iso: string | null) => (iso ? formatDateInline(iso, timezone) : '');
+  const when = [
+    insight.createdAt && `Predicted ${date(insight.createdAt)}`,
+    check.checkedAt && `checked ${date(check.checkedAt)}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return (
+    <div className="space-y-1" data-insight-checked>
+      <p className="text-body font-medium text-ink">{OUTCOME_LABELS[check.outcome]}</p>
+      {when && <p className="text-small text-ink-muted">{when}</p>}
+      {check.note && <p className="text-body text-ink [overflow-wrap:anywhere]">{check.note}</p>}
+    </div>
   );
 }
 

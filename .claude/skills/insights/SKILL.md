@@ -10,8 +10,9 @@ something about themselves that none of their notes says on its own. A card
 makes one claim in their terms, shows the evidence with links, and then goes
 two layers further: the mechanism underneath the pattern, and what the
 pattern protects them from or costs them, tied to something live this week.
-They mark each card right, not quite or wrong, and the next run reads those
-marks.
+They mark each card right, not quite, wrong or knew it, and the next run
+reads those marks. Dash also makes predictions from its cards, which stay
+hidden until a later run has checked them against the records.
 
 The method here is the one that produced the first eleven insights by hand
 on 18 October 2026, which the person rated well: the Galway theory of their
@@ -32,13 +33,13 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 
 Work these in order. Each has its section below.
 
-1. **Read what came before**: the brief, the run row, every earlier insight with its verdict, and what the person already knows about themselves.
+1. **Read what came before**: the brief, the run row, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
 2. **Read the core in full**: the private notes in Me/, the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: three subagents at once, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
-4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge.
+4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
 6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
-7. **Write three to five cards** with layers, linked receipts, a confidence and the live thing each points at, then finish the run row with a two-sentence summary.
+7. **Write three to five cards** with layers, linked receipts, a confidence and the live thing each points at, plus one or two hidden predictions, then finish the run row with a two-sentence summary.
 
 ## How you read and write
 
@@ -101,10 +102,44 @@ order by i.created_at desc;
 - **Marked not quite**: rework it with the person's note in hand. The new
   card answers the note, and when it is saved the old one is superseded by
   it (step 7).
+- **Marked knew it**: true, and they already knew it. Never write it again,
+  and treat it as a miss: the card told them nothing. Note what made it
+  obvious (usually a deeper layer taken from their own notes) and make
+  sure no card in this run is obvious in the same way.
 - **Not marked**: do not repeat it either; it is still on their tab.
 - **What the verdicts say about the method**: read the notes on not quite
   and wrong for what they object to, such as a claim that was too neat or
   evidence that was a misreading, and avoid it in every card of this run.
+
+**Check the predictions that are due.** A prediction (step 7) is saved with
+status `pending`, which the tab never shows, and `check_on`, the first day
+the records can tell whether it came true. Check each one due now before
+anything else:
+
+```sql
+select id, claim, layers, receipts, check_on, created_at from you.insights
+where user_id = '<user_id>' and status = 'pending' and check_on <= current_date
+order by check_on;
+```
+
+For each, run the query its layers or receipts name (or the nearest one the
+tables allow) over the window it gave, and decide: `happened`, `did_not`,
+or `unclear` when the records cannot say. Be strict: a prediction that came
+partly true did not happen. Then show it with the result:
+
+```sql
+update you.insights
+set outcome = 'happened', outcome_note = $n$What the records showed, with the dates and numbers.$n$,
+    checked_at = now(), status = 'shown',
+    receipts = receipts || $j$[{"source": "...", "row_id": null, "quote": "...", "link": "..."}]$j$::jsonb
+where id = '<id>' and user_id = '<user_id>' and status = 'pending';
+```
+
+A prediction that did not happen is as useful to show as one that did: it
+tells the person, and the next run, which of Dash's readings of them was
+wrong. Read the outcomes of every checked prediction, earlier ones too, as
+evidence about the method. A reading whose predictions keep failing is a
+misreading, and a card built on it is dropped.
 
 Then make a list of what the person already knows about themselves, so no
 card tells them something they wrote down. Read in full their own
@@ -277,9 +312,19 @@ card's `kind` (`INSIGHT_KINDS` in `lib/you/insights.ts`):
 | A want that recurs without action | `unmet_want` |
 | The same structure across unrelated interests | `shared_structure` |
 | What reliably precedes a low or a binge | `precursor` |
+| Something that is missing: a want that dropped out of the notes, a page or workspace never opened, a person or subject never written about, a step never taken | `absence` |
 
-A card that fits none of these is `pattern`. Write down ten or more
+A prediction (step 7) is `prediction`. A card that fits none of these is `pattern`. Write down ten or more
 candidates before choosing; most will not survive steps 5 and 6.
+
+**Look for absences on purpose.** People see what they did and miss what
+they did not, so a zero is where a surprise most often is. At least two
+candidates in every run start from one: a subject that filled the notes in
+one year and is gone from them now, a workspace or page with no views in
+`core.page_view_days`, a stated want with no order, application, reading
+or step anywhere, a kind of task always left for last. An absence needs a
+span of time like any other card: show when the thing was there, or should
+have been, and that it has not been since.
 
 ## 5. Go down three layers, then one more than seems needed
 
@@ -379,6 +424,30 @@ Write each card in the person's own words where possible, to them as "you".
 - `live_ref`: the deadline, step or lead the further layer points at, in
   one line (at most 300 characters), or null.
 
+**Predictions.** Besides the cards, write one or two predictions: what the
+pattern in a card says the person will do next, stated so the records can
+show it. Name the event that starts it, what they will do, and a window,
+such as "Within five days of the next rejection, you will spend at least
+three nights past midnight on the build pages and send no applications."
+Choose ones a reader could not make from their own notes, and that the
+tables in step 3 can check without asking them. Set `check_on` to the
+first day the window has closed, no later than four weeks from now, so the
+next monthly run can check it; for a prediction that waits on an event
+(the next rejection), set it four weeks out and say in `outcome_note` if the
+event never came, with `unclear`. Save it with `kind = 'prediction'`,
+`status = 'pending'`, its layers (why Dash expects it), and a receipt naming
+the table and the count that will decide it. The person does not see it
+until a later run has checked it.
+
+```sql
+insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, status, check_on)
+values ('<user_id>', '<run id>', 'prediction', $c$...$c$,
+        $j$[ ... ]$j$::jsonb, $j$[ ... ]$j$::jsonb, 'medium', 'pending', '<yyyy-mm-dd>')
+returning id;
+```
+
+Write each card:
+
 ```sql
 insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, live_ref)
 values ('<user_id>', '<run id>', 'named_concept', $c$...$c$,
@@ -395,7 +464,8 @@ where id = '<old id>' and user_id = '<user_id>';
 ```
 
 Finish the run row with a two-sentence summary of what the run read and
-what it found, then record it so Home lists it under what Dash did today:
+what it found (say how many predictions it checked and how they came out,
+and how many it left pending; never say what a pending one predicts), then record it so Home lists it under what Dash did today:
 
 ```sql
 select core.dash_before('you.insight_runs:<run id>');

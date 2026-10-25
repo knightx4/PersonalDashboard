@@ -69,6 +69,7 @@ const waiting: Insight[] = [
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
     fired: [],
+    check: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -90,6 +91,7 @@ const waiting: Insight[] = [
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
     fired: [],
+    check: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -108,6 +110,31 @@ const waiting: Insight[] = [
     createdAt: '2026-10-17T21:10:00Z',
     verdict: null,
     fired: [],
+    check: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000006',
+    runId: null,
+    kind: 'prediction',
+    claim: 'Within five days of the next rejection, you will spend at least three late nights building Dash and send no applications.',
+    layers: [
+      { depth: 'saw', text: 'After each of the last four rejections, late-night build sessions rose within the week and applications stopped.' },
+      { depth: 'deeper', text: 'Building gives a finished thing by morning when the search gives nothing back.' },
+    ],
+    receipts: [{ source: 'job_search.applications', rowId: 'a7', quote: '4 of 4 rejections followed by build nights', link: null }],
+    confidence: 'medium',
+    liveRef: null,
+    status: 'shown',
+    supersededBy: null,
+    createdAt: '2026-09-28T21:10:00Z',
+    verdict: null,
+    fired: [],
+    check: {
+      checkOn: '2026-10-14',
+      outcome: 'happened',
+      note: 'Rejected by Northwind on 8 October; four nights past midnight on the build pages by the 12th, and the next application went out on the 16th.',
+      checkedAt: '2026-10-17T21:10:00Z',
+    },
   },
 ];
 
@@ -130,6 +157,7 @@ const marked: Insight[] = [
       decidedAt: '2026-10-11T08:00:00Z',
     },
     fired: [],
+    check: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
@@ -145,6 +173,7 @@ const marked: Insight[] = [
     createdAt: '2026-10-10T21:10:00Z',
     verdict: { verdict: 'not_quite', note: 'Both matter; the team decides between two good products.', decidedAt: '2026-10-11T08:05:00Z' },
     fired: [],
+    check: null,
   },
 ];
 
@@ -219,12 +248,15 @@ export function YouInsightsPreview({
   state = 'ready',
   empty = false,
   fired = false,
+  prediction = false,
 }: {
   open?: InsightsOpen;
   state?: 'ready' | 'running' | 'failed';
   empty?: boolean;
   /** Cards brought back by a tripwire. */
   fired?: boolean;
+  /** The checked prediction at the front of the deck. */
+  prediction?: boolean;
 }) {
   const latest =
     state === 'running'
@@ -234,7 +266,15 @@ export function YouInsightsPreview({
         : run('ready');
   return (
     <InsightsView
-      insights={empty ? [] : fired ? withFired() : [...waiting, ...marked]}
+      insights={
+        empty
+          ? []
+          : fired
+            ? withFired()
+            : prediction
+              ? [...waiting.filter((i) => i.check), ...waiting.filter((i) => !i.check), ...marked]
+              : [...waiting, ...marked]
+      }
       run={insightRunState(empty && state === 'ready' ? null : latest, NOW)}
       runWhen="Today, 9:40 AM BST"
       available

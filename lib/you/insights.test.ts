@@ -68,6 +68,39 @@ describe('insightFromRow', () => {
   });
 });
 
+describe('predictions and knew it (you 0017)', () => {
+  it('reads a knew it mark', () => {
+    expect(verdictOf({ verdict: 'knew_it', note: null, decided_at: '2026-10-25T09:00:00Z' })?.verdict).toBe('knew_it');
+  });
+
+  it('reads the result of a checked prediction', () => {
+    const insight = insightFromRow(
+      row({
+        kind: 'prediction',
+        outcome: 'did_not',
+        outcome_note: 'Two applications went out that week.',
+        check_on: '2026-11-10',
+        checked_at: '2026-11-12T09:00:00Z',
+      }),
+    );
+    expect(insight?.check).toEqual({
+      checkOn: '2026-11-10',
+      outcome: 'did_not',
+      note: 'Two applications went out that week.',
+      checkedAt: '2026-11-12T09:00:00Z',
+    });
+  });
+
+  it('has no result for a card with no outcome or an unknown one', () => {
+    expect(insightFromRow(row())?.check).toBeNull();
+    expect(insightFromRow(row({ outcome: 'maybe' }))?.check).toBeNull();
+  });
+
+  it('reads a pending prediction as pending, which the tab never asks for', () => {
+    expect(insightFromRow(row({ kind: 'prediction', status: 'pending', check_on: '2026-11-10' }))?.status).toBe('pending');
+  });
+});
+
 describe('layersOf and receiptsOf', () => {
   it('drops a layer of an unknown depth or with no text, and keeps the order within a depth', () => {
     expect(
