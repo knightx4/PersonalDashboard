@@ -25,13 +25,14 @@ import type {
   InsightDepth,
   InsightReceipt,
   InsightVerdict,
+  NowNote,
   PredictionCheck,
   PredictionOutcome,
   Verdict,
 } from '@/lib/you/insights';
 import { linkText } from '@/lib/you/insights';
 import type { InsightRunState } from '@/lib/you/insights-run';
-import { markInsight, startInsightRun, type MarkResult } from './actions';
+import { answerInsight, markInsight, saveNowNote, startInsightRun, type MarkResult } from './actions';
 
 /**
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
@@ -57,9 +58,18 @@ import { markInsight, startInsightRun, type MarkResult } from './actions';
 export type InsightsActions = {
   mark: (insightId: string, verdict: Verdict, note?: string | null) => Promise<MarkResult>;
   lookAgain: () => Promise<{ error: string | null }>;
+  answer: (insightId: string, answer: string) => Promise<AnswerResult>;
+  saveNow: (body: string) => Promise<{ error: string | null; saved?: NowNote }>;
 };
 
-const REAL_ACTIONS: InsightsActions = { mark: markInsight, lookAgain: startInsightRun };
+type AnswerResult = { error: string | null; saved?: { answer: string | null; answeredAt: string | null } };
+
+const REAL_ACTIONS: InsightsActions = {
+  mark: markInsight,
+  lookAgain: startInsightRun,
+  answer: answerInsight,
+  saveNow: saveNowNote,
+};
 
 /** For the gallery: draw a hidden part open. */
 export type InsightsOpen = {
@@ -70,6 +80,8 @@ export type InsightsOpen = {
   fired?: boolean;
   /** The hint on the Look again button, naming the routine. */
   lookAgain?: boolean;
+  /** The note on where they are now, folded open. */
+  now?: boolean;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -148,6 +160,7 @@ export function InsightsView({
   run,
   runWhen,
   available,
+  now = { body: '', updatedAt: null },
   timezone = 'UTC',
   actions = REAL_ACTIONS,
   open = {},
@@ -159,6 +172,8 @@ export function InsightsView({
   runWhen: string | null;
   /** Whether the deployment can start a run (both goals routine variables set). */
   available: boolean;
+  /** Their note on where they are now, which every run reads first. */
+  now?: NowNote;
   /** Their timezone, for the date on a card brought back. */
   timezone?: string;
   actions?: InsightsActions;
@@ -255,6 +270,11 @@ export function InsightsView({
           timezone={timezone}
           evidenceOpen={open.evidence}
           firedOpen={open.fired}
+          question={
+            insight.question ? (
+              <Question key={insight.id} insight={insight} onAnswer={actions.answer} />
+            ) : null
+          }
           why={
             choice ? (
               <WhyLine
@@ -361,6 +381,8 @@ export function InsightsView({
           </p>
         )}
 
+        <NowFold initial={now} timezone={timezone} onSave={actions.saveNow} defaultOpen={open.now ?? (nothing || !now.body)} />
+
         {nothing ? (
           <EmptyState
             icon={Sparkles}
@@ -407,6 +429,7 @@ export function InsightsView({
                   <Chip tone={VERDICT_TONES[verdict.verdict]}>{VERDICT_LABELS[verdict.verdict]}</Chip>
                   <p className="text-body text-ink">{insight.claim}</p>
                   {verdict.note && <p className="text-ui text-ink-muted">You said: {verdict.note}</p>}
+                  {insight.answer && <p className="text-ui text-ink-muted">You answered: {insight.answer}</p>}
                 </li>
               ))}
             </ul>
@@ -424,6 +447,7 @@ function InsightCard({
   timezone,
   evidenceOpen,
   firedOpen,
+  question,
   why,
 }: {
   insight: Insight;
@@ -431,6 +455,7 @@ function InsightCard({
   timezone: string;
   evidenceOpen?: boolean;
   firedOpen?: boolean;
+  question: React.ReactNode;
   why: React.ReactNode;
 }) {
   return (
@@ -469,6 +494,8 @@ function InsightCard({
           Tied to <LinkedText text={insight.liveRef} receipts={insight.receipts} />
         </p>
       )}
+
+      {question}
 
       {insight.receipts.length > 0 && (
         <Disclosure
@@ -613,6 +640,131 @@ function Receipt({ receipt }: { receipt: InsightReceipt }) {
         <p className="text-ui text-ink-muted">{name}</p>
       )}
     </li>
+  );
+}
+
+/**
+ * The question a card ends with and their answer (you 0018). Answering does
+ * not mark the card; the next run reads the answer before anything else.
+ */
+function Question({
+  insight,
+  onAnswer,
+}: {
+  insight: Insight;
+  onAnswer: InsightsActions['answer'];
+}) {
+  const [saved, setSaved] = useState(insight.answer ?? '');
+  const [draft, setDraft] = useState(insight.answer ?? '');
+  const [editing, setEditing] = useState(!insight.answer);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  const fieldId = `answer-${insight.id}`;
+  const save = () =>
+    startSaving(async () => {
+      const result = await onAnswer(insight.id, draft);
+      setError(result.error);
+      if (!result.error) {
+        const answer = result.saved?.answer ?? '';
+        setSaved(answer);
+        setDraft(answer);
+        setEditing(!answer);
+      }
+    });
+  return (
+    <div className="space-y-2 rounded-control bg-sunken p-3" data-insight-question>
+      <Label htmlFor={fieldId} className="text-body font-medium text-ink">
+        {insight.question}
+      </Label>
+      {editing ? (
+        <>
+          <Textarea
+            id={fieldId}
+            value={draft}
+            maxLength={4000}
+            placeholder="The next run starts from your answer."
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" variant="secondary" pending={saving} onClick={save} disabled={!draft.trim()}>
+              Save answer
+            </Button>
+            {saved && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setDraft(saved);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-body text-ink [overflow-wrap:anywhere]">{saved}</p>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Change answer
+          </Button>
+        </div>
+      )}
+      <FieldError>{error}</FieldError>
+    </div>
+  );
+}
+
+/**
+ * Where they are now (you 0018): money, focus, what they have decided
+ * against. Every run reads it first, so a choice they made on purpose is not
+ * read as a gap.
+ */
+function NowFold({
+  initial,
+  timezone,
+  onSave,
+  defaultOpen,
+}: {
+  initial: NowNote;
+  timezone: string;
+  onSave: InsightsActions['saveNow'];
+  defaultOpen: boolean;
+}) {
+  const [note, setNote] = useState(initial);
+  const [draft, setDraft] = useState(initial.body);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+  const save = () =>
+    startSaving(async () => {
+      const result = await onSave(draft);
+      setError(result.error);
+      if (result.saved) {
+        setNote(result.saved);
+        setDraft(result.saved.body);
+      }
+    });
+  const changed = draft.trim() !== note.body.trim();
+  return (
+    <SectionFold
+      title="Where you are now"
+      hint={note.updatedAt ? `Updated ${formatDateInline(note.updatedAt, timezone)}` : 'Not written yet'}
+      defaultOpen={defaultOpen}
+    >
+      <div className="mt-2 space-y-2">
+        <Label htmlFor="insights-now" className="text-ui font-normal text-ink-muted">
+          What is going on for you at the moment: money, what you are focused on, what you have decided against.
+          Dash reads this before every run, so it does not take a choice you made for a gap.
+        </Label>
+        <Textarea id="insights-now" value={draft} maxLength={4000} onChange={(event) => setDraft(event.target.value)} />
+        <Button type="button" size="sm" variant="secondary" pending={saving} onClick={save} disabled={!changed}>
+          Save
+        </Button>
+        <FieldError>{error}</FieldError>
+      </div>
+    </SectionFold>
   );
 }
 

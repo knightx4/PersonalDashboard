@@ -72,6 +72,14 @@ export const youActions: ModuleActions = {
       'theirs',
       "Right, not quite or wrong is the person's verdict on what Dash wrote about them; Dash does not mark its own insights.",
     ),
+    answerInsight: none(
+      'theirs',
+      "An answer to a card's question is the person's own words about themselves; Dash reads it and does not write it.",
+    ),
+    saveNowNote: none(
+      'theirs',
+      'Where they are now is their own account of their situation; Dash reads it before every insights run and does not write it.',
+    ),
     startInsightRun: none(
       'spends',
       'Look again starts a long Dash session on the account, which spends money the person chooses to spend.',

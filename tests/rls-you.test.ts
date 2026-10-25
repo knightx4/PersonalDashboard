@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -138,6 +138,31 @@ describe('personal details', () => {
 
   it('refuses a detail past its length', async () => {
     await expect(admin`update details set phone = ${'5'.repeat(201)} where user_id = ${userA}`).rejects.toThrow();
+  });
+});
+
+describe('where they are now', () => {
+  // migrations-you/0018_insight_questions_and_now.sql: one row per person.
+  it('keeps one row each, to its owner only', async () => {
+    await asUser(userA, (tx) => tx`insert into now (user_id, body) values (${userA}, 'Contract work first.')`);
+    expect(await asUser(userA, (tx) => tx`select body from now`)).toEqual([{ body: 'Contract work first.' }]);
+    expect(await asUser(userB, (tx) => tx`select user_id from now`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`insert into now (user_id, body) values (${userA}, 'Again')`),
+    ).rejects.toThrow();
+  });
+
+  it("does not let a user write or change another account's note", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into now (user_id, body) values (${userA}, 'Not yours')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update now set body = 'Not yours'`);
+    await asUser(userB, (tx) => tx`delete from now`);
+    expect(await admin`select body from now where user_id = ${userA}`).toEqual([{ body: 'Contract work first.' }]);
+  });
+
+  it('refuses a note past its length', async () => {
+    await expect(admin`update now set body = ${'x'.repeat(4001)} where user_id = ${userA}`).rejects.toThrow();
   });
 });
 

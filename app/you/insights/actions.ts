@@ -5,7 +5,15 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createYouClient } from '@/lib/you/auth/server';
-import { saveVerdict, VERDICTS, type InsightVerdict, type Verdict } from '@/lib/you/insights';
+import {
+  saveAnswer,
+  saveNow,
+  saveVerdict,
+  VERDICTS,
+  type InsightVerdict,
+  type NowNote,
+  type Verdict,
+} from '@/lib/you/insights';
 import { startInsightRun as startRun } from '@/lib/you/insights-start';
 
 /** What a mark sends back: the verdict as saved, or why it was not. */
@@ -26,6 +34,39 @@ export async function markInsight(insightId: string, verdict: Verdict, note?: st
     return { error: null, saved };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your mark was not saved. Try again.' };
+  }
+}
+
+/**
+ * What they wrote back to the question a card ends with (you 0018). The next
+ * run reads it before anything else. A blank answer clears it.
+ */
+// latency: pending
+export async function answerInsight(
+  insightId: string,
+  answer: string,
+): Promise<{ error: string | null; saved?: { answer: string | null; answeredAt: string | null } }> {
+  if (!z.string().uuid().safeParse(insightId).success) return { error: 'That is not an insight.' };
+  const user = await requireUser();
+  try {
+    const saved = await saveAnswer(await createYouClient(), user.id, insightId, answer);
+    revalidatePath('/you/insights');
+    return { error: null, saved };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
+  }
+}
+
+/** Their note on where they are now, which every run reads first (you 0018). */
+// latency: pending
+export async function saveNowNote(body: string): Promise<{ error: string | null; saved?: NowNote }> {
+  const user = await requireUser();
+  try {
+    const saved = await saveNow(await createYouClient(), user.id, body);
+    revalidatePath('/you/insights');
+    return { error: null, saved };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your note was not saved. Try again.' };
   }
 }
 

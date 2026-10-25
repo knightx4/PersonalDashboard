@@ -33,13 +33,13 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 
 Work these in order. Each has its section below.
 
-1. **Read what came before**: the brief, the run row, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
+1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
 2. **Read the core in full**: the private notes in Me/, the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: three subagents at once, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
-6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
-7. **Write three to five cards** with layers, linked receipts, a confidence and the live thing each points at, plus one or two hidden predictions, then finish the run row with a two-sentence summary.
+6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
+7. **Write three to five cards** with layers, linked receipts, a confidence, the live thing each points at and a question for them to answer, plus one or two hidden predictions, then finish the run row with a two-sentence summary.
 
 ## How you read and write
 
@@ -84,12 +84,40 @@ update you.insight_runs set status = 'running', started_at = now(), error = null
 where id = '<run id>' and user_id = '<user_id>';
 ```
 
+**Where they are now comes first.** `you.now` is one row in their words:
+money, what they are focused on, what they have decided against. It is the
+newest thing they have said about their life and it outranks any older note
+on the same subject. Read it before anything else, and carry it through the
+run: a card that reads a choice it describes as a gap or a failure is
+wrong before it is written.
+
+```sql
+select body, updated_at from you.now where user_id = '<user_id>';
+```
+
+If it is empty or more than a month old, say so in the summary, and lean on
+their answers and verdict notes for the present instead.
+
+**Their answers are the best material the run has.** Every card ends with a
+question, and what they wrote back is them thinking about themselves out
+loud, prompted by the place Dash got closest. Read every answer in full
+before the notes. Each answer is a lead: what they said that a card had not
+seen, what they pushed back on, and above all what they said in passing
+while answering something else. At least one card in every run starts from
+an answer when there are any, and goes past it with the notes and records.
+
+```sql
+select id, claim, question, answer, answered_at from you.insights
+where user_id = '<user_id>' and answer is not null
+order by answered_at desc;
+```
+
 Then read every insight written before, in every status, with its verdict.
 This is the list the run must not repeat.
 
 ```sql
 select i.id, i.kind, i.claim, i.layers, i.receipts, i.confidence, i.status,
-       i.created_at, v.verdict, v.note, v.decided_at
+       i.created_at, i.question, i.answer, v.verdict, v.note, v.decided_at
 from you.insights i
 left join you.insight_verdicts v on v.insight_id = i.id and v.user_id = i.user_id
 where i.user_id = '<user_id>'
@@ -110,6 +138,17 @@ order by i.created_at desc;
 - **What the verdicts say about the method**: read the notes on not quite
   and wrong for what they object to, such as a claim that was too neat or
   evidence that was a misreading, and avoid it in every card of this run.
+  A verdict note is also the person telling you about their life: money,
+  plans, what they have moved on from. Treat what it says as fact for this
+  run, the same as `you.now`.
+
+**What has landed and what has not.** Up to 25 October 2026 the cards
+marked right described how they think: one rule under their economics,
+their city and Dash; projects stalling once only plumbing is left. The
+cards that missed checked what they did against what they said they would
+(applications against their own rules, a side interest read as a career
+gap) and were true but no use, or missed the reason behind the choice.
+Aim at the first kind (step 4).
 
 **Check the predictions that are due.** A prediction (step 7) is saved with
 status `pending`, which the tab never shows, and `check_on`, the first day
@@ -317,6 +356,20 @@ card's `kind` (`INSIGHT_KINDS` in `lib/you/insights.ts`):
 A prediction (step 7) is `prediction`. A card that fits none of these is `pattern`. Write down ten or more
 candidates before choosing; most will not survive steps 5 and 6.
 
+**Aim at how they work, not at whether they kept to their word.** The cards
+that land describe the machinery: how they decide, what gives them energy
+and what drains it, the rule they apply without saying it, what they reach
+for under pressure, what they protect. A gap between what they said and
+what they did is a lead into that machinery, never the card itself. "You
+said X and did Y" is at most the saw layer; the card is the reason, and the
+reason has to be one they had not put into words. At most one card in a
+run may be mainly about such a gap.
+
+**Every card has to be usable.** The further layer ends in something they
+can do, test or decide differently this week, or a choice in front of them
+that the card reframes. "Close, but nothing tangible" is a miss even when
+the reading is right.
+
 **Look for absences on purpose.** People see what they did and miss what
 they did not, so a zero is where a surprise most often is. At least two
 candidates in every run start from one: a subject that filled the notes in
@@ -378,6 +431,14 @@ Drop:
   from an earlier insight is re-run too;
 - any card that fails the surprise check.
 
+**Other explanations.** For every card, write down the two likeliest other
+reasons for what the saw layer shows: money, time, a deliberate choice, a
+change in circumstance, something they said in `you.now`, an answer or a
+verdict note. Check each against the records. Drop the card if one of them
+explains the evidence as well as the card does; say in the deeper layer
+which ones you ruled out and how, in a sentence. A card that skipped this
+step is the kind that came back "factually true but not that helpful".
+
 **The surprise check.** Send one subagent the list from step 1 (their
 self-descriptions and personality results, in full) and the claims and
 deeper layers of every candidate still standing, and nothing else: none of
@@ -430,6 +491,13 @@ Write each card in the person's own words where possible, to them as "you".
 - `confidence`: `high`, `medium` or `hunch`.
 - `live_ref`: the deadline, step or lead the further layer points at, in
   one line (at most 300 characters), or null.
+- `question`: one question for them to answer on the card, at most 300
+  characters. Ask the thing the card could not find out from the records
+  and that only they can say: which reason was the real one, what they
+  felt at the moment the pattern started, what they would choose if the
+  constraint went away. Never a yes-or-no question, never a question the
+  card has already answered, never "does this resonate?". Their answer is
+  the first thing the next run reads.
 
 **Predictions.** Besides the cards, write one or two predictions: what the
 pattern in a card says the person will do next, stated so the records can
@@ -456,9 +524,9 @@ returning id;
 Write each card:
 
 ```sql
-insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, live_ref)
+insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, live_ref, question)
 values ('<user_id>', '<run id>', 'named_concept', $c$...$c$,
-        $j$[ ... ]$j$::jsonb, $j$[ ... ]$j$::jsonb, 'medium', $l$...$l$)
+        $j$[ ... ]$j$::jsonb, $j$[ ... ]$j$::jsonb, 'medium', $l$...$l$, $q$...$q$)
 returning id;
 ```
 
@@ -485,7 +553,8 @@ select core.record_dash_action('<user_id>', 'you.insight_runs:<run id>',
 
 Read it back: the run is `ready`, and `select count(*) from you.insights
 where run_id = '<run id>' and user_id = '<user_id>'` is what you wrote,
-each with three layers and at least two receipts.
+each with three layers, at least two receipts and, for every card that is
+not a prediction, a question.
 
 If the run cannot finish (the notes cannot be read, every candidate fails
 step 6), mark it failed with a sentence the person can act on, and keep any

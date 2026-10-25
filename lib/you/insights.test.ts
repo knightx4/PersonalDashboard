@@ -182,6 +182,17 @@ describe('the store', () => {
   });
 });
 
+describe('questions and answers (you 0018)', () => {
+  it('reads the question and their answer', () => {
+    const insight = insightFromRow(row({ question: 'Which reason was the real one?', answer: 'Money.', answered_at: '2026-10-26T09:00:00Z' }));
+    expect(insight).toMatchObject({ question: 'Which reason was the real one?', answer: 'Money.', answeredAt: '2026-10-26T09:00:00Z' });
+  });
+
+  it('reads a card with no question as none', () => {
+    expect(insightFromRow(row())).toMatchObject({ question: null, answer: null });
+  });
+});
+
 describe('linkText', () => {
   const receipts = [
     { source: 'Pending/Learning Tool Idea.md', rowId: null, quote: 'Helping create connection is a big part of the value', link: '/vault/n/Pending/Learning%20Tool%20Idea.md' },
