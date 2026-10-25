@@ -388,6 +388,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-details-empty': ['/you/details'],
   'you-details-edit': ['/you/details'],
   'you-details-edit-adding': ['/you/details'],
+  'you-details-edit-rename': ['/you/details'],
   'you-details-edit-remove': ['/you/details'],
   'you-details-error': ['/you/details'],
   'you-places': ['/you/places'],

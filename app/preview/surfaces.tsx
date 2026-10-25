@@ -9237,12 +9237,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DetailsView details={{ ...youDetails, race: null, sexuality: null }} editing />,
   },
   {
-    /* Add a field opens a name box under their own fields. */
+    /* Add a field puts a new row under their own fields, the caret in its name. */
     id: 'you-details-edit-adding',
     label: 'You · Details, naming a new field',
     module: 'you',
     width: 'page',
     render: () => <DetailsView details={youDetails} editing adding />,
+  },
+  {
+    /* Pressing an own field's name opens it as a box to rename the field. */
+    id: 'you-details-edit-rename',
+    label: 'You · Details, renaming a field',
+    module: 'you',
+    width: 'page',
+    render: () => <DetailsView details={youDetails} editing renaming="own-passport" />,
   },
   {
     /* An own field pointed at shows its remove button and the tip. */
