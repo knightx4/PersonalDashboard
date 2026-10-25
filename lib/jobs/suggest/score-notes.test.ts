@@ -4,7 +4,7 @@ import { chanceText, parseScoreMinimum, passesMinimum, scoreNote, type ScoreNote
 const input = {
   kind: 'application' as const,
   title: 'Senior Financial Analyst',
-  scores: { fit_score: { value: 64, confidence: 0.3 }, chance: { value: 30, confidence: 0.9 } },
+  scores: { fit_score: { value: 64, confidence: 0.3 }, chance: { value: 15, confidence: 0.9 } },
   history: [],
   hasDescription: true,
 };
@@ -14,8 +14,8 @@ describe('scoreNote', () => {
     const note = scoreNote(input)!;
     expect(note.fit).toMatchObject({ value: 64, unsure: true });
     expect(note.fit?.reason).toBeTruthy();
-    expect(note.chance).toMatchObject({ value: 30, band: 'medium', unsure: false });
-    expect(chanceText(note.chance!)).toBe('30');
+    expect(note.chance).toMatchObject({ value: 15, band: 'medium', unsure: false });
+    expect(chanceText(note.chance!)).toBe('15');
     expect(note.chance?.reason).toBe('No past applications to compare against yet');
   });
 
@@ -31,7 +31,7 @@ describe('scoreNote', () => {
 describe('the minimums', () => {
   const note: ScoreNote = {
     fit: { value: 55, unsure: false, reason: null },
-    chance: { value: 20, band: 'low', unsure: false, reason: null },
+    chance: { value: 8, band: 'low', unsure: false, reason: null },
   };
 
   it('reads only the offered values off the URL', () => {

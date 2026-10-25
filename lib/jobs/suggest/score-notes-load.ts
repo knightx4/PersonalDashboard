@@ -2,7 +2,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { RequirementMatch } from '../evidence/match-payload';
 import { parseApplicationScores } from './application-scores';
-import { reachedInterview, type PastApplication } from './history';
+import { channelOf, reachedInterview, type PastApplication } from './history';
 import type { OpenSuggestion } from './load';
 import { scoreNote, type ScoreNote } from './score-notes';
 
@@ -24,6 +24,8 @@ export function historyFromPipeline(rows: readonly PipelineRow[]): PastApplicati
     status: row.status,
     rejectionStage: row.rejectionStage,
     hasInterview: (row.interviewKinds ?? []).length > 0,
+    source: row.source,
+    sentAt: row.submittedAt,
   }));
 }
 
@@ -66,6 +68,7 @@ export async function loadApplicationNotes(
         hasDescription: (role.jd_text ?? '').trim().length > 0,
         history,
         excludeId: app.id,
+        channel: channelOf(app),
       },
       { interviewed: reachedInterview(app) },
     );

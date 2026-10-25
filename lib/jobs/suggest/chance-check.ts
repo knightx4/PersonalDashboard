@@ -155,7 +155,14 @@ export type ChanceDisplay = { kind: 'number' } | { kind: 'band'; edges: ChanceBa
  */
 export const CHANCE_DISPLAY: ChanceDisplay = { kind: 'number' };
 
-/** The terciles of the 29 September run, still where the chance filter cuts. */
-export const CHANCE_FILTER_EDGES: ChanceBandEdges = { medium: 27, high: 38 };
+/**
+ * Where the chance filter and the chance colour cut: the terciles of the
+ * 24 October 2026 run, once chance was a percent read against applications
+ * sent the same way. 361 closed direct applications, 30 of which reached an
+ * interview: AUC 0.67, and the top third held 18 of the 30 against 4 in the
+ * bottom third. The run read each month's outcome, which a live score made
+ * that month could not, so the AUC flatters it somewhat.
+ */
+export const CHANCE_FILTER_EDGES: ChanceBandEdges = { medium: 14, high: 17 };
 
 export const CHANCE_BAND_LABELS: Record<ChanceBand, string> = { low: 'Low', medium: 'Medium', high: 'High' };
