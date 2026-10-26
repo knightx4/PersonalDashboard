@@ -6,6 +6,7 @@ import {
   checkKey,
   chooseNext,
   lessonKey,
+  levelLessonKey,
   orderSubjects,
   questionKey,
   reviewKey,
@@ -165,13 +166,42 @@ describe('chooseNext: the piece you are on', () => {
 
 describe('chooseNext: practice questions', () => {
   it('asks a question when no subject is under way, even with a ready one waiting', () => {
-    const item = chooseNext(input({ subjects: [subject('fin')], map: topicMap([DCF]) }));
+    const item = chooseNext(input({ subjects: [subject('fin')], map: topicMap([DCF], [ev('dcf1', 'not_met')]) }));
     expect(item?.kind).toBe('question');
   });
 
-  it('asks about a business-pack topic no subject of yours teaches', () => {
+  it('teaches a business-pack topic level before its first question', () => {
     const item = chooseNext(input({ map: topicMap([DCF, MOATS], allShown([DCF])) }));
-    expect(item).toMatchObject({ kind: 'question', cell: { topicId: 'moats' } });
+    expect(item).toMatchObject({ kind: 'level_lesson', lessonId: null, cell: { topicId: 'moats' } });
+    const cellId = item?.kind === 'level_lesson' ? item.cell.cellId : '';
+    expect(item?.key).toBe(levelLessonKey(cellId));
+  });
+
+  /** The level a fresh MOATS asks first, which its lesson comes before. */
+  const first = (() => {
+    const item = chooseNext(input({ map: topicMap([MOATS]) }));
+    return item?.kind === 'level_lesson' ? item.cell.cellId : 'none';
+  })();
+
+  it('carries the stored lesson, and asks the question once it has been shown', () => {
+    const map = topicMap([MOATS]);
+    const unread = new Map([[first, { id: 'll-1', status: 'ready' as const, read: false }]]);
+    expect(chooseNext(input({ map, levelLessons: unread }))).toMatchObject({ kind: 'level_lesson', lessonId: 'll-1' });
+    const read = new Map([[first, { id: 'll-1', status: 'ready' as const, read: true }]]);
+    expect(chooseNext(input({ map, levelLessons: read }))).toMatchObject({ kind: 'question', key: questionKey(first) });
+  });
+
+  it('asks the question straight away after the lesson is passed over, declined, or taught by a piece', () => {
+    const map = topicMap([MOATS]);
+    expect(chooseNext(input({ map, skip: new Set([levelLessonKey(first)]) }))).toMatchObject({ kind: 'question', key: questionKey(first) });
+    const dropped = new Map([[first, { id: 'll-1', status: 'dropped' as const, read: false }]]);
+    expect(chooseNext(input({ map, levelLessons: dropped }))).toMatchObject({ kind: 'question', key: questionKey(first) });
+    expect(chooseNext(input({ map, taughtCells: new Set([first]) }))).toMatchObject({ kind: 'question', key: questionKey(first) });
+  });
+
+  it('teaches no level that has been asked before', () => {
+    const map = topicMap([MOATS], [ev('moats1', 'met'), ev('moats2', 'not_met')]);
+    expect(chooseNext(input({ map }))).toMatchObject({ kind: 'question', key: questionKey('moats2') });
   });
 
   it('asks a missed level before anything new, with the line saying why', () => {

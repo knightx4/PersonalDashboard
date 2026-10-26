@@ -221,6 +221,12 @@ export const LEARN_OPERATIONS = [
   // lesson"; plan #976). One Sonnet call per lesson, dropped or not. The claim
   // embedded to find its closest catalogue section goes under 'embed-lesson-claim'.
   'write-lesson',
+  // Writing the lesson for one level of a topic no plan piece teaches, such
+  // as the business pack's (plan #2546.5), when the session first reaches
+  // the level. One Sonnet call per topic level, dropped or not; the stored
+  // lesson is read every time after. Its catalogue search goes under
+  // 'embed-lesson-claim'.
+  'write-level-lesson',
   // Embedding a concept's claim to find the catalogue section a Learn now
   // lesson is checked against (plan #976). Kept apart from 'embed-claim',
   // which a press records, because the background top-up records this one.

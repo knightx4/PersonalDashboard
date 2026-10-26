@@ -7,6 +7,7 @@ import { loadDueReviews } from '@/lib/learn/lessons/review-store';
 import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { countAnswered, loadLensScope } from '@/lib/learn/levels/practice-store';
 import type { GradeMap } from '@/lib/learn/levels/grade';
+import { loadLevelLessonStates } from '@/lib/learn/levels/level-lesson-store';
 import { chooseNext, type ChooseNextInput, type NextItem, type SessionPiece, type SessionSubject } from './choose';
 
 /**
@@ -194,6 +195,13 @@ export async function loadSessionSubjects(learn: LearnSupabaseClient, userId: st
   }));
 }
 
+/** The cells a plan piece teaches (plan_pieces.cell_ids), which get no level lesson of their own. */
+async function loadTaughtCells(learn: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const { data, error } = await learn.from('plan_pieces').select('cell_ids').eq('user_id', userId);
+  if (error) throw new Error(`Reading which levels your plans teach failed: ${error.message}`);
+  return new Set(((data ?? []) as { cell_ids: string[] | null }[]).flatMap((row) => row.cell_ids ?? []));
+}
+
 /** Everything `chooseNext` reads, with the map kept whole so a question can be graded from it. */
 export type LoadedNextInput = ChooseNextInput & { map: GradeMap };
 
@@ -203,14 +211,16 @@ export async function loadChooseNextInput(
   options: { now?: Date; skip?: ReadonlySet<string> } = {},
 ): Promise<LoadedNextInput> {
   const now = options.now ?? new Date();
-  const [reviews, subjects, map, answered, lens] = await Promise.all([
+  const [reviews, subjects, map, answered, lens, levelLessons, taughtCells] = await Promise.all([
     loadDueReviews(learn, userId, { limit: REVIEWS_READ }, now),
     loadSessionSubjects(learn, userId),
     loadGradeMap(learn, userId),
     countAnswered(learn, userId),
     loadLensScope(learn, userId, null),
+    loadLevelLessonStates(learn, userId),
+    loadTaughtCells(learn, userId),
   ]);
-  return { reviews, subjects, map, answered, lensTargets: lens.targets, skip: options.skip, now };
+  return { reviews, subjects, map, answered, lensTargets: lens.targets, skip: options.skip, levelLessons, taughtCells, now };
 }
 
 /** The one thing to learn next for this person, or null when nothing is left. */
