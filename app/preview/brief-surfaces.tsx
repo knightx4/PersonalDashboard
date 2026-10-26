@@ -305,5 +305,5 @@ const summaries: BriefSummary[] = [
 ];
 
 export function LearnNowBriefsSurface() {
-  return <BriefsList briefs={summaries} />;
+  return <BriefsList briefs={summaries} defaultOpen />;
 }

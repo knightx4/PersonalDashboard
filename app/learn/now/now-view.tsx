@@ -4,11 +4,13 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SectionFold } from '@/components/ui/disclosure';
 import { MainRail } from '@/components/patterns/main-rail';
 import { PageColumn } from '@/components/shell/page-width';
 import { Skeleton, PageHeaderSkeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { practiceHref } from '@/lib/learn/flow/href';
+import type { StartLine } from '@/lib/learn/next/session';
 import type { WaitingLine } from '@/lib/learn/feed/waiting';
 
 /**
@@ -28,10 +30,15 @@ import type { WaitingLine } from '@/lib/learn/feed/waiting';
 /** A subject whose preparation has not finished, as the rail lists it. */
 export type PreparingRow = { subjectId: string; name: string; line: string };
 
+/** Where Start goes: the session, which plays one item after another (plan #2546.3). */
+export const START_HREF = '/learn/go';
+
 export function NowView({
   header,
+  start,
   today,
   hasPiece,
+  pieceTitle = null,
   prepared,
   preparing,
   waiting,
@@ -40,9 +47,13 @@ export function NowView({
   children = null,
 }: {
   header: ReactNode;
+  /** What Start opens with, or null when nothing is waiting or it could not be read. */
+  start: StartLine | null;
   /** Today's piece, as `PieceFirst` draws it, or nothing when there is none. */
   today: ReactNode;
   hasPiece: boolean;
+  /** The piece's title, on its shut fold. */
+  pieceTitle?: string | null;
   /** How many of your subjects are prepared. */
   prepared: number;
   preparing: readonly PreparingRow[];
@@ -57,9 +68,24 @@ export function NowView({
   const main = (
     <>
       {header}
-      {today}
+      {ready && <StartCard start={start} />}
       {ready ? (
-        <PracticePress prepared={prepared} lead={!hasPiece} />
+        <>
+          {hasPiece && (
+            <SectionFold title="Today’s piece" hint={pieceTitle} remember="learn.fold.piece" defaultOpen={false} className="mb-4">
+              {today}
+            </SectionFold>
+          )}
+          <SectionFold
+            title="Practice"
+            hint={`${prepared} ${prepared === 1 ? 'subject' : 'subjects'}`}
+            remember="learn.fold.practice"
+            defaultOpen={false}
+            className="mb-4"
+          >
+            <PracticePress />
+          </SectionFold>
+        </>
       ) : (
         <EmptyState
           icon={BookOpen}
@@ -103,32 +129,38 @@ export function NowView({
 }
 
 /**
- * The press to practise. It leads when there is no piece today, and follows
- * the piece quietly when there is one, so the page has one primary press.
+ * The one press the page leads with (plan #2546.4): Start opens the session
+ * on the item it names. Below the press, one line says what that item is,
+ * so the press is never a surprise. Nothing waiting still starts the
+ * session, which says what is next.
  */
-function PracticePress({ prepared, lead }: { prepared: number; lead: boolean }) {
+function StartCard({ start }: { start: StartLine | null }) {
   return (
     <Card padding="standard" className="mb-6">
-      {/* With no piece today the card says so, so a missing piece does not
-          read as one that failed to load. */}
-      {lead && <p className="mb-1 text-ui text-ink-muted">No piece is waiting today.</p>}
-      <h2 className="text-body font-semibold text-ink">
-        Practice
-        {prepared > 0 && (
-          <span className="font-normal text-ink-muted">
-            {' '}
-            · {prepared} {prepared === 1 ? 'subject' : 'subjects'}
-          </span>
-        )}
-      </h2>
-      <Link
-        href={practiceHref()}
-        className={cn(buttonVariants({ variant: lead ? 'primary' : 'secondary' }), 'mt-3')}
-      >
-        Start practising
+      <Link href={START_HREF} className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'w-full sm:w-auto')}>
+        Start
         <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
       </Link>
+      {start ? (
+        <p className="mt-3 text-body text-ink [overflow-wrap:anywhere]">
+          <span className="text-ink-muted">{start.word} · </span>
+          <span className="font-medium">{start.title}</span>
+          <span className="block text-small text-ink-muted">{start.place}</span>
+        </p>
+      ) : (
+        <p className="mt-3 text-ui text-ink-muted">Nothing is due right now. Start opens the session, which says what comes next.</p>
+      )}
     </Card>
+  );
+}
+
+/** The press to practise across your prepared subjects, under its fold. */
+function PracticePress() {
+  return (
+    <Link href={practiceHref()} className={buttonVariants({ variant: 'secondary' })}>
+      Start practising
+      <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+    </Link>
   );
 }
 

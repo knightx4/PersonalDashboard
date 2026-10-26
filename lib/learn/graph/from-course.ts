@@ -228,7 +228,7 @@ export async function conceptsFromCourse(input: {
             type: 'object',
             properties: {
               subject: { type: 'string' },
-              goal_concept: { type: 'string' },
+              goal_concept: { type: 'string', description: 'A short concept name of a few words, never a sentence.' },
               too_vague: { type: 'boolean' },
               concepts: {
                 type: 'array',

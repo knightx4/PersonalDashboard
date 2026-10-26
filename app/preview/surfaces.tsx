@@ -2,6 +2,7 @@ import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { GuessedAlready } from './lesson-predict-seed';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
+import { LearnGoSurface } from './learn-go-surfaces';
 import { FigureQuestionPreview } from './figure-question-surface';
 import {
   GoalMetricsEmptySurface,
@@ -490,6 +491,7 @@ import {
   NowPageEmptySurface,
   NowPageLoadingSurface,
   NowPagePracticeSurface,
+  NowPageQuietSurface,
   NowPageSurface,
 } from './learn-now-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
@@ -7436,6 +7438,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <NowPagePracticeSurface />,
   },
   {
+    id: 'learn-now-page-quiet',
+    label: 'Now · Nothing waiting to start',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageQuietSurface />,
+  },
+  {
     id: 'learn-now-page-empty',
     label: 'Now · No prepared subject yet',
     module: 'learn',
@@ -7671,6 +7680,96 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <CellAnswerPreview state="asked" openWhy />,
+  },
+  {
+    /* A learning session (plan #2546.3): one item at a time, each the one the
+     * chooser picks, with Stop and Next held above the tab bar. Next brings the
+     * check written while the lesson was on screen. */
+    id: 'learn-go',
+    label: 'Session · A lesson, then Next',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="lesson" />,
+  },
+  {
+    /* A topic level's lesson before its first question (plan #2546.5), drawn
+     * by the piece page's lesson card. */
+    id: 'learn-go-level-lesson',
+    label: 'Session · A topic level’s lesson',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="level-lesson" />,
+  },
+  {
+    /* The piece's check in a session, drawn by the piece page's own card. */
+    id: 'learn-go-check',
+    label: 'Session · A piece’s check',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="check" />,
+  },
+  {
+    /* A level question in a session, drawn by Practice's answer screen with
+     * Stop where End run sits. */
+    id: 'learn-go-question',
+    label: 'Session · A level question',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnGoSurface state="question" />,
+  },
+  {
+    /* A review due in a session, its question already written. */
+    id: 'learn-go-review',
+    label: 'Session · A review due',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="review" />,
+  },
+  {
+    /* The piece's practice task in a session. */
+    id: 'learn-go-task',
+    label: 'Session · A piece’s practice task',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="task" />,
+  },
+  {
+    /* Hidden part: Next pressed before the next item was written. */
+    id: 'learn-go-loading',
+    label: 'Session · The next item being written',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnGoSurface state="loading" />,
+  },
+  {
+    /* Hidden part: Stop, with what the session went through and what moved. */
+    id: 'learn-go-end',
+    label: 'Session · The end, on Stop',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnGoSurface state="end" />,
+  },
+  {
+    /* Hidden part: an item whose writing failed; Next goes on past it. */
+    id: 'learn-go-failed',
+    label: 'Session · An item that could not be written',
+    module: 'learn',
+    width: 'narrow',
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => <LearnGoSurface state="failed" />,
+  },
+  {
+    /* Hidden part: no review due, no subject with pieces and no approved topic. */
+    id: 'learn-go-empty',
+    label: 'Session · Nothing to learn yet',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnGoSurface state="empty" />,
   },
   {
     /* The end of a run: every level that moved while it lasted. */

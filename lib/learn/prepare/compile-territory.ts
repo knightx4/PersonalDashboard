@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { GOAL_KIND_LABELS, isGoalKind } from '@/lib/learn/goal-kind';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MAX_ITEMS_PER_SOURCE, MAX_PERFORMANCES, MAX_SOURCES } from '@/lib/learn/levels/draft-sources';
 import { documentLabel, independenceKey, unitLine } from '@/lib/learn/levels/stored-sources';
 import {
@@ -260,6 +260,22 @@ function tool(frames: readonly string[]) {
   };
 }
 
+/**
+ * A list the model reported. Sonnet sometimes sends an array-valued field as
+ * its JSON text rather than as an array, and a reader that only takes an
+ * array saw "no topics" in a full report (plan #2546.1).
+ */
+function asList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 const tidy = (value: unknown): string => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '');
 
 /**
@@ -288,7 +304,7 @@ export function readCompiled(
   const seen = new Set<string>((input.branch?.asks ?? []).map((a) => a.trim().toLowerCase()));
   const [, max] = topicRange(input.branch);
   const topics: TerritoryTopic[] = [];
-  for (const entry of Array.isArray(report.topics) ? report.topics : []) {
+  for (const entry of asList(report.topics)) {
     const t = (entry ?? {}) as Record<string, unknown>;
     const ask = tidy(t.ask);
     const frame = frameOf.get(tidy(t.frame).toLowerCase());
@@ -297,7 +313,7 @@ export function readCompiled(
       continue;
     }
     seen.add(ask.toLowerCase());
-    const cites = Array.isArray(t.cites) ? t.cites.filter((c): c is string => typeof c === 'string') : [];
+    const cites = asList(t.cites).filter((c): c is string => typeof c === 'string');
     const from: string[] = [];
     for (const cite of cites) {
       const line = lineOf(cite);
@@ -308,7 +324,7 @@ export function readCompiled(
     topics.push({ ask, scope: tidy(t.scope) || ask, frame, target, from, canonicality: canonicalityFrom(from, texts) });
   }
 
-  const performances = (Array.isArray(report.performances) ? report.performances : [])
+  const performances = asList(report.performances)
     .map(tidy)
     .filter((p) => p !== '')
     .slice(0, MAX_PERFORMANCES);
@@ -344,7 +360,7 @@ export async function compileTerritory(input: CompileInput & {
   try {
     response = await client.messages.create({
       model: TERRITORY_COMPILE_MODEL,
-      max_tokens: 16_000,
+      max_tokens: 16_000 + THINKING_ROOM,
       system: systemFor(input.branch),
       tools: [tool(input.frames)],
       tool_choice: forceTool(TOOL_NAME, TERRITORY_COMPILE_MODEL),
@@ -361,7 +377,17 @@ export async function compileTerritory(input: CompileInput & {
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
   const read = readCompiled(block.input, input, texts);
-  if (read.territory.topics.length === 0) return { ok: false, detail: 'The call reported no topics.' };
+  if (read.territory.topics.length === 0) {
+    // Say what the reply was, so a retry that fails the same way can be read from the run.
+    const sent = asList((block.input as { topics?: unknown } | null)?.topics).length;
+    const why =
+      response.stop_reason === 'max_tokens'
+        ? 'the reply was cut off before the topics were finished'
+        : sent === 0
+          ? 'the report held no topics'
+          : `${sent} topics were reported and none named a frame topic that was offered`;
+    return { ok: false, detail: `The call reported no topics: ${why}.` };
+  }
   return { ok: true, ...read };
 }
 

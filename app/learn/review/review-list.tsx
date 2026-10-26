@@ -93,7 +93,19 @@ export function ReviewList({
   );
 }
 
-function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean }) {
+export function ReviewRow({
+  review,
+  showPlan,
+  onAnswered,
+  foldReasoning = false,
+}: {
+  review: DueReview;
+  showPlan: boolean;
+  /** The box for how you got there opens on a press, as in a learning session (law 14). */
+  foldReasoning?: boolean;
+  /** Told once an answer is marked, for a learning session's forward press (plan #2546.3). */
+  onAnswered?: () => void;
+}) {
   const [question, setQuestion] = useState<ReviewQuestion | null>(review.open);
   const [nextInDays, setNextInDays] = useState<number | null>(null);
   // A question left with its hint up opens on it, with the first try in the box (plan #2522.7).
@@ -129,6 +141,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
         // A first miss comes back open with its hint: the first try stays in the box.
         if (result.question.hint) setResponse(result.question.hint.response);
         if (result.nextInDays !== undefined) setNextInDays(result.nextInDays);
+        if (result.question.correct !== null) onAnswered?.();
       } else setError(result.error ?? 'Could not mark that.');
     });
 
@@ -143,6 +156,7 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
       if (result.question) {
         setQuestion(result.question);
         if (result.nextInDays !== undefined) setNextInDays(result.nextInDays);
+        if (result.question.correct !== null) onAnswered?.();
       } else setError(result.error ?? 'Could not show the answer.');
     });
 
@@ -221,7 +235,14 @@ function ReviewRow({ review, showPlan }: { review: DueReview; showPlan: boolean 
               disabled={marking}
             />
           </Field>
-          <HowSureInput key={question.id} id={question.id} kind="written" onChange={setHowSure} disabled={marking} className="mt-3" />
+          <HowSureInput
+            key={question.id}
+            id={question.id}
+            kind={foldReasoning ? 'choice' : 'written'}
+            onChange={setHowSure}
+            disabled={marking}
+            className="mt-3"
+          />
           <DashAction
             type="button"
             variant="primary"

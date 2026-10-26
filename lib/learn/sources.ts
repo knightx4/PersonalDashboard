@@ -317,6 +317,10 @@ export const learnSources: ModuleSources = {
     { table: 'learn.topic_cells', reason: 'One level of a topic and what meeting it looks like; read through topics.' },
     { table: 'learn.cell_links', reason: 'Which levels of one topic need which levels of another; structure, read through topics.' },
     { table: 'learn.cell_claims', reason: 'Join rows attaching concepts and vault positions to a level of a topic.' },
+    {
+      table: 'learn.level_lessons',
+      reason: 'The lesson Dash wrote for one level of a topic, kept so it is written once; what they showed they know is in cell_evidence.',
+    },
     { table: 'learn.lens_offer_declines', reason: 'Bookkeeping: the vault themes whose offer of a lens they said no to, so it is not made again.' },
     { table: 'learn.lens_targets', reason: 'The topics and target levels of a lens; read through lenses.' },
     { table: 'learn.link_reviews', reason: 'Bookkeeping for links put in doubt by disagreeing answers.' },
