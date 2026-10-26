@@ -2,8 +2,10 @@
  * Name someone for each application that went in lately, every day, so the
  * note is waiting without a press (designate.ts).
  *
- * Applications sent in the last fortnight with nobody named, and not looked
- * at in the last week, newest first. Someone on file costs only the draft;
+ * Applications sent in the last RECENT_DAYS with nobody named, and not
+ * looked at in the last week, newest first. Most applications carry no
+ * submitted_at (the confirmation mail sets the status, not the date), so one
+ * without it counts from when its row was made. Someone on file costs only the draft;
  * a web search for the hiring manager is the costly part, so at most
  * SEARCHES_PER_DAY run, and only while the run has time left for one.
  */
@@ -16,7 +18,7 @@ import { APPLIED_STATUSES } from './load';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How far back an application still counts as just sent. */
-const RECENT_DAYS = 14;
+const RECENT_DAYS = 15;
 /** How long after a look that found nobody before looking again. */
 const RETRY_DAYS = 7;
 /** Applications worked a day, each a draft. */
@@ -34,21 +36,18 @@ export async function followUpRecentApplications(
 ): Promise<DailyFollowUps> {
   const out: DailyFollowUps = { named: 0, searchSpend: [], draftSpend: [], errors: [] };
   const since = new Date(options.now.getTime() - RECENT_DAYS * DAY_MS).toISOString();
-  const retryBefore = new Date(options.now.getTime() - RETRY_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('applications')
-    .select('id')
+    .select('id, submitted_at, created_at, follow_up_tried_at')
     .eq('user_id', userId)
     .in('status', [...APPLIED_STATUSES])
     .is('follow_up_contact_id', null)
-    .gte('submitted_at', since)
-    .or(`follow_up_tried_at.is.null,follow_up_tried_at.lt.${retryBefore}`)
-    .order('submitted_at', { ascending: false })
-    .limit(PER_DAY);
+    .or(`submitted_at.gte.${since},and(submitted_at.is.null,created_at.gte.${since})`);
   if (error) return { ...out, errors: [error.message] };
+  const due = dueForFollowUp((data ?? []) as SentRow[], options.now);
 
   let searches = SEARCHES_PER_DAY;
-  for (const { id } of (data ?? []) as { id: string }[]) {
+  for (const id of due) {
     const allowSearch = searches > 0 && options.deadline - Date.now() > SEARCH_ROOM_MS;
     const result = await designateFollowUp(supabase, userId, id, {
       apiKey: options.apiKey,
@@ -67,4 +66,23 @@ export async function followUpRecentApplications(
     if (Date.now() > options.deadline) break;
   }
   return out;
+}
+
+type SentRow = { id: string; submitted_at: string | null; created_at: string; follow_up_tried_at: string | null };
+
+/**
+ * The applications to work today, newest sent first: sent (or, with no sent
+ * date, made) in the last RECENT_DAYS, and not looked at in the last
+ * RETRY_DAYS. At most PER_DAY.
+ */
+export function dueForFollowUp(rows: readonly SentRow[], now: Date): string[] {
+  const since = now.getTime() - RECENT_DAYS * DAY_MS;
+  const retryBefore = now.getTime() - RETRY_DAYS * DAY_MS;
+  const sent = (row: SentRow) => Date.parse(row.submitted_at ?? row.created_at);
+  return rows
+    .filter((row) => sent(row) >= since)
+    .filter((row) => row.follow_up_tried_at === null || Date.parse(row.follow_up_tried_at) < retryBefore)
+    .sort((a, b) => sent(b) - sent(a))
+    .slice(0, PER_DAY)
+    .map((row) => row.id);
 }

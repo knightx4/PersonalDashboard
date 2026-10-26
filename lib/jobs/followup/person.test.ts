@@ -48,6 +48,10 @@ describe('who an application is followed up with', () => {
     expect(pick([contact('c'), contact('l', { linkedinConnection: true })])?.contactId).toBe('l');
   });
 
+  it('puts a fellow alum before a second-degree connection', () => {
+    expect(pick([contact('s', { relationship: 'second_degree', title: 'Manager' }), contact('a', { relationship: 'alum' })])?.contactId).toBe('a');
+  });
+
   it('within a tier, prefers someone whose title says they hire', () => {
     const chosen = pick([contact('a', { title: 'Analyst' }), contact('b', { title: 'Head of Finance' })]);
     expect(chosen?.contactId).toBe('b');

@@ -5,8 +5,9 @@
  * note drafted to them (designate.ts). Someone already on file beats a
  * stranger found on the web, so this is tried first and costs nothing: the
  * person who referred them, then the recruiter who wrote about this
- * application, then someone they know at the company, then a LinkedIn
- * connection there, then anyone else on file at it. Only when this finds
+ * application, then someone they know at the company (a friend or former
+ * colleague, then a fellow alum, then a second-degree connection), then a
+ * LinkedIn connection there, then anyone else on file at it. Only when this finds
  * nobody does Dash search the web for the hiring manager (find-person.ts).
  *
  * Pure, so the order can be tested and read in one place.
@@ -35,10 +36,11 @@ function tier(contact: FileContact, referralId: string | null, correspondent: st
   if (correspondent && contact.email?.toLowerCase() === correspondent) return 1;
   if (contact.status === 'dormant') return null;
   if (contact.relationship === 'friend' || contact.relationship === 'former_colleague') return 2;
-  if (contact.relationship === 'alum' || contact.relationship === 'second_degree') return 3;
-  if (contact.linkedinConnection) return 4;
-  if (contact.relationship === 'recruiter') return 5;
-  return 6;
+  if (contact.relationship === 'alum') return 3;
+  if (contact.relationship === 'second_degree') return 4;
+  if (contact.linkedinConnection) return 5;
+  if (contact.relationship === 'recruiter') return 6;
+  return 7;
 }
 
 function whyFor(contact: FileContact, rank: number, company: string): string {
@@ -50,10 +52,12 @@ function whyFor(contact: FileContact, rank: number, company: string): string {
     case 2:
       return `You know ${contact.fullName} (${contact.relationship.replace(/_/g, ' ')}) and they work at ${company}.`;
     case 3:
-      return `${contact.fullName} is ${contact.relationship === 'alum' ? 'a fellow alum' : 'a second-degree connection'} at ${company}.`;
+      return `${contact.fullName} is a fellow alum at ${company}.`;
     case 4:
-      return `${contact.fullName} is one of your LinkedIn connections at ${company}.`;
+      return `${contact.fullName} is a second-degree connection at ${company}.`;
     case 5:
+      return `${contact.fullName} is one of your LinkedIn connections at ${company}.`;
+    case 6:
       return `${contact.fullName} recruits at ${company}.`;
     default:
       return `${contact.fullName} is on your contacts at ${company}${contact.title ? ` as ${contact.title}` : ''}.`;
