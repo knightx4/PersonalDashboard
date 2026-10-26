@@ -622,3 +622,24 @@ describe('what the note extractor must say about each concept', () => {
     expect(isConcreteCost(full.cost_if_wrong)).toBe(true);
   });
 });
+
+describe('a goal concept over the length limit', () => {
+  const long = Array.from({ length: 60 }, (_, i) => `word${i}`).join(' ');
+
+  it('is cut at a word boundary instead of refused', () => {
+    const payload = parse({ subject: 'Economics', goal_concept: long, concepts: [node('A')], edges: [] });
+    expect(payload.goal_concept.length).toBeLessThanOrEqual(200);
+    expect(long.startsWith(payload.goal_concept)).toBe(true);
+    expect(long.charAt(payload.goal_concept.length)).toBe(' ');
+  });
+
+  it('is cut the same way when a note yields it', () => {
+    const payload = noteChainPayloadSchema.parse({ subject: 'Economics', goal_concept: long, concepts: [] });
+    expect(payload.goal_concept.length).toBeLessThanOrEqual(200);
+  });
+
+  it('cuts a single unbroken word at the limit', () => {
+    const payload = parse({ subject: 'Economics', goal_concept: 'x'.repeat(300), concepts: [], edges: [] });
+    expect(payload.goal_concept).toHaveLength(200);
+  });
+});

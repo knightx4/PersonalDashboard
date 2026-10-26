@@ -78,6 +78,21 @@ export function placeKind(value: unknown): ConceptKind | null {
 
 export const kindSchema = z.unknown().optional().transform(placeKind);
 
+export const GOAL_CONCEPT_MAX = 200;
+
+/**
+ * An over-long goal concept cut at a word boundary, not refused. The name only
+ * has to match a proposed concept or become a label, and a writer that gave a
+ * sentence would otherwise fail the whole run on its length (plan #2546.1).
+ */
+export function cutAtWord(text: string, max: number): string {
+  const clean = text.trim();
+  if (clean.length <= max) return clean;
+  const head = clean.slice(0, max);
+  const space = head.search(/\s\S*$/);
+  return (space > 0 ? head.slice(0, space) : head).trim();
+}
+
 export const proposedConceptSchema = z.object({
   /** Short, for the graph view. */
   name: z.string().trim().min(1).max(200),
@@ -120,7 +135,7 @@ export const chainPayloadSchema = z.object({
   /** Which subject this belongs in, in the model's judgement. */
   subject: z.string().trim().min(1).max(200),
   /** The node the goal itself resolves to, by name. */
-  goal_concept: z.string().trim().min(1).max(200),
+  goal_concept: z.string().trim().min(1).transform((v) => cutAtWord(v, GOAL_CONCEPT_MAX)),
   concepts: z.array(proposedConceptSchema).max(40).default([]),
   edges: z.array(proposedEdgeSchema).max(80).default([]),
   /** Empty for every caller that does not ask for them. */
@@ -167,7 +182,7 @@ export const noteConceptSchema = proposedConceptSchema.extend({
  * concept is optional here and an empty list is a complete answer.
  */
 export const noteChainPayloadSchema = chainPayloadSchema.extend({
-  goal_concept: z.string().trim().max(200).default(''),
+  goal_concept: z.string().trim().default('').transform((v) => cutAtWord(v, GOAL_CONCEPT_MAX)),
   concepts: z.array(noteConceptSchema).max(40).default([]),
 });
 
