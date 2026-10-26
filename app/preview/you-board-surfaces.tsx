@@ -252,27 +252,32 @@ const calledMinutes = parseMinutes({
       positions: [
         {
           seat: 'hiring_manager',
-          text: 'Vote: take it. A finance-adjacent title on the résumé by February answers the question every screen asks. It would change if the firm will not put analytics or finance in the title.',
+          stance: 'Take it',
+          text: 'A finance-adjacent title on the résumé by February answers the question every screen asks. It would change if the firm will not put analytics or finance in the title.',
           receipts: [{ label: 'the contract role', link: '/jobs/roles' }],
         },
         {
           seat: 'mentor',
-          text: 'Vote: take it, with the search kept at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
+          stance: 'Take it, keep applying',
+          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
           receipts: [],
         },
         {
           seat: 'skeptic',
-          text: 'Vote: keep searching. You asked this question after two replies, and a contract is also a way to stop looking. It would change if you could name the application you would send in month two.',
+          stance: 'Keep searching',
+          text: 'You asked this question after two replies, and a contract is also a way to stop looking. It would change if you could name the application you would send in month two.',
           receipts: [],
         },
         {
           seat: 'cfo',
-          text: 'Vote: take it. Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
+          stance: 'Take it',
+          text: 'Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
           receipts: [{ label: 'Recurring', link: '/shopping/recurring' }],
         },
         {
           seat: 'dreamer',
-          text: 'Vote: keep searching, only if the song stays on the table either way. It would change if the contract allowed one free morning a week.',
+          stance: 'Keep searching, with the song kept',
+          text: 'The song stays on the table either way. It would change if the contract allowed one free morning a week.',
           receipts: [{ label: 'Personal goals', link: '/vault/n/Me/Personal%20Goals.md' }],
         },
       ],

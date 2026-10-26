@@ -9425,6 +9425,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-board-call-error',
+    label: 'You · Board, the decision line with a failed start',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview start="error" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-call-running',
     label: 'You · Board, pressing Call a meeting while one runs',
     module: 'you',

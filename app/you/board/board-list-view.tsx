@@ -49,7 +49,7 @@ export function BoardListView({
   const running = states.some((state) => state.kind === 'running');
   useRefreshWhileRunning(running);
   const call = useCallMeeting({ running, actions, start });
-  const when = `The board meets every Sunday at 6:41pm. The next meeting is ${meetingDayLabel(nextMeeting)}.`;
+  const when = `The board meets every Sunday at 6:41 PM. The next meeting is ${meetingDayLabel(nextMeeting)}.`;
   const header = <PageHeader title="Board" actions={call.button} />;
 
   if (meetings.length === 0) {
@@ -70,7 +70,7 @@ export function BoardListView({
     <ListPage
       header={header}
       tools={call.form}
-      foot={`${meetings.length} ${meetings.length === 1 ? 'meeting' : 'meetings'} · next ${meetingDayLabel(nextMeeting)}, 6:41pm`}
+      foot={`${meetings.length} ${meetings.length === 1 ? 'meeting' : 'meetings'} · next ${meetingDayLabel(nextMeeting)}, 6:41 PM`}
     >
       {meetings.map((meeting, index) => {
         const state = states[index];

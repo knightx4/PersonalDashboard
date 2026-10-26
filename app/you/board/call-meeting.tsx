@@ -5,7 +5,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
-import { FieldError, FieldHint, Input, Label } from '@/components/ui/field';
+import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { DECISION_MAX, MEETING_RUNNING_MESSAGE } from '@/lib/you/board';
 
 /**
@@ -22,7 +22,7 @@ import { DECISION_MAX, MEETING_RUNNING_MESSAGE } from '@/lib/you/board';
 export type CallActions = { call: (decision: string) => Promise<{ error: string | null }> };
 
 /** How the press starts: closed, or already showing the line or the running notice (the gallery draws both). */
-export type CallStart = 'closed' | 'form' | 'running';
+export type CallStart = 'closed' | 'form' | 'error' | 'running';
 
 export function useCallMeeting({
   running,
@@ -33,9 +33,15 @@ export function useCallMeeting({
   actions: CallActions;
   start?: CallStart;
 }) {
-  const [open, setOpen] = useState(start === 'form');
-  const [decision, setDecision] = useState(start === 'form' ? 'Should I take the three-month contract, or keep the search full time?' : '');
-  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(start === 'form' || start === 'error');
+  const [decision, setDecision] = useState(
+    start === 'form' || start === 'error'
+      ? 'Should I take the three-month contract at the analytics firm, or keep the search full time and wait for a finance role?'
+      : '',
+  );
+  const [error, setError] = useState<string | null>(
+    start === 'error' ? 'Dash could not start the meeting. The board routine answered 529, overloaded. Try again in a minute.' : null,
+  );
   const [notice, setNotice] = useState<string | null>(start === 'running' ? MEETING_RUNNING_MESSAGE : null);
   const [starting, startTransition] = useTransition();
 
@@ -63,18 +69,15 @@ export function useCallMeeting({
     });
 
   const button = (
-    <DashAction
+    <Button
       type="button"
       variant="secondary"
       onClick={press}
-      routine="board"
-      what="Cost of calling a meeting"
-      align="end"
       aria-expanded={open}
       aria-controls="call-meeting"
     >
       Call a meeting
-    </DashAction>
+    </Button>
   );
 
   const form = open ? (
@@ -123,25 +126,39 @@ export function CallMeetingForm({
       >
         <div>
           <Label htmlFor="call-meeting-decision">The decision</Label>
-          <Input
+          <Textarea
             id="call-meeting-decision"
             value={decision}
             maxLength={DECISION_MAX}
             placeholder="Take the Austin offer, or keep looking in Chicago?"
+            rows={2}
             autoFocus
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (!blank && !starting) onSubmit();
+              }
+            }}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? 'call-meeting-error' : 'call-meeting-hint'}
             onChange={(event) => onDecision(event.target.value)}
           />
           <FieldHint id="call-meeting-hint">
-            Each seat votes on it and says what would change its mind. The minutes appear here in a few minutes.
+            Each seat votes on it and says what would change its mind. The minutes appear here shortly.
           </FieldHint>
           <FieldError id="call-meeting-error">{error}</FieldError>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" disabled={blank || starting}>
+          <DashAction
+            type="submit"
+            pending={starting}
+            disabled={blank || starting}
+            routine="board"
+            what="Cost of calling a meeting"
+            align="start"
+          >
             {starting ? 'Calling…' : 'Start the meeting'}
-          </Button>
+          </DashAction>
           <Button type="button" variant="ghost" onClick={onCancel} disabled={starting}>
             Cancel
           </Button>

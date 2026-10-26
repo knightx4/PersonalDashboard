@@ -239,17 +239,14 @@ export function MeetingView({
       header={<PageHeader title={title} subject={subject} />}
       details={details}
       text={
-        minutes.since || meeting.decision ? (
+        minutes.since ? (
           <section aria-labelledby="board-since" className="space-y-2">
             <SectionHeading
               id="board-since"
-              title={meeting.kind === 'called' ? 'The decision' : 'Since last week'}
+              title={meeting.kind === 'called' ? 'Background' : 'Since last week'}
             />
             <Card padding="standard" className="space-y-2">
-              {meeting.kind === 'called' && meeting.decision && (
-                <p className="text-body font-medium text-ink">{meeting.decision}</p>
-              )}
-              {minutes.since && <Prose markdown={minutes.since} />}
+              <Prose markdown={minutes.since} />
             </Card>
           </section>
         ) : undefined
@@ -266,6 +263,7 @@ export function MeetingView({
             <DisagreementCard
               key={disagreement.key ?? index}
               disagreement={disagreement}
+              called={meeting.kind === 'called'}
               mark={markOf('vote', disagreement.key)}
               onVote={async (value, note) => {
                 const result = await actions.vote(meeting.id, disagreement.key!, value, note);
@@ -512,10 +510,13 @@ function Evidence({
  */
 function DisagreementCard({
   disagreement,
+  called,
   mark,
   onVote,
 }: {
   disagreement: BoardDisagreement;
+  /** A called meeting: the decision is the page's title, and each seat's stance is its vote. */
+  called: boolean;
   mark: BoardMark | undefined;
   onVote: (value: VoteValue, note: string | null) => Promise<BoardMarkResult>;
 }) {
@@ -547,19 +548,29 @@ function DisagreementCard({
 
   return (
     <Card padding="standard" className="space-y-4" data-board-disagreement>
-      <div className="space-y-1">
-        <h3 className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
-          {disagreement.point}
-        </h3>
-        {disagreement.note && <p className="text-ui text-ink-muted">{disagreement.note}</p>}
-      </div>
+      {(!called || disagreement.note) && (
+        <div className="space-y-1">
+          {!called && (
+            <h3 className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
+              {disagreement.point}
+            </h3>
+          )}
+          {disagreement.note && <p className="text-ui text-ink-muted">{disagreement.note}</p>}
+        </div>
+      )}
       <ul className="space-y-4">
         {disagreement.positions.map((position, index) => (
           <li key={index} className="space-y-1">
-            <p className="text-small font-medium text-ink-muted">
-              {SEAT_LABELS[position.seat]}
-              {position.stance && <span className="font-normal">, {position.stance}</span>}
-            </p>
+            {called && position.stance ? (
+              <p className="text-body font-semibold text-ink">
+                {SEAT_LABELS[position.seat]} · {position.stance}
+              </p>
+            ) : (
+              <p className="text-small font-medium text-ink-muted">
+                {SEAT_LABELS[position.seat]}
+                {position.stance && <span className="font-normal">, {position.stance}</span>}
+              </p>
+            )}
             <Prose markdown={position.text} />
             <Evidence receipts={position.receipts} written={[position.text]} />
           </li>

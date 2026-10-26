@@ -321,8 +321,10 @@ its step 4 rebuttal. Do not write vote or answer lines: the person marks
 those on the tab.
 
 For a called meeting, `disagreements` holds one entry whose `point` is the
-decision, with one position per seat: its vote on the decision and, in the
-same text, what would change it. The other keys are as above.
+decision, with one position per seat. The position's `stance` is the seat's
+vote in a few words ("Take it", "Keep searching"), which the tab shows beside
+the seat's name, and its `text` is what the vote rests on and, last, what
+would change it. The other keys are as above.
 
 Link evidence where it opens in the app: a note at
 `/vault/n/<path, each segment URL-encoded>`, a role at `/jobs/roles/<id>`,

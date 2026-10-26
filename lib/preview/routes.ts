@@ -423,6 +423,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-board-running': ['/you/board'],
   'you-board-loading': ['/you/board'],
   'you-board-call': ['/you/board'],
+  'you-board-call-error': ['/you/board'],
   'you-board-call-running': ['/you/board'],
   'you-board-meeting-called': ['/you/board/[id]'],
   'you-board-meeting': ['/you/board/[id]'],
