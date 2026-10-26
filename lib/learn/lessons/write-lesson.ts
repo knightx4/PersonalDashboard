@@ -81,6 +81,21 @@ export type LessonToWrite = {
   source: LessonSource | null;
   /** Stored figures of the source's course that may be shown (plan #2321.4); the only ones a source_figure may name. */
   sourceFigures?: OfferedFigure[];
+  /**
+   * Set when the lesson teaches one level of a topic rather than one idea
+   * (plan #2546.5). The concept's claim is then the level in a sentence and
+   * its mastery the level's checks, and `trackName` is the topic.
+   */
+  level?: LessonLevel | null;
+};
+
+/** The topic level a level lesson teaches. */
+export type LessonLevel = {
+  level: number;
+  /** What someone at this level can do, from the ladder. */
+  can: string;
+  /** What the topic covers, when it says. */
+  scope: string | null;
 };
 
 /** The source a lesson used, as the row stores it. */
@@ -321,8 +336,15 @@ export function lessonPrompt(lesson: LessonToWrite): string {
   const text = source?.text.trim() ?? '';
   const cut = text.length > MAX_SOURCE_CHARS;
 
+  const level = lesson.level ?? null;
+  const scope = level?.scope ? clean(level.scope) : '';
   return [
-    `Track: ${clean(lesson.trackName)}`,
+    level ? `Topic: ${clean(lesson.trackName)}` + (scope ? `. It covers: ${scope}` : '') : `Track: ${clean(lesson.trackName)}`,
+    level
+      ? `This lesson teaches level ${level.level} of 10 on the topic, where someone can ${clean(level.can)}. ` +
+        'It is a level rather than one idea: the claim below says the level in a sentence and the checks say what meeting it looks like. ' +
+        'Teach what the checks need, at this depth and no deeper, and count the claim as teachable when the checks are.'
+      : '',
     unit,
     '',
     `Concept: ${clean(concept.name)}`,

@@ -154,6 +154,7 @@ describe('RLS coverage', () => {
       'lens_offer_declines',
       'lens_targets',
       'lenses',
+      'level_lessons',
       'link_reviews',
       'move_reviews',
       'next_outcomes',

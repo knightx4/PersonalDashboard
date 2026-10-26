@@ -204,6 +204,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-feed-ideas': background(unit(VOYAGE_LITE, 1_500, 0)),
   // One call per lesson: the concept, its checks, and at most one catalogue section.
   'write-lesson': background(unit(SONNET, 3_500, 1_200)),
+  // Written while the session waits on it, once per topic level.
+  'write-level-lesson': run(SONNET, 3_500, 1_200),
   'embed-lesson-claim': background(unit(VOYAGE_LITE, 100, 0)),
   'embed-figure-need': background(unit(VOYAGE_LITE, 60, 0)),
   'write-figure-backfill': background(unit(SONNET, 3_000, 600)),
