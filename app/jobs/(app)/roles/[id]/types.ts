@@ -8,6 +8,7 @@ import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { StoredAsk } from '@/lib/jobs/drafting/store';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import type { FollowUp, OutreachSend } from '@/lib/jobs/followup/load';
+import type { RoleResearch } from './research-line';
 
 /** Everything the role page hands its tabs, loaded once by page.tsx. */
 export interface PanelProps {
@@ -152,6 +153,8 @@ export interface PanelProps {
     gmailHref: string | null;
   }>;
   companyName: string;
+  /** Whether the company research routine has run, for the Application tab. Absent in the gallery means not shown. */
+  research?: RoleResearch;
   /** Unlinked mail mentioning the company, offered to approve or wave off. */
   matchCandidates: Array<{
     id: string;
