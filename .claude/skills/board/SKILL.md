@@ -1,6 +1,6 @@
 ---
 name: board
-description: Hold the person's weekly board meeting. Five advisors (the hiring manager, the mentor, the skeptic, the CFO and the dreamer) each read the same pack of what the person did this week, write a memo alone, then rebut each other; the chair grades last week's predictions, reads the person's votes and answers from last week's minutes, and writes this week's minutes as a vault note through the Dash connector, with the disagreements, one question, at most three proposed resolutions, the dream on the table and each seat's prediction. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", or the user says "convene the board", "call a board meeting about <decision>", or "what does the board think".
+description: Hold the person's weekly board meeting. Five advisors (the hiring manager, the mentor, the skeptic, the CFO and the dreamer) each read the same pack of what the person did this week, write a memo alone, then rebut each other; the chair grades last week's predictions, reads the person's votes, answer and ticks from the last meeting's marks, and writes this week's minutes into its row in you.board_meetings for the Board tab in You, with the disagreements, one question, at most three proposed resolutions, the dream on the table and each seat's prediction. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", when the Board tab's call-a-meeting button fires it with "Board meeting <id>", or the user says "convene the board", "call a board meeting about <decision>", or "what does the board think".
 ---
 
 # The board
@@ -11,8 +11,8 @@ sounds reasonable. Five seats with different jobs pull in different
 directions, and the places they pull against each other are usually the
 decisions the person is putting off. The minutes lead with those.
 
-**You write one note and nothing else.** No rows, no code, no commits, no
-email, no posts, nothing deleted. The board proposes; the person decides.
+**You write one meeting row and nothing else.** No other rows, no code, no
+commits, no email, no posts, no vault note, nothing deleted. The board proposes; the person decides.
 Resolutions become todos or goal steps only when the person says so.
 
 In anything the person reads, the assistant is **Dash**; never write
@@ -81,49 +81,106 @@ they wrote to persuade someone, and `private` ones as what they think.
 Leave out relationships, health and family unless the person raised them in
 a vote or an answer.
 
-The minutes are written with the Dash connector's `write_vault_note`, loaded
-through ToolSearch. If node_modules is empty, run `npm ci` first.
+The one write is to your meeting's row in `you.board_meetings`, through
+`npx tsx scripts/sql.ts` and `core.record_dash_action` (step 6); the other
+tables are read only. If node_modules is empty, run `npm ci` first.
+
+## The brief
+
+The Board tab's button and the scheduled task fire the goals routine with:
+
+```
+Follow .claude/skills/board/SKILL.md
+Board meeting <meeting id>
+user_id <uuid>
+weekly | called: <the decision>
+```
+
+The scheduled task sends only "Follow .claude/skills/board/SKILL.md", with
+no meeting named. Then insert your own weekly row first, as the owner, and
+use its id:
+
+```sql
+insert into you.board_meetings (user_id, kind, status, started_at)
+values ('d001bb0f-ffe8-4bfb-880f-17dd1a62b685', 'weekly', 'running', now())
+returning id;
+```
+
+If it fails on `board_meetings_one_open`, a meeting is already queued or
+running: read it, and if it is `queued` take it as yours, otherwise stop and
+say so. Never start a second.
+
+With a meeting named, read its row (`id` and `user_id` both in the where). If
+it is missing, or `ready` or `failed`, stop: it has been handled. Otherwise
+mark it started, and take `kind` and `decision` from the row rather than the
+brief:
+
+```sql
+update you.board_meetings set status = 'running', started_at = now(), error = null
+where id = '<meeting id>' and user_id = '<user_id>';
+```
+
+If the run cannot finish (the pack cannot be read, the memos cannot be
+written), mark the row failed with a sentence the person can act on, and
+write nothing else:
+
+```sql
+update you.board_meetings
+set status = 'failed', finished_at = now(),
+    error = $e$Dash could not read your job search tables: the database timed out. Press Call a meeting again.$e$
+where id = '<meeting id>' and user_id = '<user_id>';
+```
 
 ## Checklist
 
-1. **Read the last minutes** and the person's votes and answers.
+1. **Read the last meetings** and the person's marks on them.
 2. **Build the week's pack**: one file every advisor reads.
 3. **Five memos**, one subagent per seat, sent in one message.
 4. **Cross-examination**: each seat rebuts one point of another's.
 5. **Chair**: grade the predictions, find the disagreements, filter hard.
-6. **Write the minutes** as a vault note and read it back.
+6. **Write the minutes** into the meeting row and read it back.
 
-## 1. Read the last minutes
+## 1. Read the last meetings
 
 ```sql
-select id, path, title, first_written_at, created_at, body
-from obsidian.notes
-where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and deleted_at is null
-  and title ilike 'Board meeting%'
-order by created_at desc limit 4;
+select id, kind, decision, held_on, minutes
+from you.board_meetings
+where user_id = '<user_id>' and status = 'ready' and id <> '<meeting id>'
+order by held_on desc, requested_at desc limit 4;
+
+select meeting_id, kind, item, value, note, todo_id, marked_at
+from you.board_marks
+where user_id = '<user_id>' and meeting_id in ('<the ids above>')
+order by marked_at;
 ```
 
-From the newest, take:
+Take the newest meeting's `minutes` (its `disagreements`, `question`,
+`resolutions`, `predictions` and `scorecard`) and its marks:
 
-- **Votes.** Under each disagreement is a line `Your vote:`. Whatever the
-  person wrote after it says which seat they sided with, or why neither.
-  A vote means the person already knows that point; do not raise it again
-  unless something new changes it.
-- **The answer** under `Your answer:` to last week's question. It opens
-  this meeting: the chair says what changes because of it.
-- **Resolutions.** Each one the person ticked (`- [x]`) or left open. A
-  resolution left open three meetings running goes on the agenda as its own
-  disagreement: why does it keep not happening?
-- **Predictions** and **the scorecard**, graded in step 5.
+- **Votes.** A `vote` mark names a disagreement by `item` (its key, `d1`)
+  and the seat the person sided with in `value`, or `neither`. A vote means
+  the person already knows that point; do not raise it again unless
+  something new changes it. A disagreement with no vote is still open.
+- **The answer.** The `answer` mark (`item = 'question'`) answers last
+  meeting's `question`. It opens this meeting: `since` says what changes
+  because of it.
+- **Resolutions.** A `resolution` mark has `value` `done` or `open`; a
+  resolution with no mark is open. `todo_id` is the todo the person made
+  from it. A resolution left open three meetings running goes on the agenda
+  as its own disagreement: why does it keep not happening? Count back
+  through the older meetings' `resolutions` and marks to find it.
+- **Predictions** and **the scorecard**, graded in step 5. The newest
+  meeting's `predictions` are the ones to grade, and its `scorecard` is
+  carried forward.
 
-The first meeting has none of this. Say so in one line of the minutes and
-start the scorecard at zero.
+No ready meeting, or none with a mark, means there is nothing to read of
+that kind. The first meeting has none of this. Say so in `since` and start
+the scorecard at zero.
 
-If the brief names a decision ("call a board meeting about <decision>"),
-this is a called meeting. Read the minutes the same way, then build the
-pack around that decision in step 2, and in step 6 replace the
-disagreements with each seat's vote on the decision and what would change
-it.
+If the meeting's `kind` is `called`, its `decision` is the decision named.
+Read the previous meetings the same way, then build the pack around that
+decision in step 2, and in step 6 replace the disagreements with each
+seat's vote on the decision and what would change it.
 
 ## 2. Build the week's pack
 
@@ -229,56 +286,63 @@ in the minutes only if you re-ran its query in this meeting.
 
 ## 6. Write the minutes
 
-Write the note with `write_vault_note`, title `Board meeting <d Mon yyyy>`
-(`Board meeting 1 Nov 2026`). It lands in the vault's Inbox, where the
-person can file it. The body, in this order:
+Write the minutes as one jsonb object into your meeting's row. Write the
+statement to a file in your scratchpad and send it with `--file`, so quotes
+need no escaping. `held_on` is today's date. The object:
 
-```markdown
-## Since last week
-<What the person's answer and votes change, in two or three lines; or that this is the first meeting.>
-
-## Where the board disagrees
-### <the point, as a plain sentence>
-- **<Seat>:** <position, with evidence and links>
-- **<Seat>:** <position, with evidence and links>
-
-Your vote:
-
-<one to three of these>
-
-## The dream on the table
-<The dreamer's dream, in the person's own words with the note and its date, and the smallest thread that keeps it alive this week. This section is in every meeting, whatever the others think of it.>
-
-## One question
-<The question.>
-
-Your answer:
-
-## Resolutions
-- [ ] <what>, by <day> (<seat>)
-
-## Predictions for next week
-- **<Seat>:** <prediction>
-
-## Last week's predictions
-- **<Seat>:** <prediction>: hit | miss | can't tell, <the fact>
-
-## Scorecard
-| Seat | Hits | Misses |
-|---|---|---|
-
-## The memos
-<Each seat's memo and rebuttal, under its name, for the person to read in full if they want to.>
 ```
+since          text: what the person's answer, votes and ticks change; or
+               that this is the first meeting
+disagreements  [ { key: 'd1', point, positions: [ { seat, stance?, text,
+                 receipts: [ { label, link } ] } ], note? } ], one to three
+dream          { text, thread, receipts: [ { label, link } ] }, in every
+               meeting
+question       text: the one question
+resolutions    [ { key: 'r1', what, day: 'yyyy-mm-dd', seats: [seat] } ],
+               at most three; resolutions_note? above them
+predictions    [ { seat, text } ]; predictions_note?
+graded         [ { seat, text, grade: 'hit'|'miss'|'cant_tell'|'pending',
+                 fact? } ], last meeting's predictions; graded_note? when
+                 there are none ("None. This is the first meeting.")
+scorecard      [ { seat, hits, misses } ], all five seats
+memos          [ { seat, memo, resolution?, prediction?,
+                 rebuttal: { to, stance?, text } } ]; memos_note? for the
+                 chair's corrections
+```
+
+`seat` is `hiring_manager`, `mentor`, `skeptic`, `cfo` or `dreamer`, always
+spelled that way. Keys are `d1`, `d2`, `r1`, `r2`, in order; the person's
+marks name them. `stance` is how a seat spoke when it was not simply its
+own view ("arguing against the board's shared view"); a rebuttal with a
+stance may answer no single seat, and its `to` is then null. `receipts` is
+an empty array when a position has none. Text fields are markdown and may
+hold links. Each `memo` is the seat's memo from step 3 and `rebuttal.text`
+its step 4 rebuttal. Do not write vote or answer lines: the person marks
+those on the tab.
+
+For a called meeting, `disagreements` holds one entry whose `point` is the
+decision, with one position per seat: its vote on the decision and, in the
+same text, what would change it. The other keys are as above.
 
 Link evidence where it opens in the app: a note at
 `/vault/n/<path, each segment URL-encoded>`, a role at `/jobs/roles/<id>`,
 a goal at `/goals/<id>`.
 
-Read it back with `vault_notes` or the select in step 1: the note exists
-and its body has every section. If `write_vault_note` fails, do not retry
-it more than once; put the minutes in your final reply instead and say the
-note was not written.
+```sql
+select core.dash_before('you.board_meetings:<meeting id>');
+update you.board_meetings
+set status = 'ready', held_on = '<yyyy-mm-dd>', finished_at = now(), error = null,
+    minutes = $m${ ... }$m$::jsonb
+where id = '<meeting id>' and user_id = '<user_id>';
+select core.record_dash_action('<user_id>', 'you.board_meetings:<meeting id>',
+  'update', 'board_meeting', $s$Dash held the board meeting of <d Mon yyyy>.$s$);
+```
+
+Read it back: the row is `ready`, and `minutes` has every key above with
+five `memos`, five `predictions`, five `scorecard` rows and one to three
+`disagreements`, each with at least two positions. If the update fails on a
+constraint, fix the object and send it again once; if it still fails, mark
+the row failed as in **The brief** and say why.
 
 End with a short report for the notification: that the board met, the
-headline disagreement in one line, the question, and the note's title.
+headline disagreement in one line, the question, and the meeting's date.
