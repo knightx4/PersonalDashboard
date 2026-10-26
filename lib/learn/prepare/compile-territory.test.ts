@@ -203,6 +203,21 @@ describe('compileTerritory', () => {
     const result = await compileTerritory({ ...input([]), frames: [], anthropicApiKey: 'k', client: fakeClient(report(32, 0)) });
     expect(result).toEqual({ ok: false, detail: 'No frame topics were found near the subject.' });
   });
+
+  it('reads a report whose topics arrive as JSON text', async () => {
+    const raw = report(32, 0);
+    const stringy = { performances: JSON.stringify(raw.performances), topics: JSON.stringify(raw.topics) };
+    const result = await compileTerritory({ ...input([]), anthropicApiKey: 'k', client: fakeClient(stringy) });
+    expect(result.ok && result.territory.topics).toHaveLength(32);
+  });
+
+  it('says why when no topic survives', async () => {
+    const result = await compileTerritory({ ...input([]), anthropicApiKey: 'k', client: fakeClient({ performances: [], topics: [] }) });
+    expect(result).toEqual({ ok: false, detail: 'The call reported no topics: the report held no topics.' });
+    const offFrame = { performances: [], topics: [{ ask: 'A', scope: 'a', frame: 'Nowhere', target: 4, cites: [] }] };
+    const second = await compileTerritory({ ...input([]), anthropicApiKey: 'k', client: fakeClient(offFrame) });
+    expect(!second.ok && second.detail).toContain('1 topics were reported and none named a frame topic');
+  });
 });
 
 describe('readTerritory', () => {
