@@ -143,6 +143,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/places', label: 'Places', icon: 'places' },
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+    { href: '/you/board', label: 'Board', icon: 'board' },
   ],
   // Now, then the Inbox of questions a session needs answered. Then three
   // lists: what is being built (the plan leads, as the page worked from most

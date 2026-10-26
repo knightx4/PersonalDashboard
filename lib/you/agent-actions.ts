@@ -90,6 +90,29 @@ export const youActions: ModuleActions = {
       'Look again starts a long Dash session on the account, which spends money the person chooses to spend.',
     ),
   },
+  // The person's marks on the board's minutes (plan #2540.3).
+  'app/you/board/actions.ts': {
+    voteOnDisagreement: none(
+      'theirs',
+      "Siding with a seat on the board's disagreement is the person's own call; the next meeting reads it and Dash does not vote for them.",
+    ),
+    answerBoardQuestion: none(
+      'theirs',
+      "An answer to the board's question is the person's own words; the next meeting starts from it.",
+    ),
+    markResolution: none(
+      'theirs',
+      'Ticking a resolution done is the person saying they did it; the next meeting reads the tick.',
+    ),
+    callMeeting: none(
+      'spends',
+      'Calling a meeting starts a long Dash session on the account, which spends money the person chooses to spend (plan #2540.5).',
+    ),
+    makeResolutionTodo: none(
+      'theirs',
+      'Making a resolution a todo is the person taking up what the board proposed, an approval Dash does not give for them.',
+    ),
+  },
   'app/you/details/actions.ts': {
     saveDetailsForm: none(
       'own',
