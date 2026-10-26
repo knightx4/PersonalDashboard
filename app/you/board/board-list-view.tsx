@@ -13,6 +13,7 @@ import {
   meetingTitle,
   type BoardMeetingRow,
 } from '@/lib/you/board';
+import { useCallMeeting, type CallActions, type CallStart } from './call-meeting';
 import { useRefreshWhileRunning } from './refresh-while-running';
 
 /**
@@ -22,15 +23,17 @@ import { useRefreshWhileRunning } from './refresh-while-running';
  * meeting is still being held, or that it failed; pressing it opens the
  * meeting's page.
  *
- * `action` is the header's one action, the press that calls a meeting about
- * one decision (plan #2540.5).
+ * The header's one action calls a meeting about one decision (plan #2540.5):
+ * it opens a line for the decision under the header, and a called meeting
+ * then shows in the list running like any other.
  */
 export function BoardListView({
   meetings,
   nextMeeting,
   timezone = 'UTC',
   now,
-  action,
+  actions,
+  start,
 }: {
   meetings: readonly BoardMeetingRow[];
   /** The day of the next weekly meeting in their zone (nextMeetingDay). */
@@ -38,17 +41,22 @@ export function BoardListView({
   timezone?: string;
   /** When the page was read, for whether a meeting is still running. */
   now: number;
-  action?: React.ReactNode;
+  actions: CallActions;
+  /** Where the press starts. Only the gallery sets it. */
+  start?: CallStart;
 }) {
   const states = meetings.map((meeting) => meetingState(meeting, now));
-  useRefreshWhileRunning(states.some((state) => state.kind === 'running'));
-  const when = `The board meets every Sunday at 6:41pm. The next meeting is ${meetingDayLabel(nextMeeting)}.`;
-  const header = <PageHeader title="Board" actions={action} />;
+  const running = states.some((state) => state.kind === 'running');
+  useRefreshWhileRunning(running);
+  const call = useCallMeeting({ running, actions, start });
+  const when = `The board meets every Sunday at 6:41 PM. The next meeting is ${meetingDayLabel(nextMeeting)}.`;
+  const header = <PageHeader title="Board" actions={call.button} />;
 
   if (meetings.length === 0) {
     return (
       <PageColumn>
         {header}
+        {call.form && <div className="mb-4">{call.form}</div>}
         <EmptyState
           icon={Users}
           title="No board meetings yet"
@@ -61,7 +69,8 @@ export function BoardListView({
   return (
     <ListPage
       header={header}
-      foot={`${meetings.length} ${meetings.length === 1 ? 'meeting' : 'meetings'} · next ${meetingDayLabel(nextMeeting)}, 6:41pm`}
+      tools={call.form}
+      foot={`${meetings.length} ${meetings.length === 1 ? 'meeting' : 'meetings'} · next ${meetingDayLabel(nextMeeting)}, 6:41 PM`}
     >
       {meetings.map((meeting, index) => {
         const state = states[index];

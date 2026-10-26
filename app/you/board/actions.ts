@@ -3,9 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { boardRoutine } from '@/lib/feedback/routine';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
+import { callBoardMeeting } from '@/lib/you/board-start';
 import {
   ANSWER_MAX,
   clearBoardMark,
@@ -173,4 +175,23 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
   } catch (error) {
     return failed(error, 'The todo was not made. Try again.');
   }
+}
+
+/**
+ * Call a meeting about one decision: queue a called meeting and fire the board
+ * routine with its brief (plan #2540.5). The meeting runs on the account's
+ * plan, so it only starts when the person presses the button. One meeting is
+ * open at a time; a second press is told so.
+ */
+// latency: pending
+export async function callMeeting(decision: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const result = await callBoardMeeting({
+    client: await createYouClient(),
+    userId: user.id,
+    decision,
+    routine: boardRoutine(),
+  });
+  revalidatePath('/you/board');
+  return { error: result.started ? null : result.error };
 }

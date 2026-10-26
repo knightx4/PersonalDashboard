@@ -104,6 +104,10 @@ export const youActions: ModuleActions = {
       'theirs',
       'Ticking a resolution done is the person saying they did it; the next meeting reads the tick.',
     ),
+    callMeeting: none(
+      'spends',
+      'Calling a meeting starts a long Dash session on the account, which spends money the person chooses to spend (plan #2540.5).',
+    ),
     makeResolutionTodo: none(
       'theirs',
       'Making a resolution a todo is the person taking up what the board proposed, an approval Dash does not give for them.',

@@ -13,7 +13,7 @@ vi.mock('@/components/runs/use-run-going', () => ({ useRunGoing: () => false }))
 
 describe('routine names', () => {
   it('gives every routine a label', () => {
-    expect(ROUTINE_KEYS).toHaveLength(9);
+    expect(ROUTINE_KEYS).toHaveLength(10);
     for (const key of ROUTINE_KEYS) expect(ROUTINE_LABELS[key].trim()).not.toBe('');
   });
 });
