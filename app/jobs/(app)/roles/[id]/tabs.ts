@@ -8,7 +8,7 @@ import { tabNamed, tabSearch, type TabAddress } from '@/lib/tabs';
  * tab (note b4cecf70) and `notes` the Comments tab (note 89ad8bef). They stay
  * as they are so that links already written land on the right tab.
  */
-export const ROLE_TABS = ['timeline', 'posting', 'answers', 'interviews', 'notes', 'mail'] as const;
+export const ROLE_TABS = ['timeline', 'posting', 'answers', 'outreach', 'interviews', 'notes', 'mail'] as const;
 
 export type RoleTab = (typeof ROLE_TABS)[number];
 

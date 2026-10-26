@@ -49,8 +49,8 @@ export function FollowUpsView({
 }
 
 function order(f: FollowUp): number {
-  if (f.draft) return 0;
-  if (!f.person) return 1;
+  if (f.people.some((p) => p.draft)) return 0;
+  if (f.people.length === 0) return 1;
   return 2;
 }
 

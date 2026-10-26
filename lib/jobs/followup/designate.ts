@@ -3,9 +3,9 @@
  *
  * The person is the recruiter or hiring manager: from the contacts on file
  * when one is there (person.ts), and otherwise from a web search for them
- * (find-person.ts), who is then added as a contact Dash found. The choice is
- * kept on the application (follow_up_contact_id, follow_up_why) and the note
- * as a draft touch on that contact with the application's id, so it is
+ * (find-person.ts), who is then added as a contact Dash found. Each person
+ * named is a row in application_outreach (with why them), and the note to
+ * them a draft touch on that contact with the application's id, so it is
  * edited, copied and marked sent like any other draft, and the role page,
  * the contact page and the Follow-ups list all read the same row.
  *
@@ -31,8 +31,11 @@ export type DesignateOptions = {
   apiKey: string;
   /** Search the web when nobody on file will do. Off, the run stops at the contacts. */
   allowSearch: boolean;
-  /** Pass over the person named now and choose again. */
-  replace?: boolean;
+  /**
+   * Name one more person beside those already named, passing over them.
+   * Off, an application that already has someone is left as it is.
+   */
+  another?: boolean;
   /** Epoch milliseconds the web search must be done by. */
   deadline?: number;
   /** What the web search cost; recorded as 'find-follow-up-person'. */
@@ -49,7 +52,8 @@ type ApplicationFacts = {
   id: string;
   status: ApplicationStatus;
   referralContactId: string | null;
-  followUpContactId: string | null;
+  /** The contacts already named to reach out to. */
+  named: string[];
   role: string;
   jdText: string | null;
   companyId: string;
@@ -60,7 +64,7 @@ type ApplicationFacts = {
 async function loadApplication(supabase: AppSupabaseClient, userId: string, applicationId: string): Promise<ApplicationFacts | null> {
   const { data } = await supabase
     .from('applications')
-    .select('id, status, referral_contact_id, follow_up_contact_id, roles!inner ( title, jd_text, company_id, companies!inner ( name, website ) )')
+    .select('id, status, referral_contact_id, application_outreach ( contact_id ), roles!inner ( title, jd_text, company_id, companies!inner ( name, website ) )')
     .eq('id', applicationId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -69,14 +73,14 @@ async function loadApplication(supabase: AppSupabaseClient, userId: string, appl
     id: string;
     status: ApplicationStatus;
     referral_contact_id: string | null;
-    follow_up_contact_id: string | null;
+    application_outreach: { contact_id: string }[] | null;
     roles: { title: string; jd_text: string | null; company_id: string; companies: { name: string; website: string | null } };
   };
   return {
     id: row.id,
     status: row.status,
     referralContactId: row.referral_contact_id,
-    followUpContactId: row.follow_up_contact_id,
+    named: (row.application_outreach ?? []).map((r) => r.contact_id),
     role: row.roles.title,
     jdText: row.roles.jd_text,
     companyId: row.roles.company_id,
@@ -112,8 +116,12 @@ export async function designateFollowUp(
   const app = await loadApplication(supabase, userId, applicationId);
   if (!app) return { ok: false, error: 'That application is not on file.', searched: false };
 
-  const passedOver = options.replace ? app.followUpContactId : null;
-  const contacts = (await loadCompanyContacts(supabase, userId, app.companyId)).filter((c) => c.id !== passedOver);
+  if (app.named.length > 0 && !options.another) {
+    return { ok: false, error: 'Someone is already named for this application.', searched: false };
+  }
+  const named = new Set(app.named);
+  const everyone = await loadCompanyContacts(supabase, userId, app.companyId);
+  const contacts = everyone.filter((c) => !named.has(c.id));
   const correspondent = (await lastCorrespondents(supabase, userId, [app.id])).get(app.id)?.fromAddress ?? null;
 
   let chosen: { contactId: string; why: string; channel: Channel; from: 'file' | 'web' | 'warm' } | null = null;
@@ -121,7 +129,7 @@ export async function designateFollowUp(
     contacts,
     company: app.company,
     role: app.role,
-    referralContactId: app.referralContactId === passedOver ? null : app.referralContactId,
+    referralContactId: app.referralContactId && named.has(app.referralContactId) ? null : app.referralContactId,
     correspondentEmail: correspondent,
   });
   if (onFile) chosen = { ...onFile, from: 'file' };
@@ -130,11 +138,7 @@ export async function designateFollowUp(
   if (!chosen && options.allowSearch) {
     searched = true;
     const seeker = await loadSeeker(supabase, userId);
-    const known = contacts.map((c) => c.fullName);
-    if (passedOver) {
-      const { data: old } = await supabase.from('contacts').select('full_name').eq('id', passedOver).eq('user_id', userId).maybeSingle();
-      if (old) known.push((old as { full_name: string }).full_name);
-    }
+    const known = everyone.map((c) => c.fullName);
     const found = await findFollowUpPerson(
       { apiKey: options.apiKey, onSpend: options.onSearchSpend, deadline: options.deadline },
       { seeker, company: app.company, website: app.website, role: app.role, jdText: app.jdText, known },
@@ -177,11 +181,13 @@ export async function designateFollowUp(
   }
 
   const { error: saveError } = await supabase
-    .from('applications')
-    .update({ follow_up_contact_id: chosen.contactId, follow_up_why: chosen.why, follow_up_tried_at: new Date().toISOString() })
-    .eq('id', app.id)
-    .eq('user_id', userId);
+    .from('application_outreach')
+    .upsert(
+      { user_id: userId, application_id: app.id, contact_id: chosen.contactId, why: chosen.why, chosen_by: 'dash' },
+      { onConflict: 'application_id,contact_id' },
+    );
   if (saveError) return { ok: false, error: saveError.message, searched };
+  await markTried(supabase, userId, app.id);
 
   const note = await draftNote(supabase, userId, {
     applicationId: app.id,
