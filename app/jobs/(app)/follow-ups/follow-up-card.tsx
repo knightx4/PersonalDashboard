@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
-import { Input, Select, Textarea } from '@/components/ui/field';
+import { Input, PressLabel, Select, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -59,6 +59,7 @@ export function FollowUpCard({
   const [newPerson, setNewPerson] = useState({ name: '', title: '', linkedinUrl: '' });
   const [working, setWorking] = useState<'find' | 'replace' | 'choose' | 'own' | 'redraft' | 'sent' | null>(null);
   const [, startTransition] = useTransition();
+  const chooseId = useId();
 
   const person = followUp.person;
   const draft = followUp.draft;
@@ -232,23 +233,27 @@ export function FollowUpCard({
               </DashAction>
             )}
             {others.length > 0 && (
-              <Select
-                aria-label="Choose from your contacts"
-                value=""
-                disabled={busy}
-                className="w-auto max-w-full"
-                onChange={(event) => {
-                  const contactId = event.target.value;
-                  if (contactId) run('choose', () => setFollowUpPerson(followUp.applicationId, { contactId }));
-                }}
-              >
-                <option value="">{working === 'choose' ? 'Saving' : 'Choose from your contacts'}</option>
-                {others.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title ? `${c.name}, ${c.title}` : c.name}
-                  </option>
-                ))}
-              </Select>
+              <div className="relative max-w-full">
+                <PressLabel htmlFor={chooseId} />
+                <Select
+                  id={chooseId}
+                  aria-label="Choose from your contacts"
+                  value=""
+                  disabled={busy}
+                  className="relative w-auto max-w-full"
+                  onChange={(event) => {
+                    const contactId = event.target.value;
+                    if (contactId) run('choose', () => setFollowUpPerson(followUp.applicationId, { contactId }));
+                  }}
+                >
+                  <option value="">{working === 'choose' ? 'Saving' : 'Choose from your contacts'}</option>
+                  {others.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title ? `${c.name}, ${c.title}` : c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             )}
             {!adding && (
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAdding(true)}>
