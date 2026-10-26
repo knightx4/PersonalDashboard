@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
-import { Select, Textarea } from '@/components/ui/field';
+import { Input, Select, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -12,10 +12,9 @@ import type { FollowUp } from '@/lib/jobs/followup/load';
 import { linkedinSearchUrl } from '@/lib/jobs/suggest/payload';
 import { CopyText } from '../roles/[id]/copy-text';
 import { markTouchSent } from '../contacts/actions';
-import { chooseFollowUp, findFollowUp, redraftFollowUp, saveFollowUpNote } from './actions';
+import { findFollowUp, redraftFollowUp, saveFollowUpNote, setFollowUpPerson, writeOwnFollowUp } from './actions';
 
 const FIND = 'app/jobs/(app)/follow-ups/actions.ts#findFollowUp';
-const CHOOSE = 'app/jobs/(app)/follow-ups/actions.ts#chooseFollowUp';
 const REDRAFT = 'app/jobs/(app)/follow-ups/actions.ts#redraftFollowUp';
 
 const CHANNEL_WORDS: Record<string, string> = {
@@ -34,6 +33,10 @@ export type CompanyContact = { id: string; name: string; title: string | null };
  * the role page and in the Follow-ups list (lib/jobs/followup). The note is
  * a draft on the contact: edited here, copied out, and marked sent once it
  * goes, which logs the send on the contact as every draft does.
+ *
+ * The person can be named by hand, from their contacts at the company or as
+ * someone new, which costs nothing and writes no note; Dash's draft or a
+ * blank one follows.
  */
 export function FollowUpCard({
   initial,
@@ -51,9 +54,10 @@ export function FollowUpCard({
   const [followUp, setFollowUp] = useState(initial);
   const [text, setText] = useState(initial.draft?.message ?? '');
   const [error, setError] = useState<string | null>(null);
-  // A contact chosen from the list, waiting on Write to them.
-  const [picked, setPicked] = useState('');
-  const [working, setWorking] = useState<'find' | 'replace' | 'choose' | 'redraft' | 'sent' | null>(null);
+  // The fields for someone not on file, open while they are typed.
+  const [adding, setAdding] = useState(false);
+  const [newPerson, setNewPerson] = useState({ name: '', title: '', linkedinUrl: '' });
+  const [working, setWorking] = useState<'find' | 'replace' | 'choose' | 'own' | 'redraft' | 'sent' | null>(null);
   const [, startTransition] = useTransition();
 
   const person = followUp.person;
@@ -179,15 +183,26 @@ export function FollowUpCard({
         )}
 
         {person && !draft && !followUp.sent && (
-          <DashAction
-            size="sm"
-            paid={REDRAFT}
-            pending={working === 'redraft'}
-            disabled={busy}
-            onClick={() => run('redraft', () => redraftFollowUp(followUp.applicationId))}
-          >
-            {working === 'redraft' ? 'Writing' : 'Write the note'}
-          </DashAction>
+          <div className="flex flex-wrap items-center gap-2">
+            <DashAction
+              size="sm"
+              paid={REDRAFT}
+              pending={working === 'redraft'}
+              disabled={busy}
+              onClick={() => run('redraft', () => redraftFollowUp(followUp.applicationId))}
+            >
+              {working === 'redraft' ? 'Writing' : 'Write the note'}
+            </DashAction>
+            <Button
+              size="sm"
+              variant="secondary"
+              pending={working === 'own'}
+              disabled={busy}
+              onClick={() => run('own', () => writeOwnFollowUp(followUp.applicationId))}
+            >
+              Write it yourself
+            </Button>
+          </div>
         )}
 
         {!person && (
@@ -202,8 +217,8 @@ export function FollowUpCard({
           </DashAction>
         )}
 
-        {(person || others.length > 0) && (
-          <div className={cn('flex flex-wrap items-center gap-2', person && 'border-t border-border pt-3')}>
+        <div className={cn('space-y-2', person && 'border-t border-border pt-3')}>
+          <div className="flex flex-wrap items-center gap-2">
             {person && (
               <DashAction
                 size="sm"
@@ -219,12 +234,15 @@ export function FollowUpCard({
             {others.length > 0 && (
               <Select
                 aria-label="Choose from your contacts"
-                value={picked}
+                value=""
                 disabled={busy}
                 className="w-auto max-w-full"
-                onChange={(event) => setPicked(event.target.value)}
+                onChange={(event) => {
+                  const contactId = event.target.value;
+                  if (contactId) run('choose', () => setFollowUpPerson(followUp.applicationId, { contactId }));
+                }}
               >
-                <option value="">Choose from your contacts</option>
+                <option value="">{working === 'choose' ? 'Saving' : 'Choose from your contacts'}</option>
                 {others.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title ? `${c.name}, ${c.title}` : c.name}
@@ -232,26 +250,60 @@ export function FollowUpCard({
                 ))}
               </Select>
             )}
-            {picked && (
-              <DashAction
-                size="sm"
-                variant="secondary"
-                paid={CHOOSE}
-                pending={working === 'choose'}
-                disabled={busy}
-                onClick={() =>
-                  run('choose', async () => {
-                    const result = await chooseFollowUp(followUp.applicationId, picked);
-                    setPicked('');
-                    return result;
-                  })
-                }
-              >
-                {working === 'choose' ? 'Writing' : 'Write to them'}
-              </DashAction>
+            {!adding && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAdding(true)}>
+                Add someone
+              </Button>
             )}
           </div>
-        )}
+
+          {adding && (
+            <form
+              className="grid gap-2 sm:grid-cols-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                run('choose', async () => {
+                  const result = await setFollowUpPerson(followUp.applicationId, newPerson);
+                  if (!result.error) {
+                    setAdding(false);
+                    setNewPerson({ name: '', title: '', linkedinUrl: '' });
+                  }
+                  return result;
+                });
+              }}
+            >
+              <Input
+                aria-label="Name"
+                placeholder="Name"
+                required
+                autoFocus
+                value={newPerson.name}
+                onChange={(event) => setNewPerson({ ...newPerson, name: event.target.value })}
+              />
+              <Input
+                aria-label="Title"
+                placeholder="Title, such as Recruiter"
+                value={newPerson.title}
+                onChange={(event) => setNewPerson({ ...newPerson, title: event.target.value })}
+              />
+              <Input
+                aria-label="LinkedIn link"
+                placeholder="LinkedIn link"
+                type="url"
+                value={newPerson.linkedinUrl}
+                onChange={(event) => setNewPerson({ ...newPerson, linkedinUrl: event.target.value })}
+              />
+              <div className="flex gap-2 sm:col-span-3">
+                <Button size="sm" type="submit" pending={working === 'choose'} disabled={busy || !newPerson.name.trim()}>
+                  Follow up with them
+                </Button>
+                <Button size="sm" variant="ghost" type="button" disabled={busy} onClick={() => setAdding(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
 
         {error && <p className="text-small text-danger" role="alert">{error}</p>}
       </div>

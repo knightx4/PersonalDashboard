@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { loadFollowUps } from '@/lib/jobs/followup/load';
+import type { CompanyContact } from './follow-up-card';
 import { FollowUpsView } from './view';
 
 export const metadata = { title: 'Follow-ups' };
@@ -22,5 +23,20 @@ export default async function FollowUpsPage() {
   ]);
   const timezone = (profile?.timezone as string | null) ?? 'UTC';
 
-  return <FollowUpsView followUps={followUps} timezone={timezone} />;
+  // Their contacts at each company, to choose the person by hand.
+  const companyIds = [...new Set(followUps.map((f) => f.companyId))];
+  const { data: contacts } = companyIds.length
+    ? await supabase
+        .from('contacts')
+        .select('id, full_name, title, company_id')
+        .eq('user_id', user.id)
+        .in('company_id', companyIds)
+        .order('full_name')
+    : { data: [] };
+  const contactsByCompany: Record<string, CompanyContact[]> = {};
+  for (const row of (contacts ?? []) as { id: string; full_name: string; title: string | null; company_id: string }[]) {
+    (contactsByCompany[row.company_id] ??= []).push({ id: row.id, name: row.full_name, title: row.title });
+  }
+
+  return <FollowUpsView followUps={followUps} contactsByCompany={contactsByCompany} timezone={timezone} />;
 }

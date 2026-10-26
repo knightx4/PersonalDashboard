@@ -165,7 +165,6 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/contacts/actions.ts#draftContactMessage': ['draft-outreach'],
   // Find the person to follow an application up with, and write them a note
   'app/jobs/(app)/follow-ups/actions.ts#findFollowUp': ['find-follow-up-person', 'draft-outreach'],
-  'app/jobs/(app)/follow-ups/actions.ts#chooseFollowUp': ['draft-outreach'],
   'app/jobs/(app)/follow-ups/actions.ts#redraftFollowUp': ['draft-outreach'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 

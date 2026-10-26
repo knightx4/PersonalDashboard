@@ -52,7 +52,8 @@ export const jobsActions: ModuleActions = {
   },
   'app/jobs/(app)/follow-ups/actions.ts': {
     findFollowUp: none('spends', 'A web search for the hiring manager and a drafted note; the daily suggestions run does the same for each new application without a press.'),
-    chooseFollowUp: none('spends', 'Writes the note with a model call; Dash can write one in Ask and keep it with change_touch.'),
+    setFollowUpPerson: none('theirs', 'The person overriding who Dash chose to follow the application up with.'),
+    writeOwnFollowUp: none('own', 'A blank note the person writes themselves.'),
     redraftFollowUp: none('spends', 'Writes the note again with a model call; Dash can write one in Ask and keep it with change_touch.'),
     saveFollowUpNote: tool('change_touch'),
   },

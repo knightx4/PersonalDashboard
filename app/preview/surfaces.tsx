@@ -6128,7 +6128,19 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     label: 'Follow-ups',
     module: 'jobs',
-    render: () => <FollowUpsView followUps={followUpRows} timezone="Europe/London" />,
+    render: () => (
+      <FollowUpsView
+        followUps={followUpRows}
+        contactsByCompany={{
+          'co-1': [
+            { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+            { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+          ],
+          'co-3': [{ id: 'c-8', name: 'Lee Park', title: 'Recruiter' }],
+        }}
+        timezone="Europe/London"
+      />
+    ),
   },
   {
     /* The page before anything has been saved or applied for. */
