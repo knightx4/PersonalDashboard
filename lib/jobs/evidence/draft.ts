@@ -27,6 +27,7 @@ import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
 import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { PLAIN_VOICE } from '@/lib/jobs/drafting/plain-voice';
 
 /** Writing in someone else's voice off their own material. Judgment again. */
 const MODEL = MODELS.jobsEvidenceDraft;
@@ -45,8 +46,9 @@ What a good answer does:
   A "why us" question says why this company and why this role, using what the
   posting says, and why they fit, using their own stories. A behavioural
   question tells one story properly, not four listed.
-- Sounds like a capable person talking plainly: first person, short sentences,
-  concrete nouns, no corporate filler. Down to earth and to the point.
+- Sounds like a capable person talking plainly: first person, short
+  sentences, concrete nouns, no corporate filler. Follow the voice rules
+  below and how they write.
 - Uses their evidence where it carries the point: a real result, a real
   situation, their own words and numbers. Pick the one or two items that fit
   best and leave the rest. The bank is material to draw on, not a limit on
@@ -64,6 +66,8 @@ all:
 - Anything the question asks for that the bank does not hold (a headcount, a
   date, a reason only they know): say what to add, and leave it out of the
   answer rather than guess it.
+
+${PLAIN_VOICE}
 
 What it never does:
 - Invent facts about them. A number, a scale, a timeline, a job title, an
