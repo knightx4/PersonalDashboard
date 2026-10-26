@@ -103,6 +103,7 @@ describe('the operation names', () => {
       'write-survey-idea',
       'write-survey-question',
       'write-lesson',
+      'write-level-lesson',
       'embed-lesson-claim',
       'embed-figure-need',
       'write-figure-backfill',

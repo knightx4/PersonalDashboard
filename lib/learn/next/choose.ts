@@ -15,7 +15,10 @@
  *    pick rules (`pickCell`: a re-check one answer in five, placement, misses
  *    first). When those rules find nothing only because the levels left are
  *    resting after an answer, the lowest of them is asked anyway, so the
- *    session never ends while a level can still be asked.
+ *    session never ends while a level can still be asked. A level you have
+ *    never been asked about, on a topic no plan piece teaches, is taught
+ *    first: its lesson comes before its question, until you have been shown
+ *    it once (plan #2546.5).
  * 4. The first piece of the next ready subject you have not started, in the
  *    same subject order.
  *
@@ -32,6 +35,9 @@
 import type { DueReview } from '@/lib/learn/lessons/review';
 import { ASK_CEILING, pickCell, whyLine, type PickedCell } from '@/lib/learn/levels/pick';
 import { isHeld, readCells, topicLevel, type TopicMap } from '@/lib/learn/levels/model';
+
+/** Where a topic level's lesson stands (learn.level_lessons). */
+export type LevelLessonState = { id: string; status: 'ready' | 'dropped'; read: boolean };
 
 /** One idea of a piece and whether its lesson has been read. */
 export type SessionLesson = {
@@ -85,6 +91,10 @@ export type ChooseNextInput = {
   lensTargets?: ReadonlyMap<string, number>;
   /** Keys of items passed over in this session. */
   skip?: ReadonlySet<string>;
+  /** The topic levels' lessons written so far, by cell id. */
+  levelLessons?: ReadonlyMap<string, LevelLessonState>;
+  /** Cells a plan piece teaches, whose lessons are the piece's, so no level lesson is written for them. */
+  taughtCells?: ReadonlySet<string>;
   now: Date;
 };
 
@@ -104,7 +114,13 @@ export type NextItem =
   | (PiecePlace & { kind: 'lesson'; key: string; conceptId: string; conceptName: string; cardId: string | null })
   | (PiecePlace & { kind: 'check'; key: string; checkId: string | null })
   | (PiecePlace & { kind: 'task'; key: string; taskId: string | null })
-  | { kind: 'question'; key: string; cell: PickedCell; why: string };
+  | { kind: 'question'; key: string; cell: PickedCell; why: string }
+  /**
+   * The lesson for a topic level, before that level's first question (plan
+   * #2546.5). `lessonId` is null until it is written: the player writes it
+   * with `writeLevelLesson(userId, cell.cellId)` and marks it read once shown.
+   */
+  | { kind: 'level_lesson'; key: string; cell: PickedCell; lessonId: string | null; why: string };
 
 export type NextItemKind = NextItem['kind'];
 
@@ -126,6 +142,10 @@ export function taskKey(pieceId: string): string {
 
 export function questionKey(cellId: string): string {
   return `question:${cellId}`;
+}
+
+export function levelLessonKey(cellId: string): string {
+  return `level_lesson:${cellId}`;
 }
 
 /** A subject you have read, answered or handed in something in. */
@@ -240,11 +260,30 @@ function anyUnheldCell(map: TopicMap, skip: ReadonlySet<string>): PickedCell | n
   return null;
 }
 
+/**
+ * Whether a level is taught before it is asked: it has never been asked and
+ * is not held through another level, no plan piece teaches it, and its lesson
+ * has not been shown or declined. A lesson passed over this session is not
+ * offered again in it.
+ */
+export function teachesFirst(input: ChooseNextInput, cellId: string, skip: ReadonlySet<string>): boolean {
+  if (skip.has(levelLessonKey(cellId)) || input.taughtCells?.has(cellId)) return false;
+  const state = input.levelLessons?.get(cellId);
+  if (state && (state.read || state.status === 'dropped')) return false;
+  return (readCells(input.map).get(cellId)?.status ?? 'open') === 'open';
+}
+
 /** A practice question on any approved topic, or null when every askable level is held. */
 export function practiceQuestion(input: ChooseNextInput, skip: ReadonlySet<string>): NextItem | null {
   const picked = pickCell(input.map, { now: input.now, answered: input.answered, lensTargets: input.lensTargets });
   const cell = picked && !skip.has(questionKey(picked.cellId)) ? picked : anyUnheldCell(input.map, skip);
-  return cell ? { kind: 'question', key: questionKey(cell.cellId), cell, why: whyLine(cell, input.now) } : null;
+  if (!cell) return null;
+  const why = whyLine(cell, input.now);
+  if (teachesFirst(input, cell.cellId, skip)) {
+    const lessonId = input.levelLessons?.get(cell.cellId)?.id ?? null;
+    return { kind: 'level_lesson', key: levelLessonKey(cell.cellId), cell, lessonId, why };
+  }
+  return { kind: 'question', key: questionKey(cell.cellId), cell, why };
 }
 
 export function chooseNext(input: ChooseNextInput): NextItem | null {
