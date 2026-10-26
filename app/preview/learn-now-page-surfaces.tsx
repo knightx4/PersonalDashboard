@@ -1,6 +1,7 @@
 import { NowHeader } from '@/app/learn/now/header';
 import { NowSkeleton, NowView, type PreparingRow } from '@/app/learn/now/now-view';
 import { waitingEmpty, waitingLines, type WaitingCounts } from '@/lib/learn/feed/waiting';
+import type { StartLine } from '@/lib/learn/next/session';
 import { TodaysPieceSurface } from './todays-piece-surfaces';
 
 /**
@@ -34,13 +35,22 @@ const NOTHING: WaitingCounts = { inbox: 0, reviews: 0, readings: 0, cards: 0 };
 
 const header = <NowHeader practice={false} />;
 
+const START: StartLine = {
+  kind: 'lesson',
+  word: 'Lesson',
+  title: 'How a supplier’s bargaining power squeezes the margins of everyone who buys from it',
+  place: 'Corporate strategy · Where an industry’s profits go',
+};
+
 /** A prepared subject's piece leads, with practice under it and three subjects still preparing beside. */
 export function NowPageSurface() {
   return (
     <NowView
       header={header}
+      start={START}
       today={<TodaysPieceSurface />}
       hasPiece
+      pieceTitle="Retention: who stays and what they pay"
       prepared={3}
       preparing={PREPARING}
       waiting={waitingLines(WAITING)}
@@ -49,11 +59,14 @@ export function NowPageSurface() {
   );
 }
 
-/** No piece today and nothing preparing: the practice press leads. */
+const QUESTION: StartLine = { kind: 'question', word: 'Question', title: 'Competitive advantage', place: 'Level 4' };
+
+/** No piece today and nothing preparing: Start opens on a question and practice folds under it. */
 export function NowPagePracticeSurface() {
   return (
     <NowView
       header={header}
+      start={QUESTION}
       today={null}
       hasPiece={false}
       prepared={1}
@@ -69,6 +82,7 @@ export function NowPageEmptySurface() {
   return (
     <NowView
       header={header}
+      start={null}
       today={null}
       hasPiece={false}
       prepared={0}
@@ -82,4 +96,20 @@ export function NowPageEmptySurface() {
 /** The page loading. */
 export function NowPageLoadingSurface() {
   return <NowSkeleton />;
+}
+
+/** A prepared subject with nothing left to learn, or a read that failed: the Start card says nothing is waiting. */
+export function NowPageQuietSurface() {
+  return (
+    <NowView
+      header={header}
+      start={null}
+      today={null}
+      hasPiece={false}
+      prepared={2}
+      preparing={[]}
+      waiting={waitingLines(NOTHING)}
+      waitingEmpty={waitingEmpty(NOTHING)}
+    />
+  );
 }

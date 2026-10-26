@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NextItem } from './choose';
-import { addToTally, placeLine, tallyKind, tallyLine, tallyTotal, type SessionItem } from './session';
+import { addToTally, placeLine, startLine, tallyKind, tallyLine, tallyTotal, type SessionItem } from './session';
 
 const place = {
   subjectId: 's1',
@@ -78,5 +78,34 @@ describe('the tally', () => {
     expect(tallyLine({})).toBe('Nothing gone through in this session.');
     expect(tallyLine({ check: 1 })).toBe('A check in this session.');
     expect(tallyLine({ review: 1, lesson: 2, question: 3 })).toBe('2 lessons, 3 questions and a review in this session.');
+  });
+});
+
+describe('startLine', () => {
+  it('titles a lesson by its idea and places it by subject and piece', () => {
+    const lesson: NextItem = { ...place, kind: 'lesson', key: 'k', conceptId: 'c1', conceptName: 'Supplier power', cardId: null };
+    expect(startLine(lesson)).toEqual({
+      kind: 'lesson',
+      word: 'Lesson',
+      title: 'Supplier power',
+      place: 'Corporate strategy · Where an industry’s profits go',
+    });
+  });
+
+  it('titles a check by its piece and a question by its topic and level', () => {
+    expect(startLine({ ...place, kind: 'check', key: 'k', checkId: null })).toMatchObject({
+      word: 'Check',
+      title: 'Where an industry’s profits go',
+      place: 'Corporate strategy',
+    });
+    const cell = {
+      cellId: 'c', topicId: 't', topicName: 'Competitive advantage', level: 4, reason: 'fringe' as const,
+      heldTo: 3, missed: false, direction: null, unlocks: 0, heldSince: null,
+    };
+    expect(startLine({ kind: 'question', key: 'q', why: '', cell })).toMatchObject({
+      word: 'Question',
+      title: 'Competitive advantage',
+      place: 'Level 4',
+    });
   });
 });

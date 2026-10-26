@@ -79,6 +79,36 @@ export function placeLine(item: NextItem): string {
   }
 }
 
+/**
+ * What the Start press on Now says it will open with (plan #2546.4): the
+ * kind and a title, and where it sits. Described from what `chooseNext`
+ * returned, so nothing is written to say it.
+ */
+export type StartLine = { kind: NextItemKind; word: string; title: string; place: string };
+
+export function startLine(item: NextItem): StartLine {
+  const word = KIND_WORD[item.kind];
+  const place = placeLine(item);
+  switch (item.kind) {
+    case 'review':
+      return { kind: item.kind, word, title: item.review.name, place };
+    case 'lesson':
+      return { kind: item.kind, word, title: item.conceptName, place };
+    case 'check':
+      return { kind: item.kind, word, title: item.pieceTitle, place: item.subjectName };
+    case 'task':
+      return { kind: item.kind, word, title: item.pieceTitle, place: item.subjectName };
+    case 'question':
+      return { kind: item.kind, word, title: item.cell.topicName, place: `Level ${item.cell.level}` };
+    case 'level_lesson':
+      return { kind: item.kind, word, title: item.cell.topicName, place: `Level ${item.cell.level}` };
+    default: {
+      const unknown: never = item;
+      return unknown;
+    }
+  }
+}
+
 /** Items gone through in a session, by kind. */
 export type SessionTally = Partial<Record<NextItemKind, number>>;
 
