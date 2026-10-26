@@ -1,7 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { z } from 'zod';
 import { DashAction } from '@/components/ui/dash-action';
-import { Card } from '@/components/ui/card';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
@@ -24,6 +23,9 @@ import { NowHeader } from './header';
 import { NowView } from './now-view';
 import { WaitingStrip } from './waiting-strip';
 import { BriefsList } from './briefs-list';
+import { FoldCard } from './fold-card';
+import { loadNextItem } from '@/lib/learn/next/choose-store';
+import { startLine, type StartLine } from '@/lib/learn/next/session';
 import { PieceFirst } from './todays-piece';
 import { loadTodaysPiece, type TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
 import { loadOpenBriefs } from '@/lib/learn/briefs/load';
@@ -198,7 +200,7 @@ export default async function NowPage({
   // Today's piece leads (plan #2164.4), or the piece `?piece=` names. A piece
   // that cannot be read leaves the practice press first.
   const pinnedPiece = z.string().uuid().safeParse(firstParam(params.piece));
-  const [briefs, piece, prepared, preparing] = await Promise.all([
+  const [briefs, piece, prepared, preparing, start] = await Promise.all([
     // The topics Dash researched for you (plan #2023.4).
     loadOpenBriefs(supabase).catch(orElse<BriefSummary[]>('briefs', [])),
     createCoreClient()
@@ -206,14 +208,20 @@ export default async function NowPage({
       .catch(orElse<TodaysPiece | null>('today’s piece', null)),
     preparedActiveSubjectIds(supabase, user.id).catch(orElse('prepared subjects', new Set<string>())),
     loadPreparingSubjects(supabase, user.id).catch(orElse<PreparingSubject[]>('preparing subjects', [])),
+    // What Start opens with, described from what is stored: choosing writes nothing.
+    loadNextItem(supabase, user.id)
+      .then((item): StartLine | null => (item ? startLine(item) : null))
+      .catch(orElse<StartLine | null>('what to start with', null)),
   ]);
   const queued = readings ?? [];
 
   return (
     <NowView
       header={header()}
+      start={start}
       today={<PieceFirst piece={piece} />}
       hasPiece={piece !== null}
+      pieceTitle={piece?.kind === 'piece' ? piece.page.piece.title : null}
       prepared={prepared.size}
       preparing={preparing.map((row) => ({
         subjectId: row.subjectId,
@@ -230,10 +238,12 @@ export default async function NowPage({
         /* One surface with hairlines, not a card per reading. Law 13: the
          * shelf is scanned, so it is a list, and a card each cost every row
          * its own border and eight pixels of margin for nothing. */
-        <Card padding="none" id={WAITING_ANCHORS.readings} className="mb-4 scroll-mt-4">
-          <h2 className="card-pad-x pt-(--card-p) text-ui font-semibold text-ink">
-            You said you would read these
-          </h2>
+        <FoldCard
+          title="You said you would read these"
+          count={queued.length}
+          remember="learn.fold.readings"
+          id={WAITING_ANCHORS.readings}
+        >
           <ul className="divide-y divide-border">
             {queued.map((reading) => {
               const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
@@ -296,7 +306,7 @@ export default async function NowPage({
               );
             })}
           </ul>
-        </Card>
+        </FoldCard>
       )}
 
       <div id={WAITING_ANCHORS.reviews} className="scroll-mt-4">

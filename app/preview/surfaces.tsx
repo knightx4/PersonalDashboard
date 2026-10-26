@@ -485,6 +485,7 @@ import {
   NowPageEmptySurface,
   NowPageLoadingSurface,
   NowPagePracticeSurface,
+  NowPageQuietSurface,
   NowPageSurface,
 } from './learn-now-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
@@ -7416,6 +7417,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <NowPagePracticeSurface />,
+  },
+  {
+    id: 'learn-now-page-quiet',
+    label: 'Now · Nothing waiting to start',
+    module: 'learn',
+    width: 'page',
+    render: () => <NowPageQuietSurface />,
   },
   {
     id: 'learn-now-page-empty',

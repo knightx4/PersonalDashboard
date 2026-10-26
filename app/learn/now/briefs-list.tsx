@@ -1,5 +1,5 @@
 import Link from '@/components/ui/link';
-import { Card } from '@/components/ui/card';
+import { FoldCard } from './fold-card';
 import { LiveDot } from '@/components/ui/live-dot';
 import { cn } from '@/lib/cn';
 import { summaryLine, type BriefSummary } from '@/lib/learn/briefs/view';
@@ -9,11 +9,10 @@ import { summaryLine, type BriefSummary } from '@/lib/learn/briefs/view';
  * #2023.4), on Now under the strip of what is waiting. Each row opens its
  * brief. Nothing is drawn when there are none.
  */
-export function BriefsList({ briefs }: { briefs: readonly BriefSummary[] }) {
+export function BriefsList({ briefs, defaultOpen = false }: { briefs: readonly BriefSummary[]; defaultOpen?: boolean }) {
   if (briefs.length === 0) return null;
   return (
-    <Card padding="none" className="mb-4">
-      <h2 className="card-pad-x pt-(--card-p) text-ui font-semibold text-ink">Topics you asked Dash to research</h2>
+    <FoldCard title="Topics you asked Dash to research" count={briefs.length} remember="learn.fold.briefs" defaultOpen={defaultOpen}>
       <ul className="divide-y divide-border">
         {briefs.map((brief) => (
           <li key={brief.id}>
@@ -35,6 +34,6 @@ export function BriefsList({ briefs }: { briefs: readonly BriefSummary[] }) {
           </li>
         ))}
       </ul>
-    </Card>
+    </FoldCard>
   );
 }

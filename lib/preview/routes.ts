@@ -240,6 +240,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-now-page': ['/learn/now'],
   'learn-now-page-practice': ['/learn/now'],
   'learn-now-page-empty': ['/learn/now'],
+  'learn-now-page-quiet': ['/learn/now'],
   'learn-now-page-loading': ['/learn/now'],
   'learn-now-deck-piece': ['/learn/now'],
   'learn-now-deck-piece-check': ['/learn/now'],
