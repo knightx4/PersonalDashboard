@@ -140,6 +140,14 @@ describe("Dash's voice", () => {
       'Name a plan step by its outline, such as #1073.4, the way the plan page heads it, never by the stored number.',
     );
   });
+
+  // A summary of them on 20 October 2026 said they were finishing an MBA
+  // that ended in May (note c5d09d23): the tense came from older text.
+  it('sets the tense of a school or job from its dates when describing them', () => {
+    const system = ASK_VOICE.system.replace(/\s+/g, ' ');
+    expect(system).toContain('you.profile_entries, you.work_history');
+    expect(system).toContain("one that ended before today is over, however an older résumé or note words it.");
+  });
 });
 
 describe('askDash', () => {
