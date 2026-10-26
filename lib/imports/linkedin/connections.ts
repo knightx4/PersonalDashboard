@@ -17,7 +17,11 @@ import type { ImportMapper, ImportStore, MappedRecord, MatchSkip, PendingRecord 
 //                   An incoming invitation sets how_we_connect.
 //   correspondents  the other person in a conversation you wrote in who is
 //                   not a connection, so the touches have a contact. Never
-//                   marked linkedin_connection, and only joined by URL.
+//                   marked linkedin_connection, and only joined by URL. The
+//                   export gives no employer for them, so the company is the
+//                   one a subject names ("Strategic Finance Role at Ramp"),
+//                   linked only when the person tracks it, like a
+//                   connection's employer.
 //   invitations     an outgoing invitation to a connection that carried a
 //                   note: a touch on linkedin_connect, outbound, with the
 //                   note. A bare connection request is not outreach and is
@@ -50,7 +54,7 @@ function fullName(c: ConnectionRecord): string | null {
 }
 
 /** The company key a connection's employer has in the companies mapper, or null. */
-function employerKey(name: string | null): string | null {
+export function employerKey(name: string | null): string | null {
   const trimmed = name?.trim();
   return trimmed ? companyNameKey(trimmed) || null : null;
 }
@@ -90,6 +94,19 @@ export interface Conversation {
   /** The other person's name and profile URL as the messages give them. */
   name: string | null;
   url: string | null;
+  /** The company a subject in it names after "at", the first one found. */
+  company: string | null;
+}
+
+// "at", then a name starting with a capital or a digit, up to a word that
+// starts a new clause ("in NYC", "for 2027"), punctuation, a spaced dash or
+// the end. The capital keeps out "at the moment" and "at your convenience".
+const AT_COMPANY = /\b[Aa][Tt]\s+([A-Z0-9][^,.!?:;()|\n]*?)(?=\s+(?:in|for|on|and|with|to|from|as)\b|\s*[,.!?:;()|]|\s+[-–—]|\s*$)/;
+
+/** The company a message subject names after "at", or null. */
+export function subjectCompany(subject: string | null): string | null {
+  const hit = subject ? AT_COMPANY.exec(subject) : null;
+  return hit ? str(hit[1]) : null;
 }
 
 /** The export's conversations, with who is in each. */
@@ -118,7 +135,8 @@ export function conversations(archive: LinkedInArchive, self: string | null): Co
       });
     }
     const wrote = !!self && messages.some((m) => m.senderProfileSlug === self && !m.isDraft);
-    return { id, messages, other: others.size === 1 ? [...others][0] : null, others: others.size, wrote, name, url };
+    const company = messages.reduce<string | null>((hit, m) => hit ?? subjectCompany(m.subject), null);
+    return { id, messages, other: others.size === 1 ? [...others][0] : null, others: others.size, wrote, name, url, company };
   });
 }
 
@@ -242,7 +260,7 @@ export const linkedInConnections: ImportMapper<LinkedInArchive> = {
 export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
   kind: 'correspondents',
   table: CONTACTS,
-  columns: { full_name: 'text', linkedin_url: 'text' },
+  columns: { full_name: 'text', linkedin_url: 'text', company_id: 'uuid' },
   records(archive) {
     const connected = new Set(archive.connections.map((c) => c.profileSlug).filter(Boolean));
     const started = startingStatuses(archive);
@@ -251,11 +269,16 @@ export const linkedInCorrespondents: ImportMapper<LinkedInArchive> = {
     for (const conv of conversations(archive, ownSlug(archive))) {
       if (!conv.wrote || !conv.other || connected.has(conv.other) || seen.has(conv.other)) continue;
       seen.add(conv.other);
+      const employer = employerKey(conv.company);
       out.push(
         conv.name
           ? {
               key: conv.other,
-              values: { full_name: conv.name, linkedin_url: conv.url },
+              values: {
+                full_name: conv.name,
+                linkedin_url: conv.url,
+                company_id: employer ? ref('companies', employer, { orNull: true }) : null,
+              },
               onInsert: { status: started.get(conv.other) ?? 'contacted' },
             }
           : { key: conv.other, skip: 'The conversation does not give their name.' },

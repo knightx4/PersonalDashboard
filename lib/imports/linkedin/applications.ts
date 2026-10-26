@@ -5,6 +5,7 @@ import { choosePursuitFor, pursuitsFromRoles } from '@/lib/jobs/inbox/pursuits';
 import { slugify } from '@/lib/jobs/slug';
 import { ref } from '../engine';
 import type { ImportMapper, ImportStore, MappedRecord, PendingRecord } from '../types';
+import { conversations, ownSlug } from './connections';
 import { recentSavedJobs } from './saved-window';
 
 // LinkedIn's Easy Apply history into Jobs (plan #2432.4): the companies and
@@ -136,6 +137,9 @@ export const FOLLOW_ONLY = 'You follow it on LinkedIn but do not track it, so it
 /** Why a connection's employer is not added to the companies list (plan #2432.5). */
 export const CONNECTION_ONLY = 'A connection works there, but you do not track the company, so it is not added.';
 
+/** Why a company a message subject names is not added to the companies list. */
+export const SUBJECT_ONLY = 'A message you wrote names it, but you do not track the company, so it is not added.';
+
 export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
   kind: 'companies',
   table: 'job_search.companies',
@@ -159,6 +163,9 @@ export const linkedInCompanies: ImportMapper<LinkedInArchive> = {
     // A connection's employer only links the contact to a company the person
     // tracks (connections.ts); it never adds one.
     for (const c of archive.connections) add(c.company, CONNECTION_ONLY);
+    // Nor does a company a subject names in a conversation you wrote in, which
+    // is all the export says of where someone you are not connected to works.
+    for (const conv of conversations(archive, ownSlug(archive))) if (conv.wrote) add(conv.company, SUBJECT_ONLY);
     return out;
   },
   async match(pending, store) {
