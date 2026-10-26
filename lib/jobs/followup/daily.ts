@@ -58,7 +58,7 @@ export async function followUpRecentApplications(
     });
     if (result.ok) {
       out.named += 1;
-      if (result.from === 'web') searches -= 1;
+      if (result.from !== 'file') searches -= 1;
       if (result.draftError) out.errors.push(result.draftError);
     } else if (result.searched) {
       searches -= 1;

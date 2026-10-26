@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelFor, followUpAim, pickOnFile, type FileContact } from '@/lib/jobs/followup/person';
+import { channelFor, followUpAim, pickOnFile, pickWarm, teamWords, type FileContact } from '@/lib/jobs/followup/person';
 import { parsePeople } from '@/lib/jobs/followup/find-person';
 
 function contact(id: string, overrides: Partial<FileContact> = {}): FileContact {
@@ -16,10 +16,11 @@ function contact(id: string, overrides: Partial<FileContact> = {}): FileContact 
   };
 }
 
-const pick = (contacts: FileContact[], extra: { referral?: string; correspondent?: string } = {}) =>
+const pick = (contacts: FileContact[], extra: { referral?: string; correspondent?: string; role?: string } = {}) =>
   pickOnFile({
     contacts,
     company: 'Ramp',
+    role: extra.role ?? 'Strategic Finance Lead',
     referralContactId: extra.referral ?? null,
     correspondentEmail: extra.correspondent ?? null,
   });
@@ -30,36 +31,64 @@ describe('who an application is followed up with', () => {
   });
 
   it('puts the referrer first', () => {
-    const chosen = pick([contact('a', { relationship: 'friend' }), contact('b')], { referral: 'b' });
+    const chosen = pick([contact('a', { relationship: 'recruiter' }), contact('b')], { referral: 'b' });
     expect(chosen?.contactId).toBe('b');
     expect(chosen?.why).toBe('Person b referred you for this role.');
   });
 
   it('puts the recruiter who wrote about the application next, by email', () => {
     const chosen = pick(
-      [contact('a', { relationship: 'friend' }), contact('r', { email: 'Rae@Ramp.com', relationship: 'recruiter' })],
+      [contact('m', { title: 'Head of Finance' }), contact('r', { email: 'Rae@Ramp.com', relationship: 'recruiter' })],
       { correspondent: 'rae@ramp.com' },
     );
     expect(chosen).toEqual({ contactId: 'r', why: 'Person r wrote to you about this application.', channel: 'email' });
   });
 
-  it('prefers someone they know over a LinkedIn connection, and that over a cold contact', () => {
-    expect(pick([contact('c'), contact('l', { linkedinConnection: true }), contact('f', { relationship: 'former_colleague' })])?.contactId).toBe('f');
-    expect(pick([contact('c'), contact('l', { linkedinConnection: true })])?.contactId).toBe('l');
+  it('puts a manager on the role\'s team before a recruiter, and a recruiter before a team member', () => {
+    const manager = contact('m', { title: 'Head of Financial Planning' });
+    const recruiter = contact('r', { title: 'Talent Partner' });
+    const member = contact('t', { title: 'Finance Analyst' });
+    expect(pick([member, recruiter, manager])?.contactId).toBe('m');
+    expect(pick([member, recruiter])?.contactId).toBe('r');
+    expect(pick([member])?.contactId).toBe('t');
   });
 
-  it('puts a fellow alum before a second-degree connection', () => {
-    expect(pick([contact('s', { relationship: 'second_degree', title: 'Manager' }), contact('a', { relationship: 'alum' })])?.contactId).toBe('a');
+  it('passes over people they know who are not on the team or recruiting', () => {
+    const friend = contact('f', { relationship: 'friend', title: 'Agent Strategy Manager' });
+    const alum = contact('a', { relationship: 'alum', title: 'Head of GTM', linkedinConnection: true });
+    expect(pick([friend, alum])).toBeNull();
+    expect(pick([friend, alum, contact('r', { relationship: 'recruiter' })])?.contactId).toBe('r');
   });
 
-  it('within a tier, prefers someone whose title says they hire', () => {
-    const chosen = pick([contact('a', { title: 'Analyst' }), contact('b', { title: 'Head of Finance' })]);
-    expect(chosen?.contactId).toBe('b');
+  it('does not count words every role here carries as the same team', () => {
+    expect(pick([contact('s', { title: 'Agent Strategy Manager' })], { role: 'Revenue Strategy & Operations Manager' })).toBeNull();
+    expect(pick([contact('v', { title: 'VP, Revenue' })], { role: 'Revenue Strategy & Operations Manager' })?.contactId).toBe('v');
+  });
+
+  it('reads FP&A as finance', () => {
+    expect(teamWords('Senior Analyst, FP&A')).toEqual(teamWords('Finance Planning'));
   });
 
   it('leaves out a dormant contact unless they referred or wrote', () => {
-    expect(pick([contact('d', { status: 'dormant' })])).toBeNull();
+    expect(pick([contact('d', { status: 'dormant', relationship: 'recruiter' })])).toBeNull();
     expect(pick([contact('d', { status: 'dormant' })], { referral: 'd' })?.contactId).toBe('d');
+  });
+});
+
+describe('the fallback when nobody hiring turns up', () => {
+  it('takes a friend over an alum over a second-degree connection over a LinkedIn connection', () => {
+    const people = [
+      contact('l', { linkedinConnection: true }),
+      contact('s', { relationship: 'second_degree' }),
+      contact('a', { relationship: 'alum' }),
+      contact('f', { relationship: 'friend' }),
+    ];
+    expect(pickWarm(people, 'Ramp')?.contactId).toBe('f');
+    expect(pickWarm(people.slice(0, 3), 'Ramp')?.contactId).toBe('a');
+  });
+
+  it('never falls back to a stranger', () => {
+    expect(pickWarm([contact('c')], 'Ramp')).toBeNull();
   });
 });
 
