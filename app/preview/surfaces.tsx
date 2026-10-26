@@ -122,6 +122,8 @@ import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
+import { FollowUpsView } from '@/app/jobs/(app)/follow-ups/view';
+import type { FollowUp } from '@/lib/jobs/followup/load';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { ToastProvider } from '@/components/ui/toast';
@@ -3229,6 +3231,7 @@ const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
   { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
   { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
@@ -4233,6 +4236,75 @@ const draftedAsks: PanelProps['dashAsks'] = [
     answer_id: null,
     question: 'Would you move to London for this, or is it remote only for you?',
     reply: null,
+  },
+];
+
+/**
+ * Follow-ups for the gallery: a note waiting to go to a recruiter who wrote,
+ * one sent to a hiring manager Dash found, an application with nobody named
+ * yet, and a role still to apply for.
+ */
+const followUpRows: FollowUp[] = [
+  {
+    applicationId: 'fu-1',
+    roleId: 'role-1',
+    role: 'Strategic Finance Associate',
+    companyId: 'co-1',
+    company: 'Ramp',
+    status: 'submitted',
+    submittedAt: '2026-10-24T15:00:00Z',
+    person: { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance', email: 'rae@ramp.example', linkedinUrl: null, foundByDash: false },
+    why: 'Rae Patel wrote to you about this application.',
+    triedAt: '2026-10-24T16:00:00Z',
+    draft: {
+      id: 't-1',
+      channel: 'email',
+      message:
+        "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nSelvey",
+    },
+    sent: null,
+  },
+  {
+    applicationId: 'fu-2',
+    roleId: 'role-2',
+    role: 'FP&A Manager',
+    companyId: 'co-2',
+    company: 'Mercury',
+    status: 'acknowledged',
+    submittedAt: '2026-10-20T15:00:00Z',
+    person: { id: 'c-2', name: 'Dana Wu', title: 'Head of FP&A', email: null, linkedinUrl: null, foundByDash: true },
+    why: 'The posting says the role reports to the Head of FP&A, which is Dana Wu.',
+    triedAt: '2026-10-20T16:00:00Z',
+    draft: null,
+    sent: { id: 't-2', channel: 'linkedin_connect', sentAt: '2026-10-21T09:00:00Z', respondedAt: null },
+  },
+  {
+    applicationId: 'fu-3',
+    roleId: 'role-3',
+    role: 'Finance Lead',
+    companyId: 'co-3',
+    company: 'Plaid',
+    status: 'submitted',
+    submittedAt: '2026-10-25T15:00:00Z',
+    person: null,
+    why: null,
+    triedAt: null,
+    draft: null,
+    sent: null,
+  },
+  {
+    applicationId: 'fu-4',
+    roleId: 'role-4',
+    role: 'Strategy & Operations',
+    companyId: 'co-4',
+    company: 'Brex',
+    status: 'lead',
+    submittedAt: null,
+    person: null,
+    why: null,
+    triedAt: '2026-10-22T16:00:00Z',
+    draft: null,
+    sent: null,
   },
 ];
 
@@ -6042,6 +6114,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <MaterialView {...material} part="voice" />,
+  },
+  {
+    /* Follow-ups: who to tell about each application, and the note to them. */
+    id: 'jobs-follow-ups',
+    width: 'page',
+    label: 'Follow-ups',
+    module: 'jobs',
+    render: () => <FollowUpsView followUps={followUpRows} timezone="Europe/London" />,
+  },
+  {
+    /* The page before anything has been saved or applied for. */
+    id: 'jobs-follow-ups-empty',
+    width: 'page',
+    label: 'Follow-ups · Empty',
+    module: 'jobs',
+    render: () => <FollowUpsView followUps={[]} timezone="Europe/London" />,
   },
   {
     /* The page as it opens, in Pipeline's order: leads to reach out to,

@@ -351,7 +351,7 @@ export async function findPeople(
  * carries the request as `queue`, and the caller finishes it as a Message
  * Batch in the background (search-batch.ts), which has no time limit.
  */
-async function searchThenReport<T>(
+export async function searchThenReport<T>(
   client: Pick<Anthropic, 'messages'>,
   options: SuggestOptions,
   call: {

@@ -54,6 +54,11 @@ export const SPEND_OPERATIONS = {
     // on file, in the person's voice, from what the page knows about them.
     // Sonnet, one call.
     'draft-outreach',
+    // Finding the hiring manager to follow one application up with, with a
+    // web search, when nobody on file at the company will do. From the role
+    // page, the Follow-ups list and the job suggestion cron. Sonnet, up to
+    // five searches and two calls; the note to them is 'draft-outreach'.
+    'find-follow-up-person',
     // Finding open postings worth applying for with a web search, from the
     // job suggestion cron (weekly) and the search button on Roles. Sonnet, up
     // to five searches and two calls.
