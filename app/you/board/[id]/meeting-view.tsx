@@ -766,13 +766,19 @@ function ResolutionRow({
     <li className="card-pad-x space-y-2 py-3" data-board-resolution>
       <div className="flex items-start gap-3">
         {resolution.key && (
-          <Checkbox
-            id={boxId}
-            checked={done}
-            onChange={(event) => void tick(event.target.checked)}
-            className="mt-1"
-            aria-label={done ? 'Done. Untick to mark it open' : 'Mark done'}
-          />
+          // The label is the 44px press area around the 16px box; its
+          // negative margins keep the box where it sat.
+          <label
+            htmlFor={boxId}
+            className="-mx-3.5 -mt-2.5 -mb-3.5 flex size-11 shrink-0 cursor-pointer items-center justify-center"
+          >
+            <Checkbox
+              id={boxId}
+              checked={done}
+              onChange={(event) => void tick(event.target.checked)}
+              aria-label={done ? 'Done. Untick to mark it open' : 'Mark done'}
+            />
+          </label>
         )}
         <div className="min-w-0 flex-1 space-y-0.5">
           <Prose markdown={resolution.what} className={cn(done && 'text-ink-muted line-through')} />
@@ -784,7 +790,7 @@ function ResolutionRow({
           {mark?.todoId ? (
             <Link
               href={`/todo/all?status=all&focus=${mark.todoId}`}
-              className={cn(linkVariants(), 'text-ui')}
+              className={cn(linkVariants(), 'press-area text-ui')}
             >
               Open the todo
             </Link>
