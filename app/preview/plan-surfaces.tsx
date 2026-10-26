@@ -20,6 +20,8 @@ import { AssigneeCell, type AssigneeWho } from '@/components/plan-tree/assignee-
 import { ColumnHeader, ROW_GRID } from '@/components/plan-tree/grid';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { ProjectMainLine } from '@/app/dev/plan/project-main-line';
+import type { MainCheck } from '@/lib/plan/main-check';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -361,13 +363,45 @@ const projectItems: PlanItem[] = [
 const project = buildPlanTree({ items: projectItems, dependencies: [], projects: PROJECT_FIXTURES });
 const site = WEBSITE_FIXTURE;
 
-export function ProjectPlanSurface() {
+/** When the project's main was read, and the clock the page drew it by. */
+const PROJECT_MAIN_NOW = Date.parse('2026-10-26T09:02:00Z');
+
+const projectMainPassed: MainCheck = {
+  sha: 'e81f2a94c0d3b6a7f5e2c1d0b9a8f7e6d5c4b3a2',
+  conclusion: 'passed',
+  checkedAt: '2026-10-26T09:00:00Z',
+  error: null,
+  reason: null,
+  runUrl: null,
+  deployState: 'deployed',
+  deployUrl: null,
+  deployError: null,
+  unapplied: null,
+  migrationsError: null,
+};
+
+/** The reading a token that cannot see the project's repository leaves. */
+const projectMainRefused: MainCheck = {
+  ...projectMainPassed,
+  sha: null,
+  conclusion: null,
+  deployState: null,
+  error:
+    'GITHUB_READ_TOKEN is missing a permission (404). Give it access to knightx4/selveyknightwebsite in the token\'s settings, then redeploy.',
+};
+
+export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = {}) {
   return (
     <ScopeLabelsProvider labels={scopeLabelsOf(project)}>
     <PageColumn className="space-y-6">
       <PageHeader
         title={site.label}
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
+      />
+      <ProjectMainLine
+        check={refused ? projectMainRefused : projectMainPassed}
+        repo={`${site.repo.owner}/${site.repo.repo}`}
+        now={PROJECT_MAIN_NOW}
       />
       <PlanView
         basePath="/dev/projects/website"

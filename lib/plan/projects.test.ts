@@ -10,6 +10,8 @@ import {
   projectById,
   projectFromRow,
   projectsFromRows,
+  repoForScope,
+  rootScopes,
   storedScopeOf,
 } from './projects';
 import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from './project-fixtures';
@@ -106,5 +108,29 @@ describe('plan scopes', () => {
       repo: 'selveyknightwebsite',
       branch: 'main',
     });
+  });
+});
+
+describe('the repository a step is built in', () => {
+  it("reads a step's scope from its root feature", () => {
+    const roots = rootScopes([
+      { id: 'feature', parentId: null, module: 'website' },
+      { id: 'step', parentId: 'feature', module: 'dev' },
+      { id: 'sub', parentId: 'step', module: null },
+      { id: 'orphan', parentId: 'gone', module: 'jobs' },
+      { id: 'loop-a', parentId: 'loop-b', module: 'learn' },
+      { id: 'loop-b', parentId: 'loop-a', module: 'learn' },
+    ]);
+    expect(roots.get('step')).toBe('website');
+    expect(roots.get('sub')).toBe('website');
+    expect(roots.get('orphan')).toBe('jobs');
+    expect(roots.get('loop-a')).toBe('learn');
+  });
+
+  it("gives a project's repository for its scope and this app's for the rest", () => {
+    expect(repoForScope('website', PROJECT_FIXTURES)).toEqual(WEBSITE_FIXTURE.repo);
+    expect(repoForScope('dev', PROJECT_FIXTURES).repo).toBe('PersonalDashboard');
+    expect(repoForScope(null, PROJECT_FIXTURES).repo).toBe('PersonalDashboard');
+    expect(repoForScope('unknown-project', PROJECT_FIXTURES).repo).toBe('PersonalDashboard');
   });
 });
