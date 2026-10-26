@@ -6,6 +6,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { saveTouchEdit } from '@/lib/jobs/contacts/edit';
+import { chooseFollowUpPerson, startOwnNote } from '@/lib/jobs/followup/choose';
 import { designateFollowUp, draftNote } from '@/lib/jobs/followup/designate';
 import { loadFollowUps, type FollowUp } from '@/lib/jobs/followup/load';
 import { channelFor, followUpAim } from '@/lib/jobs/followup/person';
@@ -71,48 +72,48 @@ export async function findFollowUp(
   };
 }
 
-/** Name someone the person picked from their contacts at the company, and draft the note to them. */
-// latency: pending -- a draft
-export async function chooseFollowUp(
+const Chosen = z.union([
+  z.object({ contactId: z.string().uuid() }),
+  z.object({
+    name: z.string().trim().min(1, 'A name is needed.').max(200),
+    title: z.string().trim().max(200).optional(),
+    linkedinUrl: z.string().trim().url('That LinkedIn link is not a web address.').optional().or(z.literal('')),
+    email: z.string().trim().email('That email does not look right.').optional().or(z.literal('')),
+  }),
+]);
+
+/**
+ * Name the person by hand: one of their contacts, or someone new, who is
+ * added as a contact at the company (lib/jobs/followup/choose.ts). No note
+ * is written; the card offers one after.
+ */
+// latency: pending -- one write; the card redraws from what comes back
+export async function setFollowUpPerson(
   applicationId: string,
-  contactId: string,
+  who: z.input<typeof Chosen>,
 ): Promise<{ error: string | null; followUp?: FollowUp }> {
-  if (!Id.safeParse(applicationId).success || !Id.safeParse(contactId).success) return { error: 'That is not a contact.' };
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Drafting is not configured.' };
+  if (!Id.safeParse(applicationId).success) return { error: 'That is not an application.' };
+  const parsed = Chosen.safeParse(who);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { data: contact } = await supabase
-    .from('contacts')
-    .select('email, relationship, status, linkedin_connection')
-    .eq('id', contactId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!contact) return { error: 'That contact is not on file.' };
-  const { data: app } = await supabase
-    .from('applications')
-    .update({ follow_up_contact_id: contactId, follow_up_why: 'You chose them.', follow_up_tried_at: new Date().toISOString() })
-    .eq('id', applicationId)
-    .eq('user_id', user.id)
-    .select('status, roles!inner ( title, companies!inner ( name ) )')
-    .maybeSingle();
-  if (!app) return { error: 'That application is not on file.' };
-
-  const facts = app as unknown as { status: Parameters<typeof roleStage>[0]; roles: { title: string; companies: { name: string } } };
-  const c = contact as { email: string | null; relationship: string; status: string; linkedin_connection: boolean };
-  const spend: SpendReport[] = [];
-  const note = await draftNote(supabase, user.id, {
-    applicationId,
-    contactId,
-    channel: channelFor({ email: c.email, relationship: c.relationship, status: c.status, linkedinConnection: c.linkedin_connection }),
-    aim: followUpAim({ role: facts.roles.title, company: facts.roles.companies.name, applied: roleStage(facts.status) !== 'lead' }),
-    apiKey,
-    onSpend: (report) => spend.push(report),
-  });
-  await recordSessionSpend(user.id, { module: 'jobs', operation: 'draft-outreach' }, spend);
+  const result = await chooseFollowUpPerson(supabase, user.id, applicationId, parsed.data);
+  if (result.error) return { error: result.error };
   refresh();
-  return { error: note.error, followUp: await current(applicationId, user.id) };
+  return { error: null, followUp: await current(applicationId, user.id) };
+}
+
+/** Open a blank note to the person named, to write without Dash. */
+// latency: pending -- one write
+export async function writeOwnFollowUp(applicationId: string): Promise<{ error: string | null; followUp?: FollowUp }> {
+  if (!Id.safeParse(applicationId).success) return { error: 'That is not an application.' };
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await startOwnNote(supabase, user.id, applicationId);
+  if (error) return { error };
+  refresh();
+  return { error: null, followUp: await current(applicationId, user.id) };
 }
 
 /** Write the note to the person named again, in place of the draft there. */

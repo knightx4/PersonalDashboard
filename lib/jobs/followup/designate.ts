@@ -1,8 +1,8 @@
 /**
  * Name the person an application is followed up with, and draft the note.
  *
- * The person comes from the contacts on file when anyone there will do
- * (person.ts), and otherwise from a web search for the hiring manager
+ * The person is the recruiter or hiring manager: from the contacts on file
+ * when one is there (person.ts), and otherwise from a web search for them
  * (find-person.ts), who is then added as a contact Dash found. The choice is
  * kept on the application (follow_up_contact_id, follow_up_why) and the note
  * as a draft touch on that contact with the application's id, so it is
@@ -25,7 +25,7 @@ import { loadSeeker } from '@/lib/jobs/suggest/run';
 import type { Channel } from '@/lib/jobs/suggest/payload';
 import { lastCorrespondents } from './recipients';
 import { findFollowUpPerson } from './find-person';
-import { channelFor, followUpAim, pickOnFile, type FileContact } from './person';
+import { channelFor, followUpAim, pickOnFile, pickWarm, type FileContact } from './person';
 
 export type DesignateOptions = {
   apiKey: string;
@@ -42,7 +42,7 @@ export type DesignateOptions = {
 };
 
 export type DesignateResult =
-  | { ok: true; contactId: string; touchId: string | null; from: 'file' | 'web'; draftError: string | null }
+  | { ok: true; contactId: string; touchId: string | null; from: 'file' | 'web' | 'warm'; draftError: string | null }
   | { ok: false; error: string; searched: boolean };
 
 type ApplicationFacts = {
@@ -116,10 +116,11 @@ export async function designateFollowUp(
   const contacts = (await loadCompanyContacts(supabase, userId, app.companyId)).filter((c) => c.id !== passedOver);
   const correspondent = (await lastCorrespondents(supabase, userId, [app.id])).get(app.id)?.fromAddress ?? null;
 
-  let chosen: { contactId: string; why: string; channel: Channel; from: 'file' | 'web' } | null = null;
+  let chosen: { contactId: string; why: string; channel: Channel; from: 'file' | 'web' | 'warm' } | null = null;
   const onFile = pickOnFile({
     contacts,
     company: app.company,
+    role: app.role,
     referralContactId: app.referralContactId === passedOver ? null : app.referralContactId,
     correspondentEmail: correspondent,
   });
@@ -157,12 +158,13 @@ export async function designateFollowUp(
         channel: channelFor({ email: null, relationship: 'cold', status: 'to_contact', linkedinConnection: false }),
         from: 'web',
       };
-    } else if (!found.ok) {
+    } else if (!found.ok && found.queue) {
       // Out of time is not a look that found nobody: the next run tries again.
-      if (found.queue) return { ok: false, error: 'The search needed more time than it had. Try again.', searched };
-      await markTried(supabase, userId, app.id);
-      return { ok: false, error: found.error, searched };
+      return { ok: false, error: 'The search needed more time than it had. Try again.', searched };
     }
+    // Nobody hiring for it turned up: someone they know there can say who is.
+    const warm = chosen ? null : pickWarm(contacts, app.company);
+    if (warm) chosen = { ...warm, from: 'warm' };
   }
 
   if (!chosen) {

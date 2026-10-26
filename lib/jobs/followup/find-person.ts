@@ -4,8 +4,8 @@
  * Used only when nobody on file at the company will do (person.ts). One web
  * search conversation, the same as the people search's (searchThenReport in
  * suggest/model.ts), asked for a single named person: whoever the role
- * reports to, else the person who leads that team, else the recruiter for
- * it. It reads public pages only (team pages, posts, talks, articles, public
+ * reports to, else the recruiter for it, else the person who leads that
+ * team. It reads public pages only (team pages, posts, talks, articles, public
  * profiles), the same rule as the people search: nothing behind a login.
  */
 import 'server-only';
@@ -41,8 +41,12 @@ that person at the company named:
 
 1. Whoever this role reports to, when the posting says (a title such as "Head
    of Strategic Finance") and you can find who holds that title now.
-2. Otherwise the person who leads the team the role sits in.
-3. Otherwise the recruiter or talent partner who hires for that team.
+2. Otherwise the recruiter or talent partner who hires for that team or that
+   kind of role.
+3. Otherwise the person who leads the team the role sits in.
+
+Only these can move an application. Never someone who works at the company
+on another team, however senior or well connected.
 
 Use public pages only: the company's team or about pages, its blog, posts,
 talks, podcasts, press, and public profiles. They must work there now; a page

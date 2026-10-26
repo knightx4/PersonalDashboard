@@ -4,13 +4,22 @@ import Link from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { APPLIED_STATUSES, TO_APPLY_STATUSES, type FollowUp } from '@/lib/jobs/followup/load';
-import { FollowUpCard } from './follow-up-card';
+import { FollowUpCard, type CompanyContact } from './follow-up-card';
 
 /**
  * The Follow-ups page: applications waiting on a first reply, then roles
  * still to apply for, each as its follow-up card.
  */
-export function FollowUpsView({ followUps, timezone }: { followUps: FollowUp[]; timezone: string }) {
+export function FollowUpsView({
+  followUps,
+  contactsByCompany = {},
+  timezone,
+}: {
+  followUps: FollowUp[];
+  /** Their contacts at each company, by company id, to choose the person by hand. */
+  contactsByCompany?: Record<string, CompanyContact[]>;
+  timezone: string;
+}) {
   const toApply = followUps.filter((f) => (TO_APPLY_STATUSES as readonly string[]).includes(f.status));
   // Notes still to send first, then the ones with nobody named, then the sent.
   const applied = followUps
@@ -31,8 +40,8 @@ export function FollowUpsView({ followUps, timezone }: { followUps: FollowUp[]; 
         />
       ) : (
         <div className="space-y-8">
-          <Group title="Applied" items={applied} timezone={timezone} empty="Nothing applied for and waiting on a reply." />
-          <Group title="To apply" items={toApply} timezone={timezone} empty="No roles waiting to be applied for." />
+          <Group title="Applied" items={applied} contactsByCompany={contactsByCompany} timezone={timezone} empty="Nothing applied for and waiting on a reply." />
+          <Group title="To apply" items={toApply} contactsByCompany={contactsByCompany} timezone={timezone} empty="No roles waiting to be applied for." />
         </div>
       )}
     </PageColumn>
@@ -45,7 +54,19 @@ function order(f: FollowUp): number {
   return 2;
 }
 
-function Group({ title, items, timezone, empty }: { title: string; items: FollowUp[]; timezone: string; empty: string }) {
+function Group({
+  title,
+  items,
+  contactsByCompany,
+  timezone,
+  empty,
+}: {
+  title: string;
+  items: FollowUp[];
+  contactsByCompany: Record<string, CompanyContact[]>;
+  timezone: string;
+  empty: string;
+}) {
   return (
     <section className="space-y-3">
       <SectionHeading title={title} count={items.length > 0 ? String(items.length) : undefined} />
@@ -57,6 +78,7 @@ function Group({ title, items, timezone, empty }: { title: string; items: Follow
             <FollowUpCard
               key={f.applicationId}
               initial={f}
+              contacts={contactsByCompany[f.companyId] ?? []}
               timezone={timezone}
               heading={
                 <Link href={`/jobs/roles/${f.roleId}`} className="press-area text-ink">

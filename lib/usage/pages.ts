@@ -170,6 +170,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/vault/settings',
   '/vault/triage',
   '/you',
+  '/you/board',
+  '/you/board/[id]',
   '/you/details',
   '/you/insights',
   '/you/personality',

@@ -199,6 +199,8 @@ export const NAV_ICONS = {
   places: MapPin,
   workSchool: GraduationCap,
   insights: Sparkles,
+  // The board's meetings (plan #2540.3): five advisors round a table.
+  board: Users,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

@@ -1313,7 +1313,10 @@ async function rowsWhere(env: JobsWriteEnv, table: string, column: string, value
   return (data ?? []) as Row[];
 }
 
-/** A role's thread stays under the role's own ref, so a merge would leave it behind: refused. */
+/**
+ * A role's thread is not among the rows the Undo reads and puts back, so
+ * Dash refuses a role with comments; the company page's button moves them.
+ */
 async function refuseThreads(env: JobsWriteEnv, merged: Row[], losers: string[], names: Map<string, string>): Promise<void> {
   for (const role of merged) {
     const { data, error } = await env.core
@@ -1325,7 +1328,7 @@ async function refuseThreads(env: JobsWriteEnv, merged: Row[], losers: string[],
     if (error) throw new Error(`Reading the role's thread failed: ${error.message}`);
     if ((data ?? []).length > 0) {
       throw new JobsRefused(
-        `${names.get(role.id as string)} has comments in its thread, which a merge would leave behind. Ask them to keep that role instead.`,
+        `${names.get(role.id as string)} has comments in its thread, which Dash's merge cannot undo. Ask them to merge on the company page, which carries the comments over.`,
       );
     }
   }

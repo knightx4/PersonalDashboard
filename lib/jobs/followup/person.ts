@@ -2,12 +2,20 @@
  * Who an application is followed up with, chosen from the contacts on file.
  *
  * Once an application goes in, one person is named to tell about it, with a
- * note drafted to them (designate.ts). Someone already on file beats a
- * stranger found on the web, so this is tried first and costs nothing: the
- * person who referred them, then the recruiter who wrote about this
- * application, then someone they know at the company, then a LinkedIn
- * connection there, then anyone else on file at it. Only when this finds
- * nobody does Dash search the web for the hiring manager (find-person.ts).
+ * note drafted to them (designate.ts). The people who can move an
+ * application are the recruiter and the hiring manager, so only they, or
+ * someone on the team the role sits in, are chosen here: the person who
+ * referred them, the recruiter who wrote about this application, a manager
+ * on the role's team, a recruiter at the company, then anyone else on the
+ * team. Knowing someone elsewhere at the company is not enough. When nobody
+ * on file fits, Dash searches the web for the hiring manager or recruiter
+ * (find-person.ts), and only if that finds nobody does it fall back to a
+ * connection at the company who could point the way (pickWarm).
+ *
+ * Whether someone is on the team is read from the titles: a contact whose
+ * title shares a word naming the work with the role's title ("Finance" in
+ * "Head of Finance" and "Strategic Finance Lead"). Words every role here
+ * carries, such as strategy and operations, do not count.
  *
  * Pure, so the order can be tested and read in one place.
  */
@@ -26,19 +34,47 @@ export type FileContact = {
 
 export type FollowUpPick = { contactId: string; why: string; channel: Channel };
 
-/** Titles of the people who decide on, or run, a hiring process. */
-const HIRING_WORDS = /\b(head|director|manager|lead|vp|vice president|chief|founder|recruit\w*|talent|people)\b/i;
+/** Titles of the people who run a team or a hiring process. */
+const LEADER_WORDS = /\b(head|director|manager|lead|vp|vice president|chief|founder|cfo|coo|ceo|partner)\b/i;
+/** Titles of the people who recruit. */
+const RECRUITER_WORDS = /\b(recruit\w*|talent|people)\b/i;
 
-/** Lower is better. Null leaves the contact out. */
-function tier(contact: FileContact, referralId: string | null, correspondent: string | null): number | null {
+/**
+ * Words in a title that say nothing about which team it is: levels, joins,
+ * and the words nearly every role in this search carries.
+ */
+const NOT_TEAM_WORDS = new Set([
+  'senior', 'junior', 'staff', 'principal', 'associate', 'analyst', 'manager', 'lead', 'head', 'director',
+  'chief', 'officer', 'vice', 'president', 'member', 'founding', 'founder', 'partner', 'global', 'team',
+  'strategy', 'strategic', 'strategist', 'operations', 'business', 'general', 'generalist', 'and', 'the', 'for', 'with',
+]);
+
+/** The words in a title that name the work, cut to a stem so "Finance" meets "Financial". */
+export function teamWords(title: string | null | undefined): Set<string> {
+  const words = (title ?? '')
+    .toLowerCase()
+    .replace(/fp&a/g, 'finance planning')
+    .split(/[^a-z]+/)
+    .filter((word) => word.length >= 3 && !NOT_TEAM_WORDS.has(word));
+  return new Set(words.map((word) => word.slice(0, 5)));
+}
+
+function onTeam(contactTitle: string | null, role: Set<string>): boolean {
+  for (const word of teamWords(contactTitle)) if (role.has(word)) return true;
+  return false;
+}
+
+/** Lower is better. Null leaves the contact out: they are not who an application is followed up with. */
+function tier(contact: FileContact, role: Set<string>, referralId: string | null, correspondent: string | null): number | null {
   if (contact.id === referralId) return 0;
   if (correspondent && contact.email?.toLowerCase() === correspondent) return 1;
   if (contact.status === 'dormant') return null;
-  if (contact.relationship === 'friend' || contact.relationship === 'former_colleague') return 2;
-  if (contact.relationship === 'alum' || contact.relationship === 'second_degree') return 3;
-  if (contact.linkedinConnection) return 4;
-  if (contact.relationship === 'recruiter') return 5;
-  return 6;
+  const title = contact.title ?? '';
+  const team = onTeam(title, role);
+  if (team && LEADER_WORDS.test(title)) return 2;
+  if (contact.relationship === 'recruiter' || RECRUITER_WORDS.test(title)) return 3;
+  if (team) return 4;
+  return null;
 }
 
 function whyFor(contact: FileContact, rank: number, company: string): string {
@@ -48,15 +84,11 @@ function whyFor(contact: FileContact, rank: number, company: string): string {
     case 1:
       return `${contact.fullName} wrote to you about this application.`;
     case 2:
-      return `You know ${contact.fullName} (${contact.relationship.replace(/_/g, ' ')}) and they work at ${company}.`;
+      return `${contact.fullName} leads the team this role sits in${contact.title ? ` (${contact.title})` : ''}.`;
     case 3:
-      return `${contact.fullName} is ${contact.relationship === 'alum' ? 'a fellow alum' : 'a second-degree connection'} at ${company}.`;
-    case 4:
-      return `${contact.fullName} is one of your LinkedIn connections at ${company}.`;
-    case 5:
       return `${contact.fullName} recruits at ${company}.`;
     default:
-      return `${contact.fullName} is on your contacts at ${company}${contact.title ? ` as ${contact.title}` : ''}.`;
+      return `${contact.fullName} works on the team this role sits in${contact.title ? ` (${contact.title})` : ''}.`;
   }
 }
 
@@ -73,29 +105,58 @@ export function channelFor(contact: Pick<FileContact, 'email' | 'relationship' |
   return contact.email ? 'email' : 'linkedin_connect';
 }
 
-/** The best person on file to follow this application up with, or null. */
+/** The recruiter or hiring manager on file for this application, or null. */
 export function pickOnFile(input: {
   contacts: readonly FileContact[];
   company: string;
+  role: string;
   referralContactId: string | null;
   /** The address that last wrote about this application (recipients.ts). */
   correspondentEmail: string | null;
 }): FollowUpPick | null {
   const correspondent = input.correspondentEmail?.trim().toLowerCase() || null;
-  let best: { contact: FileContact; rank: number; hiring: boolean } | null = null;
+  const role = teamWords(input.role);
+  let best: { contact: FileContact; rank: number } | null = null;
   for (const contact of input.contacts) {
-    const rank = tier(contact, input.referralContactId, correspondent);
+    const rank = tier(contact, role, input.referralContactId, correspondent);
     if (rank === null) continue;
-    const hiring = HIRING_WORDS.test(contact.title ?? '');
-    if (!best || rank < best.rank || (rank === best.rank && hiring && !best.hiring)) {
-      best = { contact, rank, hiring };
-    }
+    if (!best || rank < best.rank) best = { contact, rank };
   }
   if (!best) return null;
   return {
     contactId: best.contact.id,
     why: whyFor(best.contact, best.rank, input.company),
     channel: channelFor(best.contact, best.rank === 1),
+  };
+}
+
+/**
+ * Someone they know at the company, off the team, for when neither the
+ * contacts on file nor the web search turned up a recruiter or hiring
+ * manager: they cannot move the application, but they can say who can.
+ * A friend or former colleague first, then a fellow alum, a second-degree
+ * connection, a LinkedIn connection.
+ */
+export function pickWarm(contacts: readonly FileContact[], company: string): FollowUpPick | null {
+  const order = (c: FileContact) =>
+    c.relationship === 'friend' || c.relationship === 'former_colleague'
+      ? 0
+      : c.relationship === 'alum'
+        ? 1
+        : c.relationship === 'second_degree'
+          ? 2
+          : c.linkedinConnection
+            ? 3
+            : null;
+  const warm = contacts
+    .filter((c) => c.status !== 'dormant' && order(c) !== null)
+    .sort((a, b) => order(a)! - order(b)!);
+  const contact = warm[0];
+  if (!contact) return null;
+  return {
+    contactId: contact.id,
+    why: `Nobody hiring for it turned up, and you know ${contact.fullName} at ${company}, who can point you to who is.`,
+    channel: channelFor(contact),
   };
 }
 
