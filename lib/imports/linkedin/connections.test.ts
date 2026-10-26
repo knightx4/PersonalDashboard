@@ -5,8 +5,8 @@ import { readLinkedInArchive, type LinkedInArchive, type MessageRecord } from '@
 import { applyPlan, planImport } from '../engine';
 import { LINKEDIN_MAPPERS, LINKEDIN_SOURCE } from '../linkedin';
 import { memoryStore, type MemoryStore } from '../memory-store';
-import { CONNECTION_ONLY } from './applications';
-import { INCOMING, NO_NOTE, ONE_WAY, ownSlug } from './connections';
+import { CONNECTION_ONLY, SUBJECT_ONLY } from './applications';
+import { INCOMING, NO_NOTE, ONE_WAY, ownSlug, subjectCompany } from './connections';
 
 // The fixture export (lib/linkedin/archive/fixtures/build-export.ts) is Sam
 // Taylor's. Two connections: Jordan Lee, a recruiter at Acme Robotics, and
@@ -202,6 +202,33 @@ describe('importing connections, invitations and messages', () => {
     expect(casey).toMatchObject({ linkedin_url: founder[1] });
     expect(casey.linkedin_connection).toBeUndefined();
     expect(store.rows(TOUCHES).filter((t) => t.contact_id === casey.id).map((t) => t.direction).sort()).toEqual(['inbound', 'outbound']);
+  });
+
+  it('reads the company a subject names after "at"', () => {
+    expect(subjectCompany('CPA / MBA Interested in Strategic Finance Role at Ramp in NYC')).toBe('Ramp');
+    expect(subjectCompany('Interest in Chatting About Your Role at Ramp')).toBe('Ramp');
+    expect(subjectCompany('Exciting opportunity at Gen II Fund Services')).toBe('Gen II Fund Services');
+    expect(subjectCompany('Analyst at Coca-Cola - Atlanta')).toBe('Coca-Cola');
+    expect(subjectCompany('Free to talk at the moment?')).toBeNull();
+    expect(subjectCompany('Baylor Alum Looking to Connect')).toBeNull();
+    expect(subjectCompany(null)).toBeNull();
+  });
+
+  it('links someone you wrote to who is not a connection to the tracked company your subject names', async () => {
+    const input = archive();
+    const ramp: [string, string] = ['John Buller', 'https://www.linkedin.com/in/johncbuller'];
+    const other: [string, string] = ['Gale Agency', 'https://www.linkedin.com/in/gale-agency'];
+    input.messages.push(
+      message('ramp-1', ['Sam Taylor', SAM], ramp, '2026-07-13T22:38:00.000Z', 'Hi John', 'Strategic Finance Role at Ramp in NYC'),
+      message('hooli-1', ['Sam Taylor', SAM], other, '2026-07-14T10:00:00.000Z', 'Hi Gale', 'Role at Hooli'),
+    );
+    const store = seeded({ [COMPANIES]: [{ id: 'c9', name: 'Ramp', slug: 'ramp', priority: 'target', domains: [] }] });
+    const plan = await run(store, input);
+
+    expect(store.rows(CONTACTS).find((c) => c.full_name === 'John Buller')).toMatchObject({ company_id: 'c9' });
+    expect(store.rows(CONTACTS).find((c) => c.full_name === 'Gale Agency')).toMatchObject({ company_id: null });
+    expect(store.rows(COMPANIES).map((c) => c.name)).not.toContain('Hooli');
+    expect(kind(plan, 'companies').records.find((r) => r.key === 'hooli')).toMatchObject({ outcome: 'skipped', reason: SUBJECT_ONLY });
   });
 
   it('joins a touch the person logged by hand that day rather than doubling it', async () => {
