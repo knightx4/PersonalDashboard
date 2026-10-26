@@ -43,6 +43,7 @@ import {
   type BoardMarkResult,
 } from '../actions';
 import { useRefreshWhileRunning } from '../refresh-while-running';
+import { SeatLabel } from '../seat-label';
 
 /**
  * One board meeting (plan #2540.3), on the detail pattern
@@ -362,7 +363,7 @@ export function MeetingView({
               {minutes.predictions.map((prediction, index) => (
                 <li key={index} className="card-pad-x space-y-0.5 py-3">
                   <p className="text-small font-medium text-ink-muted">
-                    {SEAT_LABELS[prediction.seat]}
+                    <SeatLabel seat={prediction.seat} />
                   </p>
                   <Prose markdown={prediction.text} />
                 </li>
@@ -391,7 +392,7 @@ export function MeetingView({
                   <li key={index} className="card-pad-x space-y-1 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-small font-medium text-ink-muted">
-                        {SEAT_LABELS[graded.seat]}
+                        <SeatLabel seat={graded.seat} />
                       </p>
                       <GradeMark grade={graded.grade} />
                     </div>
@@ -430,7 +431,7 @@ export function MeetingView({
                 {minutes.memos.map((memo) => (
                   <li key={memo.seat} className="card-pad-x space-y-3 py-4">
                     <h3 className="text-ui font-semibold text-ink">
-                      {capital(SEAT_NAMES[memo.seat])}
+                      <SeatLabel seat={memo.seat} text={capital(SEAT_NAMES[memo.seat])} />
                     </h3>
                     <Prose markdown={memo.memo} />
                     {memo.resolution && (
@@ -563,11 +564,11 @@ function DisagreementCard({
           <li key={index} className="space-y-1">
             {called && position.stance ? (
               <p className="text-body font-semibold text-ink">
-                {SEAT_LABELS[position.seat]} · {position.stance}
+                <SeatLabel seat={position.seat} text={`${SEAT_LABELS[position.seat]} · ${position.stance}`} />
               </p>
             ) : (
               <p className="text-small font-medium text-ink-muted">
-                {SEAT_LABELS[position.seat]}
+                <SeatLabel seat={position.seat} />
                 {position.stance && <span className="font-normal">, {position.stance}</span>}
               </p>
             )}
@@ -597,7 +598,7 @@ function DisagreementCard({
                 pending={pendingVote === value}
                 onClick={() => void vote(value)}
               >
-                {value === 'neither' ? 'Neither' : SEAT_LABELS[value]}
+                {value === 'neither' ? 'Neither' : <SeatLabel seat={value} />}
               </Button>
             ))}
           </div>
@@ -852,7 +853,7 @@ function Scorecard({ scores }: { scores: readonly BoardScore[] }) {
           {scores.map((score) => (
             <tr key={score.seat}>
               <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
-                {SEAT_LABELS[score.seat]}
+                <SeatLabel seat={score.seat} />
               </th>
               <td className="tabular py-2 pr-4 text-right text-ink">{score.hits}</td>
               <td className="tabular card-pad-x py-2 pl-0 text-right text-ink">{score.misses}</td>
