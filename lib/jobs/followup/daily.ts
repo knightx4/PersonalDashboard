@@ -38,13 +38,16 @@ export async function followUpRecentApplications(
   const since = new Date(options.now.getTime() - RECENT_DAYS * DAY_MS).toISOString();
   const { data, error } = await supabase
     .from('applications')
-    .select('id, submitted_at, created_at, follow_up_tried_at')
+    .select('id, submitted_at, created_at, follow_up_tried_at, application_outreach ( id )')
     .eq('user_id', userId)
     .in('status', [...APPLIED_STATUSES])
-    .is('follow_up_contact_id', null)
     .or(`submitted_at.gte.${since},and(submitted_at.is.null,created_at.gte.${since})`);
   if (error) return { ...out, errors: [error.message] };
-  const due = dueForFollowUp((data ?? []) as SentRow[], options.now);
+  // Only applications with nobody named yet.
+  const unnamed = ((data ?? []) as (SentRow & { application_outreach: unknown[] | null })[]).filter(
+    (row) => (row.application_outreach ?? []).length === 0,
+  );
+  const due = dueForFollowUp(unnamed, options.now);
 
   let searches = SEARCHES_PER_DAY;
   for (const id of due) {

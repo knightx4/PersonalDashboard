@@ -20,6 +20,7 @@ import {
   Mail,
   MessageSquareText,
   MessagesSquare,
+  Send,
 } from 'lucide-react';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { Card } from '@/components/ui/card';
@@ -34,6 +35,7 @@ import { Answers } from './application';
 import { Interviews } from './interviews';
 import { RoleComments } from './comments';
 import { LinkedMail } from './mail';
+import { Outreach } from './outreach';
 
 export type { PanelProps } from './types';
 
@@ -41,6 +43,7 @@ const TABS: Array<{ id: RoleTab; label: string; icon: typeof FileText }> = [
   { id: 'timeline', label: 'Timeline', icon: ListChecks },
   { id: 'posting', label: 'Posting', icon: FileText },
   { id: 'answers', label: 'Application', icon: MessageSquareText },
+  { id: 'outreach', label: 'Outreach', icon: Send },
   { id: 'interviews', label: 'Interviews', icon: CalendarClock },
   { id: 'notes', label: 'Comments', icon: MessagesSquare },
   { id: 'mail', label: 'Linked mail', icon: Mail },
@@ -70,6 +73,7 @@ export function RoleDetailPanels(
 
   const counts: Partial<Record<RoleTab, number>> = {
     answers: props.answers.length,
+    outreach: props.followUp?.people.length,
     interviews: props.interviews.length,
     notes: props.thread.length,
     mail: props.messages.length,
@@ -90,6 +94,7 @@ export function RoleDetailPanels(
         {tab === 'timeline' && <Timeline {...props} />}
         {tab === 'posting' && <Posting {...props} />}
         {tab === 'answers' && <Answers {...props} />}
+        {tab === 'outreach' && <Outreach {...props} />}
         {tab === 'interviews' && (
           <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
         )}
