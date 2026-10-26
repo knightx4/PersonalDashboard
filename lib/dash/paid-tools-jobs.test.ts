@@ -96,6 +96,15 @@ describe('draft_application_answers', () => {
     expect(prepared.ok).toBe(false);
   });
 
+  it('takes several applications in one queued card, so a bulk request needs one lookup', async () => {
+    const prepared = await draftApplicationAnswersTool.prepare(context(TABLES), { application_refs: [APP] });
+    expect(prepared).toMatchObject({ ok: true, args: { applicationIds: [APP] }, count: 2 });
+    const mixed = await draftApplicationAnswersTool.prepare(context(TABLES), { application_refs: [APP, 'nope'] });
+    expect(mixed).toMatchObject({ ok: true, args: { applicationIds: [APP] } });
+    expect((await draftApplicationAnswersTool.prepare(context(TABLES), { application_refs: [] })).ok).toBe(false);
+    expect((await draftApplicationAnswersTool.prepare(context(TABLES), { application_refs: [APP], role_ref: ROLE })).ok).toBe(false);
+  });
+
   it('wants one of application_ref and role_ref', async () => {
     expect((await draftApplicationAnswersTool.prepare(context(TABLES), {})).ok).toBe(false);
     expect((await draftApplicationAnswersTool.prepare(context(TABLES), { application_ref: APP, role_ref: ROLE })).ok).toBe(false);
