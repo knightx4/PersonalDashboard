@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
 import { FieldError } from '@/components/ui/field';
-import { linkVariants } from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ResearchStatus } from '@/lib/jobs/companies/research';
 import { startCompanyResearch } from '../../companies/actions';
