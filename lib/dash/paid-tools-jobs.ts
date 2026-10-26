@@ -95,6 +95,9 @@ async function applicationOf(
   return { ok: true, applicationId: found.id, roleId: found.role_id, role };
 }
 
+/** Applications one draft_application_answers call may take. */
+const MAX_BATCH = 20;
+
 const REPLIES_NOTE =
   'Replies to Dash\'s earlier questions on the draft are the person\'s to give on the role page, where the Redraft button uses them.';
 
@@ -178,51 +181,107 @@ export const draftApplicationAnswersTool: DashPaidTool = {
   workspace: 'jobs',
   definition: {
     name: 'draft_application_answers',
-    description: `Draft the answers to every unanswered question on a job application in one go, from everything on file, so the answers tell different stories. The drafts are kept beside the answers for them to read, insert and save; nothing is written onto the application. Give the application_ref or role_ref a lookup returned. To draft one question, or to redraft one that has an answer, use draft_answer. ${REPLIES_NOTE} ${QUEUED}`,
+    description: `Draft the answers to every unanswered question on a job application in one go, from everything on file, so the answers tell different stories. The drafts are kept beside the answers for them to read, insert and save; nothing is written onto the application. Give the application_ref or role_ref a lookup returned. For several applications at once ("draft every lead that needs it"), give application_refs, up to 20, in one call: do not call this once per application. To draft one question, or to redraft one that has an answer, use draft_answer. ${REPLIES_NOTE} ${QUEUED}`,
     input_schema: {
       type: 'object',
       properties: {
         application_ref: { type: 'string', description: 'The application, as a lookup returned it.' },
         role_ref: { type: 'string', description: 'Or the role, whose latest application is taken. Not both.' },
+        application_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Or several applications as lookups returned them, drafted in one queued card. Instead of the two above.',
+        },
       },
       additionalProperties: false,
     },
   },
   async prepare(ctx, input) {
-    const found = await applicationOf(ctx, asArgs(input));
-    if (!found.ok) return found;
+    const args = asArgs(input);
+    const refs = Array.isArray(args.application_refs) ? args.application_refs : null;
+    if (refs && (args.application_ref || args.role_ref)) {
+      return { ok: false, error: 'Give application_refs, or one application_ref or role_ref, not both.' };
+    }
+    if (refs && (refs.length === 0 || refs.length > MAX_BATCH)) {
+      return { ok: false, error: `Give between 1 and ${MAX_BATCH} application_refs in one call; split a longer list across calls.` };
+    }
+    const inputs: Args[] = refs ? refs.map((ref) => ({ application_ref: ref })) : [args];
     const jobs = await ctx.db('job_search');
-    const answers = await rows<{ id: string; answer: string | null }>(
-      jobs.from('application_answers').select('id, answer').eq('application_id', found.applicationId).eq('user_id', ctx.userId),
-    );
-    if (answers.length === 0) {
-      return { ok: false, error: `${found.role} has no questions yet. Add them first (add_application_questions).` };
+    const picked: { applicationId: string; roleId: string; role: string; open: number }[] = [];
+    const skipped: string[] = [];
+    for (const one of inputs) {
+      const found = await applicationOf(ctx, one);
+      if (!found.ok) {
+        if (!refs) return found;
+        skipped.push(found.error);
+        continue;
+      }
+      const answers = await rows<{ id: string; answer: string | null }>(
+        jobs.from('application_answers').select('id, answer').eq('application_id', found.applicationId).eq('user_id', ctx.userId),
+      );
+      if (answers.length === 0) {
+        const error = `${found.role} has no questions yet. Add them first (add_application_questions).`;
+        if (!refs) return { ok: false, error };
+        skipped.push(error);
+        continue;
+      }
+      const open = answers.filter((a) => !a.answer?.trim()).length;
+      if (open === 0) {
+        const error = `Every question on ${found.role} has an answer already. Use draft_answer to redraft one.`;
+        if (!refs) return { ok: false, error };
+        skipped.push(error);
+        continue;
+      }
+      picked.push({ applicationId: found.applicationId, roleId: found.roleId, role: found.role, open });
     }
-    const open = answers.filter((a) => !a.answer?.trim());
-    if (open.length === 0) {
-      return { ok: false, error: `Every question on ${found.role} has an answer already. Use draft_answer to redraft one.` };
+    if (picked.length === 0) return { ok: false, error: skipped.join(' ') };
+    if (!refs) {
+      const [only] = picked;
+      return {
+        ok: true,
+        args: { applicationId: only.applicationId },
+        line: `Draft the answers to the ${only.open} unanswered ${only.open === 1 ? 'question' : 'questions'} on ${only.role}.`,
+        count: only.open,
+        paths: [`/jobs/roles/${only.roleId}`],
+      };
     }
+    const total = picked.reduce((n, p) => n + p.open, 0);
+    const left = skipped.length > 0 ? ` Left out: ${skipped.join(' ')}` : '';
     return {
       ok: true,
-      args: { applicationId: found.applicationId },
-      line: `Draft the answers to the ${open.length} unanswered ${open.length === 1 ? 'question' : 'questions'} on ${found.role}.`,
-      count: open.length,
-      paths: [`/jobs/roles/${found.roleId}`],
+      args: { applicationIds: picked.map((p) => p.applicationId) },
+      line: `Draft the ${total} unanswered ${total === 1 ? 'question' : 'questions'} on ${picked.length} applications: ${picked.map((p) => p.role).join('; ')}.${left}`,
+      count: total,
+      paths: picked.map((p) => `/jobs/roles/${p.roleId}`),
     };
   },
   async run(ctx, args) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { ok: false, error: 'Drafting is not configured.' };
-    const applicationId = String(args.applicationId);
-    const result = await draftApplicationAs(ctx.userId, apiKey, { applicationId });
-    if (result.error || !result.drafts) return { ok: false, error: result.error ?? 'No drafts came back.' };
-    const over = result.flagged.length > 0 ? ` ${result.flagged.length} are still over their limit.` : '';
-    const missing = result.missing.length > 0 ? ` ${result.missing.length} came back with no draft.` : '';
+    const ids = Array.isArray(args.applicationIds) ? args.applicationIds.map(String) : [String(args.applicationId)];
+    let drafted = 0;
+    let over = 0;
+    let missing = 0;
+    const errors: string[] = [];
+    for (const applicationId of ids) {
+      const result = await draftApplicationAs(ctx.userId, apiKey, { applicationId });
+      if (result.error || !result.drafts) {
+        errors.push(result.error ?? 'No drafts came back.');
+        continue;
+      }
+      drafted += result.drafted.length;
+      over += result.flagged.length;
+      missing += result.missing.length;
+    }
+    if (drafted === 0 && errors.length > 0) return { ok: false, error: errors.join(' ') };
+    const overNote = over > 0 ? ` ${over} are still over their limit.` : '';
+    const missingNote = missing > 0 ? ` ${missing} came back with no draft.` : '';
+    const failedNote = errors.length > 0 ? ` ${errors.length} of ${ids.length} applications failed: ${errors.join(' ')}` : '';
     return {
       ok: true,
-      subjectRef: toRef(APPLICATIONS, applicationId),
+      subjectRef: toRef(APPLICATIONS, ids[0]),
       op: 'update',
-      summary: `Dash drafted ${result.drafted.length} ${result.drafted.length === 1 ? 'answer' : 'answers'} and kept them beside the questions for them to read.${over}${missing}`,
+      summary: `Dash drafted ${drafted} ${drafted === 1 ? 'answer' : 'answers'} and kept them beside the questions for them to read.${overNote}${missingNote}${failedNote}`,
     };
   },
 };
