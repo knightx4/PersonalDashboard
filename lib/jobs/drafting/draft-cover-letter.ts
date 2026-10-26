@@ -11,9 +11,10 @@
  * follows.
  *
  * The letter follows one template (docs/JOB-SEARCH-SPEC.md, Cover letters):
- * who they are and why this role, two paragraphs of what building with AI
- * has shown them, taken from their vault notes, and a conventional close.
- * The résumé carries the stories.
+ * who they are and why this role, two middle paragraphs, and a conventional
+ * close. How many of the middle paragraphs are about building with AI depends
+ * on how much the posting is about AI (aiWeight): both, one, or none. The
+ * résumé carries the stories.
  *
  * The model can ask the person things back. Their replies are stored on the
  * same row and sent with the next call, so pressing Redraft uses them.
@@ -70,8 +71,9 @@ their views or their interests is theirs to claim, and is not an unsupported
 claim.
 
 The résumé goes with the letter, so the letter does not retell its stories.
-It says what they think about building with AI, in the way they write in
-their own notes. Every letter follows this template: four short paragraphs,
+It says what they think, in the way they write in their own notes: about
+building with AI when the role is about AI, and about the work itself when it
+is not. The request says how much this role is about AI; follow it. Every letter follows this template: four short paragraphs,
 about 220 to 300 words, after "Dear [team] Hiring Team:" (or the person
 their material says they are writing to).
 
@@ -107,15 +109,26 @@ their material says they are writing to).
    on placemaking projects and take urban planning courses on my own time,
    so I'd like to do this work for a company built around independent
    shops."
-2. The first AI paragraph. Open on one thing the posting says about AI,
-   automation, tooling or how the work gets done, in plain words. Then
-   something building with AI has shown them, from their notes on building
-   with AI. Then which way they lean and why, in one sentence. Then one thing
-   they built, named in passing.
-3. The second AI paragraph. A different observation from their notes, tied
-   to a concrete detail of something they built: what it does, what it
-   checks, what it produces. When the posting says nothing about AI, tie it
-   to the work the posting describes instead.
+2. When the role is about AI or mentions it, the AI paragraph. Open on one
+   thing the posting says about AI, automation, tooling or how the work gets
+   done, in plain words. Then something building with AI has shown them,
+   from their notes on building with AI. Then which way they lean and why,
+   in one sentence. Then one thing they built, named in passing.
+   When the posting does not mention AI, a paragraph about the work instead.
+   Open on one thing the posting says the role does, in plain words. Then
+   something doing that kind of work has shown them, from their notes, their
+   thinking about the search or their comments. Then which way they lean and
+   why, in one sentence.
+3. When AI is central to the role, the second AI paragraph: a different
+   observation from their notes on building with AI, tied to a concrete
+   detail of something they built (what it does, what it checks, what it
+   produces).
+   Otherwise, a second paragraph about the work: another part of what the
+   posting describes, and how they approach that kind of work, from their
+   material. A tool they built may appear here in one clause when it does
+   that kind of work; the paragraph is not about AI.
+   Never pad a paragraph with AI the role does not ask about, and never
+   suggest the team should be using AI.
 4. A conventional close in two sentences, the same in every letter apart
    from the role's name. First the next step: they would welcome the chance
    to talk about the role and how they could contribute, with no new topic
@@ -127,7 +140,8 @@ their material says they are writing to).
    role and how I could contribute to the team. Thank you for your time
    and for considering my application."
 
-This paragraph is from a letter they approved; match its register:
+This AI paragraph is from a letter they approved; match its register in
+whichever paragraphs you write:
 
 "The posting also asks how AI can improve every workflow. Building with AI
 has made me ask why each step of a process exists, when before I'd have just
@@ -167,7 +181,9 @@ Report through ${TOOL_NAME}:
 - asks: up to ${MAX_ASKS} short questions for them whose answers would make the
   letter better, such as why they want this role when their material gives
   no reason (always ask this one then), an observation about building with
-  AI when their notes hold fewer than two that fit, what the posting means by a line about
+  AI when AI is central to the role and their notes hold fewer than two that
+  fit, what they have noticed doing the work when the role is not about AI
+  and their material holds nothing that fits, what the posting means by a line about
   AI, or who they are writing to. Ask only what their material and earlier
   replies do not already answer. Empty when nothing is missing.`;
 
