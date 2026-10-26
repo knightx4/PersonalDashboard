@@ -238,7 +238,7 @@ function moveChildren(tables: FakeTables, keys: readonly Key[], from: string, to
   return moved;
 }
 
-/** job_search.merge_roles, as migration 0058 writes it. */
+/** job_search.merge_roles, as migration 0075 of the job-search folder writes it. */
 function mergeRoles(tables: FakeTables, args: Row): { data: unknown; error: { message: string; code: string } | null } {
   const refuse = (message: string, code = '22023') => ({ data: null, error: { message, code } });
   const keep = args.p_keep_role as string;
@@ -253,11 +253,6 @@ function mergeRoles(tables: FakeTables, args: Row): { data: unknown; error: { me
   if (roles.some((r) => merged.includes(r.id as string) && (r.company_id !== kept.company_id || r.user_id !== kept.user_id))) {
     return refuse('Roles can only be merged within the same company.');
   }
-  const refs = merged.map((id) => `job_search.roles:${id}`);
-  if ((tables['core.conversation_turns'] ?? []).some((t) => refs.includes(t.ref as string))) {
-    return refuse('One of those roles has comments in its thread, which a merge would leave behind. Keep that role instead.');
-  }
-
   let moved = 0;
   const apps = (tables['job_search.applications'] ??= []);
   const all = [...merged, keep];
@@ -277,6 +272,13 @@ function mergeRoles(tables: FakeTables, args: Row): { data: unknown; error: { me
   // Every key to a role but the applications', the old thread notes' included.
   const roleKeys: Key[] = [...ROLE_CHILDREN, { table: 'job_search.notes', column: 'role_id', unique: null }];
   for (const id of merged) {
+    // move_role_thread: the merged role's comments join the kept role's thread.
+    for (const turn of tables['core.conversation_turns'] ?? []) {
+      if (turn.ref === `job_search.roles:${id}`) {
+        turn.ref = `job_search.roles:${keep}`;
+        moved += 1;
+      }
+    }
     moved += moveChildren(tables, roleKeys, id, keep);
     roles.splice(roles.findIndex((r) => r.id === id), 1);
   }

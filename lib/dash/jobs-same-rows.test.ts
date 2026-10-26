@@ -1119,19 +1119,18 @@ describe('merge_roles folds roles as the Merge roles button does (plan #2473.6)'
     expect(rowsOf(tables)).toEqual(rowsOf(dupesSeed()));
   });
 
-  it('refuses, as the button does, a duplicate with comments in its thread', async () => {
-    const turn = { id: fakeId(), user_id: ME, ref: `job_search.roles:${ROLE_2}`, author: 'me', body: 'Hi' };
+  it('refuses a duplicate with comments in its thread, which the button merges with its comments', async () => {
+    const turn = () => ({ id: fakeId(), user_id: ME, ref: `job_search.roles:${ROLE_2}`, author: 'me', body: 'Hi' });
     const tables = dupesSeed();
-    tables['core.conversation_turns'] = [turn];
+    tables['core.conversation_turns'] = [turn()];
     const result = await runJobsWrite(merge, toolEnv(tables), { keep_role_ref: ROLE, merge_role_refs: [ROLE_2] });
     expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/comments in its thread/) });
     expect(tables['job_search.roles']).toHaveLength(2);
 
     const { mergeRoles } = await import('@/app/jobs/(app)/companies/actions');
-    session.tables = { ...dupesSeed(), 'core.conversation_turns': [turn] };
-    expect(await mergeRoles({ companyId: COMPANY, survivorRoleId: ROLE, mergedRoleIds: [ROLE_2] })).toMatchObject({
-      error: expect.stringMatching(/comments in its thread/),
-    });
-    expect(session.tables['job_search.roles']).toHaveLength(2);
+    session.tables = { ...dupesSeed(), 'core.conversation_turns': [turn()] };
+    expect(await mergeRoles({ companyId: COMPANY, survivorRoleId: ROLE, mergedRoleIds: [ROLE_2] })).toEqual({ error: null });
+    expect(session.tables['job_search.roles']).toHaveLength(1);
+    expect(session.tables['core.conversation_turns']).toMatchObject([{ ref: `job_search.roles:${ROLE}`, body: 'Hi' }]);
   });
 });
