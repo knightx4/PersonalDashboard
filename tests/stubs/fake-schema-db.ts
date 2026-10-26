@@ -238,7 +238,7 @@ function moveChildren(tables: FakeTables, keys: readonly Key[], from: string, to
   return moved;
 }
 
-/** job_search.merge_roles, as migration 0074 of the job-search folder writes it. */
+/** job_search.merge_roles, as migration 0075 of the job-search folder writes it. */
 function mergeRoles(tables: FakeTables, args: Row): { data: unknown; error: { message: string; code: string } | null } {
   const refuse = (message: string, code = '22023') => ({ data: null, error: { message, code } });
   const keep = args.p_keep_role as string;
