@@ -180,6 +180,15 @@ Things they want to buy, saved from shops, with their notes.
 - Name a row by `title`; link it by `id`
 - Opens at `/shopping/saved/<id>`
 
+### `you.board_questions` (You)
+
+The decisions they put to their board: the question, its options, the way they were leaning, and what they decided.
+
+- Search: `question`, `context`, `lean`, `decision_note`
+- Name a row by `question`; link it by `id`
+- Opens at `/you/board`
+- options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. verdict is the board's recommendation, written by Dash, so cite their decision rather than the verdict (you 0022).
+
 ### `core.conversation_turns` (Learn)
 
 What they asked or explained, and what Dash replied, turn by turn.
