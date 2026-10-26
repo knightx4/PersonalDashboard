@@ -40,6 +40,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
     sections: [
       { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+      { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
       { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },

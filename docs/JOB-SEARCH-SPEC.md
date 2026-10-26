@@ -206,6 +206,7 @@ One employer is one row. Every path that creates a company goes through `ensureC
 | submitted_at | timestamptz | |
 | source | enum | copied from role at creation, editable. Drives the by-channel funnel |
 | referral_contact_id | uuid | nullable |
+| follow_up_contact_id, follow_up_why, follow_up_tried_at | uuid, text, timestamptz | the one person to tell about the application, why them, and when Dash last looked (see Follow-ups) |
 | resume_version_id | uuid | |
 | cover_letter_id | uuid | nullable |
 | created_by | enum | `manual`, `email_inferred`. See linking |
@@ -724,6 +725,8 @@ Every source passes one gate (`lib/jobs/suggest/admit.ts`, `fit-gate.ts`): a rol
 
 **Contacts and outreach.** List, detail, touch log with response tracking. Follow-ups on a quiet application stay a deterministic template (`lib/jobs/followup/compose.ts`). First messages to people are drafted by Dash since 27 September 2026: the suggestion run searches the public web every few days for up to three people you have not met who do the work you want (or a dated event where you would meet them), and writes why, what to do and the message, which you copy, edit and send yourself (`lib/jobs/suggest`). These are listed on Find as People to meet. Pressing Sent adds the person as a contact and records the touch. A first version chose from the pipeline instead, and every suggestion it made was a follow-up on an application that had already gone quiet. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
 
+**Follow-ups.** Added on 26 October 2026, at the person's ask: every application gets one person to tell about it, and a note to them. The person comes from the contacts on file when anyone there will do, in this order: whoever referred them, the recruiter who last wrote about the application, someone they know at the company, a LinkedIn connection there, anyone else on file there (`lib/jobs/followup/person.ts`). Only when nobody is on file does Dash search public pages for the hiring manager, the team's lead or its recruiter (`find-person.ts`), and add who it finds as a contact Dash found. The choice is kept on the application (`follow_up_contact_id`, `follow_up_why`, `follow_up_tried_at`, migration 0074), and the note is a draft touch on that contact carrying the application's id, written by the contact page's drafter with an aim that says the application is in (`designate.ts`). The card is on the role page under the to-dos, with the note to edit, copy and mark sent, Write it again, Someone else, and a choice from the contacts at the company. `/jobs/follow-ups` lists the same cards for every application waiting on a first reply and every role still to apply for. The daily suggestions run names someone for each application sent in the last fortnight with nobody named, at most two web searches a day (`daily.ts`). The template follow-up on a quiet application above is unchanged.
+
 **Interviews.** Scheduled and past, at `/jobs/interviews`, reached from Today. Prep notes before, debrief after. A prompt to write the debrief that evening while it is fresh, since a debrief written three days later is worth very little.
 
 **Email ingestion and the review queue.** Everything above. The review queue is not optional polish. It is what keeps the pipeline trustworthy. It is a strip on Today, and the full queue at `/jobs/review` is one press from it.
@@ -840,7 +843,7 @@ Same design language as Shopping Manager so the two feel like a set, with one de
 
 **Color.** Same neutral base: background `#FAFAF8`, surface `#FFFFFF`, border `#E8E6E1`, text `#1A1A18` and `#6B6B66`. **Change the primary from the `#6A82FB` blue to a deeper indigo or teal**, and keep orange for deadlines and pink for nothing here. Status colors carry real meaning on this board, so fix them early and use them nowhere else: gray for lead and drafting, blue for submitted and acknowledged, amber for in process, purple for final round, green for offer, muted red for rejected, faded gray for ghosted.
 
-**Layout.** Same shell. Product name top left, avatar top right, horizontal nav across the top: Today, Pipeline, Activity, Find, Companies, Contacts, Material, Analytics, with Settings behind the settings link. Review and Interviews are reached from Today. Left rail for contextual filters. Max width around 1400px, and let the roles table go wider.
+**Layout.** Same shell. Product name top left, avatar top right, horizontal nav across the top: Today, Pipeline, Follow-ups, Activity, Find, Companies, Contacts, Material, Analytics, with Settings behind the settings link. Review and Interviews are reached from Today. Left rail for contextual filters. Max width around 1400px, and let the roles table go wider.
 
 **Density.** Higher than Shopping Manager. That app was browsing a small number of pretty objects. This one is scanning forty rows for what needs attention today. Smaller type in tables, tighter rows, tabular figures everywhere.
 

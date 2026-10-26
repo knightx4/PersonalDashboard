@@ -3393,6 +3393,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     runs: sameAs(
       ['app/jobs/(app)/contacts/actions.ts#logTouch', 'lib/jobs/contacts/edit.ts#addTouch'],
       ['app/jobs/(app)/contacts/actions.ts#updateTouch', 'lib/jobs/contacts/edit.ts#saveTouchEdit'],
+      ['app/jobs/(app)/follow-ups/actions.ts#saveFollowUpNote', 'lib/jobs/contacts/edit.ts#saveTouchEdit'],
       ['app/jobs/(app)/contacts/actions.ts#markTouchSent', 'lib/jobs/contacts/edit.ts#markDraftSent'],
       ['app/jobs/(app)/contacts/actions.ts#markTouchAnswered', 'lib/jobs/contacts/edit.ts#answerTouch'],
     ),

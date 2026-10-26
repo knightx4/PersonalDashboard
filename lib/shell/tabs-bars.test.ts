@@ -46,6 +46,7 @@ const BEFORE: Record<
         badge: 7,
       },
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+      { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
       { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
