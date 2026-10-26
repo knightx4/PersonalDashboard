@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['board_marks', 'board_meetings', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -655,5 +655,87 @@ describe('profile entries', () => {
         (tx) => tx`insert into profile_entries (user_id, kind, name) values (${userA}, 'skill', 'Forged')`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('board meetings', () => {
+  // migrations-you/0020_board_meetings.sql (plan #2540.1): the board's
+  // minutes and the person's votes, answers and ticks on them.
+  const minutes = admin.json({
+    since: 'This is the first meeting.',
+    disagreements: [{ key: 'd1', point: 'Send or publish?', positions: [{ seat: 'mentor', text: 'Publish.', receipts: [] }] }],
+    dream: { text: 'Music.', thread: 'One hour.', receipts: [] },
+    question: 'Resume or role choice?',
+    resolutions: [{ key: 'r1', what: 'Send it, by Monday 26 Oct', day: '2026-10-26', seats: ['cfo'] }],
+    predictions: [],
+    graded: [],
+    scorecard: [],
+    memos: [],
+  });
+  let meetingA = '';
+
+  it('keeps a meeting and the marks on it, to their owner only', async () => {
+    const [meeting] = await asUser(
+      userA,
+      (tx) => tx`insert into board_meetings (user_id, status, held_on, minutes)
+                 values (${userA}, 'ready', '2026-10-25', ${minutes}) returning id, kind`,
+    );
+    meetingA = meeting.id;
+    expect(meeting.kind).toBe('weekly');
+    const [todo] = await admin<{ id: string }[]>`
+      insert into todo.tasks (user_id, title) values (${userA}, 'Send it') returning id`;
+    await asUser(
+      userA,
+      (tx) => tx`insert into board_marks (user_id, meeting_id, kind, item, value, note, todo_id) values
+                 (${userA}, ${meetingA}, 'vote', 'd1', 'mentor', 'Publishing first', null),
+                 (${userA}, ${meetingA}, 'answer', 'question', 'The resume', null, null),
+                 (${userA}, ${meetingA}, 'resolution', 'r1', 'done', null, ${todo.id})`,
+    );
+    const marks = await asUser(userA, (tx) => tx`select kind, value from board_marks order by kind`);
+    expect(marks.map((m) => `${m.kind}:${m.value}`)).toEqual(['answer:The resume', 'resolution:done', 'vote:mentor']);
+    expect(await asUser(userB, (tx) => tx`select id from board_meetings`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from board_marks`)).toHaveLength(0);
+  });
+
+  it("does not let a user mark another account's meeting", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into board_marks (user_id, meeting_id, kind, item, value)
+                   values (${userB}, ${meetingA}, 'vote', 'd1', 'cfo')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update board_marks set value = 'cfo'`);
+    const [vote] = await admin`select value from board_marks where meeting_id = ${meetingA} and kind = 'vote'`;
+    expect(vote.value).toBe('mentor');
+  });
+
+  it('keeps one mark per item and one open meeting per person', async () => {
+    await expect(
+      admin`insert into board_marks (user_id, meeting_id, kind, item, value)
+            values (${userA}, ${meetingA}, 'vote', 'd1', 'cfo')`,
+    ).rejects.toThrow();
+    await admin`insert into board_meetings (user_id) values (${userA})`;
+    await expect(admin`insert into board_meetings (user_id) values (${userA})`).rejects.toThrow();
+  });
+
+  it('refuses a meeting or a mark of the wrong shape', async () => {
+    const bad = [
+      () => admin`insert into board_meetings (user_id, kind, status) values (${userA}, 'called', 'failed')`,
+      () => admin`insert into board_meetings (user_id, status, decision) values (${userA}, 'failed', 'Take the job?')`,
+      () => admin`insert into board_meetings (user_id, status, held_on) values (${userA}, 'ready', '2026-10-25')`,
+      () => admin`insert into board_meetings (user_id, status, minutes) values (${userA}, 'failed', '[]'::jsonb)`,
+      () => admin`insert into board_marks (user_id, meeting_id, kind, item, value)
+                  values (${userA}, ${meetingA}, 'vote', 'd2', 'chair')`,
+      () => admin`insert into board_marks (user_id, meeting_id, kind, item, value)
+                  values (${userA}, ${meetingA}, 'answer', 'd1', 'Yes')`,
+      () => admin`insert into board_marks (user_id, meeting_id, kind, item, value)
+                  values (${userA}, ${meetingA}, 'resolution', 'r2', 'maybe')`,
+      () => admin`insert into board_marks (user_id, meeting_id, kind, item, value)
+                  values (${userA}, ${meetingA}, 'vote', 'D 1', 'cfo')`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+    await admin`insert into board_meetings (user_id, kind, status, decision)
+                values (${userA}, 'called', 'failed', 'Take the job?')`;
   });
 });
