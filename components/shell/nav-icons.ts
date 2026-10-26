@@ -1,5 +1,6 @@
 import {
   Activity,
+  SendHorizontal,
   BarChart3,
   BookOpen,
   BookOpenCheck,
@@ -93,6 +94,8 @@ export const NAV_ICONS = {
   roles: Briefcase,
   companies: Building2,
   contacts: Users,
+  // Follow-ups: the note that goes to someone after an application.
+  followUps: SendHorizontal,
   interviews: CalendarClock,
   answers: MessageSquareText,
   analytics: BarChart3,

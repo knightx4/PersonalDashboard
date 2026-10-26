@@ -66,6 +66,8 @@ import { ChannelPicker } from './channel-picker';
 import { HeaderFacts, RoleFacts } from './role-facts';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 import { PageColumn } from '@/components/shell/page-width';
+import { loadFollowUps } from '@/lib/jobs/followup/load';
+import { FollowUpCard } from '../../follow-ups/follow-up-card';
 
 export const metadata = { title: 'Role' };
 
@@ -297,6 +299,8 @@ export default async function RoleDetailPage({
   }
 
   const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
+  // Who to tell about this application, and the note to them (lib/jobs/followup).
+  const [followUp] = await loadFollowUps(supabase, user.id, { applicationIds: [current.id as string] });
   const requirements = (role.requirements as Requirement[] | null) ?? [];
 
   const evidence = (bank ?? []).map((item) => ({
@@ -575,6 +579,17 @@ export default async function RoleDetailPage({
           }))}
           timezone={timezone}
         />
+
+        {/* A closed application keeps the card only if someone was named. */}
+        {followUp && (roleStage(status) !== 'closed' || followUp.person) && (
+          <FollowUpCard
+            initial={followUp}
+            timezone={timezone}
+            contacts={(
+              (companyContacts ?? []) as unknown as Array<{ id: string; full_name: string; title: string | null }>
+            ).map((contact) => ({ id: contact.id, name: contact.full_name, title: contact.title }))}
+          />
+        )}
 
         <RelatedNotes notes={related} />
 

@@ -167,6 +167,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-material': ['/jobs/material'],
   'jobs-material-evidence': ['/jobs/material'],
   'jobs-material-voice': ['/jobs/material'],
+  'jobs-follow-ups': ['/jobs/follow-ups'],
+  'jobs-follow-ups-empty': ['/jobs/follow-ups'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contacts-add': ['/jobs/contacts'],
   'jobs-contacts-table': ['/jobs/contacts'],

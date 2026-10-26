@@ -53,6 +53,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/jobs/contacts',
   '/jobs/contacts/[id]',
   '/jobs/find',
+  '/jobs/follow-ups',
   '/jobs/inbox',
   '/jobs/interviews',
   '/jobs/material',

@@ -50,6 +50,12 @@ export const jobsActions: ModuleActions = {
     setChannel: tool('change_application'),
     dismissPursuit: none('deletes', 'Removes the application, and the role and company with it when nothing else holds them.'),
   },
+  'app/jobs/(app)/follow-ups/actions.ts': {
+    findFollowUp: none('spends', 'A web search for the hiring manager and a drafted note; the daily suggestions run does the same for each new application without a press.'),
+    chooseFollowUp: none('spends', 'Writes the note with a model call; Dash can write one in Ask and keep it with change_touch.'),
+    redraftFollowUp: none('spends', 'Writes the note again with a model call; Dash can write one in Ask and keep it with change_touch.'),
+    saveFollowUpNote: tool('change_touch'),
+  },
   'app/jobs/(app)/contacts/actions.ts': {
     createContact: tool('change_contact'),
     updateContact: tool('change_contact'),

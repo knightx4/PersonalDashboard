@@ -18,6 +18,7 @@ import { recordRuns } from '@/lib/jobs/suggest/search-runs';
 import { collectSearchBatches } from '@/lib/jobs/suggest/search-batch';
 import { scoreApplicationsFor, scoreOpeningsFor } from '@/lib/jobs/suggest/score-run';
 import { sendToPerson } from '@/lib/push/send';
+import { followUpRecentApplications } from '@/lib/jobs/followup/daily';
 
 /**
  * Dash's job search suggestions, called daily by pg_cron through
@@ -44,11 +45,19 @@ export type JobSuggestionsSummary = {
   people: number;
   reachOut: number;
   apply: number;
+  /** Applications given someone to follow up with (lib/jobs/followup/daily.ts). */
+  followUps: number;
   failed: string[];
 };
 
 /** How long one account's searches may run before going on as batches. */
 const DAILY_SEARCH_BUDGET_MS = 150_000;
+/**
+ * When the follow-ups on new applications must be done, from the start of
+ * the run, inside the route's five minutes. Most days the searches are not
+ * due and the follow-ups have nearly all of it.
+ */
+const FOLLOW_UP_DEADLINE_MS = 270_000;
 
 export async function runJobSuggestions(now: Date = new Date()): Promise<JobSuggestionsSummary> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -59,7 +68,8 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
   const { data, error } = await core.from('account_settings').select('user_id');
   if (error) throw new Error(`Reading the accounts failed: ${error.message}`);
 
-  const summary: JobSuggestionsSummary = { people: 0, reachOut: 0, apply: 0, failed: [] };
+  const began = Date.now();
+  const summary: JobSuggestionsSummary = { people: 0, reachOut: 0, apply: 0, followUps: 0, failed: [] };
   for (const { user_id: userId } of (data ?? []) as { user_id: string }[]) {
     try {
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
@@ -93,6 +103,17 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       for (const outcome of [result.reach_out, result.apply]) {
         if (outcome.error) summary.failed.push(outcome.error);
       }
+
+      // Someone to tell about each application sent lately, with the note.
+      const followUps = await followUpRecentApplications(jobs, userId, {
+        apiKey,
+        now,
+        deadline: began + FOLLOW_UP_DEADLINE_MS,
+      });
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-follow-up-person' }, followUps.searchSpend);
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'draft-outreach' }, followUps.draftSpend);
+      summary.followUps += followUps.named;
+      summary.failed.push(...followUps.errors);
 
       const payload = suggestionsPayload(
         { people: result.reach_out.headlines, roles: result.apply.headlines },
