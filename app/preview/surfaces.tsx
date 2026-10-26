@@ -9411,6 +9411,42 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Call a meeting (plan #2540.5): the line for the decision open under the
+     * header, the notice when a meeting is already running, and the minutes
+     * of a called meeting, whose one disagreement holds each seat's vote. */
+    id: 'you-board-call',
+    label: 'You · Board, the decision line open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview start="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-call-running',
+    label: 'You · Board, pressing Call a meeting while one runs',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="running" start="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-called',
+    label: 'You · Board, a called meeting with each seat’s vote',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardMeetingPreview state="called" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-meeting-running',
     label: 'You · Board, a meeting still being held',
     module: 'you',

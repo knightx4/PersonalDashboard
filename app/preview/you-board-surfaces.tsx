@@ -1,5 +1,6 @@
 'use client';
 
+import type { CallStart } from '@/app/you/board/call-meeting';
 import { BoardListView } from '@/app/you/board/board-list-view';
 import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
 import {
@@ -238,6 +239,58 @@ const minutes = parseMinutes({
   ],
 });
 
+const CALLED_DECISION =
+  'Should I take the three-month contract at the analytics firm, or keep the search full time?';
+
+/** A called meeting's minutes: one disagreement holding each seat's vote and what would change it. */
+const calledMinutes = parseMinutes({
+  since: null,
+  disagreements: [
+    {
+      key: 'd1',
+      point: CALLED_DECISION,
+      positions: [
+        {
+          seat: 'hiring_manager',
+          text: 'Vote: take it. A finance-adjacent title on the résumé by February answers the question every screen asks. It would change if the firm will not put analytics or finance in the title.',
+          receipts: [{ label: 'the contract role', link: '/jobs/roles' }],
+        },
+        {
+          seat: 'mentor',
+          text: 'Vote: take it, with the search kept at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
+          receipts: [],
+        },
+        {
+          seat: 'skeptic',
+          text: 'Vote: keep searching. You asked this question after two replies, and a contract is also a way to stop looking. It would change if you could name the application you would send in month two.',
+          receipts: [],
+        },
+        {
+          seat: 'cfo',
+          text: 'Vote: take it. Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
+          receipts: [{ label: 'Recurring', link: '/shopping/recurring' }],
+        },
+        {
+          seat: 'dreamer',
+          text: 'Vote: keep searching, only if the song stays on the table either way. It would change if the contract allowed one free morning a week.',
+          receipts: [{ label: 'Personal goals', link: '/vault/n/Me/Personal%20Goals.md' }],
+        },
+      ],
+    },
+  ],
+  question: 'What would you need to see in the first month to know the contract was a mistake?',
+  resolutions: [
+    {
+      key: 'r1',
+      what: 'Ask the firm what title the contract carries and whether a free morning a week is possible.',
+      day: '2026-11-03',
+      seats: ['hiring_manager', 'dreamer'],
+    },
+  ],
+  predictions: [{ seat: 'cfo', text: 'The rate offered is above $38 an hour.' }],
+  memos: [],
+});
+
 const marks: BoardMark[] = [
   { ...saved('vote', 'd1', 'mentor', 'Two replies is too few to be sure.') },
   { ...saved('resolution', 'r2', 'done') },
@@ -259,7 +312,7 @@ export function YouBoardMeetingPreview({
   state = 'ready',
   open,
 }: {
-  state?: 'ready' | 'running' | 'failed';
+  state?: 'ready' | 'running' | 'failed' | 'called';
   open?: MeetingOpen;
 }) {
   const shown =
@@ -280,11 +333,13 @@ export function YouBoardMeetingPreview({
             error:
               'The meeting stopped before the minutes were written: the routine answered 529, overloaded.',
           })
-        : meeting();
+        : state === 'called'
+          ? meeting({ kind: 'called', decision: CALLED_DECISION, heldOn: '2026-11-02' })
+          : meeting();
   return (
     <MeetingView
       meeting={shown}
-      minutes={state === 'ready' ? minutes : parseMinutes(null)}
+      minutes={state === 'ready' ? minutes : state === 'called' ? calledMinutes : parseMinutes(null)}
       marks={state === 'ready' ? marks : []}
       scorecard={scorecard}
       subject={{
@@ -292,7 +347,7 @@ export function YouBoardMeetingPreview({
         path: [
           ...subject.path.slice(0, 2),
           {
-            label: state === 'ready' ? 'Board meeting 1 Nov 2026' : 'Board meeting',
+            label: state === 'ready' ? 'Board meeting 1 Nov 2026' : state === 'called' ? CALLED_DECISION : 'Board meeting',
             href: `/you/board/${ID}`,
           },
         ],
@@ -335,8 +390,10 @@ const rows: BoardMeetingRow[] = [
 
 export function YouBoardListPreview({
   state = 'ready',
+  start,
 }: {
   state?: 'ready' | 'running' | 'empty';
+  start?: CallStart;
 }) {
   const meetings =
     state === 'empty'
@@ -363,6 +420,8 @@ export function YouBoardListPreview({
       nextMeeting="2026-11-08"
       timezone="Europe/London"
       now={NOW}
+      actions={{ call: async () => ({ error: null }) }}
+      start={start}
     />
   );
 }

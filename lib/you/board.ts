@@ -546,6 +546,13 @@ export function plainText(markdown: string): string {
 export const MEETING_STALE_AFTER_MS = 3 * 60 * 60 * 1000;
 export const STALE_MEETING_ERROR = 'The meeting stopped without finishing.';
 
+/** A called meeting's decision is one line; the table holds at most 1,000 characters, the press asks for fewer (plan #2540.5). */
+export const DECISION_MAX = 500;
+
+/** What Call a meeting says while a meeting is queued or running. */
+export const MEETING_RUNNING_MESSAGE =
+  'A board meeting is already running. Its minutes will appear here when it ends.';
+
 export type MeetingState =
   | { kind: 'running'; since: string }
   | { kind: 'failed'; error: string; asked: string }

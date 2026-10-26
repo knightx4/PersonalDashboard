@@ -111,6 +111,22 @@ export function visionRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine that holds the board's meetings -- the Sunday meeting and the
+ * Call a meeting press on the Board tab in You (plan #2540.5). Its prompt is
+ * .claude/skills/board/SKILL.md.
+ *
+ * No fallback to the shared id or any other routine's token: a meeting sent
+ * to the plan routine would build a step instead. With either unset the press
+ * says so and starts nothing.
+ */
+export function boardRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_BOARD_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_BOARD_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine that audits the specs against the code -- fired each Monday by
  * /api/cron/spec-audit (plan #1524). Its standing prompt is
  * .claude/skills/spec-audit/reference/routine-prompt.md.
@@ -197,6 +213,7 @@ export const ROUTINE_FIRES = {
   review: reviewRoutine,
   goals: goalsRoutine,
   vision: visionRoutine,
+  board: boardRoutine,
   spec_audit: specAuditRoutine,
   dash_backup: dashBackupRoutine,
   overhaul: overhaulRoutine,

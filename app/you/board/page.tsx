@@ -2,6 +2,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listBoardMeetings, nextMeetingDay } from '@/lib/you/board';
+import { callMeeting } from './actions';
 import { BoardListView } from './board-list-view';
 
 export const metadata = { title: 'Board' };
@@ -29,6 +30,7 @@ export default async function Page() {
       nextMeeting={nextMeetingDay(settings.timezone)}
       timezone={settings.timezone}
       now={readAt()}
+      actions={{ call: callMeeting }}
     />
   );
 }

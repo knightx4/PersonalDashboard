@@ -18,6 +18,7 @@ export const ROUTINE_LABELS = {
   review: 'Review',
   goals: 'Goals',
   vision: 'Vision',
+  board: 'Board',
   spec_audit: 'Spec audit',
   dash_backup: 'Dash backup',
   overhaul: 'Overhaul',
