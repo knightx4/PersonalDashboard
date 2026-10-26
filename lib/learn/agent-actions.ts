@@ -228,6 +228,12 @@ export const learnActions: ModuleActions = {
     summarizeReading: tool('summarize_reading'),
     addReadingComment: none('theirs'),
   },
+  'app/learn/go/actions.ts': {
+    nextSessionItem: none('spends', 'Writes whatever the next item of the learning session needs as it comes up; the person is in the session.'),
+    markSessionLessonRead: none('own'),
+    markSessionLevelLessonRead: none('own'),
+    endSession: none('own'),
+  },
   'app/learn/review/actions.ts': {
     askReview: none('spends', STUDYING),
     answerReview: none('own'),
