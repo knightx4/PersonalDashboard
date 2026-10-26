@@ -9,7 +9,8 @@ import { useSettled } from '@/components/plan-tree/use-settled';
 import { AimButton } from '@/components/shell/aim-button';
 import type { CaptureAim } from '@/lib/capture/actions';
 import { cn } from '@/lib/cn';
-import { planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import type { PlanScope } from '@/lib/plan/projects';
+import { useScopeLabel } from './scope-labels';
 import type { PlanNode } from '@/lib/plan/tree';
 import { updateFeature, type PlanActionState } from './actions';
 import { AssigneeSelect, PrioritySelect, SizeSelect } from './step-forms';
@@ -139,9 +140,10 @@ export function FeatureCompose({
 }
 
 /** What capture is aimed at for a feature in `module`: the module when there is one. */
-function featureAim(module: PlanScope | null): CaptureAim {
+function useFeatureAim(module: PlanScope | null): CaptureAim {
+  const scopeLabel = useScopeLabel();
   return module
-    ? { kind: 'plan-feature', under: { id: module, title: planScopeLabel(module) } }
+    ? { kind: 'plan-feature', under: { id: module, title: scopeLabel(module) } }
     : { kind: 'plan-feature' };
 }
 
@@ -152,10 +154,10 @@ function featureAim(module: PlanScope | null): CaptureAim {
  * the description and the done-when are written.
  */
 export function NewFeatureButton({ module = null }: { module?: PlanScope | null }) {
-  return <AimButton aim={featureAim(module)} label="New feature" variant="secondary" />;
+  return <AimButton aim={useFeatureAim(module)} label="New feature" variant="secondary" />;
 }
 
 /** "Add a feature" at the foot of a module's section: capture aimed at a feature there. */
 export function AddFeature({ module }: { module: PlanScope | null }) {
-  return <AddTrigger label="Add a feature" aim={featureAim(module)} />;
+  return <AddTrigger label="Add a feature" aim={useFeatureAim(module)} />;
 }

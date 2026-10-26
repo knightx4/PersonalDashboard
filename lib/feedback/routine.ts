@@ -23,7 +23,7 @@
  * is the whole failure this shape exists to prevent.
  */
 import 'server-only';
-import { PROJECTS, type DevProject } from '@/lib/plan/projects';
+import type { DevProject } from '@/lib/plan/projects';
 import type { RoutineKey } from '@/lib/feedback/routine-names';
 
 export const DEFAULT_FEATURE_ROUTINE_ID = 'trig_018TQKkc6qbGLmP1Y7AKWn4N';
@@ -184,9 +184,11 @@ export function overhaulRoutine(): RoutineTarget {
  * step for another repository built here would be built in the wrong place.
  */
 export function projectRoutine(project: DevProject): RoutineTarget {
+  // A project with no routine of its own names no variables, and has no id.
+  const env = project.routineEnv;
   return {
-    id: firstSet(process.env[project.routineEnv.id]),
-    token: firstSet(process.env[project.routineEnv.token], process.env.CLAUDE_API_KEY),
+    id: env ? firstSet(process.env[env.id]) : null,
+    token: firstSet(env ? process.env[env.token] : undefined, process.env.CLAUDE_API_KEY),
   };
 }
 
@@ -195,9 +197,9 @@ export function projectRoutine(project: DevProject): RoutineTarget {
  * what it pushed here: a project's run pushes to its own repository, so the
  * silence here says nothing about it.
  */
-export function projectRoutineIds(): ReadonlySet<string> {
+export function projectRoutineIds(projects: readonly DevProject[]): ReadonlySet<string> {
   return new Set(
-    PROJECTS.map((project) => projectRoutine(project).id).filter((id): id is string => !!id),
+    projects.map((project) => projectRoutine(project).id).filter((id): id is string => !!id),
   );
 }
 

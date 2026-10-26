@@ -23,7 +23,9 @@ vi.mock('@/lib/specs/vision', async (importOriginal) => ({
   loadVisionBodies: vi.fn(async () => ({})),
 }));
 
-import { handFeatureToClaude, handStepToClaude } from './handover';
+import { builderFor, handFeatureToClaude, handStepToClaude } from './handover';
+import { buildPlanTree, findNode } from './tree';
+import { PROJECT_FIXTURES } from './project-fixtures';
 
 function item(over: Partial<PlanItem> & { id: string; number: number; title: string }): PlanItem {
   return {
@@ -90,5 +92,29 @@ describe('handing a step to a session', () => {
     const sent = await handFeatureToClaude({ supabase, userId: 'u', id: 'f' });
     expect(sent).toMatchObject({ ok: true, outline: '1073' });
     expect(started[0]).toMatch(/^Work plan feature #1073, "Feature"/);
+  });
+});
+
+describe('where a row is built', () => {
+  const site = [
+    item({ id: 's', number: 2000, title: 'Site feature', module: 'website' }),
+    item({ id: 't', number: 2001, title: 'Site step', module: 'website', parentId: 's' }),
+  ];
+
+  it("builds a project's row with the project off its section", () => {
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'token');
+    const sections = buildPlanTree({ items: site, dependencies: [], projects: PROJECT_FIXTURES });
+    const built = builderFor(sections, findNode(sections, 't')!);
+    expect(built).toMatchObject({ ok: true, project: { id: 'website' }, routine: { id: 'trig_site' } });
+    vi.unstubAllEnvs();
+  });
+
+  it('refuses a project row whose project was not loaded, rather than build it here', () => {
+    const sections = buildPlanTree({ items: site, dependencies: [] });
+    expect(builderFor(sections, findNode(sections, 't')!)).toEqual({
+      ok: false,
+      error: 'There is no project "website" to build this in.',
+    });
   });
 });

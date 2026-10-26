@@ -18,7 +18,8 @@ picked up next.
 Everything the person reads in Dev names the four levels the same way:
 
 - **Module**: a workspace of the app, such as shopping, jobs or dev, or the
-  website, which `lib/plan/projects.ts` builds from its own repository. A
+  website, a project in `public.dev_projects` (read by
+  `lib/plan/projects.ts`) built from its own repository. A
   plan row's `module` column holds it, and each one is a section on
   `/dev/plan`.
 - **Feature**: a row at the top of a module, with no parent. It carries the
