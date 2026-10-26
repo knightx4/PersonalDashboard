@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_ASKS,
+  aiWeight,
   countWords,
   coverLetterView,
   mergeAsks,
@@ -205,5 +206,45 @@ describe('renderLetterRequest', () => {
     expect(text).toContain('None yet.');
     expect(text).toContain('have not been matched');
     expect(text).not.toContain('previous draft');
+  });
+});
+
+describe('aiWeight', () => {
+  const role = (posting: string, title = 'Senior Analyst') => ({ title, industry: null, posting, requirements: [] });
+
+  it('calls a role about AI central', () => {
+    expect(aiWeight(role('Build AI agents with LLMs. You will ship generative AI features and write prompts.'))).toBe('central');
+  });
+
+  it('calls a passing mention or automation some', () => {
+    expect(aiWeight(role('Own the forecast. Comfort with AI tools a plus.'))).toBe('some');
+    expect(aiWeight(role('Own the forecast and automate the monthly close.'))).toBe('some');
+  });
+
+  it('calls a posting with no AI none, without counting words that only contain the letters', () => {
+    expect(aiWeight(role('Own the forecast, said the CFO. Work with sales agents and the HTML email team.'))).toBe('none');
+  });
+
+  it('reads the requirements too', () => {
+    expect(
+      aiWeight({ ...role('Own the forecast.'), requirements: [requirement('Experience with machine learning', 'gap')] }),
+    ).toBe('some');
+  });
+});
+
+describe('renderLetterRequest and how much the role is about AI', () => {
+  const base = { questions: [], letterComments: [] };
+
+  it('asks for two AI paragraphs only when AI is central', () => {
+    const central = renderLetterRequest({
+      material: { ...base, role: { requirements: [], posting: 'AI AI LLM generative AI' } } as unknown as GatheredMaterial,
+    });
+    expect(central).toContain('Paragraphs 2 and 3 are both about building with AI');
+
+    const none = renderLetterRequest({
+      material: { ...base, role: { requirements: [], posting: 'Own the forecast.' } } as unknown as GatheredMaterial,
+    });
+    expect(none).toContain('Paragraphs 2 and 3 are about the work the posting describes');
+    expect(none).not.toContain('ask them for one');
   });
 });
