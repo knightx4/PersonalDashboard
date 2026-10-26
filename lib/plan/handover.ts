@@ -19,7 +19,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine, projectRoutine, type RoutineTarget } from '@/lib/feedback/routine';
-import { projectById, type DevProject } from './projects';
+import { isProjectScope, type DevProject } from './projects';
 import {
   betweenStepsRefusal,
   claimIsLive,
@@ -62,13 +62,23 @@ export function builderFor(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): { ok: true; project: DevProject | null; routine: RoutineTarget } | { ok: false; error: string } {
-  const project = projectById(topFeatureOf(sections, node).module) ?? null;
-  if (!project) return { ok: true, project: null, routine: planRoutine() };
+  const scope = topFeatureOf(sections, node).module;
+  if (!isProjectScope(scope)) return { ok: true, project: null, routine: planRoutine() };
+  // The project comes off the section the plan filed the row under, which the
+  // plan's loader filled from dev_projects. A project scope with no project
+  // behind it (archived, or the list unread) is refused: the plan routine
+  // would build it in this repository.
+  const project = sections.find((section) => section.module === scope)?.project ?? null;
+  if (!project) {
+    return { ok: false, error: `There is no project "${scope}" to build this in.` };
+  }
   const routine = projectRoutine(project);
   if (!routine.id) {
     return {
       ok: false,
-      error: `${project.label} has no routine to build it yet: set ${project.routineEnv.id} and ${project.routineEnv.token}.`,
+      error: project.routineEnv
+        ? `${project.label} has no routine to build it yet: set ${project.routineEnv.id} and ${project.routineEnv.token}.`
+        : `${project.label} has no routine to build it yet.`,
     };
   }
   return { ok: true, project, routine };

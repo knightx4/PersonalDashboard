@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shell/page-header';
-import { projectById } from '@/lib/plan/projects';
+import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from '@/lib/plan/project-fixtures';
 import { PlanView } from '@/app/dev/plan/plan-view';
 import { SendScreenBack } from '@/app/dev/plan/send-back';
 import { FeaturePage } from '@/app/dev/plan/feature-page';
@@ -12,7 +12,8 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
-import { applyView, assigneeTitle, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
+import { applyView, assigneeTitle, buildPlanTree, flatten, scopeLabelsOf, summarize } from '@/lib/plan/tree';
+import { ScopeLabelsProvider } from '@/app/dev/plan/scope-labels';
 import { placeCheckBacks } from '@/lib/plan/check-backs';
 import { PageColumn } from '@/components/shell/page-width';
 import { AssigneeCell, type AssigneeWho } from '@/components/plan-tree/assignee-cell';
@@ -203,6 +204,7 @@ const items: PlanItem[] = [
 const whole = buildPlanTree({
   items,
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
+  projects: PROJECT_FIXTURES,
   // Put down until a day, so the tree draws the clock beside the dashed wait.
   checkWaits: [
     { id: 'check-week', planItemId: 'checked-later', title: 'A week of goal steps exists.', dueAt: '2026-10-26T06:00:00Z' },
@@ -356,11 +358,12 @@ const projectItems: PlanItem[] = [
   }),
 ];
 
-const project = buildPlanTree({ items: projectItems, dependencies: [] });
-const site = projectById('website')!;
+const project = buildPlanTree({ items: projectItems, dependencies: [], projects: PROJECT_FIXTURES });
+const site = WEBSITE_FIXTURE;
 
 export function ProjectPlanSurface() {
   return (
+    <ScopeLabelsProvider labels={scopeLabelsOf(project)}>
     <PageColumn className="space-y-6">
       <PageHeader
         title={site.label}
@@ -380,6 +383,7 @@ export function ProjectPlanSurface() {
         unfolded
       />
     </PageColumn>
+    </ScopeLabelsProvider>
   );
 }
 
@@ -412,7 +416,7 @@ const stopItems: PlanItem[] = [
   }),
 ];
 
-const stopTree = buildPlanTree({ items: stopItems, dependencies: [] });
+const stopTree = buildPlanTree({ items: stopItems, dependencies: [], projects: PROJECT_FIXTURES });
 
 /**
  * A shot, drawn as a page in miniature so the gallery needs no bucket.
@@ -530,7 +534,7 @@ const changedItems: PlanItem[] = [
   }),
 ];
 
-const changedTree = buildPlanTree({ items: changedItems, dependencies: [] });
+const changedTree = buildPlanTree({ items: changedItems, dependencies: [], projects: PROJECT_FIXTURES });
 
 /**
  * A phone screen in miniature, so the gallery needs no bucket. `crowded` is
@@ -811,6 +815,7 @@ for (const fixture of featureItems) {
 const featureTree = buildPlanTree({
   items: featureItems,
   dependencies: [dep('feat', 'other'), dep('feat-table', 'feat-page')],
+  projects: PROJECT_FIXTURES,
 });
 const featureSection = featureTree.find((section) => section.module === 'dev');
 const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');

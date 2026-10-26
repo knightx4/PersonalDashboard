@@ -106,7 +106,15 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { ideaDetailShortfall } from '../lib/ideas/body';
 import { isModuleId } from '../lib/modules';
-import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
+import {
+  PROJECT_COLUMNS,
+  isAppScope,
+  isPlanScope,
+  planScopeLabel,
+  planScopeOf,
+  projectsFromRows,
+  type DevProject,
+} from '../lib/plan/projects';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
@@ -406,6 +414,26 @@ async function resolveUser(sql: Sql): Promise<string> {
   return fail('More than one account here. Say which with --user <id or email>.');
 }
 
+/**
+ * The account's projects (lib/plan/projects), read once per run of the
+ * script and kept here, so every label and check in the run reads the same
+ * list. A read that fails reads as none, as it does on the page.
+ */
+let projects: DevProject[] = [];
+
+async function loadProjects(sql: Sql, userId: string): Promise<DevProject[]> {
+  try {
+    const rows = await sql.unsafe<Record<string, unknown>[]>(
+      `select ${PROJECT_COLUMNS} from dev_projects where user_id = $1 order by created_at, id`,
+      [userId],
+    );
+    return projectsFromRows(rows);
+  } catch (err) {
+    console.error(`The Dev projects could not be read: ${err instanceof Error ? err.message : 'failed'}`);
+    return [];
+  }
+}
+
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind,
@@ -419,6 +447,7 @@ async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   return {
     items: rows.map(planItemFromRow),
     dependencies: deps.map((d) => ({ id: d.id, itemId: d.item_id, dependsOnId: d.depends_on_id })),
+    projects,
   };
 }
 
@@ -621,7 +650,7 @@ function ideasFromFile(path: string): { body: string; module: PlanItem['module']
 }
 
 function moduleLabel(module: PlanItem['module']): string {
-  return planScopeLabel(module);
+  return planScopeLabel(module, projects);
 }
 
 /** Keep only the steps a predicate wants, and the way down to them. */
@@ -702,6 +731,7 @@ async function main(): Promise<void> {
   const [command = 'list', target, extra] = positional();
   const sql = connect();
   const userId = await resolveUser(sql);
+  projects = await loadProjects(sql, userId);
 
   try {
     // Every command names steps or reads a name, so the outlines are loaded
@@ -1168,8 +1198,8 @@ async function main(): Promise<void> {
       const parent = parentNumber ? await byNumber(sql, userId, parentNumber) : null;
       const moduleArg = arg('--module');
       // A plan step may belong to a project built elsewhere (lib/plan/projects).
-      if (moduleArg && !isPlanScope(moduleArg)) fail(`"${moduleArg}" is not a module or project.`);
-      const scope = parent ? parent.module : planScopeOf(moduleArg);
+      if (moduleArg && !isPlanScope(moduleArg, projects)) fail(`"${moduleArg}" is not a module or project.`);
+      const scope = parent ? parent.module : planScopeOf(moduleArg, projects);
       const priority = Number(arg('--priority') ?? 2);
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');

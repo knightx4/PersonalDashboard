@@ -32,7 +32,7 @@ import {
   countMatches,
 } from '@/lib/plan/tree';
 import { MODULES } from '@/lib/modules';
-import { PROJECTS } from '@/lib/plan/projects';
+import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from '@/lib/plan/project-fixtures';
 
 let counter = 0;
 
@@ -75,7 +75,7 @@ function dep(itemId: string, dependsOnId: string): PlanDependency {
 }
 
 function tree(items: PlanItem[], dependencies: PlanDependency[] = []) {
-  return buildPlanTree({ items, dependencies });
+  return buildPlanTree({ items, dependencies, projects: PROJECT_FIXTURES });
 }
 
 const shopping = (sections: ReturnType<typeof tree>) =>
@@ -147,7 +147,7 @@ describe('buildPlanTree', () => {
     const sections = tree([item({ id: 'a', module: 'jobs' })]);
     expect(sections.map((section) => section.module)).toEqual([
       ...MODULES.map((m) => m.id),
-      ...PROJECTS.map((p) => p.id),
+      ...PROJECT_FIXTURES.map((p) => p.id),
     ]);
     expect(sections.find((section) => section.module === 'vault')?.nodes).toEqual([]);
   });
@@ -161,6 +161,40 @@ describe('buildPlanTree', () => {
     expect(website?.label).toBe('selveyknight.com');
     expect(website?.nodes.map((node) => node.id)).toEqual(['site']);
     expect(website?.nodes[0].children.map((node) => node.id)).toEqual(['copy']);
+    expect(website?.project).toEqual(WEBSITE_FIXTURE);
+  });
+
+  it('gives a project added as a row a section of its own, with no change here', () => {
+    const blog = { ...WEBSITE_FIXTURE, id: 'blog', label: 'The blog' };
+    const sections = buildPlanTree({
+      items: [item({ id: 'post', module: 'blog' })],
+      dependencies: [],
+      projects: [...PROJECT_FIXTURES, blog],
+    });
+    expect(sections.map((section) => section.module).slice(-2)).toEqual(['website', 'blog']);
+    const section = sections.find((s) => s.module === 'blog');
+    expect(section?.label).toBe('The blog');
+    expect(section?.nodes.map((node) => node.id)).toEqual(['post']);
+    // Drawn even before it has a step, as a workspace is.
+    expect(
+      buildPlanTree({ items: [], dependencies: [], projects: [blog] }).some((s) => s.module === 'blog'),
+    ).toBe(true);
+  });
+
+  it('draws an archived project only while rows are filed under it', () => {
+    const old = { ...WEBSITE_FIXTURE, id: 'old-site', label: 'Old site', archivedAt: '2026-10-01T00:00:00Z' };
+    const empty = buildPlanTree({ items: [], dependencies: [], projects: [old] });
+    expect(empty.some((s) => s.module === 'old-site')).toBe(false);
+    const filed = buildPlanTree({ items: [item({ id: 'x', module: 'old-site' })], dependencies: [], projects: [old] });
+    expect(filed.find((s) => s.module === 'old-site')?.label).toBe('Old site');
+  });
+
+  it("keeps a project's rows out of the app-wide section when the list is not loaded", () => {
+    const sections = buildPlanTree({ items: [item({ id: 'site', module: 'website' })], dependencies: [] });
+    expect(sections.some((s) => s.module === null)).toBe(false);
+    const website = sections.find((s) => s.module === 'website');
+    expect(website?.label).toBe('website');
+    expect(website?.project).toBeNull();
   });
 
   it('shows the app-wide section only once something is in it', () => {

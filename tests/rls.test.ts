@@ -360,6 +360,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_overnight_runs = overnight.id;
 
+  // A project's id is a slug per account, so it is tagged: user B's own row
+  // must not answer the question asked of A's.
+  const [project] = await admin<{ id: string }[]>`
+    insert into dev_projects (id, user_id, label, owner, repo)
+    values (${`${tag}-site`}, ${userId}, ${`${tag}'s site`}, ${tag}, 'site')
+    returning id`;
+  ids.dev_projects = project.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})

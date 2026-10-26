@@ -34,12 +34,14 @@ import {
   flattenSections,
   isPlanView,
   planLiveness,
+  scopeLabelsOf,
   splitFinished,
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
 import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
+import { ScopeLabelsProvider } from './scope-labels';
 import { catalogOf } from './plan-catalog';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -271,6 +273,7 @@ export async function renderPlanPage({
 
   return (
     <YourInitialProvider initial={initial}>
+    <ScopeLabelsProvider labels={scopeLabelsOf(everything)}>
     <PageColumn className="space-y-6">
       <PageHeader
         subject={
@@ -335,6 +338,7 @@ export async function renderPlanPage({
         canSend={canSend}
       />
     </PageColumn>
+    </ScopeLabelsProvider>
     </YourInitialProvider>
   );
 }

@@ -67,6 +67,7 @@ import {
   type WorkRow,
 } from './run-work';
 import { readAll } from '@/lib/learn/db/read-all';
+import { loadDevProjects, type DevProject } from './projects';
 import { lineSilent, readLastLines } from '@/lib/core/run-liveness';
 import { ABANDONED_STALE_ERROR } from '@/lib/core/run-activities';
 import { subtreeTrail } from './subtree';
@@ -228,6 +229,8 @@ export async function endQuietRuns(input: {
   supabase: Db;
   userId: string;
   now?: number;
+  /** The account's projects (lib/plan/projects), when the caller has them. Read here otherwise. */
+  projects?: readonly DevProject[];
   /** What has been pushed since these runs started, when somebody has read it. */
   pushes?: readonly Push[] | null;
   /**
@@ -322,7 +325,9 @@ export async function endQuietRuns(input: {
   const pushes = input.pushes ?? null;
   // A project's run pushes to its own repository, so this one's pushes say
   // nothing about it: it is judged on the clock, as an unread listing is.
-  const elsewhere = projectRoutineIds();
+  const elsewhere = projectRoutineIds(
+    input.projects ?? (await loadDevProjects(input.supabase, input.userId)),
+  );
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
   const silent: string[] = [];
@@ -757,6 +762,8 @@ export async function readRunLiveness(input: {
   supabase: Db;
   userId: string;
   now?: number;
+  /** The account's projects (lib/plan/projects), when the caller has them. Read here otherwise. */
+  projects?: readonly DevProject[];
   fetch?: typeof globalThis.fetch;
 }): Promise<{
   steps: Record<string, StepRunReading>;
@@ -807,7 +814,9 @@ export async function readRunLiveness(input: {
   const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
   const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
 
-  const elsewhere = projectRoutineIds();
+  const elsewhere = projectRoutineIds(
+    input.projects ?? (await loadDevProjects(input.supabase, input.userId)),
+  );
   const readings: Record<string, StepRunReading> = {};
   for (const step of steps) {
     const run = latest.get(step.id);

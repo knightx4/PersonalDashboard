@@ -32,7 +32,7 @@ working by hand, apply the same ones:
 
 ```sql
 -- the open steps, in reading order. Rows whose module is a project in
--- lib/plan/projects.ts ('website') are built from that project's own
+-- public.dev_projects ('website') are built from that project's own
 -- repository by its own routine, never from this one: leave them out.
 -- Name each step by its outline (o.outline, "1073.4"), the way the page and
 -- plan.ts do; the number is its identity in the database and is not what you

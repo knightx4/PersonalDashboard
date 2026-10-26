@@ -9,7 +9,7 @@ import {
   type PlanStatus,
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
-import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import { planScopeLabel, planScopes, projectById, type DevProject, type PlanScope } from '@/lib/plan/projects';
 import { stepRef } from './ref';
 
 /**
@@ -121,6 +121,12 @@ export type PlanSection = {
   tally: PlanTally;
   /** Those same states again, as the bands of the progress bar. */
   bands: PlanBand[];
+  /**
+   * The project the section is, when it is one that was loaded: where its
+   * steps are built. Absent for a workspace, the app, and a project's rows
+   * read without the list.
+   */
+  project?: DevProject | null;
 };
 
 export const PLAN_VIEWS = [
@@ -495,7 +501,17 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
   };
   roots.forEach(placeAll);
 
-  const scopes: Array<PlanScope | null> = [...PLAN_SCOPES, null];
+  // Every workspace, then every active project (plan #2553.1), then any other
+  // scope a feature is filed under -- an archived project's, or a project's
+  // when the list was not loaded -- so no row is drawn as app-wide because
+  // its project was not at hand, and last the app as a whole.
+  const projects = data.projects ?? [];
+  const listed = planScopes(projects);
+  const known = new Set<PlanScope | null>(listed);
+  const others = [...new Set(roots.map((node) => node.module))].filter(
+    (scope): scope is PlanScope => scope !== null && !known.has(scope),
+  );
+  const scopes: Array<PlanScope | null> = [...listed, ...others, null];
   return scopes
     .map((scope) => {
       const nodes = roots.filter((node) => node.module === scope);
@@ -510,7 +526,8 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
       const working = nodes.filter((node) => !isFinishedFeature(node));
       return {
         module: scope,
-        label: planScopeLabel(scope),
+        label: planScopeLabel(scope, projects),
+        project: projectById(projects, scope) ?? null,
         nodes,
         progress: planProgress(leavesOf(working)),
         tally: tallyHealth(working, liveness),
@@ -518,6 +535,16 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
+}
+
+/**
+ * Each section's name by its scope, for the parts of the plan drawn in the
+ * browser, which cannot read a project's row (app/dev/plan/scope-labels.tsx).
+ */
+export function scopeLabelsOf(sections: readonly PlanSection[]): Record<string, string> {
+  return Object.fromEntries(
+    sections.flatMap((section) => (section.module ? [[section.module, section.label] as const] : [])),
+  );
 }
 
 /** The steps with no steps of their own, beneath these. */

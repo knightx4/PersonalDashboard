@@ -93,7 +93,7 @@ describe('planItemFromRow', () => {
     // size somebody typed into the database by hand.
     const item = planItemFromRow({
       ...row,
-      module: 'retired',
+      module: 'Not a slug',
       status: 'someday',
       priority: 9,
       size: 'xxl',
@@ -106,6 +106,14 @@ describe('planItemFromRow', () => {
     expect(item.size).toBeNull();
     expect(item.assignee).toBeNull();
     expect(item.kind).toBe('build');
+  });
+
+  it("keeps a slug it does not know as a project's id, which the tree draws under that id", () => {
+    // A project is a dev_projects row (plan #2553.1), which this reader does
+    // not have, so a row filed under one keeps it rather than reading as the
+    // app's: the changelog and the digest would otherwise count it as news.
+    expect(planItemFromRow({ ...row, module: 'website' }).module).toBe('website');
+    expect(planItemFromRow({ ...row, module: 'retired' }).module).toBe('retired');
   });
 });
 

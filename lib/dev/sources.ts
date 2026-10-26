@@ -114,6 +114,7 @@ export const devSources: ModuleSources = {
     'public.dev_comments',
     'public.dev_comment_reads',
     'public.dev_digests',
+    'public.dev_projects',
     'public.dash_finish_notifications',
     'public.feedback_items',
     'public.module_visions',
@@ -135,7 +136,9 @@ export const devSources: ModuleSources = {
         ? 'The X connection and its encrypted tokens.'
         : table === 'public.post_preferences'
           ? 'A setting: the text they wrote about what they want from their posts.'
-          : table === 'public.x_reads'
+          : table === 'public.dev_projects'
+            ? 'A setting: the repositories Dev builds plan steps in, and what each is called.'
+            : table === 'public.x_reads'
             ? 'A log of each request made to X and how many posts it read, for checking the bill.'
             : ABOUT_THE_APP,
     page: PAGES[table],
