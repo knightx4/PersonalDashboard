@@ -258,6 +258,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/learn/go/actions.ts#nextSessionItem':
+    'A learning session (plan #2546.3) asks for the next item as each one shows, so the one after is written before Next is pressed: a review question, a lesson, a topic level’s lesson (plan #2546.5, with its source search), a piece check, a practice task or a level question, the same writing the review list, the piece page and Practice do. No button starts it; the presses that answer each item carry their own hints.',
   'app/api/ask/voice/route.ts#POST':
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':

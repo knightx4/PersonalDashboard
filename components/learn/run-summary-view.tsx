@@ -64,6 +64,9 @@ export function RunSummaryView({
   againHref,
   nothingLeft = false,
   offer,
+  title = 'End of this run',
+  headline,
+  againLabel = 'Start another run',
 }: {
   summary: RunSummary;
   /** A new run. */
@@ -72,13 +75,18 @@ export function RunSummaryView({
   nothingLeft?: boolean;
   /** The lens offered for a vault theme the missed levels point to (plan #2138.14). */
   offer?: ReactNode;
+  /** The small line over the headline; a learning session's end says session (plan #2546.3). */
+  title?: string;
+  /** The sentence in place of `runHeadline`'s, for an end that counts more than questions. */
+  headline?: string;
+  againLabel?: string;
 }) {
   const groups = GROUPS.filter((g) => summary[g.key].length > 0);
   return (
     <div data-deck-item className="pb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:pb-0">
       <Card padding="standard">
-        <p className="text-small text-ink-muted">End of this run</p>
-        <p className="mt-1 text-body font-semibold text-ink">{runHeadline(summary, nothingLeft)}</p>
+        <p className="text-small text-ink-muted">{title}</p>
+        <p className="mt-1 text-body font-semibold text-ink">{headline ?? runHeadline(summary, nothingLeft)}</p>
       </Card>
       {(groups.length > 0 || summary.doubted.length > 0) && (
         <Card padding="none" className="mt-3 overflow-hidden">
@@ -105,7 +113,7 @@ export function RunSummaryView({
           className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center justify-end gap-2 px-3 py-2 lg:static"
         >
           <Link href={againHref} className={buttonVariants({ size: 'lg' })}>
-            Start another run
+            {againLabel}
             <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
           </Link>
         </Card>
