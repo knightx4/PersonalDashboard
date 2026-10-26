@@ -15,6 +15,12 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
+import {
+  YouBoardListLoadingPreview,
+  YouBoardListPreview,
+  YouBoardMeetingLoadingPreview,
+  YouBoardMeetingPreview,
+} from './you-board-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -3333,6 +3339,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+  { href: '/you/board', label: 'Board', icon: 'board' },
 ];
 
 const triageCrumbs = [
@@ -9335,6 +9342,102 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouInsightsLoadingPreview />,
+  },
+  {
+    /* Board (plan #2540.3): the board's meetings newest first, each row saying
+     * how far through its minutes the person is; a called meeting first. */
+    id: 'you-board',
+    label: 'You · Board, four meetings',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-empty',
+    label: 'You · Board, no meetings yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-running',
+    label: 'You · Board, a meeting being held',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-loading',
+    label: 'You · Board, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouBoardListLoadingPreview />,
+  },
+  {
+    /* One meeting's minutes in the board skill's order: since last week, the
+     * disagreements with a vote each, the dream, the question, the
+     * resolutions, the predictions, the scorecard, and the memos folded. */
+    id: 'you-board-meeting',
+    label: 'You · Board, one meeting with some marks made',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardMeetingPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-memos',
+    label: 'You · Board, a meeting with the memos open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardMeetingPreview open={{ memos: true }} />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-running',
+    label: 'You · Board, a meeting still being held',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardMeetingPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-failed',
+    label: 'You · Board, a meeting that failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardMeetingPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-loading',
+    label: 'You · Board, a meeting loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouBoardMeetingLoadingPreview />,
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
