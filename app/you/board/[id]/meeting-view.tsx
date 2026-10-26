@@ -99,7 +99,7 @@ function GradeMark({ grade }: { grade: Grade }) {
   const Glyph = GRADE_GLYPHS[grade];
   return (
     <span className="inline-flex items-center gap-1 text-small font-medium text-ink">
-      <Glyph aria-hidden className="size-3.5" strokeWidth={2} />
+      <Glyph aria-hidden className="size-3.5" strokeWidth={1.75} />
       {GRADE_LABELS[grade]}
     </span>
   );
