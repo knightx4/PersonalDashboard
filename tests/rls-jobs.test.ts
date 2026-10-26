@@ -80,6 +80,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.interview_participants = participant.id;
 
+  const [outreach] = await admin<{ id: string }[]>`
+    insert into application_outreach (user_id, application_id, contact_id, why, chosen_by)
+    values (${userId}, ${application.id}, ${contact.id}, ${`${tag} recruits for it`}, 'dash')
+    returning id`;
+  ids.application_outreach = outreach.id;
+
   const [touch] = await admin<{ id: string }[]>`
     insert into contact_touches (user_id, contact_id, application_id, channel, direction, message)
     values (${userId}, ${contact.id}, ${application.id}, 'linkedin_dm', 'outbound', ${`${tag} hello`})

@@ -130,7 +130,7 @@ import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/mate
 import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
 import { FollowUpsView } from '@/app/jobs/(app)/follow-ups/view';
-import type { FollowUp } from '@/lib/jobs/followup/load';
+import type { FollowUp, OutreachPerson } from '@/lib/jobs/followup/load';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { ToastProvider } from '@/components/ui/toast';
@@ -4253,6 +4253,18 @@ const draftedAsks: PanelProps['dashAsks'] = [
  * one sent to a hiring manager Dash found, an application with nobody named
  * yet, and a role still to apply for.
  */
+const followUpPerson = (p: Partial<OutreachPerson> & Pick<OutreachPerson, 'contactId' | 'name'>): OutreachPerson => ({
+  title: null,
+  email: null,
+  linkedinUrl: null,
+  foundByDash: false,
+  why: null,
+  chosenBy: 'dash',
+  draft: null,
+  sent: null,
+  ...p,
+});
+
 const followUpRows: FollowUp[] = [
   {
     applicationId: 'fu-1',
@@ -4262,16 +4274,29 @@ const followUpRows: FollowUp[] = [
     company: 'Ramp',
     status: 'submitted',
     submittedAt: '2026-10-24T15:00:00Z',
-    person: { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance', email: 'rae@ramp.example', linkedinUrl: null, foundByDash: false },
-    why: 'Rae Patel wrote to you about this application.',
     triedAt: '2026-10-24T16:00:00Z',
-    draft: {
-      id: 't-1',
-      channel: 'email',
-      message:
-        "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nSelvey",
-    },
-    sent: null,
+    people: [
+      followUpPerson({
+        contactId: 'c-1',
+        name: 'Rae Patel',
+        title: 'Talent Partner, Finance',
+        email: 'rae@ramp.example',
+        why: 'Rae Patel wrote to you about this application.',
+        draft: {
+          id: 't-1',
+          channel: 'email',
+          message:
+            "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nSelvey",
+        },
+      }),
+      followUpPerson({
+        contactId: 'c-9',
+        name: 'Sam Ortiz',
+        title: 'Head of Strategic Finance',
+        why: 'You chose them.',
+        chosenBy: 'person',
+      }),
+    ],
   },
   {
     applicationId: 'fu-2',
@@ -4281,11 +4306,17 @@ const followUpRows: FollowUp[] = [
     company: 'Mercury',
     status: 'acknowledged',
     submittedAt: '2026-10-20T15:00:00Z',
-    person: { id: 'c-2', name: 'Dana Wu', title: 'Head of FP&A', email: null, linkedinUrl: null, foundByDash: true },
-    why: 'The posting says the role reports to the Head of FP&A, which is Dana Wu.',
     triedAt: '2026-10-20T16:00:00Z',
-    draft: null,
-    sent: { id: 't-2', channel: 'linkedin_connect', sentAt: '2026-10-21T09:00:00Z', respondedAt: null },
+    people: [
+      followUpPerson({
+        contactId: 'c-2',
+        name: 'Dana Wu',
+        title: 'Head of FP&A',
+        foundByDash: true,
+        why: 'The posting says the role reports to the Head of FP&A, which is Dana Wu.',
+        sent: { id: 't-2', channel: 'linkedin_connect', sentAt: '2026-10-21T09:00:00Z', respondedAt: null },
+      }),
+    ],
   },
   {
     applicationId: 'fu-3',
@@ -4295,11 +4326,8 @@ const followUpRows: FollowUp[] = [
     company: 'Plaid',
     status: 'submitted',
     submittedAt: '2026-10-25T15:00:00Z',
-    person: null,
-    why: null,
     triedAt: null,
-    draft: null,
-    sent: null,
+    people: [],
   },
   {
     applicationId: 'fu-4',
@@ -4309,11 +4337,8 @@ const followUpRows: FollowUp[] = [
     company: 'Brex',
     status: 'lead',
     submittedAt: null,
-    person: null,
-    why: null,
     triedAt: '2026-10-22T16:00:00Z',
-    draft: null,
-    sent: null,
+    people: [],
   },
 ];
 
@@ -4360,6 +4385,28 @@ export const SURFACES: readonly Surface[] = [
     // A lead, which opens on its posting.
     render: () => (
       <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+    ),
+  },
+  {
+    /* The Outreach tab: two people to reach out to, one with a note waiting,
+     * one named by hand with none yet, and the send log empty. */
+    id: 'jobs-role-outreach',
+    label: 'Role · Outreach',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="submitted"
+        defaultTab="outreach"
+        followUp={followUpRows[0]}
+        sends={[]}
+        companyContacts={[
+          { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+          { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+          { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
+        ]}
+      />
     ),
   },
   {
@@ -6137,6 +6184,7 @@ export const SURFACES: readonly Surface[] = [
           'co-1': [
             { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
             { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+            { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
           ],
           'co-3': [{ id: 'c-8', name: 'Lee Park', title: 'Recruiter' }],
         }}

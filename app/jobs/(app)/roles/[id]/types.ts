@@ -7,6 +7,7 @@ import type { DevComment } from '@/lib/comments/load';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { StoredAsk } from '@/lib/jobs/drafting/store';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
+import type { FollowUp, OutreachSend } from '@/lib/jobs/followup/load';
 
 /** Everything the role page hands its tabs, loaded once by page.tsx. */
 export interface PanelProps {
@@ -168,6 +169,10 @@ export interface PanelProps {
     outcome: string | null;
     rejectionStage: string | null;
   }>;
+  /** Who to reach out to about this application, and the note to each, for the Outreach tab. */
+  followUp?: FollowUp;
+  /** What went to anyone about this application, newest first. */
+  sends?: OutreachSend[];
 }
 
 /**
