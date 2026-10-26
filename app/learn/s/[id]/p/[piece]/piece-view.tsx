@@ -134,7 +134,8 @@ export function LessonCard({
   figuresOpen = false,
 }: {
   idea: PieceIdea;
-  number: number;
+  /** Its place in the piece; a topic level's lesson has none and is labelled Lesson alone (plan #2546.3). */
+  number?: number;
   writing: Writing | null;
   /** Shows the takeaway alone, with the rest behind Open the lesson (plan #2292.5). */
   folded?: boolean;
@@ -144,7 +145,7 @@ export function LessonCard({
   const { lesson } = idea;
   return (
     <Card padding="standard">
-      <p className="text-small text-ink-muted tabular-nums">Lesson {number}</p>
+      <p className="text-small text-ink-muted tabular-nums">{number === undefined ? 'Lesson' : `Lesson ${number}`}</p>
       <h2 className="mt-0.5 font-display text-title tracking-tight break-words text-ink">{idea.name}</h2>
 
       {lesson ? (
@@ -296,7 +297,7 @@ export function PiecePassing({
   );
 }
 
-function PracticeCard({
+export function PracticeCard({
   subjectId,
   pieceId,
   practice: initialPractice,
@@ -526,7 +527,7 @@ export function PracticeData({ table }: { table: PracticeTable }) {
   );
 }
 
-function PieceCheckCard({
+export function PieceCheckCard({
   subjectId,
   pieceId,
   check: initialCheck,
@@ -534,6 +535,7 @@ function PieceCheckCard({
   practicePassed,
   checkPassed,
   checkOn,
+  brief = false,
   onAnswered,
 }: {
   subjectId: string;
@@ -543,6 +545,11 @@ function PieceCheckCard({
   practicePassed: boolean;
   checkPassed: boolean;
   checkOn: { topicName: string; level: number; above?: boolean } | null;
+  /**
+   * The question alone under the heading, for a learning session (plan
+   * #2546.3), whose line above the card names the piece and the level.
+   */
+  brief?: boolean;
   onAnswered: (result: AnswerResult) => void;
 }) {
   const [check, setCheck] = useState(initialCheck);
@@ -612,7 +619,7 @@ function PieceCheckCard({
   return (
     <Card padding="standard">
       <h2 className="font-display text-title tracking-tight text-ink">Check</h2>
-      <p className="mt-1 text-ui text-ink-muted">
+      <p className={cn('mt-1 text-ui text-ink-muted', brief && 'hidden')}>
         {passedAt
           ? 'You have passed this piece.'
           : checkPassed
@@ -664,7 +671,8 @@ function PieceCheckCard({
               disabled={marking}
             />
           </Field>
-          <HowSureInput key={check.id} id={check.id} kind="written" onChange={setHowSure} disabled={marking} />
+          {/* In a session the box for how you got there opens on a press (law 14). */}
+          <HowSureInput key={check.id} id={check.id} kind={brief ? 'choice' : 'written'} onChange={setHowSure} disabled={marking} />
           <DashAction
             type="button"
             variant="primary"

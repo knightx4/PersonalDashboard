@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import { useFormStatus } from 'react-dom';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import Link from '@/components/ui/link';
@@ -208,23 +208,40 @@ function RevealButton() {
  * at the end of the scroll the row rests below the last line of the list
  * instead of over it.
  */
-const UNDER_DOCK = 'pb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:pb-0';
+export const UNDER_DOCK = 'pb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] lg:pb-0';
 
 /**
  * An item at least a screen tall on a phone, so a forward row after a
  * flexible spacer rests at the foot above the tab bar on every item, however
  * short the item is (plan #2292.2). Exported for the placement's end.
  */
+/**
+ * Room under an item whose forward row is pinned to the foot of a phone
+ * screen (plan #2546.3): the tab bar's height and the row's, so the last line
+ * scrolls clear of both.
+ */
+export const PINNED_ROOM = 'pb-[calc(var(--dock-h)+env(safe-area-inset-bottom)+5.5rem)] lg:pb-0';
+
 export const HOLD_FORWARD = 'flex min-h-[calc(100dvh-var(--dock-h)-env(safe-area-inset-bottom))] flex-col lg:block lg:min-h-0';
 
-function ForwardRow({
+export function ForwardRow({
   children,
   endHref,
+  onEnd,
   endLabel = 'End run',
   endShort,
+  pinned = false,
 }: {
   children: React.ReactNode;
+  /**
+   * Fixed to the foot of a phone screen, above the tab bar, so it sits at the
+   * same height on every item however long (plan #2546.3). The item takes
+   * `PINNED_ROOM` under it. From lg it follows the item, as the sticky row does.
+   */
+  pinned?: boolean;
   endHref?: string;
+  /** End pressed in place, for a session drawn on one screen (plan #2546.3); used when there is no `endHref`. */
+  onEnd?: () => void;
   endLabel?: string;
   /** A shorter label for a phone, where the long one would not fit beside the forward action. */
   endShort?: string;
@@ -232,26 +249,47 @@ function ForwardRow({
   return (
     <Card
       padding="none"
-      className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center justify-end gap-2 px-3 py-2 lg:static"
+      className={cn(
+        'bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center justify-end gap-2 px-3 py-2 lg:static',
+        pinned ? 'max-lg:fixed max-lg:inset-x-4' : 'sticky',
+      )}
     >
-      {endHref && (
+      {endHref ? (
         <Link
           href={endHref}
           aria-label={endShort ? endLabel : undefined}
           className={cn(buttonVariants({ variant: 'ghost', size: 'lg' }), 'mr-auto')}
         >
-          {endShort ? (
-            <>
-              <span className="sm:hidden">{endShort}</span>
-              <span className="hidden sm:inline">{endLabel}</span>
-            </>
-          ) : (
-            endLabel
-          )}
+          <EndWords label={endLabel} short={endShort} />
         </Link>
+      ) : (
+        onEnd && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            onClick={onEnd}
+            aria-label={endShort ? endLabel : undefined}
+            className="mr-auto"
+            data-deck-end
+          >
+            <EndWords label={endLabel} short={endShort} />
+          </Button>
+        )
       )}
       {children}
     </Card>
+  );
+}
+
+function EndWords({ label, short }: { label: string; short?: string }) {
+  return short ? (
+    <>
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{label}</span>
+    </>
+  ) : (
+    label
   );
 }
 
@@ -280,10 +318,13 @@ export function CellAnswerView({
   state,
   action,
   nextHref,
+  onNext,
   endHref,
+  onEnd,
   endLabel,
   endShort,
   holdForward,
+  pinForward,
   pending,
   openFirstQuote,
   openWhy,
@@ -294,15 +335,21 @@ export function CellAnswerView({
   /** The form action; the gallery leaves it out. */
   action?: (formData: FormData) => void;
   /** Where Next goes once the answer is graded. */
-  nextHref: string;
+  nextHref?: string;
+  /** Next pressed in place, for a session drawn on one screen (plan #2546.3); used when there is no `nextHref`. */
+  onNext?: () => void;
   /** Where End run goes: the run's summary. Absent outside a run. */
   endHref?: string;
+  /** End pressed in place, beside `onNext`. */
+  onEnd?: () => void;
   /** What the link to `endHref` says; a placement's is Skip to the lesson (plan #2292.2). */
   endLabel?: string;
   /** The same on a phone, when the full label is too long to sit beside the forward action. */
   endShort?: string;
   /** Hold the forward row at the foot of a phone screen on every item, as a placement does. */
   holdForward?: boolean;
+  /** Pin the forward row to the foot of a phone screen, as a learning session does on every item (plan #2546.3). */
+  pinForward?: boolean;
   /** Drawn mid-grade by the gallery; the live screen reads it from the form. */
   pending?: boolean;
   /** Draws the first quote open, for the gallery. */
@@ -341,7 +388,7 @@ export function CellAnswerView({
     // A pick posts its choice's value; it is said by its label.
     const given = asked.figure?.choices?.find((choice) => choice.value === state.response)?.label ?? state.response;
     return (
-      <div data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
+      <div data-deck-item className={pinForward ? PINNED_ROOM : cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
         <Card padding="standard">
           {head}
           {/* Right after a hint wrote nothing on the ladder (plan #2522.7), so
@@ -394,12 +441,19 @@ export function CellAnswerView({
             </ul>
           </Card>
         )}
-        {holdForward && <div className="flex-1" aria-hidden />}
-        <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
-          <Link href={nextHref} className={buttonVariants({ size: 'lg' })} data-deck-next>
-            Next
-            <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
-          </Link>
+        {holdForward && !pinForward && <div className="flex-1" aria-hidden />}
+        <ForwardRow endHref={endHref} onEnd={onEnd} endLabel={endLabel} endShort={endShort} pinned={pinForward}>
+          {nextHref !== undefined ? (
+            <Link href={nextHref} className={buttonVariants({ size: 'lg' })} data-deck-next>
+              Next
+              <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+            </Link>
+          ) : (
+            <Button type="button" size="lg" onClick={onNext} data-deck-next>
+              Next
+              <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+            </Button>
+          )}
         </ForwardRow>
       </div>
     );
@@ -409,7 +463,7 @@ export function CellAnswerView({
     // A first miss (plan #2522.7): the hint, the first answer back in a box
     // to change, and how sure, kept from the first try.
     return (
-      <form action={action} data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
+      <form action={action} data-deck-item className={pinForward ? PINNED_ROOM : cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
         <input type="hidden" name="questionId" value={asked.questionId} />
         <Card padding="standard">
           {head}
@@ -428,8 +482,8 @@ export function CellAnswerView({
             </p>
           )}
         </Card>
-        {holdForward && <div className="flex-1" aria-hidden />}
-        <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
+        {holdForward && !pinForward && <div className="flex-1" aria-hidden />}
+        <ForwardRow endHref={endHref} onEnd={onEnd} endLabel={endLabel} endShort={endShort} pinned={pinForward}>
           <RevealButton />
           <SendButton pending={pending} retry />
         </ForwardRow>
@@ -438,7 +492,7 @@ export function CellAnswerView({
   }
 
   return (
-    <form action={action} data-deck-item className={cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
+    <form action={action} data-deck-item className={pinForward ? PINNED_ROOM : cn(UNDER_DOCK, holdForward && HOLD_FORWARD)}>
       <input type="hidden" name="questionId" value={asked.questionId} />
       <Card padding="standard">
         {head}
@@ -477,7 +531,8 @@ export function CellAnswerView({
         {/* A pick folds the box for how you got there; a written answer opens it. */}
         <HowSureInput
           id={asked.questionId}
-          kind={asked.figure ? 'choice' : 'written'}
+          // A pick, and any question in a learning session (law 14), folds the box for how you got there.
+          kind={asked.figure || pinForward ? 'choice' : 'written'}
           defaultValue={state.howSure}
           disabled={pending}
           reasoningOpen={reasoningOpen}
@@ -488,8 +543,8 @@ export function CellAnswerView({
           </p>
         )}
       </Card>
-      {holdForward && <div className="flex-1" aria-hidden />}
-      <ForwardRow endHref={endHref} endLabel={endLabel} endShort={endShort}>
+      {holdForward && !pinForward && <div className="flex-1" aria-hidden />}
+      <ForwardRow endHref={endHref} onEnd={onEnd} endLabel={endLabel} endShort={endShort} pinned={pinForward}>
         <SendButton pending={pending} />
       </ForwardRow>
     </form>

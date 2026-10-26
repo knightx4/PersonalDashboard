@@ -171,7 +171,7 @@ export function Deck({
  * a drag never carries over. The transform is written by `follow` and
  * `release` (components/motion/swipe.ts), never by React.
  */
-function DeckSwipe({
+export function DeckSwipe({
   next,
   onSwiped,
   children,
