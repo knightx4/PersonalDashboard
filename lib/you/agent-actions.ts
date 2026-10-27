@@ -94,7 +94,11 @@ export const youActions: ModuleActions = {
   'app/you/board/review-actions.ts': {
     answerBoardReview: none(
       'theirs',
-      "How a decision turned out is the person's own verdict on it; the advisors' picks are graded from that answer (plan #2561.8).",
+      "How a decision turned out is the person's own verdict on it; the advisors' picks are graded, or their forecasts scored, from that answer (plans #2561.8, #2581.10).",
+    ),
+    answerBoardTripwire: none(
+      'theirs',
+      "Whether what would reopen a decision has happened is the person's own call on the tab; the Sunday meeting checks it from their rows otherwise (plan #2581.10).",
     ),
   },
   'app/you/board/make-actions.ts': {

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  decisionReviews,
+  dueUnwritten,
   gradeReview,
   nextReview,
+  openReviews,
+  outcomeLabels,
+  reviewAsk,
   pickOf,
   pickScorecard,
   reviewDates,
@@ -23,6 +28,7 @@ const review = (over: Partial<BoardReview> = {}): BoardReview => ({
   outcome: null,
   answeredAt: null,
   grades: [],
+  scores: [],
   ...over,
 });
 
@@ -127,5 +133,57 @@ describe('pickScorecard', () => {
     const cfo = cards.find((c) => c.advisor === 'cfo')!;
     expect(cfo).toMatchObject({ held: 1, graded: 2 });
     expect(topicsLine(cfo)).toBe('Work 0 of 1 · Other 1 of 1');
+  });
+});
+
+describe('check-backs that fell due before a meeting wrote them (plan #2581.10)', () => {
+  const row = {
+    id: 'q1',
+    question: 'Take the contract?',
+    options: [{ letter: 'A', text: 'Take it' }],
+    decided_option: 'A',
+    decided_at: '2026-09-01T10:00:00Z',
+    success_measure: 'Two interviews by December.',
+    topic: 'work',
+    reviews: [],
+  };
+
+  it('lists a due check-back with no account, from its day on', () => {
+    expect(dueUnwritten('2026-09-01T10:00:00Z', [], '2026-09-30')).toEqual([]);
+    expect(dueUnwritten('2026-09-01T10:00:00Z', [], '2026-10-01')).toEqual([{ at: 30, due: '2026-10-01' }]);
+    const [due] = decisionReviews(row, '2026-10-27');
+    expect(due).toMatchObject({
+      at: 30,
+      account: '',
+      option: 'A',
+      due: '2026-10-01',
+      successMeasure: 'Two interviews by December.',
+    });
+    expect(decisionReviews(row)).toEqual([]);
+  });
+
+  it('keeps an answered entry with no account', () => {
+    const [entry] = reviewsOf([
+      { at: 30, outcome: 'well', answered_at: 'x', scores: [{ advisor: 'cfo', probability: 0.7, brier: 0.09 }] },
+    ]);
+    expect(entry).toMatchObject({ account: '', scores: [{ advisor: 'cfo', probability: 0.7, brier: 0.09 }] });
+  });
+
+  it('asks from the success measure and labels the answers met or not', () => {
+    expect(reviewAsk({ ask: '', successMeasure: 'Two interviews by December.' })).toBe(
+      'You said you would know it went well if: Two interviews by December. Did it?',
+    );
+    expect(reviewAsk({ ask: 'Did it go well?', successMeasure: 'x' })).toBe('Did it go well?');
+    expect(reviewAsk({ ask: '', successMeasure: null })).toBe('Did this decision go well?');
+    expect(outcomeLabels({ successMeasure: 'x' }).well).toBe('Met it');
+    expect(outcomeLabels({ successMeasure: null }).well).toBe('Went well');
+  });
+
+  it('lists only the latest unanswered check-back, and none before a later answer', () => {
+    expect(openReviews([{ at: 30, outcome: null }, { at: 90, outcome: null }]).map((r) => r.at)).toEqual([90]);
+    expect(openReviews([{ at: 30, outcome: null }, { at: 90, outcome: 'well' as const }])).toEqual([]);
+    expect(openReviews([{ at: 30, outcome: 'well' as const }, { at: 90, outcome: null }]).map((r) => r.at)).toEqual([
+      90,
+    ]);
   });
 });
