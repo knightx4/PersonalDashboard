@@ -103,7 +103,7 @@ is not one. Work it down:
   calls, how many tokens each. Compare with `INPUT_BUDGET`, `MAX_LOOKUPS`
   and `TIME_BUDGET_MS` in `lib/dash/loop.ts`. Then ask why it needed so many
   lookups: usually a tool returned a page of rows when a filtered query would
-  have answered (the Concourse question read 50 of 832 applications).
+  have answered (one question about a single company read a page of 50 out of several hundred applications).
 - **A wrong or unfounded answer.** Compare the body with what its lookups
   returned (`tool_calls`). If it states something no lookup returned, the
   prompt or the tools let it guess: fix that, not the one answer.
@@ -135,8 +135,8 @@ For each cause:
    ```sh
    npx tsx scripts/sql.ts --file /tmp/case.sql
    -- insert into core.dash_eval_cases (user_id, question, expect, origin)
-   -- values (:owner, 'what roles have i applied to at concourse',
-   --         '{"cites_any": ["Concourse"], "max_lookups": 6}', 'turn cbb3f6f3: fell back after three lookups')
+   -- values (:owner, 'what roles have i applied to at northwind',
+   --         '{"cites_any": ["Northwind"], "max_lookups": 6}', 'turn 1a2b3c4d: fell back after three lookups')
    -- returning id
    ```
 

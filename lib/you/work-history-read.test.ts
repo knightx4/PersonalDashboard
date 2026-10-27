@@ -6,14 +6,14 @@ describe('readWorkHistoryAnswer', () => {
     expect(
       readWorkHistoryAnswer({
         jobs: [
-          { employer: 'Stealth startup', title: 'Strategic Finance Advisor', place: 'New Haven, CT', started: '2025', ended: '2026', current: false },
-          { employer: '  EY ', title: 'Assurance Senior', place: 'Dallas, TX', started: '2020-09', ended: '2023-07', current: false },
+          { employer: 'Stealth startup', title: 'Strategic Finance Advisor', place: 'Portland, OR', started: '2025', ended: '2026', current: false },
+          { employer: '  Halvorsen & Co. ', title: 'Assurance Senior', place: 'Denver, CO', started: '2020-09', ended: '2023-07', current: false },
           { employer: 'Acme', title: null, place: null, started: '2024', ended: '2025', current: true },
         ],
       }),
     ).toEqual([
-      { employer: 'Stealth startup', title: 'Strategic Finance Advisor', place: 'New Haven, CT', started: '2025', ended: '2026' },
-      { employer: 'EY', title: 'Assurance Senior', place: 'Dallas, TX', started: '2020-09', ended: '2023-07' },
+      { employer: 'Stealth startup', title: 'Strategic Finance Advisor', place: 'Portland, OR', started: '2025', ended: '2026' },
+      { employer: 'Halvorsen & Co.', title: 'Assurance Senior', place: 'Denver, CO', started: '2020-09', ended: '2023-07' },
       { employer: 'Acme', title: null, place: null, started: '2024', ended: null },
     ]);
   });
@@ -44,12 +44,12 @@ describe('readWorkHistoryAnswer', () => {
 
 describe('readWorkHistory', () => {
   it('asks once with the résumé text and hands back the jobs', async () => {
-    const ask = vi.fn(async () => ({ ok: true as const, input: { jobs: [{ employer: 'EY', started: '2020' }] } }));
-    await expect(readWorkHistory('  SELVEY KNIGHT\nEY 2020 - 2023  ', ask)).resolves.toEqual({
+    const ask = vi.fn(async () => ({ ok: true as const, input: { jobs: [{ employer: 'Halvorsen & Co.', started: '2020' }] } }));
+    await expect(readWorkHistory('  ALEX RIVERA\nHALVORSEN & CO. 2020 - 2023  ', ask)).resolves.toEqual({
       ok: true,
-      jobs: [{ employer: 'EY', title: null, place: null, started: '2020', ended: null }],
+      jobs: [{ employer: 'Halvorsen & Co.', title: null, place: null, started: '2020', ended: null }],
     });
-    expect(ask).toHaveBeenCalledWith('SELVEY KNIGHT\nEY 2020 - 2023');
+    expect(ask).toHaveBeenCalledWith('ALEX RIVERA\nHALVORSEN & CO. 2020 - 2023');
   });
 
   it('says so when there is no text, nothing comes back, or the call fails', async () => {

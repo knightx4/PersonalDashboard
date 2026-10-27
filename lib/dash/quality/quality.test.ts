@@ -4,7 +4,7 @@ import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 import { dashHealth, PROMPT_TOKENS_ALERT, pushesBack, type HealthTurn } from './health';
 import { qualityNote, runDashQuality, type DashQualityPorts } from './run';
 
-const ROLE = { table: 'job_search.applications', ref: 'a-1', title: 'Strategy Lead at Concourse', href: '/jobs/roles/r-1' };
+const ROLE = { table: 'job_search.applications', ref: 'a-1', title: 'Strategy Lead at Northwind', href: '/jobs/roles/r-1' };
 
 function answered(body: string, extra: Partial<Extract<CaseOutcome, { ok: true }>> = {}): CaseOutcome {
   return { ok: true, body, stop: 'answered', citations: [ROLE], toolCalls: [{ name: 'search', input: {}, result: { ok: true, rows: [] } }], seconds: 8, ...extra };
@@ -12,15 +12,15 @@ function answered(body: string, extra: Partial<Extract<CaseOutcome, { ok: true }
 
 describe('grading an answer', () => {
   it('passes an answer that shows what the case expects', () => {
-    const expect_ = parseExpect({ mentions_all: ['concourse'], cites_any: ['Concourse'], max_lookups: 4 });
-    expect(gradeAnswer(expect_, answered('You applied to one role at Concourse.'))).toEqual([]);
+    const expect_ = parseExpect({ mentions_all: ['northwind'], cites_any: ['Northwind'], max_lookups: 4 });
+    expect(gradeAnswer(expect_, answered('You applied to one role at Northwind.'))).toEqual([]);
   });
 
   it('counts a name as shown when it is only in a cited row', () => {
     expect(gradeAnswer(parseExpect({ mentions_all: ['Strategy Lead'] }), answered('One role.'))).toEqual([]);
   });
 
-  it('fails the Concourse answer of 21 October on every count it broke', () => {
+  it('fails the Northwind answer of 21 October on every count it broke', () => {
     const outcome = answered('I could not finish this answer: the model stopped without writing an answer.', {
       stop: 'unfinished',
       citations: [],
@@ -30,17 +30,17 @@ describe('grading an answer', () => {
         { name: 'recall', input: {}, result: { ok: false, error: 'That lookup failed to read the database.' } },
       ],
     });
-    const failures = gradeAnswer(parseExpect({ cites_any: ['Concourse'] }), outcome);
+    const failures = gradeAnswer(parseExpect({ cites_any: ['Northwind'] }), outcome);
     expect(failures.join('\n')).toContain('I could not finish');
     expect(failures.join('\n')).toContain('"unfinished"');
     expect(failures.join('\n')).toContain('1 lookup was refused at a limit');
     expect(failures.join('\n')).toContain('Lookup recall failed');
-    expect(failures.join('\n')).toContain('No cited row matches "Concourse"');
+    expect(failures.join('\n')).toContain('No cited row matches "Northwind"');
   });
 
   it('holds limits, names to avoid, and the vendor name', () => {
     const outcome = answered('Claude found it. I stopped after 12 lookups, so this answer rests only on what those found.', { seconds: 50 });
-    const failures = gradeAnswer(parseExpect({ mentions_none: ['doola'], max_seconds: 30, max_lookups: 0 }), outcome);
+    const failures = gradeAnswer(parseExpect({ mentions_none: ['fabrikam'], max_seconds: 30, max_lookups: 0 }), outcome);
     expect(failures).toContain('The answer says "Claude".');
     expect(failures).toContain('A limit cut the answer short.');
     expect(failures).toContain('It took 50 seconds, more than 30.');
@@ -101,10 +101,10 @@ describe('the day of real answers', () => {
   });
 
   it('hears pushback in the reply after an answer, at no cost', () => {
-    for (const reply of ['no, the other one', "that's wrong", 'You missed the Concourse role', 'not what i asked', 'why did you say that', 'still wrong']) {
+    for (const reply of ['no, the other one', "that's wrong", 'You missed the Northwind role', 'not what i asked', 'why did you say that', 'still wrong']) {
       expect(pushesBack(reply)).toBe(true);
     }
-    for (const reply of ['thanks', 'now do the same for Decagon', 'nothing else', 'know anyone there?']) {
+    for (const reply of ['thanks', 'now do the same for Contoso', 'nothing else', 'know anyone there?']) {
       expect(pushesBack(reply)).toBe(false);
     }
     const health = dashHealth([{ ...turn('t1', 'One role.'), followUp: "That's wrong, I applied to two" }, { ...turn('t2', 'Ok.'), followUp: 'great' }], []);
@@ -144,11 +144,11 @@ describe('a run', () => {
       owner: async () => 'owner',
       model: async () => 'claude-sonnet-5-5',
       cases: async () => [
-        { id: 'c1', question: 'what roles have i applied to at concourse', expect: { cites_any: ['Concourse'] } },
+        { id: 'c1', question: 'what roles have i applied to at northwind', expect: { cites_any: ['Northwind'] } },
         { id: 'c2', question: 'what did i spend on books', expect: { mentions_all: ['£12'] } },
       ],
       ask: async (_user, question) => ({
-        outcome: question.includes('concourse') ? answered('One role at Concourse.') : answered('Nothing on books.', { citations: [] }),
+        outcome: question.includes('northwind') ? answered('One role at Northwind.') : answered('Nothing on books.', { citations: [] }),
         costMicros: 50_000,
       }),
       turns: async () => [],
@@ -178,7 +178,7 @@ describe('a run', () => {
   });
 
   it('writes no note when all is well, and keeps a case that threw as a failure', async () => {
-    const quiet = ports({ cases: async () => [{ id: 'c1', question: 'what roles have i applied to at concourse', expect: {} }] });
+    const quiet = ports({ cases: async () => [{ id: 'c1', question: 'what roles have i applied to at northwind', expect: {} }] });
     expect((await runDashQuality(quiet.port, { trigger: 'manual', deploy: null })).noteId).toBeNull();
     expect(quiet.notes).toEqual([]);
 
@@ -223,7 +223,7 @@ describe('a run', () => {
     const one = ports({
       cases: async (_user, only) => {
         named.push(only);
-        return [{ id: 'c1', question: 'what roles have i applied to at concourse', expect: {} }];
+        return [{ id: 'c1', question: 'what roles have i applied to at northwind', expect: {} }];
       },
     });
     await runDashQuality(one.port, { trigger: 'manual', only: 'c1', deploy: null });

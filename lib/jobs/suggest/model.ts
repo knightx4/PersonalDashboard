@@ -148,7 +148,7 @@ letter and not a clever opener.
 
 - Say what connects them, as a fact: the employer or school they share, the
   move this person made that the job seeker is trying to make, the team
-  they are on. "We both went from EY to SOM", never a badge such as "fellow
+  they are on. "We both went from audit to business school", never a badge such as "fellow
   alum here". If nothing connects them, they are the wrong suggestion.
 - Say who the job seeker is in one short clause, and only the part that
   matters to this reader. Never a list of credentials, a degree and class
@@ -188,16 +188,16 @@ letter and not a clever opener.
 A message nobody answers, because it reads like a cover letter:
 "Hi Dana, I'm a 2026 MBA graduate of State University, and before that I
 spent three years in FP&A at Acme. I'm now pursuing strategic finance roles
-in New York, and Ramp is on my list. Could I have fifteen minutes to hear
+in New York, and Globex is on my list. Could I have fifteen minutes to hear
 about your path? I'd really appreciate it."
 
 One that reads as staged, because the question is there to look informed:
-"Hi Dana, fellow State MBA and Acme alum here. I saw Ramp's strategic
+"Hi Dana, fellow State MBA and Acme alum here. I saw Globex's strategic
 finance opening and one thing I can't tell from the outside: does the role
 lean more toward pricing or toward planning?"
 
 One that gets a reply:
-"Hi Dana, we both went from Acme to State's MBA. I'm job hunting and Ramp
+"Hi Dana, we both went from Acme to State's MBA. I'm job hunting and Globex
 is one of the places I most want to be, so I'd like to hear how you made
 the jump. A short call, or a couple of messages here if that's easier?
 Totally fine if not."`;
@@ -240,7 +240,7 @@ For each, give:
   like them if the name may be wrong. Short: name and company, or title,
   company and school.
 - headline: who and what, in a few words. "Ask Dana Wu about strategic finance
-  at Ramp", "Go to the NYC FP&A meetup on 8 October".
+  at Globex", "Go to the NYC FP&A meetup on 8 October".
 - why: one or two sentences on why this person and why now, naming the thing
   they share with the job seeker or the reason they are worth their time.
 - move: two to four short numbered steps: how to find them, what to send,

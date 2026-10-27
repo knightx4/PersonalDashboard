@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto';
  * section names in capitals, bullets that wrap onto the next line, and the
  * employer, title, place and dates on lines of their own. A passage is one
  * bullet with its wrapped lines joined, prefixed with its section and the
- * lines naming the role it sits under, so "Built an automated revenue testing
- * system" is embedded as work at EY rather than on its own. Lines that are
+ * lines naming the role it sits under, so "Wrote a reconciliation workbook"
+ * is embedded as work at the audit firm rather than on its own. Lines that are
  * never followed by a bullet (the name and contact details, a trailing date)
  * make no passage.
  */

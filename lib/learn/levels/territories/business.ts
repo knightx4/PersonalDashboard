@@ -21,14 +21,12 @@ import type { Territory, TerritoryTopic } from '@/lib/learn/levels/territory';
  *   Accounting (Spring 2004), its calendar of lecture topics.
  * - MIT OpenCourseWare 15.535, Business Analysis Using Financial Statements
  *   (Spring 2003, Peter Wysocki), its calendar of lecture topics.
- * - The person's Yale SOM course summaries, from the vault's Yale/Course
- *   Summaries folder: MGT 541 Corporate Finance (Spring 2026, Kelly Shue),
- *   MGT 423 Sourcing and Managing Funds (Spring 2025), MGT 847 Private Equity:
- *   Leveraged Buyouts (Fall 2025), MGT 816 The Private Firm CFO (Fall 2025)
- *   and MGT 815 Managerial Controls (Spring 2026). Each line is a session's
- *   topic or a key framework's heading as the summary writes it. MGT 402
- *   Basics of Accounting was waived on the CPA, so it has no summary; the
- *   accounting area's syllabi are the published ones above.
+ * - Invented course summaries for a business school, one per course:
+ *   FIN 410 Corporate Finance, FIN 420 Raising and Managing Capital, FIN 610
+ *   Private Equity: Leveraged Buyouts, ACC 520 Finance and Accounting for
+ *   Private Companies and ACC 530 Management Control Systems. Each line is a
+ *   session's topic or a key framework's heading as the summary writes it.
+ *   The accounting area's syllabi are the published ones above.
  *
  * For banking, strategy and operations:
  *
@@ -49,11 +47,10 @@ import type { Territory, TerritoryTopic } from '@/lib/learn/levels/territory';
  *   in-class exercises; 15.760A, Operations Management (Spring 2002), each
  *   line of a lecture's topics as its own; 15.761, Introduction to Operations
  *   Management (Spring 2013); and 15.769, Operations Strategy (Fall 2010).
- * - The person's Yale SOM course summaries: MGT 932 Financial Markets and
- *   Macroeconomic Policy (Fall 2025, Alp Simsek), MGT 410 Competitor (Fall
- *   2024) and MGT 422 The Operations Engine (Spring 2025), each line a
- *   session's topic or a key framework's heading; banking also reads MGT 541
- *   for its IPO, repo and restructuring sessions.
+ * - Invented course summaries of the same kind: ECO 610 Financial Markets
+ *   and Monetary Policy, STR 610 Competitive Strategy and OPS 510 Operations
+ *   Management, each line a session's topic or a key framework's heading;
+ *   banking also reads FIN 410 for its IPO, repo and restructuring sessions.
  *
  * Each text names the areas it serves. A drafting call reads the roles and
  * the texts of the topic's area, so with two role phrases each area here
@@ -101,7 +98,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Company',
     4,
     'Sole proprietorships, partnerships, LLCs and C corporations, and how liability and taxation differ between them.',
-    ['osfin: Business Structures', 'yale816: Choice of entity'],
+    ['osfin: Business Structures', 'acc520: Choice of entity'],
   ),
   finance(
     'Agency problems between shareholders and managers',
@@ -118,7 +115,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Company',
     4,
     "The board's duties, its committees and composition as a company grows, and what a board package reports.",
-    ['osfin: Role of the Board of Directors', 'yale816: Governance: boards, board packages, reporting'],
+    ['osfin: Role of the Board of Directors', 'acc520: Governance: boards, board packages, reporting'],
   ),
   finance(
     'Financial markets and intermediaries',
@@ -156,7 +153,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Interest (economics)',
     6,
     'Discounting several cash flows of different sizes and timing to one value today, the basis of every valuation.',
-    ['osfin: Timing of Cash Flows', 'yale541: Cash flows and present value. NPV, bond pricing, financial statement review'],
+    ['osfin: Timing of Cash Flows', 'fin410: Cash flows and present value. NPV, bond pricing, financial statement review'],
   ),
   finance(
     'Perpetuities and growing perpetuities',
@@ -198,7 +195,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Debt',
     6,
     "Pricing a bond as the present value of its coupons and principal, and solving for its yield; premium and discount bonds.",
-    ['osfin: Bond Valuation', 'yale541: Cash flows and present value. NPV, bond pricing, financial statement review'],
+    ['osfin: Bond Valuation', 'fin410: Cash flows and present value. NPV, bond pricing, financial statement review'],
   ),
   finance(
     'The yield curve and the term structure of interest rates',
@@ -219,7 +216,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Debt',
     5,
     "Credit spreads and ratings, and why a risky bond's promised yield is higher than the return its holders expect.",
-    ['osfin: Risks of Interest Rates and Default', 'yale541: Yield vs expected return'],
+    ['osfin: Risks of Interest Rates and Default', 'fin410: Yield vs expected return'],
   ),
   finance(
     'Approaches to stock valuation',
@@ -281,7 +278,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Expected return as the risk-free rate plus beta times the market premium, the security market line and its assumptions.',
     [
       'osfin: The Capital Asset Pricing Model (CAPM)',
-      'yale541: Capital Asset Pricing Model. Estimating beta from raw return data',
+      'fin410: Capital Asset Pricing Model. Estimating beta from raw return data',
     ],
   ),
   finance(
@@ -290,7 +287,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     "Regressing a stock's returns on the market's to estimate beta, choosing the window and index, and the estimate's error.",
     [
-      'yale541: Capital Asset Pricing Model. Estimating beta from raw return data',
+      'fin410: Capital Asset Pricing Model. Estimating beta from raw return data',
       'osfin: Regression Applications in Finance',
     ],
   ),
@@ -335,8 +332,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     "A project's value as the present value of its cash flows less its cost, and the rule to accept when NPV is positive.",
     [
       'osfin: Net Present Value (NPV) Method',
-      'yale541: Cash flows and present value. NPV, bond pricing, financial statement review',
-      'yale423: Review: the three paths to value and the main issues raised in the course',
+      'fin410: Cash flows and present value. NPV, bond pricing, financial statement review',
+      'fin420: Review: the three paths to value and the main issues raised in the course',
     ],
   ),
   finance(
@@ -360,8 +357,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Cash available to all capital providers: after-tax operating profit less capital spending and the change in working capital.',
     [
       'osfin: Operating Cash Flow and Free Cash Flow to the Firm (FCFF)',
-      'yale423: Free cash flow definition and calculation; terminal value and the role of growth',
-      'yale541: Free cash flows and the cost of capital',
+      'fin420: Free cash flow definition and calculation; terminal value and the role of growth',
+      'fin410: Free cash flows and the cost of capital',
     ],
   ),
   finance(
@@ -369,7 +366,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Investment',
     6,
     'Valuing cash flows beyond the forecast by a growing perpetuity or an exit multiple, and how sensitive value is to the growth assumed.',
-    ['yale423: Free cash flow definition and calculation; terminal value and the role of growth'],
+    ['fin420: Free cash flow definition and calculation; terminal value and the role of growth'],
   ),
   finance(
     'Financial forecasting and pro forma statements',
@@ -380,7 +377,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
       'osfin: Forecasting Sales',
       'osfin: Pro Forma Financials',
       'osfin: Generating the Complete Forecast',
-      'yale423: Cost structure and projections; how costs and margins trend as firms grow',
+      'fin420: Cost structure and projections; how costs and margins trend as firms grow',
     ],
   ),
   finance(
@@ -396,8 +393,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'ROIC against the cost of capital, economic income as profit less a charge for capital, and peak and terminal ROIC in a valuation.',
     [
-      'yale423: Review of PS #1: peak and terminal ROIC for BYND; alternative measures of value creation; profit margin versus economic income',
-      'yale423: Economic income (profit minus r x book value) and ROI as the accounting-side equivalents of NPV and IRR',
+      'fin420: Problem set review: peak and terminal ROIC for a packaged food company; alternative measures of value creation; profit margin versus economic income',
+      'fin420: Economic income (profit minus r x book value) and ROI as the accounting-side equivalents of NPV and IRR',
     ],
   ),
   finance(
@@ -407,7 +404,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Valuing a whole firm from forecast free cash flow, a terminal value and the cost of capital, then bridging to equity value.',
     [
       'osfin: Discounted Cash Flow (DCF) Model',
-      'yale423: BYND wrap-up: DCF value versus the 2019 year-end price; review of valuation methods',
+      'fin420: Valuation case wrap-up: DCF value versus the year-end share price; review of valuation methods',
     ],
   ),
   finance(
@@ -416,9 +413,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'Choosing peers matched on growth and risk, choosing the value driver, and the case against the P/E ratio.',
     [
-      'yale423: Review of PS #2 model assumptions; valuation using multiples',
-      'yale423: Valuation by multiples: peer selection matched on growth and risk, choice of value driver, enterprise value versus equity value multiples',
-      'yale541: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E',
+      'fin420: Problem set review: model assumptions; valuation using multiples',
+      'fin420: Valuation by multiples: peer selection matched on growth and risk, choice of value driver, enterprise value versus equity value multiples',
+      'fin410: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E',
     ],
   ),
   finance(
@@ -427,7 +424,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'The bridge between the value of the operations and the value of the shares: debt, cash, minorities and other claims.',
     [
-      'yale423: Valuation by multiples: peer selection matched on growth and risk, choice of value driver, enterprise value versus equity value multiples',
+      'fin420: Valuation by multiples: peer selection matched on growth and risk, choice of value driver, enterprise value versus equity value multiples',
     ],
   ),
   finance(
@@ -436,8 +433,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'Valuing by discounted cash flow, by book value plus discounted economic income, and by multiples, and why done right they agree.',
     [
-      'yale423: Review: the three paths to value and the main issues raised in the course',
-      'yale423: Cash flow versus accrual approaches to valuation; value creation versus wealth delivered; connecting market and book values',
+      'fin420: Review: the three paths to value and the main issues raised in the course',
+      'fin420: Cash flow versus accrual approaches to valuation; value creation versus wealth delivered; connecting market and book values',
     ],
   ),
   finance(
@@ -446,8 +443,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'Every asset and claim at present value rather than book value, including intangibles and excluding sunk costs.',
     [
-      'yale541: Market value balance sheet',
-      'yale541: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
+      'fin410: Market value balance sheet',
+      'fin410: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
     ],
   ),
   finance(
@@ -457,7 +454,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     "The mix of debt and equity that funds a firm's assets, how each claim is paid, and how leverage is measured.",
     [
       'osfin: The Concept of Capital Structure',
-      'yale541: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
+      'fin410: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
     ],
   ),
   finance(
@@ -466,9 +463,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'Why in a frictionless market the mix of debt and equity cannot change firm value: value the whole, then divide it.',
     [
-      'yale541: Capital structure in a frictionless world',
-      'yale541: M&M I and II',
-      'yale423: Capital structure theory; Modigliani-Miller; exceptions from taxes, financial distress, information asymmetry, conflicts of interest; how CFOs decide in practice',
+      'fin410: Capital structure in a frictionless world',
+      'fin410: M&M I and II',
+      'fin420: Capital structure theory; Modigliani-Miller; exceptions from taxes, financial distress, information asymmetry, conflicts of interest; how CFOs decide in practice',
     ],
   ),
   finance(
@@ -476,14 +473,14 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Capital (economics)',
     6,
     'Why the cost of equity rises with leverage just enough to hold the asset cost of capital fixed, so debt is not cheaper capital.',
-    ['yale541: Cost of capital in a frictionless world', 'yale541: M&M I and II'],
+    ['fin410: Cost of capital in a frictionless world', 'fin410: M&M I and II'],
   ),
   finance(
     'Leveraged recapitalizations, repurchases and issues',
     'Stock',
     5,
     'Working a recap, buyback or share issue as two equations in two unknowns: the post-deal share price and the amount raised or spent.',
-    ['yale541: Two equations, two unknowns'],
+    ['fin410: Two equations, two unknowns'],
   ),
   finance(
     'Interest tax shield',
@@ -491,9 +488,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'The value of deducting interest, its present value under fixed and proportional debt, and limits such as the 30% interest cap.',
     [
-      'yale541: Tradeoff theory of capital structure',
+      'fin410: Tradeoff theory of capital structure',
       'osfin: The Costs of Debt and Equity Capital',
-      'yale423: TCJA effects on financing and valuation',
+      'fin420: TCJA effects on financing and valuation',
     ],
   ),
   finance(
@@ -501,35 +498,35 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Bankruptcy',
     5,
     'Direct and indirect costs of distress, insolvency as against illiquidity, and which firms bear them most.',
-    ['yale541: Tradeoff theory of capital structure', 'yale541: Debt capacity'],
+    ['fin410: Tradeoff theory of capital structure', 'fin410: Debt capacity'],
   ),
   finance(
     'Tradeoff theory and optimal capital structure',
     'Capital (economics)',
     6,
     'Choosing leverage by weighing the tax shield against expected distress costs, and the optimum that implies.',
-    ['osfin: Optimal Capital Structure', 'yale541: Tradeoff theory and debt capacity'],
+    ['osfin: Optimal Capital Structure', 'fin410: Tradeoff theory and debt capacity'],
   ),
   finance(
     'Debt capacity and coverage ratios',
     'Debt',
     5,
     'How much a firm can borrow, interest and EBITDA coverage, and the circularity between credit rating and interest rate.',
-    ['yale541: Debt capacity', 'yale541: Tradeoff theory and debt capacity'],
+    ['fin410: Debt capacity', 'fin410: Tradeoff theory and debt capacity'],
   ),
   finance(
     'Debt overhang',
     'Debt',
     5,
     'Why a heavily indebted firm passes up good projects when the gains would go to its creditors.',
-    ['yale541: Debt overhang', 'yale541: Debt overhang and risk shifting'],
+    ['fin410: Debt overhang', 'fin410: Debt overhang and risk shifting'],
   ),
   finance(
     'Risk shifting and conflicts between claimholders',
     'Debt',
     5,
     'Asset substitution, where equity holders of a levered firm gamble at creditors’ expense, and conflicts between majority and minority owners.',
-    ['yale541: Other conflicts among investors', 'yale541: Debt overhang and risk shifting'],
+    ['fin410: Other conflicts among investors', 'fin410: Debt overhang and risk shifting'],
   ),
   finance(
     'Pecking order theory and asymmetric information',
@@ -537,9 +534,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'Why firms use retained cash first, then debt, then equity, and why an equity issue tends to lower the share price.',
     [
-      'yale541: Asymmetric information and capital structure',
-      'yale541: Pecking order',
-      'yale423: Capital structure in practice: how Hertz sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
+      'fin410: Asymmetric information and capital structure',
+      'fin410: Pecking order',
+      'fin420: Capital structure in practice: how a car rental company sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
     ],
   ),
   finance(
@@ -549,8 +546,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'How CFOs actually set leverage across a firm’s life, the cost of changing it, and signs a firm has levered too far.',
     [
       'osfin: Capital Structure Choices',
-      'yale423: Capital structure in practice: how Hertz sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
-      'yale423: Capital structure theory; Modigliani-Miller; exceptions from taxes, financial distress, information asymmetry, conflicts of interest; how CFOs decide in practice',
+      'fin420: Capital structure in practice: how a car rental company sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
+      'fin420: Capital structure theory; Modigliani-Miller; exceptions from taxes, financial distress, information asymmetry, conflicts of interest; how CFOs decide in practice',
     ],
   ),
   finance(
@@ -558,14 +555,14 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Bankruptcy',
     5,
     'Liquidation as against reorganisation, the automatic stay, DIP financing, cramdown and the absolute priority of claims.',
-    ['yale541: Case: United Airlines. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown'],
+    ['fin410: Case: an airline in bankruptcy. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown'],
   ),
   finance(
     'Cost of debt',
     'Capital (economics)',
     5,
     'Estimating what a firm pays to borrow from yields, ratings and spreads, before and after tax.',
-    ['osfin: The Costs of Debt and Equity Capital', 'yale541: Yield vs expected return'],
+    ['osfin: The Costs of Debt and Equity Capital', 'fin410: Yield vs expected return'],
   ),
   finance(
     'Cost of equity',
@@ -574,7 +571,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Estimating the return shareholders require with CAPM or the dividend growth model, and choosing the risk-free rate and premium.',
     [
       'osfin: The Costs of Debt and Equity Capital',
-      'yale423: Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for IBM; how leverage changes the cost of capital',
+      'fin420: Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for a large technology company; how leverage changes the cost of capital',
     ],
   ),
   finance(
@@ -584,8 +581,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Blending the after-tax costs of debt and equity at market-value weights, and when WACC is the right discount rate.',
     [
       'osfin: Calculating the Weighted Average Cost of Capital',
-      'yale423: Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for IBM; how leverage changes the cost of capital',
-      'yale541: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E',
+      'fin420: Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for a large technology company; how leverage changes the cost of capital',
+      'fin410: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E',
     ],
   ),
   finance(
@@ -593,14 +590,14 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Capital (economics)',
     6,
     'Asset beta as a weighted average of debt and equity betas, and moving between equity and asset betas at a given leverage.',
-    ['yale423: Levering and unlevering beta'],
+    ['fin420: Levering and unlevering beta'],
   ),
   finance(
     'Adjusted present value (APV)',
     'Investment',
     5,
     'Valuing a project as if all-equity and then adding the financing side effects, and when to use it instead of WACC.',
-    ['yale541: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E', 'yale541: WACC vs APV'],
+    ['fin410: WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E', 'fin410: WACC vs APV'],
   ),
   finance(
     'Divisional and project cost of capital',
@@ -608,9 +605,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'Building a division’s WACC from comparable firms’ asset betas relevered at its target leverage, and the errors of one firm-wide rate.',
     [
-      'yale541: Divisional cost of capital',
-      'yale541: Case: Eaton part 1. Building a divisional WACC',
-      'yale423: Divisional cost of capital; operational data for performance evaluation and compensation',
+      'fin410: Divisional cost of capital',
+      'fin410: Case: an industrial conglomerate. Building a divisional WACC',
+      'fin420: Divisional cost of capital; operational data for performance evaluation and compensation',
     ],
   ),
   finance(
@@ -618,14 +615,14 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Capital (economics)',
     5,
     'Current assets and liabilities as an investment the business needs, and how growth and terms change it.',
-    ['osfin: What Is Working Capital?', 'yale541: Working capital and payout policy'],
+    ['osfin: What Is Working Capital?', 'fin410: Working capital and payout policy'],
   ),
   finance(
     'Cash conversion cycle and trade credit',
     'Capital (economics)',
     5,
     'Days of inventory, receivables and payables, and the implied cost of early-payment discounts such as 2/10 net 30.',
-    ['osfin: What Is Trade Credit?', 'yale541: Working capital and payout policy'],
+    ['osfin: What Is Trade Credit?', 'fin410: Working capital and payout policy'],
   ),
   finance(
     'Cash, receivables and inventory management',
@@ -639,14 +636,14 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Stock',
     5,
     'Dividend irrelevance under Modigliani-Miller, homemade dividends, repurchase methods and what payout announcements signal.',
-    ['yale541: Working capital and payout policy'],
+    ['fin410: Working capital and payout policy'],
   ),
   finance(
     'Share buybacks and earnings per share targets',
     'Stock',
     4,
     'How repurchases raise EPS without raising value, accelerated share repurchases and the quality of earnings that follows.',
-    ['yale541: Case: Generating Higher Value at IBM'],
+    ['fin410: Case: raising value at a mature technology company'],
   ),
   finance(
     'Raising equity: IPOs and seasoned offerings',
@@ -654,9 +651,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'The IPO process, underwriting and its spread, underpricing, seasoned offerings and SPACs.',
     [
-      'yale541: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
-      'yale816: IPO prep, CFO role, Square IPO discussion',
-      'yale816: Going public',
+      'fin410: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
+      'acc520: IPO prep, CFO role, the IPO of a payments company',
+      'acc520: Going public',
     ],
   ),
   finance(
@@ -671,42 +668,42 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Investment',
     5,
     'Funding by stage, how SAFEs and convertible notes convert with caps and discounts, and the economic terms of a preferred round.',
-    ['yale816: Fundraising', 'yale816: Fundraising and capital structure'],
+    ['acc520: Fundraising', 'acc520: Fundraising and capital structure'],
   ),
   finance(
     'Cap tables and dilution',
     'Stock',
     5,
     'Pre-money and post-money valuation, fully diluted ownership across rounds, and the option pool shuffle.',
-    ['yale816: Capitalization tables and round mechanics', 'yale816: Cap tables, cash management, accounting systems'],
+    ['acc520: Capitalization tables and round mechanics', 'acc520: Cap tables, cash management, accounting systems'],
   ),
   finance(
     'Venture debt and term loans for private companies',
     'Loan',
     4,
     'Venture debt with warrants, term loans and receivables lines of credit, and what lenders require from a young firm.',
-    ['yale816: Debt and financial obligations'],
+    ['acc520: Debt and financial obligations'],
   ),
   finance(
     'Private company valuation for 409A',
     'Stock',
     4,
     'Setting the fair value of common stock below the preferred price by blending methods and discounting for marketability.',
-    ['yale816: 409A valuations', 'yale816: Equity splits, options and 409A valuation'],
+    ['acc520: 409A valuations', 'acc520: Equity splits, options and 409A valuation'],
   ),
   finance(
     'Leasing as financing',
     'Debt',
     4,
     'A lease as secured debt, the lease-or-buy decision by the equivalent-loan method, and tax and non-tax leases.',
-    ['yale541: Leasing'],
+    ['fin410: Leasing'],
   ),
   finance(
     'International capital budgeting',
     'Investment',
     4,
     'Valuing a foreign project in home or foreign currency, forward rates from interest rate parity and taxes across borders.',
-    ['yale541: International capital budgeting', 'osfin: Exchange Rates and Risk'],
+    ['fin410: International capital budgeting', 'osfin: Exchange Rates and Risk'],
   ),
   finance(
     'Corporate risk management and hedging',
@@ -714,7 +711,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'When hedging adds value, the Froot-Scharfstein-Stein view, and hedging commodity, currency and interest rate risk with forwards, options and swaps.',
     [
-      'yale541: Risk management',
+      'fin410: Risk management',
       'osfin: The Importance of Risk Management',
       'osfin: Commodity Price Risk',
       'osfin: Exchange Rates and Risk',
@@ -725,7 +722,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Company',
     5,
     'Value created as synergies less the premium paid, cash against stock offers, takeover defences and accretion arithmetic.',
-    ['yale541: Mergers and acquisitions'],
+    ['fin410: Mergers and acquisitions'],
   ),
   finance(
     'Reading M&A announcement returns',
@@ -733,8 +730,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     4,
     'Inferring what investors think of a deal from the acquirer’s and target’s price moves, and the implied deal probability.',
     [
-      'yale423: M&A and investor disagreement; inferring investor beliefs from announcement price responses; channels of communication with investors',
-      'yale541: Mergers and acquisitions',
+      'fin420: M&A and investor disagreement; inferring investor beliefs from announcement price responses; channels of communication with investors',
+      'fin410: Mergers and acquisitions',
     ],
   ),
   finance(
@@ -743,9 +740,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     6,
     'Buying a company with mostly borrowed money, the mini LBO model from sources and uses to exit, and why the deal is first a credit decision.',
     [
-      'yale847: PE industry overview: market history and trends, how PE firms price deals, walk-through of the mini LBO model',
-      'yale847: The "L" in LBO',
-      'yale847: Mini-model mechanics',
+      'fin610: PE industry overview: market history and trends, how PE firms price deals, walk-through of the mini LBO model',
+      'fin610: The "L" in LBO',
+      'fin610: Mini-model mechanics',
     ],
   ),
   finance(
@@ -754,9 +751,9 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'Solving for the most a buyer can pay from projections, debt capacity and a target IRR, and the growth a return requires.',
     [
-      'yale847: Pricing deals',
-      'yale847: Required growth rises with multiples',
-      'yale847: Sector specialists: software investing and SaaS buyouts; take-private lecture; IRR math',
+      'fin610: Pricing deals',
+      'fin610: Required growth rises with multiples',
+      'fin610: Sector specialists: software investing and SaaS buyouts; take-private lecture; IRR math',
     ],
   ),
   finance(
@@ -764,7 +761,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Loan',
     5,
     'Leveraged loans against private credit, covenants, cash sweeps and PIK, and how buyout debt is restructured.',
-    ['yale847: Debt markets and structures: leveraged loans versus private/direct debt, debt restructurings'],
+    ['fin610: Debt markets and structures: leveraged loans versus private/direct debt, debt restructurings'],
   ),
   finance(
     'Due diligence and quality of earnings',
@@ -772,8 +769,8 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     5,
     'Testing a target’s market and competitive position, EBITDA adjustments and add-backs, and the biases diligence guards against.',
     [
-      'yale847: Due diligence and valuation: tools to outsmart your biases, smart diligence using data analysis and outside information, the LBO decision framework for evaluating businesses',
-      'yale847: EBITDA adjustments as a bidding lever',
+      'fin610: Due diligence and valuation: tools to outsmart your biases, smart diligence using data analysis and outside information, the LBO decision framework for evaluating businesses',
+      'fin610: EBITDA adjustments as a bidding lever',
     ],
   ),
   finance(
@@ -782,7 +779,7 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     4,
     'Cost and growth initiatives, add-on acquisitions that average down the purchase multiple, and active ownership of a portfolio company.',
     [
-      'yale847: Value creation and ESG: managing management and board execution, growth initiatives, prioritization by magnitude versus cost versus disruption, add-on acquisitions, ESG integration',
+      'fin610: Value creation and ESG: managing management and board execution, growth initiatives, prioritization by magnitude versus cost versus disruption, add-on acquisitions, ESG integration',
     ],
   ),
   finance(
@@ -790,28 +787,28 @@ const CORPORATE_FINANCE_TOPICS: TerritoryTopic[] = [
     'Company',
     4,
     'Preemptive processes against broad auctions, the seller’s diligence materials and why buyers bid differently for one company.',
-    ['yale847: Auction dynamics'],
+    ['fin610: Auction dynamics'],
   ),
   finance(
     'Acquisition agreements: price adjustments, escrow and earn-outs',
     'Company',
     4,
     'The parts of a purchase agreement, cash-free debt-free pricing with a working capital target, escrows, earn-outs and rollover equity.',
-    ['yale847: Acquisition agreement anatomy', 'yale816: Exit accounting'],
+    ['fin610: Acquisition agreement anatomy', 'acc520: Exit accounting'],
   ),
   finance(
     'Behavioral corporate finance',
     'Investment',
     4,
     'How manager and investor biases, such as overconfidence and anchoring on round numbers, show up in corporate decisions and prices.',
-    ['yale541: Behavioral corporate finance'],
+    ['fin410: Behavioral corporate finance'],
   ),
   finance(
     'ESG and the cost of capital',
     'Capital (economics)',
     4,
     'What raising polluting firms’ cost of capital does to their choices, and how sustainable investing is measured.',
-    ['yale541: ESG and sustainable investing'],
+    ['fin410: ESG and sustainable investing'],
   ),
 ];
 
@@ -880,7 +877,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Accounting',
     6,
     'Recording revenue when earned and expenses when incurred rather than when cash moves, and why the two give different profits.',
-    ['mit501: The Income Statement and Principles of Accrual Accounting', 'yale816: Course intro; financial infrastructure for startups'],
+    ['mit501: The Income Statement and Principles of Accrual Accounting', 'acc520: Course intro; financial infrastructure for startups'],
   ),
   accounting(
     'Debits, credits and journal entries',
@@ -911,7 +908,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Accounting',
     4,
     'Closing temporary accounts to retained earnings, the post-closing trial balance and how a finance team runs the close.',
-    ['osacct: Describe and Prepare Closing Entries for a Business', 'yale816: Cap tables, cash management, accounting systems'],
+    ['osacct: Describe and Prepare Closing Entries for a Business', 'acc520: Cap tables, cash management, accounting systems'],
   ),
   accounting(
     'Accounting information systems and subsidiary ledgers',
@@ -961,7 +958,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'mit501: Revenue Recognition',
       'osacct: Explain the Revenue Recognition Principle and How It Relates to Current and Future Sales and Purchase Transactions',
-      'yale816: Revenue recognition',
+      'acc520: Revenue recognition',
     ],
   ),
   accounting(
@@ -976,7 +973,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Accounting',
     5,
     'Principal against agent presentation, deferred revenue as a liability, and bookings and billings against revenue.',
-    ['yale816: Revenue recognition and SaaS', 'yale816: Revenue recognition'],
+    ['acc520: Revenue recognition and SaaS', 'acc520: Revenue recognition'],
   ),
   accounting(
     'Accounts receivable and bad debts',
@@ -1066,7 +1063,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Purchase accounting: fair-valuing the assets and liabilities acquired, goodwill as the residual, and goodwill impairment.',
     [
       'mit501: Intangibles and Business Combinations',
-      'yale816: M&A, purchase accounting, exit planning',
+      'acc520: M&A, purchase accounting, exit planning',
       'mit535: Mergers and Acquisitions: Impairment of Goodwill, Writedowns, Private Firm Valuation',
     ],
   ),
@@ -1152,7 +1149,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'osacct: Explain the Process of Securing Equity Financing through the Issuance of Stock',
       'osacct: Analyze and Record Transactions for the Issuance and Repurchase of Stock',
-      'yale816: Journal entries for equity issuance',
+      'acc520: Journal entries for equity issuance',
     ],
   ),
   accounting(
@@ -1184,7 +1181,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     5,
     'Expensing options and restricted stock at grant-date fair value over vesting, ISOs against NQSOs, and the tax effects.',
     [
-      'yale816: Equity-based compensation, accounting and tax',
+      'acc520: Equity-based compensation, accounting and tax',
       'mit535: Employee Stock Options and Valuation: Should Options be Expensed? Understanding the current debate',
     ],
   ),
@@ -1290,7 +1287,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'osacct: Explain Contribution Margin and Calculate Contribution Margin per Unit, Contribution Margin Ratio, and Total Contribution Margin',
       'osacct: Calculate a Break-Even Point in Units and Dollars',
-      'yale815: Cost-volume-profit',
+      'acc530: Cost-volume-profit',
     ],
   ),
   accounting(
@@ -1319,7 +1316,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'osacct: Compute a Predetermined Overhead Rate and Apply Overhead to Production',
       'mit501: Indirect Allocation of Costs, Destin Brass',
-      'yale815: Cost allocation bases and the overhead death spiral',
+      'acc530: Cost allocation bases and the overhead death spiral',
     ],
   ),
   accounting(
@@ -1327,14 +1324,14 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Accounting',
     5,
     'Assigning overhead by the activities products consume, the cost hierarchy, and which products a single rate miscosts.',
-    ['osacct: Calculate Activity-Based Product Costs', 'mit501: ABC, Destin Brass', 'yale815: Activity based costing'],
+    ['osacct: Calculate Activity-Based Product Costs', 'mit501: ABC, Destin Brass', 'acc530: Activity based costing'],
   ),
   accounting(
     'Customer profitability and activity-based pricing',
     'Price',
     4,
     'Costing customers rather than products, and pricing on the activities each account consumes.',
-    ['yale815: Activity based pricing'],
+    ['acc530: Activity based pricing'],
   ),
   accounting(
     'Variable versus absorption costing',
@@ -1352,7 +1349,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
       'osacct: Identify Relevant Information for Decision-Making',
       'osacct: Evaluate and Determine Whether to Make or Buy a Component',
       'osacct: Evaluate and Determine Whether to Keep or Discontinue a Segment or Product',
-      'yale815: Relevant cost analysis',
+      'acc530: Relevant cost analysis',
     ],
   ),
   accounting(
@@ -1363,8 +1360,8 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'osacct: Prepare Operating Budgets',
       'osacct: Prepare Financial Budgets',
-      'yale816: Budgeting, forecasting and planning',
-      'yale816: Budgeting and forecasting',
+      'acc520: Budgeting, forecasting and planning',
+      'acc520: Budgeting and forecasting',
     ],
   ),
   accounting(
@@ -1383,7 +1380,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
       'osacct: Explain How and Why a Standard Cost Is Developed',
       'osacct: Compute and Evaluate Materials Variances',
       'osacct: Describe How Companies Use Variance Analysis',
-      'yale815: Standard costing and variance analysis',
+      'acc530: Standard costing and variance analysis',
     ],
   ),
   accounting(
@@ -1394,7 +1391,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     [
       'osacct: Describe the Types of Responsibility Centers',
       'osacct: Evaluate an Operating Segment or a Project Using Return on Investment, Residual Income, and Economic Value Added',
-      'yale815: Responsibility centers and segment performance',
+      'acc530: Responsibility centers and segment performance',
     ],
   ),
   accounting(
@@ -1402,7 +1399,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Price',
     4,
     'Pricing goods and services between divisions so each division’s incentives match the firm’s.',
-    ['yale815: Transfer pricing and internal profit allocation'],
+    ['acc530: Transfer pricing and internal profit allocation'],
   ),
   accounting(
     'Performance measures and KPIs',
@@ -1411,8 +1408,8 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'What makes a measure effective, the behaviour a single metric induces, and choosing KPIs for a business.',
     [
       'osacct: Identify the Characteristics of an Effective Performance Measure',
-      'yale815: Performance measurement and incentive design',
-      'yale816: KPIs and managerial accounting',
+      'acc530: Performance measurement and incentive design',
+      'acc520: KPIs and managerial accounting',
     ],
   ),
   accounting(
@@ -1420,7 +1417,7 @@ const ACCOUNTING_TOPICS: TerritoryTopic[] = [
     'Accounting',
     4,
     'Financial, customer, process and learning measures together, and what to do when they point different ways.',
-    ['osacct: Describe the Balanced Scorecard and Explain How It Is Used', 'yale815: Balanced scorecard'],
+    ['osacct: Describe the Balanced Scorecard and Explain How It Is Used', 'acc530: Balanced scorecard'],
   ),
   accounting(
     'Sustainability reporting',
@@ -1451,14 +1448,14 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Loan',
     5,
     'How a bank takes short-term deposits and makes long-term loans, and the liquidity and credit risk that creates.',
-    ['osecon: The Role of Banks', 'yale932: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response'],
+    ['osecon: The Role of Banks', 'eco610: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response'],
   ),
   banking(
     'The bank balance sheet: deposits, loans, reserves and capital',
     'Loan',
     5,
     "What sits on each side of a bank's balance sheet and how its capital absorbs losses on its assets.",
-    ['osecon: The Role of Banks', 'yale932: Bank net worth, amplification, and runs'],
+    ['osecon: The Role of Banks', 'eco610: Bank net worth, amplification, and runs'],
   ),
   banking(
     'How banks create money: fractional reserves and the money multiplier',
@@ -1500,35 +1497,35 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Loan',
     4,
     'Why deposits are insured, what the insurance prevents and the risk-taking it can encourage.',
-    ['osecon: Bank Regulation', 'yale932: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
+    ['osecon: Bank Regulation', 'eco610: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
   ),
   banking(
     'Bank runs and the Diamond-Dybvig model',
     '2008 financial crisis',
     5,
     'How a liquidity mismatch makes a run self-fulfilling, and why a lender of last resort and deposit insurance stop it.',
-    ['yale932: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion', 'yale932: Bank net worth, amplification, and runs'],
+    ['eco610: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion', 'eco610: Bank net worth, amplification, and runs'],
   ),
   banking(
     'Interest rate risk on a bank balance sheet: the failure of Silicon Valley Bank',
     'Interest (economics)',
     5,
     'How unrealized losses on long bonds and an uninsured deposit base made SVB fail once depositors ran.',
-    ['yale932: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
+    ['eco610: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
   ),
   banking(
     'Bank net worth and credit crunches',
     '2008 financial crisis',
     5,
     'Why a fall in bank capital contracts lending to the whole economy, and how that turns losses into a recession.',
-    ['yale932: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response', 'yale932: Bank net worth, amplification, and runs'],
+    ['eco610: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response', 'eco610: Bank net worth, amplification, and runs'],
   ),
   banking(
     'Leverage, fire sales and amplification',
     '2008 financial crisis',
     5,
     'How leveraged holders forced to sell push prices down and spread losses to others holding the same assets.',
-    ['yale932: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
+    ['eco610: Amplification: leverage, fire sales, Diamond-Dybvig bank runs, SVB case discussion'],
   ),
   banking(
     'The 2007-2009 financial crisis and the government response',
@@ -1536,8 +1533,8 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     5,
     'From subprime losses through Bear Stearns and Lehman to the rescues, guarantees and capital injections that followed.',
     [
-      'yale932: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response',
-      'yale541: Case: JPMC and Bear Stearns. Repos, haircuts, MBS, CDO tranching',
+      'eco610: Banks, credit crunches, and financial crises: bank net worth channel, the 2007-2009 crisis, government response',
+      'fin410: Case: a bank rescue in 2008. Repos, haircuts, MBS, CDO tranching',
     ],
   ),
   banking(
@@ -1545,14 +1542,14 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Loan',
     5,
     'Repurchase agreements as secured short-term funding, how haircuts are set and why they rose in a run on repo.',
-    ['yale541: Case: JPMC and Bear Stearns. Repos, haircuts, MBS, CDO tranching'],
+    ['fin410: Case: a bank rescue in 2008. Repos, haircuts, MBS, CDO tranching'],
   ),
   banking(
     'Securitization: mortgage-backed securities and CDO tranching',
     'Mortgage',
     5,
     'Pooling loans into securities, splitting the pool into senior and junior tranches, and where the risk ends up.',
-    ['yale541: Case: JPMC and Bear Stearns. Repos, haircuts, MBS, CDO tranching', 'mit617: Commercial Lending and Securitization'],
+    ['fin410: Case: a bank rescue in 2008. Repos, haircuts, MBS, CDO tranching', 'mit617: Commercial Lending and Securitization'],
   ),
   banking(
     'The Federal Reserve and central banks',
@@ -1575,8 +1572,8 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'How a rate change reaches spending through the cost of capital, credit, wealth and the exchange rate.',
     [
       'osecon: Monetary Policy and Economic Outcomes',
-      'yale932: Transmission from markets to the real economy: interest rate channels, wealth effects, exchange rate effects, financial conditions indices, the Fed put',
-      'yale932: Transmission channels and financial conditions',
+      'eco610: Transmission from markets to the real economy: interest rate channels, wealth effects, exchange rate effects, financial conditions indices, the Fed put',
+      'eco610: Transmission channels and financial conditions',
     ],
   ),
   banking(
@@ -1584,21 +1581,21 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Stock exchange',
     4,
     'Measuring how tight markets are across rates, spreads, stocks, housing and the dollar, and the Fed\'s habit of easing after falls.',
-    ['yale932: Transmission from markets to the real economy: interest rate channels, wealth effects, exchange rate effects, financial conditions indices, the Fed put'],
+    ['eco610: Transmission from markets to the real economy: interest rate channels, wealth effects, exchange rate effects, financial conditions indices, the Fed put'],
   ),
   banking(
     'The IS-MP model of output and interest rates',
     'Gross domestic product',
     4,
     'Aggregate demand falling with the real rate, the central bank setting that rate, and what shifts each curve.',
-    ['yale932: Keynesian business cycles and the IS-MP model; market reaction to macro news announcements', 'yale932: IS-MP and macro news'],
+    ['eco610: Keynesian business cycles and the IS-MP model; market reaction to macro news announcements', 'eco610: IS-MP and macro news'],
   ),
   banking(
     'How markets react to macroeconomic news',
     'Interest (economics)',
     4,
     'Why prices move on the surprise in a release rather than the release, and how yields, the dollar and stocks respond.',
-    ['yale932: Keynesian business cycles and the IS-MP model; market reaction to macro news announcements', 'yale932: IS-MP and macro news'],
+    ['eco610: Keynesian business cycles and the IS-MP model; market reaction to macro news announcements', 'eco610: IS-MP and macro news'],
   ),
   banking(
     'The effective lower bound and quantitative easing',
@@ -1606,8 +1603,8 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     5,
     'Why rates cannot go far below zero, and how large-scale asset purchases lower long yields through expectations and the term premium.',
     [
-      'yale932: Effective lower bound and the QE case discussion: ZLB, Great Recession, large-scale asset purchases',
-      'yale932: ELB and QE',
+      'eco610: Effective lower bound and the QE case discussion: ZLB, Great Recession, large-scale asset purchases',
+      'eco610: ELB and QE',
       'osecon: Pitfalls for Monetary Policy',
     ],
   ),
@@ -1617,9 +1614,9 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     5,
     'Output gaps, expectations and cost shocks as drivers of inflation, and how an inflation-targeting central bank responds.',
     [
-      'yale932: Inflation, the Phillips curve, and the Great Inflation of the 1970s; central bank independence',
-      'yale932: New Keynesian Phillips curve and inflation targeting',
-      'yale932: Inflation targeting applied to Covid-19 inflation and tariffs',
+      'eco610: Inflation, the Phillips curve, and the Great Inflation of the 1970s; central bank independence',
+      'eco610: New Keynesian Phillips curve and inflation targeting',
+      'eco610: Inflation targeting applied to Covid-19 inflation and tariffs',
     ],
   ),
   banking(
@@ -1627,7 +1624,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Inflation',
     4,
     'How the 1970s inflation took hold, what the Volcker disinflation cost, and why central banks were made independent.',
-    ['yale932: Inflation, the Phillips curve, and the Great Inflation of the 1970s; central bank independence'],
+    ['eco610: Inflation, the Phillips curve, and the Great Inflation of the 1970s; central bank independence'],
   ),
   banking(
     'Lags and pitfalls of monetary policy',
@@ -1642,8 +1639,8 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     5,
     'Reading the expected path of policy rates off the yield curve once the term premium is taken out.',
     [
-      'yale932: Interest rates and the expectations hypothesis: fixed income basics, term structure, term premium',
-      'yale932: Expectations hypothesis with a term premium',
+      'eco610: Interest rates and the expectations hypothesis: fixed income basics, term structure, term premium',
+      'eco610: Expectations hypothesis with a term premium',
       'mit433: The Fixed Income Market, Part 2: The Yield Curve',
     ],
   ),
@@ -1652,14 +1649,14 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Inflation',
     5,
     'The Fisher equation, inflation-protected bonds as a read on real rates, and what breakeven inflation does and does not measure.',
-    ['yale932: Credit spreads and real rates: corporates vs Treasuries, Fisher equation, inflation expectations, TIPS, breakeven inflation', 'yale932: Credit spreads and real rates'],
+    ['eco610: Credit spreads and real rates: corporates vs Treasuries, Fisher equation, inflation expectations, TIPS, breakeven inflation', 'eco610: Credit spreads and real rates'],
   ),
   banking(
     'Credit spreads, default risk and ratings',
     'Debt',
     5,
     'Splitting a corporate spread into expected default and risk and liquidity premia, and how ratings migrate.',
-    ['mit433: The Credit Market, Part 1: Default Risk, Credit Spreads and Ratings Transitions', 'yale932: Credit spreads and real rates'],
+    ['mit433: The Credit Market, Part 1: Default Risk, Credit Spreads and Ratings Transitions', 'eco610: Credit spreads and real rates'],
   ),
   banking(
     'Credit derivatives and credit default swaps',
@@ -1701,7 +1698,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Exchange rate',
     5,
     'Rate differentials and risk premia as drivers of exchange rates, and why borrowing low-rate currencies to lend high-rate ones pays until it crashes.',
-    ['yale932: Exchange rates and the carry trade: uncovered interest parity, UIP with a risk premium, carry trade returns', 'yale932: UIP and the carry trade'],
+    ['eco610: Exchange rates and the carry trade: uncovered interest parity, UIP with a risk premium, carry trade returns', 'eco610: UIP and the carry trade'],
   ),
   banking(
     'Exchange rate regimes and their macroeconomic effects',
@@ -1716,8 +1713,8 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     4,
     'Why market valuation ratios swing more than dividends justify, and the belief, risk-premium and inelastic-market explanations.',
     [
-      'yale932: Aggregate asset price fluctuations: tech boom, Liberation Day crash, excess volatility puzzle, rational vs behavioral explanations, supply-demand effects',
-      'yale932: Excess volatility and its explanations',
+      'eco610: Aggregate asset price fluctuations: tech boom, Liberation Day crash, excess volatility puzzle, rational vs behavioral explanations, supply-demand effects',
+      'eco610: Excess volatility and its explanations',
     ],
   ),
   banking(
@@ -1750,7 +1747,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Derivative (finance)',
     4,
     'Measuring a trading book\'s risk with value at risk and stress tests, and the limits of each.',
-    ['mit433: Risk Management', 'yale541: Risk management'],
+    ['mit433: Risk Management', 'fin410: Risk management'],
   ),
   banking(
     'What investment banks do: advisory, underwriting and trading',
@@ -1766,7 +1763,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     "The bank's side of an IPO or bond deal: due diligence, the roadshow, building the book, setting the price and the gross spread.",
     [
       'mit617: Public Offerings and Investment Banking',
-      'yale541: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
+      'fin410: What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
     ],
   ),
   banking(
@@ -1781,7 +1778,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     'Company',
     5,
     'An adviser\'s view of a deal from mandate to close: the parties, the stages and the choice of merger, stock or asset purchase.',
-    ['mit617: Key Players, Stages and Deal Structures', 'yale541: Mergers and acquisitions'],
+    ['mit617: Key Players, Stages and Deal Structures', 'fin410: Mergers and acquisitions'],
   ),
   banking(
     'Tax structuring of an acquisition: stock versus asset deals',
@@ -1826,7 +1823,7 @@ const BANKING_TOPICS: TerritoryTopic[] = [
     [
       'mit617: Bankruptcy and Reorganization I',
       'mit617: Bankruptcy and Reorganization II',
-      'yale541: Case: United Airlines. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown',
+      'fin410: Case: an airline in bankruptcy. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown',
     ],
   ),
 ];
@@ -1902,9 +1899,9 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Entry, rivalry, buyers, suppliers and substitutes as the forces that set an industry\'s long-run profitability.',
     [
       "osmgmt: A Firm's Micro Environment: Porter's Five Forces",
-      "yale410: Porter's five forces plus complements",
+      "str610: Porter's five forces plus complements",
       'mit902: Porter’s Frameworks and the Resource-Based View of the Firm',
-      'yale410: Industry analysis framework',
+      'str610: Industry analysis framework',
     ],
   ),
   strategy(
@@ -1912,14 +1909,14 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Competition (economics)',
     5,
     'Brandenburger and Nalebuff\'s map of the players, added value, and why complements are missing from the five forces.',
-    ['yale410: Value net and added value', 'yale410: Course introduction: the Competitor perspective'],
+    ['str610: Value net and added value', 'str610: Course introduction: thinking like a competitor'],
   ),
   strategy(
     'Value creation versus value capture',
     'Profit (economics)',
     5,
     'The gap between willingness to pay and cost as the value a firm creates, and what decides how much of it the firm keeps.',
-    ['yale410: Value net and added value', 'mit912: Creating, capturing, and delivering value with technology strategy'],
+    ['str610: Value net and added value', 'mit912: Creating, capturing, and delivering value with technology strategy'],
   ),
   strategy(
     'Industry analysis from financial statements',
@@ -1927,10 +1924,10 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     5,
     "Reading the strength of each force and a rival's strategy from margins, capex, risk factors and operating metrics in its filings.",
     [
-      'yale410: Mapping accounting line items to force strength',
-      'yale410: Using accounting data to understand competitor strategies',
-      'yale410: Industry analysis applied',
-      'yale410: Airline operating metrics',
+      'str610: Mapping accounting line items to force strength',
+      'str610: Using accounting data to understand competitor strategies',
+      'str610: Industry analysis applied',
+      'str610: Airline operating metrics',
     ],
   ),
   strategy(
@@ -1938,7 +1935,7 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Supply and demand',
     4,
     'Ordering producers by cost to draw the supply curve, and why inelastic demand makes commodity prices volatile.',
-    ['yale410: Supply curves built from producer cost stacks'],
+    ['str610: Supply curves built from producer cost stacks'],
   ),
   strategy(
     'The resource-based view and core competencies',
@@ -1985,8 +1982,8 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     5,
     'Competing on taste versus quality, choosing a position relative to a rival, and how differentiation softens price competition.',
     [
-      'yale410: Product differentiation and positioning',
-      'yale410: Oligopoly III: choosing a differentiation position',
+      'str610: Product differentiation and positioning',
+      'str610: Oligopoly III: choosing a differentiation position',
       'mit010: Pricing, Product Characteristics and Quality',
     ],
   ),
@@ -2024,8 +2021,8 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     5,
     'Reaction functions and the equilibrium when firms choose quantities, with equal and unequal costs.',
     [
-      'yale410: Cournot quantity competition',
-      'yale410: Oligopoly I: Bertrand/Cournot for mergers and first-mover advantage',
+      'str610: Cournot quantity competition',
+      'str610: Oligopoly I: Bertrand/Cournot for mergers and first-mover advantage',
       'mit010: Cournot-Nash in detail',
     ],
   ),
@@ -2034,14 +2031,14 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Game theory',
     5,
     'Why identical products and no capacity limit drive price to marginal cost, and what breaks the result.',
-    ['yale410: Bertrand price competition', 'yale410: Oligopoly I: Bertrand/Cournot for mergers and first-mover advantage'],
+    ['str610: Bertrand price competition', 'str610: Oligopoly I: Bertrand/Cournot for mergers and first-mover advantage'],
   ),
   strategy(
     'First-mover advantage and Stackelberg leadership',
     'Game theory',
     5,
     'Committing to a large quantity before a follower moves, and when moving first pays.',
-    ['yale410: Stackelberg first-mover advantage', 'mit010: First-mover Advantage: Stackelberg'],
+    ['str610: Stackelberg first-mover advantage', 'mit010: First-mover Advantage: Stackelberg'],
   ),
   strategy(
     'Repeated games, tacit collusion and cartel stability',
@@ -2049,8 +2046,8 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     5,
     'How repeated play sustains cooperation, the temptation to defect, trigger strategies and the swing producer in a cartel.',
     [
-      'yale410: Repeated games and cartel stability',
-      'yale410: Oligopoly II: Cournot applied and repeated interaction',
+      'str610: Repeated games and cartel stability',
+      'str610: Oligopoly II: Cournot applied and repeated interaction',
       'mit010: Repeated Games',
       'mit010: Tacit Collusion',
     ],
@@ -2152,7 +2149,7 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     5,
     'Why two successive markups raise price and cut joint profit, and the costs and benefits of integrating or contracting instead.',
     [
-      'yale410: Double marginalization and vertical integration',
+      'str610: Double marginalization and vertical integration',
       'mit010: Double Marginalization',
       'mit010: Costs and Benefits of Vertical Integration',
       'mit912: Horizontal / vertical strategies and the evolution of the value chain',
@@ -2163,21 +2160,21 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Contract',
     4,
     'Franchise fees and royalties as two-part tariffs between a brand and its outlets, and why they strain under uncertain demand.',
-    ['yale410: Transfer pricing, double marginalization and franchising'],
+    ['str610: Transfer pricing, double marginalization and franchising'],
   ),
   strategy(
     'Co-opetition',
     'Competition (economics)',
     4,
     'When cooperating with a rival enlarges the pie, and where cooperation becomes collusion.',
-    ['yale410: Co-opetition', 'yale410: Competing and cooperating'],
+    ['str610: Co-opetition', 'str610: Competing and cooperating'],
   ),
   strategy(
     'Antitrust: cartels, monopolization and merger review',
     'Monopoly',
     5,
     'Sherman Act sections 1 and 2, Clayton Act merger review, leniency programs and the tech monopolization cases.',
-    ['yale410: Antitrust', 'mit010: Antitrust Laws'],
+    ['str610: Antitrust', 'mit010: Antitrust Laws'],
   ),
   strategy(
     'Corporate strategy: diversification and the scope of the firm',
@@ -2230,7 +2227,7 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Investment',
     5,
     "Linking a competitive position to enterprise value: valuing a business under each scenario for how its rivals and buyers behave.",
-    ['yale410: Oligopoly IV: what game are we playing? Strategy and valuation', 'yale410: Perpetuity valuation of a commodity business'],
+    ['str610: Oligopoly IV: what game are we playing? Strategy and valuation', 'str610: Perpetuity valuation of a commodity business'],
   ),
   strategy(
     'Asymmetric information: adverse selection and signaling',
@@ -2265,7 +2262,7 @@ const STRATEGY_TOPICS: TerritoryTopic[] = [
     'Market failure',
     4,
     'Costs a firm imposes on others, how regulation prices them, and when a firm pursues a social goal on its own.',
-    ['mit010: Positive and Negative Externalities', 'yale410: Social objectives in a for-profit company'],
+    ['mit010: Positive and Negative Externalities', 'str610: Social objectives in a for-profit company'],
   ),
 ];
 
@@ -2278,7 +2275,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     [
       'osbus: Production and Operations Management—An Overview',
       'mit760a: Operations Overview',
-      'yale422: Introduction to Operations Management; mortgage processing in-class exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
+      'ops510: Introduction to Operations Management; loan processing exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
     ],
   ),
   operations(
@@ -2287,8 +2284,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'Choosing a flow unit, and mapping the tasks, resources, buffers and routes it passes through.',
     [
-      'yale422: Process flow analysis',
-      'yale422: Introduction to Operations Management; mortgage processing in-class exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
+      'ops510: Process flow analysis',
+      'ops510: Introduction to Operations Management; loan processing exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
       'mit760a: Process Flow Models',
     ],
   ),
@@ -2305,8 +2302,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     6,
     'Capacity of each resource, the bottleneck as the slowest step, and flow rate as the lesser of demand and bottleneck capacity.',
     [
-      'yale422: Capacity and bottlenecks',
-      'yale422: Process Analysis I: tasks, resources, capacity',
+      'ops510: Capacity and bottlenecks',
+      'ops510: Process Analysis I: tasks, resources, capacity',
       'mit761: Capacity I: Capacity analysis & queuing',
     ],
   ),
@@ -2315,21 +2312,21 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Productivity',
     5,
     'How busy each resource is against its capacity, and implied utilization above one as the sign of a resource that cannot keep up.',
-    ['yale422: Capacity and bottlenecks', 'yale422: Process Analysis I: tasks, resources, capacity'],
+    ['ops510: Capacity and bottlenecks', 'ops510: Process Analysis I: tasks, resources, capacity'],
   ),
   operations(
     "Little's Law",
     'Productivity',
     6,
     'Inventory equals flow rate times flow time, and using it to find any one of the three from the other two.',
-    ["yale422: Little's Law", "yale422: Process Analysis II: flow rate R, inventory I, flow time T, Little's Law"],
+    ["ops510: Little's Law", "ops510: Process Analysis II: flow rate R, inventory I, flow time T, Little's Law"],
   ),
   operations(
     'Inventory buildup diagrams for peak demand',
     'Productivity',
     5,
     'Tracking the queue that builds when arrivals exceed capacity over a peak, how long it lasts and how big it gets.',
-    ['yale422: Process Diagnostics and Improvements: bottleneck identification, inventory buildup over a peak day'],
+    ['ops510: Process Diagnostics and Improvements: bottleneck identification, inventory buildup over a peak day'],
   ),
   operations(
     'The theory of constraints',
@@ -2354,8 +2351,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'Poisson arrivals, exponential service times and the coefficient of variation as the measure of how uneven a process is.',
     [
-      'yale422: Variability in Processes I: Poisson arrivals, coefficient of variation, utilization',
-      'yale422: Queueing and variability',
+      'ops510: Variability in Processes I: Poisson arrivals, coefficient of variation, utilization',
+      'ops510: Queueing and variability',
     ],
   ),
   operations(
@@ -2364,8 +2361,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'The waiting-time formula for one and many servers, and why waits explode as utilization nears one.',
     [
-      'yale422: Variability in Processes II: multi-server queues, waiting time',
-      'yale422: Queueing and variability',
+      'ops510: Variability in Processes II: multi-server queues, waiting time',
+      'ops510: Queueing and variability',
       'mit760a: Queueing Systems',
     ],
   ),
@@ -2374,7 +2371,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Operations research',
     5,
     'Choosing how many servers to staff against the cost of waiting, and service design in places like hospitals.',
-    ['yale422: Service operations', 'yale422: Variability in Processes II: multi-server queues, waiting time'],
+    ['ops510: Service operations', 'ops510: Variability in Processes II: multi-server queues, waiting time'],
   ),
   operations(
     'Why firms hold inventory: cycle, safety and pipeline stock',
@@ -2389,8 +2386,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'Trading ordering cost against holding cost to choose an order size, and how sensitive the total is to getting it wrong.',
     [
-      'yale422: EOQ',
-      'yale422: Inventory Management II: EOQ model, order and holding cost trade-off, pooling',
+      'ops510: EOQ',
+      'ops510: Inventory Management II: EOQ model, order and holding cost trade-off, pooling',
       'mit761: Inventory I: EOQ & cycle stocks',
     ],
   ),
@@ -2399,7 +2396,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Logistics',
     5,
     'Why holding stock in one place needs less of it for the same service, and when that saving beats being near the customer.',
-    ['yale422: Inventory Management II: EOQ model, order and holding cost trade-off, pooling'],
+    ['ops510: Inventory Management II: EOQ model, order and holding cost trade-off, pooling'],
   ),
   operations(
     'The newsvendor model and the critical ratio',
@@ -2407,8 +2404,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     6,
     'Choosing a one-time order under uncertain demand from the costs of ordering too few and too many.',
     [
-      'yale422: Inventory and the newsvendor model',
-      'yale422: Inventory Management I: newsvendor model, critical ratio, in-stock probability',
+      'ops510: Inventory and the newsvendor model',
+      'ops510: Inventory Management I: newsvendor model, critical ratio, in-stock probability',
       'mit761: Inventory II: Newsvendor & safety stocks',
     ],
   ),
@@ -2432,8 +2429,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     4,
     "Garvin's eight dimensions of quality, and the costs of prevention, appraisal and failure.",
     [
-      "yale422: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma",
-      'yale422: Quality and process control',
+      "ops510: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma",
+      'ops510: Quality and process control',
       'mit769: Competing on quality: Sources of quality and different measures of quality',
     ],
   ),
@@ -2443,8 +2440,8 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'Telling common-cause from special-cause variation with control charts, including p-charts with three-sigma limits.',
     [
-      'yale422: Quality and process control',
-      "yale422: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma",
+      'ops510: Quality and process control',
+      "ops510: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma",
       'mit760a: Process Quality',
     ],
   ),
@@ -2453,7 +2450,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Industrial engineering',
     5,
     "Comparing a process's spread with its specification limits, capability indices, and the Six Sigma method.",
-    ["yale422: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma", 'yale422: Quality and process control'],
+    ["ops510: Quality Management: Garvin's eight dimensions, statistical process control, Six Sigma", 'ops510: Quality and process control'],
   ),
   operations(
     'Quality tools and total quality management',
@@ -2468,7 +2465,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     'Just-in-time and jidoka as the two pillars of the Toyota Production System, and why lean is a system rather than a toolkit.',
     [
-      'yale422: Lean and the Toyota Production System',
+      'ops510: Lean and the Toyota Production System',
       'mit760a: Toyota Production System',
       'mit761: Toyota production system + Toyota case',
     ],
@@ -2478,7 +2475,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Mass production',
     5,
     'Pacing a process to demand with takt time, and assigning tasks to stations so none is over the takt.',
-    ['yale422: Lean Operations and the Toyota Production System: takt time, line balancing, waste'],
+    ['ops510: Lean Operations and the Toyota Production System: takt time, line balancing, waste'],
   ),
   operations(
     'Waste and continuous improvement',
@@ -2486,7 +2483,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     4,
     'The kinds of waste lean names, and kaizen as small, constant improvement by the people doing the work.',
     [
-      'yale422: Lean Operations and the Toyota Production System: takt time, line balancing, waste',
+      'ops510: Lean Operations and the Toyota Production System: takt time, line balancing, waste',
       'osbus: Looking for a Better Way: Improving Production and Operations',
     ],
   ),
@@ -2547,7 +2544,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     [
       'mit760a: Operations Strategy',
       'mit769: Frameworks for strategy and the decision category approach',
-      'yale422: Operations as strategy',
+      'ops510: Operations as strategy',
     ],
   ),
   operations(
@@ -2556,7 +2553,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     5,
     "How Zara's short cycle times and local production beat cheaper rivals by selling more at full price.",
     [
-      'yale422: Operations-Enabled Business Model: fast fashion, responsiveness vs. cost',
+      'ops510: Operations-Enabled Business Model: fast fashion, responsiveness vs. cost',
       'mit761: Apparel supply chains + Marks & Spencer and Zara Case',
     ],
   ),
@@ -2686,7 +2683,7 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
     'Productivity',
     4,
     'What makes services different to run, setting service standards, and recovering from a failure.',
-    ['yale422: Service operations', 'mit761: Quality management + Hank Kolb case'],
+    ['ops510: Service operations', 'mit761: Quality management + Hank Kolb case'],
   ),
 ];
 
@@ -2930,10 +2927,10 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale541',
-      label: 'Yale SOM MGT 541, Corporate Finance (Spring 2026): sessions and key frameworks, from the course summary',
+      key: 'fin410',
+      label: 'Riverside School of Management FIN 410, Corporate Finance: sessions and key frameworks, from a course summary',
       areas: [CORPORATE_FINANCE, BANKING],
-      independence: 'yale-mgt-541',
+      independence: 'course-fin410',
       items: [
         'Cash flows and present value. NPV, bond pricing, financial statement review',
         'What is capital structure. Market value balance sheet, debt vs equity claims, IPOs and SEOs, underwriting spreads, SPACs, off-balance-sheet financing',
@@ -2943,15 +2940,15 @@ export const BUSINESS: Territory = {
         'Debt capacity',
         'Debt overhang',
         'Other conflicts among investors',
-        'Case: United Airlines. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown',
+        'Case: an airline in bankruptcy. Chapter 7 vs 11, automatic stay, 120-day exclusivity, DIP financing, cramdown',
         'Asymmetric information and capital structure',
-        'Case: JPMC and Bear Stearns. Repos, haircuts, MBS, CDO tranching',
+        'Case: a bank rescue in 2008. Repos, haircuts, MBS, CDO tranching',
         'Working capital and payout policy',
         'Free cash flows and the cost of capital',
         'Capital Asset Pricing Model. Estimating beta from raw return data',
         'WACC and APV. When each is the right tool (fixed leverage ratio vs fixed debt level), why never to use both at once, multiples valuation and the case against P/E',
-        'Case: Generating Higher Value at IBM',
-        'Case: Eaton part 1. Building a divisional WACC',
+        'Case: raising value at a mature technology company',
+        'Case: an industrial conglomerate. Building a divisional WACC',
         'International capital budgeting',
         'Leasing',
         'Mergers and acquisitions',
@@ -2970,22 +2967,22 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale423',
-      label: 'Yale SOM MGT 423, Sourcing and Managing Funds (Spring 2025): sessions and key frameworks, from the course summary',
+      key: 'fin420',
+      label: 'Riverside School of Management FIN 420, Raising and Managing Capital: sessions and key frameworks, from a course summary',
       areas: [CORPORATE_FINANCE],
-      independence: 'yale-mgt-423',
+      independence: 'course-fin420',
       items: [
         'Cash flow versus accrual approaches to valuation; value creation versus wealth delivered; connecting market and book values',
         'Impact of competition on profitability; measuring profitability; including debt investors',
-        'Review of PS #1: peak and terminal ROIC for BYND; alternative measures of value creation; profit margin versus economic income',
+        'Problem set review: peak and terminal ROIC for a packaged food company; alternative measures of value creation; profit margin versus economic income',
         'Cost structure and projections; how costs and margins trend as firms grow',
-        'Review of PS #2 model assumptions; valuation using multiples',
+        'Problem set review: model assumptions; valuation using multiples',
         'Free cash flow definition and calculation; terminal value and the role of growth',
-        'BYND wrap-up: DCF value versus the 2019 year-end price; review of valuation methods',
-        'Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for IBM; how leverage changes the cost of capital',
+        'Valuation case wrap-up: DCF value versus the year-end share price; review of valuation methods',
+        'Estimating WACC with debt and equity; firm risk, equity risk and leverage; WACC for a large technology company; how leverage changes the cost of capital',
         'Divisional cost of capital; operational data for performance evaluation and compensation',
         'Capital structure theory; Modigliani-Miller; exceptions from taxes, financial distress, information asymmetry, conflicts of interest; how CFOs decide in practice',
-        'Capital structure in practice: how Hertz sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
+        'Capital structure in practice: how a car rental company sourced capital across its lifecycle, cost of changing capital structure, whether it levered too far, managing information asymmetry when raising equity',
         'M&A and investor disagreement; inferring investor beliefs from announcement price responses; channels of communication with investors',
         'Review: the three paths to value and the main issues raised in the course',
         'Economic income (profit minus r x book value) and ROI as the accounting-side equivalents of NPV and IRR',
@@ -2995,10 +2992,10 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale847',
-      label: 'Yale SOM MGT 847, Private Equity: Leveraged Buyouts (Fall 2025): sessions and key frameworks, from the course summary',
+      key: 'fin610',
+      label: 'Riverside School of Management FIN 610, Private Equity: Leveraged Buyouts: sessions and key frameworks, from a course summary',
       areas: [CORPORATE_FINANCE],
-      independence: 'yale-mgt-847',
+      independence: 'course-fin610',
       items: [
         'PE industry overview: market history and trends, how PE firms price deals, walk-through of the mini LBO model',
         'Due diligence and valuation: tools to outsmart your biases, smart diligence using data analysis and outside information, the LBO decision framework for evaluating businesses',
@@ -3017,11 +3014,11 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale816',
+      key: 'acc520',
       label:
-        'Yale SOM MGT 816, The Private Firm CFO: Accounting and Finance Strategies (Fall 2025): sessions and key frameworks, from the course summary',
+        'Riverside School of Management ACC 520, Finance and Accounting for Private Companies: sessions and key frameworks, from a course summary',
       areas: [CORPORATE_FINANCE, ACCOUNTING],
-      independence: 'yale-mgt-816',
+      independence: 'course-acc520',
       items: [
         'Course intro; financial infrastructure for startups',
         'Cap tables, cash management, accounting systems',
@@ -3035,7 +3032,7 @@ export const BUSINESS: Territory = {
         'Fundraising and capital structure',
         'Debt and financial obligations',
         'M&A, purchase accounting, exit planning',
-        'IPO prep, CFO role, Square IPO discussion',
+        'IPO prep, CFO role, the IPO of a payments company',
         'Capitalization tables and round mechanics',
         'Journal entries for equity issuance',
         'Choice of entity',
@@ -3049,10 +3046,10 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale815',
-      label: 'Yale SOM MGT 815, Managerial Controls (Spring 2026): key frameworks, from the course summary',
+      key: 'acc530',
+      label: 'Riverside School of Management ACC 530, Management Control Systems: key frameworks, from a course summary',
       areas: [ACCOUNTING],
-      independence: 'yale-mgt-815',
+      independence: 'course-acc530',
       items: [
         'Relevant cost analysis',
         'Cost allocation bases and the overhead death spiral',
@@ -3147,11 +3144,11 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale932',
+      key: 'eco610',
       label:
-        'Yale SOM MGT 932, Financial Markets and Macroeconomic Policy (Fall 2025): sessions and key frameworks, from the course summary',
+        'Riverside School of Management ECO 610, Financial Markets and Monetary Policy: sessions and key frameworks, from a course summary',
       areas: [BANKING],
-      independence: 'yale-mgt-932',
+      independence: 'course-eco610',
       items: [
         'Course intro and asset pricing basics: markets and policy in the Covid-19 cycle, present discounted value, Gordon growth model',
         'Aggregate asset price fluctuations: tech boom, Liberation Day crash, excess volatility puzzle, rational vs behavioral explanations, supply-demand effects',
@@ -3299,12 +3296,12 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale410',
-      label: 'Yale SOM MGT 410, Competitor (Fall 2024): sessions and key frameworks, from the course summary',
+      key: 'str610',
+      label: 'Riverside School of Management STR 610, Competitive Strategy: sessions and key frameworks, from a course summary',
       areas: [STRATEGY],
-      independence: 'yale-mgt-410',
+      independence: 'course-str610',
       items: [
-        'Course introduction: the Competitor perspective',
+        'Course introduction: thinking like a competitor',
         'Oligopoly I: Bertrand/Cournot for mergers and first-mover advantage',
         'Oligopoly II: Cournot applied and repeated interaction',
         'Oligopoly III: choosing a differentiation position',
@@ -3428,12 +3425,12 @@ export const BUSINESS: Territory = {
       ],
     },
     {
-      key: 'yale422',
-      label: 'Yale SOM MGT 422, The Operations Engine (Spring 2025): sessions and key frameworks, from the course summary',
+      key: 'ops510',
+      label: 'Riverside School of Management OPS 510, Operations Management: sessions and key frameworks, from a course summary',
       areas: [OPERATIONS],
-      independence: 'yale-mgt-422',
+      independence: 'course-ops510',
       items: [
-        'Introduction to Operations Management; mortgage processing in-class exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
+        'Introduction to Operations Management; loan processing exercise (flow units, process flow diagrams, efficiency vs. quality frontier)',
         'Process Analysis I: tasks, resources, capacity',
         "Process Analysis II: flow rate R, inventory I, flow time T, Little's Law",
         'Process Diagnostics and Improvements: bottleneck identification, inventory buildup over a peak day',
