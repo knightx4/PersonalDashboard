@@ -9562,6 +9562,44 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The board checking back on decisions at 30 and 90 days (plan #2561.8):
+     * how each turned out with receipts, and the three presses to answer;
+     * and the same with a save that failed. */
+    id: 'you-board-reviews',
+    label: 'You · Board, the board checks back on two decisions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="reviews" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-reviews-error',
+    label: 'You · Board, an answer to a check-back that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="reviews-error" />
+      </div>
+    ),
+  },
+  {
+    /* A meeting that checked back on two decisions, one answered and graded,
+     * with the scorecard of whose picks held up by topic (plan #2561.8). */
+    id: 'you-board-meeting-reviewed',
+    label: 'You · Board, a meeting that checked back on decisions, with picks graded',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview reviewed />
+      </div>
+    ),
+  },
+  {
     /* A verdict that names its assumptions (plan #2561.11). */
     id: 'you-board-meeting-assumed',
     label: 'You · Board, a verdict resting on stated assumptions',

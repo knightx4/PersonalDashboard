@@ -21,13 +21,14 @@ import {
 } from '@/lib/you/board';
 import { whenDay } from '@/lib/core/when';
 import {
-  optionLabel,
   type BoardAdvisor,
   type BoardDecision,
   type BoardQuestion,
 } from '@/lib/you/board-questions';
 import type { PersonAsk } from '@/lib/you/board-asks';
+import { nextReview, type DecisionReview } from '@/lib/you/board-reviews';
 import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-rows';
+import { ReviewRow, type ReviewAnswerAction } from './review-rows';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
@@ -42,12 +43,16 @@ import { useRefreshWhileRunning } from './refresh-while-running';
  * on its own page (./[id]).
  */
 
-export type BoardListActions = AskActions & QuestionActions & { answerAsk: AskAnswerAction };
+export type BoardListActions = AskActions &
+  QuestionActions & { answerAsk: AskAnswerAction; answerReview: ReviewAnswerAction };
 
 export function BoardListView({
   meetings,
   questions = [],
   asks = [],
+  reviews = [],
+  names = {},
+  reviewError,
   advisors = [],
   decisions = [],
   nextMeeting,
@@ -62,6 +67,12 @@ export function BoardListView({
   questions?: readonly BoardQuestion[];
   /** What the board asks them, unanswered or answered and not yet read (listBoardAsks). */
   asks?: readonly PersonAsk[];
+  /** The board's check-backs on their decisions still waiting on their answer (listOpenReviews). */
+  reviews?: readonly DecisionReview[];
+  /** Every advisor's name by key, for whose pick held up (advisorNames). */
+  names?: Readonly<Record<string, string>>;
+  /** A failed answer to draw on the first check-back. Only the gallery sets it. */
+  reviewError?: string;
   /** The active roster, for the compose card's advisors. */
   advisors?: readonly BoardAdvisor[];
   /** Every question they decided, newest first (listDecisions). */
@@ -99,7 +110,13 @@ export function BoardListView({
   const suggestions = questions.filter((q) => q.status === 'suggested');
   const asked = questions.filter((q) => q.status !== 'suggested');
 
-  if (meetings.length === 0 && questions.length === 0 && asks.length === 0 && decisions.length === 0) {
+  if (
+    meetings.length === 0 &&
+    questions.length === 0 &&
+    asks.length === 0 &&
+    reviews.length === 0 &&
+    decisions.length === 0
+  ) {
     return (
       <PageColumn>
         {header}
@@ -139,6 +156,19 @@ export function BoardListView({
                   asks={group.asks}
                   answer={actions.answerAsk}
                   errorOn={index === 0 ? (asksError ?? null) : null}
+                />
+              ))}
+            </Group>
+          )}
+          {reviews.length > 0 && (
+            <Group title="How did it go?" count={reviews.length}>
+              {reviews.map((review, index) => (
+                <ReviewRow
+                  key={`${review.questionId}:${review.at}`}
+                  review={review}
+                  names={names}
+                  answer={actions.answerReview}
+                  startError={index === 0 ? (reviewError ?? null) : null}
                 />
               ))}
             </Group>
@@ -216,10 +246,30 @@ export function BoardListView({
   );
 }
 
-/** "Board said B · You chose A, Take the contract": the recommendation beside the choice. */
+/** An option's words cut at a word boundary to about `max` characters, with an ellipsis when cut. */
+export function shortOption(text: string, max = 24): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max + 1).replace(/\s+\S*$/, '');
+  return `${cut || text.slice(0, max)}…`;
+}
+
+/** Non-breaking spaces, so a phrase wraps as one piece. */
+const together = (phrase: string) => phrase.replace(/ /g, ' ');
+
+/**
+ * "Board said B · You chose A, Take the contract · Check back 1 Dec": the
+ * recommendation beside the choice, the option's words cut short so the line
+ * fits two lines on a phone, then the next day the board checks back on it
+ * (plan #2561.8), kept in one piece so a wrap never splits the date.
+ */
 export function decisionMeta(decision: BoardDecision): string {
-  const chose = optionLabel(decision.options, decision.chosen);
-  return `${decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle'} · You chose ${chose}`;
+  const next = nextReview(decision.decidedAt, (decision.reviewed ?? []).map((at) => ({ at })));
+  const option = decision.options.find((o) => o.letter === decision.chosen);
+  return [
+    decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle',
+    option ? `You chose ${decision.chosen}, ${shortOption(option.text)}` : `You chose ${decision.chosen}`,
+    together(next ? `Check back ${heldOnLabel(next.due).replace(/ \d{4}$/, '')}` : 'Checked back at 30 and 90 days'),
+  ].join(' · ');
 }
 
 /** One group of the surface: its label, then its rows, folded away by the label with the count kept. */

@@ -34,6 +34,9 @@ import {
   type VoteValue,
 } from '@/lib/you/board';
 import { NO_DEBATE, type MeetingDebate } from '@/lib/you/board-debate';
+import { heldLine, topicsLine, type DecisionReview, type PickScore } from '@/lib/you/board-reviews';
+import { answerBoardReview } from '../review-actions';
+import { advisorName, ReviewRow, type ReviewAnswerAction } from '../review-rows';
 import {
   answerBoardQuestion,
   decideQuestion,
@@ -97,8 +100,7 @@ export type MeetingOpen = {
   make?: 'error';
 };
 
-const DECIDE_ERROR = 'Your decision was not saved. Try again.';
-const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
+const DECIDE_ERROR = 'Your decision was not saved. Try again.';const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -146,6 +148,10 @@ export function MeetingView({
   actions = REAL_ACTIONS,
   decide = decideQuestion,
   make,
+  reviews = [],
+  picks = [],
+  names = {},
+  answerReview = answerBoardReview,
   open = {},
 }: {
   meeting: BoardMeeting;
@@ -164,6 +170,13 @@ export function MeetingView({
   decide?: DecideAction;
   /** Writes a decided question as todos or goal steps (plan #2561.9). */
   make?: MakeProps;
+  /** The check-backs on earlier decisions this meeting wrote (plan #2561.8). */
+  reviews?: readonly DecisionReview[];
+  /** How often each advisor's pick held up, across every decision (loadPickScorecard). */
+  picks?: readonly PickScore[];
+  /** Every advisor's name by key (advisorNames). */
+  names?: Readonly<Record<string, string>>;
+  answerReview?: ReviewAnswerAction;
   open?: MeetingOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, BoardMark>>(
@@ -299,6 +312,24 @@ export function MeetingView({
       }
     >
       {questions}
+
+      {reviews.length > 0 && (
+        <section aria-labelledby="board-reviews" className="space-y-3">
+          <SectionHeading id="board-reviews" title="Checking back" count={reviews.length} />
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {reviews.map((review) => (
+                <ReviewRow
+                  key={`${review.questionId}:${review.at}`}
+                  review={review}
+                  names={names}
+                  answer={answerReview}
+                />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       {!isDebate && minutes.disagreements.length > 0 && (
         <section aria-labelledby="board-disagreements" className="space-y-3">
@@ -458,6 +489,7 @@ export function MeetingView({
       <section aria-labelledby="board-scorecard" className="space-y-3">
         <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
         <Scorecard scores={scorecard} bare={isDebate} />
+        {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
       </section>
 
       {minutes.memos.length > 0 && (
@@ -903,6 +935,53 @@ function Scorecard({
           cover.
         </p>
       )}
+    </Card>
+  );
+}
+
+/**
+ * How often each advisor's final pick held up once you said how a decision
+ * went (plan #2561.8), with the count by topic under each name. Drawn only
+ * once a pick is graded: the decisions' rows already say when the board
+ * checks back.
+ */
+function PickScorecard({
+  picks,
+  names,
+}: {
+  picks: readonly PickScore[];
+  names: Readonly<Record<string, string>>;
+}) {
+  return (
+    <Card padding="none">
+      <table className="w-full text-ui">
+        <caption className="sr-only">How often each advisor’s pick held up, by topic</caption>
+        <thead>
+          <tr className="border-b border-border text-left text-small text-ink-muted">
+            <th scope="col" className="card-pad-x py-2 font-medium">
+              Advisor
+            </th>
+            <th scope="col" className="card-pad-x py-2 pl-0 text-right font-medium">
+              Picks that held up
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {picks.map((score) => (
+            <tr key={score.advisor} className="align-top">
+              <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
+                <span className="block">{advisorName(score.advisor, names)}</span>
+                <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
+                  {topicsLine(score)}
+                </span>
+              </th>
+              <td className="tabular card-pad-x py-2 pl-0 text-right text-ink whitespace-nowrap">
+                {heldLine(score.held, score.graded)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Card>
   );
 }

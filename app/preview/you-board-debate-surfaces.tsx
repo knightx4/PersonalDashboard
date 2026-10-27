@@ -3,6 +3,8 @@
 import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
+import type { DecisionReview, PickScore } from '@/lib/you/board-reviews';
+import { boardReviews } from './you-board-surfaces';
 
 /**
  * A meeting held as a debate, in the gallery (plan #2561.5): two questions,
@@ -484,6 +486,35 @@ const meeting = (over: Partial<BoardMeeting> = {}): BoardMeeting => ({
 
 const decide = async () => ({ error: null });
 
+/** The meeting's check-backs (plan #2561.8): the 30-day one answered and graded, the 90-day one waiting. */
+const meetingReviews: DecisionReview[] = [
+  {
+    ...boardReviews[0],
+    outcome: 'well',
+    answeredAt: '2026-11-02T09:00:00Z',
+    grades: [
+      { advisor: 'hiring_manager', pick: 'B', held: false },
+      { advisor: 'mentor', pick: 'A', held: true },
+      { advisor: 'skeptic', pick: 'B', held: false },
+      { advisor: 'cfo', pick: 'A', held: true },
+      { advisor: 'dreamer', pick: null, held: null },
+      { advisor: 'buffett', pick: 'A', held: true },
+    ],
+  },
+  boardReviews[1],
+];
+
+const picks: PickScore[] = [
+  { advisor: 'cfo', held: 3, graded: 4, topics: [{ topic: 'work', held: 2, graded: 2 }, { topic: 'money', held: 1, graded: 2 }] },
+  { advisor: 'mentor', held: 3, graded: 4, topics: [{ topic: 'work', held: 2, graded: 2 }, { topic: 'learning', held: 1, graded: 1 }, { topic: 'money', held: 0, graded: 1 }] },
+  { advisor: 'skeptic', held: 1, graded: 4, topics: [{ topic: 'work', held: 0, graded: 2 }, { topic: 'money', held: 1, graded: 2 }] },
+  { advisor: 'hiring_manager', held: 1, graded: 3, topics: [{ topic: 'work', held: 1, graded: 3 }] },
+  { advisor: 'dreamer', held: 1, graded: 2, topics: [{ topic: 'projects', held: 1, graded: 1 }, { topic: null, held: 0, graded: 1 }] },
+  { advisor: 'buffett', held: 1, graded: 1, topics: [{ topic: 'work', held: 1, graded: 1 }] },
+];
+
+const NAMES = { buffett: 'Warren Buffett' };
+
 const actions: MeetingActions = {
   vote: async () => ({ error: null, saved: null }),
   answer: async () => ({ error: null, saved: null }),
@@ -497,8 +528,11 @@ export function YouBoardDebatePreview({
   advisor,
   decision,
   make,
+  reviewed = false,
 }: {
   state?: 'ready' | 'running';
+  /** The meeting checked back on two earlier decisions, and picks have been graded (plan #2561.8). */
+  reviewed?: boolean;
   /** The first verdict names its assumptions. */
   assumed?: boolean;
   /** Draw this advisor's thinking open. */
@@ -550,6 +584,10 @@ export function YouBoardDebatePreview({
           : undefined
       }
       scorecard={scorecardFrom([])}
+      reviews={reviewed ? meetingReviews : []}
+      picks={reviewed ? picks : []}
+      names={NAMES}
+      answerReview={async () => ({ error: null })}
       subject={{
         ref: null,
         path: [

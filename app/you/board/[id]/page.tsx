@@ -8,6 +8,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { todayInTimezone } from '@/lib/money';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { loadGoalChoices, withMade } from '@/lib/you/board-make-store';
+import { advisorNames, listMeetingReviews, loadPickScorecard } from '@/lib/you/board-reviews';
 import { makeDecisionHappen } from '../make-actions';
 import { MeetingView } from './meeting-view';
 
@@ -36,10 +37,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!UUID.test(id)) notFound();
   const user = await requireUser();
   const you = await createYouClient();
-  const [found, scorecard, settings] = await Promise.all([
+  const [found, scorecard, settings, reviews, picks, names] = await Promise.all([
     loadBoardMeeting(you, user.id, id),
     boardScorecard(you, user.id),
     loadAccountSettings(user.id),
+    listMeetingReviews(you, user.id, id),
+    loadPickScorecard(you, user.id),
+    advisorNames(you, user.id),
   ]);
   if (!found) notFound();
   const loaded = await loadMeetingDebate(you, user.id, id, found.minutes.agenda);
@@ -55,6 +59,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       debate={debate}
       make={{ action: makeDecisionHappen, goals: goalChoices, today: todayInTimezone(settings.timezone) }}
       scorecard={scorecard}
+      reviews={reviews}
+      picks={picks}
+      names={names}
       timezone={settings.timezone}
       now={readAt()}
       subject={{

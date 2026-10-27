@@ -185,7 +185,8 @@ where id = '<meeting id>' and user_id = '<user_id>';
 6. **Round 1**: every advisor scores every option.
 7. **Round 2**: advisors who disagree answer each other by name.
 8. **Round 3**: the final vote.
-9. **Chair**: a verdict per question, the dream, predictions, scorecard.
+9. **Chair**: a verdict and topic per question, the check-backs that fell
+   due, the dream, predictions, scorecard.
 10. **Suggest** three to five new questions.
 11. **Write the minutes** and read everything back.
 
@@ -248,6 +249,24 @@ step 9) and its `dream`. Then:
   with what each decision changes. Where they decided against the board's
   `verdict.recommended`, say so plainly and take it as information about
   what they weigh, not as an error.
+- **Check-backs that fell due.** The board checks back on every decision 30
+  and 90 days after `decided_at` (step 9, "Check back on decisions"). Find
+  the ones due today and not yet written:
+
+  ```sql
+  select q.id, q.question, q.options, q.decided_option, q.decision_note, q.decided_at,
+         q.topic, q.verdict->'scores' as scores, d.at
+  from you.board_questions q, (values (30), (90)) as d(at)
+  where q.user_id = '<user_id>' and q.status = 'decided'
+    and q.decided_at + make_interval(days => d.at) <= now()
+    and not exists (select 1 from jsonb_array_elements(q.reviews) r where (r->>'at')::int = d.at)
+  order by q.decided_at;
+  ```
+
+  A 90-day check-back that is due while its 30-day one was never written
+  gets both, written by this meeting. Take each into the pack (step 3) and
+  write it in step 9. Answers to earlier check-backs (`outcome` set) are the
+  person's verdict on how a decision went: read them as facts like any other.
 - **Waiting on them.** A question still `discussing` from an earlier meeting
   has a verdict the person has not acted on. Name it in `since`; do not
   debate it again.
@@ -589,6 +608,47 @@ where id = '<id>' and user_id = '<user_id>' and asks <> '[]'::jsonb;
 The question stays `discussing` with its verdict until the person decides on
 the tab; never set `decided`, `decided_option` or `decided_at`.
 
+**Name each question's topic** in the same update as its verdict, as
+`topic = '<topic>'`: one of `work`, `money`, `learning`, `projects`,
+`place` (where and how they live) or `time`. The scorecard counts whose
+picks held up by topic, so pick the area the decision changes most.
+
+**Check back on decisions.** For each check-back step 1 found due, read
+what happened since `decided_at` in the person's own rows: applications and
+their stages, money in and out, goal steps closed or stalled, todos, and
+notes they wrote. Write it onto the question:
+
+- `account`: two to four sentences of what happened, each number from a
+  query run in this meeting, with its date. Say what the decision changed
+  and what it did not; do not grade it yourself.
+- `receipts`: `[ { label, link } ]`, a link to each row the account rests
+  on.
+- `ask`: one line to the person, naming the trade-off the account shows and
+  ending in a question on whether it went well ("Taking the contract slowed
+  the search and covered the month. Did it go well?"). They answer on the
+  Board tab with Went well, Mixed or Went badly; the app grades each
+  advisor's round 3 pick from that answer, so leave `outcome` and `grades`
+  null.
+
+```sql
+select core.dash_before('you.board_questions:<id>');
+update you.board_questions
+set reviews = reviews || jsonb_build_array(jsonb_build_object(
+      'at', 30, 'option', decided_option, 'meeting_id', '<meeting id>', 'written_at', now(),
+      'account', $a$…$a$, 'receipts', $r$[{"label": "…", "link": "/jobs/roles"}]$r$::jsonb,
+      'ask', $k$…$k$, 'outcome', null, 'answered_at', null, 'grades', '[]'::jsonb)),
+    topic = coalesce(topic, '<topic>')
+where id = '<id>' and user_id = '<user_id>' and status = 'decided'
+  and not exists (select 1 from jsonb_array_elements(reviews) r where (r->>'at')::int = 30);
+select core.record_dash_action('<user_id>', 'you.board_questions:<id>', 'update',
+  'board_review', $s$The board checked back on "<question>" after 30 days.$s$);
+```
+
+Name the check-backs in `since`, one line each, and leave the debate to
+this week's questions: a decision being reviewed is not taken up again
+unless the person's answer to an earlier check-back said it went badly and
+they asked for it.
+
 **Keep the dream on the table.** Every meeting has a `dream`: the dream the
 debate came closest to dropping, in the person's own words with its date,
 and the smallest thread this week that keeps it going, from the dreamer's
@@ -685,7 +745,9 @@ with `addressed_to` set, at least two each way between every pair; the
 question is `discussing` with a `verdict` whose `scores` name every advisor
 who voted, and any assumption it rested on is in `verdict.assumptions` with a matching ask on the row. Three to five questions are `suggested` with this meeting's ids
 in `minutes.suggested`. `minutes` has five `predictions` and five
-`scorecard` rows.
+`scorecard` rows. Each agenda question has a `topic`, and every check-back
+step 1 found due is in its question's `reviews` with this meeting's id, an
+`account`, receipts and an `ask`.
 
 ```sql
 select question_id, round, kind, count(*) as turns, count(addressed_to) as addressed

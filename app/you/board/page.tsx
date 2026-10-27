@@ -4,7 +4,9 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { listBoardMeetings, nextMeetingDay } from '@/lib/you/board';
 import { listBoardAdvisors, listBoardQuestions, listDecisions } from '@/lib/you/board-questions';
 import { listBoardAsks } from '@/lib/you/board-asks';
+import { advisorNames, listOpenReviews } from '@/lib/you/board-reviews';
 import { acceptSuggestion, answerBoardAsk, askBoard, conveneQuestion, dismissSuggestion } from './actions';
+import { answerBoardReview } from './review-actions';
 import { BoardListView } from './board-list-view';
 
 export const metadata = { title: 'Board' };
@@ -19,15 +21,18 @@ function readAt(): number {
  * You's Board tab (plans #2540.3 and #2561.4): Ask the board, the board's
  * suggested questions, the questions asked, and the meetings newest first.
  * Each meeting opens on its own page (./[id]), where the person reads the
- * minutes and marks them.
+ * minutes and marks them. The board's check-backs on their decisions wait
+ * here for their answer (plan #2561.8).
  */
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [meetings, questions, asks, decisions, advisors, settings] = await Promise.all([
+  const [meetings, questions, asks, reviews, names, decisions, advisors, settings] = await Promise.all([
     listBoardMeetings(client, user.id),
     listBoardQuestions(client, user.id),
     listBoardAsks(client, user.id),
+    listOpenReviews(client, user.id),
+    advisorNames(client, user.id),
     listDecisions(client, user.id),
     listBoardAdvisors(client, user.id),
     loadAccountSettings(user.id),
@@ -37,6 +42,8 @@ export default async function Page() {
       meetings={meetings}
       questions={questions}
       asks={asks}
+      reviews={reviews}
+      names={names}
       advisors={advisors}
       decisions={decisions}
       nextMeeting={nextMeetingDay(settings.timezone)}
@@ -48,6 +55,7 @@ export default async function Page() {
         dismiss: dismissSuggestion,
         convene: conveneQuestion,
         answerAsk: answerBoardAsk,
+        answerReview: answerBoardReview,
       }}
     />
   );
