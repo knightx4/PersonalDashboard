@@ -352,6 +352,8 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   sync_run_status: 'state of a background sync',
   vault_connection_status: 'connection state of a vault',
   parse_status: 'whether an email was read',
+  board_advisors_brain_status_ck: 'whether an advisor\'s brain is built, building or failed',
+  board_questions_status_ck: 'where a board question stands from suggested to decided, kept on the Board tab',
   import_runs_status_ck: 'whether an import is running, applied or failed',
   topics_status_ck: 'whether a topic is still a draft or approved to ask about',
   graph_moves_status_ck: 'whether a claims-graph subject has been moved onto topics',

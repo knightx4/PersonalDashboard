@@ -2,7 +2,8 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listBoardMeetings, nextMeetingDay } from '@/lib/you/board';
-import { callMeeting } from './actions';
+import { listBoardAdvisors, listBoardQuestions, listDecisions } from '@/lib/you/board-questions';
+import { acceptSuggestion, askBoard, conveneQuestion, dismissSuggestion } from './actions';
 import { BoardListView } from './board-list-view';
 
 export const metadata = { title: 'Board' };
@@ -14,23 +15,36 @@ function readAt(): number {
 }
 
 /**
- * You's Board tab (plan #2540.3): the board's meetings, newest first. Each
- * opens on its own page (./[id]), where the person reads the minutes and
- * marks them.
+ * You's Board tab (plans #2540.3 and #2561.4): Ask the board, the board's
+ * suggested questions, the questions asked, and the meetings newest first.
+ * Each meeting opens on its own page (./[id]), where the person reads the
+ * minutes and marks them.
  */
 export default async function Page() {
   const user = await requireUser();
-  const [meetings, settings] = await Promise.all([
-    listBoardMeetings(await createYouClient(), user.id),
+  const client = await createYouClient();
+  const [meetings, questions, decisions, advisors, settings] = await Promise.all([
+    listBoardMeetings(client, user.id),
+    listBoardQuestions(client, user.id),
+    listDecisions(client, user.id),
+    listBoardAdvisors(client, user.id),
     loadAccountSettings(user.id),
   ]);
   return (
     <BoardListView
       meetings={meetings}
+      questions={questions}
+      advisors={advisors}
+      decisions={decisions}
       nextMeeting={nextMeetingDay(settings.timezone)}
       timezone={settings.timezone}
       now={readAt()}
-      actions={{ call: callMeeting }}
+      actions={{
+        ask: askBoard,
+        accept: acceptSuggestion,
+        dismiss: dismissSuggestion,
+        convene: conveneQuestion,
+      }}
     />
   );
 }

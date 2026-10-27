@@ -1,7 +1,13 @@
 'use client';
 
-import type { CallStart } from '@/app/you/board/call-meeting';
-import { BoardListView } from '@/app/you/board/board-list-view';
+import type { AskStart } from '@/app/you/board/ask-board';
+import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
+import {
+  sortAdvisors,
+  type BoardAdvisor,
+  type BoardDecision,
+  type BoardQuestion,
+} from '@/lib/you/board-questions';
 import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
 import {
   MeetingView,
@@ -393,12 +399,137 @@ const rows: BoardMeetingRow[] = [
   }),
 ];
 
+/** The roster as migrations-you/0022 seeds it: five seats and seven guests. */
+const advisors: BoardAdvisor[] = sortAdvisors([
+  { key: 'hiring_manager', name: 'Hiring manager', kind: 'seat', focus: null },
+  { key: 'mentor', name: 'Mentor', kind: 'seat', focus: null },
+  { key: 'skeptic', name: 'Skeptic', kind: 'seat', focus: null },
+  { key: 'cfo', name: 'CFO', kind: 'seat', focus: null },
+  { key: 'dreamer', name: 'Dreamer', kind: 'seat', focus: null },
+  { key: 'buffett', name: 'Warren Buffett', kind: 'guest', focus: null },
+  { key: 'dalio', name: 'Ray Dalio', kind: 'guest', focus: null },
+  { key: 'dimon', name: 'Jamie Dimon', kind: 'guest', focus: null },
+  { key: 'jobs', name: 'Steve Jobs', kind: 'guest', focus: null },
+  { key: 'da_vinci', name: 'Leonardo da Vinci', kind: 'guest', focus: null },
+  { key: 'franklin', name: 'Benjamin Franklin', kind: 'guest', focus: null },
+  { key: 'washington', name: 'George Washington', kind: 'guest', focus: null },
+]);
+
+const CONTRACT_QUESTION =
+  'Should I take the three-month contract at the analytics firm, or keep the search full time?';
+
+const question = (over: Partial<BoardQuestion> & Pick<BoardQuestion, 'id' | 'question'>): BoardQuestion => ({
+  options: [],
+  context: null,
+  lean: null,
+  advisors: [],
+  source: 'person',
+  status: 'queued',
+  meetingId: null,
+  createdAt: '2026-11-01T12:00:00Z',
+  ...over,
+});
+
+const suggestions: BoardQuestion[] = [
+  question({
+    id: '00000000-0000-4000-8000-0000000000e1',
+    source: 'board',
+    status: 'suggested',
+    question:
+      'Do you move to Chicago in the spring if the finance offer comes through, or ask to start remote until the lease ends in August?',
+    options: [
+      { letter: 'A', text: 'Move in March and break the lease' },
+      { letter: 'B', text: 'Ask to start remote until August' },
+      { letter: 'C', text: 'Turn down any role that will not allow it' },
+    ],
+  }),
+  question({
+    id: '00000000-0000-4000-8000-0000000000e2',
+    source: 'board',
+    status: 'suggested',
+    question: 'Is the Saturday course worth £60 a month while there is no income?',
+    options: [
+      { letter: 'A', text: 'Keep it' },
+      { letter: 'B', text: 'Pause it until the first pay cheque' },
+    ],
+  }),
+];
+
+const asked: BoardQuestion[] = [
+  question({
+    id: '00000000-0000-4000-8000-0000000000e3',
+    question: 'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    options: [
+      { letter: 'A', text: 'The bank, which pays more' },
+      { letter: 'B', text: 'The fintech, which I want more' },
+    ],
+    lean: 'B',
+    advisors: ['hiring_manager', 'buffett'],
+  }),
+  question({
+    id: '00000000-0000-4000-8000-0000000000e4',
+    question: 'Should I sell the car before the move or keep it for the first winter?',
+    status: 'deferred',
+  }),
+];
+
+/** Questions the person decided, one against the board's recommendation and one with no verdict recommendation. */
+const decisions: BoardDecision[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000e6',
+    question: 'Should I take the three-month contract at the analytics firm, or keep the search full time?',
+    options: [
+      { letter: 'A', text: 'Take the contract, full time, from 16 November' },
+      { letter: 'B', text: 'Keep the search full time and say no' },
+      { letter: 'C', text: 'Ask for three days a week and keep two for the search' },
+    ],
+    recommended: 'A',
+    chosen: 'C',
+    note: 'Asking for three days. If they say no I take A, with the evening in writing.',
+    decidedAt: '2026-11-01T20:15:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000e7',
+    question: 'Should the studio evening move from Thursday to Sunday morning?',
+    options: [
+      { letter: 'A', text: 'Move it to Sunday, 9 to 11' },
+      { letter: 'B', text: 'Keep Thursday evening' },
+    ],
+    recommended: 'A',
+    chosen: 'A',
+    note: null,
+    decidedAt: '2026-10-26T19:02:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000b0',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000e8',
+    question: 'Is the Saturday course worth £60 a month while there is no income, given the first pay cheque is not due until January?',
+    options: [
+      { letter: 'A', text: 'Keep it' },
+      { letter: 'B', text: 'Pause it until the first pay cheque' },
+    ],
+    recommended: null,
+    chosen: 'B',
+    note: null,
+    decidedAt: '2026-10-19T08:30:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000af',
+  },
+];
+
+const listActions: BoardListActions = {
+  ask: async () => ({ error: null, queued: true }),
+  accept: async () => ({ error: null }),
+  dismiss: async () => ({ error: null }),
+  convene: async () => ({ error: null }),
+};
+
 export function YouBoardListPreview({
   state = 'ready',
   start,
 }: {
   state?: 'ready' | 'running' | 'empty';
-  start?: CallStart;
+  start?: AskStart;
 }) {
   const meetings =
     state === 'empty'
@@ -408,8 +539,7 @@ export function YouBoardListPreview({
             row({
               id: '00000000-0000-4000-8000-0000000000d1',
               kind: 'called',
-              decision:
-                'Should I take the three-month contract at the analytics firm, or keep the search full time?',
+              decision: CONTRACT_QUESTION,
               status: 'running',
               heldOn: null,
               requestedAt: '2026-11-02T09:40:00Z',
@@ -419,13 +549,35 @@ export function YouBoardListPreview({
             ...rows.slice(1),
           ]
         : rows;
+  const questions =
+    state === 'empty'
+      ? []
+      : state === 'running'
+        ? [
+            ...suggestions,
+            question({
+              id: '00000000-0000-4000-8000-0000000000e5',
+              question: CONTRACT_QUESTION,
+              options: [
+                { letter: 'A', text: 'Take the contract' },
+                { letter: 'B', text: 'Keep the search full time' },
+              ],
+              lean: 'A',
+              createdAt: '2026-11-02T09:40:00Z',
+            }),
+            ...asked,
+          ]
+        : [...suggestions, ...asked];
   return (
     <BoardListView
       meetings={meetings}
+      questions={questions}
+      advisors={advisors}
+      decisions={state === 'empty' ? [] : decisions}
       nextMeeting="2026-11-08"
       timezone="Europe/London"
       now={NOW}
-      actions={{ call: async () => ({ error: null }) }}
+      actions={listActions}
       start={start}
     />
   );

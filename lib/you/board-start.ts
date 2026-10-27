@@ -6,6 +6,7 @@ import {
   MEETING_STALE_AFTER_MS,
   STALE_MEETING_ERROR,
 } from '@/lib/you/board';
+import { QUESTION_MAX } from '@/lib/you/board-questions';
 
 /**
  * Call a board meeting about one decision (plan #2540.5), as Look again starts
@@ -21,13 +22,24 @@ export function cleanDecision(text: string): string | null {
   return line ? line : null;
 }
 
-/** The brief the routine is fired with, in the shape the board skill reads. */
-export function boardBrief(input: { meetingId: string; userId: string; decision: string }): string {
+/**
+ * The brief the routine is fired with, in the shape the board skill reads.
+ * A meeting convened about questions asked on the tab (plan #2561.4) adds a
+ * `questions <id>, <id>` line, and those questions, in that order, are its
+ * whole agenda.
+ */
+export function boardBrief(input: {
+  meetingId: string;
+  userId: string;
+  decision: string;
+  questionIds?: readonly string[];
+}): string {
   return [
     `Follow ${BOARD_SKILL_PATH}`,
     `Board meeting ${input.meetingId}`,
     `user_id ${input.userId}`,
     `called: ${input.decision}`,
+    ...(input.questionIds?.length ? [`questions ${input.questionIds.join(', ')}`] : []),
   ].join('\n');
 }
 
@@ -50,13 +62,15 @@ export async function callBoardMeeting(input: {
   userId: string;
   decision: string;
   routine: RoutineTarget;
+  /** The questions the meeting is about, asked on the tab; their text is the decision. */
+  questionIds?: readonly string[];
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<CallBoardMeetingResult> {
-  const { client, userId, routine } = input;
+  const { client, userId, routine, questionIds } = input;
   const decision = cleanDecision(input.decision);
   if (!decision) return { started: false, reason: 'invalid', error: 'Say what the decision is first.' };
-  if (decision.length > DECISION_MAX) {
+  if (decision.length > (questionIds?.length ? QUESTION_MAX : DECISION_MAX)) {
     return {
       started: false,
       reason: 'invalid',
@@ -94,7 +108,7 @@ export async function callBoardMeeting(input: {
   const fired = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: boardBrief({ meetingId, userId, decision }),
+    text: boardBrief({ meetingId, userId, decision, questionIds }),
     fetch: input.fetch,
   });
 

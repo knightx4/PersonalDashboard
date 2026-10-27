@@ -60,12 +60,15 @@ export function ListRow({
   title,
   meta,
   end,
+  wrapMeta = false,
 }: {
   href: string;
   /** What the item is called. */
   title: string;
   /** One short line after the name: where it came from, what state it is in. */
   meta?: string;
+  /** Let the meta line wrap rather than end in an ellipsis, for a line whose whole text is the point. */
+  wrapMeta?: boolean;
   /** One value at the end of the row, such as a date or an amount. */
   end?: React.ReactNode;
 }) {
@@ -77,7 +80,16 @@ export function ListRow({
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-ui text-ink">{title}</span>
-          {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
+          {meta && (
+            <span
+              className={cn(
+                'block text-small text-ink-muted',
+                wrapMeta ? '[overflow-wrap:anywhere]' : 'truncate',
+              )}
+            >
+              {meta}
+            </span>
+          )}
         </span>
         {end && <span className="tabular shrink-0 text-small text-ink-muted">{end}</span>}
       </RowLink>
