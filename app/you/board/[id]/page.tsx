@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { boardScorecard, loadBoardMeeting, meetingTitle } from '@/lib/you/board';
+import { loadMeetingDebate } from '@/lib/you/board-debate';
 import { MeetingView } from './meeting-view';
 
 export const metadata = { title: 'Board meeting' };
@@ -17,7 +18,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * One board meeting (plan #2540.3): its minutes, the person's marks on them,
- * and the scorecard counted across every meeting.
+ * the scorecard counted across every meeting, and the debate held on each
+ * question it took up (plan #2561.5), read after the minutes since their
+ * agenda gives the questions' order.
  *
  * The path is written here rather than read from the catalogue
  * (lib/core/subject.ts): board meetings are not a source (lib/you/sources.ts),
@@ -34,11 +37,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     loadAccountSettings(user.id),
   ]);
   if (!found) notFound();
+  const debate = await loadMeetingDebate(you, user.id, id, found.minutes.agenda);
   return (
     <MeetingView
       meeting={found.meeting}
       minutes={found.minutes}
       marks={found.marks}
+      debate={debate}
       scorecard={scorecard}
       timezone={settings.timezone}
       now={readAt()}
