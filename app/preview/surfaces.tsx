@@ -4414,12 +4414,20 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    // An application being written, which opens on its questions.
+    // An application being written, which opens on its questions, with the
+    // line saying the company research has not been run (note 6b260c08).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
         status="drafting"
         defaultTab={defaultRoleTab('drafting')}
+        research={{
+          companyId: 'company-1',
+          companySlug: 'halloran-achterberg',
+          latestStatus: null,
+          readyAt: null,
+          available: true,
+        }}
       />
     ),
   },
