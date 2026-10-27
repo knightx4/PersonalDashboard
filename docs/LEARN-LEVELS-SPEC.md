@@ -611,7 +611,7 @@ separately. `topicReach`, `groupReach` and `lensProgress` in
 
 | route | what it is |
 | --- | --- |
-| `/learn/t/[id]` | one topic: the ten-row ladder with each cell's status, its evidence and quotes, the links in and out, and the next cell |
+| `/learn/topics/[id]` | one topic: the ten-row ladder with each cell's status, its evidence and quotes, the links in and out, and the next cell |
 | `/learn/lens/[id]` | one lens: each topic as a bar to its target, with progress and the fringe inside the lens |
 | `/learn/know` | fields by mean level, and the lenses |
 | `/learn/now?practice=1` | Practice Flow, now asking placement, fringe and re-check questions, with the answer screen listing every cell an answer reached |
