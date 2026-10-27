@@ -11,8 +11,9 @@ import { todayIn } from '@/lib/todo/tasks/model';
  * checks again, as a second line rather than the first. No onboarding gate:
  * nothing here needs a Gmail grant.
  *
- * Two tabs: the home, which is the daily view (#926), and All goals, where
- * areas and goals are added and arranged (#924). The full tree of a goal
+ * Four tabs: the home, which is the daily view (#926), the Inbox, All goals,
+ * where areas and goals are added and arranged (#924), and Hours, the time
+ * logged on every goal with an Hours logged metric (goals 0089). The full tree of a goal
  * opens from either (#925), so it is a deeper view rather than a tab. Files
  * (core.files) and Runs (#1012) are pages without a tab: Files is linked
  * from All goals and from a goal's Details, Runs from What Dash did on the

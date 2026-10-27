@@ -1109,8 +1109,8 @@ the file.
 ### Metrics
 
 A metric counts something on the goal by week or by month, with an optional
-aim per period (feature #2084, `goals.metrics`). It counts one of three
-things, its `source` (plan #2397):
+aim per period (feature #2084, `goals.metrics`). It counts one of four
+things, its `source` (plan #2397, migration goals 0089):
 
 - **A list**: the records of one of the goal's lists, each in the period one
   of its date fields falls in ("Applications · Applied on · weekly · aim 5").
@@ -1119,6 +1119,17 @@ things, its `source` (plan #2397):
   ("Steps closed · weekly · aim 3").
 - **Dash files**: the files Dash wrote under the goal or one of its steps,
   each in the period it was filed ("Dash files · monthly").
+- **Hours logged**: the time logged as progress on the goal or any step
+  under it, added up in hours in the period of the day it happened ("Hours
+  logged · weekly · aim 10–15"). An entry counts when its unit is a unit of
+  time (h, hrs, hours, min, minutes; `hoursOf` in `lib/goals/metrics.ts`),
+  and capture files "applied 2h" as 2 hours of progress on the step that
+  names the work.
+
+The aim may be a range: `target` is its low end and `target_high` its top,
+which the form asks for as **Up to, for a range**. The chart draws a range
+as a faint band from the low end up to the top, under the dashed line at
+the low end.
 
 The metrics sit in the properties column under **Metrics**, each as its name
 over that line (`metricLine` in `lib/goals/metric-form.ts`), with **Change**
@@ -1136,6 +1147,28 @@ the goal was made (`goal-metrics.tsx`), with the aim as a dashed line. A
 metric with nothing counted yet says what it counts in place of the chart.
 The counts are worked out when the page is read and never stored
 (`lib/goals/metrics.ts`).
+
+### Hours
+
+**Hours** (`/goals/hours`, a tab of Goals) puts every weekly Hours logged
+metric on an open goal on one page (`lib/goals/hours.ts`), in four parts:
+
+- **This week**: each metric's hours so far on a bar scaled to the top of
+  its aim, the range as a band, and a tick at what the weekday pace expects
+  by today. The pace counts Monday to Friday, so an aim of 10 expects 2 by
+  the end of Monday and 10 by Friday; time at the weekend counts towards the
+  week but not the pace. Within half an hour of the pace reads On pace, and
+  a row for all of them together closes the card.
+- **Day by day**: the last four weeks, one cell a day for each metric and a
+  row for all of them, shaded on one scale so a long day reads the same in
+  every row.
+- **Week by week**: for each metric, its average a weekday over the last
+  four full weeks, last week, its best week of twelve, how many of the last
+  eight weeks reached the aim, and how many in a row up to last week did.
+- Each metric's twelve-week bar chart, as a goal's Overview draws it.
+
+Every part uses the accent alone, and the rows are told apart by name. With
+no hours metric yet the page says how to add one.
 
 ## Your examples, broken down
 

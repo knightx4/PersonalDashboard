@@ -1,4 +1,5 @@
 import {
+  Timer,
   Activity,
   SendHorizontal,
   BarChart3,
@@ -186,6 +187,9 @@ export const NAV_ICONS = {
   // Every area and goal, for adding and arranging them; the home is the short
   // daily list, so this is the long one.
   goalsAll: List,
+  // The time you log on your goals against each week's aim: a stopwatch,
+  // since the hourglass is Waiting's and the calendar-clock Interviews'.
+  goalsHours: Timer,
   // Every run Claude made on your goals, newest first: a record of what was
   // done, so the same clock-and-arrow the changelog uses.
   goalsRuns: History,

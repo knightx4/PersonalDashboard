@@ -43,8 +43,8 @@ export type MetricsShown = {
  * and what it counts, with Change and Remove in a row menu, and a line that
  * opens a small form in place for a new one. The form asks for a name, what
  * to count (one of the goal's lists, its closed steps or the files Dash wrote
- * under it, plan #2397.3), the list's date when it is a list, week or month,
- * and an optional aim. The Overview's chart reads the same rows, so it
+ * under it, plan #2397.3, or the hours logged on it), the list's date when it is a list, week or month,
+ * and an optional aim, which may be a range. The Overview's chart reads the same rows, so it
  * follows each change on the revalidated page.
  *
  * Every goal has steps and files to count, so the section shows on a goal
@@ -179,17 +179,19 @@ function MetricRow({
  * the goal's closed steps and Dash's files. It posts `source` and
  * `collectionId` through hidden inputs, which parseMetricForm reads.
  */
-type Counted = 'steps' | 'files' | `list:${string}`;
+type Counted = 'steps' | 'files' | 'hours' | `list:${string}`;
 
 const SOURCE_LABELS: Record<Exclude<MetricSource, 'list'>, string> = {
   steps: 'Steps closed',
   files: 'Dash files',
+  hours: 'Hours logged',
 };
 
 const PLACEHOLDERS: Record<MetricSource, string> = {
   list: 'Applications per week',
   steps: 'Steps done each week',
   files: 'Drafts from Dash',
+  hours: 'Hours applying',
 };
 
 function countedOf(metric: Metric | undefined, lists: MetricList[]): Counted {
@@ -290,6 +292,7 @@ function MetricForm({
           ))}
           <option value="steps">{SOURCE_LABELS.steps}</option>
           <option value="files">{SOURCE_LABELS.files}</option>
+          <option value="hours">{SOURCE_LABELS.hours}</option>
         </Select>
       </Field>
       {source === 'list' && (
@@ -322,17 +325,30 @@ function MetricForm({
         />
         <FieldError>{errorOn('period')}</FieldError>
       </div>
-      <Field id={`${id}-target`} label={`Aim per ${period}, if any`} error={errorOn('target')}>
-        <Input
-          id={`${id}-target`}
-          name="target"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={String(MAX_TARGET).length}
-          defaultValue={shown?.target ?? metric?.target ?? ''}
-          className="tabular"
-        />
-      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field id={`${id}-target`} label={`Aim per ${period}, if any`} error={errorOn('target')}>
+          <Input
+            id={`${id}-target`}
+            name="target"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={String(MAX_TARGET).length}
+            defaultValue={shown?.target ?? metric?.target ?? ''}
+            className="tabular"
+          />
+        </Field>
+        <Field id={`${id}-target-high`} label="Up to, for a range" error={errorOn('targetHigh')}>
+          <Input
+            id={`${id}-target-high`}
+            name="targetHigh"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={String(MAX_TARGET).length}
+            defaultValue={metric?.targetHigh ?? ''}
+            className="tabular"
+          />
+        </Field>
+      </div>
       {state.error && !state.field && <FieldError>{state.error}</FieldError>}
       <div className="flex items-center gap-2 pt-0.5">
         <Button type="submit" size="sm" pending={pending}>

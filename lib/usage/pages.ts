@@ -38,6 +38,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/goals/area/[areaId]',
   '/goals/files',
   '/goals/files/[fileId]',
+  '/goals/hours',
   '/goals/inbox',
   '/goals/runs',
   '/goals/runs/[runId]',

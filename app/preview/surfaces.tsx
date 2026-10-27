@@ -10,6 +10,7 @@ import {
   GoalMetricsSurface,
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
+import { GoalHoursSurface } from './goal-hours-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -5219,6 +5220,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalMetricsSurface />,
+  },
+  {
+    /* The Hours page (goals 0089): twelve weeks of three hours metrics, this
+     * week against each aim's pace, four weeks day by day, the week-by-week
+     * table and each metric's chart. */
+    id: 'goals-hours',
+    label: 'Goals · Hours across the goals',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface />,
   },
   {
     id: 'goals-metrics-tooltip',

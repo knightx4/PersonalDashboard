@@ -136,6 +136,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     // Everything on you across the goals. Its count is put on by the layout.
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
+    // The hours logged on every goal with an Hours logged metric, together.
+    { href: '/goals/hours', label: 'Hours', icon: 'goalsHours', exact: true },
   ],
   you: [
     { href: '/you/personality', label: 'Personality', icon: 'personality' },
