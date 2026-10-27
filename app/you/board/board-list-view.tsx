@@ -31,6 +31,7 @@ import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-row
 import { ReviewRow, type ReviewAnswerAction } from './review-rows';
 import type { BoardPanel } from '@/lib/you/board-panels';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
+import { useStartMeeting, type StartActions, type StartStart } from './start-meeting';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
 
@@ -45,6 +46,7 @@ import { useRefreshWhileRunning } from './refresh-while-running';
  */
 
 export type BoardListActions = AskActions &
+  StartActions &
   QuestionActions & { answerAsk: AskAnswerAction; answerReview: ReviewAnswerAction };
 
 export function BoardListView({
@@ -62,6 +64,7 @@ export function BoardListView({
   now,
   actions,
   start,
+  meetingStart,
   asksError,
 }: {
   meetings: readonly BoardMeetingRow[];
@@ -89,6 +92,8 @@ export function BoardListView({
   actions: BoardListActions;
   /** Where the press starts. Only the gallery sets it. */
   start?: AskStart;
+  /** Where the Start a meeting press starts. Only the gallery sets it. */
+  meetingStart?: StartStart;
   /** A failed answer to draw on the first ask. Only the gallery sets it. */
   asksError?: string;
 }) {
@@ -96,6 +101,7 @@ export function BoardListView({
   const running = states.some((state) => state.kind === 'running');
   useRefreshWhileRunning(running);
   const ask = useAskBoard({ advisors, panels, actions, start });
+  const starting = useStartMeeting({ panels, roster: advisors, running, actions, start: meetingStart });
   const header = (
     <PageHeader
       title="Board"
@@ -104,6 +110,7 @@ export function BoardListView({
           <Link href="/you/board/advisors" className={buttonVariants({ variant: 'ghost' })}>
             Advisors
           </Link>
+          {starting.button}
           {ask.button}
         </>
       }
@@ -124,6 +131,7 @@ export function BoardListView({
     return (
       <PageColumn>
         {header}
+        {starting.form && <div className="mb-4">{starting.form}</div>}
         {ask.form && <div className="mb-4">{ask.form}</div>}
         <EmptyState
           icon={Users}
@@ -148,6 +156,7 @@ export function BoardListView({
   return (
     <PageColumn>
       {header}
+      {starting.form && <div className="mb-4">{starting.form}</div>}
       {ask.form && <div className="mb-4">{ask.form}</div>}
       <Card padding="none">
         <ul className="divide-y divide-border">

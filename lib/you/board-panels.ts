@@ -13,7 +13,7 @@ export const PANEL_NAME_MAX = 60;
 export const PANEL_SIZE_MAX = 12;
 export const NEW_PANEL_NAME = 'New panel';
 
-export type BoardPanel = { id: string; name: string; advisors: string[] };
+export type BoardPanel = { id: string; name: string; advisors: string[]; topic: string | null };
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -24,10 +24,11 @@ export function panelOf(row: Record<string, unknown>): BoardPanel | null {
     id: row.id,
     name,
     advisors: Array.isArray(row.advisors) ? row.advisors.filter((a): a is string => typeof a === 'string') : [],
+    topic: str(row.topic) || null,
   };
 }
 
-const COLUMNS = 'id, name, advisors';
+const COLUMNS = 'id, name, advisors, topic';
 
 /** Every panel, oldest first so the seeded four keep their order. */
 export async function listPanels(client: YouSupabaseClient, userId: string): Promise<BoardPanel[]> {

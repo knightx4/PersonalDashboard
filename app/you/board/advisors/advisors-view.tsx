@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { AlertTriangle, Check, Plus, RotateCcw, X } from 'lucide-react';
-import { ListRow } from '@/components/patterns/list-detail';
+import { RowLink } from '@/components/shell/back-link';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import {
   type BrainState,
   type RosterAdvisor,
 } from '@/lib/you/board-advisors';
+import { MEETING_RUNNING_MESSAGE } from '@/lib/you/board';
 import { panelNames, type BoardPanel } from '@/lib/you/board-panels';
 import { AdvisorMark } from '../advisor-mark';
 import { useRefreshWhileRunning } from '../refresh-while-running';
@@ -42,6 +43,8 @@ export type AdvisorActions = {
   setActive: (id: string, active: boolean) => Promise<{ error: string | null }>;
   /** Make an empty panel; the view opens it to be named. */
   createPanel: () => Promise<{ error: string | null; panelId?: string }>;
+  /** Start a board meeting for a panel (plan #2576.3). */
+  startMeeting: (panelId: string) => Promise<{ error: string | null }>;
 };
 
 /** How the press starts: closed, with the card open and filled, or refusing a name (the gallery draws each). */
@@ -54,6 +57,7 @@ export const SAMPLE_ADD_ERROR = 'Marcus Aurelius is already on your board.';
 export function AdvisorsView({
   advisors,
   panels = [],
+  meetingRunning = false,
   now,
   actions,
   subject,
@@ -62,6 +66,8 @@ export function AdvisorsView({
   advisors: readonly RosterAdvisor[];
   /** Their panels, each opening on its own page. */
   panels?: readonly BoardPanel[];
+  /** A board meeting is queued or running, so a panel's Start a meeting is off. */
+  meetingRunning?: boolean;
   /** When the page was read, for whether a build is still going. */
   now: number;
   actions: AdvisorActions;
@@ -187,11 +193,12 @@ export function AdvisorsView({
         <ul className="divide-y divide-border">
           <Group title="Panels" count={panels.length}>
             {panels.map((panel) => (
-              <ListRow
+              <PanelRow
                 key={panel.id}
-                href={`/you/board/advisors/panels/${panel.id}`}
-                title={panel.name}
-                meta={panelNames(panel, advisors).join(', ') || 'No advisors yet'}
+                panel={panel}
+                members={panelNames(panel, advisors).join(', ') || 'No advisors yet'}
+                running={meetingRunning}
+                start={actions.startMeeting}
               />
             ))}
             <NewPanelRow create={actions.createPanel} />
@@ -359,6 +366,71 @@ function BrainStatus({ state }: { state: BrainState }) {
       <AlertTriangle aria-hidden strokeWidth={1.75} className="size-3.5" />
       Build failed
     </span>
+  );
+}
+
+/**
+ * A panel's row: its name and members open the panel, and Start a meeting beside
+ * them holds a meeting for it (plan #2576.3). The press is a sibling of the link,
+ * never inside it; once the meeting starts the Board tab shows it running.
+ */
+function PanelRow({
+  panel,
+  members,
+  running,
+  start,
+}: {
+  panel: BoardPanel;
+  members: string;
+  running: boolean;
+  start: AdvisorActions['startMeeting'];
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [, startTransition] = useTransition();
+  const empty = panel.advisors.length === 0;
+  const press = () => {
+    setPending(true);
+    setError(null);
+    startTransition(async () => {
+      const result = await start(panel.id);
+      setPending(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push('/you/board');
+    });
+  };
+  const why = running ? MEETING_RUNNING_MESSAGE : empty ? `${panel.name} has no advisors yet` : null;
+  return (
+    <li className="card-pad-x row-pad relative">
+      <RowLink href={`/you/board/advisors/panels/${panel.id}`} className="block min-h-11 hover:bg-sunken">
+        {/* The press sits over the name line's empty right; the member line below takes the full width. */}
+        <span className="block min-h-8 pr-48 text-ui text-ink">{panel.name}</span>
+        <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">{members}</span>
+        {why && <span className="block text-small text-ink-muted">{why}</span>}
+      </RowLink>
+      <div className="absolute right-[var(--card-p)] top-[var(--row-y)]">
+        <DashAction
+          type="button"
+          variant="secondary"
+          size="sm"
+          pending={pending}
+          disabled={pending || why !== null}
+          routine="board"
+          what="Cost of a board meeting"
+          align="end"
+          onClick={press}
+        >
+          {pending ? 'Starting…' : 'Start a meeting'}
+        </DashAction>
+      </div>
+      {error && (
+        <FieldError>{error}</FieldError>
+      )}
+    </li>
   );
 }
 

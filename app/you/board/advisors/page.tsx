@@ -1,8 +1,9 @@
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
+import { hasOpenMeeting } from '@/lib/you/board';
 import { listPanels } from '@/lib/you/board-panels';
-import { addBoardAdvisor, createBoardPanel, retryAdvisorBrain, setAdvisorActive } from '../actions';
+import { addBoardAdvisor, createBoardPanel, retryAdvisorBrain, setAdvisorActive, startMeeting } from '../actions';
 import { AdvisorsView } from './advisors-view';
 
 export const metadata = { title: 'Board advisors' };
@@ -20,11 +21,16 @@ function readAt(): number {
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [advisors, panels] = await Promise.all([listRoster(client, user.id), listPanels(client, user.id)]);
+  const [advisors, panels, running] = await Promise.all([
+    listRoster(client, user.id),
+    listPanels(client, user.id),
+    hasOpenMeeting(client, user.id),
+  ]);
   return (
     <AdvisorsView
       advisors={advisors}
       panels={panels}
+      meetingRunning={running}
       now={readAt()}
       subject={{
         ref: null,
@@ -39,6 +45,7 @@ export default async function Page() {
         retry: retryAdvisorBrain,
         setActive: setAdvisorActive,
         createPanel: createBoardPanel,
+        startMeeting,
       }}
     />
   );

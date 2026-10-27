@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { cleanPanelMembers, cleanPanelName, panelOf, panelPicked, panelSeats, type BoardPanel } from './board-panels';
 
-const money: BoardPanel = { id: 'p1', name: 'Money', advisors: ['cfo', 'buffett', 'dalio', 'dimon'] };
+const money: BoardPanel = { id: 'p1', name: 'Money', advisors: ['cfo', 'buffett', 'dalio', 'dimon'], topic: null };
 
 describe('panels', () => {
   it('reads a row and drops one with no name', () => {
-    expect(panelOf({ id: 'p1', name: ' Money ', advisors: ['cfo', 3] })).toEqual({ id: 'p1', name: 'Money', advisors: ['cfo'] });
+    expect(panelOf({ id: 'p1', name: ' Money ', advisors: ['cfo', 3] })).toEqual({ id: 'p1', name: 'Money', advisors: ['cfo'], topic: null });
     expect(panelOf({ id: 'p1', name: ' ' })).toBeNull();
   });
 

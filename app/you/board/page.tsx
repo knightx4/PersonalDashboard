@@ -12,6 +12,7 @@ import {
   askBoard,
   conveneQuestion,
   dismissSuggestion,
+  startMeeting,
 } from './actions';
 import { answerBoardReview } from './review-actions';
 import { BoardListView } from './board-list-view';
@@ -61,6 +62,7 @@ export default async function Page() {
       now={readAt()}
       actions={{
         ask: askBoard,
+        start: startMeeting,
         accept: acceptSuggestion,
         dismiss: dismissSuggestion,
         convene: conveneQuestion,

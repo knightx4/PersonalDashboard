@@ -9691,6 +9691,39 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    id: 'you-board-start',
+    label: 'You · Board, Start a meeting open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview meetingStart="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-start-error',
+    label: 'You · Board, a meeting that could not be started',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview meetingStart="error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-start-running',
+    label: 'You · Board, Start a meeting while one is running',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="running" meetingStart="running" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-meeting-called',
     label: 'You · Board, a called meeting with each seat’s vote',
     module: 'you',

@@ -110,6 +110,38 @@ it leans on a rule, a position or a story. Brief a guest with this paragraph:
 
 followed by the `brain` object as it is in the row.
 
+## A panel meeting
+
+When the meeting row has a `panel_id`, the person started it for one panel.
+The row holds everything about the panel as it was when they pressed the
+button: `panel_name`, `panel_topic` (null means the topic is the panel's
+name) and `panel_advisors`, an ordered array of advisor keys. Read these from
+the meeting row, never from `you.board_panels`, which the person may have
+edited since. With no `panel_id` nothing in this section applies and the
+meeting runs as described everywhere else.
+
+- **Who sits.** Exactly the advisors in `panel_advisors`, no more. The five
+  seats sit only if their keys are listed, and guests are not added by fit:
+  skip the "usable guests whose question and focus bear most" rule and the
+  four-guest cap does not need to trim anything. A key is looked up in
+  `you.board_advisors` (`key`, owner's `user_id`). One that is a guest
+  with `brain_status` of `none`, `building` or `failed`, or not `active`,
+  or has no row, does not sit, as the guest rule above says. The meeting
+  goes ahead with the members who are ready. Name each one who could not sit
+  in `chair_note`, with the reason ("Richard Feynman: his brain has not been
+  built yet"), so the person sees the panel was short. If no member can sit,
+  or fewer than two, mark the meeting failed (see **The brief**) with an
+  error saying which brains are missing.
+  The "five seats sit on every question" rule gives way to the panel: a
+  seat missing from `panel_advisors` does not sit, so a panel can be guests
+  and one or two seats. Write predictions only for the seats that sat (the
+  others have none to grade next time), carry an absent seat's `scorecard`
+  row over unchanged from the last meeting, and where the read-back asks for
+  five of either, it means one per seat that sat.
+- **What is debated.** Only questions within the topic (step 2).
+- **What is read.** The pack covers what bears on the topic (step 3).
+- **What is suggested.** Only questions within the topic (step 10).
+
 ## How you read
 
 Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through
@@ -138,11 +170,17 @@ Board meeting <meeting id>
 user_id <uuid>
 weekly | called: <the decision>
 questions <question id>, <question id>
+panel <panel id>
 ```
 
 The `questions` line is there when the person called a meeting about
 questions they named; those, in that order, are the whole agenda. Without
 it the chair builds the agenda (step 2).
+
+The `panel` line is there when the person started the meeting for a panel.
+It repeats the meeting row's `panel_id`; read the row for the rest, as **A
+panel meeting** says. A brief without it is a meeting with no panel, unless
+the row itself has a `panel_id`, in which case the row wins.
 
 The scheduled Sunday task sends only "Follow .claude/skills/board/SKILL.md",
 with no meeting named. Then insert your own weekly row first, as the owner,
@@ -158,7 +196,8 @@ If it fails on `board_meetings_one_open`, a meeting is already queued or
 running: read it, and if it is `queued` take it as yours, otherwise stop and
 say so. Never start a second.
 
-With a meeting named, read its row (`id` and `user_id` both in the where). If
+With a meeting named, read its row (`id` and `user_id` both in the where),
+including `panel_id`, `panel_name`, `panel_topic` and `panel_advisors`. If
 it is missing, or `ready` or `failed`, stop: it has been handled. Otherwise
 mark it started, and take `kind` and `decision` from the row rather than the
 brief:
@@ -298,6 +337,20 @@ Otherwise fill the three places in this order, oldest first within each:
    `suggested` that this week's pack makes most pressing. Take one at most,
    and only when the pack gives the board something to argue about.
 
+**For a panel meeting** (the row has a `panel_id`), the topic is
+`panel_topic`, or `panel_name` where that is null. Run the same three places
+over the questions that fall within the topic, judged from the question,
+its options and its `context`; a question outside the topic stays where it
+is for the next ordinary meeting, and `chair_note` says how many were left.
+The person's queued questions on the topic come first, then accepted
+suggestions on it, then the board's pick, which is a `suggested` question
+within the topic, or, if none is there and the pack gives something to
+argue about, a new question you write on the topic (insert it as step 10
+does and take it, so the pick is never off-topic). A `questions` line in the
+brief still decides the agenda by itself. A panel meeting with nothing on its
+topic is a meeting with no debate (below): it still suggests questions on the
+topic in step 10.
+
 ```sql
 select id, question, options, context, lean, advisors, seats_off, source, status, created_at
 from you.board_questions
@@ -391,6 +444,18 @@ where a number moves.
 - **What they wrote.** The journal's dated entries and the daily notes from
   this week, in full (`obsidian.notes.dated_entries` and paths ending in a
   date, as `.claude/skills/insights/SKILL.md` step 2 reads them).
+
+**For a panel meeting**, read what bears on the topic rather than the whole
+week. Keep the "Who they are" section and drop any other that has nothing to
+say about the topic; put the weight on the sources that fit it. The panel's
+topic is a guide, not a fixed list: Philosophy reads the private notes, the
+journal and the vault themes; Money reads `public.orders` and
+`public.recurring_payments`; Learning reads what they studied and saved in
+Learn; Building reads the commits and `public.plan_items`; Career reads the
+job search, goals and todos; Hobbies and Life read the dated notes, the
+dreams and the daily notes. Name the topic at the top of `week.md`. Still
+cover the seven days, with the four before for comparison, and give a topic's
+older material (a note from last year) where the topic needs it.
 
 Then one section per agenda question, `## Q1`, `## Q2`, `## Q3`, holding
 what step 4 found for it. Mark any number you could not get, rather than
@@ -680,7 +745,9 @@ Every meeting leaves three to five new questions for the person to accept or
 dismiss, drawn from the week's pack, their goals and their notes. Spread
 them across work, money, learning, projects, where and how they live, and
 time; no two from the same area unless the pack gives nothing for the
-others. Each is a decision they face now or soon, with two to four lettered
+others. **For a panel meeting**, every one is within the panel's topic
+instead, and the spread is over the angles the topic has; put the panel's
+advisor keys that fit in `advisors`, only keys from `panel_advisors`. Each is a decision they face now or soon, with two to four lettered
 options, a `context` of one to three sentences saying what in the pack
 raised it (with dates), and the advisors who should hear it in `advisors`
 where one fits plainly. Never suggest a question about relationships, health
@@ -721,7 +788,9 @@ disagreements  [ { key: 'd1', point, positions: [ { seat, stance, text,
                  receipts } ] } ], one per agenda question, for the tab
                  until it reads the turns
 chair_note     text?: who sat and why, guests left out and why, questions
-               skipped
+               skipped; for a panel meeting also the panel members who could
+               not sit and why, and the questions left for another meeting
+               as off the topic
 ```
 
 `seat` is `hiring_manager`, `mentor`, `skeptic`, `cfo` or `dreamer`, always

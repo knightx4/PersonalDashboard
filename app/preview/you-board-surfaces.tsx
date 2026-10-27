@@ -1,6 +1,7 @@
 'use client';
 
 import type { AskStart } from '@/app/you/board/ask-board';
+import type { StartStart } from '@/app/you/board/start-meeting';
 import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
 import {
   sortAdvisors,
@@ -626,21 +627,25 @@ export const PREVIEW_PANELS: BoardPanel[] = [
     id: '00000000-0000-4000-8000-0000000000f1',
     name: 'Money',
     advisors: ['cfo', 'buffett', 'dalio', 'dimon'],
+    topic: 'Spending, saving, debt and income.',
   },
   {
     id: '00000000-0000-4000-8000-0000000000f2',
     name: 'Career',
     advisors: ['hiring_manager', 'mentor', 'skeptic', 'dimon'],
+    topic: 'Work, the job search, skills and pay.',
   },
   {
     id: '00000000-0000-4000-8000-0000000000f3',
     name: 'Building',
     advisors: ['jobs', 'da_vinci', 'skeptic', 'dreamer'],
+    topic: 'Projects and the things they make.',
   },
   {
     id: '00000000-0000-4000-8000-0000000000f4',
     name: 'Life',
     advisors: ['mentor', 'dreamer', 'franklin', 'washington'],
+    topic: 'Where and how they live, and their time; relationships only if they ask.',
   },
 ];
 
@@ -648,6 +653,7 @@ const listActions: BoardListActions = {
   answerAsk: async () => ({ error: null }),
   answerReview: async () => ({ error: null }),
   ask: async () => ({ error: null, queued: true }),
+  start: async () => ({ error: null }),
   accept: async () => ({ error: null }),
   dismiss: async () => ({ error: null }),
   convene: async () => ({ error: null }),
@@ -656,9 +662,11 @@ const listActions: BoardListActions = {
 export function YouBoardListPreview({
   state = 'ready',
   start,
+  meetingStart,
 }: {
   state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error' | 'reviews' | 'reviews-error';
   start?: AskStart;
+  meetingStart?: StartStart;
 }) {
   const meetings =
     state === 'empty'
@@ -710,6 +718,7 @@ export function YouBoardListPreview({
       now={NOW}
       actions={listActions}
       start={start}
+      meetingStart={meetingStart}
       asksError={
         state === 'asks-error'
           ? 'This question changed while you were looking. Read the page again.'
