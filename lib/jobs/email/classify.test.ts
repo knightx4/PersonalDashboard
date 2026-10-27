@@ -1,5 +1,6 @@
 /**
- * The classifier, against real recruiting mail.
+ * The classifier, against recruiting mail modeled on real mail, with every
+ * name and address made up.
  *
  * The corpus lives in lib/jobs/email/fixtures as body .txt files with the expected
  * JSON beside each. It is weighted toward rejections and toward direct
@@ -40,7 +41,7 @@ const COMPANIES: CompanyDomainHit[] = [
   { id: 'c-ramp', slug: 'ramp', name: 'Ramp', domains: ['ramp.com'] },
   { id: 'c-figma', slug: 'figma', name: 'Figma', domains: ['figma.com'] },
   { id: 'c-linear', slug: 'linear', name: 'Linear', domains: ['linear.app'] },
-  { id: 'c-stripe', slug: 'stripe', name: 'Stripe', domains: ['stripe.com'] },
+  { id: 'c-hooli', slug: 'hooli', name: 'Hooli', domains: ['hooli.com'] },
 ];
 
 function header(raw: string, name: string): string | null {
@@ -224,14 +225,14 @@ describe('a booked interview against finding a time', () => {
   };
 
   const cases: [string, 'interview_invite' | 'scheduling', string[]][] = [
-    ['a calendar invitation', 'interview_invite', ['trial-campfire-calendar-invitation', 'rippling-scheduling']],
-    ['an interview confirmation', 'interview_invite', ['trial-eliseai-interview-confirmation', 'calendly-scheduling-confirmed']],
-    ['an interview reminder', 'interview_invite', ['trial-eliseai-interview-reminder']],
-    ['a request for availability', 'scheduling', ['real-galaxy-availability-request', 'trial-axial-interview-availability', 'trial-triomics-next-steps']],
-    ['a list of offered slots', 'scheduling', ['trial-respark-offered-slots']],
-    ['a booking link', 'scheduling', ['real-garage-ashby-intro-call', 'greenhouse-interview-invite']],
-    ['a reminder to book a time', 'scheduling', ['trial-tabs-reminder-to-book']],
-    ['a cancellation', 'scheduling', ['trial-mercor-cancelled-interview']],
+    ['a calendar invitation', 'interview_invite', ['trial-calendar-invitation', 'rippling-scheduling']],
+    ['an interview confirmation', 'interview_invite', ['trial-interview-confirmation', 'calendly-scheduling-confirmed']],
+    ['an interview reminder', 'interview_invite', ['trial-ashby-interview-reminder']],
+    ['a request for availability', 'scheduling', ['greenhouse-availability-request', 'trial-interview-availability', 'trial-next-steps']],
+    ['a list of offered slots', 'scheduling', ['trial-offered-slots']],
+    ['a booking link', 'scheduling', ['ashby-intro-call-booking-link', 'greenhouse-interview-invite']],
+    ['a reminder to book a time', 'scheduling', ['trial-reminder-to-book']],
+    ['a cancellation', 'scheduling', ['trial-cancelled-interview']],
   ];
 
   for (const [label, expected, names] of cases) {
@@ -265,8 +266,8 @@ describe('a booked interview against finding a time', () => {
   it('reads plain mail from a scheduling tool as booked', () => {
     const result = classifyMessage({
       fromAddress: 'notifications@calendly.com',
-      subject: 'Meet with Sam Young at 09:30am on Monday, August 3, 2026',
-      bodyPreview: 'Sam Young, Monday, August 3, 2026, 09:30am Central Time.',
+      subject: 'Meet with Riley Park at 09:30am on Monday, August 3, 2026',
+      bodyPreview: 'Riley Park, Monday, August 3, 2026, 09:30am Central Time.',
       companies: COMPANIES,
     });
     expect(result.classification).toBe('interview_invite');
@@ -275,7 +276,7 @@ describe('a booked interview against finding a time', () => {
 
 /**
  * Acknowledgements that were filed as rejections (plan #1227). The trial
- * fixtures hold only real envelopes, so the body wording here is written for
+ * fixtures hold only envelopes, so the body wording here is written for
  * the test: the sentences acknowledgements use that share a soft phrase with
  * rejections.
  */
@@ -293,14 +294,14 @@ describe('an acknowledgement is not a rejection', () => {
     });
   };
 
-  it('labels the Cohere and Kalshi acknowledgements as confirmations', () => {
-    for (const name of ['trial-cohere-ashby-ack', 'trial-kalshi-ashby-ack']) {
+  it('labels the two Ashby acknowledgements as confirmations', () => {
+    for (const name of ['trial-ashby-ack-thanks-for-applying', 'trial-ashby-ack-interest']) {
       expect(classifyFixture(name).classification, name).toBe('application_confirmation');
     }
   });
 
-  it('labels the KKR security code not relevant', () => {
-    const result = classifyFixture('trial-kkr-greenhouse-security-code');
+  it('labels the Greenhouse security code not relevant', () => {
+    const result = classifyFixture('trial-greenhouse-security-code');
     expect(result.classification).toBe('not_relevant');
     expect(result.tier).toBe('A');
   });

@@ -7,8 +7,8 @@ const gmailForward = [
   '---------- Forwarded message ---------',
   'From: Goods of Desire <store+123@shopifyemail.com>',
   'Date: Fri, Sep 18, 2026 at 9:14 AM',
-  'Subject: Order Confirmation #1RGJRCL',
-  'To: <samantha.kuo@gmail.com>',
+  'Subject: Order Confirmation #1FAKE42',
+  'To: <jordan.lee@example.net>',
   '',
   '',
   'Thank you for your order.',
@@ -21,9 +21,9 @@ const outlookForward = [
   '________________________________',
   'From: Hen & Heifer <hello@henandheifer.com>',
   'Sent: Thursday, September 17, 2026 4:02 PM',
-  'To: Samantha Kuo <kuosamantha@yahoo.com>;',
-  '    Eddy Liu <eddy@god.com.hk>',
-  'Subject: Your order #8028 is ready for pickup',
+  'To: Jordan Lee <jordan.lee@example.org>;',
+  '    Casey Wong <casey@god.com.hk>',
+  'Subject: Your order #8042 is ready for pickup',
   '',
   'Your order is ready.',
 ].join('\n');
@@ -32,7 +32,7 @@ describe('quotedOriginal', () => {
   it('reads the sender, subject and text under a Gmail forward header', () => {
     expect(quotedOriginal(gmailForward)).toEqual({
       fromAddress: '"Goods of Desire" <store+123@shopifyemail.com>',
-      subject: 'Order Confirmation #1RGJRCL',
+      subject: 'Order Confirmation #1FAKE42',
       text: 'Thank you for your order.\nTea towel × 2  HK$200.00',
     });
   });
@@ -40,7 +40,7 @@ describe('quotedOriginal', () => {
   it('reads an Outlook forward, with its Sent: line and a wrapped To:', () => {
     expect(quotedOriginal(outlookForward)).toEqual({
       fromAddress: '"Hen & Heifer" <hello@henandheifer.com>',
-      subject: 'Your order #8028 is ready for pickup',
+      subject: 'Your order #8042 is ready for pickup',
       text: 'Your order is ready.',
     });
   });
@@ -51,14 +51,14 @@ describe('quotedOriginal', () => {
       '-----Original Message-----',
       '*From:* Goods of Desire [mailto:shop@god.com.hk]',
       '*Sent:* Monday, September 14, 2026 10:00 AM',
-      '*To:* Selvey Knight',
-      '*Subject:* [Goods of Desire] Order #11888 placed by Selvey Knight',
+      '*To:* Alex Rivera',
+      '*Subject:* [Goods of Desire] Order #10042 placed by Alex Rivera',
       '',
       'Order summary',
     ].join('\n');
     expect(quotedOriginal(text)).toMatchObject({
       fromAddress: '"Goods of Desire" <shop@god.com.hk>',
-      subject: '[Goods of Desire] Order #11888 placed by Selvey Knight',
+      subject: '[Goods of Desire] Order #10042 placed by Alex Rivera',
       text: 'Order summary',
     });
   });
@@ -70,13 +70,13 @@ describe('quotedOriginal', () => {
       'On Mon, Sep 14, 2026 at 10:02 AM Goods of Desire <',
       'shop@god.com.hk> wrote:',
       '',
-      '> Order #11888',
+      '> Order #10042',
       '> Tea towel × 2',
     ].join('\n');
     expect(quotedOriginal(text)).toEqual({
       fromAddress: '"Goods of Desire" <shop@god.com.hk>',
       subject: null,
-      text: 'Order #11888\nTea towel × 2',
+      text: 'Order #10042\nTea towel × 2',
     });
   });
 
@@ -84,14 +84,14 @@ describe('quotedOriginal', () => {
     const text = [
       'Thanks, will do.',
       '',
-      'On Tue, Sep 15, 2026 at 8:00 AM Selvey Knight <selveyknight4@gmail.com> wrote:',
+      'On Tue, Sep 15, 2026 at 8:00 AM Alex Rivera <alex.rivera@example.com> wrote:',
       '> Here it is.',
       '>',
       '> ---------- Forwarded message ---------',
       '> From: Goods of Desire <shop@god.com.hk>',
       '> Date: Mon, Sep 14, 2026 at 10:00 AM',
-      '> Subject: Order #11888 placed',
-      '> To: <selveyknight4@gmail.com>',
+      '> Subject: Order #10042 placed',
+      '> To: <alex.rivera@example.com>',
       '>',
       '> Order summary',
     ].join('\n');
@@ -104,7 +104,7 @@ describe('quotedOriginal', () => {
   });
 
   it('ignores a From: and To: pair that is a shipping label, not a header', () => {
-    const text = ['Shipment details', 'From: Warehouse 4, Kowloon', 'To: Samantha Kuo', '', 'Arriving Friday'].join('\n');
+    const text = ['Shipment details', 'From: Warehouse 4, Kowloon', 'To: Jordan Lee', '', 'Arriving Friday'].join('\n');
     expect(quotedOriginal(text)).toBeNull();
   });
 });
@@ -112,14 +112,14 @@ describe('quotedOriginal', () => {
 describe('unwrapQuotedOriginal', () => {
   it('replaces the forwarder, their name and the outer text with the quoted message', () => {
     const unwrapped = unwrapQuotedOriginal({
-      subject: 'Fwd: Order Confirmation #1RGJRCL',
+      subject: 'Fwd: Order Confirmation #1FAKE42',
       text: gmailForward,
-      fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>',
-      merchantName: 'Samantha Kuo',
+      fromAddress: 'Jordan Lee <jordan.lee@example.net>',
+      merchantName: 'Jordan Lee',
       merchantSlug: null,
     });
     expect(unwrapped).toEqual({
-      subject: 'Order Confirmation #1RGJRCL',
+      subject: 'Order Confirmation #1FAKE42',
       text: 'Thank you for your order.\nTea towel × 2  HK$200.00',
       fromAddress: '"Goods of Desire" <store+123@shopifyemail.com>',
       merchantName: 'Goods of Desire',
@@ -131,7 +131,7 @@ describe('unwrapQuotedOriginal', () => {
     const unwrapped = unwrapQuotedOriginal({
       subject: 'Fwd: Order',
       text: gmailForward,
-      fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>',
+      fromAddress: 'Jordan Lee <jordan.lee@example.net>',
       merchantName: 'Target',
     });
     expect(unwrapped.merchantName).toBe('Target');
