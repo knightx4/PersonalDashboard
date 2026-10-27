@@ -50,7 +50,7 @@ export const youActions: ModuleActions = {
     ),
     renameCourseWeekAction: none(
       'theirs',
-      'Corrects the topic Dash read for a week; the person\'s correction is what a later read keeps, so it is theirs to make.',
+      "Corrects the topic Dash read for a week; the person's correction is what a later read keeps, so it is theirs to make.",
     ),
     removeCourseWeekAction: none(
       'theirs',
@@ -91,6 +91,12 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
+  'app/you/board/make-actions.ts': {
+    makeDecisionHappen: none(
+      'theirs',
+      'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
+    ),
+  },
   'app/you/board/actions.ts': {
     voteOnDisagreement: none(
       'theirs',
@@ -105,6 +111,10 @@ export const youActions: ModuleActions = {
       'Ticking a resolution done is the person saying they did it; the next meeting reads the tick.',
     ),
     askBoard: tool('ask_board'),
+    answerBoardAsk: none(
+      'theirs',
+      "An answer to what the board asked is the person's own words, which the next meeting reads first (plan #2561.11).",
+    ),
     acceptSuggestion: none(
       'spends',
       "Taking up one of the board's suggested questions is the person's choice of what the board works on, and Ask now starts a paid Dash session (plan #2561.4).",
