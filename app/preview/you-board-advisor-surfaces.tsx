@@ -24,6 +24,7 @@ const actions: AdvisorActions = {
   retry: async () => ({ error: null }),
   setActive: async () => ({ error: null }),
   createPanel: async () => ({ error: null, panelId: PREVIEW_PANELS[0].id }),
+  startMeeting: async () => ({ error: null }),
 };
 
 function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'name' | 'question'>): RosterAdvisor {
@@ -204,7 +205,7 @@ const panelActions = {
 /** One panel's page: the seeded Money panel, a panel just made with no advisors, or the delete confirm showing. */
 export function YouBoardPanelPreview({ state = 'ready' }: { state?: 'ready' | 'empty' | 'delete' }) {
   const panel =
-    state === 'empty' ? { id: PREVIEW_PANELS[0].id, name: 'New panel', advisors: [] } : PREVIEW_PANELS[0];
+    state === 'empty' ? { id: PREVIEW_PANELS[0].id, name: 'New panel', advisors: [], topic: null } : PREVIEW_PANELS[0];
   return (
     <PanelView
       panel={panel}

@@ -11,7 +11,15 @@ import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build
 import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
 import { answerAsk, answerError } from '@/lib/you/board-asks';
 import { listRoster } from '@/lib/you/board-advisors';
-import { cleanPanelMembers, cleanPanelName, createPanel, removePanel, updatePanel } from '@/lib/you/board-panels';
+import {
+  cleanPanelMembers,
+  cleanPanelName,
+  createPanel,
+  loadPanel,
+  removePanel,
+  updatePanel,
+} from '@/lib/you/board-panels';
+import { startBoardMeeting } from '@/lib/you/board-start';
 import {
   DECIDABLE,
   decideBoardQuestion,
@@ -421,6 +429,28 @@ export async function answerBoardAsk(
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
+  }
+}
+
+/**
+ * Start a board meeting by hand (plan #2576.3), for one panel's topic or for
+ * none: the meeting is queued weekly-kind with the panel copied onto it and the
+ * board routine fired, and the tab lists it running. A meeting already open
+ * answers with MEETING_RUNNING_MESSAGE.
+ */
+// latency: pending
+export async function startMeeting(panelId: string | null): Promise<{ error: string | null }> {
+  try {
+    if (panelId !== null && !meetingId.safeParse(panelId).success) return { error: 'That is not one of your panels.' };
+    const user = await requireUser();
+    const client = await createYouClient();
+    const panel = panelId === null ? null : await loadPanel(client, user.id, panelId);
+    if (panelId !== null && !panel) return { error: 'That panel is not yours or no longer exists.' };
+    const result = await startBoardMeeting({ client, userId: user.id, routine: boardRoutine(), panel });
+    revalidatePath('/you/board');
+    return { error: result.started ? null : result.error };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The meeting did not start. Try again.' };
   }
 }
 

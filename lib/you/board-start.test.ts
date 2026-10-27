@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { DECISION_MAX } from '@/lib/you/board';
-import { boardBrief, callBoardMeeting, cleanDecision } from '@/lib/you/board-start';
+import { boardBrief, callBoardMeeting, cleanDecision, startBoardMeeting } from '@/lib/you/board-start';
 
 const NOW = Date.parse('2026-11-02T12:00:00Z');
 const routine = { id: 'rt', token: 'tk' };
@@ -136,5 +136,50 @@ describe('callBoardMeeting', () => {
       await callBoardMeeting({ client, userId: 'u1', decision: 'a'.repeat(DECISION_MAX + 1), routine, now: NOW }),
     ).toMatchObject({ started: false, reason: 'invalid' });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('startBoardMeeting', () => {
+  const career = { id: 'p-career', name: 'Career', topic: null, advisors: ['hiring_manager', 'mentor', 'seneca'] };
+
+  it('queues a weekly meeting with the panel copied on and names the panel in the brief', async () => {
+    const { client, calls } = fakeYou();
+    const fetch = okFetch();
+    const r = await startBoardMeeting({ client, userId: 'u1', panel: career, routine, now: NOW, fetch });
+    expect(r).toEqual({ started: true, meetingId: 'meet-new' });
+    expect(calls.find((c) => c.op === 'insert')?.values).toEqual({
+      user_id: 'u1',
+      kind: 'weekly',
+      panel_id: 'p-career',
+      panel_name: 'Career',
+      panel_topic: null,
+      panel_advisors: ['hiring_manager', 'mentor', 'seneca'],
+      status: 'queued',
+    });
+    expect(sentText(fetch).split('\n')).toEqual([
+      'Follow .claude/skills/board/SKILL.md',
+      'Board meeting meet-new',
+      'user_id u1',
+      'weekly',
+      'panel p-career',
+    ]);
+  });
+
+  it('starts a meeting for no panel with the four panel columns left off', async () => {
+    const { client, calls } = fakeYou();
+    const fetch = okFetch();
+    await startBoardMeeting({ client, userId: 'u1', panel: null, routine, now: NOW, fetch });
+    expect(calls.find((c) => c.op === 'insert')?.values).toEqual({ user_id: 'u1', kind: 'weekly', status: 'queued' });
+    expect(sentText(fetch)).not.toContain('panel');
+  });
+
+  it('says one is already running, and refuses a panel with no advisors', async () => {
+    const taken = fakeYou({ insertError: { code: '23505', message: 'dup' } });
+    const r = await startBoardMeeting({ client: taken.client, userId: 'u1', panel: null, routine, now: NOW, fetch: okFetch() });
+    expect(r).toMatchObject({ started: false, reason: 'running' });
+    const empty = fakeYou();
+    const e = await startBoardMeeting({ client: empty.client, userId: 'u1', panel: { ...career, advisors: [] }, routine, now: NOW });
+    expect(e).toMatchObject({ started: false, reason: 'invalid' });
+    expect(empty.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });
