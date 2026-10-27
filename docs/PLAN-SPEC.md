@@ -21,7 +21,10 @@ Everything the person reads in Dev names the four levels the same way:
   website, a project in `public.dev_projects` (read by
   `lib/plan/projects.ts`) built from its own repository. A
   plan row's `module` column holds it, and each one is a section on
-  `/dev/plan`.
+  `/dev/plan`. The Projects tab (`/dev/projects`) lists these rows and
+  adds one from the GitHub repositories `GITHUB_READ_TOKEN` can see, or
+  from a typed owner/name; Ask Dash's `add_project` does the same, and
+  archiving one takes its section away and keeps its rows.
 - **Feature**: a row at the top of a module, with no parent. It carries the
   done-when the steps beneath it add up to.
 - **Step**: a row under a feature.

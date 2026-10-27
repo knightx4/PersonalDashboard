@@ -45,6 +45,9 @@ import { ScopeLabelsProvider } from './scope-labels';
 import { catalogOf } from './plan-catalog';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
+import { Thread } from '@/components/thread/thread';
+import { loadThread } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { repoKey } from '@/lib/plan/github';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { ProjectMainLine } from './project-main-line';
@@ -273,6 +276,12 @@ export async function renderPlanPage({
   const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
   // Your initial, for the Assignee cells (plan #2069.1).
   const initial = await loadYourInitial(user);
+  // A project's own thread, at the foot of its page (plan #2553.5); its
+  // length is the comment mark on the project's row on /dev/projects.
+  const projectRef = project ? threadRef('project', project.id) : null;
+  const projectTurns = projectRef
+    ? await loadThread(supabase, projectRef, { userId: user.id }).catch(() => [])
+    : [];
   // A project's own main, read from its row the tick keeps (plan #2553.2).
   const projectMain = project
     ? { repo: repoKey(project.repo), check: await loadMainCheck(repoKey(project.repo)) }
@@ -286,7 +295,7 @@ export async function renderPlanPage({
       <PageHeader
         subject={
           project
-            ? sectionSubject('/dev/plan', 'Plan', { label: project.label, href: basePath })
+            ? sectionSubject('/dev/projects', 'Projects', { label: project.label, href: basePath })
             : sectionSubject('/dev/plan', 'Plan')
         }
         title={project ? project.label : 'Plan'}
@@ -348,6 +357,13 @@ export async function renderPlanPage({
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />
+      {projectRef && (
+        <Thread
+          subject={projectRef}
+          turns={projectTurns}
+          placeholder="A note on this project, or a question for Dash about it."
+        />
+      )}
     </PageColumn>
     </ScopeLabelsProvider>
     </YourInitialProvider>

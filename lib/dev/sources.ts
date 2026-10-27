@@ -33,6 +33,12 @@ const PAGES: Record<string, Page> = {
     section: { href: '/dev/plan', label: 'Plan' },
     parent: parentBy('plan_item_id', 'public.plan_items'),
   },
+  // A project opens on its plan page (plan #2553.5), under the Projects list.
+  'public.dev_projects': {
+    title: 'label',
+    href: (row) => `/dev/projects/${row.id}`,
+    section: { href: '/dev/projects', label: 'Projects' },
+  },
   'public.ideas': {
     title: 'body',
     href: (row) => `/dev/ideas#idea-${row.id}`,
