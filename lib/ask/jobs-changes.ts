@@ -13,7 +13,7 @@ import type { LearnChangeInput } from './learn-changes';
 
 /** The write tools, by name, which is the kind each change is kept under. */
 /** Material's, Settings' and Find's (plan #1894.6.7, lib/dash/career-writes.ts), last in JOBS_WRITES. */
-const CAREER_CHANGE_KINDS = ['add_evidence', 'add_resume_version', 'attach_resume_pdf', 'change_career_thought', 'add_discovered_company'] as const;
+const CAREER_CHANGE_KINDS = ['add_evidence', 'add_resume_version', 'attach_resume_pdf', 'change_career_thought', 'change_search_aim', 'add_discovered_company'] as const;
 
 /** A role's interviews, interviewers and rounds (plan #1894.6.9, lib/dash/interview-edit-writes.ts), after them. */
 const INTERVIEW_EDIT_CHANGE_KINDS = ['change_interview', 'change_interviewer', 'change_interview_round'] as const;
