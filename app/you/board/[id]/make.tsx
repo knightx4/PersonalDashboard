@@ -180,6 +180,7 @@ export function MakeItHappen({
                     <div
                       aria-hidden
                       className={cn(
+                        // ui-ok: it draws the closed select, which wraps the picked goal's full name over the real select
                         'flex min-h-(--control-h) items-center gap-2 rounded-control border border-control bg-surface px-(--control-px) py-1.5',
                         // eslint-disable-next-line no-restricted-syntax -- text-base matches the select's own 16px on a phone, which stops iOS zooming on focus.
                         'text-base text-ink sm:text-ui',
