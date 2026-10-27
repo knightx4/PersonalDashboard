@@ -36,6 +36,7 @@ import {
 import { NO_DEBATE, type MeetingDebate } from '@/lib/you/board-debate';
 import {
   answerBoardQuestion,
+  decideQuestion,
   makeResolutionTodo,
   markResolution,
   voteOnDisagreement,
@@ -44,6 +45,7 @@ import {
 import { useRefreshWhileRunning } from '../refresh-while-running';
 import { SeatLabel } from '../seat-label';
 import { AdvisorDrawer, QuestionDebate } from './debate';
+import type { DecideAction } from './decision';
 import { Evidence, Prose } from './prose';
 
 /**
@@ -85,7 +87,14 @@ const REAL_ACTIONS: MeetingActions = {
 };
 
 /** For the gallery: draw a hidden part open, the memos or one advisor's thinking by id. */
-export type MeetingOpen = { memos?: boolean; advisor?: string };
+export type MeetingOpen = {
+  memos?: boolean;
+  advisor?: string;
+  /** The decision form open under each verdict, or open with a failed save's error. */
+  decide?: 'open' | 'error';
+};
+
+const DECIDE_ERROR = 'Your decision was not saved. Try again.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -131,6 +140,7 @@ export function MeetingView({
   timezone = 'UTC',
   now,
   actions = REAL_ACTIONS,
+  decide = decideQuestion,
   open = {},
 }: {
   meeting: BoardMeeting;
@@ -145,6 +155,8 @@ export function MeetingView({
   /** When the page was read, for whether a meeting is still running. */
   now: number;
   actions?: MeetingActions;
+  /** Saves a decision under a debated question's verdict (plan #2561.6); not part of the old view's actions. */
+  decide?: DecideAction;
   open?: MeetingOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, BoardMark>>(
@@ -165,6 +177,9 @@ export function MeetingView({
       advisors={debate.advisors}
       running={state.kind === 'running'}
       onOpen={setAdvisorId}
+      decide={decide}
+      decideOpen={open.decide !== undefined}
+      decideError={open.decide === 'error' ? DECIDE_ERROR : null}
     />
   ));
   const drawer = shownAdvisor && (

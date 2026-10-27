@@ -16,7 +16,13 @@ import {
   type BoardMeetingRow,
   type MeetingState,
 } from '@/lib/you/board';
-import type { BoardAdvisor, BoardQuestion } from '@/lib/you/board-questions';
+import { whenDay } from '@/lib/core/when';
+import {
+  optionLabel,
+  type BoardAdvisor,
+  type BoardDecision,
+  type BoardQuestion,
+} from '@/lib/you/board-questions';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
@@ -37,6 +43,7 @@ export function BoardListView({
   meetings,
   questions = [],
   advisors = [],
+  decisions = [],
   nextMeeting,
   timezone = 'UTC',
   now,
@@ -48,6 +55,8 @@ export function BoardListView({
   questions?: readonly BoardQuestion[];
   /** The active roster, for the compose card's advisors. */
   advisors?: readonly BoardAdvisor[];
+  /** Every question they decided, newest first (listDecisions). */
+  decisions?: readonly BoardDecision[];
   /** The day of the next weekly meeting in their zone (nextMeetingDay). */
   nextMeeting: string;
   timezone?: string;
@@ -67,7 +76,7 @@ export function BoardListView({
   const suggestions = questions.filter((q) => q.status === 'suggested');
   const asked = questions.filter((q) => q.status !== 'suggested');
 
-  if (meetings.length === 0 && questions.length === 0) {
+  if (meetings.length === 0 && questions.length === 0 && decisions.length === 0) {
     return (
       <PageColumn>
         {header}
@@ -122,6 +131,20 @@ export function BoardListView({
               ))}
             </Group>
           )}
+          {decisions.length > 0 && (
+            <Group title="Decisions" count={decisions.length}>
+              {decisions.map((decision) => (
+                <ListRow
+                  key={decision.id}
+                  href={decision.meetingId ? `/you/board/${decision.meetingId}` : '/you/board'}
+                  title={decision.question}
+                  meta={decisionMeta(decision)}
+                  wrapMeta
+                  end={whenDay(decision.decidedAt, { timeZone: timezone, now })}
+                />
+              ))}
+            </Group>
+          )}
           {meetings.length > 0 && (
             <Group title="Meetings" count={meetings.length}>
               {meetings.map((meeting, index) => {
@@ -155,6 +178,12 @@ export function BoardListView({
       </div>
     </PageColumn>
   );
+}
+
+/** "Board said B · You chose A, Take the contract": the recommendation beside the choice. */
+export function decisionMeta(decision: BoardDecision): string {
+  const chose = optionLabel(decision.options, decision.chosen);
+  return `${decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle'} · You chose ${chose}`;
 }
 
 /** One group of the surface: its label, then its rows. */

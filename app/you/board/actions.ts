@@ -10,11 +10,15 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { callBoardMeeting } from '@/lib/you/board-start';
 import {
   cleanQuestion,
+  DECIDABLE,
+  decideBoardQuestion,
+  decisionError,
   insertBoardQuestion,
   listBoardAdvisors,
   loadBoardQuestion,
   moveBoardQuestion,
   type BoardQuestion,
+  type DecisionChoice,
   type QuestionInput,
 } from '@/lib/you/board-questions';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
@@ -295,6 +299,36 @@ export async function dismissSuggestion(id: string): Promise<{ error: string | n
     return {
       error: error instanceof Error ? error.message : 'The suggestion was not dismissed. Try again.',
     };
+  }
+}
+
+/**
+ * Decide a debated question from its verdict (plan #2561.6): pick an option,
+ * put it off (it goes back to the questions the board can take up again) or
+ * turn it down, with an optional note. The next meeting reads the decision and
+ * the note first (.claude/skills/board/SKILL.md). A decided question can be
+ * decided again, to change their mind.
+ */
+// latency: pending
+export async function decideQuestion(
+  id: string,
+  choice: DecisionChoice,
+  note?: string | null,
+): Promise<{ error: string | null }> {
+  try {
+    const found = await questionFor(id);
+    if ('error' in found) return { error: found.error ?? null };
+    const { client, user, question } = found;
+    const problem = decisionError(choice, question.options, note ?? null);
+    if (problem) return { error: problem };
+    if (!DECIDABLE.includes(question.status))
+      return { error: 'This question has not been through a meeting, so there is nothing to decide yet.' };
+    const saved = await decideBoardQuestion(client, user.id, id, choice, note ?? null);
+    if (!saved) return { error: 'This question changed while you were looking. Read the page again.' };
+    revalidatePath('/you/board');
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your decision was not saved. Try again.' };
   }
 }
 

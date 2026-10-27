@@ -120,6 +120,10 @@ export const youActions: ModuleActions = {
       'spends',
       'Convening the board now about a queued question starts a long Dash session on the account, which spends money the person chooses to spend (plan #2561.4).',
     ),
+    decideQuestion: none(
+      'theirs',
+      "Deciding a debated question, or putting it off or turning it down, is the person's own call on the board's verdict; the next meeting reads it and Dash does not decide for them (plan #2561.6).",
+    ),
     makeResolutionTodo: none(
       'theirs',
       'Making a resolution a todo is the person taking up what the board proposed, an approval Dash does not give for them.',

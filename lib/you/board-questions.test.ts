@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanQuestion,
+  decisionColumns,
+  decisionError,
+  decisionOf,
+  optionLabel,
   initials,
   optionsOf,
   questionOf,
@@ -94,5 +98,60 @@ describe('advisors', () => {
       { key: 'mentor', name: 'Mentor', kind: 'seat', focus: null },
     ]);
     expect(sorted.map((a) => a.key)).toEqual(['mentor', 'cfo', 'jobs', 'buffett']);
+  });
+});
+
+describe('the person’s decision (plan #2561.6)', () => {
+  const options = [
+    { letter: 'A', text: 'Take it' },
+    { letter: 'B', text: 'Leave it' },
+  ];
+
+  it('an option decides the question and stamps the time', () => {
+    expect(decisionColumns({ kind: 'option', letter: 'B' }, '  because  ', '2026-11-01T10:00:00Z')).toEqual({
+      status: 'decided',
+      decided_option: 'B',
+      decision_note: 'because',
+      decided_at: '2026-11-01T10:00:00Z',
+    });
+  });
+
+  it('putting off and turning down clear the option and the time, so decided iff decided_at holds', () => {
+    expect(decisionColumns({ kind: 'defer' }, null, 'x')).toEqual({
+      status: 'deferred',
+      decided_option: null,
+      decision_note: null,
+      decided_at: null,
+    });
+    expect(decisionColumns({ kind: 'reject' }, '', 'x').status).toBe('dismissed');
+  });
+
+  it('refuses an option the question lacks and a note that is too long', () => {
+    expect(decisionError({ kind: 'option', letter: 'C' }, options, null)).toMatch(/not one of/);
+    expect(decisionError({ kind: 'option', letter: 'A' }, options, 'x'.repeat(2001))).toMatch(/at most 2,000/);
+    expect(decisionError({ kind: 'defer' }, [], null)).toBeNull();
+    expect(decisionError({ kind: 'option', letter: 'B' }, options, 'fine')).toBeNull();
+  });
+
+  it('reads a decided row with the board’s recommendation, and drops one without a choice', () => {
+    const row = {
+      id: 'q1',
+      question: 'Take it?',
+      options,
+      verdict: { recommended: 'A' },
+      decided_option: 'B',
+      decision_note: 'later',
+      decided_at: '2026-11-01T10:00:00Z',
+      meeting_id: 'm1',
+    };
+    expect(decisionOf(row)).toMatchObject({ recommended: 'A', chosen: 'B', note: 'later', meetingId: 'm1' });
+    expect(decisionOf({ ...row, verdict: null })?.recommended).toBeNull();
+    expect(decisionOf({ ...row, decided_option: null })).toBeNull();
+  });
+
+  it('names an option by letter and text', () => {
+    expect(optionLabel(options, 'B')).toBe('B, Leave it');
+    expect(optionLabel(options, 'D')).toBe('D');
+    expect(optionLabel(options, null)).toBeNull();
   });
 });

@@ -158,7 +158,7 @@ export function AskedRow({
         : question.status === 'discussing'
           ? 'Discussed, waiting on your decision'
           : question.status === 'deferred'
-            ? 'Put off by the board'
+            ? 'Put off'
             : `For ${nextMeeting}`;
   const meta = [
     state,

@@ -26,6 +26,7 @@ import {
 import type { BoardOption } from '@/lib/you/board-questions';
 import { AdvisorMark } from '../advisor-mark';
 import { SEAT_ICONS } from '../seat-label';
+import { VerdictAndDecision, type DecideAction } from './decision';
 import { Evidence, Prose, ReceiptLink } from './prose';
 
 /**
@@ -107,6 +108,9 @@ export function QuestionDebate({
   advisors,
   running,
   onOpen,
+  decide,
+  decideOpen,
+  decideError,
 }: {
   question: DebateQuestion;
   number: number;
@@ -114,6 +118,11 @@ export function QuestionDebate({
   advisors: readonly DebateAdvisor[];
   running: boolean;
   onOpen: (id: string) => void;
+  /** Saves the person's decision under the verdict. */
+  decide: DecideAction;
+  /** For the gallery: draw the decision form open, with this error showing. */
+  decideOpen?: boolean;
+  decideError?: string | null;
 }) {
   const headingId = `board-q-${question.id}`;
   const byId = new Map(advisors.map((a) => [a.id, a]));
@@ -246,6 +255,16 @@ export function QuestionDebate({
             );
           })}
         </>
+      )}
+
+      {!running && (question.verdict || question.decision) && (
+        <VerdictAndDecision
+          question={question}
+          advisors={advisors}
+          decide={decide}
+          editing={decideOpen}
+          error={decideError}
+        />
       )}
     </section>
   );

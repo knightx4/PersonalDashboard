@@ -291,7 +291,7 @@ export function questionStateLabel(question: Pick<BoardQuestion, 'status' | 'sou
     case 'discussing':
       return 'In a meeting';
     case 'deferred':
-      return 'Put off by the board';
+      return 'Put off';
     case 'decided':
       return 'Decided';
     case 'dismissed':
@@ -299,4 +299,131 @@ export function questionStateLabel(question: Pick<BoardQuestion, 'status' | 'sou
     case 'suggested':
       return 'Suggested';
   }
+}
+
+// ---------------------------------------------------------------------------
+// The person's decision (plan #2561.6).
+// ---------------------------------------------------------------------------
+
+export const DECISION_NOTE_MAX = 2000;
+
+/** What the person does with a debated question: pick an option, put it off, or turn it down. */
+export type DecisionChoice =
+  | { kind: 'option'; letter: string }
+  | { kind: 'defer' }
+  | { kind: 'reject' };
+
+/** The columns a choice writes. Deciding sets the time; the other choices clear what an earlier decision left. */
+export function decisionColumns(
+  choice: DecisionChoice,
+  note: string | null,
+  at: string,
+): {
+  status: QuestionStatus;
+  decided_option: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+} {
+  const decision_note = note?.trim() || null;
+  if (choice.kind === 'option')
+    return { status: 'decided', decided_option: choice.letter, decision_note, decided_at: at };
+  return {
+    status: choice.kind === 'defer' ? 'deferred' : 'dismissed',
+    decided_option: null,
+    decision_note,
+    decided_at: null,
+  };
+}
+
+/** Why a choice cannot be made on this question, or null. */
+export function decisionError(
+  choice: DecisionChoice,
+  options: readonly BoardOption[],
+  note: string | null,
+): string | null {
+  if (note && note.length > DECISION_NOTE_MAX)
+    return `A note holds at most ${thousands(DECISION_NOTE_MAX)} characters.`;
+  if (choice.kind === 'option' && !options.some((o) => o.letter === choice.letter))
+    return 'That is not one of the question’s options.';
+  return null;
+}
+
+/** The statuses a debated question can be decided from: waiting on them, put off, or already decided (to change their mind). */
+export const DECIDABLE: readonly QuestionStatus[] = ['discussing', 'deferred', 'decided'];
+
+/** Save the person's decision. Returns whether the question was still there to decide. */
+export async function decideBoardQuestion(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+  choice: DecisionChoice,
+  note: string | null,
+  at: string = new Date().toISOString(),
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('board_questions')
+    .update(decisionColumns(choice, note, at))
+    .eq('user_id', userId)
+    .eq('id', id)
+    .in('status', DECIDABLE as QuestionStatus[])
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+export type BoardDecision = {
+  id: string;
+  question: string;
+  options: BoardOption[];
+  /** The option the board recommended, from its verdict. */
+  recommended: string | null;
+  chosen: string;
+  note: string | null;
+  decidedAt: string;
+  meetingId: string | null;
+};
+
+export function decisionOf(row: Record<string, unknown>): BoardDecision | null {
+  const question = text(row.question);
+  const chosen = text(row.decided_option);
+  const verdict =
+    row.verdict && typeof row.verdict === 'object' ? (row.verdict as Record<string, unknown>) : null;
+  const recommended = text(verdict?.recommended);
+  if (typeof row.id !== 'string' || !question || !chosen || typeof row.decided_at !== 'string')
+    return null;
+  return {
+    id: row.id,
+    question,
+    options: optionsOf(row.options),
+    recommended: /^[A-Z]$/.test(recommended) ? recommended : null,
+    chosen,
+    note: text(row.decision_note) || null,
+    decidedAt: row.decided_at,
+    meetingId: typeof row.meeting_id === 'string' ? row.meeting_id : null,
+  };
+}
+
+/** Every question they decided, newest decision first. */
+export async function listDecisions(
+  client: YouSupabaseClient,
+  userId: string,
+): Promise<BoardDecision[]> {
+  const { data, error } = await client
+    .from('board_questions')
+    .select('id, question, options, verdict, decided_option, decision_note, decided_at, meeting_id')
+    .eq('user_id', userId)
+    .eq('status', 'decided')
+    .order('decided_at', { ascending: false })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .map((row) => decisionOf(row as Record<string, unknown>))
+    .filter((d): d is BoardDecision => d !== null);
+}
+
+/** "B, Keep the search full time", or just the letter when the options are gone. */
+export function optionLabel(options: readonly BoardOption[], letter: string | null): string | null {
+  if (!letter) return null;
+  const option = options.find((o) => o.letter === letter);
+  return option ? `${letter}, ${option.text}` : letter;
 }
