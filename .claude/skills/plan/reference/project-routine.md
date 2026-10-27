@@ -22,7 +22,57 @@ The prompt and the connectors are stored on claude.ai, not read from here,
 so a change to either takes effect only once it is made on the routine
 itself.
 
-## Setting it up
+## Closing a project's step
+
+`done` records the commit it is given, and without `--commit` that is this
+checkout's HEAD, which is the dashboard's. Close a project's step with
+`npx tsx scripts/plan.ts done <n> --commit <sha> --note "…"`, naming the
+commit on the project's branch that holds the step. `done` asks GitHub
+whether that commit is on the project's branch and refuses one that is not.
+
+## Setting up a new project
+
+Adding a repository on the Projects page, or through Ask Dash's
+`add_project`, writes a "Set up" feature in the project's section with one
+ready step, "Make <owner>/<repo> ready for Dash to build in"
+(`lib/plan/project-setup.ts`). Until it closes the project row has no
+`set_up_at`, and the brief says so. That step is this job:
+
+1. **Read the repository.** Its README, its package manifest or build file
+   (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, a `Makefile`),
+   its CI workflows and any existing `CLAUDE.md` or `AGENTS.md`. Work out how
+   it installs, how it is tested and how it is built.
+2. **Run what you found.** Install, then run the checks in the clone. The
+   check command is the one a session should run before merging a step: the
+   tests, the linter and the type check where it has them, joined with `&&`
+   (`npm ci && npm test && npm run build`). Keep only what passes on the
+   branch as it stands; a check that already fails would block every step
+   after this one, so leave it out and say so on the step.
+3. **Commit a CLAUDE.md** to the project's branch if it has none, short:
+   how to install and run it, the check command, that each step merges to
+   that branch and is pushed, and that its plan rows live in the dashboard
+   (knightx4/PersonalDashboard), read and written with that checkout's
+   `scripts/plan.ts`. Leave an existing CLAUDE.md alone unless it
+   contradicts what you found; then add to it rather than rewriting it.
+4. **Record it.** `npx tsx scripts/plan.ts project-ready <project id> --check
+   "<command>"` writes the command and the set-up time onto the project's
+   row. A repository with nothing to run takes `--no-check`, and the note
+   says why. Every brief after this one tells the session to run the command
+   before it merges. When plan.ts cannot reach the database, send
+   `update dev_projects set check_command = '<command>', set_up_at = now()
+   where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and id = '<project id>'`
+   through `npx tsx scripts/sql.ts`.
+5. **Write up what only the person can supply** with `needs … --for <the
+   step>`: push access the session was refused, a secret the checks need
+   (name it and where it goes), or the GitHub App not installed on the
+   repository. One setup step each, with the detail saying exactly where to
+   go. When one of these stops the CLAUDE.md commit, the step waits on it
+   instead of closing.
+6. **Close the step** with `done <n> --commit <sha>` naming the CLAUDE.md
+   commit, or the head of the branch you read when it already had one, and a
+   note saying what the check command is and what could not be settled.
+
+## Setting up the routine
 
 1. On claude.ai, create a routine on knightx4/PersonalDashboard with the
    **Supabase** connector attached. It needs no schedule of its own, and no

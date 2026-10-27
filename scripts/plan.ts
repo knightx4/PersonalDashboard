@@ -21,6 +21,9 @@
  *                                # something only the person can supply: one
  *                                # setup job of theirs, under the feature that
  *                                # ran into it, and #<n> waits on it
+ *   npx tsx scripts/plan.ts project-ready <project id> --check "<command>" | --no-check
+ *                                # a project's set-up step found how its repository
+ *                                # is checked: record the command and the set-up time
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
  *                                # file one follow-on, marked as your suggestion
@@ -112,6 +115,7 @@ import {
   isPlanScope,
   planScopeLabel,
   planScopeOf,
+  projectById,
   projectsFromRows,
   repoForScope,
   storedScopeOf,
@@ -1435,6 +1439,37 @@ async function main(): Promise<void> {
         console.log(readable(line));
       }
       await checkRowWriting(sql, userId, row, { title, detail });
+      return;
+    }
+
+    /**
+     * A project's set-up step (plan #2553.6) found how its repository installs,
+     * tests and builds: the command goes on the project's row with the time,
+     * and every brief after this one tells the session to run it before
+     * merging (projectPreamble in lib/plan/handover.ts). --no-check records the
+     * set-up with no command, for a repository with nothing to run; the step
+     * says why.
+     */
+    if (command === 'project-ready') {
+      const usage = 'project-ready <project id> --check "<command>", or --no-check when it has nothing to run.';
+      const project = target ? projectById(projects, target.trim()) : undefined;
+      if (!project) {
+        fail(
+          `${target ? `"${target}" is not a project.` : 'Name the project.'} ${usage} ` +
+            `Projects: ${projects.map((p) => p.id).join(', ') || 'none'}.`,
+        );
+      }
+      const check = arg('--check')?.trim() || null;
+      if (!check && !has('--no-check')) fail(usage);
+      if (check && check.length > 500) fail('The check command holds at most 500 characters.');
+      await sql`
+        update dev_projects set check_command = ${check}, set_up_at = now()
+        where user_id = ${userId} and id = ${project.id}`;
+      console.log(
+        check
+          ? `${project.label} is set up. Its check command is now \`${check}\`, and every brief after this carries it.`
+          : `${project.label} is set up with no check command. Say on the step why there is none.`,
+      );
       return;
     }
 

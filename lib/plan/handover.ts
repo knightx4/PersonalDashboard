@@ -116,6 +116,13 @@ export function projectPreamble(project: DevProject): string {
     ? `Before merging a closed step to ${branch} there, run \`${project.checkCommand}\` in that ` +
       'repository and merge only when it passes; then push. '
     : `Merge each closed step to ${branch} there and push. `;
+  // Until its set-up step closes, nothing records how the repository is
+  // checked (plan #2553.6, lib/plan/project-setup.ts).
+  const setUp = project.setUpAt
+    ? ''
+    : `${project.label} has not been set up for Dash yet. If this step is under its Set up feature, ` +
+      'follow "Setting up a new project" in project-routine.md and record what you find with ' +
+      `npx tsx scripts/plan.ts project-ready ${project.id} --check "<command>". `;
   return (
     `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
     'dashboard this session checked out. Follow .claude/skills/plan/reference/project-routine.md. ' +
@@ -123,7 +130,7 @@ export function projectPreamble(project: DevProject): string {
     'register_repo_root on the clone, and build there: the code, the commits and the checks are ' +
     `that repository's, and its ${project.skill} says how a step is built in it. ` +
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
-    `both. ${check}` +
+    `both. ${check}${setUp}` +
     'If add_repo is refused, do not build anywhere else: write a setup step for the person with ' +
     'the remedy the tool returned, as project-routine.md says, and stop.\n\n'
   );

@@ -6,8 +6,9 @@
  * newest pushed first. Choosing one reads the repository from GitHub (its
  * default branch, description and homepage) and writes a `dev_projects` row
  * (migration 0282), so the project has its own section on /dev/plan on the
- * next draw. Ask Dash's `add_project` goes through the same `addDevProject`,
- * so the two cannot drift apart.
+ * next draw, with a "Set up" feature and its first ready step in it
+ * (lib/plan/project-setup.ts, plan #2553.6). Ask Dash's `add_project` goes
+ * through the same `addDevProject`, so the two cannot drift apart.
  *
  * A fine-grained token can be limited to chosen repositories. One limited to
  * this repository lists only this repository, and the picker says which
@@ -24,6 +25,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isModuleId } from '@/lib/modules';
 import { ask, readToken, REPO_KEY } from './github';
 import { loadDevProjects, projectFromRow, PROJECT_COLUMNS, type DevProject } from './projects';
+import { writeSetUpSteps } from './project-setup';
 
 /** One repository as the picker lists it. */
 export type GithubRepository = {
@@ -49,7 +51,16 @@ export type RepositoryListing = {
 
 /** What adding a repository came to. */
 export type AddProjectResult =
-  | { ok: true; project: DevProject; restored: boolean }
+  | {
+      ok: true;
+      project: DevProject;
+      restored: boolean;
+      /**
+       * The set-up step written under the new project (lib/plan/project-setup),
+       * or why it was not. Null for a project put back, whose rows are kept.
+       */
+      setUp: { number: number } | { error: string } | null;
+    }
   | { ok: false; error: string };
 
 /** What a database client must offer here: the person's own client, or Dash's. */
@@ -262,7 +273,9 @@ export async function addDevProject(input: {
     if (error) return { ok: false, error: `${existing.label} could not be put back: ${error.message}` };
     const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
     const project = row ? projectFromRow(row) : null;
-    return project ? { ok: true, project, restored: true } : { ok: false, error: `${existing.label} could not be put back.` };
+    return project
+      ? { ok: true, project, restored: true, setUp: null }
+      : { ok: false, error: `${existing.label} could not be put back.` };
   }
 
   const token = input.token === undefined ? readToken() : input.token;
@@ -307,9 +320,17 @@ export async function addDevProject(input: {
   }
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
   const project = row ? projectFromRow(row) : null;
-  return project
-    ? { ok: true, project, restored: false }
-    : { ok: false, error: `${repository.fullName} was added but could not be read back.` };
+  if (!project) return { ok: false, error: `${repository.fullName} was added but could not be read back.` };
+  // The project stands without its set-up step, so a step that was not
+  // written is reported rather than taking the project back out.
+  const written = await writeSetUpSteps({ db: input.db, userId: input.userId, project });
+  if ('error' in written) console.error(`${project.label}: ${written.error}`);
+  return {
+    ok: true,
+    project,
+    restored: false,
+    setUp: 'error' in written ? written : { number: written.number },
+  };
 }
 
 /** Put a project away: off the plan and its page, its rows kept. */

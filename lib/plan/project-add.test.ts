@@ -144,6 +144,43 @@ describe('addDevProject', () => {
     });
   });
 
+  it('files a Set up feature with one ready step under the new project (plan #2553.6)', async () => {
+    const tables: FakeTables = { 'public.dev_projects': [], 'public.plan_items': [] };
+    const result = await addDevProject({
+      db: db(tables),
+      userId: ME,
+      repository: { owner: 'knightx4', repo: 'recipes' },
+      token: 't',
+      fetch: github({ '/repos/knightx4/recipes': recipes }),
+    });
+    expect(result).toMatchObject({ ok: true, restored: false });
+    if (result.ok) expect(result.setUp).not.toHaveProperty('error');
+    const [feature, step] = tables['public.plan_items'];
+    expect(feature).toMatchObject({ user_id: ME, module: 'recipes', parent_id: null, title: 'Set up', status: 'not_started' });
+    expect(step).toMatchObject({
+      user_id: ME,
+      module: 'recipes',
+      parent_id: feature.id,
+      title: 'Make knightx4/recipes ready for Dash to build in',
+      status: 'not_started',
+      kind: 'build',
+    });
+    expect(step.detail).toContain('project-ready recipes --check');
+    expect(step.acceptance).toContain('CLAUDE.md on trunk');
+  });
+
+  it('writes no set-up step for a project put back', async () => {
+    const tables: FakeTables = {
+      'public.dev_projects': [
+        { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
+      ],
+      'public.plan_items': [],
+    };
+    const result = await addDevProject({ db: db(tables), userId: ME, repository: { owner: 'knightx4', repo: 'recipes' }, token: 't' });
+    expect(result).toMatchObject({ ok: true, restored: true, setUp: null });
+    expect(tables['public.plan_items']).toEqual([]);
+  });
+
   it('refuses one already added, and this app', async () => {
     const tables: FakeTables = {
       'public.dev_projects': [{ id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'Recipes' }],

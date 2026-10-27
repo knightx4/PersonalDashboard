@@ -200,6 +200,51 @@ describe('undoDashAction', () => {
       });
     });
   });
+
+  describe('a Dev project Dash added (plan #2553.6)', () => {
+    const added: Row = { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: null };
+
+    function projectSetup(project: Row) {
+      const tables: Tables = {
+        'core.dash_actions': [
+          action({
+            kind: 'add_project',
+            subject_ref: 'public.dev_projects:recipes',
+            op: 'insert',
+            before_values: null,
+            after_values: added,
+            undo: { archive_project: true },
+          }),
+        ],
+        'public.dev_projects': [project],
+        // The set-up feature written with it, which a delete would strand.
+        'public.plan_items': [{ id: id(80), user_id: ME, module: 'recipes', title: 'Set up' }],
+      };
+      const client = fakeSchemaDb(tables);
+      const deps: DashActionDeps = {
+        userId: ME,
+        core: client('core'),
+        db: async (schema: AskSchema) => client(schema),
+        now: () => '2026-10-03T12:00:00Z',
+      };
+      return { tables, deps };
+    }
+
+    it('archives the project and keeps the set-up rows filed under it', async () => {
+      const { tables, deps } = projectSetup({ ...added });
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({ ok: true, action: { status: 'undone' } });
+      expect(tables['public.dev_projects'][0].archived_at).toBe('2026-10-03T12:00:00Z');
+      expect(tables['public.plan_items']).toHaveLength(1);
+    });
+
+    it('refuses a project archived already', async () => {
+      const { deps } = projectSetup({ ...added, archived_at: '2026-10-02T00:00:00Z' });
+      expect(await undoDashAction(deps, ACTION)).toMatchObject({
+        ok: false,
+        error: 'It has been archived already, so there is nothing to undo.',
+      });
+    });
+  });
 });
 
 describe('planUndo', () => {
