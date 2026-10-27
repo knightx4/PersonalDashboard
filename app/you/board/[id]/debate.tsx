@@ -118,7 +118,7 @@ function tally(turns: readonly DebateTurn[]): string {
 
 const ROUND_TITLES: Record<Round, string> = {
   1: 'Round 1: openings',
-  2: 'Round 2: exchanges',
+  2: 'Round 2: what they said to each other',
   3: 'Round 3: the vote',
 };
 
@@ -254,12 +254,13 @@ export function QuestionDebate({
             if (!turns.length) return null;
             const backing = round === 2 ? '' : tally(turns);
             // A round folds away by its heading. While the meeting runs every
-            // round is open; once it is over they start folded, so each
-            // question reads as its options, scores, rounds and verdict.
+            // round is open. Once it is over the openings and the vote fold,
+            // and the exchanges stay open: what the advisors said to each
+            // other is what the person comes to the page to read.
             return (
               <Disclosure
                 key={round}
-                defaultOpen={running}
+                defaultOpen={running || round === 2}
                 title={<span className="font-semibold">{ROUND_TITLES[round]}</span>}
                 meta={
                   <span className="tabular">
