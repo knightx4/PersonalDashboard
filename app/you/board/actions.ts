@@ -7,6 +7,7 @@ import { boardRoutine } from '@/lib/feedback/routine';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
+import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { callBoardMeeting } from '@/lib/you/board-start';
 import {
   cleanQuestion,
@@ -365,5 +366,68 @@ export async function conveneQuestion(id: string): Promise<{ error: string | nul
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The meeting did not start. Try again.' };
+  }
+}
+
+/**
+ * Add a guest advisor by name (plan #2561.7): the row is saved building and
+ * the board routine is fired to build the brain from their public work
+ * (.claude/skills/board/advisor-brain.md). A build that could not start leaves
+ * the row failed with the reason, and the Advisors view offers a retry.
+ */
+// latency: pending
+export async function addBoardAdvisor(input: {
+  name: string;
+  focus?: string | null;
+}): Promise<{ error: string | null; saved?: boolean }> {
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await addAdvisor({
+      client,
+      userId: user.id,
+      name: input.name,
+      focus: input.focus,
+      routine: boardRoutine(),
+    });
+    revalidatePath('/you/board');
+    revalidatePath('/you/board/advisors');
+    return { error: result.error, saved: Boolean(result.advisorId) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The advisor was not added. Try again.' };
+  }
+}
+
+/** Build a failed brain again. */
+// latency: pending
+export async function retryAdvisorBrain(advisorId: string): Promise<{ error: string | null }> {
+  if (!meetingId.safeParse(advisorId).success) return { error: 'That is not one of your advisors.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await retryBuild({ client, userId: user.id, advisorId, routine: boardRoutine() });
+    revalidatePath('/you/board/advisors');
+    return { error: result.started ? null : result.error };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The build did not start. Try again.' };
+  }
+}
+
+/** Let the chair bring a guest in, or keep them out. */
+// latency: pending
+export async function setAdvisorActive(
+  advisorId: string,
+  active: boolean,
+): Promise<{ error: string | null }> {
+  if (!meetingId.safeParse(advisorId).success) return { error: 'That is not one of your advisors.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await setActive({ client, userId: user.id, advisorId, active });
+    revalidatePath('/you/board');
+    revalidatePath('/you/board/advisors');
+    return result;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
   }
 }

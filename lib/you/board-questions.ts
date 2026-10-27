@@ -133,14 +133,14 @@ export async function loadBoardQuestion(
   return data ? questionOf(data as Record<string, unknown>) : null;
 }
 
-/** The active roster, the five seats first and then the guests, each in name order. */
+/** The roster that can sit: the five seats first, then the guests with a ready brain, each in name order. */
 export async function listBoardAdvisors(
   client: YouSupabaseClient,
   userId: string,
 ): Promise<BoardAdvisor[]> {
   const { data, error } = await client
     .from('board_advisors')
-    .select('key, name, kind, focus')
+    .select('key, name, kind, focus, brain_status')
     .eq('user_id', userId)
     .eq('active', true);
   if (error) throw new Error(error.message);
@@ -150,6 +150,8 @@ export async function listBoardAdvisors(
       const key = text(r.key);
       const name = text(r.name);
       if (!key || !name) return [];
+      // A guest sits only on a ready brain (.claude/skills/board/SKILL.md), so one still being built is not offered.
+      if (r.kind !== 'seat' && r.brain_status !== 'ready') return [];
       return [{ key, name, kind: r.kind === 'seat' ? 'seat' : 'guest', focus: text(r.focus) || null } as BoardAdvisor];
     }),
   );
@@ -157,8 +159,8 @@ export async function listBoardAdvisors(
 
 const SEAT_ORDER = ['hiring_manager', 'mentor', 'skeptic', 'cfo', 'dreamer'];
 
-export function sortAdvisors(advisors: readonly BoardAdvisor[]): BoardAdvisor[] {
-  const rank = (a: BoardAdvisor) => (a.kind === 'seat' ? SEAT_ORDER.indexOf(a.key) : 99);
+export function sortAdvisors<T extends BoardAdvisor>(advisors: readonly T[]): T[] {
+  const rank = (a: T) => (a.kind === 'seat' ? SEAT_ORDER.indexOf(a.key) : 99);
   return [...advisors].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 }
 

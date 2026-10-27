@@ -4,7 +4,9 @@ import { Users } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { ListRow } from '@/components/patterns/list-detail';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import Link from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { formatDateTime } from '@/lib/jobs/applications/load';
@@ -70,7 +72,19 @@ export function BoardListView({
   const running = states.some((state) => state.kind === 'running');
   useRefreshWhileRunning(running);
   const ask = useAskBoard({ advisors, actions, start });
-  const header = <PageHeader title="Board" actions={ask.button} />;
+  const header = (
+    <PageHeader
+      title="Board"
+      actions={
+        <>
+          <Link href="/you/board/advisors" className={buttonVariants({ variant: 'ghost' })}>
+            Advisors
+          </Link>
+          {ask.button}
+        </>
+      }
+    />
+  );
   const nextDay = meetingDayLabel(nextMeeting);
 
   const suggestions = questions.filter((q) => q.status === 'suggested');
