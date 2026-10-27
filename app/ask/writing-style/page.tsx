@@ -1,6 +1,8 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { ConversationChat } from '@/components/patterns/conversation';
 import { Markdown } from '@/components/ui/markdown';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { whenDate } from '@/lib/core/when';
 import { CHATS_BACK } from '../view';
 
 export const metadata = { title: 'Writing style' };
@@ -19,8 +21,8 @@ type WritingStyleRow = {
  * it is drawn over the list with the way back above its title.
  */
 export default async function WritingStylePage() {
-  await requireUser();
-  const client = await createClient();
+  const user = await requireUser();
+  const [settings, client] = await Promise.all([loadAccountSettings(user.id), createClient()]);
   // The request's own session: core.writing_style is read under RLS.
   const { data, error } = await client
     .schema('core')
@@ -31,14 +33,14 @@ export default async function WritingStylePage() {
 
   return (
     <ConversationChat title="Writing style" back={CHATS_BACK} fill>
-      <div className="mx-auto w-full max-w-3xl py-4">
+      <div className="max-w-prose py-4">
         {error ? (
           <p className="text-small text-danger">Your writing style could not be read. Reload to try again.</p>
         ) : row ? (
           <>
             <p className="mb-4 text-small text-ink-muted">
               {row.read_from}: {row.messages_read} messages read. Written{' '}
-              {new Date(row.updated_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+              {whenDate(row.updated_at, { timeZone: settings.timezone, month: 'long' })}.
             </p>
             <Markdown markdown={row.body} className="vault-prose" />
           </>

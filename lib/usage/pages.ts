@@ -7,6 +7,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/account/spend',
   '/ask',
   '/ask/[ref]',
+  '/ask/writing-style',
   '/auth/auth-code-error',
   '/dev',
   '/dev/bugs',
