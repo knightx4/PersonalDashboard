@@ -9,6 +9,7 @@ import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
 import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
+import { answerAsk, answerError } from '@/lib/you/board-asks';
 import {
   DECIDABLE,
   decideBoardQuestion,
@@ -390,5 +391,33 @@ export async function setAdvisorActive(
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
+  }
+}
+
+/**
+ * Answer one of the board's questions to the person (plan #2561.11). The
+ * answer is kept on the board question the ask belongs to and the next meeting
+ * reads it first (.claude/skills/board/SKILL.md). A blank answer takes it off.
+ */
+// latency: pending
+export async function answerBoardAsk(
+  questionId: string,
+  askId: string,
+  answer: string,
+): Promise<{ error: string | null }> {
+  const problem = answerError(answer);
+  if (problem) return { error: problem };
+  if (!meetingId.safeParse(questionId).success || !askId || askId.length > 40)
+    return { error: 'That is not a question the board asked.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await answerAsk(client, user.id, questionId, askId, answer);
+    if (result === 'missing') return { error: 'That question is no longer on your board.' };
+    if (result === 'changed') return { error: 'This question changed while you were looking. Read the page again.' };
+    revalidatePath('/you/board');
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
   }
 }

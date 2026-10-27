@@ -226,6 +226,22 @@ step 9) and its `dream`. Then:
   A `deferred` question with a note was put off by the person, and a
   `dismissed` one turned down; the note says why. Their notes bind the
   agenda and the pack as much as a decision does.
+- **Answers to the board's questions, read first.** The board leaves
+  questions for the person on the question they are about (`asks`, step 4).
+  Read every ask that has an answer no meeting has read yet:
+
+  ```sql
+  select q.id, q.question, q.status, q.verdict->'assumptions' as assumptions, a.ask
+  from you.board_questions q, jsonb_array_elements(q.asks) as a(ask)
+  where q.user_id = '<user_id>' and q.status <> 'dismissed'
+    and a.ask->>'answer' is not null and a.ask->>'read_in' is null;
+  ```
+
+  Treat each answer as a fact from the person, ahead of the pack: quote it in
+  the question's section of `week.md`. If a question's verdict listed an
+  assumption the answer overturns, that question comes back to the agenda
+  (step 2). After the meeting's questions are written, mark each answer read
+  (step 9).
 - **Decisions.** A question `decided` since the last meeting is settled:
   `decided_option` and `decision_note` are the person's. Do not debate it
   again unless something in this week's pack changes it, and open `since`
@@ -264,6 +280,25 @@ from you.board_questions
 where user_id = '<user_id>' and status in ('queued', 'suggested') and meeting_id is null
 order by (source = 'person') desc, (status = 'queued') desc, created_at;
 ```
+
+**Reopening.** A question whose verdict named an assumption that a new
+answer overturns goes on the agenda ahead of the three places, even if it is
+`discussing`, `deferred` or `decided`. Put it back, keeping the old verdict
+and the person's earlier choice in the row, and say in `chair_note` which
+answer reopened it and what the earlier decision was:
+
+```sql
+select core.dash_before('you.board_questions:<id>');
+update you.board_questions
+set status = 'queued', meeting_id = null, decided_at = null
+where id = '<id>' and user_id = '<user_id>' and status in ('discussing', 'deferred', 'decided');
+select core.record_dash_action('<user_id>', 'you.board_questions:<id>', 'update',
+  'board_question_reopened', $s$Dash reopened "<question>" because your answer changes an assumption.$s$);
+```
+
+A question the person decided is reopened only when the answer plainly
+contradicts an assumption the verdict rested on; otherwise their decision
+stands. Then claim it as below.
 
 A question that waits past three places stays `queued` for the next
 meeting. A `deferred` question comes back only when the person queues it
@@ -369,6 +404,34 @@ fills what it can from the person's rows:
 Write all four into the question's section of `week.md`, with the person's
 `context` quoted first. Leave their `question`, `context` and `lean` as they
 wrote them.
+
+**Missing facts: assume, then ask.** Never hold a meeting back for a missing
+fact. When something that would change the verdict is not in the person's
+rows or in their `context` (a budget, a deadline, what success looks like, a
+number only they know), write it down as an assumption in the question's
+section of `week.md`, and tell every advisor to debate on it as stated. The
+assumption is one sentence the person can read and say is wrong ("You need to
+be earning again by February"). Only facts that would change the verdict
+count: not what the pack could have found, and not what the person already
+answered.
+
+Also write one to three short questions for the person, one per missing
+fact, each answerable in a line. Put them on the question's row in `asks`
+(`id` a1, a2 and so on, unique within the question), keeping every ask
+already there:
+
+```sql
+update you.board_questions
+set asks = asks || $a$[{"id":"a1","text":"What do you need to earn each month to stay on this search?","asked_in":["<meeting id>"],"answer":null,"answered_at":null,"read_in":null}]$a$::jsonb
+where id = '<id>' and user_id = '<user_id>';
+```
+
+An ask from an earlier meeting with no answer is asked again: append this
+meeting's id to its `asked_in`, unless `asked_in` already holds three ids, in
+which case leave it alone and do not ask it again. Do not write a new ask the
+person already answered, and do not ask more than three in all for one
+question, counting the open ones. Asks are the board's own questions to the
+person, so they are not recorded as a change to their rows.
 
 **The lean.** If `lean` is set, the section says it in one line: "You lean
 toward B: <their words>." Every advisor is told to test the lean, not to
@@ -500,15 +563,27 @@ person reads.
 - `would_change`: one to three facts that, if they turned out otherwise,
   would change the recommendation.
 - `scores`: each advisor's round 3 scores, `{ advisor: <key>, scores: { … } }`.
+- `assumptions`: every assumption from step 4 that the debate rested on, as
+  the sentences the advisors were given. Leave it out when none was made.
 
 ```sql
 select core.dash_before('you.board_questions:<id>');
 update you.board_questions
 set verdict = $v${"recommended": "B", "conditions": ["…"], "dissent": [{"advisor": "cfo", "text": "…"}],
-                  "would_change": ["…"], "scores": [{"advisor": "mentor", "scores": {"A": 4, "B": 8}}]}$v$::jsonb
+                  "would_change": ["…"], "assumptions": ["…"], "scores": [{"advisor": "mentor", "scores": {"A": 4, "B": 8}}]}$v$::jsonb
 where id = '<id>' and user_id = '<user_id>';
 select core.record_dash_action('<user_id>', 'you.board_questions:<id>', 'update',
   'board_verdict', $s$The board recommends B on "<question>".$s$);
+```
+
+Then, for each agenda question, mark the answers this meeting read, so the tab stops showing them:
+
+```sql
+update you.board_questions
+set asks = (select jsonb_agg(case when e->>'answer' is not null and e->>'read_in' is null
+              then e || jsonb_build_object('read_in', '<meeting id>') else e end)
+            from jsonb_array_elements(asks) e)
+where id = '<id>' and user_id = '<user_id>' and asks <> '[]'::jsonb;
 ```
 
 The question stays `discussing` with its verdict until the person decides on
@@ -608,7 +683,7 @@ select core.record_dash_action('<user_id>', 'you.board_meetings:<meeting id>',
 advisor who sat on it, each with every option scored, and round 2 replies
 with `addressed_to` set, at least two each way between every pair; the
 question is `discussing` with a `verdict` whose `scores` name every advisor
-who voted. Three to five questions are `suggested` with this meeting's ids
+who voted, and any assumption it rested on is in `verdict.assumptions` with a matching ask on the row. Three to five questions are `suggested` with this meeting's ids
 in `minutes.suggested`. `minutes` has five `predictions` and five
 `scorecard` rows.
 

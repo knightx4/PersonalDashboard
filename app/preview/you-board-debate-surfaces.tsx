@@ -171,6 +171,23 @@ const decidedRows = questionRows.map((row, i) =>
 
 const turns = [...q1Turns, ...q2Turns];
 const debate = debateFrom(questionRows, turns, advisorRows, [Q1, Q2]);
+/** The first question's verdict with the assumptions the board made where it lacked facts (plan #2561.11). */
+const assumedRows = questionRows.map((row, i) =>
+  i === 0
+    ? {
+        ...row,
+        verdict: {
+          ...row.verdict,
+          assumptions: [
+            'The contract pays about £4,200 a month after tax, the figure in the recruiter’s email of 21 October.',
+            'You need to be earning again by February, since no savings figure has been entered.',
+            'Success means an offer in your field by spring, not only an income.',
+          ],
+        },
+      }
+    : row,
+);
+const assumedDebate = debateFrom(assumedRows, turns, advisorRows, [Q1, Q2]);
 const decidedDebate = debateFrom(decidedRows, turns, advisorRows, [Q1, Q2]);
 /** Still being held: the first question's first round so far, the second not reached. */
 const runningDebate = debateFrom(questionRows, q1Turns.slice(0, 4), advisorRows, [Q1, Q2]);
@@ -221,10 +238,13 @@ const actions: MeetingActions = {
 
 export function YouBoardDebatePreview({
   state = 'ready',
+  assumed = false,
   advisor,
   decision,
 }: {
   state?: 'ready' | 'running';
+  /** The first verdict names its assumptions. */
+  assumed?: boolean;
   /** Draw this advisor's thinking open. */
   advisor?: keyof typeof A;
   /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
@@ -246,7 +266,7 @@ export function YouBoardDebatePreview({
       }
       minutes={running ? parseMinutes(null) : minutes}
       marks={[]}
-      debate={running ? runningDebate : decision === 'made' || decision === 'open' ? decidedDebate : debate}
+      debate={running ? runningDebate : assumed ? assumedDebate : decision === 'made' || decision === 'open' ? decidedDebate : debate}
       scorecard={scorecardFrom([])}
       subject={{
         ref: null,

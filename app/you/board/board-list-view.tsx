@@ -26,6 +26,8 @@ import {
   type BoardDecision,
   type BoardQuestion,
 } from '@/lib/you/board-questions';
+import type { PersonAsk } from '@/lib/you/board-asks';
+import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-rows';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
@@ -40,11 +42,12 @@ import { useRefreshWhileRunning } from './refresh-while-running';
  * on its own page (./[id]).
  */
 
-export type BoardListActions = AskActions & QuestionActions;
+export type BoardListActions = AskActions & QuestionActions & { answerAsk: AskAnswerAction };
 
 export function BoardListView({
   meetings,
   questions = [],
+  asks = [],
   advisors = [],
   decisions = [],
   nextMeeting,
@@ -52,10 +55,13 @@ export function BoardListView({
   now,
   actions,
   start,
+  asksError,
 }: {
   meetings: readonly BoardMeetingRow[];
   /** Their suggested and open questions (listBoardQuestions). */
   questions?: readonly BoardQuestion[];
+  /** What the board asks them, unanswered or answered and not yet read (listBoardAsks). */
+  asks?: readonly PersonAsk[];
   /** The active roster, for the compose card's advisors. */
   advisors?: readonly BoardAdvisor[];
   /** Every question they decided, newest first (listDecisions). */
@@ -68,6 +74,8 @@ export function BoardListView({
   actions: BoardListActions;
   /** Where the press starts. Only the gallery sets it. */
   start?: AskStart;
+  /** A failed answer to draw on the first ask. Only the gallery sets it. */
+  asksError?: string;
 }) {
   const states = meetings.map((meeting) => meetingState(meeting, now));
   const running = states.some((state) => state.kind === 'running');
@@ -91,7 +99,7 @@ export function BoardListView({
   const suggestions = questions.filter((q) => q.status === 'suggested');
   const asked = questions.filter((q) => q.status !== 'suggested');
 
-  if (meetings.length === 0 && questions.length === 0 && decisions.length === 0) {
+  if (meetings.length === 0 && questions.length === 0 && asks.length === 0 && decisions.length === 0) {
     return (
       <PageColumn>
         {header}
@@ -122,6 +130,19 @@ export function BoardListView({
       {ask.form && <div className="mb-4">{ask.form}</div>}
       <Card padding="none">
         <ul className="divide-y divide-border">
+          {asks.length > 0 && (
+            <Group title="The board asks you" count={asks.length}>
+              {groupByQuestion(asks).map((group, index) => (
+                <AskQuestionRow
+                  key={group.questionId}
+                  question={group.question}
+                  asks={group.asks}
+                  answer={actions.answerAsk}
+                  errorOn={index === 0 ? (asksError ?? null) : null}
+                />
+              ))}
+            </Group>
+          )}
           {suggestions.length > 0 && (
             <Group title="Suggested by the board" count={suggestions.length}>
               {suggestions.map((question) => (

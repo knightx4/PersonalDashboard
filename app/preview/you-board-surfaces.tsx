@@ -14,6 +14,7 @@ import {
   type MeetingActions,
   type MeetingOpen,
 } from '@/app/you/board/[id]/meeting-view';
+import type { PersonAsk } from '@/lib/you/board-asks';
 import {
   parseMinutes,
   scorecardFrom,
@@ -517,7 +518,42 @@ const decisions: BoardDecision[] = [
   },
 ];
 
+/** What the board asks: a first ask, one asked a second time, one answered and waiting on the next meeting, one with a long question. */
+const boardAsks: PersonAsk[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e5',
+    question: CONTRACT_QUESTION,
+    id: 'a1',
+    text: 'What do you need to earn each month to stay on this search without borrowing?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b1'],
+    answer: null,
+    answeredAt: null,
+    readIn: null,
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e5',
+    question: CONTRACT_QUESTION,
+    id: 'a2',
+    text: 'By what date do you want an offer in your field, if the contract is not taken?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b0', '00000000-0000-4000-8000-0000000000b1'],
+    answer: null,
+    answeredAt: null,
+    readIn: null,
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e3',
+    question: 'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    id: 'a1',
+    text: 'Has the bank said when it will decide, and does the fintech know about the bank?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b1'],
+    answer: 'The bank decides by Friday 13 November. The fintech does not know.',
+    answeredAt: '2026-11-02T08:15:00Z',
+    readIn: null,
+  },
+];
+
 const listActions: BoardListActions = {
+  answerAsk: async () => ({ error: null }),
   ask: async () => ({ error: null, queued: true }),
   accept: async () => ({ error: null }),
   dismiss: async () => ({ error: null }),
@@ -528,7 +564,7 @@ export function YouBoardListPreview({
   state = 'ready',
   start,
 }: {
-  state?: 'ready' | 'running' | 'empty';
+  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error';
   start?: AskStart;
 }) {
   const meetings =
@@ -573,12 +609,14 @@ export function YouBoardListPreview({
       meetings={meetings}
       questions={questions}
       advisors={advisors}
+      asks={state === 'asks' || state === 'asks-error' ? boardAsks : []}
       decisions={state === 'empty' ? [] : decisions}
       nextMeeting="2026-11-08"
       timezone="Europe/London"
       now={NOW}
       actions={listActions}
       start={start}
+      asksError={state === 'asks-error' ? 'This question changed while you were looking. Read the page again.' : undefined}
     />
   );
 }

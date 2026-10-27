@@ -50,6 +50,9 @@ export function VerdictCard({
       {verdict.conditions.length > 0 && (
         <VerdictList title="On these conditions" items={verdict.conditions} />
       )}
+      {verdict.assumptions.length > 0 && (
+        <VerdictList title="Assumed, because the board did not know" items={verdict.assumptions} />
+      )}
       {verdict.dissent.length > 0 && (
         <div className="space-y-1">
           <p className="text-small font-medium text-ink-muted">Dissent</p>

@@ -9537,6 +9537,43 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* What the board asks the person (plan #2561.11): answer boxes under The
+     * board asks you, one asked a second time, one answered and waiting for
+     * the next meeting; and the same with a failed save. */
+    id: 'you-board-asks',
+    label: 'You · Board, the board asks you questions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="asks" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-asks-error',
+    label: 'You · Board, an answer to the board that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="asks-error" />
+      </div>
+    ),
+  },
+  {
+    /* A verdict that names its assumptions (plan #2561.11). */
+    id: 'you-board-meeting-assumed',
+    label: 'You · Board, a verdict resting on stated assumptions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview assumed />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-empty',
     label: 'You · Board, nothing asked, suggested or held yet',
     module: 'you',

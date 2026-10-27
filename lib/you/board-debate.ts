@@ -49,6 +49,8 @@ export type BoardVerdict = {
   conditions: string[];
   dissent: { advisor: string; text: string }[];
   wouldChange: string[];
+  /** What the board took as given where a fact was missing (plan #2561.11). */
+  assumptions: string[];
   /** Each advisor's final score per option, by advisor key. */
   scores: { advisor: string; scores: Scores }[];
 };
@@ -141,6 +143,7 @@ export function verdictOf(value: unknown): BoardVerdict | null {
       return advisor && said ? [{ advisor, text: said }] : [];
     }),
     wouldChange: texts(row.would_change),
+    assumptions: texts(row.assumptions),
     scores: list(row.scores).flatMap((entry) => {
       const s = record(entry);
       const advisor = text(s?.advisor);
