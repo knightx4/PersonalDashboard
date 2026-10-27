@@ -210,7 +210,8 @@ export const youSources: ModuleSources = {
       note:
         'options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. ' +
         'source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. ' +
-        'verdict is the board\'s recommendation, written by Dash, so cite their decision rather than the verdict (you 0022).',
+        'verdict is the board\'s recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). ' +
+        'reviews is the board checking back 30 and 90 days after the decision: account is Dash\'s, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026).',
     },
   ],
   notSources: [

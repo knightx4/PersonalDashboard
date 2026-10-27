@@ -383,6 +383,8 @@ export type BoardDecision = {
   note: string | null;
   decidedAt: string;
   meetingId: string | null;
+  /** The check-backs written so far, by days after the decision (plan #2561.8). */
+  reviewed?: number[];
 };
 
 export function decisionOf(row: Record<string, unknown>): BoardDecision | null {
@@ -402,6 +404,9 @@ export function decisionOf(row: Record<string, unknown>): BoardDecision | null {
     note: text(row.decision_note) || null,
     decidedAt: row.decided_at,
     meetingId: typeof row.meeting_id === 'string' ? row.meeting_id : null,
+    reviewed: Array.isArray(row.reviews)
+      ? row.reviews.flatMap((r) => (r && typeof r === 'object' && typeof (r as { at?: unknown }).at === 'number' ? [(r as { at: number }).at] : []))
+      : [],
   };
 }
 
@@ -412,7 +417,7 @@ export async function listDecisions(
 ): Promise<BoardDecision[]> {
   const { data, error } = await client
     .from('board_questions')
-    .select('id, question, options, verdict, decided_option, decision_note, decided_at, meeting_id')
+    .select('id, question, options, verdict, decided_option, decision_note, decided_at, meeting_id, reviews')
     .eq('user_id', userId)
     .eq('status', 'decided')
     .order('decided_at', { ascending: false })

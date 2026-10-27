@@ -15,6 +15,7 @@ import {
   type MeetingOpen,
 } from '@/app/you/board/[id]/meeting-view';
 import type { PersonAsk } from '@/lib/you/board-asks';
+import type { DecisionReview } from '@/lib/you/board-reviews';
 import {
   parseMinutes,
   scorecardFrom,
@@ -552,8 +553,60 @@ const boardAsks: PersonAsk[] = [
   },
 ];
 
+/** The board checking back (plan #2561.8): a 30-day check-back with receipts, and a 90-day one on a long question. */
+export const boardReviews: DecisionReview[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e9',
+    question: 'Should I take the part-time analytics contract while I keep searching, or hold out for a permanent role?',
+    options: [
+      { letter: 'A', text: 'Take the contract, three days a week' },
+      { letter: 'B', text: 'Hold out for a permanent role' },
+    ],
+    chosen: 'A',
+    option: 'A',
+    decidedAt: '2026-10-02T19:10:00Z',
+    topic: 'work',
+    at: 30,
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+    writtenAt: '2026-11-01T18:55:00Z',
+    account:
+      'You started the contract on 5 October. Since then you sent 9 applications, down from 14 in the month before, and two reached a first interview. The contract paid £3,120 in October, which covered rent and the course with £410 left.',
+    receipts: [
+      { label: 'Roles, 9 applied since 5 Oct', link: '/jobs/roles' },
+      { label: 'Money, October', link: '/money' },
+    ],
+    ask: 'Taking the contract slowed the search and covered the month. Did it go well?',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000ea',
+    question: 'Should I move the Saturday course to the evening cohort so weekends stay free for the studio?',
+    options: [
+      { letter: 'A', text: 'Move to the evening cohort' },
+      { letter: 'B', text: 'Keep Saturdays' },
+    ],
+    chosen: 'B',
+    option: 'B',
+    decidedAt: '2026-08-03T09:00:00Z',
+    topic: 'learning',
+    at: 90,
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+    writtenAt: '2026-11-01T18:56:00Z',
+    account:
+      'You kept Saturdays. Your course log shows 11 of 12 sessions attended, and the studio goal has no entry since 14 September.',
+    receipts: [{ label: 'Studio goal', link: '/goals' }],
+    ask: 'Keeping Saturdays held the course and stalled the studio. How did it go?',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+  },
+];
+
 const listActions: BoardListActions = {
   answerAsk: async () => ({ error: null }),
+  answerReview: async () => ({ error: null }),
   ask: async () => ({ error: null, queued: true }),
   accept: async () => ({ error: null }),
   dismiss: async () => ({ error: null }),
@@ -564,7 +617,7 @@ export function YouBoardListPreview({
   state = 'ready',
   start,
 }: {
-  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error';
+  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error' | 'reviews' | 'reviews-error';
   start?: AskStart;
 }) {
   const meetings =
@@ -617,6 +670,8 @@ export function YouBoardListPreview({
       actions={listActions}
       start={start}
       asksError={state === 'asks-error' ? 'This question changed while you were looking. Read the page again.' : undefined}
+      reviews={state === 'reviews' || state === 'reviews-error' ? boardReviews : []}
+      reviewError={state === 'reviews-error' ? 'Your answer was not saved. Try again.' : undefined}
     />
   );
 }
