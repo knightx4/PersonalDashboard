@@ -297,6 +297,31 @@ describe('endQuietRuns', () => {
     ]);
   });
 
+  it("judges a project's run on the clock, since it pushes to another repository", async () => {
+    // Its step's root is a project's: the listing here cannot speak for it.
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'site-step', created_at: minutesAgo(300) },
+    ]);
+    const asked: string[][] = [];
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      // A push here four minutes ago would keep this app's run going.
+      pushes: pushes({ ref: 'claude/one', minutes: 4 }),
+      readProjectSteps: async (ids) => {
+        asked.push([...ids]);
+        return new Set(['site-step']);
+      },
+    });
+
+    expect(asked).toEqual([['site-step']]);
+    expect(result.failed).toBe(1);
+    expect(updates[0]).toMatchObject({ values: { status: 'failed' }, ids: ['run-1'] });
+    expect(String(updates[0].values.error)).not.toContain('pushed');
+  });
+
   it('finishes a run whose step closed after it was fired', async () => {
     const { supabase, updates } = db(
       [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
@@ -646,6 +671,26 @@ describe('readRunLiveness', () => {
       abandoned: false,
     });
     expect(steps['step-1'].lastPush?.ref).toBe('claude/one');
+    vi.unstubAllEnvs();
+  });
+
+  it("reads no push for a project's step, whatever was pushed here", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const supabase = db(
+      [{ id: 'site-step', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'site-step', created_at: minutesAgo(45) }],
+    );
+
+    const { steps } = await readRunLiveness({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+      readProjectSteps: async () => new Set(['site-step']),
+    });
+
+    expect(steps['site-step'].lastPush).toBeNull();
+    expect(steps['site-step'].liveness).not.toBe('working');
     vi.unstubAllEnvs();
   });
 

@@ -177,30 +177,44 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
- * The routine that builds a project's steps (lib/plan/projects) -- "Send to
- * Dash" on a row in that project's section of /dev/plan.
+ * The one routine that builds every project's steps (plan #2553.3), so a new
+ * project needs nothing set up on claude.ai. It checks out this repository,
+ * adds the project's repository to the session, and builds there; its
+ * standing prompt is .claude/skills/plan/reference/project-routine.md.
  *
- * No fallback to the plan routine: that one checks out this repository, and a
- * step for another repository built here would be built in the wrong place.
+ * No fallback to the plan routine or the shared token: the plan routine
+ * builds in this repository, and a project's step built there would land in
+ * the wrong place. With either unset a project with no routine of its own is
+ * refused and nothing starts.
  */
-export function projectRoutine(project: DevProject): RoutineTarget {
-  // A project with no routine of its own names no variables, and has no id.
-  const env = project.routineEnv;
+export function projectsRoutine(): RoutineTarget {
   return {
-    id: env ? firstSet(process.env[env.id]) : null,
-    token: firstSet(env ? process.env[env.token] : undefined, process.env.CLAUDE_API_KEY),
+    id: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_TOKEN),
   };
 }
 
 /**
- * The routine ids that build projects, for the sweeps that judge a run by
- * what it pushed here: a project's run pushes to its own repository, so the
- * silence here says nothing about it.
+ * The routine of a project's own, when its row names one and the deployment
+ * sets its id: the override the website keeps until the shared routine has
+ * built one of its steps (#2553.4). Its token falls back to the shared one,
+ * as it did before there was a shared routine.
  */
-export function projectRoutineIds(projects: readonly DevProject[]): ReadonlySet<string> {
-  return new Set(
-    projects.map((project) => projectRoutine(project).id).filter((id): id is string => !!id),
-  );
+export function ownProjectRoutine(project: DevProject): RoutineTarget | null {
+  const env = project.routineEnv;
+  const id = env ? firstSet(process.env[env.id]) : null;
+  if (!env || !id) return null;
+  return { id, token: firstSet(process.env[env.token], process.env.CLAUDE_API_KEY) };
+}
+
+/**
+ * The routine that builds a project's steps (lib/plan/projects) -- "Send to
+ * Dash" on a row in that project's section of /dev/plan, a reply to a run's
+ * question, and the overnight runner: the project's own when it has one, and
+ * the shared projects routine otherwise.
+ */
+export function projectRoutine(project: DevProject): RoutineTarget {
+  return ownProjectRoutine(project) ?? projectsRoutine();
 }
 
 /**

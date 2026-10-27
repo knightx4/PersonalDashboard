@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   activeProjects,
   isAppScope,
   isPlanScope,
   isProjectScope,
+  loadProjectStepIds,
   planScopeLabel,
   planScopeOf,
   planScopes,
@@ -15,7 +16,7 @@ import {
   storedScopeOf,
 } from './projects';
 import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from './project-fixtures';
-import { projectRoutine, projectRoutineIds } from '@/lib/feedback/routine';
+import { projectRoutine } from '@/lib/feedback/routine';
 
 const ARCHIVED = { ...WEBSITE_FIXTURE, id: 'old-site', label: 'Old site', archivedAt: '2026-10-01T00:00:00Z' };
 
@@ -50,11 +51,91 @@ describe('project rows', () => {
     ]);
   });
 
-  it('has no routine of its own when the row names no variables', () => {
+  it('goes to the shared projects routine when the row names no variables', () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
     const plain = projectFromRow({ ...WEBSITE_ROW, id: 'blog', routine_id_env: null, routine_token_env: null })!;
     expect(plain.routineEnv).toBeNull();
-    expect(projectRoutine(plain).id).toBeNull();
-    expect(projectRoutineIds([plain]).size).toBe(0);
+    expect(projectRoutine(plain)).toEqual({ id: 'trig_projects', token: 'projects-token' });
+  });
+
+  it("prefers a project's own routine while its id is set, and falls back once it is not", () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'site-token');
+    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'trig_site', token: 'site-token' });
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
+    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'trig_projects', token: 'projects-token' });
+  });
+
+  it('never falls back to the plan routine or the shared token', () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', '');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_plan');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_feature');
+    vi.stubEnv('CLAUDE_API_KEY', 'shared');
+    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: null, token: null });
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+/** A client answering `plan_items` reads from these rows, by the ids asked for. */
+function planItemsClient(
+  rows: Array<{ id: string; parent_id: string | null; module: string | null }>,
+  calls: string[][] = [],
+) {
+  return {
+    from: () => {
+      let ids: string[] = [];
+      const query = {
+        select: () => query,
+        eq: () => query,
+        in: (_column: string, values: string[]) => {
+          ids = values;
+          calls.push(values);
+          return query;
+        },
+        then: (resolve: (value: unknown) => void) =>
+          resolve({ data: rows.filter((row) => ids.includes(row.id)), error: null }),
+      };
+      return query;
+    },
+  } as never;
+}
+
+describe('the steps under a project', () => {
+  const rows = [
+    { id: 'site', parent_id: null, module: 'website' },
+    { id: 'site-feature', parent_id: 'site', module: 'website' },
+    { id: 'site-step', parent_id: 'site-feature', module: null },
+    { id: 'app', parent_id: null, module: 'dev' },
+    { id: 'moved', parent_id: 'app', module: 'website' },
+  ];
+
+  it("reads each step's root, one level at a time, and keeps the ones under a project", async () => {
+    const calls: string[][] = [];
+    const ids = await loadProjectStepIds(planItemsClient(rows, calls), 'u', [
+      'site-step',
+      'moved',
+      'app',
+    ]);
+    expect([...ids]).toEqual(['site-step']);
+    expect(calls).toEqual([['site-step', 'moved', 'app'], ['site-feature'], ['site']]);
+  });
+
+  it('reads none under a project when the read fails', async () => {
+    const failing = {
+      from: () => {
+        throw new Error('down');
+      },
+    } as never;
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect((await loadProjectStepIds(failing, 'u', ['site-step'])).size).toBe(0);
   });
 });
 
