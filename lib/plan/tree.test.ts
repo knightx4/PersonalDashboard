@@ -158,7 +158,7 @@ describe('buildPlanTree', () => {
       item({ id: 'copy', module: 'website', parentId: 'site' }),
     ]);
     const website = sections.find((section) => section.module === 'website');
-    expect(website?.label).toBe('selveyknight.com');
+    expect(website?.label).toBe('alexrivera.dev');
     expect(website?.nodes.map((node) => node.id)).toEqual(['site']);
     expect(website?.nodes[0].children.map((node) => node.id)).toEqual(['copy']);
     expect(website?.project).toEqual(WEBSITE_FIXTURE);

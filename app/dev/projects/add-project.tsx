@@ -107,7 +107,7 @@ export function AddProject({
     event.preventDefault();
     const parsed = parseRepositoryName(typed);
     if (!parsed) {
-      setError('Write the repository as owner/name, such as knightx4/recipes.');
+      setError('Write the repository as owner/name, such as alex-rivera/recipes.');
       return;
     }
     add(parsed);

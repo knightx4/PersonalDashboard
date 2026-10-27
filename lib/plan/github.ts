@@ -20,11 +20,29 @@ const API = 'https://api.github.com';
 export type Repo = { owner: string; repo: string; branch: string };
 
 /**
- * The repository this app is built in. A plan step is built here unless its
+ * The repository this app is built in, from the environment so the code names
+ * no one's account: APP_REPOSITORY ("owner/name"), else the repository Vercel
+ * deployed from (VERCEL_GIT_REPO_OWNER and VERCEL_GIT_REPO_SLUG), else the one
+ * a GitHub Actions run is in (GITHUB_REPOSITORY). With none of them the owner
+ * and name are empty, and every GitHub read below fails with GitHub's own
+ * not-found rather than reading someone else's repository.
+ */
+export function appRepo(env: Readonly<Record<string, string | undefined>> = process.env): Repo {
+  const vercel =
+    env.VERCEL_GIT_REPO_OWNER && env.VERCEL_GIT_REPO_SLUG
+      ? `${env.VERCEL_GIT_REPO_OWNER}/${env.VERCEL_GIT_REPO_SLUG}`
+      : '';
+  const named = env.APP_REPOSITORY?.trim() || vercel || env.GITHUB_REPOSITORY?.trim() || '';
+  const [owner = '', repo = ''] = named.split('/');
+  return { owner, repo, branch: 'main' };
+}
+
+/**
+ * This app's repository (`appRepo`). A plan step is built here unless its
  * feature sits under a Dev project (lib/plan/projects), whose own repository
  * every question below takes instead (plan #2553.2).
  */
-export const REPO: Repo = { owner: 'knightx4', repo: 'PersonalDashboard', branch: 'main' };
+export const REPO: Repo = appRepo();
 
 /** How `plan_main_checks` names a repository: its primary key. */
 export function repoKey(repo: Pick<Repo, 'owner' | 'repo'>): string {

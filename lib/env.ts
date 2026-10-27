@@ -157,7 +157,7 @@ export function serverEnv() {
       CLAUDE_PROJECTS_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the projects routine. Scoped to it, not to the account. */
       CLAUDE_PROJECTS_ROUTINE_TOKEN: z.string().min(1).optional(),
-      /** selveyknight.com's own routine, preferred over the shared one while it is set. */
+      /** The website project's own routine, preferred over the shared one while it is set. */
       CLAUDE_WEBSITE_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the website routine. Scoped to it, not to the account. */
       CLAUDE_WEBSITE_ROUTINE_TOKEN: z.string().min(1).optional(),

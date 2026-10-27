@@ -2,7 +2,7 @@
 
 A writing mode in Learn. You write short essays, 200 to 2,000 words, about
 what you have been learning. Each one is a note in your vault from its first
-save, and the finished ones can go on selveyknight.com. Dash helps with
+save, and the finished ones can go on alexrivera.dev. Dash helps with
 everything around the sentences: sharpening the question, finding what you
 already wrote and read, pointing at gaps, and checking claims. It does not
 write the essay.
@@ -410,7 +410,7 @@ you tick: each note is a heading, the claim and a link back to the essay; the
 evidence item is one row in the bank whose story links to the essay, made
 once an essay. A stage a note already has beyond seedling is kept.
 
-"Publish" puts the essay on selveyknight.com:
+"Publish" puts the essay on alexrivera.dev:
 
 - The site reads the same Supabase project as the dashboard, as its Ask my AI
   tables already do. Publishing copies the essay into a published snapshot, so

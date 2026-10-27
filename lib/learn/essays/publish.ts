@@ -3,7 +3,7 @@
  * "Finishing and publishing", rule R4).
  *
  * Publish copies the note as the vault holds it into `learn.essays`, and
- * selveyknight.com reads that copy through `public.published_essays()` and
+ * the person's website reads that copy through `public.published_essays()` and
  * `public.published_essay(slug)`. What goes in:
  *
  * - The authorship block is removed first, before anything else reads the file.

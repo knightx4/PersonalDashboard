@@ -117,7 +117,7 @@ const INPUT: Anthropic.Tool['input_schema'] = {
     repository: {
       type: 'string',
       description:
-        'The repository as owner/name ("knightx4/recipes"), a github.com link, or just its name as they said it ("recipes").',
+        'The repository as owner/name ("alex-rivera/recipes"), a github.com link, or just its name as they said it ("recipes").',
     },
   },
   required: ['repository'],

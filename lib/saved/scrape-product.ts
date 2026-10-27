@@ -12,6 +12,7 @@ import {
   type ScrapedProduct,
 } from '@/lib/saved/parse-product';
 import { isBlockedHostname, isPrivateIpAddress } from '@/lib/saved/ssrf';
+import { appContactUrl } from '@/lib/net/user-agent';
 
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_BODY_BYTES = 1_000_000;
@@ -75,7 +76,7 @@ export async function scrapeProductUrl(rawUrl: string): Promise<ScrapedProduct> 
       headers: {
         Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
         'User-Agent':
-          'ShoppingManagerBot/1.0 (+https://github.com/knightx4/ShoppingManager; saved-item-unfurl)',
+          `ShoppingManagerBot/1.0 (+${appContactUrl()}; saved-item-unfurl)`,
       },
     });
 

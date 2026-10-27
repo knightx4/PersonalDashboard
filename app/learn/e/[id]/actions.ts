@@ -1270,7 +1270,7 @@ export type PublishResult =
     };
 
 /**
- * Publish the essay for selveyknight.com (plan #1863.11; spec, "Finishing
+ * Publish the essay for the person's website (plan #1863.11; spec, "Finishing
  * and publishing", R4). Only a finished essay is published. The note is
  * written to the vault first, marked published, and the file as written is
  * copied into the snapshot the site reads (lib/learn/essays/publish.ts):

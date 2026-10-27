@@ -199,7 +199,7 @@ function connection(overrides: Partial<VaultConnectionRow> = {}): VaultConnectio
   return {
     id: 'conn-1',
     user_id: 'user-1',
-    repo_owner: 'knightx4',
+    repo_owner: 'example-owner',
     repo_name: 'vault',
     branch: 'main',
     subpath: '',

@@ -1,5 +1,5 @@
 /**
- * What selveyknight.com can read of the essays (plan #1863.11; learn
+ * What alexrivera.dev can read of the essays (plan #1863.11; learn
  * migration 0110, LEARN-ESSAYS-SPEC "Finishing and publishing").
  *
  * The site calls public.published_essays() and public.published_essay(slug)

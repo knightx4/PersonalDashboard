@@ -1,9 +1,10 @@
 /**
  * The person's own details (plan #2124.1): you.details, one row each, as the
- * Details tab and Dash's tools read it. Nine values, each optional and kept as
+ * Details tab and Dash's tools read it. Ten values, each optional and kept as
  * they wrote it (supabase/migrations-you/0007_details.sql). The name, email,
  * phone and mailing address are what a cover letter is signed with
- * (supabase/migrations-you/0031_details_name_address.sql).
+ * (supabase/migrations-you/0031_details_name_address.sql), and the website
+ * is where a published essay is linked (0032).
  *
  * No server imports, so the client form and the gallery can use it.
  */
@@ -13,6 +14,7 @@ export const DETAIL_KEYS = [
   'email',
   'phone',
   'mailing_address',
+  'website_url',
   'linkedin_url',
   'citizenship',
   'race',
@@ -42,6 +44,7 @@ export const DETAIL_LABELS: Record<DetailKey, string> = {
   email: 'Email',
   phone: 'Phone',
   mailing_address: 'Mailing address',
+  website_url: 'Website',
   linkedin_url: 'LinkedIn',
   citizenship: 'Citizenship',
   race: 'Race',
@@ -79,6 +82,23 @@ export function letterheadFrom(
   return { signer: details.full_name?.trim() || null, contact: contact || null };
 }
 
+/**
+ * Their website as the essay Publish card names it: the host and path with no
+ * scheme ("alexrivera.dev"), or null when they have not given one or what they
+ * typed is not an http(s) address.
+ */
+export function siteName(website: string | null | undefined): string | null {
+  const typed = website?.trim();
+  if (!typed) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(typed) ? typed : `https://${typed}`);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return `${url.host}${url.pathname}`.replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+}
+
 /** The columns a row is read with. */
 export const DETAIL_COLUMNS = `${DETAIL_KEYS.join(', ')}, custom_fields`;
 
@@ -88,6 +108,7 @@ export const DETAIL_MAX: Record<DetailKey, number> = {
   email: 200,
   phone: 200,
   mailing_address: 500,
+  website_url: 500,
   linkedin_url: 500,
   citizenship: 200,
   race: 200,
@@ -101,6 +122,7 @@ export const EMPTY_DETAILS: Details = {
   email: null,
   phone: null,
   mailing_address: null,
+  website_url: null,
   linkedin_url: null,
   citizenship: null,
   race: null,

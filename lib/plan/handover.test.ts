@@ -127,7 +127,7 @@ describe('where a row is built', () => {
     const sent = await handStepToClaude({ supabase, userId: 'u', id: 't' });
     expect(sent).toMatchObject({ ok: true, outline: '2000.1' });
     expect(routines.at(-1)).toEqual({ id: 'trig_projects', token: 'projects-token' });
-    expect(started[0]).toContain('call add_repo for knightx4/selveyknightwebsite with push access');
+    expect(started[0]).toContain('call add_repo for example-owner/alexrivera-site with push access');
     expect(started[0]).toContain('register_repo_root');
     expect(started[0]).toContain("this checkout's scripts/plan.ts");
     expect(started[0]).toContain('.claude/skills/plan/reference/project-routine.md');
@@ -181,7 +181,7 @@ describe('where a row is built', () => {
     expect(builderFor(sections, findNode(sections, 't')!)).toEqual({
       ok: false,
       error:
-        'selveyknight.com has no routine to build it yet: ' +
+        'alexrivera.dev has no routine to build it yet: ' +
         'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
     });
     vi.unstubAllEnvs();

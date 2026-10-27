@@ -176,9 +176,13 @@ export const youActions: ModuleActions = {
     deleteBoardPanel: none('deletes'),
   },
   'app/you/details/actions.ts': {
+    letterheadAction: none(
+      'page',
+      'Reads their name and contact details for the cover letter PDF the roles page builds in the browser; an agent reads you.details directly.',
+    ),
     saveDetailsForm: none(
       'own',
-      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
+      'Your name, contact details, website, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
     ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).

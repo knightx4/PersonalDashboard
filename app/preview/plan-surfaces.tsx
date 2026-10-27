@@ -331,7 +331,7 @@ const projectItems: PlanItem[] = [
     module: 'website',
     title: 'Publish the writing page with the three essays already drafted',
     detail: 'The site gets a writing page listing each essay with its date.',
-    acceptance: 'selveyknight.com/writing lists the three essays, newest first.',
+    acceptance: 'alexrivera.dev/writing lists the three essays, newest first.',
     priority: 1,
     size: 'm',
   }),
@@ -390,7 +390,7 @@ const projectMainRefused: MainCheck = {
   conclusion: null,
   deployState: null,
   error:
-    'GITHUB_READ_TOKEN is missing a permission (404). Give it access to knightx4/selveyknightwebsite in the token\'s settings, then redeploy.',
+    'GITHUB_READ_TOKEN is missing a permission (404). Give it access to alex-rivera/alexrivera-site in the token\'s settings, then redeploy.',
 };
 
 export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = {}) {

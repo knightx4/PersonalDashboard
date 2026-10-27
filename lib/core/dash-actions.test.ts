@@ -202,7 +202,7 @@ describe('undoDashAction', () => {
   });
 
   describe('a Dev project Dash added (plan #2553.6)', () => {
-    const added: Row = { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: null };
+    const added: Row = { id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'recipes', archived_at: null };
 
     function projectSetup(project: Row) {
       const tables: Tables = {

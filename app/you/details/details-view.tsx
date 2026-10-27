@@ -35,6 +35,7 @@ const INPUT_PROPS: Partial<Record<DetailKey, React.ComponentProps<'input'>>> = {
   email: { type: 'email', inputMode: 'email', autoComplete: 'email' },
   phone: { type: 'tel', inputMode: 'tel', autoComplete: 'tel' },
   mailing_address: { autoComplete: 'street-address', placeholder: 'As a letter would show it' },
+  website_url: { inputMode: 'url', autoComplete: 'url', placeholder: 'yoursite.com' },
   linkedin_url: { inputMode: 'url', autoComplete: 'url', placeholder: 'linkedin.com/in/…' },
   citizenship: { autoComplete: 'off' },
   // Free text, since any list of options would leave someone out. Said in

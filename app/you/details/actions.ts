@@ -92,6 +92,7 @@ export async function saveDetailsForm(_prev: DetailsFormState, form: FormData): 
  * PDF the roles page builds in the browser. Empty, rather than an error, when
  * the read fails, so the letter still downloads, signed without them.
  */
+// latency: pending
 export async function letterheadAction(): Promise<Letterhead> {
   const user = await requireUser();
   try {

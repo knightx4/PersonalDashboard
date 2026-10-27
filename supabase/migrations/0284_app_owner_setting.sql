@@ -12,15 +12,16 @@
 -- the owner it already had; on a new install there is no such account, the
 -- owner is empty, and the Dev workspace stays shut until it is set:
 --
---   update core.app_settings
---      set owner_user_id = (select id from auth.users where email = 'you@example.com');
+--   insert into core.app_settings (owner_user_id)
+--   select id from auth.users where email = 'you@example.com'
+--   on conflict (singleton) do update set owner_user_id = excluded.owner_user_id;
 --
 -- (docs/SETUP.md). Only the definer functions read the table; nothing outside
 -- the database reaches it.
 
 create table if not exists core.app_settings (
   singleton boolean primary key default true check (singleton),
-  owner_user_id uuid references auth.users (id) on delete set null,
+  owner_user_id uuid references auth.users (id) on delete cascade,
   updated_at timestamptz not null default now()
 );
 

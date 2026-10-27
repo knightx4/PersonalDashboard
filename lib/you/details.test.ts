@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customFieldErrors, letterheadFrom, linkedinHref, whyNotSaved } from './details';
+import { customFieldErrors, letterheadFrom, linkedinHref, siteName, whyNotSaved } from './details';
 
 describe('customFieldErrors', () => {
   it('passes named fields, an empty value included', () => {
@@ -76,5 +76,18 @@ describe('letterheadFrom', () => {
       signer: null,
       contact: null,
     });
+  });
+});
+
+describe('siteName', () => {
+  it('names a site without its scheme, typed either way', () => {
+    expect(siteName('https://alexrivera.dev/')).toBe('alexrivera.dev');
+    expect(siteName('alexrivera.dev/blog')).toBe('alexrivera.dev/blog');
+  });
+
+  it('is null for nothing, or for something that is not a web address', () => {
+    expect(siteName(null)).toBeNull();
+    expect(siteName('  ')).toBeNull();
+    expect(siteName('not a site at all')).toBeNull();
   });
 });
