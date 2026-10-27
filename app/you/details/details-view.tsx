@@ -31,7 +31,10 @@ import type { DetailsFormState } from './actions';
 
 /** How each field is typed: the keyboard a phone offers and what the browser may fill in. */
 const INPUT_PROPS: Partial<Record<DetailKey, React.ComponentProps<'input'>>> = {
+  full_name: { autoComplete: 'name' },
+  email: { type: 'email', inputMode: 'email', autoComplete: 'email' },
   phone: { type: 'tel', inputMode: 'tel', autoComplete: 'tel' },
+  mailing_address: { autoComplete: 'street-address', placeholder: 'As a letter would show it' },
   linkedin_url: { inputMode: 'url', autoComplete: 'url', placeholder: 'linkedin.com/in/…' },
   citizenship: { autoComplete: 'off' },
   // Free text, since any list of options would leave someone out. Said in
@@ -42,13 +45,13 @@ const INPUT_PROPS: Partial<Record<DetailKey, React.ComponentProps<'input'>>> = {
 };
 
 /**
- * You's Details tab (plan #2124.2): the six facts a form asks for, read as a
+ * You's Details tab (plan #2124.2): the facts a form asks for, read as a
  * list of answers, each "Not set" until given, and under them the fields the
  * person added of their own (plan #2531.2). One Edit turns the list into
  * fields in the same place (law 14), where an own field's name can be
  * changed where it stands and the field removed; Save puts the answers back.
  * Add a field puts a new row in the form with the caret in its name. The rail
- * says how many of the six are set and who reads them, once any is.
+ * says how many of them are set and who reads them, once any is.
  *
  * `save` is the server action, passed in so the gallery can draw the tab
  * without one; `editing`, `adding`, `revealRemove`, `renaming` and `state` let
@@ -168,7 +171,8 @@ export function DetailsView({
             <Stat value={`${setCount} of ${DETAIL_KEYS.length}`} label="details set" />
           ) : null}
           <p className="text-small text-ink-muted">
-            Dash reads all six, and any fields you add, when it answers you or works on your goals.
+            Dash reads all of these, and any fields you add, when it answers you or works on your
+            goals.
           </p>
         </Card>
       }
@@ -184,7 +188,7 @@ const ADD_FIELD = 'font-medium text-ink hover:text-ink';
 
 /**
  * One detail, read: its name and its value on one line at every width, the
- * name in a column that wraps a long one, so six facts take six lines on a
+ * name in a column that wraps a long one, so each fact takes one line on a
  * phone rather than twelve. ValueRow stacks them below 448px, which suits a
  * long value under a short name but doubles a list of short answers.
  */
@@ -297,7 +301,7 @@ function DetailsForm({
 
 /**
  * The fields of their own, inside the Details form (plan #2531.2). Each is
- * drawn as the six are, a name over a box, except that pressing the name
+ * drawn as the fixed details are, a name over a box, except that pressing the name
  * renames the field where it stands (law 12, OwnFieldName), with a remove
  * button beside it that shows when the field is pointed at or holds focus,
  * and always on a phone. Removing asks nothing: the field's text is still in
@@ -419,8 +423,8 @@ function OwnFields({
 
 /**
  * An own field's name, which renames the field where it stands. At rest it is
- * text set as the six labels are, wrapping when long, over a dashed underline
- * the six do not have, so it reads as something that can be changed; pressed,
+ * text set as the fixed labels are, wrapping when long, over a dashed underline
+ * the fixed ones do not have, so it reads as something that can be changed; pressed,
  * it becomes a box holding the name, 16px on a phone so iOS does not zoom the
  * page, and Enter, Escape or leaving it puts the text back. A field with no
  * name shows "Add a name" in the box's place, drawn as a box with a danger

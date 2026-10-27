@@ -38,6 +38,7 @@ import {
   type ProbeEvent,
 } from '../lib/learn/ordering-report';
 import { loadHarnessExport } from '../lib/learn/harness-export';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 const argv = process.argv.slice(2);
 function arg(flag: string): string | null {
@@ -49,7 +50,7 @@ function connect() {
   const url = process.env.DATABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key)) as unknown as ReturnType<typeof postgres>;
   }
   if (!url) {

@@ -29,8 +29,9 @@ import { MAIL_PILES, type MailPile } from '../lib/core/mailroom/question';
 import { storedPilesStatement, updatePilesStatement, type StoredPile } from '../lib/core/mailroom/reask';
 import { costMicrosFor, type TokenUsage } from '../lib/core/spend/pricing';
 import { httpsSql, literal, restTransport } from '../lib/db/https-sql';
-import { sqlRefusal } from '../lib/db/sql-guard';
+import { OWNER_QUERY, sqlRefusal } from '../lib/db/sql-guard';
 import { jevApiKey } from '../lib/jev/wire';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 function loadEnvironment(): void {
   for (const file of ['.env.local', '.env']) {
@@ -51,7 +52,7 @@ async function run(statement: string): Promise<Record<string, unknown>[]> {
   const url = process.env.DATABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key)).unsafe(statement);
   }
   if (!url) throw new Error('Neither DATABASE_URL nor SUPABASE_SERVICE_ROLE_KEY is set.');
@@ -63,8 +64,11 @@ async function run(statement: string): Promise<Record<string, unknown>[]> {
   }
 }
 
+let owner: Promise<string | null> | null = null;
+
 async function guarded(statement: string): Promise<Record<string, unknown>[]> {
-  const refused = sqlRefusal(statement);
+  owner ??= run(OWNER_QUERY).then(([row]) => (typeof row?.id === 'string' ? row.id : null));
+  const refused = sqlRefusal(statement, await owner);
   if (refused) throw new Error(refused);
   return run(statement);
 }

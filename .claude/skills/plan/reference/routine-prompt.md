@@ -54,7 +54,7 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 
 - If node_modules is empty and the job builds or checks code, run `npm ci` first. A job that only writes rows does not need it.
 - `scripts/plan.ts` reaches the database over HTTPS with `SUPABASE_SERVICE_ROLE_KEY`. If it cannot, do not diagnose it: send the SQL in `reference/offline.md` through `npx tsx scripts/sql.ts`, including its `core.record_dash_action` call for each write. Use the `Supabase` connector only when neither works, and never send a timed-out call again.
-- `plan_items`, `plan_dependencies`, `ideas` and `raised_items` are in the `public` schema. The plan belongs to user_id `d001bb0f-ffe8-4bfb-880f-17dd1a62b685`; other accounts exist with empty plans, so always filter by that id.
+- `plan_items`, `plan_dependencies`, `ideas` and `raised_items` are in the `public` schema. The plan belongs to the owner (`:owner` in scripts/sql.ts); other accounts exist with empty plans, so always filter by that id.
 - `started_at` and `completed_at` are written by a trigger from the status. Never set them by hand.
 - Use plain `git fetch origin`. Naming a branch that is not on the remote yet aborts the whole fetch and leaves origin/main stale.
 - Apply any migration you write to the live project in the same sitting, under its file's own name, as CLAUDE.md says. Before merging to main, merge origin/main and run `npm run gate`, and push only when it ends with "gate: all clear".

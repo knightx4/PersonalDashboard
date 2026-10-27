@@ -53,16 +53,16 @@ fix, re-ask the one case it is about, never all of them.
   cases waiting to be written.
 
 All reads and writes go through `npx tsx scripts/sql.ts` and name the
-owner's id, `d001bb0f-ffe8-4bfb-880f-17dd1a62b685` (CLAUDE.md). Run `npm ci`
+owner's id, which scripts/sql.ts puts in wherever a statement says `:owner` (CLAUDE.md). Run `npm ci`
 first if `node_modules` is empty.
 
 ## 1. Read what the day found
 
 ```sh
-npx tsx scripts/sql.ts "select id, trigger, deploy, model, started_at, finished_at, cases, passed, cost_micros, note_id, error, health->'alerts' alerts from core.dash_eval_runs where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' order by started_at desc limit 3"
+npx tsx scripts/sql.ts "select id, trigger, deploy, model, started_at, finished_at, cases, passed, cost_micros, note_id, error, health->'alerts' alerts from core.dash_eval_runs where user_id = :owner order by started_at desc limit 3"
 npx tsx scripts/sql.ts "select jsonb_pretty(health->'thumbsDown') down, jsonb_pretty(health->'pushback') pushback, jsonb_pretty(health->'failedLookups') failed, health->'unfinished' unfinished from core.dash_eval_runs where id = '<run id>'"
 npx tsx scripts/sql.ts "select r->>'question' q, r->'failures' f, r->>'stop' stop, r->'lookups' lookups, left(r->>'body', 400) body from core.dash_eval_runs, jsonb_array_elements(results) r where id = '<run id>' and not (r->>'passed')::boolean"
-npx tsx scripts/sql.ts "select id, status, left(body, 300) from public.feedback_items where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and page_path = '/ask' and status not in ('done','declined') order by created_at desc limit 10"
+npx tsx scripts/sql.ts "select id, status, left(body, 300) from public.feedback_items where user_id = :owner and page_path = '/ask' and status not in ('done','declined') order by created_at desc limit 10"
 ```
 
 **No run in the last 26 hours, or a run with no `finished_at`, means the
@@ -83,7 +83,7 @@ For each thumbs down, pushback and other alert, find the turn it names, with
 the question before it and the reply after it:
 
 ```sh
-npx tsx scripts/sql.ts "select t.id, t.created_at, left(t.body, 300) body, jsonb_pretty(t.tool_calls) calls, (select left(u.body, 300) from core.conversation_turns u where u.conversation_id = t.conversation_id and u.role = 'user' and u.created_at < t.created_at order by u.created_at desc limit 1) asked from core.conversation_turns t where t.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and t.id = '<turn id>'"
+npx tsx scripts/sql.ts "select t.id, t.created_at, left(t.body, 300) body, jsonb_pretty(t.tool_calls) calls, (select left(u.body, 300) from core.conversation_turns u where u.conversation_id = t.conversation_id and u.role = 'user' and u.created_at < t.created_at order by u.created_at desc limit 1) asked from core.conversation_turns t where t.user_id = :owner and t.id = '<turn id>'"
 ```
 
 ## 2. Find the cause, not the symptom
@@ -135,7 +135,7 @@ For each cause:
    ```sh
    npx tsx scripts/sql.ts --file /tmp/case.sql
    -- insert into core.dash_eval_cases (user_id, question, expect, origin)
-   -- values ('d001bb0f-ffe8-4bfb-880f-17dd1a62b685', 'what roles have i applied to at concourse',
+   -- values (:owner, 'what roles have i applied to at concourse',
    --         '{"cites_any": ["Concourse"], "max_lookups": 6}', 'turn cbb3f6f3: fell back after three lookups')
    -- returning id
    ```

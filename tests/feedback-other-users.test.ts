@@ -103,8 +103,8 @@ const BOTH = [
 ];
 
 const EMAILS = {
-  [OWNER]: 'selveyknight4@gmail.com',
-  [OTHER]: 'averyjadek@gmail.com',
+  [OWNER]: 'owner@example.com',
+  [OTHER]: 'another@example.com',
 };
 
 describe('loadFeedbackQueue', () => {
@@ -133,7 +133,7 @@ describe('loadOtherUsersFeedback', () => {
     expect(others).toEqual([
       {
         id: 'theirs-1',
-        email: 'averyjadek@gmail.com',
+        email: 'another@example.com',
         kind: 'feature',
         body: 'A dark mode for the list',
         pagePath: '/jobs/pipeline',

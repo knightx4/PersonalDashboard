@@ -31,7 +31,7 @@ const loans: CollectionField[] = [
 ];
 const collection = { name: 'loans', shape: 'list' as const, fields: loans };
 
-const USER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+const USER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 const FILE_ID = '0b6f3c1e-8a2d-4f7b-9c1a-2d3e4f5a6b7c';
 
 /** A model stub that records what it was given and answers with these records. */

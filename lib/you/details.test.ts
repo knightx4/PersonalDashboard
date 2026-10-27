@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customFieldErrors, linkedinHref, whyNotSaved } from './details';
+import { customFieldErrors, letterheadFrom, linkedinHref, whyNotSaved } from './details';
 
 describe('customFieldErrors', () => {
   it('passes named fields, an empty value included', () => {
@@ -45,5 +45,36 @@ describe('whyNotSaved', () => {
     expect(whyNotSaved(new Error('Saving your details failed: new row violates check constraint "details_phone_check".'))).toBe(
       'The database refused these details (new row violates check constraint "details_phone_check"). What you typed is still here.',
     );
+  });
+});
+
+describe('letterheadFrom', () => {
+  it('signs with their name over address, phone and email', () => {
+    expect(
+      letterheadFrom({
+        full_name: 'Alex Rivera',
+        mailing_address: '12 Elm Street,\nSpringfield',
+        phone: '555-0100',
+        email: 'alex@example.com',
+      }),
+    ).toEqual({
+      signer: 'Alex Rivera',
+      contact: '12 Elm Street, Springfield   555-0100   alex@example.com',
+    });
+  });
+
+  it('leaves out what they have not given, and is empty when they have given nothing', () => {
+    expect(
+      letterheadFrom({ full_name: null, mailing_address: null, phone: '555-0100', email: null }),
+    ).toEqual({
+      signer: null,
+      contact: '555-0100',
+    });
+    expect(
+      letterheadFrom({ full_name: ' ', mailing_address: null, phone: null, email: null }),
+    ).toEqual({
+      signer: null,
+      contact: null,
+    });
   });
 });

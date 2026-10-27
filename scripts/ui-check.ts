@@ -45,6 +45,7 @@ import {
   type CheckOwner,
   type KeptShot,
 } from '../lib/preview/ui-checks';
+import { supabaseProjectUrl } from '../lib/db/project';
 
 function fail(message: string): never {
   console.error(message);
@@ -82,14 +83,13 @@ function keepShots(owner: CheckOwner, surface: string, round: number): KeptShot[
 
 function serviceClient() {
   // Cloud sessions have the service key but not the public URL, and without
-  // this fallback every round they recorded went in with no shots, so the plan
-  // row had no pictures to send back from. scripts/plan.ts falls back the same way.
-  // The gate exports a placeholder URL for the build, which counts as unset here.
-  const fromEnv = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const url =
-    fromEnv && !fromEnv.includes('placeholder') ? fromEnv : 'https://asjztutnqxbecruvyrbj.supabase.co';
+  // a fallback every round they recorded went in with no shots, so the plan
+  // row had no pictures to send back from. The project is read from the key
+  // then (lib/db/project.ts), as scripts/plan.ts does. The gate exports a
+  // placeholder URL for the build, which counts as unset here.
+  const url = supabaseProjectUrl();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) return null;
+  if (!key || !url) return null;
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 

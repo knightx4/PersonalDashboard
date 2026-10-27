@@ -10,7 +10,7 @@ import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, closeDb, createUser, sql } from './helpers/db-learn';
 
-const OWNER = 'selveyknight4@gmail.com';
+const OWNER = 'essay-publish-owner@example.test';
 const OTHER = 'essay-publish-other@example.test';
 
 let owner = '';
@@ -52,6 +52,10 @@ describe('published essays for the website', () => {
     await admin`delete from auth.users where email in (${OWNER}, ${OTHER})`;
     owner = await createUser(OWNER);
     other = await createUser(OTHER);
+    // The owner is whoever core.app_settings names (0284).
+    await admin`
+    insert into core.app_settings (singleton, owner_user_id) values (true, ${owner})
+    on conflict (singleton) do update set owner_user_id = excluded.owner_user_id`;
     published = await essay(owner, 'money-odd-good-out', {
       body: 'The published words.\n',
       stage: 'seedling',

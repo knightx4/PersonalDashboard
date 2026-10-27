@@ -129,6 +129,7 @@ export const coreSources: ModuleSources = {
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
+    { table: 'core.app_settings', reason: 'Settings for the whole install: which account is the owner.' },
     { table: 'core.ask_reply_checks', reason: 'Bookkeeping for the weekly check of Ask Dash replies that went badly: the week, what it flagged and the Dev note it wrote; the thumbs themselves are on core.conversation_turns.' },
     { table: 'core.dash_eval_cases', reason: 'The questions the nightly Dash quality check asks and what a good answer must show; test fixtures, not something the person wrote.' },
     { table: 'core.dash_eval_runs', reason: 'Bookkeeping for the nightly Dash quality check: each run, its graded answers, the day\'s health and the Dev note it wrote.' },

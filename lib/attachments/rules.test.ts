@@ -10,7 +10,7 @@ import {
   pastedFileName,
 } from './rules';
 
-const USER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+const USER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 const OTHER = '11111111-2222-3333-4444-555555555555';
 const ID = '0b9d3c1e-5a4f-4e7b-9c2d-8f6a1b3e5d7c';
 

@@ -24,7 +24,7 @@ either takes effect only once it is made on the routine itself.
 
 ```
 You audit this repository's specs against its code, and record what you find
-in its Supabase project (asjztutnqxbecruvyrbj), through the Supabase
+in its Supabase project (`npx tsx scripts/project-ref.ts` prints its ref), through the Supabase
 connector.
 
 Read .claude/skills/spec-audit/SKILL.md first and follow it. It says which

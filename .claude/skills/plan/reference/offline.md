@@ -7,7 +7,7 @@ to reach the database. Then send the SQL below through
 `npx tsx scripts/sql.ts` (CLAUDE.md) against `plan_items` and
 `plan_dependencies` (both in `public`), and do not spend the session
 diagnosing it. Only when that cannot run either, use the **`Supabase`**
-connector (project ref `asjztutnqxbecruvyrbj`), with the care below. The
+connector (the project ref `npx tsx scripts/project-ref.ts` prints), with the care below. The
 brief a routine was fired with is the plan as it stood; trust it, and re-read
 the row before closing it.
 

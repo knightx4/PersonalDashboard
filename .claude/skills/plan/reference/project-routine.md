@@ -60,7 +60,7 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
    says why. Every brief after this one tells the session to run the command
    before it merges. When plan.ts cannot reach the database, send
    `update dev_projects set check_command = '<command>', set_up_at = now()
-   where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and id = '<project id>'`
+   where user_id = :owner and id = '<project id>'`
    through `npx tsx scripts/sql.ts`.
 5. **Write up what only the person can supply** with `needs … --for <the
    step>`: push access the session was refused, a secret the checks need
@@ -115,7 +115,7 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 ## Environment (Claude Code on the web)
 
 - If this checkout's node_modules is empty, run `npm ci` here first: scripts/plan.ts needs it.
-- scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to user_id d001bb0f-ffe8-4bfb-880f-17dd1a62b685; always filter by that id.
+- scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to the owner; always filter by `user_id = :owner`, which scripts/sql.ts fills in.
 - Use plain git fetch origin in each repository.
 
 ## Reporting

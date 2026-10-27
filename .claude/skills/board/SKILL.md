@@ -175,7 +175,7 @@ meeting runs as described everywhere else.
 
 Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through
 scripts/sql.ts"), every query filtered by the owner's
-`user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'`. You run as the service
+`user_id = :owner`. You run as the service
 role, so the filter is the only thing keeping other accounts' rows out.
 Check a column against `information_schema.columns` before relying on it,
 and fix and resend a query that fails on a column name. For long SQL (every
@@ -217,7 +217,7 @@ and use its id:
 
 ```sql
 insert into you.board_meetings (user_id, kind, status, started_at)
-values ('d001bb0f-ffe8-4bfb-880f-17dd1a62b685', 'weekly', 'running', now())
+values (:owner, 'weekly', 'running', now())
 returning id;
 ```
 

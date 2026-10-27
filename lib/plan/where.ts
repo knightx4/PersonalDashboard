@@ -34,7 +34,7 @@ const SERVICES: readonly { name: RegExp; label: string; href: string }[] = [
   {
     name: /\bsupabase\b/i,
     label: 'Supabase',
-    href: 'https://supabase.com/dashboard/project/asjztutnqxbecruvyrbj',
+    href: 'https://supabase.com/dashboard/projects',
   },
   { name: /\bgithub\b/i, label: 'GitHub', href: 'https://github.com/settings/tokens' },
   { name: /\bgoogle cloud\b/i, label: 'Google Cloud', href: 'https://console.cloud.google.com' },

@@ -3328,9 +3328,12 @@ const youPlacesOnMap: Place[] = youPlaces.map((place) => {
   return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
 });
 
-/** Six details filled in, LinkedIn typed without its scheme (plan #2124.2). */
+/** Every detail filled in, LinkedIn typed without its scheme (plan #2124.2). */
 const youDetails: Details = {
+  full_name: 'Christopher Alexander Montgomery-Whitfield',
+  email: 'chris.whitfield@example.com',
   phone: '+1 (415) 555-0142',
+  mailing_address: '1200 Larkin Street, Apt 4B, San Francisco, CA 94109',
   linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
   citizenship: 'United States and Ireland',
   race: 'White',
@@ -10059,7 +10062,10 @@ export const SURFACES: readonly Surface[] = [
         editing
         state={{
           values: {
+            full_name: 'Christopher Alexander Montgomery-Whitfield',
+            email: 'chris.whitfield@example.com',
             phone: '+353 87 555 0199',
+            mailing_address: '1200 Larkin Street, Apt 4B, San Francisco, CA 94109',
             linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
             citizenship: 'United States and Ireland',
             race: 'White',

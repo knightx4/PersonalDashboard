@@ -1,12 +1,7 @@
 import type { DevProject } from '@/lib/plan/projects';
 import { ruleScores } from '@/lib/writing/check';
-import {
-  LINK_PATTERN,
-  MAX_THREAD_POSTS,
-  X_POST_LIMIT,
-  X_POST_MARGIN,
-  xLength,
-} from './posts';
+import { LINK_PATTERN, MAX_THREAD_POSTS, X_POST_LIMIT, X_POST_MARGIN, xLength } from './posts';
+import { supabaseProjectRef } from '@/lib/db/project';
 
 /**
  * The check every X draft passes before the posts run inserts it (plan #1417).
@@ -122,22 +117,6 @@ const THREAD_MARKER = /🧵|^\s*\d+\s?\/\s?\d*(\s|$)/;
 const EMOJI = /\p{Extended_Pictographic}/u;
 const EM_DASH = /—/;
 
-/** The Supabase project ref, kept out of posts by name. */
-const PROJECT_REF = 'asjztutnqxbecruvyrbj';
-
-/**
- * The website the plan has built since before projects were rows (plan
- * #2553.1): its host carries the person's name, and its GitHub owner is
- * theirs. Kept here so every check refuses them with no read; any other
- * project's terms come from `projectAvoidTerms` over the loaded projects.
- */
-const KNOWN_PROJECTS: ReadonlyArray<Pick<DevProject, 'url' | 'repo'>> = [
-  {
-    url: 'https://selveyknight.com',
-    repo: { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' },
-  },
-];
-
 /**
  * The hosts of these projects, which carry the person's name, and the GitHub
  * owners and repositories behind them.
@@ -160,9 +139,15 @@ export function projectAvoidTerms(projects: ReadonlyArray<Pick<DevProject, 'url'
   return [...terms].filter((term) => term.length >= 3);
 }
 
-/** Terms every check refuses: the project ref, and the website's terms. */
+/**
+ * Terms every check refuses without being told: the Supabase project's ref,
+ * when the environment names one (lib/db/project.ts). The person's own name,
+ * sites and repositories come from their rows, through the caller's `avoid`
+ * (avoidTerms in lib/dash/post-writes.ts).
+ */
 export function builtInAvoidTerms(): string[] {
-  return [PROJECT_REF, ...projectAvoidTerms(KNOWN_PROJECTS)];
+  const ref = supabaseProjectRef();
+  return ref ? [ref] : [];
 }
 
 function escape(term: string): string {

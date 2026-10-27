@@ -197,6 +197,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from '../lib/plan/tree';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -210,7 +211,7 @@ function connect() {
   // A cloud session's proxy carries HTTPS and not Postgres, so there each
   // statement goes through the REST API instead (lib/db/https-sql.ts).
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key)) as unknown as ReturnType<typeof postgres>;
   }
   if (!url) {

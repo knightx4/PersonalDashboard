@@ -9,17 +9,19 @@ import {
   DETAIL_KEYS,
   DETAIL_LABELS,
   DETAIL_MAX,
+  letterheadFrom,
   readCustomFields,
   whyNotSaved,
   type CustomField,
   type DetailKey,
   type Details,
+  type Letterhead,
 } from '@/lib/you/details';
-import { saveDetails } from '@/lib/you/details-store';
+import { getDetails, saveDetails } from '@/lib/you/details-store';
 
 /** What the Details form shows after a save. */
 export type DetailsFormState = {
-  /** All six and their own fields as saved, after a save that went through. */
+  /** The fixed details and their own fields as saved, after a save that went through. */
   saved?: Details;
   /** What was typed, drawn again after a refused save. */
   values?: Record<DetailKey, string>;
@@ -32,7 +34,7 @@ export type DetailsFormState = {
 };
 
 /**
- * Save the six details and their own fields from the Details tab's form
+ * Save the fixed details and their own fields from the Details tab's form
  * (plan #2124.2, #2531.2). A field left empty clears that detail. Their own
  * fields come as one hidden `custom_fields` JSON list that replaces the
  * stored one; a form without it leaves the list alone. A refused save sends
@@ -83,4 +85,18 @@ export async function saveDetailsForm(_prev: DetailsFormState, form: FormData): 
 
   revalidatePath('/you/details');
   return { saved };
+}
+
+/**
+ * Who signs a cover letter and its contact line, from their details, for the
+ * PDF the roles page builds in the browser. Empty, rather than an error, when
+ * the read fails, so the letter still downloads, signed without them.
+ */
+export async function letterheadAction(): Promise<Letterhead> {
+  const user = await requireUser();
+  try {
+    return letterheadFrom(await getDetails(await createYouClient(), user.id));
+  } catch {
+    return { signer: null, contact: null };
+  }
 }

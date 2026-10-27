@@ -57,6 +57,7 @@ import {
   settleRefusal,
   surfacesToCompare,
 } from '../lib/plan/ui-settle-diff';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 function arg(flag: string): string | null {
   const i = process.argv.indexOf(flag);
@@ -78,8 +79,10 @@ function reachableDatabase(): string | null {
 
 function connect(target: string) {
   if (target === 'https') {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
-    return httpsSql(restTransport(rest, process.env.SUPABASE_SERVICE_ROLE_KEY as string)) as unknown as ReturnType<typeof postgres>;
+    const rest = requireSupabaseProjectUrl();
+    return httpsSql(
+      restTransport(rest, process.env.SUPABASE_SERVICE_ROLE_KEY as string),
+    ) as unknown as ReturnType<typeof postgres>;
   }
   return postgres(target, { max: 1, prepare: false, onnotice: () => {} });
 }

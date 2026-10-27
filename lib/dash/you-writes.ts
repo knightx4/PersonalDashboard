@@ -38,7 +38,7 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 dates or the note.
  *   set_detail    one of the fields they named themselves on Details, set by
  *                 its label, created when none has that label (plan #2531.3).
- *                 Never touches the six fixed details (plan #2124.3) and never
+ *                 Never touches the fixed details (plan #2124.3) and never
  *                 removes a field.
  *   save_about_me something they said about themselves in a chat with
  *                 Claude, in their words, with why it was saved
@@ -502,7 +502,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
     name: 'set_detail',
     runs: noButton('The Details tab saves the whole list of their own fields at once; no button sets one by its name.'),
     description:
-      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their phone, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
+      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their name, email, phone, mailing address, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
     input_schema: {
       type: 'object',
       properties: {
