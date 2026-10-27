@@ -31,7 +31,7 @@ import {
 import type { PlanNode } from '@/lib/plan/tree';
 import { catalogLabel, subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { useSettled } from '@/components/plan-tree/use-settled';
-import { planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import { useScopeLabel } from './scope-labels';
 
 /**
  * The edit form for a plan step, the add that opens capture, and the labels they share.
@@ -42,10 +42,6 @@ export const STATUS_LABEL = PLAN_STATUS_LABEL;
 export const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
 export const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me' };
 
-
-export function scopeLabel(module: PlanScope | null): string {
-  return planScopeLabel(module);
-}
 
 function StatusOptions() {
   return (
@@ -252,6 +248,7 @@ export function EditStep({
 }) {
   const [state, action, pending] = useActionState(updatePlanItem, {} as PlanActionState);
   useSettled(state, onDone);
+  const scopeLabel = useScopeLabel();
 
   const excluded = subtreeOf(catalog, node.id);
   const parents = catalog.filter(

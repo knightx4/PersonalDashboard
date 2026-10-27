@@ -1,4 +1,4 @@
-import { PROJECTS } from '@/lib/plan/projects';
+import type { DevProject } from '@/lib/plan/projects';
 import { ruleScores } from '@/lib/writing/check';
 import {
   LINK_PATTERN,
@@ -126,16 +126,31 @@ const EM_DASH = /—/;
 const PROJECT_REF = 'asjztutnqxbecruvyrbj';
 
 /**
- * Terms every check refuses: the hosts of the projects the plan builds, which
- * carry the person's name, and the GitHub owners behind them.
+ * The website the plan has built since before projects were rows (plan
+ * #2553.1): its host carries the person's name, and its GitHub owner is
+ * theirs. Kept here so every check refuses them with no read; any other
+ * project's terms come from `projectAvoidTerms` over the loaded projects.
  */
-export function builtInAvoidTerms(): string[] {
-  const terms = new Set<string>([PROJECT_REF]);
-  for (const project of PROJECTS) {
+const KNOWN_PROJECTS: ReadonlyArray<Pick<DevProject, 'url' | 'repo'>> = [
+  {
+    url: 'https://selveyknight.com',
+    repo: { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' },
+  },
+];
+
+/**
+ * The hosts of these projects, which carry the person's name, and the GitHub
+ * owners and repositories behind them.
+ */
+export function projectAvoidTerms(projects: ReadonlyArray<Pick<DevProject, 'url' | 'repo'>>): string[] {
+  const terms = new Set<string>();
+  for (const project of projects) {
     try {
-      const host = new URL(project.url).hostname.replace(/^www\./, '');
-      terms.add(host);
-      terms.add(host.split('.')[0]);
+      if (project.url) {
+        const host = new URL(project.url).hostname.replace(/^www\./, '');
+        terms.add(host);
+        terms.add(host.split('.')[0]);
+      }
     } catch {
       // A project without a parseable url has no host to keep out.
     }
@@ -143,6 +158,11 @@ export function builtInAvoidTerms(): string[] {
     terms.add(project.repo.repo);
   }
   return [...terms].filter((term) => term.length >= 3);
+}
+
+/** Terms every check refuses: the project ref, and the website's terms. */
+export function builtInAvoidTerms(): string[] {
+  return [PROJECT_REF, ...projectAvoidTerms(KNOWN_PROJECTS)];
 }
 
 function escape(term: string): string {

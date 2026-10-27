@@ -73,6 +73,11 @@ export const devActions: ModuleActions = {
     acknowledgePlanRunAction: none('theirs'),
     answerPlanRunAction: none('theirs'),
   },
+  'app/dev/projects/actions.ts': {
+    listRepositories: none('page'),
+    addProject: tool('add_project'),
+    archiveProject: none('theirs', 'Takes a project off the plan, which is the person\'s call about their own plan.'),
+  },
   'app/dev/posts/actions.ts': {
     suggestPosts: none('spends', DEV_SPENDS),
     suggestPostAbout: none('spends', DEV_SPENDS),

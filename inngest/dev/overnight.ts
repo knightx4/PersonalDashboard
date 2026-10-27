@@ -5,7 +5,7 @@ import { answerPortsFor, sendUnactedAnswers, type AnswerSend } from '@/inngest/d
 import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { goalsNightNote, runGoalsNight, type GoalsNightTick } from '@/inngest/goals/overnight';
-import { listPushes, refreshMainCheck } from '@/lib/plan/ci';
+import { listPushes, refreshMainCheck, refreshProjectMainChecks } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
 import type { CheckConclusion } from '@/lib/plan/checks';
 import {
@@ -1466,6 +1466,15 @@ export async function runOvernightTick(
     const said = err instanceof Error ? err.message : 'failed';
     console.error(`main's CI could not be read on this tick: ${said}`);
     main = { sha: null, conclusion: null, error: said, reason: null };
+  }
+  // Each Dev project's main, for its own page (plan #2553.2). Stepped over
+  // the same way: a project's reading is not a precondition for a night.
+  try {
+    await refreshProjectMainChecks({ supabase, now, fetch: input.fetch });
+  } catch (err) {
+    console.error(
+      `the projects' CI could not be read on this tick: ${err instanceof Error ? err.message : 'failed'}`,
+    );
   }
 
   // Every run still marked started is read against what it left behind, on

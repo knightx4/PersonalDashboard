@@ -4,6 +4,7 @@ import {
   listPushes,
   refreshCommitChecks,
   refreshMainCheck,
+  refreshProjectMainChecks,
   refusalFor,
 } from '@/lib/plan/ci';
 
@@ -125,13 +126,20 @@ type Chain = {
  * commits, what is already known about them, and the rows it writes back.
  */
 function db(
-  steps: Array<{ commit_sha: string; completed_at?: string | null }>,
+  steps: Array<{
+    commit_sha: string;
+    completed_at?: string | null;
+    id?: string;
+    parent_id?: string | null;
+    module?: string | null;
+  }>,
   known: Array<{
     commit_sha: string;
     merge_sha: string | null;
     conclusion: string;
     checked_at: string;
   }> = [],
+  projects: Array<Record<string, unknown>> = [],
 ) {
   const upsert = vi.fn(async () => ({ error: null as null }));
   const answering = (result: unknown): Chain => {
@@ -149,7 +157,11 @@ function db(
   const supabase = {
     from: (table: string) =>
       answering(
-        table === 'plan_items' ? { data: steps, error: null } : { data: known, error: null },
+        table === 'plan_items'
+          ? { data: steps, error: null }
+          : table === 'dev_projects'
+            ? { data: projects, error: null }
+            : { data: known, error: null },
       ),
   };
   return { supabase, upsert };
@@ -713,5 +725,160 @@ describe('commitSubjects', () => {
     expect(await commitSubjects({ shas: ['', 'nope'], fetch: fetchFn as never })).toEqual({});
     expect(fetchFn).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+});
+
+/** A Dev project's step is asked about in the project's repository (plan #2553.2). */
+describe('refreshCommitChecks for a project step', () => {
+  const WEBSITE = {
+    id: 'website',
+    label: 'selveyknight.com',
+    owner: 'knightx4',
+    repo: 'selveyknightwebsite',
+    branch: 'main',
+  };
+
+  it("reads the website's main, not this app's, for a step under the website", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const sha = BRANCH.slice(0, 7);
+    const { supabase, upsert } = db(
+      [{ id: 'step-1', parent_id: null, module: 'website', commit_sha: sha }],
+      [],
+      [WEBSITE],
+    );
+    const fetchFn = github([{ status: 'completed', conclusion: 'success' }]);
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(result).toEqual({ checked: 1, error: null });
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.every((url) => url.includes('/repos/knightx4/selveyknightwebsite/'))).toBe(true);
+    const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ conclusion: string }>>>;
+    expect(rows[0].conclusion).toBe('passed');
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps this app's answers when the project's repository refuses", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = db(
+      [
+        { id: 'app-step', parent_id: null, module: 'dev', commit_sha: BRANCH.slice(0, 7) },
+        { id: 'site-step', parent_id: null, module: 'website', commit_sha: 'e'.repeat(7) },
+      ],
+      [],
+      [WEBSITE],
+    );
+    const fetchFn = vi.fn(async (url: string) => {
+      if (String(url).includes('selveyknightwebsite')) {
+        return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+      }
+      return String(url).includes('/actions/runs')
+        ? new Response(JSON.stringify({ workflow_runs: [] }), { status: 200 })
+        : new Response(JSON.stringify(MAIN), { status: 200 });
+    });
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(result.checked).toBe(1);
+    expect(result.error).toContain('knightx4/selveyknightwebsite');
+    const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ commit_sha: string }>>>;
+    expect(rows.map((row) => row.commit_sha)).toEqual([BRANCH.slice(0, 7)]);
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('refreshMainCheck for a project', () => {
+  it("stores the project's main under its own key, with no migrations reading", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const rpc = vi.fn();
+    const fetchFn = vi.fn(async (url: string) =>
+      String(url).includes('/actions/runs')
+        ? new Response(
+            JSON.stringify({ workflow_runs: [{ status: 'completed', conclusion: 'success' }] }),
+            { status: 200 },
+          )
+        : String(url).includes('/deployments')
+          ? new Response(JSON.stringify([]), { status: 200 })
+          : new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 }),
+    );
+
+    const result = await refreshMainCheck({
+      supabase: { from: () => ({ upsert }), rpc } as never,
+      now: Date.parse('2026-09-18T21:40:00.000Z'),
+      fetch: fetchFn as never,
+      repo: { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' },
+    });
+
+    expect(result).toMatchObject({ sha: MERGE, conclusion: 'passed', error: null });
+    const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
+    expect(row).toMatchObject({
+      repo: 'knightx4/selveyknightwebsite',
+      unapplied_migrations: null,
+      migrations_error: null,
+    });
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.every((url) => url.includes('/repos/knightx4/selveyknightwebsite/'))).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('refreshProjectMainChecks', () => {
+  function chain(data: unknown) {
+    const node: Record<string, unknown> = {};
+    for (const verb of ['select', 'eq', 'order']) node[verb] = () => node;
+    node.then = (resolve: (value: unknown) => unknown) =>
+      Promise.resolve({ data, error: null }).then(resolve);
+    return node;
+  }
+
+  it("reads the owner's active projects, one row each, and never another account's", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const eq = vi.fn();
+    const supabase = {
+      rpc: vi.fn(async () => ({ data: { userId: 'owner-1', email: 'o@example.com' }, error: null })),
+      from: (table: string) => {
+        if (table === 'plan_main_checks') return { upsert };
+        const node = chain([
+          { id: 'website', label: 'Site', owner: 'knightx4', repo: 'selveyknightwebsite' },
+          { id: 'old', label: 'Old', owner: 'knightx4', repo: 'old-site', archived_at: '2026-01-01' },
+        ]);
+        const plainEq = node.eq as () => unknown;
+        node.eq = (...args: unknown[]) => {
+          eq(...args);
+          return plainEq();
+        };
+        return node;
+      },
+    };
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+
+    const read = await refreshProjectMainChecks({
+      supabase: supabase as never,
+      now: Date.parse('2026-09-18T21:40:00.000Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(read).toBe(1);
+    expect(eq).toHaveBeenCalledWith('user_id', 'owner-1');
+    const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
+    expect(row.repo).toBe('knightx4/selveyknightwebsite');
+    vi.unstubAllEnvs();
+  });
+
+  it('reads nothing when the owner cannot be named', async () => {
+    const supabase = { rpc: vi.fn(async () => ({ data: null, error: null })), from: vi.fn() };
+    expect(await refreshProjectMainChecks({ supabase: supabase as never })).toBe(0);
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

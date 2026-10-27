@@ -1,6 +1,6 @@
 import type { Crumb } from '@/components/shell/breadcrumb';
 import { planRowId } from '@/lib/comments/refs';
-import { isProjectId, type PlanScope } from '@/lib/plan/projects';
+import { isProjectScope, type PlanScope } from '@/lib/plan/projects';
 import {
   flatten,
   healthOf,
@@ -149,7 +149,7 @@ export function featureCrumbs(
         {
           label,
           href:
-            module && isProjectId(module)
+            isProjectScope(module)
               ? `/dev/projects/${module}`
               : `/dev/plan#${moduleAnchor(module)}`,
         },

@@ -195,7 +195,9 @@ describe('refs against the database', () => {
     expect(tables).toEqual(expect.arrayContaining(['public.orders', 'public.plan_items', 'goals.items']));
   });
 
-  it.each(PAGES.map((entry) => [entry.table, entry] as const))(
+  // A project is keyed by a slug, not a uuid (plan #2553.1): the generic row
+  // this writes would need a slug id, so dev_projects is checked on its own.
+  it.each(PAGES.filter((entry) => entry.table !== 'public.dev_projects').map((entry) => [entry.table, entry] as const))(
     '%s resolves a real ref to its page and title, and a missing one to no longer there',
     async (table, { page }) => {
       const titleColumn = typeof page.title === 'string' ? page.title : null;

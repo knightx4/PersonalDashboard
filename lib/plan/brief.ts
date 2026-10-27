@@ -142,8 +142,9 @@ export const STATUS_WORD: Record<PlanStatus, string> = {
 
 const PRIORITY_WORD = { 1: 'next', 2: 'normal', 3: 'someday' } as const;
 
-function moduleLabel(module: PlanNode['module']): string {
-  return planScopeLabel(module);
+/** A scope's name as the plan's sections carry it: a project's label comes off its row. */
+function moduleLabel(sections: readonly PlanSection[], module: PlanNode['module']): string {
+  return sections.find((section) => section.module === module)?.label ?? planScopeLabel(module, []);
 }
 
 /**
@@ -595,7 +596,7 @@ export function planBrief(
   out.push('');
 
   const facts = [
-    `Module: ${moduleLabel(node.module)}`,
+    `Module: ${moduleLabel(sections, node.module)}`,
     `Status: ${stateWord(node, options.liveness)}`,
     `Priority: ${PRIORITY_WORD[node.priority]}`,
   ];

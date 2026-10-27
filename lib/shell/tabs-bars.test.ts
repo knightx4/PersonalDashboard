@@ -20,6 +20,7 @@ const BEFORE: Record<
       { href: '/dev/raised', label: 'Now', icon: 'devHome' },
       { href: '/dev/inbox', label: 'Inbox', icon: 'inbox', badge: 7 },
       { href: '/dev/plan', label: 'Plan', icon: 'plan' },
+      { href: '/dev/projects', label: 'Projects', icon: 'project' },
       { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
       { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
       { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },

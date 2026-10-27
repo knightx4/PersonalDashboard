@@ -20,6 +20,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/dev/plan/[number]',
   '/dev/plan/runs/[runId]',
   '/dev/posts',
+  '/dev/projects',
   '/dev/projects/[id]',
   '/dev/raised',
   '/dev/settings',

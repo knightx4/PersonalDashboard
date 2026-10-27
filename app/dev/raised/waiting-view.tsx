@@ -175,7 +175,7 @@ export function WaitingCard({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-micro text-ink-ghost">
-            {row.module ? planScopeLabel(row.module) : 'Everything'}
+            {row.module ? (row.moduleLabel ?? planScopeLabel(row.module, [])) : 'Everything'}
           </p>
           {snooze && <SnoozeMenu snoozeRef={planRowRef(row.id)} label={`#${row.number} ${row.title}`} />}
         </div>
