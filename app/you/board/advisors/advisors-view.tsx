@@ -7,6 +7,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Input, Label, Switch } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveDot } from '@/components/ui/live-dot';
@@ -181,11 +182,7 @@ export function AdvisorsView({
               <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
             ))}
           </Group>
-          <Group
-            title="Guests"
-            count={guests.length}
-            note="Personas built from public work"
-          >
+          <Group title="Guests" count={guests.length}>
             {guests.map((advisor) => (
               <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
             ))}
@@ -196,26 +193,31 @@ export function AdvisorsView({
   );
 }
 
+/** One group of the roster, folded away by its heading with its count kept on the folded line. */
 function Group({
   title,
   count,
-  note,
   children,
 }: {
   title: string;
   count: number;
-  note?: string;
   children: React.ReactNode;
 }) {
   return (
     <li>
-      <div className="card-pad-x pb-1 pt-3">
-        <SectionLabel as="h2" count={count}>
-          {title}
-        </SectionLabel>
-        {note && <p className="mt-0.5 text-small text-ink-muted">{note}</p>}
-      </div>
-      <ul className="divide-y divide-border">{children}</ul>
+      <Disclosure
+        defaultOpen
+        remember={`you.board.advisors.fold.${title}`}
+        title={
+          <SectionLabel as="span" count={count}>
+            {title}
+          </SectionLabel>
+        }
+        summaryClassName="card-pad-x rounded-none pb-1 pt-3"
+        bodyClassName=""
+      >
+        <ul className="divide-y divide-border">{children}</ul>
+      </Disclosure>
     </li>
   );
 }
@@ -327,8 +329,8 @@ function BrainStatus({ state }: { state: BrainState }) {
   }
   if (state.kind === 'building') {
     return (
-      <span className={`${base} text-accent`}>
-        <LiveDot className="size-1.5" />
+      <span className={`${base} text-ink-muted`}>
+        <LiveDot tone="muted" className="size-1.5" />
         Building
       </span>
     );

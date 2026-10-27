@@ -6,6 +6,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { ListRow } from '@/components/patterns/list-detail';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import Link from '@/components/ui/link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -200,7 +201,7 @@ export function decisionMeta(decision: BoardDecision): string {
   return `${decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle'} · You chose ${chose}`;
 }
 
-/** One group of the surface: its label, then its rows. */
+/** One group of the surface: its label, then its rows, folded away by the label with the count kept. */
 function Group({
   title,
   count,
@@ -212,10 +213,19 @@ function Group({
 }) {
   return (
     <li>
-      <SectionLabel as="h2" count={count} className="card-pad-x pb-1 pt-3">
-        {title}
-      </SectionLabel>
-      <ul className="divide-y divide-border">{children}</ul>
+      <Disclosure
+        defaultOpen
+        remember={`you.board.fold.${title}`}
+        title={
+          <SectionLabel as="span" count={count}>
+            {title}
+          </SectionLabel>
+        }
+        summaryClassName="card-pad-x rounded-none pb-1 pt-3"
+        bodyClassName=""
+      >
+        <ul className="divide-y divide-border">{children}</ul>
+      </Disclosure>
     </li>
   );
 }

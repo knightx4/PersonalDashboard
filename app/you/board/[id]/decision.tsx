@@ -110,7 +110,11 @@ export function DecisionCard({
 }) {
   const [decision, setDecision] = useState<QuestionDecision | null>(question.decision);
   const [editing, setEditing] = useState(startEditing || question.decision === null);
-  const [picked, setPicked] = useState<string | null>(question.decision?.option ?? null);
+  // A save that failed keeps the choice it was saving. The gallery draws that
+  // state from nothing, so it stands the board's recommendation in for it.
+  const [picked, setPicked] = useState<string | null>(
+    question.decision?.option ?? (startError ? (question.verdict?.recommended ?? null) : null),
+  );
   const [note, setNote] = useState(question.decision?.note ?? '');
   const [noteOpen, setNoteOpen] = useState(Boolean(question.decision?.note));
   const [error, setError] = useState<string | null>(startError);

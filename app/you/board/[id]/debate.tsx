@@ -3,6 +3,7 @@
 import { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { IconButton } from '@/components/ui/icon-button';
 import { scrim } from '@/components/ui/popover';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -92,6 +93,26 @@ function ScoreLine({ scores, options }: { scores: Scores; options: readonly Boar
         .join(' · ')}
     </span>
   );
+}
+
+/**
+ * Which option the turns of a round back, for its folded line: "3 back A,
+ * 1 backs C". A turn backs the option it scored highest; a tie or a turn
+ * with no scores backs none.
+ */
+function tally(turns: readonly DebateTurn[]): string {
+  const counts = new Map<string, number>();
+  for (const turn of turns) {
+    if (!turn.scores) continue;
+    const ranked = Object.entries(turn.scores).sort((a, b) => b[1] - a[1]);
+    if (!ranked.length || (ranked[1] && ranked[1][1] === ranked[0]![1])) continue;
+    const letter = ranked[0]![0];
+    counts.set(letter, (counts.get(letter) ?? 0) + 1);
+  }
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([letter, n]) => `${n} back${n === 1 ? 's' : ''} ${letter}`)
+    .join(', ');
 }
 
 const ROUND_TITLES: Record<Round, string> = {
@@ -225,9 +246,24 @@ export function QuestionDebate({
           {([1, 2, 3] as const).map((round) => {
             const turns = turnsInRound(question, round);
             if (!turns.length) return null;
+            const backing = round === 2 ? '' : tally(turns);
+            // A round folds away by its heading. While the meeting runs every
+            // round is open; once it is over they start folded, so each
+            // question reads as its options, scores, rounds and verdict.
             return (
-              <div key={round} className="space-y-2">
-                <SectionHeading as="h3" title={ROUND_TITLES[round]} count={turns.length} />
+              <Disclosure
+                key={round}
+                defaultOpen={running}
+                title={<span className="font-semibold">{ROUND_TITLES[round]}</span>}
+                meta={
+                  <span className="tabular">
+                    {turns.length === 1 ? '1 turn' : `${turns.length} turns`}
+                    {backing && ` · ${backing}`}
+                  </span>
+                }
+                summaryClassName="min-h-8"
+                bodyClassName="mt-2"
+              >
                 {round === 2 ? (
                   <Card padding="none">
                     <ul className="divide-y divide-border">
@@ -251,7 +287,7 @@ export function QuestionDebate({
                     <TurnList turns={turns} options={question.options} byId={byId} onOpen={onOpen} />
                   </Card>
                 )}
-              </div>
+              </Disclosure>
             );
           })}
         </>
