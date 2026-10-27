@@ -18,7 +18,7 @@ describe('weekOf', () => {
 
 describe('surfacesOfNote', () => {
   it('matches a page to the surfaces of its route, leaving off the query', () => {
-    expect(surfacesOfNote('/jobs/companies/concourse?tab=people')).toEqual(
+    expect(surfacesOfNote('/jobs/companies/northwind?tab=people')).toEqual(
       expect.arrayContaining(['jobs-company', 'jobs-company-add-person']),
     );
   });
@@ -39,7 +39,7 @@ describe('correctionWeeks', () => {
     const weeks = correctionWeeks(
       [pass('jobs-company', '2026-10-04T04:17:00Z')],
       [
-        { created_at: '2026-10-04T21:59:00Z', page_path: '/jobs/companies/concourse' },
+        { created_at: '2026-10-04T21:59:00Z', page_path: '/jobs/companies/northwind' },
         { created_at: '2026-10-04T22:00:00Z', page_path: '/learn/videos' },
         { created_at: '2026-10-05T10:00:00Z', page_path: '/preview?s=jobs-company' },
       ],

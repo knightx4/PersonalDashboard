@@ -71,7 +71,7 @@ export function bandWords(band: Band): string {
 
 /**
  * The reason beside the band, as the mark's basis:
- * "from MGT 847 Private Equity, H, 2025: an advanced course reaches level 4
+ * "from FIN 610 Private Equity, H, 2025: an advanced course reaches level 4
  * at most, and the grade and a year since keep 4. Topics guessed from the
  * course title."
  */

@@ -7,8 +7,8 @@ import { tooShortForMap, whyNotRead, type NotRead } from '@/lib/vault/map/rules'
  * After each sync the hourly job (plan #1289) asks Jev one question about each
  * new note version: does it hold a live question? Maya writes a thought only
  * on a note Jev is sure of. The line was set by a report-only trial on the
- * person's notes (scripts/maya-gate-trial.ts, written up in
- * docs/trials/2026-09-30-maya-gate.md).
+ * person's notes (scripts/maya-gate-trial.ts; its write-up quoted the
+ * person's notes, so it is not kept in the repository).
  *
  * Strict by design. There is no Haiku fallback: when Jev is off for the
  * account, has no key, errors or answers something unreadable, the note gets
@@ -23,7 +23,7 @@ import { tooShortForMap, whyNotRead, type NotRead } from '@/lib/vault/map/rules'
 
 /**
  * Jev's probability of a yes at or above which Maya writes. Set from the
- * trial of 2026-09-30 on 200 notes (docs/trials/2026-09-30-maya-gate.md):
+ * trial of 2026-09-30 on 200 notes (a trial write-up, not kept in the repository because it quoted the person's own data):
  * four of 177 notes clear 0.95 and all four hold a live question. At 0.94 the
  * first class notes come through, and at 0.90 five of 24 are course records,
  * case notes or fiction drafts.

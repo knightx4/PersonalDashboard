@@ -67,7 +67,7 @@ const STOPWORDS = new Set(
     'yes so if then than up out over into about all any some one two'
   ).split(' '),
 );
-/** A web address's last part: "yale edu" is an address, not a mention. */
+/** A web address's last part: "stateu edu" is an address, not a mention. */
 const WEB_ENDINGS = new Set(['com', 'org', 'edu', 'net', 'gov', 'io']);
 
 const WORD_RE = /[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu;

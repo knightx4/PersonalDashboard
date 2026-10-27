@@ -51,7 +51,7 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
 3. **Commit a CLAUDE.md** to the project's branch if it has none, short:
    how to install and run it, the check command, that each step merges to
    that branch and is pushed, and that its plan rows live in the dashboard
-   (knightx4/PersonalDashboard), read and written with that checkout's
+   (this repository), read and written with that checkout's
    `scripts/plan.ts`. Leave an existing CLAUDE.md alone unless it
    contradicts what you found; then add to it rather than rewriting it.
 4. **Record it.** `npx tsx scripts/plan.ts project-ready <project id> --check
@@ -74,7 +74,7 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
 
 ## Setting up the routine
 
-1. On claude.ai, create a routine on knightx4/PersonalDashboard with the
+1. On claude.ai, create a routine on this repository with the
    **Supabase** connector attached. It needs no schedule of its own, and no
    project repository: each session adds the one its step names.
 2. Paste the prompt below as its instructions.
@@ -92,7 +92,7 @@ this repository.
 ## The prompt
 
 ```
-You build plan steps for the Dev projects of knightx4/PersonalDashboard: repositories other than this one, whose features and steps are rows in plan_items with module set to the project's id.
+You build plan steps for the Dev projects of this repository: repositories other than this one, whose features and steps are rows in plan_items with module set to the project's id.
 
 The turn after this one names the project's repository, the step and the file to follow. Read that file and follow it. Where this prompt and that file disagree, the file is right.
 

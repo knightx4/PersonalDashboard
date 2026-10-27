@@ -9,7 +9,7 @@ import {
   marksLine,
 } from './course-explain';
 
-const course = { code: 'MGT 847', title: 'Private Equity', grade: 'H', year: 2025 };
+const course = { code: 'FIN 610', title: 'Private Equity', grade: 'H', year: 2025 };
 const topics = [
   { id: 'debt', title: 'Debt' },
   { id: 'equity', title: 'Equity' },
@@ -56,13 +56,13 @@ describe('the marks an answer makes', () => {
         topic_id: 'debt',
         level: 2,
         quote: 'Debt is money borrowed that must be paid back with interest.',
-        basis: 'from MGT 847 Private Equity, H, 2025, and your explanation of it: tested at level 2.',
+        basis: 'from FIN 610 Private Equity, H, 2025, and your explanation of it: tested at level 2.',
       },
       {
         topic_id: 'equity',
         level: 0,
         quote: null,
-        basis: 'from MGT 847 Private Equity, H, 2025: your explanation did not show it.',
+        basis: 'from FIN 610 Private Equity, H, 2025: your explanation did not show it.',
       },
     ]);
   });

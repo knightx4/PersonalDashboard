@@ -30,7 +30,7 @@ const index = buildTopicNames([
   { id: 'lbo', title: 'Leveraged buyout', aliases: ['LBO', 'the change', 'in an'] },
   { id: 'time', title: 'Time', aliases: null },
   { id: 'interest', title: 'Interest (economics)', aliases: ['Interest rate'] },
-  { id: 'yale', title: 'Yale University', aliases: ['yale.edu'] },
+  { id: 'stateu', title: 'State University', aliases: ['stateu.edu'] },
   { id: 'stoicism', title: 'Stoicism', aliases: ['Stoic philosophy'] },
 ]);
 
@@ -56,8 +56,8 @@ describe('finding names', () => {
 
   it('drops names made of small words and web addresses', () => {
     expect(findTopicNames(index, 'it came in an hour').has('lbo')).toBe(false);
-    expect(findTopicNames(index, 'mail me at someone@yale.edu').has('yale')).toBe(false);
-    expect(findTopicNames(index, 'my time at Yale University').get('yale')?.sure).toBe(true);
+    expect(findTopicNames(index, 'mail me at someone@stateu.edu').has('stateu')).toBe(false);
+    expect(findTopicNames(index, 'my time at State University').get('stateu')?.sure).toBe(true);
   });
 
   it('reads accents and curly apostrophes as plain letters', () => {
@@ -222,8 +222,8 @@ describe('sources', () => {
   });
 
   it('weighs a course by grade and age, and drops one that counts nothing', () => {
-    expect(topicSource('course', row({ title: 'Corporate Finance', detail: 'MGT 541', grade: 'A', year: 2026 }), 2026)).toMatchObject({
-      label: 'MGT 541 Corporate Finance',
+    expect(topicSource('course', row({ title: 'Corporate Finance', detail: 'FIN 410', grade: 'A', year: 2026 }), 2026)).toMatchObject({
+      label: 'FIN 410 Corporate Finance',
       weight: 1,
     });
     expect(topicSource('course', row({ title: 'Corporate Finance', grade: 'W', year: 2026 }), 2026)).toBeNull();

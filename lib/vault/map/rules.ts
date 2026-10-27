@@ -5,7 +5,7 @@ import { z } from 'zod';
  *
  * Nothing here calls a model or the database, so each rule can be tested on
  * its own. They are the trials' findings written as code: the 75-note trial
- * (docs/trials/2026-09-19-map-75-notes.md) changed two routing rules, and
+ * (a trial write-up, not kept in the repository because it quoted the person's own data) changed two routing rules, and
  * KNOWLEDGE-SPEC.md ("What the sweep must not read") adds two refusals.
  *
  * The learn module's classifier in lib/learn/vault still has four classes and

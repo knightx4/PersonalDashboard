@@ -14,7 +14,7 @@ import {
 const groups: ConnectionForModel[] = [
   {
     older: { title: 'Money Changes Everything', opening: 'Goetzmann on how finance shaped civilisations.' },
-    recent: [{ title: 'MGT 649 - World Financial History', opening: 'Week one: Mesopotamian loans.' }],
+    recent: [{ title: 'HIS 649 - World Financial History', opening: 'Week one: Mesopotamian loans.' }],
   },
   {
     older: { title: 'Songdo', opening: 'A city built from scratch near Incheon.' },
@@ -41,7 +41,7 @@ describe('openingOf', () => {
     expect(
       openingOf('![[Pasted image.png]] [[Investor TA - Review Session]] ## Asset Allocation $$U = E - S^2$$ **risk** [site](https://x.y)'),
     ).toBe('Investor TA - Review Session Asset Allocation risk site');
-    expect(openingOf('[[MGT 410 - Competitor|Competitor]] notes')).toBe('Competitor notes');
+    expect(openingOf('[[STR 410 - Competitor|Competitor]] notes')).toBe('Competitor notes');
   });
 
   it('is cut to its length', () => {

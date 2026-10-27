@@ -2,5 +2,5 @@
   "classification": "not_relevant",
   "ats": "greenhouse",
   "tier": "A",
-  "note": "A one-time code for the application form, which was filed as a rejection because its subject matches \"your application to\". Not job-search mail at all. The envelope is modeled on one from the Jev trial (docs/trials/2026-09-29-jev-job-email.md), with the company, names and addresses changed. The body was not fetched: Gmail was not reachable from the session that wrote this (plan #1227), and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+  "note": "A one-time code for the application form, which was filed as a rejection because its subject matches \"your application to\". Not job-search mail at all. The envelope is modeled on one from the Jev trial (a trial write-up, not kept in the repository because it quoted the person's own data), with the company, names and addresses changed. The body was not fetched: Gmail was not reachable from the session that wrote this (plan #1227), and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
 }

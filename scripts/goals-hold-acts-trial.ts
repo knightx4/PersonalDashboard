@@ -9,8 +9,8 @@
  * is optional and is printed beside the answer, for invented cases whose
  * right answer is known. Needs TYPESAFE_API_KEY. The question, the state and
  * the 0.3 line are the ones the live check uses (lib/goals/hold-acts.ts), so
- * the trial reads what the check would do. The results written up are in
- * docs/trials/2026-09-29-goals-hold-acts.md.
+ * the trial reads what the check would do. Its write-up quoted the person's
+ * goals, so it is not kept in the repository.
  */
 import { readFileSync } from 'node:fs';
 import { ACTS_QUESTION, actsState, checkActs, HOLD_ACTS_THRESHOLD, type ActsCandidate } from '../lib/goals/hold-acts';

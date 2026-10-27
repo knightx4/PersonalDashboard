@@ -207,9 +207,9 @@ const FINISH_DETAIL: FinishDetail = {
   documents: [
     {
       itemId: 'a1',
-      title: 'MGT 452: Metrics and Unit Economics for Subscription Businesses, Spring 2025 syllabus',
+      title: 'FIN 452: Metrics and Unit Economics for Subscription Businesses, Spring 2025 syllabus',
       provider: 'Open Syllabus',
-      url: 'https://example.edu/mgt452',
+      url: 'https://example.edu/fin452',
       licence: 'structure_only',
       rights: 'Copyright of the instructor; structure only',
       units: 14,

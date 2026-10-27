@@ -2,5 +2,5 @@
   "classification": "interview_invite",
   "ats": "unknown",
   "tier": "subject_heuristic",
-  "note": "An interview confirmation with the time, so the interview is booked. The trial's Jev answer was scheduling, under the reversed wording it was first given. The envelope is modeled on one from the Jev trial (docs/trials/2026-09-29-jev-job-email.md), with the company, names and addresses changed. The body was not fetched: Gmail was not reachable from the session that wrote this, and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+  "note": "An interview confirmation with the time, so the interview is booked. The trial's Jev answer was scheduling, under the reversed wording it was first given. The envelope is modeled on one from the Jev trial (a trial write-up, not kept in the repository because it quoted the person's own data), with the company, names and addresses changed. The body was not fetched: Gmail was not reachable from the session that wrote this, and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
 }
