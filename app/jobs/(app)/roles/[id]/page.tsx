@@ -67,6 +67,8 @@ import { HeaderFacts, RoleFacts } from './role-facts';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 import { PageColumn } from '@/components/shell/page-width';
 import { loadApplicationSends, loadFollowUps } from '@/lib/jobs/followup/load';
+import { goalsRoutine } from '@/lib/feedback/routine';
+import type { ResearchStatus } from '@/lib/jobs/companies/research';
 
 export const metadata = { title: 'Role' };
 
@@ -433,6 +435,27 @@ export default async function RoleDetailPage({
     [rowRef('job_search.applications', current.id as string), rowRef('job_search.roles', id)],
   );
 
+  // Whether the company research routine has run on this company, for the
+  // line on the Application tab (note 6b260c08). The newest run says whether
+  // one is going; the newest finished one says when it was done.
+  const { data: researchRuns } = await supabase
+    .from('company_research')
+    .select('status, finished_at, requested_at')
+    .eq('company_id', company.id)
+    .eq('user_id', user.id)
+    .order('requested_at', { ascending: false })
+    .limit(10);
+  const researchReady = (researchRuns ?? []).find((run) => run.status === 'ready');
+  const research = {
+    companyId: company.id,
+    companySlug: company.slug,
+    latestStatus: ((researchRuns ?? [])[0]?.status as ResearchStatus | undefined) ?? null,
+    readyAt: researchReady
+      ? ((researchReady.finished_at ?? researchReady.requested_at) as string)
+      : null,
+    available: Boolean(goalsRoutine().id && goalsRoutine().token),
+  };
+
   // One column, facts above the tabs: a detail page reads top to bottom, and
   // a rail beside the tabs squeezed them off the edge at laptop width.
   return (
@@ -736,6 +759,7 @@ export default async function RoleDetailPage({
             }),
           }))}
           companyName={company.name}
+          research={research}
           followUp={followUp}
           sends={sends}
           matchCandidates={matchCandidates}
