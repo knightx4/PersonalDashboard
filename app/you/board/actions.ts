@@ -8,21 +8,16 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
 import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
-import { callBoardMeeting } from '@/lib/you/board-start';
+import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
 import {
-  cleanQuestion,
   DECIDABLE,
   decideBoardQuestion,
   decisionError,
-  insertBoardQuestion,
-  listBoardAdvisors,
   loadBoardQuestion,
   moveBoardQuestion,
-  type BoardQuestion,
   type DecisionChoice,
   type QuestionInput,
 } from '@/lib/you/board-questions';
-import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import {
   ANSWER_MAX,
   clearBoardMark,
@@ -194,34 +189,6 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
 }
 
 /**
- * Fire a called meeting about one question (plan #2561.4, replacing Call a
- * meeting from #2540.5). The question stays queued with no meeting: the
- * meeting itself moves it to discussing and names itself on it
- * (.claude/skills/board/SKILL.md). The meeting runs on the account's plan, so
- * it only starts when the person presses. One meeting is open at a time; a
- * second is told so and the question waits for Sunday.
- */
-async function convene(
-  client: YouSupabaseClient,
-  userId: string,
-  question: BoardQuestion,
-): Promise<{ error: string | null }> {
-  const result = await callBoardMeeting({
-    client,
-    userId,
-    decision: question.question,
-    questionIds: [question.id],
-    routine: boardRoutine(),
-  });
-  if (result.started) return { error: null };
-  if (result.reason === 'running') return { error: QUEUED_WHILE_RUNNING };
-  return { error: `Your question is saved for Sunday, but the meeting did not start: ${result.error}` };
-}
-
-const QUEUED_WHILE_RUNNING =
-  'A board meeting is already running, so your question is saved for Sunday. Press Ask now on it once that meeting ends.';
-
-/**
  * Ask the board a question: save it queued, and with `now` convene a meeting
  * about it at once. A meeting that cannot start leaves the question queued
  * for Sunday and says why, with `queued` and its id so the card can close
@@ -235,16 +202,10 @@ export async function askBoard(
   try {
     const user = await requireUser();
     const client = await createYouClient();
-    const roster = await listBoardAdvisors(client, user.id);
-    const clean = cleanQuestion(
-      input,
-      roster.map((a) => a.key),
-    );
-    if (!clean.ok) return { error: clean.error };
-    const question = await insertBoardQuestion(client, user.id, clean.value);
-    const result = when === 'now' ? await convene(client, user.id, question) : { error: null };
+    const result = await putQuestionToBoard({ client, userId: user.id, question: input, when });
+    if (!result.ok) return { error: result.error };
     revalidatePath('/you/board');
-    return { error: result.error, queued: true, questionId: question.id };
+    return { error: result.convening, queued: true, questionId: result.question.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your question was not saved. Try again.' };
   }
