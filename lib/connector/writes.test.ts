@@ -60,6 +60,7 @@ describe('runConnectorWrite', () => {
       'save_job',
       'save_about_me',
       'set_detail',
+      'ask_board',
       'mark_issue_unread',
       'save_story',
       'send_story_to_learn',

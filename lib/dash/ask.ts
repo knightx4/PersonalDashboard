@@ -178,7 +178,7 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
+or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to put a question to their board ("ask the board whether ..."), call ask_board with the question, the options they gave, the numbers and limits from the conversation as context, and their lean if they said one; it queues the question for the Sunday meeting, and pass when 'now' only if they asked for a meeting now. Answer with the question and the link to the Board tab. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
 drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
 with the whole new text. When they ask for a post about the app or how
 they build it, read what it rests on, call post_pictures for a picture of that screen,

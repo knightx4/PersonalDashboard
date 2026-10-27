@@ -13,7 +13,7 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The You write tools, by name, which is the kind each change is kept under. */
-export const YOU_CHANGE_KINDS = ['add_place', 'change_place', 'save_job', 'save_about_me', 'set_detail'] as const;
+export const YOU_CHANGE_KINDS = ['add_place', 'change_place', 'save_job', 'save_about_me', 'set_detail', 'ask_board'] as const;
 
 export type YouChangeKind = (typeof YOU_CHANGE_KINDS)[number];
 
