@@ -109,6 +109,10 @@ export type BoardMinutes = {
   scorecard: BoardScore[];
   memos: BoardMemo[];
   memosNote: string | null;
+  /** New-form minutes (plan #2561.3): the question ids in the order debated. */
+  agenda: string[];
+  /** New-form minutes: who sat and why, guests left out, questions skipped. */
+  chairNote: string | null;
 };
 
 export type BoardMeeting = {
@@ -266,6 +270,8 @@ export function parseMinutes(value: unknown): BoardMinutes {
       ];
     }),
     memosNote: textOrNull(row.memos_note),
+    agenda: list(row.agenda).filter((id): id is string => typeof id === 'string'),
+    chairNote: textOrNull(row.chair_note),
   };
 }
 

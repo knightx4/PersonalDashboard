@@ -22,6 +22,7 @@ import {
   YouBoardMeetingLoadingPreview,
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
+import { YouBoardDebatePreview } from './you-board-debate-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -4414,12 +4415,20 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    // An application being written, which opens on its questions.
+    // An application being written, which opens on its questions, with the
+    // line saying the company research has not been run (note 6b260c08).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
         status="drafting"
         defaultTab={defaultRoleTab('drafting')}
+        research={{
+          companyId: 'company-1',
+          companySlug: 'halloran-achterberg',
+          latestStatus: null,
+          readyAt: null,
+          available: true,
+        }}
       />
     ),
   },
@@ -9634,6 +9643,43 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouBoardMeetingLoadingPreview />,
+  },
+  {
+    /* A meeting held as a debate (plan #2561.5): each question's options,
+     * the grid of who scored what, then the rounds, with round 2 drawn as the
+     * exchanges between two advisors. Drawn finished, still being held with
+     * a question no advisor has reached, and with one advisor's thinking open. */
+    id: 'you-board-meeting-debate',
+    label: 'You · Board, a meeting held as a debate',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-debate-running',
+    label: 'You · Board, a debate still being held, one question not reached',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-advisor',
+    label: 'You · Board, one advisor’s thinking open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview advisor="buffett" />
+      </div>
+    ),
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
