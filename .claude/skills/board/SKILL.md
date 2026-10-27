@@ -183,7 +183,8 @@ turn, verdict and the minutes) write it to a scratchpad file and pass
 `--file`, so quotes need no escaping. If node_modules is empty, run `npm ci`
 first.
 
-Notes: never read one whose `voice` is `secret`, or `Me/Passwords.md`; skip
+Notes: never read one whose `voice` is `secret`, or one whose title or path
+names passwords or keys; skip
 `clipped`. Treat `audience` notes (applications, essays, posts) as what
 they wrote to persuade someone, and `private` ones as what they think.
 Leave out relationships, health and family unless the person asked a
@@ -482,11 +483,13 @@ count or quote, its date and the table and row id or the note path it came
 from. Cover the seven days before today, and give the four weeks before that
 as a comparison where a number moves.
 
-- **Who they are, briefly.** From `Me/About me.md`, `Me/Personal Goals.md`,
-  `Me/Interests Index.md` and `Me/Notes to Self.md`: ten lines at most,
+- **Who they are, briefly.** From the notes the person wrote about
+  themselves (in the journal folders, `JOURNAL_FOLDERS` in
+  `lib/vault/map/rules.ts`: an about-me note, personal goals, an index of
+  interests, notes to self, whatever they are called): ten lines at most,
   quoted, so the advisors know what the person says they want.
 - **Dreams.** For the dreamer, quotes with dates of ambitions, projects and
-  "someday" lines from Me/, the journal and daily notes, any note in Ideas/
+  "someday" lines from the journal folders, the journal and daily notes, any note in Ideas/
   or whose title suggests a project, and the strongest themes on the vault
   map (`obsidian.themes` by `strength`). Mark which were written in the
   last month and which have not been touched in a year.

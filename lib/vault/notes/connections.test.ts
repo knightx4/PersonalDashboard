@@ -9,9 +9,8 @@ import {
 } from '@/lib/vault/notes/connections';
 
 /**
- * Which pairs become the week's connections. The pairs below are the live
- * vault's, from the week of 19 September 2026 (plan #1115), so each rule is
- * checked on the case that made it.
+ * Which pairs become the week's connections. The pairs below are made up in
+ * the shape of the cases that made each rule (plan #1115).
  */
 
 function pair(
@@ -22,7 +21,7 @@ function pair(
 ): NeighbourPair {
   return {
     recentId: extra.recentId ?? `r-${recent}`,
-    recentPath: extra.recentPath ?? `Yale/${recent}.md`,
+    recentPath: extra.recentPath ?? `Courses/${recent}.md`,
     recentTitle: recent,
     recentChars: 5_000,
     olderId: extra.olderId ?? `o-${older}`,
@@ -37,8 +36,8 @@ function pair(
 
 describe('the pairs left out', () => {
   it('keeps a pair across subjects the person did not name alike', () => {
-    expect(droppedBecause(pair('MGT 649 - World Financial History', 'Money Changes Everything', 0.768))).toBeNull();
-    expect(droppedBecause(pair('bang on the drum all day', 'About me', 0.63))).toBeNull();
+    expect(droppedBecause(pair('ECON 210 - History of Trade', 'Notes on Shipping', 0.768))).toBeNull();
+    expect(droppedBecause(pair('a song stuck in my head', 'What I want next', 0.63))).toBeNull();
   });
 
   it('drops a weak pair and the same material twice', () => {
@@ -48,68 +47,68 @@ describe('the pairs left out', () => {
 
   it('drops an older note that is near everything', () => {
     expect(
-      droppedBecause(pair('MGT 541 - Corporate Finance', 'Financial Markets Problem Set 1', 0.809, { mutualRank: 13 })),
+      droppedBecause(pair('STAT 101 - Sampling', 'Probability Problem Set 1', 0.809, { mutualRank: 13 })),
     ).toBe('hub');
   });
 
   it('drops two notes named alike', () => {
-    expect(droppedBecause(pair('MGT 850 - Science of Experience', 'MGT 850 - The Science of Experience', 0.8))).toBe(
+    expect(droppedBecause(pair('STAT 101 - Week 1', 'STAT 101 - The Week 1', 0.8))).toBe(
       'named alike',
     );
-    expect(droppedBecause(pair('covet health application', 'UPSTACK Application', 0.757))).toBe('named alike');
+    expect(droppedBecause(pair('acme application', 'Northwind Application', 0.757))).toBe('named alike');
   });
 
   it('drops two applications however they are named', () => {
     expect(
       droppedBecause(
-        pair('Galaxy Take Home Quiz', 'Adonis Application', 0.679, {
-          recentPath: 'Career/Job Applications/Galaxy Take Home Quiz.md',
-          olderPath: 'Career/Job Applications/Adonis Application.md',
+        pair('Halvorsen Take Home Quiz', 'Northwind Application', 0.679, {
+          recentPath: 'Career/Job Applications/Halvorsen Take Home Quiz.md',
+          olderPath: 'Career/Job Applications/Northwind Application.md',
         }),
       ),
     ).toBe('applications');
   });
 
   it('drops an index or an export on either side', () => {
-    expect(droppedBecause(pair('_Master Summary', 'MGT 430 - The Executive', 0.777))).toBe('export');
-    expect(droppedBecause(pair('Yale Combined', 'Hedge Funds', 0.672, { recentChars: 383_887 }))).toBe('export');
+    expect(droppedBecause(pair('_Master Summary', 'STAT 210 - Regression', 0.777))).toBe('export');
+    expect(droppedBecause(pair('Courses Combined', 'Index Funds', 0.672, { recentChars: 383_887 }))).toBe('export');
   });
 });
 
 describe('title words', () => {
   it('ignores short and common words and plurals', () => {
-    expect(sharesTitleWord('on following your passion', 'bang on the drum all day')).toBe(false);
+    expect(sharesTitleWord('on choosing a hobby', 'a song stuck in my head')).toBe(false);
     expect(sharesTitleWord('Job Applications', 'array application')).toBe(true);
   });
 
   it('calls two titles nearly the same when half their words are shared', () => {
-    expect(nearlySameTitle('MGT 885 - Commercial Real Estate Investing', 'MGT 885 - Commercial Real Estate Investing')).toBe(true);
-    expect(nearlySameTitle('MGT 816 - Private Firm CFO', 'MGT 847 - Private Equity Leveraged Buyouts')).toBe(false);
+    expect(nearlySameTitle('STAT 310 - Survey Design and Analysis', 'STAT 310 - Survey Design and Analysis')).toBe(true);
+    expect(nearlySameTitle('STAT 216 - Time Series Forecasting', 'STAT 247 - Time Series Methods')).toBe(false);
   });
 });
 
 describe('picking the week', () => {
   it('groups recent notes by the older note they come back to, each in its closest group only', () => {
     const picked = pickConnections([
-      pair('MGT 816 - Private Firm CFO', 'Galaxy Digital Application', 0.837, { mutualRank: 3 }),
-      pair('MGT 847 - Private Equity Leveraged Buyouts', 'Galaxy Digital Application', 0.804, { mutualRank: 4 }),
-      pair('MGT 847 - Private Equity Leveraged Buyouts', 'Venture Capital', 0.7),
-      pair('MGT 411 - Customer', 'Business Frameworks', 0.778),
+      pair('STAT 216 - Time Series Forecasting', 'Halvorsen Digital Application', 0.837, { mutualRank: 3 }),
+      pair('STAT 247 - Time Series Methods', 'Halvorsen Digital Application', 0.804, { mutualRank: 4 }),
+      pair('STAT 247 - Time Series Methods', 'Venture Capital', 0.7),
+      pair('STAT 150 - Data Visualisation', 'Business Frameworks', 0.778),
     ]);
     expect(picked.map((c) => [c.older.title, c.recent.map((n) => n.title)])).toEqual([
-      ['Galaxy Digital Application', ['MGT 816 - Private Firm CFO', 'MGT 847 - Private Equity Leveraged Buyouts']],
-      ['Business Frameworks', ['MGT 411 - Customer']],
+      ['Halvorsen Digital Application', ['STAT 216 - Time Series Forecasting', 'STAT 247 - Time Series Methods']],
+      ['Business Frameworks', ['STAT 150 - Data Visualisation']],
     ]);
     expect(picked[0]!.similarity).toBe(0.837);
   });
 
   it('names a course and its summary once', () => {
     const [only] = pickConnections([
-      pair('MGT 885 - Commercial Real Estate Investing', 'CRE - Homework 2', 0.765, {
+      pair('STAT 310 - Survey Design and Analysis', 'Problem Set 2', 0.765, {
         recentId: 'summary',
-        recentPath: 'Yale/Course Summaries/MGT 885 - Commercial Real Estate Investing.md',
+        recentPath: 'Courses/Course Summaries/STAT 310 - Survey Design and Analysis.md',
       }),
-      pair('MGT 885 - Commercial Real Estate Investing', 'CRE - Homework 2', 0.752, { recentId: 'notes' }),
+      pair('STAT 310 - Survey Design and Analysis', 'Problem Set 2', 0.752, { recentId: 'notes' }),
     ]);
     expect(only!.recent.map((note) => note.id)).toEqual(['summary']);
   });
