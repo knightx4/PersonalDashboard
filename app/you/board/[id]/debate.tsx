@@ -28,6 +28,7 @@ import type { BoardOption } from '@/lib/you/board-questions';
 import { AdvisorMark } from '../advisor-mark';
 import { SEAT_ICONS } from '../seat-label';
 import { VerdictAndDecision, type DecideAction } from './decision';
+import type { MakeProps } from './make';
 import { Evidence, Prose, ReceiptLink } from './prose';
 
 /**
@@ -132,6 +133,8 @@ export function QuestionDebate({
   decide,
   decideOpen,
   decideError,
+  make,
+  makeFailed,
 }: {
   question: DebateQuestion;
   number: number;
@@ -144,6 +147,9 @@ export function QuestionDebate({
   /** For the gallery: draw the decision form open, with this error showing. */
   decideOpen?: boolean;
   decideError?: string | null;
+  /** Writes the decision as todos or goal steps (plan #2561.9). */
+  make?: MakeProps;
+  makeFailed?: string | null;
 }) {
   const headingId = `board-q-${question.id}`;
   const byId = new Map(advisors.map((a) => [a.id, a]));
@@ -300,6 +306,8 @@ export function QuestionDebate({
           decide={decide}
           editing={decideOpen}
           error={decideError}
+          make={make}
+          makeFailed={makeFailed}
         />
       )}
     </section>

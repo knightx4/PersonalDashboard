@@ -170,6 +170,58 @@ const decidedRows = questionRows.map((row, i) =>
 );
 
 const turns = [...q1Turns, ...q2Turns];
+
+/**
+ * Make it happen (plan #2561.9): the contract question decided as the board
+ * recommended, so its conditions are offered with the option. The first
+ * condition carries a date.
+ */
+const makeRows = [
+  {
+    ...questionRows[0],
+    verdict: {
+      ...questionRows[0].verdict,
+      conditions: [
+        'Get one evening a week written into the contract before you sign, by 13 November.',
+        'Keep two applications a week going through the three months.',
+      ],
+    },
+    status: 'decided',
+    decided_option: 'A',
+    decision_note: null,
+    decided_at: '2026-11-01T20:15:00Z',
+  },
+];
+const makeDebate = debateFrom(makeRows, q1Turns, advisorRows, [Q1]);
+const MADE = {
+  todo: '00000000-0000-4000-8000-0000000000f1',
+  step: '00000000-0000-4000-8000-0000000000f2',
+};
+/** After the action was written as a todo: the condition still to write, the action listed. */
+const madeDebate = {
+  ...makeDebate,
+  questions: makeDebate.questions.map((q) => ({
+    ...q,
+    made: [
+      {
+        kind: 'todo' as const,
+        id: MADE.todo,
+        key: 'action',
+        title: 'Take the contract, full time, from 16 November',
+        dueOn: '2026-11-16',
+        done: false,
+        href: `/todo/all?status=all&focus=${MADE.todo}`,
+        goal: null,
+      },
+    ],
+  })),
+};
+const GOALS = [
+  { id: '00000000-0000-4000-8000-0000000000b1', title: 'Land a senior analytics role by February', area: 'Career' },
+  { id: '00000000-0000-4000-8000-0000000000b2', title: 'Release the second album', area: 'Music' },
+  { id: '00000000-0000-4000-8000-0000000000b3', title: 'Keep the runway above six months', area: 'Money' },
+];
+const makeAction = async () => ({ error: null });
 const debate = debateFrom(questionRows, turns, advisorRows, [Q1, Q2]);
 const decidedDebate = debateFrom(decidedRows, turns, advisorRows, [Q1, Q2]);
 /** Still being held: the first question's first round so far, the second not reached. */
@@ -223,12 +275,15 @@ export function YouBoardDebatePreview({
   state = 'ready',
   advisor,
   decision,
+  make,
 }: {
   state?: 'ready' | 'running';
   /** Draw this advisor's thinking open. */
   advisor?: keyof typeof A;
   /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
   decision?: 'made' | 'open' | 'error';
+  /** Make it happen under the decision (plan #2561.9): 'todos' as first offered, 'steps' with a goal picked and a failed write, 'made' after the action was written. */
+  make?: 'todos' | 'steps' | 'made';
 }) {
   const running = state === 'running';
   return (
@@ -246,7 +301,27 @@ export function YouBoardDebatePreview({
       }
       minutes={running ? parseMinutes(null) : minutes}
       marks={[]}
-      debate={running ? runningDebate : decision === 'made' || decision === 'open' ? decidedDebate : debate}
+      debate={
+        running
+          ? runningDebate
+          : make === 'made'
+            ? madeDebate
+            : make
+              ? makeDebate
+              : decision === 'made' || decision === 'open'
+                ? decidedDebate
+                : debate
+      }
+      make={
+        make
+          ? {
+              action: makeAction,
+              goals: GOALS,
+              today: '2026-11-02',
+              ...(make === 'steps' ? { start: { mode: 'goal' as const, goalId: GOALS[0].id } } : {}),
+            }
+          : undefined
+      }
       scorecard={scorecardFrom([])}
       subject={{
         ref: null,
@@ -266,6 +341,7 @@ export function YouBoardDebatePreview({
       open={{
         ...(advisor ? { advisor: A[advisor] } : {}),
         ...(decision === 'open' || decision === 'error' ? { decide: decision } : {}),
+        ...(make === 'steps' ? { make: 'error' as const } : {}),
       }}
     />
   );
