@@ -24,7 +24,10 @@ Everything the person reads in Dev names the four levels the same way:
   `/dev/plan`. The Projects tab (`/dev/projects`) lists these rows and
   adds one from the GitHub repositories `GITHUB_READ_TOKEN` can see, or
   from a typed owner/name; Ask Dash's `add_project` does the same, and
-  archiving one takes its section away and keeps its rows.
+  archiving one takes its section away and keeps its rows. A new project
+  starts with a "Set up" feature holding one ready step, whose run records
+  the repository's check command and set-up time on the row and commits a
+  CLAUDE.md there (`lib/plan/project-setup.ts`).
 - **Feature**: a row at the top of a module, with no parent. It carries the
   done-when the steps beneath it add up to.
 - **Step**: a row under a feature.

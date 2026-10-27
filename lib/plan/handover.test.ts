@@ -145,6 +145,21 @@ describe('where a row is built', () => {
     vi.unstubAllEnvs();
   });
 
+  it('tells the session on a project not yet set up how to record its check (plan #2553.6)', async () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    const fresh = [{ ...PROJECT_FIXTURES[0], routineEnv: null, setUpAt: null }];
+    plan.data = { items: site, dependencies: [], projects: fresh };
+    await handStepToClaude({ supabase, userId: 'u', id: 't' });
+    expect(started[0]).toContain('has not been set up for Dash yet');
+    expect(started[0]).toContain('scripts/plan.ts project-ready website --check');
+    started.length = 0;
+    plan.data = { items: site, dependencies: [], projects: [{ ...fresh[0], setUpAt: '2026-10-27T00:00:00Z' }] };
+    await handStepToClaude({ supabase, userId: 'u', id: 't' });
+    expect(started[0]).not.toContain('has not been set up');
+    vi.unstubAllEnvs();
+  });
+
   it("keeps the website's own routine and its old preamble while that routine is set", async () => {
     vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
     vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');

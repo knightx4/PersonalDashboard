@@ -23,8 +23,10 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * added is refused, and one archived is put back. A bare name ("my recipes
  * repo") is matched against the repositories GITHUB_READ_TOKEN lists.
  *
- * Undo deletes a row it added while nothing is filed under it, and archives
- * again one it put back, by the one undo rule in lib/core/dash-actions.ts.
+ * A new project comes with a "Set up" feature and its first ready step
+ * (lib/plan/project-setup.ts, plan #2553.6). Undo archives a project it
+ * added, since those rows are filed under it (archivesProject in
+ * lib/core/dash-actions.ts), and archives again one it put back.
  */
 
 class Refused extends Error {}
@@ -62,7 +64,7 @@ async function addProject(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   const result = await addDevProject({ db, userId: ctx.userId, repository });
   if (!result.ok) throw new Refused(`${result.error} Nothing was added.`);
 
-  const { project, restored } = result;
+  const { project, restored, setUp } = result;
   const after = await read(project.id);
   const href = `/dev/projects/${project.id}`;
   const input: PostChangeInput = {
@@ -81,8 +83,15 @@ async function addProject(ctx: DashWriteContext, args: Args): Promise<DashWriteR
     op: restored ? 'update' : 'insert',
     before: restored ? before : null,
     after,
-    summary: `Dash ${restored ? 'put back' : 'added'} the project ${project.label}, built in ${project.repo.owner}/${project.repo.repo}. It has its own section on the plan.`,
+    summary:
+      `Dash ${restored ? 'put back' : 'added'} the project ${project.label}, built in ${project.repo.owner}/${project.repo.repo}. It has its own section on the plan.` +
+      (setUp && !('error' in setUp)
+        ? ` Its first step, under Set up, readies the repository for Dash: press Send to Dash on it.`
+        : setUp
+          ? ` Its set-up step could not be written (${setUp.error}).`
+          : ''),
     row: { table: TABLE, ref: project.id, title: project.label, href },
+    ...(restored ? {} : { undo: { archive_project: true } }),
   };
 }
 

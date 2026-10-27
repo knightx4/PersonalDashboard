@@ -48,6 +48,16 @@ describe('add_project', () => {
     ]);
   });
 
+  it('writes the set-up step with it and is undone by archiving (plan #2553.6)', async () => {
+    const result = await tool.apply(ctx(), { repository: 'recipes' });
+    expect(result).toMatchObject({ ok: true, undo: { archive_project: true } });
+    if (result.ok) expect(result.summary).toMatch(/under Set up/);
+    expect(tables['public.plan_items'].map((row) => row.title)).toEqual([
+      'Set up',
+      'Make knightx4/recipes ready for Dash to build in',
+    ]);
+  });
+
   it('refuses a name GitHub does not list, and adds nothing', async () => {
     const result = await tool.apply(ctx(), { repository: 'nothing-here' });
     expect(result.ok).toBe(false);

@@ -29,7 +29,9 @@ import { MODEL_CHANGE_KINDS } from '@/lib/ask/model-changes';
  *   delete  the row Dash removed is inserted again as it was.
  *
  * One insert is archived instead (archivesBrief): a research brief Dash
- * started, which its run goes on filling in after the change is kept.
+ * started, which its run goes on filling in after the change is kept. So is
+ * a Dev project Dash added (archivesProject), which is written with its
+ * set-up step filed under it.
  *
  * The undo itself is not a new action: the action is marked `undone`, which
  * the table's guard allows only from `done`, so a second press finds nothing
@@ -259,6 +261,22 @@ export function noUndoReason(action: Pick<DashAction, 'undo'>): string | null {
  */
 export function archivesBrief(action: Pick<DashAction, 'op' | 'subjectRef' | 'undo'>): boolean {
   return action.op === 'insert' && action.undo?.archive_brief === true && !!action.subjectRef?.startsWith('learn.briefs:');
+}
+
+/**
+ * Whether undoing this archives a Dev project rather than deleting it (plan
+ * #2553.6). Ask Dash's add_project writes the project with a "Set up"
+ * feature and step filed under it, so a delete would leave those rows under
+ * an id nothing names. Undo archives the project instead, the same as the
+ * Projects page's Archive: its section goes and its rows stay. The record
+ * says so with `undo.archive_project`.
+ */
+export function archivesProject(action: Pick<DashAction, 'op' | 'subjectRef' | 'undo'>): boolean {
+  return (
+    action.op === 'insert' &&
+    action.undo?.archive_project === true &&
+    !!action.subjectRef?.startsWith('public.dev_projects:')
+  );
 }
 
 /**
@@ -522,7 +540,9 @@ export type UndoPlan =
   | { op: 'update'; values: Values }
   | { op: 'insert'; values: Values }
   /** Archive a research brief and shelve its list (archivesBrief). */
-  | { op: 'archive_brief'; trackId: string | null };
+  | { op: 'archive_brief'; trackId: string | null }
+  /** Archive a Dev project (archivesProject). */
+  | { op: 'archive_project' };
 
 /** Why an action in this status cannot be undone. */
 function notDone(status: DashActionStatus): string {
@@ -604,6 +624,10 @@ export function planUndo(
   if (archivesBrief(action)) {
     if (current.archived_at) return { ok: false, reason: 'It has been archived already, so there is nothing to undo.' };
     return { ok: true, plan: { op: 'archive_brief', trackId: typeof current.track_id === 'string' ? current.track_id : null } };
+  }
+  if (archivesProject(action)) {
+    if (current.archived_at) return { ok: false, reason: 'It has been archived already, so there is nothing to undo.' };
+    return { ok: true, plan: { op: 'archive_project' } };
   }
   if (movedColumns(current, after!).length > 0) {
     return {
@@ -733,6 +757,19 @@ async function apply(deps: DashActionDeps, ref: string, plan: UndoPlan, current:
         .eq('status', 'active');
       if (trackError) console.error(`undo: shelving the reading list of ${ref} failed`, trackError.message);
     }
+    return;
+  }
+
+  if (plan.op === 'archive_project') {
+    const { data, error } = await client
+      .from(table)
+      .update({ archived_at: deps.now ? deps.now() : new Date().toISOString() })
+      .eq('user_id', deps.userId)
+      .eq('id', id)
+      .is('archived_at', null)
+      .select('id');
+    if (error) throw new Refused(`Dash could not archive it: ${error.message}`);
+    if ((data ?? []).length === 0) throw new Refused(CHANGED);
     return;
   }
 
