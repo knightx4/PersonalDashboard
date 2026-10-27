@@ -187,7 +187,7 @@ The decisions they put to their board: the question, its options, the way they w
 - Search: `question`, `context`, `lean`, `decision_note`
 - Name a row by `question`; link it by `id`
 - Opens at `/you/board`
-- options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. verdict is the board's recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). reviews is the board checking back 30 and 90 days after the decision: account is Dash's, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026).
+- options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. verdict is the board's recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). reviews is the board checking back 30 and 90 days after the decision: account is Dash's, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026). door is one_way or two_way; success_measure, decide_by and lean_probability (0 to 1) are theirs; premortem and tripwire are written with the board (you 0029).
 
 ### `core.conversation_turns` (Learn)
 
@@ -616,6 +616,24 @@ The schools, certifications, honors, skills and courses on their LinkedIn profil
 - Name a row by `name`; link it by `id`
 - Opens at `/you/work#profile-<id>`
 - kind is school, certification, honor, skill or course. detail is a school's degree or a certification's authority; code is a certification's license number or a course's number. started and ended are "YYYY" or "YYYY-MM"; an honor's started is the day it was issued. Written by the LinkedIn import (plan #2432.7).
+
+### `you.advisor_chats` (You)
+
+The one-on-one talks they started with one of their advisors, by title.
+
+- Search: `title`
+- Name a row by `title`; link it by `id`
+- Opens at `/you/board`
+- advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).
+
+### `you.advisor_messages` (You)
+
+What they said to an advisor in a one-on-one talk, and what the advisor answered.
+
+- Search: `text`
+- Name a row by `text`; link it by `id`
+- Opens at `/you/board`
+- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029).
 
 ### `core.files` (Files)
 
