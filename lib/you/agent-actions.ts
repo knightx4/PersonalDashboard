@@ -91,6 +91,12 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
+  'app/you/board/review-actions.ts': {
+    answerBoardReview: none(
+      'theirs',
+      "How a decision turned out is the person's own verdict on it; the advisors' picks are graded from that answer (plan #2561.8).",
+    ),
+  },
   'app/you/board/make-actions.ts': {
     makeDecisionHappen: none(
       'theirs',
@@ -151,7 +157,10 @@ export const youActions: ModuleActions = {
       'theirs',
       "A panel is the person's own grouping of who they want to hear from; they make and name it themselves (plan #2561.12).",
     ),
-    renameBoardPanel: none('theirs', "Naming a panel is the person's own grouping of advisors (plan #2561.12)."),
+    renameBoardPanel: none(
+      'theirs',
+      "Naming a panel is the person's own grouping of advisors (plan #2561.12).",
+    ),
     setBoardPanelAdvisors: none(
       'theirs',
       "Who sits on a panel is the person's own call on whom to hear from (plan #2561.12).",
