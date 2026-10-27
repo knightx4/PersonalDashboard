@@ -5,7 +5,9 @@ import {
   type AddStart,
   type AdvisorActions,
 } from '@/app/you/board/advisors/advisors-view';
+import { PREVIEW_PANELS } from './you-board-surfaces';
 import { BoardListSkeleton } from '@/app/you/board/board-skeleton';
+import { PanelView } from '@/app/you/board/advisors/panels/[id]/panel-view';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
 
 /**
@@ -21,6 +23,7 @@ const actions: AdvisorActions = {
   add: async () => ({ error: null, saved: true }),
   retry: async () => ({ error: null }),
   setActive: async () => ({ error: null }),
+  createPanel: async () => ({ error: null, panelId: PREVIEW_PANELS[0].id }),
 };
 
 function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'name' | 'question'>): RosterAdvisor {
@@ -110,6 +113,27 @@ const guests: RosterAdvisor[] = [
     sources: 16,
   }),
   advisor({
+    key: 'dimon',
+    name: 'Jamie Dimon',
+    question: 'Can you carry this out, and what happens if it goes wrong?',
+    focus: 'Execution, facing hard facts early, and preparing for the bad case.',
+    sources: 13,
+  }),
+  advisor({
+    key: 'jobs',
+    name: 'Steve Jobs',
+    question: 'Is this the one thing worth doing, and are you willing to say no to the rest?',
+    focus: 'Focus, saying no, and the care put into the work itself.',
+    sources: 15,
+  }),
+  advisor({
+    key: 'washington',
+    name: 'George Washington',
+    question: 'Does this keep your word and your reputation intact under pressure?',
+    focus: 'Duty, restraint, character, and knowing when to step back.',
+    sources: 10,
+  }),
+  advisor({
     key: 'franklin',
     name: 'Benjamin Franklin',
     question: 'Is this useful, and does it make you better day by day?',
@@ -151,6 +175,7 @@ export function YouBoardAdvisorsPreview({
   return (
     <AdvisorsView
       advisors={[...seats, ...guests, ...extra]}
+      panels={PREVIEW_PANELS}
       now={NOW}
       actions={actions}
       start={start}
@@ -168,4 +193,33 @@ export function YouBoardAdvisorsPreview({
 
 export function YouBoardAdvisorsLoadingPreview() {
   return <BoardListSkeleton />;
+}
+
+const panelActions = {
+  rename: async () => ({ error: null }),
+  setAdvisors: async () => ({ error: null }),
+  remove: async () => ({ error: null }),
+};
+
+/** One panel's page: the seeded Money panel, a panel just made with no advisors, or the delete confirm showing. */
+export function YouBoardPanelPreview({ state = 'ready' }: { state?: 'ready' | 'empty' | 'delete' }) {
+  const panel =
+    state === 'empty' ? { id: PREVIEW_PANELS[0].id, name: 'New panel', advisors: [] } : PREVIEW_PANELS[0];
+  return (
+    <PanelView
+      panel={panel}
+      roster={[...seats, ...guests]}
+      actions={panelActions}
+      armDelete={state === 'delete'}
+      subject={{
+        ref: null,
+        path: [
+          { label: 'You', href: '/you' },
+          { label: 'Board', href: '/you/board' },
+          { label: 'Advisors', href: '/you/board/advisors' },
+          { label: panel.name, href: `/you/board/advisors/panels/${panel.id}` },
+        ],
+      }}
+    />
+  );
 }

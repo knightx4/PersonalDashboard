@@ -3,6 +3,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listBoardMeetings, nextMeetingDay } from '@/lib/you/board';
 import { listBoardAdvisors, listBoardQuestions, listDecisions } from '@/lib/you/board-questions';
+import { listPanels } from '@/lib/you/board-panels';
 import { listBoardAsks } from '@/lib/you/board-asks';
 import { acceptSuggestion, answerBoardAsk, askBoard, conveneQuestion, dismissSuggestion } from './actions';
 import { BoardListView } from './board-list-view';
@@ -24,12 +25,13 @@ function readAt(): number {
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [meetings, questions, asks, decisions, advisors, settings] = await Promise.all([
+  const [meetings, questions, asks, decisions, advisors, panels, settings] = await Promise.all([
     listBoardMeetings(client, user.id),
     listBoardQuestions(client, user.id),
     listBoardAsks(client, user.id),
     listDecisions(client, user.id),
     listBoardAdvisors(client, user.id),
+    listPanels(client, user.id),
     loadAccountSettings(user.id),
   ]);
   return (
@@ -38,6 +40,7 @@ export default async function Page() {
       questions={questions}
       asks={asks}
       advisors={advisors}
+      panels={panels}
       decisions={decisions}
       nextMeeting={nextMeetingDay(settings.timezone)}
       timezone={settings.timezone}

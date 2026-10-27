@@ -14,6 +14,7 @@ import {
   type MeetingActions,
   type MeetingOpen,
 } from '@/app/you/board/[id]/meeting-view';
+import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import {
   parseMinutes,
@@ -552,6 +553,14 @@ const boardAsks: PersonAsk[] = [
   },
 ];
 
+/** The seeded four panels, as the compose card offers them. */
+export const PREVIEW_PANELS: BoardPanel[] = [
+  { id: '00000000-0000-4000-8000-0000000000f1', name: 'Money', advisors: ['cfo', 'buffett', 'dalio', 'dimon'] },
+  { id: '00000000-0000-4000-8000-0000000000f2', name: 'Career', advisors: ['hiring_manager', 'mentor', 'skeptic', 'dimon'] },
+  { id: '00000000-0000-4000-8000-0000000000f3', name: 'Building', advisors: ['jobs', 'da_vinci', 'skeptic', 'dreamer'] },
+  { id: '00000000-0000-4000-8000-0000000000f4', name: 'Life', advisors: ['mentor', 'dreamer', 'franklin', 'washington'] },
+];
+
 const listActions: BoardListActions = {
   answerAsk: async () => ({ error: null }),
   ask: async () => ({ error: null, queued: true }),
@@ -609,6 +618,7 @@ export function YouBoardListPreview({
       meetings={meetings}
       questions={questions}
       advisors={advisors}
+      panels={PREVIEW_PANELS}
       asks={state === 'asks' || state === 'asks-error' ? boardAsks : []}
       decisions={state === 'empty' ? [] : decisions}
       nextMeeting="2026-11-08"

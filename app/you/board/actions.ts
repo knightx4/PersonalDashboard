@@ -10,6 +10,8 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
 import { answerAsk, answerError } from '@/lib/you/board-asks';
+import { listRoster } from '@/lib/you/board-advisors';
+import { cleanPanelMembers, cleanPanelName, createPanel, removePanel, updatePanel } from '@/lib/you/board-panels';
 import {
   DECIDABLE,
   decideBoardQuestion,
@@ -419,5 +421,88 @@ export async function answerBoardAsk(
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
+  }
+}
+
+/**
+ * Panels of advisors (plan #2561.12): a named group the person picks when
+ * asking a question. Each action reads under the signed-in person, and a
+ * member list is checked against their own roster.
+ */
+export type PanelResult = { error: string | null; panelId?: string };
+
+const panelFailed = (error: unknown, fallback: string): PanelResult => ({
+  error: error instanceof Error ? error.message : fallback,
+});
+
+/** Make an empty panel called "New panel"; the person names it and picks its advisors on its page. */
+// latency: pending
+export async function createBoardPanel(): Promise<PanelResult> {
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const panel = await createPanel(client, user.id);
+    revalidatePath('/you/board/advisors');
+    return { error: null, panelId: panel.id };
+  } catch (error) {
+    return panelFailed(error, 'The panel was not made. Try again.');
+  }
+}
+
+/** Rename a panel. */
+// latency: pending
+export async function renameBoardPanel(id: string, name: string): Promise<PanelResult> {
+  if (!meetingId.safeParse(id).success) return { error: 'That is not one of your panels.' };
+  const clean = cleanPanelName(name);
+  if (!clean.ok) return { error: clean.error };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const saved = await updatePanel(client, user.id, id, { name: clean.name });
+    if (!saved) return { error: 'That panel is not yours or no longer exists.' };
+    revalidatePath('/you/board/advisors');
+    revalidatePath(`/you/board/advisors/panels/${id}`);
+    return { error: null };
+  } catch (error) {
+    return panelFailed(error, 'The name was not saved. Try again.');
+  }
+}
+
+/** Replace a panel's advisors with the keys given. */
+// latency: pending
+export async function setBoardPanelAdvisors(id: string, advisors: string[]): Promise<PanelResult> {
+  if (!meetingId.safeParse(id).success) return { error: 'That is not one of your panels.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const roster = await listRoster(client, user.id);
+    const clean = cleanPanelMembers(
+      advisors,
+      roster.map((a) => a.key),
+    );
+    if (!clean.ok) return { error: clean.error };
+    const saved = await updatePanel(client, user.id, id, { advisors: clean.advisors });
+    if (!saved) return { error: 'That panel is not yours or no longer exists.' };
+    revalidatePath('/you/board/advisors');
+    revalidatePath(`/you/board/advisors/panels/${id}`);
+    return { error: null };
+  } catch (error) {
+    return panelFailed(error, 'The panel was not saved. Try again.');
+  }
+}
+
+/** Delete a panel. Questions already asked keep the advisors they were given. */
+// latency: pending
+export async function deleteBoardPanel(id: string): Promise<PanelResult> {
+  if (!meetingId.safeParse(id).success) return { error: 'That is not one of your panels.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    await removePanel(client, user.id, id);
+    revalidatePath('/you/board');
+    revalidatePath('/you/board/advisors');
+    return { error: null };
+  } catch (error) {
+    return panelFailed(error, 'The panel was not deleted. Try again.');
   }
 }

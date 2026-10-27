@@ -28,6 +28,7 @@ import {
 } from '@/lib/you/board-questions';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-rows';
+import type { BoardPanel } from '@/lib/you/board-panels';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
@@ -49,6 +50,7 @@ export function BoardListView({
   questions = [],
   asks = [],
   advisors = [],
+  panels = [],
   decisions = [],
   nextMeeting,
   timezone = 'UTC',
@@ -64,6 +66,8 @@ export function BoardListView({
   asks?: readonly PersonAsk[];
   /** The active roster, for the compose card's advisors. */
   advisors?: readonly BoardAdvisor[];
+  /** Their panels of advisors, one press each on the compose card (listPanels). */
+  panels?: readonly BoardPanel[];
   /** Every question they decided, newest first (listDecisions). */
   decisions?: readonly BoardDecision[];
   /** The day of the next weekly meeting in their zone (nextMeetingDay). */
@@ -80,7 +84,7 @@ export function BoardListView({
   const states = meetings.map((meeting) => meetingState(meeting, now));
   const running = states.some((state) => state.kind === 'running');
   useRefreshWhileRunning(running);
-  const ask = useAskBoard({ advisors, actions, start });
+  const ask = useAskBoard({ advisors, panels, actions, start });
   const header = (
     <PageHeader
       title="Board"

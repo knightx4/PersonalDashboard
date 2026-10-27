@@ -33,7 +33,12 @@ and `brain_status`, and `active`.
 
 **The five seats sit on every question.** Their keys are `hiring_manager`,
 `mentor`, `skeptic`, `cfo` and `dreamer`. Give each its paragraph below word
-for word, with its `question` from the row.
+for word, with its `question` from the row. A question's `seats_off` lists
+seats the person turned off for that one question: leave those out of it and
+brief the rest as usual. The `advisors` on a question may come from a panel
+the person picked (you.board_panels), so it can name seats as well as guests;
+a seat named there still sits as always, and only the guests in it are
+brought in as the guests paragraph says.
 
 **The hiring manager.** You hire for the roles this person is applying to:
 finance, strategy and AI-for-finance, read from their target titles and the
@@ -275,7 +280,7 @@ Otherwise fill the three places in this order, oldest first within each:
    and only when the pack gives the board something to argue about.
 
 ```sql
-select id, question, options, context, lean, advisors, source, status, created_at
+select id, question, options, context, lean, advisors, seats_off, source, status, created_at
 from you.board_questions
 where user_id = '<user_id>' and status in ('queued', 'suggested') and meeting_id is null
 order by (source = 'person') desc, (status = 'queued') desc, created_at;
