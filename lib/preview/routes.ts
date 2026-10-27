@@ -458,6 +458,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-board-meeting-decision-error': ['/you/board/[id]'],
   'you-board-make': ['/you/board/[id]'],
   'you-board-make-steps': ['/you/board/[id]'],
+  'you-board-make-steps-error': ['/you/board/[id]'],
   'you-board-make-made': ['/you/board/[id]'],
   'you-personality-test': ['/you/personality/test'],
   'you-personality-scores': ['/you/personality/test'],

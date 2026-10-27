@@ -104,7 +104,10 @@ export async function makeDecisionHappen(
           due_on: candidate.dueOn,
         });
         if (!stepId) {
-          failure = 'That goal is no longer open, so nothing more was written under it.';
+          failure =
+            added.length > 0
+              ? 'That goal is no longer open, so nothing more was written under it.'
+              : 'That goal is no longer open, so nothing was written under it.';
           break;
         }
         const ref: MadeRef = { kind: 'step', id: stepId, key: candidate.key };

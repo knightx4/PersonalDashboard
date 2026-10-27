@@ -9757,8 +9757,8 @@ export const SURFACES: readonly Surface[] = [
   {
     /* Make it happen (plan #2561.9): a decision made as the board recommended,
      * offering the action and the conditions as todos, with a date read from
-     * the words; the steps choice with a goal picked and a write that failed;
-     * and the card after the action was written, listing it. */
+     * the words; the steps choice with a goal picked; the same after a write
+     * that failed; and the card after the action was written, listing it. */
     id: 'you-board-make',
     label: 'You · Board, writing a decision as todos',
     module: 'you',
@@ -9777,6 +9777,18 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardDebatePreview make="steps" />
+      </div>
+    ),
+  },
+  {
+    /* The steps choice after a write under a goal that had closed. */
+    id: 'you-board-make-steps-error',
+    label: 'You · Board, a decision whose goal had closed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="steps-error" />
       </div>
     ),
   },

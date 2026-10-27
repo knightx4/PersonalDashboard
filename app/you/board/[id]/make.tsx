@@ -1,10 +1,12 @@
 'use client';
 
 import { useId, useMemo, useState, useTransition } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckRow, FieldError, Label, Select } from '@/components/ui/field';
 import Link from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { Segmented } from '@/components/ui/segmented';
 import { whenWeekday } from '@/lib/core/when';
 import { heldOnLabel } from '@/lib/you/board';
@@ -46,6 +48,17 @@ function dayText(day: string): string {
 
 type Mode = 'todo' | 'goal';
 
+/** The goals by area, in the order the areas first appear; an empty area last. */
+function goalGroups(goals: readonly GoalChoice[]): [string, GoalChoice[]][] {
+  const byArea = new Map<string, GoalChoice[]>();
+  for (const goal of goals) {
+    const list = byArea.get(goal.area) ?? [];
+    list.push(goal);
+    byArea.set(goal.area, list);
+  }
+  return [...byArea].sort(([a], [b]) => (a ? 0 : 1) - (b ? 0 : 1));
+}
+
 export function MakeItHappen({
   question,
   make,
@@ -71,6 +84,7 @@ export function MakeItHappen({
 
   const chosen = candidates.filter((c) => !unticked.has(c.key));
   const needsGoal = mode === 'goal' && goalId === '';
+  const pickedGoal = make.goals.find((g) => g.id === goalId) ?? null;
 
   if (candidates.length === 0 && made.length === 0) return null;
 
@@ -159,20 +173,57 @@ export function MakeItHappen({
               ) : (
                 <div className="space-y-1">
                   <Label htmlFor={goalSelectId}>Goal</Label>
-                  <Select
-                    id={goalSelectId}
-                    value={goalId}
-                    disabled={pending}
-                    onChange={(event) => setGoalId(event.target.value)}
-                    className="w-full"
-                  >
-                    <option value="">Choose a goal</option>
-                    {make.goals.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.area ? `${g.area}: ${g.title}` : g.title}
-                      </option>
-                    ))}
-                  </Select>
+                  {/* A closed select cuts a long goal name at a phone's width,
+                      so the picked goal is drawn in the box, wrapping, and the
+                      native select lies over it unseen to take the press. */}
+                  <div className="group relative">
+                    <div
+                      aria-hidden
+                      className={cn(
+                        'flex min-h-(--control-h) items-center gap-2 rounded-control border border-control bg-surface px-(--control-px) py-1.5',
+                        // eslint-disable-next-line no-restricted-syntax -- text-base matches the select's own 16px on a phone, which stops iOS zooming on focus.
+                        'text-base text-ink sm:text-ui',
+                        'group-has-[select:focus]:border-accent group-has-[select:focus]:ring-1 group-has-[select:focus]:ring-accent/40',
+                        pending && 'opacity-50',
+                      )}
+                    >
+                      <span className={cn('min-w-0 flex-1', !pickedGoal && 'text-ink-ghost')}>
+                        {pickedGoal ? pickedGoal.title : 'Choose a goal'}
+                      </span>
+                      <ChevronDown
+                        className="size-4 shrink-0 text-ink-muted"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                    </div>
+                    <Select
+                      id={goalSelectId}
+                      value={goalId}
+                      disabled={pending}
+                      onChange={(event) => setGoalId(event.target.value)}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    >
+                      <option value="">Choose a goal</option>
+                      {/* Grouped by area, so the box above shows the goal's own name. */}
+                      {goalGroups(make.goals).map(([area, goals]) =>
+                        area ? (
+                          <optgroup key={area} label={area}>
+                            {goals.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.title}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : (
+                          goals.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.title}
+                            </option>
+                          ))
+                        ),
+                      )}
+                    </Select>
+                  </div>
                 </div>
               ))}
           </div>

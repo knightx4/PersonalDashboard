@@ -98,7 +98,7 @@ export type MeetingOpen = {
 };
 
 const DECIDE_ERROR = 'Your decision was not saved. Try again.';
-const MAKE_ERROR = 'That goal is no longer open, so nothing more was written under it.';
+const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',

@@ -426,7 +426,15 @@ const assumedRows = questionRows.map((row, i) =>
           ],
         },
       }
-    : row,
+    : {
+        ...row,
+        // Twelve-hour times say AM or PM.
+        options: row.options.map((o) =>
+          o.text === 'Move it to Sunday, 9 to 11'
+            ? { ...o, text: 'Move it to Sunday, 9 to 11 AM' }
+            : o,
+        ),
+      },
 );
 const assumedDebate = debateFrom(assumedRows, turns, advisorRows, [Q1, Q2]);
 const decidedDebate = debateFrom(decidedRows, turns, advisorRows, [Q1, Q2]);
@@ -497,8 +505,8 @@ export function YouBoardDebatePreview({
   advisor?: keyof typeof A;
   /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
   decision?: 'made' | 'open' | 'error';
-  /** Make it happen under the decision (plan #2561.9): 'todos' as first offered, 'steps' with a goal picked and a failed write, 'made' after the action was written. */
-  make?: 'todos' | 'steps' | 'made';
+  /** Make it happen under the decision (plan #2561.9): 'todos' as first offered, 'steps' with a goal picked, 'steps-error' with a goal picked and a failed write, 'made' after the action was written. */
+  make?: 'todos' | 'steps' | 'steps-error' | 'made';
 }) {
   const running = state === 'running';
   return (
@@ -535,7 +543,7 @@ export function YouBoardDebatePreview({
               action: makeAction,
               goals: GOALS,
               today: '2026-11-02',
-              ...(make === 'steps'
+              ...(make === 'steps' || make === 'steps-error'
                 ? { start: { mode: 'goal' as const, goalId: GOALS[0].id } }
                 : {}),
             }
@@ -560,7 +568,7 @@ export function YouBoardDebatePreview({
       open={{
         ...(advisor ? { advisor: A[advisor] } : {}),
         ...(decision === 'open' || decision === 'error' ? { decide: decision } : {}),
-        ...(make === 'steps' ? { make: 'error' as const } : {}),
+        ...(make === 'steps-error' ? { make: 'error' as const } : {}),
       }}
     />
   );
