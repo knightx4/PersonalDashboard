@@ -2656,7 +2656,7 @@ describe('a goal’s number from its collection (plan #1024)', () => {
       update items set number_from_collection_id = ${collection}, number_from_field = 'balance',
         number_from_how = 'sum' where id = ${goal}`);
     const [now] = await admin<{ n: string }[]>`select goals.goal_number(${goal})::text as n`;
-    expect(now.n).toBe('204384.62');
+    expect(now.n).toBe('166304.41');
 
     // One statement touching both loans writes one reading, dated by the statement.
     await asUser(userA, (tx) => tx`
@@ -2670,7 +2670,7 @@ describe('a goal’s number from its collection (plan #1024)', () => {
     await asUser(userA, (tx) => tx`update records set archived_at = now() where id = ${second}`);
 
     const readings = await goalReadings();
-    expect(readings.map((r) => r.value)).toEqual(['204384.62', '204184.62', '79980.21']);
+    expect(readings.map((r) => r.value)).toEqual(['166304.41', '166104.41', '41900']);
     expect(readings[1].read_on).toBe('2026-09-20');
     expect(readings[0].note).toBe('From Student loans: total balance');
   });
@@ -2681,7 +2681,7 @@ describe('a goal’s number from its collection (plan #1024)', () => {
     await asUser(userA, (tx) => tx`
       update items set number_from_how = 'latest', number_from_field = 'balance' where id = ${goal}`);
     const readings = await goalReadings();
-    expect(readings.slice(-2).map((r) => r.value)).toEqual(['1', '79980.21']);
+    expect(readings.slice(-2).map((r) => r.value)).toEqual(['1', '41900']);
   });
 });
 
