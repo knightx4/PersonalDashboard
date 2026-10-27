@@ -84,8 +84,8 @@ function zip(entries: Record<string, string>): Uint8Array {
 describe('readIntoForm, with the model stubbed', () => {
   it('fills the loans table from a pasted servicer page', async () => {
     const model = stub([
-      { name: 'Loan 1-01', servicer: 'Nelnet', balance: 12450.37, rate: 6.8, minimum: 145, due_day: 15 },
-      { name: 'Loan 1-02', servicer: 'Nelnet', balance: 3100, rate: 4.53, minimum: null, due_day: null },
+      { name: 'Loan 1-01', servicer: 'Northstar', balance: 12450.37, rate: 6.8, minimum: 145, due_day: 15 },
+      { name: 'Loan 1-02', servicer: 'Northstar', balance: 3100, rate: 4.53, minimum: null, due_day: null },
     ]);
     const result = await readIntoForm(
       collection,
@@ -96,8 +96,8 @@ describe('readIntoForm, with the model stubbed', () => {
     expect(result).toEqual({
       ok: true,
       rows: [
-        { name: 'Loan 1-01', servicer: 'Nelnet', balance: '12450.37', rate: '6.8', minimum: '145', due_day: '15' },
-        { name: 'Loan 1-02', servicer: 'Nelnet', balance: '3100', rate: '4.53', minimum: '', due_day: '' },
+        { name: 'Loan 1-01', servicer: 'Northstar', balance: '12450.37', rate: '6.8', minimum: '145', due_day: '15' },
+        { name: 'Loan 1-02', servicer: 'Northstar', balance: '3100', rate: '4.53', minimum: '', due_day: '' },
       ],
       asOf: null,
       suggestions: [],
@@ -202,7 +202,7 @@ describe('suggested fields and cautions (plan #986)', () => {
         records: [
           { name: 'Direct Unsubsidized', balance: 20500 },
           { name: null, balance: null },
-          { name: 'Grad PLUS', balance: 31000 },
+          { name: 'Graduate loan', balance: 31000 },
         ],
         extra: [
           {
@@ -231,14 +231,14 @@ describe('suggested fields and cautions (plan #986)', () => {
         caution: [
           {
             label: 'Repayment Begin Date', field: null,
-            note: 'For the Grad PLUS loan this is the last disbursement date, not when payments start.',
+            note: 'For the graduate loan this is the last disbursement date, not when payments start.',
           },
         ],
       },
     });
     const result = await readIntoForm(collection, { text: 'NSLDS file' }, ask);
     if (!result.ok) throw new Error(result.error);
-    expect(result.rows.map((r) => r.name)).toEqual(['Direct Unsubsidized', 'Grad PLUS']);
+    expect(result.rows.map((r) => r.name)).toEqual(['Direct Unsubsidized', 'Graduate loan']);
     expect(result.suggestions.map((s) => [s.field.key, s.field.type, s.values])).toEqual([
       ['loan_id', 'text', ['DU-1', 'GP-1']],
       ['status', 'choice', ['In school', 'Repayment']],
@@ -252,7 +252,7 @@ describe('suggested fields and cautions (plan #986)', () => {
       {
         label: 'Repayment Begin Date',
         field: null,
-        note: 'For the Grad PLUS loan this is the last disbursement date, not when payments start.',
+        note: 'For the graduate loan this is the last disbursement date, not when payments start.',
       },
     ]);
   });
@@ -320,23 +320,23 @@ describe('matchRows (plan #985)', () => {
     { key: 'balance', label: 'Balance', type: 'money', tracked: true },
   ];
   const saved = [
-    { id: 'rec-a', data: { name: 'Grad PLUS', loan_id: '*****8042P25G01426001', balance: 80080.21 } },
-    { id: 'rec-b', data: { name: 'Unsub', loan_id: '*****8042U25G01426001', balance: 23549.6 } },
+    { id: 'rec-a', data: { name: 'Graduate loan', loan_id: '*****5170P25G01000001', balance: 42000 } },
+    { id: 'rec-b', data: { name: 'Unsub', loan_id: '*****5170U25G01000001', balance: 12000 } },
     { id: 'rec-c', data: { name: 'No ID', loan_id: null, balance: 5 } },
   ];
 
   it('updates the saved row with the same ID, and adds the rest', () => {
     const rows = [
-      { name: 'Grad PLUS', loan_id: ' *****8042p25g01426001 ', balance: '80500' },
-      { name: 'New loan', loan_id: '*****8042U26G01426001', balance: '100' },
-      { name: 'Unsub', loan_id: '*****8042U25G01426001', balance: '23549.60' },
+      { name: 'Graduate loan', loan_id: ' *****5170p25g01000001 ', balance: '42300' },
+      { name: 'New loan', loan_id: '*****5170U26G01000001', balance: '100' },
+      { name: 'Unsub', loan_id: '*****5170U25G01000001', balance: '12000.00' },
       { name: 'Blank', loan_id: '', balance: '1' },
     ];
     expect(matchRows(withId, rows, saved)).toEqual(['rec-a', null, 'rec-b', null]);
   });
 
   it('matches nothing when the collection has no ID field', () => {
-    expect(matchRows(loans, [{ name: 'Grad PLUS' }], saved)).toEqual([null]);
+    expect(matchRows(loans, [{ name: 'Graduate loan' }], saved)).toEqual([null]);
   });
 });
 
@@ -370,8 +370,8 @@ describe('documents', () => {
   });
 
   it('keeps each file in your own folder under a fresh id, and only those are yours', () => {
-    const path = documentPath(USER, FILE_ID, 'May statement (Nelnet).pdf');
-    expect(path).toBe(`${USER}/${FILE_ID}-May-statement-Nelnet-.pdf`);
+    const path = documentPath(USER, FILE_ID, 'May statement (Northstar).pdf');
+    expect(path).toBe(`${USER}/${FILE_ID}-May-statement-Northstar-.pdf`);
     expect(ownsDocumentPath(USER, path)).toBe(true);
     expect(ownsDocumentPath('someone-else', path)).toBe(false);
     expect(ownsDocumentPath(USER, `${USER}/../other/${FILE_ID}-a.pdf`)).toBe(false);

@@ -48,7 +48,7 @@ function context(itemId = 'step-2'): GoalReplyContext {
     name: 'Loans',
     shape: 'list',
     fields: loanFields,
-    records: [{ data: { servicer: 'Nelnet', balance: 8000, rate: 5.5 }, draft: false }],
+    records: [{ data: { servicer: 'Northstar', balance: 8000, rate: 5.5 }, draft: false }],
   };
   const profile: ReplyCollection = {
     id: 'col-profile',
@@ -100,7 +100,7 @@ describe('the goal written out for a reply', () => {
     expect(text).toContain('### c1: Loans');
     expect(text).toContain('- balance: Balance, money, an amount as a plain number, 12450.37.');
     expect(text).not.toContain('- old:');
-    expect(text).toContain('- Servicer Nelnet; Balance $8,000.00; Rate 5.5%');
+    expect(text).toContain('- Servicer Northstar; Balance $8,000.00; Rate 5.5%');
     expect(text).toContain('### c2: Income');
     expect(text).toContain('Holds a single record.');
     expect(refs.collections.get('c1')?.id).toBe('col-loans');
@@ -126,10 +126,10 @@ describe('the goal written out for a reply', () => {
     const { message } = goalReplyMessage(
       context(),
       [{ id: 'c1', author: 'me', body: 'How many loans?', createdAt: '2026-09-24T10:00:00Z' }],
-      'The Navient one is 12,450 at 6.8%',
+      'The Brightline one is 12,450 at 6.8%',
     );
     expect(message.indexOf('# A goal')).toBeLessThan(message.indexOf('The person: How many loans?'));
-    expect(message.trimEnd().endsWith('The Navient one is 12,450 at 6.8%')).toBe(true);
+    expect(message.trimEnd().endsWith('The Brightline one is 12,450 at 6.8%')).toBe(true);
   });
 });
 
@@ -196,7 +196,7 @@ describe('reading the reply', () => {
         answer: null,
         needs_routine: false,
         file: [
-          { collection: 'c1', values: { servicer: 'Navient', balance: 12450, rate: 6.8, old: null } },
+          { collection: 'c1', values: { servicer: 'Brightline', balance: 12450, rate: 6.8, old: null } },
           { collection: 'c9', values: { balance: 1 } },
           { collection: 'c1', values: { servicer: '' } },
         ],
@@ -208,7 +208,7 @@ describe('reading the reply', () => {
     expect(reply.body).toBe('');
     expect(reply.filings).toHaveLength(1);
     expect(reply.filings[0].collection.id).toBe('col-loans');
-    expect(reply.filings[0].values).toEqual({ servicer: 'Navient', balance: 12450, rate: 6.8 });
+    expect(reply.filings[0].values).toEqual({ servicer: 'Brightline', balance: 12450, rate: 6.8 });
   });
 
   it('passes to the routine whenever it says so, ignoring an answer beside it', () => {
@@ -228,22 +228,22 @@ describe('what the reply says it filed', () => {
 
   it('names one filed record in its stored form and where to confirm it', () => {
     const body = replyBody('', [
-      { ok: true, collection: loans, data: { servicer: 'Navient', balance: 12450, rate: 6.8 } },
+      { ok: true, collection: loans, data: { servicer: 'Brightline', balance: 12450, rate: 6.8 } },
     ]);
     expect(body).toBe(
-      'Filed into Loans as a draft: Servicer Navient, Balance $12,450.00, Rate 6.8%. Confirm it on the step.',
+      'Filed into Loans as a draft: Servicer Brightline, Balance $12,450.00, Rate 6.8%. Confirm it on the step.',
     );
   });
 
   it('lists several, and says what was refused and why', () => {
     const body = replyBody('Got them.', [
-      { ok: true, collection: loans, data: { servicer: 'Navient' } },
-      { ok: true, collection: loans, data: { servicer: 'Nelnet' } },
+      { ok: true, collection: loans, data: { servicer: 'Brightline' } },
+      { ok: true, collection: loans, data: { servicer: 'Northstar' } },
       { ok: false, collection: loans, error: 'Rate must be a number.' },
     ]);
     expect(body).toContain('Got them.');
     expect(body).toContain('Filed 2 records as drafts. Confirm them on the step:');
-    expect(body).toContain('- Loans: Servicer Nelnet');
+    expect(body).toContain('- Loans: Servicer Northstar');
     expect(body).toContain('Not filed into Loans: Rate must be a number.');
   });
 });
@@ -257,13 +257,13 @@ describe('the brief for the goals routine', () => {
       itemTitle: 'List each loan',
       onGoal: false,
       thread: [{ id: 'x', author: 'claude', body: 'Which servicer?', createdAt: '' }],
-      question: 'Find my Navient statement in Gmail',
+      question: 'Find my Brightline statement in Gmail',
       why: 'Needs email.',
     });
     expect(text.startsWith('Work on one goal')).toBe(true);
     expect(text).toContain('the step "List each loan"');
     expect(text).toContain('Claude: Which servicer?');
-    expect(text).toContain('Find my Navient statement in Gmail');
+    expect(text).toContain('Find my Brightline statement in Gmail');
     expect(text).toContain(
       "select core.add_thread_turn('user-1', 'goals.items:step-2', 'claude', '<your reply>');",
     );

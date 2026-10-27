@@ -158,11 +158,11 @@ describe('rhythmSteps', () => {
 
 describe('firstSentence', () => {
   it('takes the first sentence of the first paragraph, without markdown', () => {
-    expect(firstSentence('**Floor:** about $118,000 base. Below that, nothing clears.\n\nMore.')).toBe(
-      'Floor: about $118,000 base.',
+    expect(firstSentence('**Floor:** about $95,000 base. Below that, nothing clears.\n\nMore.')).toBe(
+      'Floor: about $95,000 base.',
     );
-    expect(firstSentence('## Heading\n\n- Array is the strongest fit. It is Series B.')).toBe(
-      'Array is the strongest fit.',
+    expect(firstSentence('## Heading\n\n- Globex is the strongest fit. It is Series B.')).toBe(
+      'Globex is the strongest fit.',
     );
   });
 
@@ -240,22 +240,22 @@ describe('nowStages', () => {
 });
 
 describe('stepPreps', () => {
-  const apply = node('apply', { title: 'Apply to Kroll' });
+  const apply = node('apply', { title: 'Apply to Northwind' });
   const prep = (extra: Partial<StepNode> = {}) =>
-    node('prep', { kind: 'claude', title: 'Draft the Kroll cover letter', preparesId: 'apply', ...extra });
+    node('prep', { kind: 'claude', title: 'Draft the Northwind cover letter', preparesId: 'apply', ...extra });
 
   it('says an open prep step is preparing, by its title, and names the step it is for', () => {
     const { prepFor, targetOf } = stepPreps([[prep(), apply]]);
     expect(prepFor.apply).toEqual({
       id: 'prep',
-      title: 'Draft the Kroll cover letter',
+      title: 'Draft the Northwind cover letter',
       done: false,
       line: null,
       result: null,
       resultUrl: null,
       unread: false,
     });
-    expect(targetOf.prep).toEqual({ id: 'apply', title: 'Apply to Kroll' });
+    expect(targetOf.prep).toEqual({ id: 'apply', title: 'Apply to Northwind' });
   });
 
   it('gives a done prep step the first sentence of what it produced', () => {
