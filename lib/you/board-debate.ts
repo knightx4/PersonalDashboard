@@ -53,12 +53,37 @@ export type BoardVerdict = {
   scores: { advisor: string; scores: Scores }[];
 };
 
+/** The person's decision on a question: an option, or putting it off or turning it down. */
+export type QuestionDecision = {
+  kind: 'option' | 'defer' | 'reject';
+  /** The option letter, for `option`. */
+  option: string | null;
+  note: string | null;
+  decidedAt: string | null;
+};
+
+/** The decision a question row holds, from its status and decision columns. */
+export function decisionFromRow(row: Record<string, unknown>): QuestionDecision | null {
+  const note = text(row.decision_note) || null;
+  if (row.status === 'decided') {
+    const option = text(row.decided_option);
+    return option
+      ? { kind: 'option', option, note, decidedAt: typeof row.decided_at === 'string' ? row.decided_at : null }
+      : null;
+  }
+  if (row.status === 'deferred') return { kind: 'defer', option: null, note, decidedAt: null };
+  if (row.status === 'dismissed') return { kind: 'reject', option: null, note, decidedAt: null };
+  return null;
+}
+
 export type DebateQuestion = {
   id: string;
   question: string;
   options: BoardOption[];
   status: QuestionStatus;
   verdict: BoardVerdict | null;
+  /** What the person did with the verdict (plan #2561.6); null while they have not. */
+  decision: QuestionDecision | null;
   /** Its turns, in the order they were spoken. */
   turns: DebateTurn[];
 };
@@ -188,6 +213,7 @@ export function debateFrom(
         options: optionsOf(row.options),
         status,
         verdict: verdictOf(row.verdict),
+        decision: decisionFromRow(row),
         turns: turns.filter((t) => t.questionId === row.id),
       },
     ];
@@ -328,7 +354,7 @@ export async function loadMeetingDebate(
   const [questions, turns, advisors] = await Promise.all([
     client
       .from('board_questions')
-      .select('id, question, options, status, verdict, created_at')
+      .select('id, question, options, status, verdict, decided_option, decision_note, decided_at, created_at')
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),
     client

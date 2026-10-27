@@ -211,6 +211,21 @@ order by marked_at;
 From the newest meeting take its `predictions` and `scorecard` (graded in
 step 9) and its `dream`. Then:
 
+- **Decisions and notes first.** Before anything else, read what the person
+  decided and wrote since the last meeting, from the Board tab's Decisions:
+
+  ```sql
+  select question, options, verdict->>'recommended' as recommended, status,
+         decided_option, decision_note, decided_at
+  from you.board_questions
+  where user_id = '<user_id>' and (decided_at > now() - interval '30 days'
+        or (status in ('deferred', 'dismissed') and decision_note is not null))
+  order by decided_at desc nulls last;
+  ```
+
+  A `deferred` question with a note was put off by the person, and a
+  `dismissed` one turned down; the note says why. Their notes bind the
+  agenda and the pack as much as a decision does.
 - **Decisions.** A question `decided` since the last meeting is settled:
   `decided_option` and `decision_note` are the person's. Do not debate it
   again unless something in this week's pack changes it, and open `since`

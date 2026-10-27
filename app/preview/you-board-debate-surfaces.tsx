@@ -59,6 +59,22 @@ const questionRows = [
       { letter: 'C', text: 'Ask for three days a week and keep two for the search' },
     ],
     status: 'discussing',
+    verdict: {
+      recommended: 'A',
+      conditions: [
+        'Get one evening a week written into the contract before you sign.',
+        'Keep two applications a week going through the three months.',
+      ],
+      dissent: [
+        { advisor: 'mentor', text: 'Three days keeps two warm interviews alive and still moves the runway to May.' },
+        { advisor: 'dreamer', text: 'Nothing in your notes dreams about analytics, and the last contract took the album from weekly to nothing in five weeks.' },
+      ],
+      would_change: [
+        'The firm will not put an evening in writing: C becomes the better ask.',
+        'A second interview lands in the first two weeks: B costs less than it did.',
+      ],
+      scores: [],
+    },
     created_at: '2026-10-29T09:00:00Z',
   },
   {
@@ -69,6 +85,13 @@ const questionRows = [
       { letter: 'B', text: 'Keep Thursday evening' },
     ],
     status: 'discussing',
+    verdict: {
+      recommended: 'A',
+      conditions: ['Book the Sunday studio by Friday.'],
+      dissent: [],
+      would_change: ['Sunday morning fills with something else before it is booked.'],
+      scores: [],
+    },
     created_at: '2026-10-30T09:00:00Z',
   },
 ];
@@ -132,7 +155,23 @@ const q2Turns = [
   turn(Q2, 3, 'cfo', 'A.', { A: 7, B: 3 }),
 ];
 
-const debate = debateFrom(questionRows, [...q1Turns, ...q2Turns], advisorRows, [Q1, Q2]);
+/** The same questions after the person decided: the first against the board, the second with it. */
+const decidedRows = questionRows.map((row, i) =>
+  i === 0
+    ? {
+        ...row,
+        status: 'decided',
+        decided_option: 'C',
+        decision_note:
+          'Asking for three days. If they say no I take A, with the evening in writing.',
+        decided_at: '2026-11-01T20:15:00Z',
+      }
+    : { ...row, status: 'decided', decided_option: 'A', decision_note: null, decided_at: '2026-11-01T20:16:00Z' },
+);
+
+const turns = [...q1Turns, ...q2Turns];
+const debate = debateFrom(questionRows, turns, advisorRows, [Q1, Q2]);
+const decidedDebate = debateFrom(decidedRows, turns, advisorRows, [Q1, Q2]);
 /** Still being held: the first question's first round so far, the second not reached. */
 const runningDebate = debateFrom(questionRows, q1Turns.slice(0, 4), advisorRows, [Q1, Q2]);
 
@@ -171,6 +210,8 @@ const meeting = (over: Partial<BoardMeeting> = {}): BoardMeeting => ({
   ...over,
 });
 
+const decide = async () => ({ error: null });
+
 const actions: MeetingActions = {
   vote: async () => ({ error: null, saved: null }),
   answer: async () => ({ error: null, saved: null }),
@@ -181,10 +222,13 @@ const actions: MeetingActions = {
 export function YouBoardDebatePreview({
   state = 'ready',
   advisor,
+  decision,
 }: {
   state?: 'ready' | 'running';
   /** Draw this advisor's thinking open. */
   advisor?: keyof typeof A;
+  /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
+  decision?: 'made' | 'open' | 'error';
 }) {
   const running = state === 'running';
   return (
@@ -202,7 +246,7 @@ export function YouBoardDebatePreview({
       }
       minutes={running ? parseMinutes(null) : minutes}
       marks={[]}
-      debate={running ? runningDebate : debate}
+      debate={running ? runningDebate : decision === 'made' || decision === 'open' ? decidedDebate : debate}
       scorecard={scorecardFrom([])}
       subject={{
         ref: null,
@@ -218,7 +262,11 @@ export function YouBoardDebatePreview({
       timezone="Europe/London"
       now={NOW}
       actions={actions}
-      open={advisor ? { advisor: A[advisor] } : undefined}
+      decide={decide}
+      open={{
+        ...(advisor ? { advisor: A[advisor] } : {}),
+        ...(decision === 'open' || decision === 'error' ? { decide: decision } : {}),
+      }}
     />
   );
 }

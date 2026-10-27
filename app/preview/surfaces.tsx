@@ -9671,6 +9671,42 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The verdict and the decision under a question (plan #2561.6): both
+     * questions decided, the first against the board; the form to change a
+     * decision; and the form with a save that failed. */
+    id: 'you-board-meeting-decided',
+    label: 'You · Board, both questions decided from their verdicts',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="made" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-change',
+    label: 'You · Board, changing a decision',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="open" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-error',
+    label: 'You · Board, a decision that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="error" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-meeting-advisor',
     label: 'You · Board, one advisor’s thinking open',
     module: 'you',

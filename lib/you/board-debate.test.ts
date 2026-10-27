@@ -3,6 +3,7 @@ import {
   advisorThinking,
   BRIEF_OPENING,
   debateFrom,
+  decisionFromRow,
   exchanges,
   scoreGrid,
   scoresOf,
@@ -162,5 +163,17 @@ describe('BRIEF_OPENING', () => {
   it('finds the opening the skill writes for a brief', () => {
     expect(BRIEF_OPENING.test('Arguing for B, which nobody backed: Dreamer, Thursday is booked.')).toBe(true);
     expect(BRIEF_OPENING.test('Dreamer, arguing for B is fine.')).toBe(false);
+  });
+});
+
+describe('decisionFromRow (plan #2561.6)', () => {
+  it('reads what the person did from the status and decision columns', () => {
+    expect(decisionFromRow({ status: 'discussing' })).toBeNull();
+    expect(
+      decisionFromRow({ status: 'decided', decided_option: 'B', decision_note: ' why ', decided_at: '2026-11-01T10:00:00Z' }),
+    ).toEqual({ kind: 'option', option: 'B', note: 'why', decidedAt: '2026-11-01T10:00:00Z' });
+    expect(decisionFromRow({ status: 'deferred', decision_note: null })?.kind).toBe('defer');
+    expect(decisionFromRow({ status: 'dismissed' })?.kind).toBe('reject');
+    expect(decisionFromRow({ status: 'decided', decided_option: null })).toBeNull();
   });
 });
