@@ -211,7 +211,38 @@ export const youSources: ModuleSources = {
         'options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. ' +
         'source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. ' +
         'verdict is the board\'s recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). ' +
-        'reviews is the board checking back 30 and 90 days after the decision: account is Dash\'s, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026).',
+        'reviews is the board checking back 30 and 90 days after the decision: account is Dash\'s, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026). ' +
+        'door is one_way or two_way; success_measure, decide_by and lean_probability (0 to 1) are theirs; premortem and tripwire are written with the board (you 0029).',
+    },
+    {
+      table: 'you.advisor_chats',
+      module: 'You',
+      holds: 'The one-on-one talks they started with one of their advisors, by title.',
+      weight: 'record',
+      search: ['title'],
+      title: 'title',
+      facts: ['last_message_at'],
+      newest: 'last_message_at',
+      href: () => '/you/board',
+      section: BOARD,
+      page: null,
+      note: 'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).',
+    },
+    {
+      table: 'you.advisor_messages',
+      module: 'You',
+      holds: 'What they said to an advisor in a one-on-one talk, and what the advisor answered.',
+      weight: 'record',
+      search: ['text'],
+      title: 'text',
+      newest: 'created_at',
+      href: () => '/you/board',
+      section: BOARD,
+      page: null,
+      parent: parentBy('chat_id', 'you.advisor_chats'),
+      note:
+        'role is person (what they said) or advisor (written by Dash in the advisor\'s voice), so cite only role person as theirs. ' +
+        'chat_id points at you.advisor_chats (you 0029).',
     },
   ],
   notSources: [
@@ -235,6 +266,7 @@ export const youSources: ModuleSources = {
     { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
     { table: 'you.board_panels', reason: 'Named groups of advisors the person picks when asking the board, which is a setting of the board, not something they wrote, wanted or did.' },
     { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
+    { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },
     // Lines from their private notes for the insights run (plan #2413.8).
     {
