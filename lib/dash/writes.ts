@@ -38,6 +38,7 @@ import { JOBS_WRITE_TOOLS } from './jobs-writes';
 import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 import { POST_WRITE_TOOLS } from './post-writes';
 import { MODEL_WRITE_TOOLS } from './model-writes';
+import { PROJECT_WRITE_TOOLS } from './project-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -1291,6 +1292,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...INTERVIEW_WRITE_TOOLS,
   // A post draft's text (plan #2202.1).
   ...POST_WRITE_TOOLS,
+  // A repository added as a Dev project (plan #2553.5).
+  ...PROJECT_WRITE_TOOLS,
   ...MODEL_WRITE_TOOLS,
 ];
 

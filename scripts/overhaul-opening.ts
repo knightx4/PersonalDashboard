@@ -20,7 +20,7 @@ import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { currentSession, sessionStamp } from '../lib/plan/origin';
 import { overhaulOpening, overhaulOpeningSql } from '../lib/plan/overhaul-opening';
-import { isPlanScope, planScopeOf } from '../lib/plan/projects';
+import { storedScopeOf } from '../lib/plan/projects';
 
 const argv = process.argv.slice(2);
 function arg(flag: string): string | null {
@@ -39,11 +39,12 @@ function need(flag: string): string {
 }
 
 const moduleArg = arg('--module');
-if (moduleArg && !isPlanScope(moduleArg)) {
+// No database is read here, so a project id is taken on its shape alone.
+if (moduleArg && !storedScopeOf(moduleArg)) {
   console.error(`"${moduleArg}" is not a module or project.`);
   process.exit(2);
 }
-const scope = planScopeOf(moduleArg);
+const scope = storedScopeOf(moduleArg);
 const userId = need('--user');
 const opening = overhaulOpening({
   title: need('--title'),

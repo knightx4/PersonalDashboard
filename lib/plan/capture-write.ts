@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import type { CaptureRowWrite } from '@/lib/capture/file';
 import { nextPlanPosition } from '@/lib/plan/position';
-import { planScopeOf } from '@/lib/plan/projects';
+import { loadDevProjects, planScopeOf, storedScopeOf } from '@/lib/plan/projects';
 
 const Title = z.string().trim().min(1, 'A step needs a name.').max(200);
 const Id = z.string().uuid();
@@ -27,7 +27,8 @@ export async function writePlanItem(
   const name = Title.safeParse(title);
   if (!name.success) return { ok: false, error: name.error.issues[0].message };
 
-  let scope = planScopeOf(at.scope);
+  // Only a scope that names something: a workspace or an active project.
+  let scope = at.scope ? planScopeOf(at.scope, await loadDevProjects(supabase, userId)) : null;
   let parentId: string | null = null;
   if (at.parentId) {
     if (!Id.safeParse(at.parentId).success) return { ok: false, error: 'That parent step does not exist.' };
@@ -38,7 +39,7 @@ export async function writePlanItem(
       .eq('id', at.parentId)
       .maybeSingle();
     if (!parent) return { ok: false, error: 'That parent step does not exist.' };
-    scope = planScopeOf(parent.module);
+    scope = storedScopeOf(parent.module);
     parentId = at.parentId;
   }
 

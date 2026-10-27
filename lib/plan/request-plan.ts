@@ -2,6 +2,16 @@ import 'server-only';
 import { cache } from 'react';
 import { createClient } from '@/lib/auth/server';
 import { loadPlan, type PlanData } from './load';
+import { loadDevProjects, type DevProject } from './projects';
+
+/**
+ * The account's projects (lib/plan/projects), read once per request: a
+ * project's page asks for them in its metadata and again in its body.
+ */
+export const loadProjectsForRequest = cache(async (userId: string): Promise<DevProject[]> => {
+  const supabase = await createClient();
+  return loadDevProjects(supabase, userId);
+});
 
 /**
  * The plan, read once per request however many parts of the page ask for it.

@@ -22,6 +22,8 @@ import {
   YouBoardMeetingLoadingPreview,
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
+import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -514,6 +516,16 @@ import {
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
+import {
+  ProjectsAddErrorSurface,
+  ProjectsArchiveSurface,
+  ProjectsCommentsSurface,
+  ProjectsEmptySurface,
+  ProjectsNarrowTokenSurface,
+  ProjectsPickerSurface,
+  ProjectsSearchEmptySurface,
+  ProjectsSurface,
+} from './projects-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -9511,10 +9523,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouInsightsLoadingPreview />,
   },
   {
-    /* Board (plan #2540.3): the board's meetings newest first, each row saying
-     * how far through its minutes the person is; a called meeting first. */
+    /* Board (plans #2540.3 and #2561.4): one surface in three groups, the
+     * board's suggested questions with Ask now, Save for Sunday and Dismiss,
+     * the questions asked with their state, then the meetings newest first. */
     id: 'you-board',
-    label: 'You · Board, four meetings',
+    label: 'You · Board, suggestions, questions and meetings',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9525,7 +9538,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-empty',
-    label: 'You · Board, no meetings yet',
+    label: 'You · Board, nothing asked, suggested or held yet',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9536,7 +9549,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-running',
-    label: 'You · Board, a meeting being held',
+    label: 'You · Board, a question convened now, its meeting being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9578,11 +9591,11 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Call a meeting (plan #2540.5): the line for the decision open under the
-     * header, the notice when a meeting is already running, and the minutes
-     * of a called meeting, whose one disagreement holds each seat's vote. */
-    id: 'you-board-call',
-    label: 'You · Board, the decision line open',
+    /* Ask the board (plan #2561.4): the compose card open under the header,
+     * filled as far as a real question goes, and the card with a question
+     * that was saved but whose meeting could not start. */
+    id: 'you-board-ask',
+    label: 'You · Board, Ask the board open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9592,24 +9605,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'you-board-call-error',
-    label: 'You · Board, the decision line with a failed start',
+    id: 'you-board-ask-error',
+    label: 'You · Board, a question whose meeting could not start',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardListPreview start="error" />
-      </div>
-    ),
-  },
-  {
-    id: 'you-board-call-running',
-    label: 'You · Board, pressing Call a meeting while one runs',
-    module: 'you',
-    width: 'page',
-    render: () => (
-      <div className={SHELL_FOOT}>
-        <YouBoardListPreview state="running" start="running" />
       </div>
     ),
   },
@@ -9652,6 +9654,132 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouBoardMeetingLoadingPreview />,
+  },
+  {
+    /* A meeting held as a debate (plan #2561.5): each question's options,
+     * the grid of who scored what, then the rounds, with round 2 drawn as the
+     * exchanges between two advisors. Drawn finished, still being held with
+     * a question no advisor has reached, and with one advisor's thinking open. */
+    id: 'you-board-meeting-debate',
+    label: 'You · Board, a meeting held as a debate',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-debate-running',
+    label: 'You · Board, a debate still being held, one question not reached',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview state="running" />
+      </div>
+    ),
+  },
+  {
+    /* The verdict and the decision under a question (plan #2561.6): both
+     * questions decided, the first against the board; the form to change a
+     * decision; and the form with a save that failed. */
+    id: 'you-board-meeting-decided',
+    label: 'You · Board, both questions decided from their verdicts',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="made" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-change',
+    label: 'You · Board, changing a decision',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="open" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-error',
+    label: 'You · Board, a decision that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="error" />
+      </div>
+    ),
+  },
+  {
+    /* Advisors (plan #2561.7): the five seats and every guest with the
+     * question each owns, a brain state and the switch for the chair. */
+    id: 'you-board-advisors',
+    label: 'You · Board, the advisors and their switches',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-add',
+    label: 'You · Board, Add advisor open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview start="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-building',
+    label: 'You · Board, a guest’s brain being built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-failed',
+    label: 'You · Board, a brain that failed to build, with retry',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-loading',
+    label: 'You · Board, advisors loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouBoardAdvisorsLoadingPreview />,
+  },
+  {
+    id: 'you-board-meeting-advisor',
+    label: 'You · Board, one advisor’s thinking open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview advisor="buffett" />
+      </div>
+    ),
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
@@ -10728,11 +10856,82 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevIdeasEmptySurface />,
   },
   {
+    /* Dev's Projects page (plan #2553.5): three projects, one failing on main, one never read, the longest name there is. Fixtures in projects-surfaces.tsx. */
+    id: 'dev-projects',
+    label: 'Dev · Projects',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSurface />,
+  },
+  {
+    /* The picker Add project opens, listing the repositories newest pushed first, with the ones added marked. */
+    id: 'dev-projects-picker',
+    label: 'Dev · Projects, Add project open',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsPickerSurface />,
+  },
+  {
+    /* The picker with a search that matches nothing. */
+    id: 'dev-projects-search-empty',
+    label: 'Dev · Projects, no repository matches',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSearchEmptySurface />,
+  },
+  {
+    /* The picker when GITHUB_READ_TOKEN sees only this app: the setting to change, and the typed owner/name. */
+    id: 'dev-projects-narrow-token',
+    label: 'Dev · Projects, token sees only this repository',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsNarrowTokenSurface />,
+  },
+  {
+    /* The picker after GitHub refused a typed repository. */
+    id: 'dev-projects-add-error',
+    label: 'Dev · Projects, GitHub refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsAddErrorSurface />,
+  },
+  {
+    /* A row's menu open on Archive's confirm. */
+    id: 'dev-projects-archive',
+    label: 'Dev · Projects, archive confirm',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsArchiveSurface />,
+  },
+  {
+    /* The comment mark on rows whose thread has comments. */
+    id: 'dev-projects-comments',
+    label: 'Dev · Projects, rows with comments',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsCommentsSurface />,
+  },
+  {
+    /* The page before any project is added. */
+    id: 'dev-projects-empty',
+    label: 'Dev · Projects, none yet',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsEmptySurface />,
+  },
+  {
     id: 'dev-project-plan',
     label: "Dev · A project's plan",
     module: 'dev',
     width: 'page',
     render: () => <ProjectPlanSurface />,
+  },
+  {
+    id: 'dev-project-plan-unread',
+    label: "Dev · A project's plan, main not readable",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface refused />,
   },
   {
     id: 'dev-raised',

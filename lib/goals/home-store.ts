@@ -24,6 +24,7 @@ import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
 import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
 import { snoozeRefOf, withoutSnoozed } from '@/lib/goals/inbox-snooze';
+import { withoutPassiveGoals } from '@/lib/goals/inbox';
 import type { RunQuestion } from '@/lib/core/run-questions';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,14 +100,20 @@ export async function loadHome(
     };
   });
   const holders = goalHolders({ goals, byGoal: tree.byGoal, onYou: ranked, runs, now });
-  const onYou = await withoutSnoozedRows(supabase, ranked, now);
+  // A passive goal puts nothing on you (plan #2503): its rows leave here, so
+  // the Inbox, its badge and Do next all go without them.
+  const { onYou, dash } = withoutPassiveGoals(
+    tree.goals,
+    await withoutSnoozedRows(supabase, ranked, now),
+    dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
+  );
   return {
     onYou,
     goals,
     working: runs.filter((run) => isGoing(run, now)),
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
     preparable: preparableSteps({ byGoal: tree.byGoal, onYou: ranked, runs, now }),
-    dash: dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
+    dash,
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
     waitingRuns,
     suggested: suggestedItems({ goals: tree.goals, byGoal: tree.byGoal, suggestions: input.suggestions }),

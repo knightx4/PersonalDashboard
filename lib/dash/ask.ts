@@ -183,7 +183,9 @@ drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
 with the whole new text. When they ask for a post about the app or how
 they build it, read what it rests on, call post_pictures for a picture of that screen,
 and call suggest_post with the angle, the posts and the picture where one
-fits; it saves the draft to the Posts tab and never posts it. Never hand_off a request for a post. When they state a rule for many items or
+fits; it saves the draft to the Posts tab and never posts it. Never hand_off a request for a post. When they ask
+to add one of their GitHub repositories as a project in Dev, call add_project with
+its name as they said it. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. When a

@@ -106,14 +106,24 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { ideaDetailShortfall } from '../lib/ideas/body';
 import { isModuleId } from '../lib/modules';
-import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
+import {
+  PROJECT_COLUMNS,
+  isAppScope,
+  isPlanScope,
+  planScopeLabel,
+  planScopeOf,
+  projectsFromRows,
+  repoForScope,
+  storedScopeOf,
+  type DevProject,
+} from '../lib/plan/projects';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
-import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
@@ -341,9 +351,18 @@ async function doneRefusal(
   number: number,
   commit: string,
 ): Promise<string | null> {
-  const landing = await commitOnMain({ sha: commit });
-  const refusal = closeRefusal({ sha: commit, landing, branches: branchesContaining(commit) });
+  // Asked of the repository the step was built in: its root feature's
+  // project's, or this one (plan #2553.2).
+  const repo = repoForScope(await rootScope(sql, userId, number), projects);
+  const app = isAppRepo(repo);
+  const landing = await commitOnMain({ sha: commit, repo });
+  // This checkout's branches say nothing about another repository's.
+  const branches = app ? branchesContaining(commit) : [];
+  const refusal = closeRefusal({ sha: commit, landing, branches, repo });
   if (refusal) return refusal;
+  // The screens and the design critic are this app's; a project's
+  // repository has its own checks.
+  if (!app) return null;
 
   let inputs: { files: string[]; surfaces: string[] };
   try {
@@ -360,6 +379,21 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/** The scope a step's root feature is filed under: a workspace, a project, or null. */
+async function rootScope(sql: Sql, userId: string, number: number): Promise<string | null> {
+  const rows = await sql<{ module: string | null }[]>`
+    with recursive up as (
+      select id, parent_id, module, 0 as depth from plan_items
+      where user_id = ${userId} and number = ${number}
+      union all
+      select p.id, p.parent_id, p.module, up.depth + 1 from plan_items p
+      join up on p.id = up.parent_id
+      where p.user_id = ${userId} and up.depth < 50
+    )
+    select module from up order by depth desc limit 1`;
+  return storedScopeOf(rows[0]?.module ?? null);
 }
 
 /**
@@ -406,6 +440,26 @@ async function resolveUser(sql: Sql): Promise<string> {
   return fail('More than one account here. Say which with --user <id or email>.');
 }
 
+/**
+ * The account's projects (lib/plan/projects), read once per run of the
+ * script and kept here, so every label and check in the run reads the same
+ * list. A read that fails reads as none, as it does on the page.
+ */
+let projects: DevProject[] = [];
+
+async function loadProjects(sql: Sql, userId: string): Promise<DevProject[]> {
+  try {
+    const rows = await sql.unsafe<Record<string, unknown>[]>(
+      `select ${PROJECT_COLUMNS} from dev_projects where user_id = $1 order by created_at, id`,
+      [userId],
+    );
+    return projectsFromRows(rows);
+  } catch (err) {
+    console.error(`The Dev projects could not be read: ${err instanceof Error ? err.message : 'failed'}`);
+    return [];
+  }
+}
+
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind,
@@ -419,6 +473,7 @@ async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   return {
     items: rows.map(planItemFromRow),
     dependencies: deps.map((d) => ({ id: d.id, itemId: d.item_id, dependsOnId: d.depends_on_id })),
+    projects,
   };
 }
 
@@ -621,7 +676,7 @@ function ideasFromFile(path: string): { body: string; module: PlanItem['module']
 }
 
 function moduleLabel(module: PlanItem['module']): string {
-  return planScopeLabel(module);
+  return planScopeLabel(module, projects);
 }
 
 /** Keep only the steps a predicate wants, and the way down to them. */
@@ -702,6 +757,7 @@ async function main(): Promise<void> {
   const [command = 'list', target, extra] = positional();
   const sql = connect();
   const userId = await resolveUser(sql);
+  projects = await loadProjects(sql, userId);
 
   try {
     // Every command names steps or reads a name, so the outlines are loaded
@@ -1168,8 +1224,8 @@ async function main(): Promise<void> {
       const parent = parentNumber ? await byNumber(sql, userId, parentNumber) : null;
       const moduleArg = arg('--module');
       // A plan step may belong to a project built elsewhere (lib/plan/projects).
-      if (moduleArg && !isPlanScope(moduleArg)) fail(`"${moduleArg}" is not a module or project.`);
-      const scope = parent ? parent.module : planScopeOf(moduleArg);
+      if (moduleArg && !isPlanScope(moduleArg, projects)) fail(`"${moduleArg}" is not a module or project.`);
+      const scope = parent ? parent.module : planScopeOf(moduleArg, projects);
       const priority = Number(arg('--priority') ?? 2);
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');

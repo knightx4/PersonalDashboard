@@ -25,7 +25,6 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   fireFeatureRoutine,
-  projectRoutineIds,
   resolveRoutineId,
   type FireRoutineResult,
   type RoutineTarget,
@@ -67,6 +66,7 @@ import {
   type WorkRow,
 } from './run-work';
 import { readAll } from '@/lib/learn/db/read-all';
+import { loadProjectStepIds } from './projects';
 import { lineSilent, readLastLines } from '@/lib/core/run-liveness';
 import { ABANDONED_STALE_ERROR } from '@/lib/core/run-activities';
 import { subtreeTrail } from './subtree';
@@ -228,6 +228,11 @@ export async function endQuietRuns(input: {
   supabase: Db;
   userId: string;
   now?: number;
+  /**
+   * Which of these steps sit under a project (lib/plan/projects), whose runs
+   * push to another repository. `loadProjectStepIds` unless a test hands one in.
+   */
+  readProjectSteps?: (stepIds: readonly string[]) => Promise<ReadonlySet<string>>;
   /** What has been pushed since these runs started, when somebody has read it. */
   pushes?: readonly Push[] | null;
   /**
@@ -322,7 +327,12 @@ export async function endQuietRuns(input: {
   const pushes = input.pushes ?? null;
   // A project's run pushes to its own repository, so this one's pushes say
   // nothing about it: it is judged on the clock, as an unread listing is.
-  const elsewhere = projectRoutineIds();
+  // Told apart by the step it was sent at, whose root is the project's: one
+  // shared routine builds every project, so its id says nothing (#2553.3).
+  const elsewhere = await (
+    input.readProjectSteps ??
+    ((ids) => loadProjectStepIds(input.supabase, input.userId, ids))
+  )(stepIds);
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
   const silent: string[] = [];
@@ -364,7 +374,7 @@ export async function endQuietRuns(input: {
       !pushes ||
       !listed ||
       judgedOnClock(row.job) ||
-      (row.routine_id !== null && elsewhere.has(row.routine_id))
+      (row.plan_item_id !== null && elsewhere.has(row.plan_item_id))
     ) {
       verdict = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
       note = runQuietNote(row.created_at, now);
@@ -757,6 +767,11 @@ export async function readRunLiveness(input: {
   supabase: Db;
   userId: string;
   now?: number;
+  /**
+   * Which of these steps sit under a project (lib/plan/projects), whose runs
+   * push to another repository. `loadProjectStepIds` unless a test hands one in.
+   */
+  readProjectSteps?: (stepIds: readonly string[]) => Promise<ReadonlySet<string>>;
   fetch?: typeof globalThis.fetch;
 }): Promise<{
   steps: Record<string, StepRunReading>;
@@ -807,14 +822,17 @@ export async function readRunLiveness(input: {
   const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
   const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
 
-  const elsewhere = projectRoutineIds();
+  const elsewhere = await (
+    input.readProjectSteps ??
+    ((ids) => loadProjectStepIds(input.supabase, input.userId, ids))
+  )([...latest.keys()]);
   const readings: Record<string, StepRunReading> = {};
   for (const step of steps) {
     const run = latest.get(step.id);
     if (!run) continue;
     // A project's run (lib/plan/projects) pushes to another repository, so the
     // listing here cannot speak for it either way.
-    const readable = !pushError && !(run.routine_id !== null && elsewhere.has(run.routine_id));
+    const readable = !pushError && !elsewhere.has(step.id);
     const evidence: RunEvidence = {
       startedAt: run.created_at,
       lastPush: readable ? lastPushSince(pushes, run.created_at) : null,
