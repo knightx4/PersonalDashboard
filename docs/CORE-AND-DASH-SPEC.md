@@ -57,7 +57,7 @@ own model, tools and limits.
 
 | Path | Model | Can read | Can write |
 |---|---|---|---|
-| Ask Dash (`lib/talk/ask.ts`) | Sonnet | 15 lookup tools across every workspace | 4 kinds of proposal |
+| Ask Dash (`lib/dash/ask.ts`) | Sonnet | 15 lookup tools across every workspace | 4 kinds of proposal |
 | @dash on dev rows (`lib/comments/ask.ts`) | Haiku | The row and its thread only | Ideas, notes, rewording, plan steps |
 | @dash on goals (`lib/goals/ask.ts`) | Haiku | The goal map and its collections | Facts into collections, step handover |
 | @dash on a role (`lib/jobs/role-thread`) | Sonnet | The role, evidence bank and profile | The cover letter |
@@ -210,7 +210,7 @@ updated to use it.
 
 ## Part 6: One Dash
 
-`lib/dash/` holds one loop, grown from `lib/talk/ask.ts`, and one tool
+`lib/dash/` holds one loop, grown from the earlier `lib/talk/ask.ts`, and one tool
 registry. Every surface calls the same loop with a context: which surface, the
 subject ref and its thread if there is one, and the page the person is on.
 
