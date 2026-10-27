@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { answerReview, OUTCOMES, REVIEW_DAYS, type Outcome, type ReviewAt } from '@/lib/you/board-reviews';
+import { answerTripwire } from '@/lib/you/board-tripwires';
 
 /**
  * The person's answer to the board checking back on a decision (plan
@@ -34,6 +35,32 @@ export async function answerBoardReview(
     if (result === 'changed') return { error: 'This decision changed while you were looking. Read the page again.' };
     revalidatePath('/you/board');
     revalidatePath('/you/board/[id]', 'page');
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
+  }
+}
+
+const tripwireInput = z.object({ questionId: z.string().uuid(), tripped: z.boolean() });
+
+/**
+ * The person settling a tripwire that fell due (plan #2581.10): it happened,
+ * which reopens the decision for the next meeting, or it did not.
+ */
+// latency: pending
+export async function answerBoardTripwire(
+  questionId: string,
+  tripped: boolean,
+): Promise<{ error: string | null }> {
+  const parsed = tripwireInput.safeParse({ questionId, tripped });
+  if (!parsed.success) return { error: 'That is not a tripwire the board set.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await answerTripwire(client, user.id, questionId, tripped);
+    if (result === 'missing') return { error: 'That decision is no longer on your board.' };
+    if (result === 'changed') return { error: 'The board already checked this tripwire. Read the page again.' };
+    revalidatePath('/you/board');
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };

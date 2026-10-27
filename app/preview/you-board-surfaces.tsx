@@ -18,6 +18,8 @@ import {
 import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import type { DecisionReview } from '@/lib/you/board-reviews';
+import type { DueTripwire } from '@/lib/you/board-tripwires';
+import type { TrackRecord } from '@/lib/you/board-scoring';
 import {
   parseMinutes,
   scorecardFrom,
@@ -595,6 +597,9 @@ export const boardReviews: DecisionReview[] = [
     outcome: null,
     answeredAt: null,
     grades: [],
+    scores: [],
+    successMeasure: null,
+    due: '2026-11-01',
   },
   {
     questionId: '00000000-0000-4000-8000-0000000000ea',
@@ -618,6 +623,104 @@ export const boardReviews: DecisionReview[] = [
     outcome: null,
     answeredAt: null,
     grades: [],
+    scores: [],
+    successMeasure: null,
+    due: '2026-11-01',
+  },
+];
+
+/**
+ * What fell due (plan #2581.10): a forecast decision's 30-day check-back on
+ * its day, before any meeting wrote how it went, so it asks from the success
+ * measure; and the older written one.
+ */
+export const dueReviews: DecisionReview[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000eb',
+    question: 'Should I accept the fintech offer at £68,000 or wait two weeks for the bank’s final round?',
+    options: [
+      { letter: 'A', text: 'Accept the fintech offer now' },
+      { letter: 'B', text: 'Ask the fintech for two weeks and finish the bank’s process' },
+      { letter: 'C', text: 'Decline both and keep searching' },
+    ],
+    chosen: 'B',
+    option: 'B',
+    decidedAt: '2026-10-02T19:10:00Z',
+    topic: 'work',
+    at: 30,
+    meetingId: null,
+    writtenAt: null,
+    account: '',
+    receipts: [],
+    ask: '',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+    scores: [],
+    successMeasure: 'A signed offer at £70,000 or more, starting before February.',
+    due: '2026-11-01',
+  },
+  boardReviews[0],
+];
+
+/** A tripwire whose day has come. */
+export const dueTripwires: DueTripwire[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000ec',
+    question: 'Should I move to Lisbon in March, or stay in London until the contract ends?',
+    options: [
+      { letter: 'A', text: 'Move in March' },
+      { letter: 'B', text: 'Stay until the contract ends in June' },
+    ],
+    chosen: 'A',
+    condition:
+      'Fewer than two first interviews from the remote roles applied to in October, by 2 November.',
+    checkOn: '2026-11-02',
+    status: 'watching',
+    checkedAt: null,
+    fact: null,
+  },
+];
+
+/** Who has been right about what, closest first. */
+export const trackRecordsFixture: TrackRecord[] = [
+  {
+    advisor: 'cfo',
+    name: 'CFO',
+    scored: 8,
+    brier: 0.11,
+    topics: [
+      { topic: 'work', scored: 6, brier: 0.09, weight: 1.64 },
+      { topic: 'money', scored: 2, brier: 0.17, weight: 1 },
+    ],
+  },
+  {
+    advisor: 'hiring_manager',
+    name: 'Hiring manager',
+    scored: 6,
+    brier: 0.19,
+    topics: [{ topic: 'work', scored: 6, brier: 0.19, weight: 1.24 }],
+  },
+  {
+    advisor: 'richard_feynman',
+    name: 'Richard Feynman',
+    scored: 2,
+    brier: 0.22,
+    topics: [
+      { topic: 'learning', scored: 1, brier: 0.16, weight: 1 },
+      { topic: 'projects', scored: 1, brier: 0.28, weight: 1 },
+    ],
+  },
+  {
+    advisor: 'dreamer',
+    name: 'Dreamer',
+    scored: 7,
+    brier: 0.36,
+    topics: [
+      { topic: 'work', scored: 5, brier: 0.41, weight: 0.36 },
+      { topic: 'place', scored: 1, brier: 0.25, weight: 1 },
+      { topic: 'time', scored: 1, brier: 0.2, weight: 1 },
+    ],
   },
 ];
 
@@ -652,6 +755,7 @@ export const PREVIEW_PANELS: BoardPanel[] = [
 const listActions: BoardListActions = {
   answerAsk: async () => ({ error: null }),
   answerReview: async () => ({ error: null }),
+  answerTripwire: async () => ({ error: null }),
   ask: async () => ({ error: null, queued: true }),
   start: async () => ({ error: null }),
   accept: async () => ({ error: null }),
@@ -664,7 +768,7 @@ export function YouBoardListPreview({
   start,
   meetingStart,
 }: {
-  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error' | 'reviews' | 'reviews-error';
+  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error' | 'reviews' | 'reviews-error' | 'due';
   start?: AskStart;
   meetingStart?: StartStart;
 }) {
@@ -724,7 +828,11 @@ export function YouBoardListPreview({
           ? 'This question changed while you were looking. Read the page again.'
           : undefined
       }
-      reviews={state === 'reviews' || state === 'reviews-error' ? boardReviews : []}
+      reviews={
+        state === 'reviews' || state === 'reviews-error' ? boardReviews : state === 'due' ? dueReviews : []
+      }
+      tripwires={state === 'due' ? dueTripwires : []}
+      records={state === 'due' ? trackRecordsFixture : []}
       reviewError={state === 'reviews-error' ? 'Your answer was not saved. Try again.' : undefined}
     />
   );

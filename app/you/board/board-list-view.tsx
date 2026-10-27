@@ -29,6 +29,10 @@ import type { PersonAsk } from '@/lib/you/board-asks';
 import { nextReview, type DecisionReview } from '@/lib/you/board-reviews';
 import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-rows';
 import { ReviewRow, type ReviewAnswerAction } from './review-rows';
+import { TripwireRow, type TripwireAnswerAction } from './tripwire-rows';
+import { TrackRecordRows } from './track-records';
+import type { DueTripwire } from '@/lib/you/board-tripwires';
+import type { TrackRecord } from '@/lib/you/board-scoring';
 import type { BoardPanel } from '@/lib/you/board-panels';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { useStartMeeting, type StartActions, type StartStart } from './start-meeting';
@@ -39,21 +43,29 @@ import { useRefreshWhileRunning } from './refresh-while-running';
  * The Board tab's list (plans #2540.3 and #2561.4), on the list pattern
  * (components/patterns/list-detail.tsx): the header's one action, Ask the
  * board, which opens the compose card under it; then one surface of rows in
- * three groups. The board's suggested questions come first, each with Ask
+ * groups. What fell due comes first (plan #2581.10): the check-backs waiting
+ * on how a decision went, then the tripwires whose day has come. The board's suggested questions come first, each with Ask
  * now, Save for Sunday and Dismiss; then the questions the person asked,
  * with the state each is in; then every meeting, newest first, each opening
- * on its own page (./[id]).
+ * on its own page (./[id]). Last, once a forecast is scored, each
+ * advisor's track record by topic.
  */
 
 export type BoardListActions = AskActions &
   StartActions &
-  QuestionActions & { answerAsk: AskAnswerAction; answerReview: ReviewAnswerAction };
+  QuestionActions & {
+    answerAsk: AskAnswerAction;
+    answerReview: ReviewAnswerAction;
+    answerTripwire: TripwireAnswerAction;
+  };
 
 export function BoardListView({
   meetings,
   questions = [],
   asks = [],
   reviews = [],
+  tripwires = [],
+  records = [],
   names = {},
   reviewError,
   advisors = [],
@@ -74,6 +86,10 @@ export function BoardListView({
   asks?: readonly PersonAsk[];
   /** The board's check-backs on their decisions still waiting on their answer (listOpenReviews). */
   reviews?: readonly DecisionReview[];
+  /** Tripwires watching whose day has come (listDueTripwires). */
+  tripwires?: readonly DueTripwire[];
+  /** Each advisor's scored forecasts by topic (loadTrackRecords). */
+  records?: readonly TrackRecord[];
   /** Every advisor's name by key, for whose pick held up (advisorNames). */
   names?: Readonly<Record<string, string>>;
   /** A failed answer to draw on the first check-back. Only the gallery sets it. */
@@ -126,6 +142,7 @@ export function BoardListView({
     questions.length === 0 &&
     asks.length === 0 &&
     reviews.length === 0 &&
+    tripwires.length === 0 &&
     decisions.length === 0
   ) {
     return (
@@ -160,19 +177,6 @@ export function BoardListView({
       {ask.form && <div className="mb-4">{ask.form}</div>}
       <Card padding="none">
         <ul className="divide-y divide-border">
-          {asks.length > 0 && (
-            <Group title="The board asks you" count={asks.length}>
-              {groupByQuestion(asks).map((group, index) => (
-                <AskQuestionRow
-                  key={group.questionId}
-                  question={group.question}
-                  asks={group.asks}
-                  answer={actions.answerAsk}
-                  errorOn={index === 0 ? (asksError ?? null) : null}
-                />
-              ))}
-            </Group>
-          )}
           {reviews.length > 0 && (
             <Group title="How did it go?" count={reviews.length}>
               {reviews.map((review, index) => (
@@ -182,6 +186,26 @@ export function BoardListView({
                   names={names}
                   answer={actions.answerReview}
                   startError={index === 0 ? (reviewError ?? null) : null}
+                />
+              ))}
+            </Group>
+          )}
+          {tripwires.length > 0 && (
+            <Group title="Tripwires due" count={tripwires.length}>
+              {tripwires.map((wire) => (
+                <TripwireRow key={wire.questionId} wire={wire} answer={actions.answerTripwire} />
+              ))}
+            </Group>
+          )}
+          {asks.length > 0 && (
+            <Group title="The board asks you" count={asks.length}>
+              {groupByQuestion(asks).map((group, index) => (
+                <AskQuestionRow
+                  key={group.questionId}
+                  question={group.question}
+                  asks={group.asks}
+                  answer={actions.answerAsk}
+                  errorOn={index === 0 ? (asksError ?? null) : null}
                 />
               ))}
             </Group>
@@ -248,6 +272,11 @@ export function BoardListView({
                   />
                 );
               })}
+            </Group>
+          )}
+          {records.length > 0 && (
+            <Group title="Track records" count={records.length}>
+              <TrackRecordRows records={records} />
             </Group>
           )}
         </ul>
