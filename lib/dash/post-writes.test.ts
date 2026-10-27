@@ -8,6 +8,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import { listPostPictures } from './post-pictures';
 import { POST_WRITE_TOOLS } from './post-writes';
+import { PROJECT_WRITE_TOOLS } from './project-writes';
 import type { DashWriteContext, DashWriteResult } from './registry';
 
 /**
@@ -121,7 +122,8 @@ beforeEach(() => {
 
 describe('rewrite_post', () => {
   it('lists the post kinds Ask keeps', () => {
-    expect(POST_WRITE_TOOLS.map((t) => t.name)).toEqual([...POST_CHANGE_KINDS]);
+    // add_project shares the kinds (lib/dash/project-writes.ts, plan #2553.5).
+    expect([...POST_WRITE_TOOLS, ...PROJECT_WRITE_TOOLS].map((t) => t.name)).toEqual([...POST_CHANGE_KINDS]);
   });
 
   it('shortens a draft: body takes the new text and draft keeps what Dash first wrote', async () => {

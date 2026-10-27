@@ -226,11 +226,10 @@ export type HomeLists = {
  * Other goals is every goal with no due date, plus an errand with no row in
  * Do next, so a dated errand always shows somewhere.
  *
- * A passive goal (plan #2503) asks for nothing: its due date does not bring
- * its steps or rhythms in, and only a step you sent to Todo yourself and the
- * ANY_GOAL_KINDS rows, which hold up work, are kept from it. Passive goals
- * are listed apart from Other goals, under a heading of their own (plan
- * #2503.4), errand or not.
+ * A passive goal (plan #2503) asks for nothing: loadHome takes its rows out
+ * before they reach here (withoutPassiveGoals in lib/goals/inbox.ts), and its
+ * due date does not bring anything in. Passive goals are listed apart from
+ * Other goals, under a heading of their own (plan #2503.4), errand or not.
  */
 export function homeLists(
   ranked: readonly TodayItem[],

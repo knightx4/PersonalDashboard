@@ -16,6 +16,7 @@
  * covers every row already sitting blocked rather than only ones filed from
  * here on.
  */
+import { isProjectScope } from './projects';
 import {
   flatten,
   flattenSections,
@@ -37,6 +38,12 @@ export type WaitingRow = {
   number: number;
   title: string;
   module: PlanNode['module'];
+  /**
+   * What the row's section is called: a project's label comes off its row,
+   * which the browser cannot read (plan #2553.1). Absent reads as the
+   * workspace's name or the bare id.
+   */
+  moduleLabel?: string;
   /**
    * `unanswered`, `proposed`, `blocked` or `setup` -- what kind of waiting it
    * is. The same names `healthOf` uses, because this reads it rather than
@@ -137,6 +144,7 @@ const ORDER: Record<WaitingRow['health'], number> = {
 export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
   const rows: WaitingRow[] = [];
   const nodes = flattenSections(sections);
+  const labels = new Map(sections.map((section) => [section.module, section.label]));
   const byId = new Map(nodes.map((node) => [node.id, node]));
   // The top of the row's chain: the feature it is a step of, however deep.
   const featureOf = (node: PlanNode): WaitingRow['feature'] => {
@@ -189,6 +197,10 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       number: node.number,
       title: node.title,
       module: node.module,
+      // Only a project's: a workspace's name is in lib/modules for anyone.
+      ...(isProjectScope(node.module) && labels.has(node.module)
+        ? { moduleLabel: labels.get(node.module) }
+        : {}),
       health,
       detail: node.detail?.trim() || null,
       resolution: node.resolution?.trim() || null,

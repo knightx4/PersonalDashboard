@@ -135,6 +135,7 @@ export function ActionMenu({
   panelClassName,
   onOpenChange,
   defaultOpen = false,
+  defaultArmed,
   header,
 }: {
   label?: string;
@@ -158,6 +159,8 @@ export function ActionMenu({
   onOpenChange?: (open: boolean) => void;
   /** For the gallery: draw the menu open, as a hidden part of the screen it sits on. */
   defaultOpen?: boolean;
+  /** For the gallery: the item whose confirm shows from the start, with `defaultOpen`. */
+  defaultArmed?: string;
   /**
    * Drawn above the items, inside the panel: a field that narrows a table
    * column by a typed value (plan #2341.3). Clicks in it keep the menu open.
@@ -168,7 +171,7 @@ export function ActionMenu({
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   /** The item whose confirm is showing, if any. Cleared whenever the menu closes. */
-  const [armed, setArmed] = useState<string | null>(null);
+  const [armed, setArmed] = useState<string | null>(defaultArmed ?? null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();

@@ -370,6 +370,9 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     { schema: 'public', table: 'spec_changes', column: 'plan_item_id' },
   ],
   'public.ideas': [{ schema: 'public', table: 'inspiration_takeaways', column: 'idea_id' }],
+  // A project with plan rows filed under it (plan #2553.5): the features and
+  // steps written since are later work, and would be left under a bare id.
+  'public.dev_projects': [{ schema: 'public', table: 'plan_items', column: 'module' }],
   // What routines add through core.record_dash_action (plan #1460).
   'goals.items': [
     { schema: 'goals', table: 'items', column: 'parent_id' },

@@ -89,8 +89,8 @@ import {
   EditStep,
   SIZE_LABEL,
   STATUS_LABEL,
-  scopeLabel,
 } from './step-forms';
+import { useScopeLabel } from './scope-labels';
 import { outlinesOf, type TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
 import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
@@ -98,7 +98,7 @@ import { CriticStop } from './critic-stop';
 import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
-import { projectById } from '@/lib/plan/projects';
+import { isProjectScope } from '@/lib/plan/projects';
 import type { RoutineKey } from '@/lib/feedback/routine-names';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
@@ -262,7 +262,7 @@ function SetupJob({
  * (`builderFor` in lib/plan/handover.ts).
  */
 function sendsTo(node: PlanNode): RoutineKey {
-  return projectById(node.module) ? 'project' : 'plan';
+  return isProjectScope(node.module) ? 'project' : 'plan';
 }
 
 /**
@@ -774,6 +774,7 @@ export function usePlanRow({
    */
   source?: string;
 }) {
+  const scopeLabel = useScopeLabel();
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
   // server render and the first client one agreeing.
@@ -1599,6 +1600,7 @@ export type PlanRowProps = Parameters<typeof usePlanRow>[0];
 export function PlanRow(props: PlanRowProps) {
   const { node: own, trail, view, searching, unfolded, opened = false } = props;
   const parts = usePlanRow(props);
+  const scopeLabel = useScopeLabel();
   const inset = rowInset(trail);
   // A feature is a build row at the top of its module. Its title opens the
   // feature's page; a step's title still opens its panel in place.
