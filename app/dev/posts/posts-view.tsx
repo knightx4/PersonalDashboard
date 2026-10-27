@@ -111,7 +111,7 @@ export function PostsScreen({
         <EmptyState
           icon={Megaphone}
           title="No drafts yet"
-          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, then press Post to send it to X, or post it yourself and paste the link back here."
+          description="Suggest posts asks Dash for three to five X posts about building this app: what shipped lately, older work, how it is built, and things near it. Or write your own. Click a post to edit it, then press Post to send it to X, or post it yourself and paste the link back here."
         />
       ) : (
         <>

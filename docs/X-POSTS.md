@@ -17,7 +17,28 @@ they scroll past anything that reads like an announcement.
 What they want from a post about this app is how it is built: one person
 directing Dash sessions that work from a written plan, several of them merging
 to main each day, with checks that keep main working. Each post shows one
-concrete piece of that.
+concrete piece of that, or of something near it: what the person has learned
+directing AI agents, how they decide what to build, the tools and habits around
+the work, a mistake and what changed after it.
+
+## What a post can be about
+
+A post is about building this app, and it does not have to be about the
+newest step. Any of these is a subject:
+
+- **What shipped lately.** The plan's done steps since the last posted row.
+  When there are some worth a post, they come first.
+- **Older work.** A step closed months ago is as new to a reader as one closed
+  yesterday, provided no posted or dropped row has taken its angle.
+- **How the app is built and run.** The rules in `CLAUDE.md`, the skills
+  under `.claude/skills/`, the specs, the gate, the routines that run each day,
+  the design laws, the git history. Most of this was never one step.
+- **Things near it.** How the person works with Dash, what they changed their
+  mind about, what a day of directing sessions looks like, an opinion about
+  building with AI that the work here supports.
+
+A run that finds nothing new in the plan writes from the rest of this list. It
+writes no draft only when every angle it can find is already taken.
 
 ## What a post is
 
@@ -33,19 +54,24 @@ concrete piece of that.
   it follows, what it checks. A reader new to the account does not know who
   Dash is, so a post that would not make sense otherwise says so: "Dash, the
   AI that builds my app".
-- **Opens with a concrete fact.** A number, a rule, or what changed, taken
-  from the plan. The opening line is what decides whether anyone reads the
+- **Opens with a concrete fact.** A number, a rule, or what changed. The opening line is what decides whether anyone reads the
   rest, so it carries the substance rather than a teaser.
 - **Explains its terms.** Write "the checks every merge must pass" or "the
   pre-merge check" rather than "the gate", and "a question Dash writes for me
   to answer" rather than "a decision row". App vocabulary goes in only with
   enough words around it to make sense to a stranger.
 
-## What the plan can back
+## What backs a claim
 
-Every claim in a post must be traceable to a plan step or a closed note the
-row cites in `source_plan_item_ids` or `source_feedback_ids`. If the step does
-not say it, the post does not say it.
+Every fact in a post must be something the run can point to: a plan step or
+closed note the row cites in `source_plan_item_ids` or `source_feedback_ids`,
+a file in the repository, a commit, or a query it ran. If none of them says
+it, the post does not say it. A post resting on a file or a commit cites no
+step, and its `angle` names what it rests on so the person can check it.
+
+A view or a lesson needs no source, but it is the person's view, so it rests on
+something they did or wrote here (a rule in `CLAUDE.md`, a comment on a step,
+what they want from their posts) and never on an outcome nobody measured.
 
 - **Counts come from the table, not from step numbers.** Some rows have been
   deleted and numbers are never reused, so the highest number overstates how
@@ -84,9 +110,10 @@ reading the draft.
 
 - **Anything from a workspace other than Dev.** Jobs, goals, the vault, Learn,
   news, shopping, todo, mail and calendar hold the person's life, and a step
-  in one of them describes that life even when its title looks technical. Draft
-  only from steps whose module is `dev` or null, and leave out a null-module
-  step whose text mentions another workspace's data.
+  in one of them describes that life even when its title looks technical. Cite
+  only steps whose module is `dev` or null, and leave out a null-module
+  step whose text mentions another workspace's data. A post about how the app
+  is built may say a workspace exists; it never says what is in it.
 - **People's names**, including the person's own and anything that contains
   it, such as the app's domain.
 - **Amounts of money**, including what a run or a model call cost.

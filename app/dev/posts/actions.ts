@@ -54,8 +54,8 @@ const POSTS_PATH = '/dev/posts';
 const idSchema = z.string().uuid();
 
 /**
- * Suggest posts: start a Dash run that drafts three to five posts about what
- * shipped since the last posted one (lib/dev/posts-run.ts). It is refused
+ * Suggest posts: start a Dash run that drafts three to five posts about
+ * building the app, recent work first (lib/dev/posts-run.ts). It is refused
  * while the last run is still going.
  *
  * With an `ask` in the form (note 114ff495), the run writes one draft about

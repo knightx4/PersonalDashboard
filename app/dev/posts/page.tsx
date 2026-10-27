@@ -13,8 +13,8 @@ export const maxDuration = 300;
 /**
  * X posts Dash drafted about building this app (plan #1419, feature #1414).
  *
- * Suggest posts starts a run that drafts a few from what shipped since the
- * last posted one. Each draft is edited here, then either sent to X with
+ * Suggest posts starts a run that drafts a few about building the app, from
+ * recent work and from anything else a post can honestly rest on. Each draft is edited here, then either sent to X with
  * Post and a confirm (plan #2072), or copied, posted by the person and
  * marked posted with its link; or dropped. Nothing is posted unless the
  * person presses Post on that draft.

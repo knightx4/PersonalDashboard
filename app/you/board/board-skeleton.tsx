@@ -2,12 +2,12 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skeleton';
 
-/** The Board tab's list while it loads: the header and rows in the shape a meeting's row takes. */
+/** The Board tab's list while it loads: the header with Ask the board, then rows in the shape a question's and a meeting's take. */
 export function BoardListSkeleton() {
   return (
     <PageColumn>
-      <PageHeaderSkeleton action={false} />
-      <RowsSkeleton rows={4} />
+      <PageHeaderSkeleton />
+      <RowsSkeleton rows={5} />
     </PageColumn>
   );
 }
