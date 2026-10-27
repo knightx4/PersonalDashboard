@@ -23,6 +23,7 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -9705,6 +9706,59 @@ export const SURFACES: readonly Surface[] = [
         <YouBoardDebatePreview decision="error" />
       </div>
     ),
+  },
+  {
+    /* Advisors (plan #2561.7): the five seats and every guest with the
+     * question each owns, a brain state and the switch for the chair. */
+    id: 'you-board-advisors',
+    label: 'You · Board, the advisors and their switches',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-add',
+    label: 'You · Board, Add advisor open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview start="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-building',
+    label: 'You · Board, a guest’s brain being built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-failed',
+    label: 'You · Board, a brain that failed to build, with retry',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-loading',
+    label: 'You · Board, advisors loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouBoardAdvisorsLoadingPreview />,
   },
   {
     id: 'you-board-meeting-advisor',

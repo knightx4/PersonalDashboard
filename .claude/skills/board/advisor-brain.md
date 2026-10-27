@@ -13,7 +13,7 @@ code, no commits, nothing deleted.
 
 ## The brief
 
-The Board tab, when the person adds an advisor, fires the goals routine
+The Board tab, when the person adds an advisor, fires the board routine
 with:
 
 ```
@@ -92,8 +92,9 @@ sources     [ { label, link } ]    every source read, ten at least
 ```
 
 - **The question.** The row's `question` is the one question this advisor
-  owns. Keep it when the person wrote it. When it is empty or a placeholder,
-  write one from the brain, in their terms and addressed to "you", and set
+  owns. Keep it when the person wrote it. When it is empty or a placeholder
+  (the tab writes "What would <name> make of this?" for a guest the person
+  adds), write one from the brain, in their terms and addressed to "you", and set
   it in the same update.
 - **Rules** are what they decide by, eight of them, each with its source in
   brackets at the end: `(1996 letter)`. Write them as instructions the guest
@@ -161,10 +162,14 @@ Read it back: the row is `ready`, its brain has every key above, and
 When fewer than ten sources survive, or the work cannot be read at all,
 leave the brain as it was. A rebuild of a brain that was `ready` in step 1
 sets it back to `ready`, so the guest keeps sitting on the old brain; any
-other row is marked failed:
+other row is marked failed, with the reason in `brain.error`. The Board
+tab's Advisors view shows that text under the guest, beside a Try again that
+runs this file again, so write it for the person: what was found and what is
+missing, in a sentence or two, and nothing in it that is not true.
 
 ```sql
-update you.board_advisors set brain_status = 'failed'
+update you.board_advisors
+set brain_status = 'failed', brain = jsonb_build_object('error', $e$<why, in a sentence or two>$e$)
 where id = '<advisor id>' and user_id = '<user_id>';
 ```
 
