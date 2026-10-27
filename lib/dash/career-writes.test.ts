@@ -203,3 +203,37 @@ describe('add_discovered_company (plan #1894.6.7)', () => {
     expect(await refused('add_discovered_company', find(), { name: 'Huge Labs' })).toMatch(/No startup on Find/);
   });
 });
+
+describe('change_search_aim', () => {
+  const profile = () => ({
+    'job_search.profiles': [{ id: ME, target_titles: ['Strategic Finance', 'FP&A'], excluded_industries: ['Crypto'] }],
+  }) as FakeTables;
+
+  it('adds titles without losing the ones there, and keeps what was before for the Undo', async () => {
+    const tables = profile();
+    const change = await made('change_search_aim', tables, { add_target_titles: ['Accounting', 'fp&a', 'Controller'] });
+    expect(tables['job_search.profiles'][0].target_titles).toEqual(['Strategic Finance', 'FP&A', 'Accounting', 'Controller']);
+    expect(tables['job_search.profiles'][0].excluded_industries).toEqual(['Crypto']);
+    expect(change).toMatchObject({ op: 'update', subjectRef: `job_search.profiles:${ME}`, before: { target_titles: ['Strategic Finance', 'FP&A'] } });
+    expect(change.summary).toBe('Dash set their target titles: Strategic Finance, FP&A, Accounting, Controller.');
+  });
+
+  it('replaces a whole list, takes entries off, and takes a comma list', async () => {
+    const tables = profile();
+    await made('change_search_aim', tables, { excluded_industries: 'Crypto, Defense', remove_target_titles: ['fp&a'] });
+    expect(tables['job_search.profiles'][0].excluded_industries).toEqual(['Crypto', 'Defense']);
+    expect(tables['job_search.profiles'][0].target_titles).toEqual(['Strategic Finance']);
+  });
+
+  it('refuses a call that changes nothing, and one that asks for nothing', async () => {
+    expect(await refused('change_search_aim', profile(), { add_target_titles: ['FP&A'] })).toMatch(/already read that way/);
+    expect(await refused('change_search_aim', profile(), {})).toMatch(/Give target_titles/);
+  });
+
+  it("does not touch another account's profile", async () => {
+    const tables = profile();
+    tables['job_search.profiles'].push({ id: SOMEONE, target_titles: ['Sales'], excluded_industries: [] });
+    await made('change_search_aim', tables, { add_target_titles: ['Accounting'] });
+    expect(tables['job_search.profiles'][1].target_titles).toEqual(['Sales']);
+  });
+});

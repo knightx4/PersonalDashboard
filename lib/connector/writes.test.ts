@@ -107,6 +107,7 @@ describe('runConnectorWrite', () => {
       'add_resume_version',
       'attach_resume_pdf',
       'change_career_thought',
+      'change_search_aim',
       'add_discovered_company',
       'change_interview',
       'change_interviewer',

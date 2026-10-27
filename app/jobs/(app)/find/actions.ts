@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { findStartupsFor } from '@/lib/jobs/suggest/press';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { parseAimList, saveAimList } from '@/lib/jobs/aim';
 
 export interface AimState {
   error?: string;
@@ -26,17 +27,12 @@ export async function saveAim(_prev: AimState, form: FormData): Promise<AimState
   const parsed = aimSchema.safeParse({ field: form.get('field'), value: form.get('value') ?? '' });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const list = parsed.data.value
-    .split(/[,\n]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  const patch =
-    parsed.data.field === 'targetTitles' ? { target_titles: list } : { excluded_industries: list };
+  const list = parseAimList(parsed.data.value);
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
-  if (error) return { error: error.message };
+  const { error } = await saveAimList(supabase, user.id, parsed.data.field, list);
+  if (error) return { error };
   revalidatePath('/jobs/find');
   return {};
 }

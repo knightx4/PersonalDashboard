@@ -100,7 +100,7 @@ export const jobsActions: ModuleActions = {
     deleteThought: none('deletes'),
   },
   'app/jobs/(app)/find/actions.ts': {
-    saveAim: none('setting'),
+    saveAim: tool('change_search_aim'),
     findStartups: tool('find_startups'),
     addDiscoveredCompany: tool('add_discovered_company'),
   },

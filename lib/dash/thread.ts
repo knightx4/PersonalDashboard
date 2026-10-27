@@ -71,7 +71,7 @@ change_goal_link, change_goal_form, change_goals_inbox and change_goal_list, and
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
-add_discovered_company, add_role_from_email, change_interview, change_interviewer and
+change_search_aim, add_discovered_company, add_role_from_email, change_interview, change_interviewer and
 change_interview_round, and in Dev rewrite_post for the text of an X post
 draft, suggest_post to save a new one and add_project to add a GitHub
 repository as a project. This
