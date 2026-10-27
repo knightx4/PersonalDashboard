@@ -7,7 +7,7 @@ import { boardRoutine } from '@/lib/feedback/routine';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
-import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisors';
+import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { callBoardMeeting } from '@/lib/you/board-start';
 import {
   cleanQuestion,

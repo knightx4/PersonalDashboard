@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { addAdvisor, advisorBrief, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import {
-  addAdvisor,
-  advisorBrief,
   advisorKey,
   brainState,
   BUILD_STALE_AFTER_MS,
   cleanAdvisor,
-  retryBuild,
   rosterOf,
-  setActive,
 } from '@/lib/you/board-advisors';
+
+vi.mock('server-only', () => ({}));
 
 const NOW = Date.parse('2026-11-02T12:00:00Z');
 const routine = { id: 'rt', token: 'tk' };
