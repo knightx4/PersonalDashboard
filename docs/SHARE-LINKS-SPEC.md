@@ -251,7 +251,7 @@ matching `0007_lock_down_definer_functions.sql`'s rule and its stated exception.
   `lib/share/auth/public.ts`, the shopping-schema twin of
   `lib/jobs/auth/public.ts`: anon key, no cookie storage, so a signed-in
   stranger and a signed-out one see the identical page).
-- `app/api/s/[token]/respond/route.ts` — POST, Zod-parsed body, same anon
+- `app/s/[token]/actions.ts` (`respondToShare`) — a server action, Zod-parsed input, same anon
   client, calls `share_respond`, returns the fresh group.
 - `proxy.ts` — add `/s` and `/api/s` to `PUBLIC_PATHS`, with the same comment
   the case page got: authorized by an unguessable token and one definer
