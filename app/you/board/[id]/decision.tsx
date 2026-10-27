@@ -13,6 +13,7 @@ import {
   type BoardOption,
   type DecisionChoice,
 } from '@/lib/you/board-questions';
+import { MakeItHappen, type MakeProps } from './make';
 import { Prose } from './prose';
 
 /**
@@ -270,12 +271,17 @@ export function VerdictAndDecision({
   decide,
   editing,
   error,
+  make,
+  makeFailed,
 }: {
   question: DebateQuestion;
   advisors: readonly DebateAdvisor[];
   decide: DecideAction;
   editing?: boolean;
   error?: string | null;
+  /** Writes the decision as todos or goal steps (plan #2561.9); left out, there is no such card. */
+  make?: MakeProps;
+  makeFailed?: string | null;
 }) {
   return (
     <div className="space-y-2">
@@ -284,6 +290,9 @@ export function VerdictAndDecision({
         <VerdictCard verdict={question.verdict} options={question.options} advisors={advisors} />
       )}
       <DecisionCard question={question} decide={decide} editing={editing} error={error} />
+      {make && question.decision?.kind === 'option' && (
+        <MakeItHappen question={question} make={make} failed={makeFailed} />
+      )}
     </div>
   );
 }

@@ -4,6 +4,11 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { boardScorecard, loadBoardMeeting, meetingTitle } from '@/lib/you/board';
 import { loadMeetingDebate } from '@/lib/you/board-debate';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { todayInTimezone } from '@/lib/money';
+import { createTodoClient } from '@/lib/todo/auth/server';
+import { loadGoalChoices, withMade } from '@/lib/you/board-make-store';
+import { makeDecisionHappen } from '../make-actions';
 import { MeetingView } from './meeting-view';
 
 export const metadata = { title: 'Board meeting' };
@@ -37,13 +42,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     loadAccountSettings(user.id),
   ]);
   if (!found) notFound();
-  const debate = await loadMeetingDebate(you, user.id, id, found.minutes.agenda);
+  const loaded = await loadMeetingDebate(you, user.id, id, found.minutes.agenda);
+  const decided = loaded.questions.some((q) => q.decision?.kind === 'option');
+  const [todo, goals] = decided ? await Promise.all([createTodoClient(), createGoalsClient()]) : [null, null];
+  const debate = todo && goals ? await withMade(you, { todo, goals }, user.id, loaded) : loaded;
+  const goalChoices = goals ? await loadGoalChoices(goals, user.id) : [];
   return (
     <MeetingView
       meeting={found.meeting}
       minutes={found.minutes}
       marks={found.marks}
       debate={debate}
+      make={{ action: makeDecisionHappen, goals: goalChoices, today: todayInTimezone(settings.timezone) }}
       scorecard={scorecard}
       timezone={settings.timezone}
       now={readAt()}

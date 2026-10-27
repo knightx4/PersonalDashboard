@@ -28,11 +28,47 @@ const A = {
 } as const;
 
 const advisorRows = [
-  { id: A.hiring_manager, key: 'hiring_manager', name: 'Hiring manager', kind: 'seat', question: 'Would I interview you for the roles you are applying to?', focus: 'This month: the pipeline, where each application stalled, and how your materials read.' },
-  { id: A.mentor, key: 'mentor', name: 'Mentor', kind: 'seat', question: 'Does this build toward a career you would want in ten years?', focus: 'Five to ten years: what you are building, and what you are not.' },
-  { id: A.skeptic, key: 'skeptic', name: 'Skeptic', kind: 'seat', question: 'Do your hours match what you say matters?', focus: 'Right now: stated priorities beside where the time went.' },
-  { id: A.cfo, key: 'cfo', name: 'CFO', kind: 'seat', question: 'What does this cost, and can you afford it?', focus: 'Six to twelve months: spending, runway and income.' },
-  { id: A.dreamer, key: 'dreamer', name: 'Dreamer', kind: 'seat', question: 'Which dream does this keep alive, or quietly drop?', focus: 'No horizon: the big ambitions in your own notes, and the smallest thread that keeps one going.' },
+  {
+    id: A.hiring_manager,
+    key: 'hiring_manager',
+    name: 'Hiring manager',
+    kind: 'seat',
+    question: 'Would I interview you for the roles you are applying to?',
+    focus: 'This month: the pipeline, where each application stalled, and how your materials read.',
+  },
+  {
+    id: A.mentor,
+    key: 'mentor',
+    name: 'Mentor',
+    kind: 'seat',
+    question: 'Does this build toward a career you would want in ten years?',
+    focus: 'Five to ten years: what you are building, and what you are not.',
+  },
+  {
+    id: A.skeptic,
+    key: 'skeptic',
+    name: 'Skeptic',
+    kind: 'seat',
+    question: 'Do your hours match what you say matters?',
+    focus: 'Right now: stated priorities beside where the time went.',
+  },
+  {
+    id: A.cfo,
+    key: 'cfo',
+    name: 'CFO',
+    kind: 'seat',
+    question: 'What does this cost, and can you afford it?',
+    focus: 'Six to twelve months: spending, runway and income.',
+  },
+  {
+    id: A.dreamer,
+    key: 'dreamer',
+    name: 'Dreamer',
+    kind: 'seat',
+    question: 'Which dream does this keep alive, or quietly drop?',
+    focus:
+      'No horizon: the big ambitions in your own notes, and the smallest thread that keeps one going.',
+  },
   {
     id: A.buffett,
     key: 'buffett',
@@ -41,9 +77,18 @@ const advisorRows = [
     question: 'Will you still be glad of this in twenty years?',
     focus: 'Long-term value, staying inside what you understand, and a margin of safety.',
     sources: [
-      { label: 'Berkshire Hathaway shareholder letters, 1977 to 2024', link: 'https://www.berkshirehathaway.com/letters/letters.html' },
-      { label: 'Remarks to University of Florida business students, 1998', link: 'https://www.youtube.com/watch?v=2MHIcabnjrA' },
-      { label: 'The Snowball, by Alice Schroeder', link: 'https://en.wikipedia.org/wiki/The_Snowball' },
+      {
+        label: 'Berkshire Hathaway shareholder letters, 1977 to 2024',
+        link: 'https://www.berkshirehathaway.com/letters/letters.html',
+      },
+      {
+        label: 'Remarks to University of Florida business students, 1998',
+        link: 'https://www.youtube.com/watch?v=2MHIcabnjrA',
+      },
+      {
+        label: 'The Snowball, by Alice Schroeder',
+        link: 'https://en.wikipedia.org/wiki/The_Snowball',
+      },
     ],
   },
 ];
@@ -66,8 +111,14 @@ const questionRows = [
         'Keep two applications a week going through the three months.',
       ],
       dissent: [
-        { advisor: 'mentor', text: 'Three days keeps two warm interviews alive and still moves the runway to May.' },
-        { advisor: 'dreamer', text: 'Nothing in your notes dreams about analytics, and the last contract took the album from weekly to nothing in five weeks.' },
+        {
+          advisor: 'mentor',
+          text: 'Three days keeps two warm interviews alive and still moves the runway to May.',
+        },
+        {
+          advisor: 'dreamer',
+          text: 'Nothing in your notes dreams about analytics, and the last contract took the album from weekly to nothing in five weeks.',
+        },
       ],
       would_change: [
         'The firm will not put an evening in writing: C becomes the better ask.',
@@ -122,34 +173,158 @@ const ROLES = { label: 'Roles, 31 applied', link: '/jobs/roles' };
 const RUNWAY = { label: 'Runway, October', link: '/money' };
 
 const q1Turns = [
-  turn(Q1, 1, 'hiring_manager', 'Of the 31 roles you applied to since August, 24 asked for "recent hands-on analytics". The contract is exactly that line on the résumé. Taking it full time stops the search for three months, but you come back to it with the thing screeners are filtering on. I back A. Your lean is C, and the case against it is that a contractor at three days reads as part time to the firm and to the next screener.', { A: 8, B: 4, C: 6 }, null, [ROLES]),
-  turn(Q1, 1, 'mentor', 'The work matters more than the title. Their team builds forecasting for logistics, which is two steps from the energy roles you say you want in five years. Three days lets you do the work and keep two warm interviews alive. I back C.', { A: 6, B: 3, C: 8 }),
-  turn(Q1, 1, 'skeptic', 'You have said the search is the priority for six weeks running, and in October it got eleven hours a week on average. Full time on the search has not meant full time. B scores low because it describes a week you have not had. I back A, with a hunch that structure helps you more than freedom does.', { A: 7, B: 2, C: 5 }),
-  turn(Q1, 1, 'cfo', 'At the October rate the savings last until early March. The contract pays £14,400 over three months, which moves that to July. C pays £8,640 and moves it to May. Both are better than B, which spends a month of runway for every month the search takes. I back A.', { A: 9, B: 2, C: 7 }, null, [RUNWAY]),
-  turn(Q1, 1, 'dreamer', 'Nothing in your notes dreams about analytics. The essay series and the album do, and both stopped the last time work was full time. C keeps two days that could hold a thread of either. I back C.', { A: 3, B: 5, C: 8 }),
-  turn(Q1, 1, 'buffett', 'Stay inside what you understand. You know analytics work and you know how you behave without structure. A contract with a fixed end and a known payer is a margin of safety, and that is what I would want first. I back A.', { A: 8, B: 3, C: 6 }),
+  turn(
+    Q1,
+    1,
+    'hiring_manager',
+    'Of the 31 roles you applied to since August, 24 asked for "recent hands-on analytics". The contract is exactly that line on the résumé. Taking it full time stops the search for three months, but you come back to it with the thing screeners are filtering on. I back A. Your lean is C, and the case against it is that a contractor at three days reads as part time to the firm and to the next screener.',
+    { A: 8, B: 4, C: 6 },
+    null,
+    [ROLES],
+  ),
+  turn(
+    Q1,
+    1,
+    'mentor',
+    'The work matters more than the title. Their team builds forecasting for logistics, which is two steps from the energy roles you say you want in five years. Three days lets you do the work and keep two warm interviews alive. I back C.',
+    { A: 6, B: 3, C: 8 },
+  ),
+  turn(
+    Q1,
+    1,
+    'skeptic',
+    'You have said the search is the priority for six weeks running, and in October it got eleven hours a week on average. Full time on the search has not meant full time. B scores low because it describes a week you have not had. I back A, with a hunch that structure helps you more than freedom does.',
+    { A: 7, B: 2, C: 5 },
+  ),
+  turn(
+    Q1,
+    1,
+    'cfo',
+    'At the October rate the savings last until early March. The contract pays £14,400 over three months, which moves that to July. C pays £8,640 and moves it to May. Both are better than B, which spends a month of runway for every month the search takes. I back A.',
+    { A: 9, B: 2, C: 7 },
+    null,
+    [RUNWAY],
+  ),
+  turn(
+    Q1,
+    1,
+    'dreamer',
+    'Nothing in your notes dreams about analytics. The essay series and the album do, and both stopped the last time work was full time. C keeps two days that could hold a thread of either. I back C.',
+    { A: 3, B: 5, C: 8 },
+  ),
+  turn(
+    Q1,
+    1,
+    'buffett',
+    'Stay inside what you understand. You know analytics work and you know how you behave without structure. A contract with a fixed end and a known payer is a margin of safety, and that is what I would want first. I back A.',
+    { A: 8, B: 3, C: 6 },
+  ),
 
-  turn(Q1, 2, 'dreamer', 'Hiring manager, you count the line on the résumé and not what three months of full time costs you outside it. The last contract took the album from weekly to nothing in five weeks.', null, 'hiring_manager'),
-  turn(Q1, 2, 'hiring_manager', 'Dreamer, that is fair about the album, and it does not change what the screeners filter on. A part-time line reads as a gap filled. I stay where I was.', null, 'dreamer'),
-  turn(Q1, 2, 'dreamer', 'Then ask for the full-time contract with one evening that is yours in writing. If they say no to that, it tells you about the three months.', { A: 5, B: 4, C: 8 }, 'hiring_manager'),
-  turn(Q1, 2, 'hiring_manager', 'An evening in writing costs them nothing and keeps the line whole. That moves me towards C a little, since C is the same ask made bigger.', { A: 8, B: 4, C: 7 }, 'dreamer'),
-  turn(Q1, 2, 'mentor', 'CFO, you price the runway and not the next role. A contract that ends in February lands you in the slowest hiring month of the year.', null, 'cfo'),
-  turn(Q1, 2, 'cfo', 'Mentor, February is slow, and July runway means February does not matter. Without the contract, you would be choosing in February with five weeks of money left.', null, 'mentor'),
+  turn(
+    Q1,
+    2,
+    'dreamer',
+    'Hiring manager, you count the line on the résumé and not what three months of full time costs you outside it. The last contract took the album from weekly to nothing in five weeks.',
+    null,
+    'hiring_manager',
+  ),
+  turn(
+    Q1,
+    2,
+    'hiring_manager',
+    'Dreamer, that is fair about the album, and it does not change what the screeners filter on. A part-time line reads as a gap filled. I stay where I was.',
+    null,
+    'dreamer',
+  ),
+  turn(
+    Q1,
+    2,
+    'dreamer',
+    'Then ask for the full-time contract with one evening that is yours in writing. If they say no to that, it tells you about the three months.',
+    { A: 5, B: 4, C: 8 },
+    'hiring_manager',
+  ),
+  turn(
+    Q1,
+    2,
+    'hiring_manager',
+    'An evening in writing costs them nothing and keeps the line whole. That moves me towards C a little, since C is the same ask made bigger.',
+    { A: 8, B: 4, C: 7 },
+    'dreamer',
+  ),
+  turn(
+    Q1,
+    2,
+    'mentor',
+    'CFO, you price the runway and not the next role. A contract that ends in February lands you in the slowest hiring month of the year.',
+    null,
+    'cfo',
+  ),
+  turn(
+    Q1,
+    2,
+    'cfo',
+    'Mentor, February is slow, and July runway means February does not matter. Without the contract, you would be choosing in February with five weeks of money left.',
+    null,
+    'mentor',
+  ),
 
-  turn(Q1, 3, 'hiring_manager', 'A, with one evening written into the contract. The screeners want the line.', { A: 8, B: 3, C: 7 }),
-  turn(Q1, 3, 'mentor', 'C. The CFO is right that the runway matters, and three days still moves it to May.', { A: 6, B: 3, C: 8 }),
+  turn(
+    Q1,
+    3,
+    'hiring_manager',
+    'A, with one evening written into the contract. The screeners want the line.',
+    { A: 8, B: 3, C: 7 },
+  ),
+  turn(
+    Q1,
+    3,
+    'mentor',
+    'C. The CFO is right that the runway matters, and three days still moves it to May.',
+    { A: 6, B: 3, C: 8 },
+  ),
   turn(Q1, 3, 'skeptic', 'A. Nothing in round 2 answered the eleven hours.', { A: 8, B: 2, C: 5 }),
   turn(Q1, 3, 'cfo', 'A. July, not May.', { A: 9, B: 2, C: 7 }),
   turn(Q1, 3, 'dreamer', 'C, and A only with the evening in writing.', { A: 5, B: 4, C: 8 }),
-  turn(Q1, 3, 'buffett', 'A. The evening is a good clause; a margin of safety for the album too.', { A: 8, B: 2, C: 6 }),
+  turn(Q1, 3, 'buffett', 'A. The evening is a good clause; a margin of safety for the album too.', {
+    A: 8,
+    B: 2,
+    C: 6,
+  }),
 ];
 
 const q2Turns = [
-  turn(Q2, 1, 'skeptic', 'Thursday evenings were skipped four times out of six in October. Sunday mornings have nothing booked in them. Move it.', { A: 8, B: 3 }),
-  turn(Q2, 1, 'dreamer', 'Mornings are when the songs in your notes were written. Move it.', { A: 9, B: 2 }),
-  turn(Q2, 1, 'cfo', 'No cost either way. Move it, since Sunday makes it more likely to happen.', { A: 7, B: 4 }),
-  turn(Q2, 2, 'skeptic', 'Arguing for B, which nobody backed: Dreamer, Thursday is the one evening with the studio booked and paid for. Sunday has no booking, and a session nobody booked is the first to go.', null, 'dreamer'),
-  turn(Q2, 2, 'dreamer', 'Skeptic, that is the best case for Thursday, and it is about the booking, not the day. Book Sunday.', null, 'skeptic'),
+  turn(
+    Q2,
+    1,
+    'skeptic',
+    'Thursday evenings were skipped four times out of six in October. Sunday mornings have nothing booked in them. Move it.',
+    { A: 8, B: 3 },
+  ),
+  turn(Q2, 1, 'dreamer', 'Mornings are when the songs in your notes were written. Move it.', {
+    A: 9,
+    B: 2,
+  }),
+  turn(Q2, 1, 'cfo', 'No cost either way. Move it, since Sunday makes it more likely to happen.', {
+    A: 7,
+    B: 4,
+  }),
+  turn(
+    Q2,
+    2,
+    'skeptic',
+    'Arguing for B, which nobody backed: Dreamer, Thursday is the one evening with the studio booked and paid for. Sunday has no booking, and a session nobody booked is the first to go.',
+    null,
+    'dreamer',
+  ),
+  turn(
+    Q2,
+    2,
+    'dreamer',
+    'Skeptic, that is the best case for Thursday, and it is about the booking, not the day. Book Sunday.',
+    null,
+    'skeptic',
+  ),
   turn(Q2, 3, 'skeptic', 'A, with Sunday booked by Friday.', { A: 8, B: 3 }),
   turn(Q2, 3, 'dreamer', 'A.', { A: 9, B: 2 }),
   turn(Q2, 3, 'cfo', 'A.', { A: 7, B: 3 }),
@@ -166,10 +341,76 @@ const decidedRows = questionRows.map((row, i) =>
           'Asking for three days. If they say no I take A, with the evening in writing.',
         decided_at: '2026-11-01T20:15:00Z',
       }
-    : { ...row, status: 'decided', decided_option: 'A', decision_note: null, decided_at: '2026-11-01T20:16:00Z' },
+    : {
+        ...row,
+        status: 'decided',
+        decided_option: 'A',
+        decision_note: null,
+        decided_at: '2026-11-01T20:16:00Z',
+      },
 );
 
 const turns = [...q1Turns, ...q2Turns];
+
+/**
+ * Make it happen (plan #2561.9): the contract question decided as the board
+ * recommended, so its conditions are offered with the option. The first
+ * condition carries a date.
+ */
+const makeRows = [
+  {
+    ...questionRows[0],
+    verdict: {
+      ...questionRows[0].verdict,
+      conditions: [
+        'Get one evening a week written into the contract before you sign, by 13 November.',
+        'Keep two applications a week going through the three months.',
+      ],
+    },
+    status: 'decided',
+    decided_option: 'A',
+    decision_note: null,
+    decided_at: '2026-11-01T20:15:00Z',
+  },
+];
+const makeDebate = debateFrom(makeRows, q1Turns, advisorRows, [Q1]);
+const MADE = {
+  todo: '00000000-0000-4000-8000-0000000000f1',
+  step: '00000000-0000-4000-8000-0000000000f2',
+};
+/** After the action was written as a todo: the condition still to write, the action listed. */
+const madeDebate = {
+  ...makeDebate,
+  questions: makeDebate.questions.map((q) => ({
+    ...q,
+    made: [
+      {
+        kind: 'todo' as const,
+        id: MADE.todo,
+        key: 'action',
+        title: 'Take the contract, full time, from 16 November',
+        dueOn: '2026-11-16',
+        done: false,
+        href: `/todo/all?status=all&focus=${MADE.todo}`,
+        goal: null,
+      },
+    ],
+  })),
+};
+const GOALS = [
+  {
+    id: '00000000-0000-4000-8000-0000000000b1',
+    title: 'Land a senior analytics role by February',
+    area: 'Career',
+  },
+  { id: '00000000-0000-4000-8000-0000000000b2', title: 'Release the second album', area: 'Music' },
+  {
+    id: '00000000-0000-4000-8000-0000000000b3',
+    title: 'Keep the runway above six months',
+    area: 'Money',
+  },
+];
+const makeAction = async () => ({ error: null });
 const debate = debateFrom(questionRows, turns, advisorRows, [Q1, Q2]);
 /** The first question's verdict with the assumptions the board made where it lacked facts (plan #2561.11). */
 const assumedRows = questionRows.map((row, i) =>
@@ -201,9 +442,15 @@ const minutes = parseMinutes({
     thread: 'One session on Sunday morning, booked by Friday.',
   },
   predictions: [
-    { seat: 'hiring_manager', text: 'If you take the contract, two recruiters reply within a fortnight of the résumé changing.' },
+    {
+      seat: 'hiring_manager',
+      text: 'If you take the contract, two recruiters reply within a fortnight of the résumé changing.',
+    },
     { seat: 'mentor', text: 'They agree to three days if you ask before Wednesday.' },
-    { seat: 'skeptic', text: 'Sunday’s session happens if it is booked by Friday, and not if it is not.' },
+    {
+      seat: 'skeptic',
+      text: 'Sunday’s session happens if it is booked by Friday, and not if it is not.',
+    },
     { seat: 'cfo', text: 'October’s spending comes in under £1,900.' },
     { seat: 'dreamer', text: 'A second export is in the song folder by 8 November.' },
   ],
@@ -241,6 +488,7 @@ export function YouBoardDebatePreview({
   assumed = false,
   advisor,
   decision,
+  make,
 }: {
   state?: 'ready' | 'running';
   /** The first verdict names its assumptions. */
@@ -249,6 +497,8 @@ export function YouBoardDebatePreview({
   advisor?: keyof typeof A;
   /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
   decision?: 'made' | 'open' | 'error';
+  /** Make it happen under the decision (plan #2561.9): 'todos' as first offered, 'steps' with a goal picked and a failed write, 'made' after the action was written. */
+  make?: 'todos' | 'steps' | 'made';
 }) {
   const running = state === 'running';
   return (
@@ -266,7 +516,31 @@ export function YouBoardDebatePreview({
       }
       minutes={running ? parseMinutes(null) : minutes}
       marks={[]}
-      debate={running ? runningDebate : assumed ? assumedDebate : decision === 'made' || decision === 'open' ? decidedDebate : debate}
+      debate={
+        running
+          ? runningDebate
+          : assumed
+            ? assumedDebate
+            : make === 'made'
+              ? madeDebate
+              : make
+                ? makeDebate
+                : decision === 'made' || decision === 'open'
+                  ? decidedDebate
+                  : debate
+      }
+      make={
+        make
+          ? {
+              action: makeAction,
+              goals: GOALS,
+              today: '2026-11-02',
+              ...(make === 'steps'
+                ? { start: { mode: 'goal' as const, goalId: GOALS[0].id } }
+                : {}),
+            }
+          : undefined
+      }
       scorecard={scorecardFrom([])}
       subject={{
         ref: null,
@@ -286,6 +560,7 @@ export function YouBoardDebatePreview({
       open={{
         ...(advisor ? { advisor: A[advisor] } : {}),
         ...(decision === 'open' || decision === 'error' ? { decide: decision } : {}),
+        ...(make === 'steps' ? { make: 'error' as const } : {}),
       }}
     />
   );

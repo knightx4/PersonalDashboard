@@ -1,5 +1,6 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { SEATS, type BoardReceipt } from '@/lib/you/board';
+import type { MadeItem } from '@/lib/you/board-make';
 import { optionsOf, type BoardOption, type QuestionStatus, QUESTION_STATUSES } from '@/lib/you/board-questions';
 
 /**
@@ -86,6 +87,8 @@ export type DebateQuestion = {
   verdict: BoardVerdict | null;
   /** What the person did with the verdict (plan #2561.6); null while they have not. */
   decision: QuestionDecision | null;
+  /** The todos and goal steps Make it happen wrote from the decision (plan #2561.9), as they are now; the page fills it in. */
+  made: MadeItem[];
   /** Its turns, in the order they were spoken. */
   turns: DebateTurn[];
 };
@@ -217,6 +220,7 @@ export function debateFrom(
         status,
         verdict: verdictOf(row.verdict),
         decision: decisionFromRow(row),
+        made: [],
         turns: turns.filter((t) => t.questionId === row.id),
       },
     ];

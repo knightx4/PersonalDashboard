@@ -9755,6 +9755,43 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Make it happen (plan #2561.9): a decision made as the board recommended,
+     * offering the action and the conditions as todos, with a date read from
+     * the words; the steps choice with a goal picked and a write that failed;
+     * and the card after the action was written, listing it. */
+    id: 'you-board-make',
+    label: 'You · Board, writing a decision as todos',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="todos" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-make-steps',
+    label: 'You · Board, writing a decision as steps under a goal',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="steps" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-make-made',
+    label: 'You · Board, what a decision made',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="made" />
+      </div>
+    ),
+  },
+  {
     /* Advisors (plan #2561.7): the five seats and every guest with the
      * question each owns, a brain state and the switch for the chair. */
     id: 'you-board-advisors',

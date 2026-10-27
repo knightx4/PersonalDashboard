@@ -45,6 +45,7 @@ import {
 import { useRefreshWhileRunning } from '../refresh-while-running';
 import { SeatLabel } from '../seat-label';
 import { AdvisorDrawer, QuestionDebate } from './debate';
+import type { MakeProps } from './make';
 import type { DecideAction } from './decision';
 import { Evidence, Prose } from './prose';
 
@@ -92,9 +93,12 @@ export type MeetingOpen = {
   advisor?: string;
   /** The decision form open under each verdict, or open with a failed save's error. */
   decide?: 'open' | 'error';
+  /** The Make it happen card with a failed write's error showing (plan #2561.9). */
+  make?: 'error';
 };
 
 const DECIDE_ERROR = 'Your decision was not saved. Try again.';
+const MAKE_ERROR = 'That goal is no longer open, so nothing more was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -141,6 +145,7 @@ export function MeetingView({
   now,
   actions = REAL_ACTIONS,
   decide = decideQuestion,
+  make,
   open = {},
 }: {
   meeting: BoardMeeting;
@@ -157,6 +162,8 @@ export function MeetingView({
   actions?: MeetingActions;
   /** Saves a decision under a debated question's verdict (plan #2561.6); not part of the old view's actions. */
   decide?: DecideAction;
+  /** Writes a decided question as todos or goal steps (plan #2561.9). */
+  make?: MakeProps;
   open?: MeetingOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, BoardMark>>(
@@ -180,6 +187,8 @@ export function MeetingView({
       decide={decide}
       decideOpen={open.decide !== undefined}
       decideError={open.decide === 'error' ? DECIDE_ERROR : null}
+      make={make}
+      makeFailed={open.make === 'error' ? MAKE_ERROR : null}
     />
   ));
   const drawer = shownAdvisor && (
