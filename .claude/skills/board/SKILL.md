@@ -1053,9 +1053,23 @@ notes they wrote. Write it onto the question:
   on.
 - `ask`: one line to the person, naming the trade-off the account shows and
   ending in a question on whether it went well ("Taking the contract slowed
-  the search and covered the month. Did it go well?"). They answer on the
-  Board tab with Went well, Mixed or Went badly; the app grades each
-  advisor's pick from that answer, so leave `outcome` and `grades` null.
+  the search and covered the month. Did it go well?"). Where the question
+  has a `success_measure`, end instead on whether it was met ("… Did you
+  get two first interviews by December?"). They answer on the Board tab
+  with Went well, Mixed or Went badly, shown as Met it, Partly and Did not
+  where there is a measure. On a decision the advisors forecast, the app
+  Brier-scores each advisor's latest probability for the chosen option
+  from that answer and works out their `believability` again; on an older
+  one it grades each pick. Leave `outcome`, `grades` and `scores` null.
+
+A check-back is due on its day whether or not a meeting has written it: a
+daily job notifies the person and the tab asks them from the success
+measure. One they answered first already has its entry, so step 1's query
+does not find it and it needs no account. Likewise a tripwire they marked
+on the tab is no longer `watching`: one they said happened has already put
+the question back to `queued` with `fact` "You said it happened.", so take
+it up as a reopened question and say in `chair_note` that their answer
+reopened it.
 
 ```sql
 select core.dash_before('you.board_questions:<id>');

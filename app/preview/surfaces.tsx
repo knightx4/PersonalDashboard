@@ -9587,6 +9587,21 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* What fell due, first on the tab (plan #2581.10): a forecast decision's
+     * check-back asked from its success measure before any meeting wrote
+     * it, a written one, a tripwire whose day came, and under the list each
+     * advisor's track record by topic. */
+    id: 'you-board-due',
+    label: 'You · Board, check-backs and a tripwire due, with track records',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="due" />
+      </div>
+    ),
+  },
+  {
     /* A meeting that checked back on two decisions, one answered and graded,
      * with the scorecard of whose picks held up by topic (plan #2561.8). */
     id: 'you-board-meeting-reviewed',

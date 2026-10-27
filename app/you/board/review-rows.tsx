@@ -6,13 +6,15 @@ import { FieldError } from '@/components/ui/field';
 import { heldOnLabel, SEAT_LABELS, SEATS, type Seat } from '@/lib/you/board';
 import { optionLabel } from '@/lib/you/board-questions';
 import {
-  OUTCOME_LABELS,
   OUTCOMES,
+  outcomeLabels,
+  reviewAsk,
   type DecisionReview,
   type Outcome,
   type ReviewAt,
   type ReviewGrade,
 } from '@/lib/you/board-reviews';
+import type { ForecastScore } from '@/lib/you/board-scoring';
 import { Evidence, Prose } from './[id]/prose';
 
 /**
@@ -20,7 +22,10 @@ import { Evidence, Prose } from './[id]/prose';
  * meeting that wrote it: the question and what was chosen, how it turned out
  * with its receipts, then the board's one line and three presses to answer
  * it. Once answered, the answer shows with Change, and under it whose pick
- * held up.
+ * held up. A decision the advisors forecast (plan #2581.10) asks whether it
+ * met the success measure instead, and under the answer shows how close each
+ * advisor's probability came. A check-back that fell due before a meeting
+ * wrote it has no account yet and is answered from the success measure.
  */
 
 export type ReviewAnswerAction = (
@@ -45,6 +50,17 @@ export function gradesLine(grades: readonly ReviewGrade[], names: Readonly<Recor
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/** "Scored: Mentor 0.70, close · Skeptic 0.20, far off.", or null when nothing was scored. */
+export function scoresLine(scores: readonly ForecastScore[], names: Readonly<Record<string, string>>): string | null {
+  if (scores.length === 0) return null;
+  const ranked = [...scores].sort((a, b) => a.brier - b.brier);
+  const said = ranked.map(
+    (s) =>
+      `${advisorName(s.advisor, names)} gave it ${Math.round(s.probability * 100)}%${s.brier <= 0.09 ? ', close' : s.brier >= 0.49 ? ', far off' : ''}`,
+  );
+  return `${said.join(' · ')}.`;
 }
 
 /** "30 days on · You chose A, Take the contract · decided 28 Sep 2026". */
@@ -92,19 +108,26 @@ export function ReviewRow({
     });
   };
   // The grades on the row are the saved answer's; a new answer's grades arrive with the page.
-  const graded = outcome === review.outcome ? gradesLine(review.grades, names) : null;
+  const graded =
+    outcome === review.outcome ? (scoresLine(review.scores, names) ?? gradesLine(review.grades, names)) : null;
+  const labels = outcomeLabels(review);
+  const ask = reviewAsk(review);
   return (
     <li className="card-pad-x row-pad space-y-2">
       <div className="space-y-0.5">
         <p className="text-ui font-medium text-ink [overflow-wrap:anywhere]">{review.question}</p>
         <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{reviewMeta(review)}</p>
       </div>
-      <Prose markdown={review.account} />
-      <Evidence receipts={review.receipts} written={[review.account]} />
+      {review.account && (
+        <>
+          <Prose markdown={review.account} />
+          <Evidence receipts={review.receipts} written={[review.account]} />
+        </>
+      )}
       <div className="space-y-2 pt-1">
-        <p className="text-ui text-ink [overflow-wrap:anywhere]">{review.ask}</p>
+        <p className="text-ui text-ink [overflow-wrap:anywhere]">{ask}</p>
         {open ? (
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={review.ask}>
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={ask}>
             {OUTCOMES.map((value) => (
               <Button
                 key={value}
@@ -116,7 +139,7 @@ export function ReviewRow({
                 disabled={pending}
                 onClick={() => press(value)}
               >
-                {OUTCOME_LABELS[value]}
+                {labels[value]}
               </Button>
             ))}
             {outcome && (
@@ -128,7 +151,7 @@ export function ReviewRow({
         ) : (
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1 space-y-0.5 text-small text-ink-muted [overflow-wrap:anywhere]">
-              <p>{`You: ${outcome ? OUTCOME_LABELS[outcome] : ''}`}</p>
+              <p>{`You: ${outcome ? labels[outcome] : ''}`}</p>
               {graded && <p>{graded}</p>}
             </div>
             <Button type="button" size="sm" variant="secondary" className="shrink-0" onClick={() => setOpen(true)}>

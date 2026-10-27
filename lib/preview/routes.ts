@@ -436,6 +436,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-board-asks-error': ['/you/board'],
   'you-board-reviews': ['/you/board'],
   'you-board-reviews-error': ['/you/board'],
+  'you-board-due': ['/you/board'],
   'you-board-meeting-reviewed': ['/you/board/[id]'],
   'you-board-running': ['/you/board'],
   'you-board-loading': ['/you/board'],

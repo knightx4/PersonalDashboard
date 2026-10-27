@@ -14,7 +14,9 @@ import {
   dismissSuggestion,
   startMeeting,
 } from './actions';
-import { answerBoardReview } from './review-actions';
+import { answerBoardReview, answerBoardTripwire } from './review-actions';
+import { listDueTripwires } from '@/lib/you/board-tripwires';
+import { loadTrackRecords } from '@/lib/you/board-scoring';
 import { BoardListView } from './board-list-view';
 
 export const metadata = { title: 'Board' };
@@ -30,12 +32,13 @@ function readAt(): number {
  * suggested questions, the questions asked, and the meetings newest first.
  * Each meeting opens on its own page (./[id]), where the person reads the
  * minutes and marks them. The board's check-backs on their decisions wait
- * here for their answer (plan #2561.8).
+ * here for their answer (plan #2561.8), first on the tab once due, with the
+ * tripwires whose day has come and each advisor's track record (#2581.10).
  */
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [meetings, questions, asks, reviews, names, decisions, advisors, panels, settings] =
+  const [meetings, questions, asks, reviews, names, decisions, advisors, panels, settings, tripwires, records] =
     await Promise.all([
       listBoardMeetings(client, user.id),
       listBoardQuestions(client, user.id),
@@ -46,6 +49,8 @@ export default async function Page() {
       listBoardAdvisors(client, user.id),
       listPanels(client, user.id),
       loadAccountSettings(user.id),
+      listDueTripwires(client, user.id),
+      loadTrackRecords(client, user.id),
     ]);
   return (
     <BoardListView
@@ -53,6 +58,8 @@ export default async function Page() {
       questions={questions}
       asks={asks}
       reviews={reviews}
+      tripwires={tripwires}
+      records={records}
       names={names}
       advisors={advisors}
       panels={panels}
@@ -68,6 +75,7 @@ export default async function Page() {
         convene: conveneQuestion,
         answerAsk: answerBoardAsk,
         answerReview: answerBoardReview,
+        answerTripwire: answerBoardTripwire,
       }}
     />
   );
