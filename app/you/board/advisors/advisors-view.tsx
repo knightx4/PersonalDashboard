@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { RotateCcw, X } from 'lucide-react';
+import { AlertTriangle, Check, RotateCcw, X } from 'lucide-react';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
 import { DashAction } from '@/components/ui/dash-action';
 import { FieldError, FieldHint, Input, Label, Switch } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
@@ -177,7 +176,7 @@ export function AdvisorsView({
       )}
       <Card padding="none">
         <ul className="divide-y divide-border">
-          <Group title="Seats" count={seats.length} note="The five standing seats always sit.">
+          <Group title="Seats" count={seats.length}>
             {seats.map((advisor) => (
               <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
             ))}
@@ -185,7 +184,7 @@ export function AdvisorsView({
           <Group
             title="Guests"
             count={guests.length}
-            note="Personas Dash builds from each person’s public work, shown by initials. The switch lets the chair bring a guest in."
+            note="Personas built from public work"
           >
             {guests.map((advisor) => (
               <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
@@ -205,7 +204,7 @@ function Group({
 }: {
   title: string;
   count: number;
-  note: string;
+  note?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -214,7 +213,7 @@ function Group({
         <SectionLabel as="h2" count={count}>
           {title}
         </SectionLabel>
-        <p className="mt-0.5 text-small text-ink-muted">{note}</p>
+        {note && <p className="mt-0.5 text-small text-ink-muted">{note}</p>}
       </div>
       <ul className="divide-y divide-border">{children}</ul>
     </li>
@@ -264,7 +263,7 @@ function AdvisorRow({
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui text-ink">
             {guest && <AdvisorMark name={advisor.name} />}
             <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
-            <BrainChip state={state} />
+            <BrainStatus state={state} />
           </span>
           <span className="mt-0.5 block text-small text-ink-muted [overflow-wrap:anywhere]">
             {advisor.question}
@@ -314,26 +313,30 @@ function AdvisorRow({
   );
 }
 
-function BrainChip({ state }: { state: BrainState }) {
-  if (state.kind === 'seat') return <Chip size="sm">Seat</Chip>;
+/** A guest's brain in a shape and words, grey when all is well and coloured only where it needs the person. */
+function BrainStatus({ state }: { state: BrainState }) {
+  if (state.kind === 'seat') return null;
+  const base = 'inline-flex items-center gap-1 whitespace-nowrap text-small';
   if (state.kind === 'ready') {
     return (
-      <Chip size="sm" tone="positive">
-        {`Brain ready · ${state.sources} sources`}
-      </Chip>
+      <span className={`${base} tabular text-ink-muted`}>
+        <Check aria-hidden strokeWidth={1.75} className="size-3.5" />
+        {`Ready · ${state.sources} sources`}
+      </span>
     );
   }
   if (state.kind === 'building') {
     return (
-      <Chip size="sm" tone="accent">
+      <span className={`${base} text-accent`}>
         <LiveDot className="size-1.5" />
         Building
-      </Chip>
+      </span>
     );
   }
   return (
-    <Chip size="sm" tone="danger">
+    <span className={`${base} text-danger`}>
+      <AlertTriangle aria-hidden strokeWidth={1.75} className="size-3.5" />
       Build failed
-    </Chip>
+    </span>
   );
 }
