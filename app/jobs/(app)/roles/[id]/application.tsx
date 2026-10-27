@@ -37,6 +37,7 @@ import { roleStage } from '@/lib/jobs/role-stage';
 import { DashQuestions } from './dash-questions';
 import { Considerations, DraftPanel, LimitCount, countOf } from './draft-panel';
 import type { PanelProps } from './types';
+import { ResearchLine } from './research-line';
 
 export function Answers({
   answers,
@@ -54,6 +55,8 @@ export function Answers({
   coverLetterDraft,
   coverLetterRun,
   answerThreads,
+  research,
+  timezone,
 }: PanelProps) {
   // A closed application is read, not written: what was sent stays editable
   // as a record, but adding questions and drafting from the bank are folded
@@ -142,6 +145,9 @@ export function Answers({
         letter={letterMark}
         onLetter={setLetterMark}
       />
+      {research && !closed && (
+        <ResearchLine research={research} companyName={companyName} timezone={timezone} />
+      )}
       {/* The panel is the answers. Adding questions is something you do to it
           now and then, and it used to be a four-row textarea sitting above
           them on every visit -- the first thing on a page you came to read.
