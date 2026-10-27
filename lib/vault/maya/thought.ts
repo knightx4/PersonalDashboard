@@ -4,6 +4,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import type { VaultRules } from '@/lib/vault/map/rules';
 import { gatherMaterial, mayaRetrieveStore, type MayaMaterial, type MayaRetrievePorts } from './retrieve';
 import { callThoughtModel, THOUGHT_MODEL } from './thought-model';
 import { verifyThought, type MayaPoint, type MayaSynthesis, type MayaThought, type VerifyReport } from './verify';
@@ -135,6 +136,8 @@ export async function writeThought(
     userId: string;
     noteId: string;
     ports?: MayaRetrievePorts;
+    /** The person's private folders, when the caller has read them; otherwise the ports read them. */
+    rules?: VaultRules;
   },
 ): Promise<WrittenThought | ThoughtFailure> {
   if (!input.client && !input.anthropicApiKey) {
@@ -142,7 +145,11 @@ export async function writeThought(
   }
   let material: MayaMaterial;
   try {
-    const found = await gatherMaterial(input.ports ?? mayaRetrieveStore(input.vault, input.userId), input.noteId);
+    const found = await gatherMaterial(
+      input.ports ?? mayaRetrieveStore(input.vault, input.userId),
+      input.noteId,
+      input.rules,
+    );
     if (!found.ok) return found;
     material = found.material;
   } catch (error) {

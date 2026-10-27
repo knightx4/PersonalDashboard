@@ -34,7 +34,7 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 Work these in order. Each has its section below.
 
 1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
-2. **Read the core in full**: the private notes in the journal folders (`JOURNAL_FOLDERS` in `lib/vault/map/rules.ts`), the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
+2. **Read the core in full**: the private notes in the journal folders (`journal_folders` on their `obsidian.vault_connections` row), the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: four subagents at once, one of them on their chats with Claude, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.

@@ -7,6 +7,7 @@ import { encryptToken } from '@/lib/crypto/tokens';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
+import { cleanFolder } from '@/lib/vault/map/rules';
 import { normaliseSubpath } from '@/lib/vault/paths';
 import { parseRepoInput } from '@/lib/vault/repo-input';
 
@@ -158,4 +159,44 @@ export async function rescanVault(formData: FormData): Promise<void> {
 
   revalidatePath('/vault');
   revalidatePath('/vault/settings');
+}
+
+/** One folder per line, or separated by commas, cleaned and without repeats. */
+function folderList(raw: FormDataEntryValue | null): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const piece of String(raw ?? '').split(/[\n,]/)) {
+    const folder = cleanFolder(piece);
+    if (folder && !seen.has(folder.toLowerCase())) {
+      seen.add(folder.toLowerCase());
+      out.push(folder);
+    }
+  }
+  return out;
+}
+
+/**
+ * Save which folders are journals and which are left out (migrations-vault
+ * 0041). Nothing in either is ever sent to a model. An empty journal list is
+ * allowed: it is what someone with no journal folder asks for.
+ */
+// latency: pending
+export async function savePrivateFolders(
+  _prev: VaultActionState,
+  formData: FormData,
+): Promise<VaultActionState> {
+  const user = await requireUser();
+  const journal = folderList(formData.get('journal_folders'));
+  const excluded = folderList(formData.get('excluded_folders'));
+  if (journal.length > 50 || excluded.length > 50) {
+    return { error: 'Name at most 50 folders in each list.' };
+  }
+  const supabase = await createVaultClient();
+  const { error } = await supabase
+    .from('vault_connections')
+    .update({ journal_folders: journal, excluded_folders: excluded })
+    .eq('user_id', user.id);
+  if (error) return { error: `Saving the folders failed: ${error.message}` };
+  revalidatePath('/vault/settings');
+  return { message: 'Saved. Notes in these folders are not sent to a model from now on.' };
 }

@@ -3,7 +3,7 @@ import type { NoteSkip } from '@/lib/learn/graph/note-chunks';
 import type { AcceptResult } from '@/lib/vault/map/accept';
 import type { MapNote, ProposeResult } from '@/lib/vault/map/extract';
 import type { NoteMapProposal } from '@/lib/vault/map/proposal';
-import { tooShortForMap, whyNotRead } from '@/lib/vault/map/rules';
+import { tooShortForMap, whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
 import { offerThemes } from '@/lib/vault/map/themes';
 
 /**
@@ -148,8 +148,12 @@ function row(note: MapNote, outcome: SweepOutcome, detail: string | null): Sweep
  * whyNotRead runs again inside proposeNoteMap; it is asked here first so that
  * a journal is counted as a journal and not as a note too short to read.
  */
-export function beforeRead(note: MapNote, settledSha: string | undefined): SweepNoteRow | null {
-  const notRead = whyNotRead(note);
+export function beforeRead(
+  note: MapNote,
+  settledSha: string | undefined,
+  rules?: VaultRules,
+): SweepNoteRow | null {
+  const notRead = whyNotRead(note, rules);
   if (notRead) return row(note, notRead.reason, notRead.detail);
   if (tooShortForMap(note.body)) {
     return row(note, 'too_short', 'Not read: under 80 characters.');
@@ -202,8 +206,9 @@ async function sweepOne(
   note: MapNote,
   settledSha: string | undefined,
   themes: () => Promise<string[]>,
+  rules: VaultRules | undefined,
 ): Promise<SweepNoteRow> {
-  const early = beforeRead(note, settledSha);
+  const early = beforeRead(note, settledSha, rules);
   if (early) return early;
 
   await ports.record(row(note, 'reading', null));
@@ -249,6 +254,11 @@ export async function runSweepSlice(opts: {
   afterPath: string | null;
   ports: SweepPorts;
   budgetMs: number;
+  /**
+   * The person's private folders (loadVaultRules), read once for the slice.
+   * The propose port is given the same rules; left out, the defaults apply.
+   */
+  rules?: VaultRules;
 }): Promise<SliceResult> {
   const { ports } = opts;
   const now = ports.now ?? (() => Date.now());
@@ -284,7 +294,7 @@ export async function runSweepSlice(opts: {
       // Once one call has been refused for credit, the rest of the batch is
       // left for the resumed sweep rather than sent to be refused too.
       if (outOfCredits) return;
-      const done = await sweepOne(ports, note, settled.get(note.id), themes);
+      const done = await sweepOne(ports, note, settled.get(note.id), themes, opts.rules);
       if (done.outcome === 'failed' && isOutOfCredits(done.detail)) {
         outOfCredits = true;
         await ports.forget(note.id);

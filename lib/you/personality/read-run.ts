@@ -11,6 +11,7 @@ import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { relatedNotesStore, vectorForText } from '@/lib/vault/notes/related';
 import { fromRow, RESULT_COLUMNS, type PersonalityResult, type ReadPoint, type ResultRow } from './model';
 import {
@@ -146,15 +147,16 @@ async function read(
       return rows.filter((r) => r.similarity >= READ_MIN_SIMILARITY).map((r) => r.note_id);
     }),
   );
-  const [bodies, pinned, themes] = await Promise.all([
+  const [bodies, pinned, themes, rules] = await Promise.all([
     notesByIds(vault, userId, [...new Set(nearestIds.flat())]),
     pinnedNotes(vault, userId),
     result.kind === 'big_five' ? loadTraitThemes(vault, userId, result.scores, { core }) : null,
+    loadVaultRules(vault, userId),
   ]);
   const nearest = nearestIds.map((ids) =>
     ids.map((id) => bodies.get(id)).filter((n): n is CandidateNote => Boolean(n)),
   );
-  const notes = chooseNotes(pinned, nearest);
+  const notes = chooseNotes(pinned, nearest, undefined, rules);
 
   // Nothing of yours to compare with: a read with no points, and no call.
   if (notes.length === 0) {

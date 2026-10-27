@@ -1,5 +1,5 @@
 import type { JevQuestion, JevResult, JevYesNoAnswer } from '@/lib/jev/wire';
-import { tooShortForMap, whyNotRead, type NotRead } from '@/lib/vault/map/rules';
+import { tooShortForMap, whyNotRead, type NotRead, type VaultRules } from '@/lib/vault/map/rules';
 
 /**
  * Whether Maya writes on a note without being asked (plan #1288).
@@ -52,12 +52,13 @@ export type GateRefusal = NotRead | { reason: 'too-short'; detail: string };
 
 /**
  * Why this note is never put to Jev, or null when it may be. The map's rules
- * (whyNotRead: the Me folder, Career/Job Applications, anything shaped like an
- * API key) and its 80-character floor. A refused note gets no automatic
- * thought and costs no call.
+ * (whyNotRead: the folders the person marks as journals or leaves out, and
+ * anything shaped like an API key) and its 80-character floor. A refused note
+ * gets no automatic thought and costs no call. `rules` are the person's own
+ * (loadVaultRules); left out, the defaults apply.
  */
-export function gateRefusal(note: Pick<GateNote, 'path' | 'body'>): GateRefusal | null {
-  const refused = whyNotRead({ path: note.path, body: note.body });
+export function gateRefusal(note: Pick<GateNote, 'path' | 'body'>, rules?: VaultRules): GateRefusal | null {
+  const refused = whyNotRead({ path: note.path, body: note.body }, rules);
   if (refused) return refused;
   if (tooShortForMap(note.body)) {
     return { reason: 'too-short', detail: 'Not asked: the note is too short to hold a question.' };

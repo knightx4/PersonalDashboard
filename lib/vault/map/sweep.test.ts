@@ -167,10 +167,15 @@ describe('runSweepSlice', () => {
     expect(v.afterPath).toBeNull();
   });
 
-  it('does not send a note in Career/Job Applications', async () => {
+  it('does not send a note in a folder the person leaves out', async () => {
     const v = vault([note('Career/Job Applications/Acme.md'), note('Career/Career Options.md')]);
 
-    await runSweepSlice({ afterPath: null, ports: v.ports, budgetMs: 200_000 });
+    await runSweepSlice({
+      afterPath: null,
+      ports: v.ports,
+      budgetMs: 200_000,
+      rules: { journalFolders: ['Me'], excludedFolders: ['Career/Job Applications'] },
+    });
 
     expect(v.sent).toEqual(['Career/Career Options.md']);
     expect(v.rows.get('id-Career/Job Applications/Acme.md')?.outcome).toBe('excluded');

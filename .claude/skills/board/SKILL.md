@@ -484,8 +484,8 @@ from. Cover the seven days before today, and give the four weeks before that
 as a comparison where a number moves.
 
 - **Who they are, briefly.** From the notes the person wrote about
-  themselves (in the journal folders, `JOURNAL_FOLDERS` in
-  `lib/vault/map/rules.ts`: an about-me note, personal goals, an index of
+  themselves (in the journal folders, `journal_folders` on their
+  obsidian.vault_connections row: an about-me note, personal goals, an index of
   interests, notes to self, whatever they are called): ten lines at most,
   quoted, so the advisors know what the person says they want.
 - **Dreams.** For the dreamer, quotes with dates of ambitions, projects and
