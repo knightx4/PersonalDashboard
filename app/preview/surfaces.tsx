@@ -10727,6 +10727,13 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ProjectPlanSurface />,
   },
   {
+    id: 'dev-project-plan-unread',
+    label: "Dev · A project's plan, main not readable",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface refused />,
+  },
+  {
     id: 'dev-raised',
     label: 'Dev · Home',
     module: 'dev',

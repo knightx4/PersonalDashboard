@@ -27,7 +27,18 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { readAll } from '@/lib/learn/db/read-all';
 
-import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
+import {
+  ask,
+  commitOnMain,
+  isAppRepo,
+  readToken,
+  REPO,
+  REPO_KEY,
+  refusalFor,
+  repoKey,
+  type Repo,
+} from './github';
+import { activeProjects, loadDevProjects, repoForScope, rootScopes } from './projects';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import { deployStateFrom, type DeployState } from './deploy';
 import { failureReason, type FailedJob, type FailedRun } from './main-check';
@@ -97,6 +108,7 @@ type CommitRow = {
  */
 async function listMain(
   wanted: ReadonlySet<string>,
+  repo: Repo,
   token: string,
   doFetch: typeof globalThis.fetch,
 ): Promise<CommitNode[]> {
@@ -105,7 +117,7 @@ async function listMain(
 
   for (let page = 1; page <= PAGE_CAP; page += 1) {
     const rows = await ask<CommitRow[]>(
-      `/repos/${REPO.owner}/${REPO.repo}/commits?sha=${REPO.branch}&per_page=${PAGE_SIZE}&page=${page}`,
+      `/repos/${repo.owner}/${repo.repo}/commits?sha=${encodeURIComponent(repo.branch)}&per_page=${PAGE_SIZE}&page=${page}`,
       token,
       doFetch,
     );
@@ -132,11 +144,12 @@ async function listMain(
  */
 async function checkCommit(
   sha: string,
+  repo: Repo,
   token: string,
   doFetch: typeof globalThis.fetch,
 ): Promise<CheckConclusion> {
   const body = await ask<{ workflow_runs?: CheckRun[] }>(
-    `/repos/${REPO.owner}/${REPO.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
+    `/repos/${repo.owner}/${repo.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
     token,
     doFetch,
   );
@@ -169,6 +182,7 @@ const EXPLAIN_BUDGET = 3;
  */
 async function explainFailure(
   runs: readonly WorkflowRun[],
+  repo: Repo,
   token: string,
   doFetch: typeof globalThis.fetch,
 ): Promise<{ reason: string | null; runUrl: string | null }> {
@@ -186,7 +200,7 @@ async function explainFailure(
       jobs:
         (
           await ask<{ jobs?: FailedJob[] }>(
-            `/repos/${REPO.owner}/${REPO.repo}/actions/runs/${run.id}/jobs?per_page=${PAGE_SIZE}`,
+            `/repos/${repo.owner}/${repo.repo}/actions/runs/${run.id}/jobs?per_page=${PAGE_SIZE}`,
             token,
             doFetch,
           )
@@ -211,6 +225,7 @@ const DEPLOY_ENVIRONMENT = 'Production';
  */
 async function readDeploy(
   sha: string,
+  repo: Repo,
   committedAt: string | null,
   now: number,
   token: string,
@@ -218,7 +233,7 @@ async function readDeploy(
 ): Promise<{ state: DeployState | null; url: string | null; error: string | null }> {
   try {
     const deployments = await ask<Array<{ id: number }>>(
-      `/repos/${REPO.owner}/${REPO.repo}/deployments?sha=${sha}&environment=${DEPLOY_ENVIRONMENT}&per_page=1`,
+      `/repos/${repo.owner}/${repo.repo}/deployments?sha=${sha}&environment=${DEPLOY_ENVIRONMENT}&per_page=1`,
       token,
       doFetch,
     );
@@ -229,7 +244,7 @@ async function readDeploy(
       const statuses = await ask<
         Array<{ state: string; target_url?: string | null; environment_url?: string | null }>
       >(
-        `/repos/${REPO.owner}/${REPO.repo}/deployments/${newest.id}/statuses?per_page=1`,
+        `/repos/${repo.owner}/${repo.repo}/deployments/${newest.id}/statuses?per_page=1`,
         token,
         doFetch,
       );
@@ -335,6 +350,12 @@ export async function refreshMainCheck(input: {
   supabase: Db;
   now?: number;
   fetch?: typeof globalThis.fetch;
+  /**
+   * The repository to read. This app's by default; a Dev project's gets a
+   * row of its own under its own key (plan #2553.2), with no migrations
+   * reading, since the live database is this app's.
+   */
+  repo?: Repo;
 }): Promise<{
   sha: string | null;
   conclusion: CheckConclusion | null;
@@ -343,6 +364,7 @@ export async function refreshMainCheck(input: {
 }> {
   const now = input.now ?? Date.now();
   const doFetch = input.fetch ?? globalThis.fetch;
+  const repo = input.repo ?? REPO;
   const token = readToken();
 
   let sha: string | null = null;
@@ -354,22 +376,22 @@ export async function refreshMainCheck(input: {
   let migrations: Awaited<ReturnType<typeof readMigrations>> = { unapplied: null, error: null };
 
   if (!token) {
-    error = `No GITHUB_READ_TOKEN is set, so ${REPO.branch}'s checks cannot be read.`;
+    error = `No GITHUB_READ_TOKEN is set, so ${repo.branch}'s checks cannot be read.`;
   } else {
     try {
       // One commit. The whole question is what is at the head of the branch,
       // and `listMain`'s eight pages are for finding commits somebody named.
       const rows = await ask<CommitRow[]>(
-        `/repos/${REPO.owner}/${REPO.repo}/commits?sha=${REPO.branch}&per_page=1`,
+        `/repos/${repo.owner}/${repo.repo}/commits?sha=${encodeURIComponent(repo.branch)}&per_page=1`,
         token,
         doFetch,
       );
       sha = rows[0]?.sha ?? null;
       if (!sha) {
-        error = `GitHub named no commits on ${REPO.branch}.`;
+        error = `GitHub named no commits on ${repo.branch}.`;
       } else {
         const body = await ask<{ workflow_runs?: WorkflowRun[] }>(
-          `/repos/${REPO.owner}/${REPO.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
+          `/repos/${repo.owner}/${repo.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
           token,
           doFetch,
         );
@@ -380,10 +402,12 @@ export async function refreshMainCheck(input: {
         // its own refusal, so one GitHub will not answer leaves the others.
         const [explained, deployed, compared] = await Promise.all([
           conclusion === 'failed'
-            ? explainFailure(runs, token, doFetch)
+            ? explainFailure(runs, repo, token, doFetch)
             : Promise.resolve({ reason: null, runUrl: null }),
-          readDeploy(head, rows[0]?.commit?.committer?.date ?? null, now, token, doFetch),
-          readMigrations(head, input.supabase, token, doFetch),
+          readDeploy(head, repo, rows[0]?.commit?.committer?.date ?? null, now, token, doFetch),
+          isAppRepo(repo)
+            ? readMigrations(head, input.supabase, token, doFetch)
+            : Promise.resolve({ unapplied: null, error: null }),
         ]);
         ({ reason, runUrl } = explained);
         deploy = deployed;
@@ -396,7 +420,7 @@ export async function refreshMainCheck(input: {
 
   const { error: writeError } = await input.supabase.from('plan_main_checks').upsert(
     {
-      repo: REPO_KEY,
+      repo: repoKey(repo),
       head_sha: sha,
       conclusion,
       checked_at: new Date(now).toISOString(),
@@ -414,10 +438,43 @@ export async function refreshMainCheck(input: {
   // Logged rather than carried, like every other best-effort write on this
   // path. A tick that could not store the reading still has a night to run.
   if (writeError) {
-    console.error(`main's CI reading could not be stored: ${writeError.message}`);
+    console.error(`${repoKey(repo)} main's CI reading could not be stored: ${writeError.message}`);
   }
 
   return { sha, conclusion, error, reason };
+}
+
+/** How many project repositories one tick reads main for. */
+const PROJECT_MAIN_BUDGET = 10;
+
+/**
+ * Main's CI for every active Dev project the owner has, one `plan_main_checks`
+ * row per repository, for each project's page to draw (plan #2553.2).
+ *
+ * The owner's projects only. The token is the owner's, and the row is
+ * readable by anyone signed in, so a repository another account named would
+ * have its main read with the owner's key and shown to that account. Each
+ * repository is read as `refreshMainCheck` reads this app's, and carries its
+ * own refusal: a token that cannot read one stores the sentence naming it.
+ */
+export async function refreshProjectMainChecks(input: {
+  supabase: Db;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<number> {
+  const { data: owner, error } = await input.supabase.rpc('app_owner');
+  const ownerId = (owner as { userId?: unknown } | null)?.userId;
+  if (error || typeof ownerId !== 'string') return 0;
+
+  const repos = new Map<string, Repo>();
+  for (const project of activeProjects(await loadDevProjects(input.supabase, ownerId))) {
+    if (!isAppRepo(project.repo)) repos.set(repoKey(project.repo), project.repo);
+  }
+  const wanted = [...repos.values()].slice(0, PROJECT_MAIN_BUDGET);
+  await inLanes(wanted, (repo) =>
+    refreshMainCheck({ supabase: input.supabase, now: input.now, fetch: input.fetch, repo }),
+  );
+  return wanted.length;
 }
 
 /** A few at a time, so a backlog does not become twenty-five round trips. */
@@ -490,12 +547,12 @@ export async function refreshCommitChecks(input: {
 
   // Paged: closed steps with a commit are most of the plan, and the plan is
   // past PostgREST's thousand-row cap.
-  let steps: Array<{ commit_sha: string; completed_at?: string | null }>;
+  let steps: Array<{ id: string; commit_sha: string; completed_at?: string | null }>;
   try {
     steps = await readAll((from, to) =>
       input.supabase
         .from('plan_items')
-        .select('commit_sha, completed_at')
+        .select('id, commit_sha, completed_at')
         .eq('user_id', input.userId)
         .eq('status', 'done')
         .not('commit_sha', 'is', null)
@@ -525,85 +582,166 @@ export async function refreshCommitChecks(input: {
   if (wanted.size === 0) return { checked: 0, error: null };
 
   try {
-    const carrier = carriedBy(await listMain(wanted, token, doFetch));
-
-    // Which merge each commit needs an answer from, and which commits are
-    // answered by each merge. A commit the listing did not reach gets no merge
-    // and no answer from here; it is asked about below instead.
-    const missing: string[] = [];
-    const byMerge = new Map<string, string[]>();
-    for (const sha of wanted) {
-      const merge = carrierFor(carrier, sha);
-      if (!merge) {
-        missing.push(sha);
-        continue;
-      }
-      const sharing = byMerge.get(merge);
-      if (sharing) sharing.push(sha);
-      else byMerge.set(merge, [sha]);
-    }
-
-    // Whether main carries each of those, asked one comparison at a time.
-    // Only a definite no is written down: main carrying a commit the listing
-    // never reached says nothing about which merge ran the checks, and an
-    // answer GitHub would not give is not an answer. Both leave the commit
-    // unwritten and asked again next time, which reads as "not checked" --
-    // true, where "never reached main" would be a guess.
-    const landings = await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
-      sha,
-      landing: await commitOnMain({ sha, fetch: doFetch }),
-    }));
-    const unmerged = landings
-      .filter(({ landing }) => landing.onMain === false)
-      .map(({ sha }) => sha);
-    // A definite yes on a commit already answered `none` keeps that answer and
-    // stamps when it was confirmed. Without the stamp an old commit past
-    // the listing was compared again on every open of the page, forever; with
-    // it, a `none` settles the same way one the listing reached does.
-    const confirmed = landings
-      .filter(({ sha, landing }) => landing.onMain === true && known[sha]?.conclusion === 'none')
-      .map(({ sha }) => sha);
-
-    const merges = [...byMerge.keys()].slice(0, MERGE_BUDGET);
-    const conclusions = await inLanes(merges, (sha) => checkCommit(sha, token, doFetch));
-
+    // Each commit is asked about in the repository its step was built in:
+    // this app's, or a Dev project's when the step's feature sits under one.
+    const byRepo = await reposForCommits(input.supabase, input.userId, steps, wanted);
     const stamp = new Date(now).toISOString();
-    const rows = [
-      ...unmerged.map((sha) => ({
-        user_id: input.userId,
-        commit_sha: sha,
-        merge_sha: null,
-        conclusion: 'unmerged' as CheckConclusion,
-        checked_at: stamp,
-      })),
-      ...confirmed.map((sha) => ({
-        user_id: input.userId,
-        commit_sha: sha,
-        merge_sha: known[sha].mergeSha,
-        conclusion: known[sha].conclusion,
-        checked_at: stamp,
-      })),
-      ...merges.flatMap((merge, i) =>
-        (byMerge.get(merge) ?? []).map((sha) => ({
-          user_id: input.userId,
-          commit_sha: sha,
-          merge_sha: merge,
-          conclusion: conclusions[i],
-          checked_at: stamp,
-        })),
-      ),
-    ];
-    if (rows.length === 0) return { checked: 0, error: null };
+    const rows: Array<{
+      user_id: string;
+      commit_sha: string;
+      merge_sha: string | null;
+      conclusion: CheckConclusion;
+      checked_at: string;
+    }> = [];
+    // One repository GitHub will not answer for leaves the others' answers
+    // standing; its refusal is carried back as the reason.
+    let refused: string | null = null;
+    for (const { repo, shas } of byRepo) {
+      try {
+        const answered = await checkInRepo({ repo, wanted: shas, known, token, doFetch });
+        for (const row of answered) rows.push({ user_id: input.userId, checked_at: stamp, ...row });
+      } catch (error) {
+        refused ??= error instanceof Error ? error.message : String(error);
+      }
+    }
+    if (rows.length === 0) return { checked: 0, error: refused };
 
     const { error } = await input.supabase
       .from('plan_commit_checks')
       .upsert(rows, { onConflict: 'user_id,commit_sha' });
     if (error) return { checked: 0, error: error.message };
 
-    return { checked: rows.length, error: null };
+    return { checked: rows.length, error: refused };
   } catch (error) {
     return { checked: 0, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/**
+ * The commits asked about, grouped by the repository each was built in.
+ *
+ * A step's repository is its root feature's project's (lib/plan/projects
+ * `rootScopes`), so reading it needs the whole tree's parents. That read is
+ * skipped when the account has no projects, which leaves every commit this
+ * app's, as it was before there were any.
+ */
+async function reposForCommits(
+  supabase: Db,
+  userId: string,
+  steps: ReadonlyArray<{ id: string; commit_sha: string }>,
+  wanted: ReadonlySet<string>,
+): Promise<Array<{ repo: Repo; shas: Set<string> }>> {
+  const projects = await loadDevProjects(supabase, userId);
+  const groups = new Map<string, { repo: Repo; shas: Set<string> }>();
+  const put = (repo: Repo, sha: string) => {
+    const key = repoKey(repo);
+    const group = groups.get(key) ?? { repo, shas: new Set<string>() };
+    group.shas.add(sha);
+    groups.set(key, group);
+  };
+
+  if (projects.length === 0) {
+    for (const sha of wanted) put(REPO, sha);
+    return [...groups.values()];
+  }
+
+  const tree = await readAll<{ id: string; parent_id: string | null; module: string | null }>(
+    (from, to) =>
+      supabase
+        .from('plan_items')
+        .select('id, parent_id, module')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to),
+  );
+  const roots = rootScopes(
+    tree.map((row) => ({ id: row.id, parentId: row.parent_id, module: row.module })),
+  );
+  const placed = new Set<string>();
+  for (const step of steps) {
+    if (!wanted.has(step.commit_sha) || placed.has(step.commit_sha)) continue;
+    placed.add(step.commit_sha);
+    put(repoForScope(roots.get(step.id) ?? null, projects), step.commit_sha);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The answers one repository gives for the commits built in it: the merge on
+ * its main that carried each and what CI said there, or `unmerged` where its
+ * main definitely does not carry one.
+ */
+async function checkInRepo(input: {
+  repo: Repo;
+  wanted: ReadonlySet<string>;
+  known: Record<string, CommitCheck>;
+  token: string;
+  doFetch: typeof globalThis.fetch;
+}): Promise<
+  Array<{ commit_sha: string; merge_sha: string | null; conclusion: CheckConclusion }>
+> {
+  const { repo, wanted, known, token, doFetch } = input;
+  const carrier = carriedBy(await listMain(wanted, repo, token, doFetch));
+
+  // Which merge each commit needs an answer from, and which commits are
+  // answered by each merge. A commit the listing did not reach gets no merge
+  // and no answer from here; it is asked about below instead.
+  const missing: string[] = [];
+  const byMerge = new Map<string, string[]>();
+  for (const sha of wanted) {
+    const merge = carrierFor(carrier, sha);
+    if (!merge) {
+      missing.push(sha);
+      continue;
+    }
+    const sharing = byMerge.get(merge);
+    if (sharing) sharing.push(sha);
+    else byMerge.set(merge, [sha]);
+  }
+
+  // Whether main carries each of those, asked one comparison at a time.
+  // Only a definite no is written down: main carrying a commit the listing
+  // never reached says nothing about which merge ran the checks, and an
+  // answer GitHub would not give is not an answer. Both leave the commit
+  // unwritten and asked again next time, which reads as "not checked" --
+  // true, where "never reached main" would be a guess.
+  const landings = await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
+    sha,
+    landing: await commitOnMain({ sha, repo, fetch: doFetch }),
+  }));
+  const unmerged = landings
+    .filter(({ landing }) => landing.onMain === false)
+    .map(({ sha }) => sha);
+  // A definite yes on a commit already answered `none` keeps that answer and
+  // stamps when it was confirmed. Without the stamp an old commit past
+  // the listing was compared again on every open of the page, forever; with
+  // it, a `none` settles the same way one the listing reached does.
+  const confirmed = landings
+    .filter(({ sha, landing }) => landing.onMain === true && known[sha]?.conclusion === 'none')
+    .map(({ sha }) => sha);
+
+  const merges = [...byMerge.keys()].slice(0, MERGE_BUDGET);
+  const conclusions = await inLanes(merges, (sha) => checkCommit(sha, repo, token, doFetch));
+
+  return [
+    ...unmerged.map((sha) => ({
+      commit_sha: sha,
+      merge_sha: null,
+      conclusion: 'unmerged' as CheckConclusion,
+    })),
+    ...confirmed.map((sha) => ({
+      commit_sha: sha,
+      merge_sha: known[sha].mergeSha,
+      conclusion: known[sha].conclusion,
+    })),
+    ...merges.flatMap((merge, i) =>
+      (byMerge.get(merge) ?? []).map((sha) => ({
+        commit_sha: sha,
+        merge_sha: merge,
+        conclusion: conclusions[i],
+      })),
+    ),
+  ];
 }
 
 /**

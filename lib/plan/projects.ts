@@ -22,6 +22,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { MODULES, isModuleId, type ModuleId } from '@/lib/modules';
+import { REPO, type Repo } from './github';
 
 /** A project's slug, as `dev_projects.id` and a plan row's `module` hold it. */
 export type ProjectId = string;
@@ -194,4 +195,41 @@ export function planScopes(projects: readonly DevProject[]): PlanScope[] {
  */
 export function isAppScope(scope: PlanScope | null): scope is ModuleId | null {
   return scope === null || isModuleId(scope);
+}
+
+/**
+ * The scope each plan row's root holds, by row id: the workspace or project
+ * its top-level feature was filed under. A step moved under another feature
+ * may still carry its old `module`, so what a step is built in is read from
+ * its root rather than from the step (plan #2553.2). A row whose parent is
+ * missing counts as its own root.
+ */
+export function rootScopes(
+  rows: ReadonlyArray<{ id: string; parentId: string | null; module: string | null }>,
+): Map<string, PlanScope | null> {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const out = new Map<string, PlanScope | null>();
+  const rootOf = (id: string, seen: Set<string>): PlanScope | null => {
+    const known = out.get(id);
+    if (known !== undefined) return known;
+    const row = byId.get(id)!;
+    const parent = row.parentId ? byId.get(row.parentId) : undefined;
+    const scope =
+      parent && !seen.has(parent.id)
+        ? rootOf(parent.id, seen.add(id))
+        : storedScopeOf(row.module);
+    out.set(id, scope);
+    return scope;
+  };
+  for (const row of rows) rootOf(row.id, new Set());
+  return out;
+}
+
+/**
+ * The repository a scope's steps are built in: the project's, for a project
+ * the list knows, and this app's for everything else.
+ */
+export function repoForScope(scope: PlanScope | null, projects: readonly DevProject[]): Repo {
+  const project = isProjectScope(scope) ? projectById(projects, scope) : undefined;
+  return project ? project.repo : REPO;
 }

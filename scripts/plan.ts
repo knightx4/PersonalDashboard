@@ -113,6 +113,8 @@ import {
   planScopeLabel,
   planScopeOf,
   projectsFromRows,
+  repoForScope,
+  storedScopeOf,
   type DevProject,
 } from '../lib/plan/projects';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
@@ -121,7 +123,7 @@ import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
-import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
@@ -349,9 +351,18 @@ async function doneRefusal(
   number: number,
   commit: string,
 ): Promise<string | null> {
-  const landing = await commitOnMain({ sha: commit });
-  const refusal = closeRefusal({ sha: commit, landing, branches: branchesContaining(commit) });
+  // Asked of the repository the step was built in: its root feature's
+  // project's, or this one (plan #2553.2).
+  const repo = repoForScope(await rootScope(sql, userId, number), projects);
+  const app = isAppRepo(repo);
+  const landing = await commitOnMain({ sha: commit, repo });
+  // This checkout's branches say nothing about another repository's.
+  const branches = app ? branchesContaining(commit) : [];
+  const refusal = closeRefusal({ sha: commit, landing, branches, repo });
   if (refusal) return refusal;
+  // The screens and the design critic are this app's; a project's
+  // repository has its own checks.
+  if (!app) return null;
 
   let inputs: { files: string[]; surfaces: string[] };
   try {
@@ -368,6 +379,21 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/** The scope a step's root feature is filed under: a workspace, a project, or null. */
+async function rootScope(sql: Sql, userId: string, number: number): Promise<string | null> {
+  const rows = await sql<{ module: string | null }[]>`
+    with recursive up as (
+      select id, parent_id, module, 0 as depth from plan_items
+      where user_id = ${userId} and number = ${number}
+      union all
+      select p.id, p.parent_id, p.module, up.depth + 1 from plan_items p
+      join up on p.id = up.parent_id
+      where p.user_id = ${userId} and up.depth < 50
+    )
+    select module from up order by depth desc limit 1`;
+  return storedScopeOf(rows[0]?.module ?? null);
 }
 
 /**
