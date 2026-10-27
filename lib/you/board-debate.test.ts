@@ -81,6 +81,7 @@ describe('verdictOf', () => {
       conditions: ['One evening in writing'],
       dissent: [{ advisor: 'mentor', text: 'Three days.' }],
       wouldChange: ['A full-time offer'],
+      assumptions: [],
       scores: [{ advisor: 'skeptic', scores: { A: 8, B: 2 } }],
     });
   });
