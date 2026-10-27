@@ -44,7 +44,7 @@ const SHIPPING_SUBJECT =
  * A shipping, delivery or return email is applied as what it is. A
  * confirmation is read again from its subject, because the classifier checks
  * for "order #" before it checks for "on the way", so "A shipment from order
- * #11888 is on the way" arrives as a confirmation. When the subject reads as
+ * #10042 is on the way" arrives as a confirmation. When the subject reads as
  * none of the three (a pickup notice, a support thread, a ticket), the result
  * is null and the email is only linked to the order, with nothing applied.
  */

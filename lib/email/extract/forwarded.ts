@@ -3,7 +3,7 @@ import { displayNameFromAddress } from './heuristic';
 /**
  * Forwarded and replied emails carry the shop's original message quoted in
  * the body. The sender of the outer email is whoever forwarded or replied, so
- * reading the merchant from it names a person ("Samantha Kuo") instead of the
+ * reading the merchant from it names a person ("Jordan Lee") instead of the
  * shop. This finds the quoted original and returns its sender and its text.
  *
  * Only a real quoted header counts:

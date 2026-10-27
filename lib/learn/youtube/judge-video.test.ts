@@ -16,7 +16,7 @@ import {
 } from './judge-video';
 
 const profile: LearnerProfile = {
-  tracks: [{ name: 'Startup Finance / FP&A', note: null, frontier: ['A three-statement model links cash to profit.'], settled: 4 }],
+  tracks: [{ name: 'Small Business Finance', note: null, frontier: ['A three-statement model links cash to profit.'], settled: 4 }],
   goals: [{ title: 'Run a half marathon', detail: 'Under two hours by spring.' }],
   ideas: [{ theme: 'Maginot Line', names: ['Why France fortified the east'] }],
 };
@@ -33,7 +33,7 @@ const video = (videoId: string, title: string): VideoToScreen => ({
 describe('profileText', () => {
   it('names every track, goal and theme so a reason can quote them', () => {
     const text = profileText(profile);
-    expect(text).toContain('Track "Startup Finance / FP&A"');
+    expect(text).toContain('Track "Small Business Finance"');
     expect(text).toContain('Where they are now: A three-statement model links cash to profit.');
     expect(text).toContain('Goal "Run a half marathon"');
     expect(text).toContain('Theme "Maginot Line": Why France fortified the east');
@@ -75,7 +75,7 @@ describe('the screen', () => {
       {
         videos: [
           { number: 2, decision: 'skip', why: 'Touches none of your tracks, goals or ideas; a game run.' },
-          { number: 1, decision: 'look', why: 'Serves your "Startup Finance / FP&A" track.' },
+          { number: 1, decision: 'look', why: 'Serves your "Small Business Finance" track.' },
           { number: 3, decision: 'skip', why: 'Not a video that was sent.' },
           { number: 1, decision: 'skip', why: 'A second answer for the same video.' },
         ],
@@ -84,7 +84,7 @@ describe('the screen', () => {
     );
     expect(screened).toEqual([
       { videoId: 'bbbbbbbbbbb', decision: 'skip', why: 'Touches none of your tracks, goals or ideas; a game run.' },
-      { videoId: 'aaaaaaaaaaa', decision: 'look', why: 'Serves your "Startup Finance / FP&A" track.' },
+      { videoId: 'aaaaaaaaaaa', decision: 'look', why: 'Serves your "Small Business Finance" track.' },
     ]);
   });
 
@@ -140,7 +140,7 @@ describe('reading a verdict', () => {
     const judged = readJudgeReply(
       {
         verdict: 'watch',
-        why: 'Serves your "Startup Finance / FP&A" track: builds the model live.',
+        why: 'Serves your "Small Business Finance" track: builds the model live.',
         best_from: 2,
         best_to: 3,
         windows: [
@@ -155,7 +155,7 @@ describe('reading a verdict', () => {
     expect(judged).toEqual({
       outcome: 'judged',
       verdict: 'watch',
-      why: 'Serves your "Startup Finance / FP&A" track: builds the model live.',
+      why: 'Serves your "Small Business Finance" track: builds the model live.',
       bestStartSeconds: 240,
       bestEndSeconds: 900,
       stretches: [

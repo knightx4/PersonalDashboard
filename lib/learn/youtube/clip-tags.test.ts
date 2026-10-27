@@ -10,7 +10,7 @@ import { readTagReply, tagClipBatch, tagPrompt, TAG_BATCH, type ClipToTag, type 
  */
 
 const SUBJECTS: SubjectToTag[] = [
-  { id: 'subject-1', name: 'Startup Finance / FP&A', note: 'runway and burn' },
+  { id: 'subject-1', name: 'Small Business Finance', note: 'runway and burn' },
   { id: 'subject-2', name: 'SaaS and subscription business metrics', note: null },
 ];
 
@@ -23,7 +23,7 @@ const CLIPS: ClipToTag[] = [
 describe('tagPrompt', () => {
   it('lists the subjects with their notes and numbers each clip by caption and point', () => {
     const prompt = tagPrompt(SUBJECTS, CLIPS);
-    expect(prompt).toContain('- Startup Finance / FP&A (runway and burn)');
+    expect(prompt).toContain('- Small Business Finance (runway and burn)');
     expect(prompt).toContain('- SaaS and subscription business metrics');
     expect(prompt).toContain('[1] Why profitable firms still run out of cash. Point: Working capital gaps need funding.');
     expect(prompt).toContain('[2] Net revenue retention, explained');
@@ -36,9 +36,9 @@ describe('readTagReply', () => {
     const read = readTagReply(
       {
         clips: [
-          { clip: 1, subjects: ['Startup Finance / FP&A', 'saas and subscription business metrics', 'Cooking'] },
+          { clip: 1, subjects: ['Small Business Finance', 'saas and subscription business metrics', 'Cooking'] },
           { clip: 2, subjects: 'SaaS and subscription business metrics' },
-          { clip: 9, subjects: ['Startup Finance / FP&A'] },
+          { clip: 9, subjects: ['Small Business Finance'] },
         ],
       },
       CLIPS,
@@ -58,8 +58,8 @@ describe('readTagReply', () => {
 
 const REPLY = {
   clips: [
-    { clip: 1, subjects: ['Startup Finance / FP&A'] },
-    { clip: 2, subjects: ['SaaS and subscription business metrics', 'Startup Finance / FP&A'] },
+    { clip: 1, subjects: ['Small Business Finance'] },
+    { clip: 2, subjects: ['SaaS and subscription business metrics', 'Small Business Finance'] },
     { clip: 3, subjects: [] },
   ],
 };

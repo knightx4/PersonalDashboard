@@ -856,7 +856,7 @@ async function companyForApplication(
  * A contact row for a person the mail named, without making a second one.
  *
  * Identity is the person, not the address. Within one company the name is who
- * they are -- the same recruiter wrote from @eliseai.com and @meetelise.com,
+ * they are -- the same recruiter wrote from @eliseai.com and @contoso.example,
  * and two rows for that reads as a bug -- so a name match at the company wins,
  * and an address found later fills a blank rather than forking the row. Only
  * where there is no company does the address carry identity on its own.

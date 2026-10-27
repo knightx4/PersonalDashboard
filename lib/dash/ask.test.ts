@@ -867,7 +867,7 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
           path: '/jobs/roles/r1',
           module: 'jobs',
           page: 'Role',
-          row: { ...about, title: 'Backend Engineer at EliseAI', href: '/jobs/roles/r1' },
+          row: { ...about, title: 'Backend Engineer at Contoso', href: '/jobs/roles/r1' },
         },
         execute: stubExecute().execute,
         anthropicApiKey: 'k',

@@ -20,7 +20,7 @@ export type MoveState = (typeof MOVE_STATES)[number];
 
 /**
  * Who a waiting row is waiting on: a ref to their row (lib/core/refs.ts) with
- * the title it is named by, or a short text such as "recruiter at EliseAI".
+ * the title it is named by, or a short text such as "recruiter at Contoso".
  */
 export type WaitingOn = string | { ref: string; title: string };
 
@@ -68,7 +68,7 @@ export function waitingOnName(waitingOn: WaitingOn): string {
   return typeof waitingOn === 'string' ? waitingOn : waitingOn.title;
 }
 
-/** The word for a move: "Waiting on the recruiter at EliseAI" where it knows who. */
+/** The word for a move: "Waiting on the recruiter at Contoso" where it knows who. */
 export function moveWord(move: Move): string {
   if (move.state === 'waiting' && move.waitingOn) {
     const name = waitingOnName(move.waitingOn).trim();

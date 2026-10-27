@@ -467,7 +467,7 @@ export function highWaterFromRejectionStage(
 /**
  * The rung the logged interviews prove. An application closed as ghosted or
  * rejected often has no rejection stage, and without this its onsite rounds
- * counted as nothing: Galaxy, Campfire and EliseAI all read as zero final
+ * counted as nothing: Globex, Initech and Contoso all read as zero final
  * rounds. A panel counts with onsite and final, as the rejection stage already
  * files a panel under onsite.
  */
