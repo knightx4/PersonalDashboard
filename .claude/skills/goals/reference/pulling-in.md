@@ -100,7 +100,7 @@ select source_table, source_ref, max(similarity) as best,
 from core.search_memory_from(
   '<user>',                -- the owner, always
   'obsidian.notes',        -- the row you found: its table, schema and all
-  'Bulk/Strong Towns Housing Course.md',  -- and its ref (below)
+  'Bulk/Housing Policy Course.md',  -- and its ref (below)
   null,                    -- or '{obsidian.notes,job_search.thoughts}' to narrow
   50,                      -- passages back, at most 50
   0.53                     -- the floor
@@ -128,7 +128,7 @@ order by best desc;
 Rows found this way are read and judged the same as any other: read the
 note in full before relying on it, and keep it only if it changes the map.
 When you keep one, say in its `why` that the meaning search found it ("Found
-by meaning from Strong Towns Housing Course: says the real problem is
+by meaning from Housing Policy Course: says the real problem is
 displacement."), so the person can see what the word search would have
 missed.
 

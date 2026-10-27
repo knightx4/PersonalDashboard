@@ -161,7 +161,7 @@ where id = '<step id>' and user_id = '<user>' and kind = 'mine';
 
 `evidence` is one line, up to 500 characters, that the person reads on the
 Goals home after "Closed <the step>:". Name the thing you saw and its date,
-and where it is: "The Nelnet email of 20 September says autopay is on for
+and where it is: "The Northstar email of 20 September says autopay is on for
 both loans." `evidence_source` is `jobs`, `gmail`, `calendar` or `todo`.
 `shopping` is the database's own: a step of the person's that links a saved
 product closes by itself when the product is bought (plan #2330.5), so a

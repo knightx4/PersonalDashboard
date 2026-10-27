@@ -177,7 +177,7 @@ describe('todayList on the goals as they stood on 26 September', () => {
       blockKind: 'outside',
       title: 'List what is coming up at your community board',
       blockAsk:
-        'Which community board is yours? Tell me the neighborhood or borough you live in and I will find the board and list its agendas.',
+        'Which community board is yours? Tell me the neighborhood you live in and I will find the board and list its agendas.',
     }),
     step('choose', 'pick', { title: 'Choose the one you care about', position: 20 }),
     step('ready', 'speak', { title: 'Get the testimony ready', position: 20 }),
@@ -248,25 +248,25 @@ describe('todayList on the goals as they stood on 26 September', () => {
     ]);
     expect(list.map((item) => item.action)).toEqual(['Done', 'Answer', 'Log one', 'Done', 'Done']);
     expect(list[1].detail).toBe(
-      'Tell me the neighborhood or borough you live in and I will find the board and list its agendas.',
+      'Tell me the neighborhood you live in and I will find the board and list its agendas.',
     );
     expect(list[2].detail).toBe('0 of 5 this week, 2 days left');
   });
 
   it('keeps a suggested event off the list, as an offer rather than something on you', () => {
     const ta = suggestion('ta', 'volunteer', {
-      title: "Transportation Alternatives' volunteer info session",
+      title: "Springfield Streets' volunteer info session",
       happensOn: '2026-09-28',
     });
     const given = input(goals, steps, { deps, rhythms, suggestions: [ta] });
     expect(titles(todayRanked(given))).not.toContain(
-      "Transportation Alternatives' volunteer info session",
+      "Springfield Streets' volunteer info session",
     );
     expect(suggestedItems(given)).toMatchObject([
       {
         kind: 'suggestion',
         id: 'ta',
-        title: "Transportation Alternatives' volunteer info session",
+        title: "Springfield Streets' volunteer info session",
         on: '2026-09-28',
         action: 'Going',
       },
@@ -510,7 +510,7 @@ describe('proposals to close or park a goal (plan #1084)', () => {
 
 describe('helpers', () => {
   it('reads a question out of a Needs line', () => {
-    expect(askedOfYou('Which board is yours? Tell me the borough.')).toBe('Which board is yours?');
+    expect(askedOfYou('Which board is yours? Tell me the neighborhood.')).toBe('Which board is yours?');
     expect(askedOfYou('A pay floor set; still open.')).toBeNull();
     expect(askedOfYou(null)).toBeNull();
   });

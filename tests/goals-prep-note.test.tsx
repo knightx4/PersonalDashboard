@@ -67,11 +67,11 @@ function render(steps: Step[]) {
   return renderToStaticMarkup(<StepTree map={map} todoOn={false} opened />);
 }
 
-const apply = step('apply', { title: 'Apply to Kroll', position: 20 });
+const apply = step('apply', { title: 'Apply to Northwind', position: 20 });
 const prep = (extra: Partial<Step> = {}) =>
   step('prep', {
     kind: 'claude',
-    title: 'Draft the Kroll cover letter',
+    title: 'Draft the Northwind cover letter',
     preparesId: 'apply',
     position: 10,
     ...extra,
@@ -81,7 +81,7 @@ describe('a Dash prep step on the step it serves', () => {
   it('says an open one is preparing, by its title, linked to its row', () => {
     const html = render([prep(), apply]);
     expect(html).toContain('Dash is preparing: ');
-    expect(html).toMatch(/href="\/goals\/goal-role\/s\/prep"[^>]*>Draft the Kroll cover letter</);
+    expect(html).toMatch(/href="\/goals\/goal-role\/s\/prep"[^>]*>Draft the Northwind cover letter</);
   });
 
   it('puts a finished one on the step as Dash’s draft, folded to its first sentence', () => {
@@ -98,7 +98,7 @@ describe('a Dash prep step on the step it serves', () => {
   });
 
   it('names the step a prep step is for on its own row', () => {
-    expect(render([prep(), apply])).toMatch(/href="\/goals\/goal-role\/s\/apply"[^>]*>For Apply to Kroll</);
+    expect(render([prep(), apply])).toMatch(/href="\/goals\/goal-role\/s\/apply"[^>]*>For Apply to Northwind</);
   });
 
   it('shows nothing for a dropped prep step, or on a step with none', () => {

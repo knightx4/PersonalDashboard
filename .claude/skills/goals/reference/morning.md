@@ -31,7 +31,7 @@ month's payment plus a month's interest on the row
    (a marketing email, a password reset) and one whose figures are not newer
    than the row's date.
 2. Match each loan or account the statement names to a row by the ID
-   field. A statement often masks an ID (`*****8042P25G01426001`, or the
+   field. A statement often masks an ID (`*****5170P25G01000001`, or the
    last four digits): it matches when the characters it shows agree and
    they name exactly one row.
 3. **Straight in** when the statement matches a saved row by its ID and
@@ -45,7 +45,7 @@ month's payment plus a month's interest on the row
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
 update goals.records
-   set data = data || '{"balance": 80686.15, "interest": 12076.15, "next_due": "2027-01-18"}'::jsonb,
+   set data = data || '{"balance": 42294, "interest": 6294, "next_due": "2027-01-18"}'::jsonb,
        as_of = '<the statement date>', source = 'gmail', source_ref = '<the Gmail message id>'
  where id = '<the row id from the brief>' and user_id = '<user>'
    and not draft and archived_at is null;
@@ -59,7 +59,7 @@ update goals.records
    row (`confirmRecord` in `lib/goals/collections-store.ts`), so do not
    leave out the ID to avoid a duplicate. Write one draft per row, and check
    for a draft already waiting with that ID and date before writing another.
-   Name each held change and why it waited in the run summary ("Grad PLUS
+   Name each held change and why it waited in the run summary ("Graduate loan
    2024–25: balance fell by $10,000, more than a month's payment and
    interest").
 5. Only the values the statement gives go in. Leave a value it does not

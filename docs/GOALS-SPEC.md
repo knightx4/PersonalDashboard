@@ -237,7 +237,7 @@ What waits on you:
   submitting a form or an application, booking or buying, posting or sharing,
   or changing your records outside Goals. It is a Claude step whose `acts`
   holds one sentence naming what working it does ("Sends the hardship request
-  to help@nelnet.net from your Gmail"). It arrives proposed, the row shows
+  to help@northstar.example from your Gmail"). It arrives proposed, the row shows
   the sentence with Approve and Turn down, and no run works it until you
   approve that step. The database refuses Claude writing such a step in any
   other status, opening one, or changing what a live step does.
@@ -1183,13 +1183,13 @@ for one number a month, the new balances. There is no bank connection.
 drafts applications as `claude` steps; you apply and interview. Progress is
 counted from Jobs.
 
-**Get plugged into city life in NYC** (The city). Outcomes such as knowing
+**Get plugged into city life** (The city). Outcomes such as knowing
 ten people in the scene by name, with a rhythm of one event a week inside,
 fed by the weekly research. Reading and courses go to Learn as linked aims.
 After a few events, a `decision` step asks whether the next move is more
 education or joining an organization, based on what you marked as worth it.
 
-**Make friends in New York** (Relationships). Mostly yours. A rhythm, a map of
+**Make friends in your city** (Relationships). Mostly yours. A rhythm, a map of
 steps, and credit from city events you attended. No people list for now.
 
 **Have good relationships** (Relationships). Starts as a title alone, refined
@@ -1370,8 +1370,8 @@ A closed step comes back when a new document changes one of its answers
 (plan #997). A date that moves at all, or an amount that moves by more than
 5% of the answer the step closed on, reopens it. A written answer reopens it
 only when its meaning changes, which the goals routine judges on each
-rewrite and stores with a one-line reason (plan #1036): "Nelnet" rewritten as
-"Nelnet Servicing" leaves the step closed, and "MOHELA" reopens it. A
+rewrite and stores with a one-line reason (plan #1036): "Northstar" rewritten as
+"Northstar Servicing" leaves the step closed, and "Brightline" reopens it. A
 rewrite that comes without a verdict is compared on its wording, case and
 spacing aside, so a change nobody judged still shows. The answer is marked
 changed, and the step shows what it said before, what moved (for a written
@@ -1397,7 +1397,7 @@ then the person does.
    row of the preview. A suggestion becomes the ID field only when the list
    has none. The read also warns about labels that do not mean what they
    say, such as an NSLDS "Repayment Begin Date" that is the last
-   disbursement date for a Grad PLUS loan; those are listed above the rows.
+   disbursement date for a graduate loan; those are listed above the rows.
 
    Saving a read teaches the collection that kind of document
    (`goals.document_kinds`). The reader names the kind ("NSLDS loan

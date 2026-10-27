@@ -56,7 +56,7 @@ describe('field values', () => {
   });
 
   it('text: one trimmed line up to 500 characters', () => {
-    expect(ok('text', '  Nelnet ')).toBe('Nelnet');
+    expect(ok('text', '  Northstar ')).toBe('Northstar');
     expect(refused('text', 'two\nlines')).toBe('Value must be one line of text, up to 500 characters.');
     expect(refused('text', 'x'.repeat(501))).not.toBeNull();
     expect(refused('text', 12)).not.toBeNull();
@@ -75,7 +75,7 @@ describe('field values', () => {
   });
 
   it('money: to the cent, with a sign and separators allowed', () => {
-    expect(ok('money', '$18,250.40')).toBe(18250.4);
+    expect(ok('money', '$9,400.40')).toBe(9400.4);
     expect(ok('money', 212)).toBe(212);
     expect(refused('money', '18.255')).toBe('Value must be an amount of money, to the cent.');
     expect(refused('money', 'lots')).not.toBeNull();
@@ -165,12 +165,12 @@ describe('checkRecord', () => {
   it('stores what was typed in its own form', () => {
     const result = checkRecord(
       loans,
-      { name: 'Loan 1', servicer: 'Nelnet', balance: '$18,250.40', rate: '6.8%', minimum: '212', due_day: '15' },
+      { name: 'Loan 1', servicer: 'Northstar', balance: '$9,400.40', rate: '6.8%', minimum: '212', due_day: '15' },
       null,
     );
     expect(result).toEqual({
       ok: true,
-      data: { name: 'Loan 1', servicer: 'Nelnet', balance: 18250.4, rate: 6.8, minimum: 212, due_day: 15 },
+      data: { name: 'Loan 1', servicer: 'Northstar', balance: 9400.4, rate: 6.8, minimum: 212, due_day: 15 },
     });
   });
 
@@ -189,16 +189,16 @@ describe('checkRecord', () => {
 
   it('keeps values the write does not mention, including a removed field', () => {
     const revised = loans.map((f) => (f.key === 'servicer' ? { ...f, removed: true } : f));
-    const previous = { name: 'Loan 1', servicer: 'Nelnet', balance: 18250.4 };
-    const result = checkRecord(revised, { balance: '18,000' }, previous);
-    expect(result).toEqual({ ok: true, data: { name: 'Loan 1', servicer: 'Nelnet', balance: 18000 } });
+    const previous = { name: 'Loan 1', servicer: 'Northstar', balance: 9400.4 };
+    const result = checkRecord(revised, { balance: '9,200' }, previous);
+    expect(result).toEqual({ ok: true, data: { name: 'Loan 1', servicer: 'Northstar', balance: 9200 } });
   });
 
   it('refuses a new value for a removed field, but lets the old one through unchanged', () => {
     const revised = loans.map((f) => (f.key === 'servicer' ? { ...f, removed: true } : f));
-    const previous = { servicer: 'Nelnet' };
-    expect(checkRecord(revised, { servicer: 'Mohela' }, previous)).toMatchObject({ ok: false, field: 'servicer' });
-    expect(checkRecord(revised, { servicer: 'Nelnet' }, previous)).toMatchObject({ ok: true });
+    const previous = { servicer: 'Northstar' };
+    expect(checkRecord(revised, { servicer: 'Brightline' }, previous)).toMatchObject({ ok: false, field: 'servicer' });
+    expect(checkRecord(revised, { servicer: 'Northstar' }, previous)).toMatchObject({ ok: true });
   });
 
   it('does not re-check a value kept from an earlier version', () => {
@@ -220,14 +220,14 @@ describe('a place kept as it was', () => {
 
 describe('trackedChanges', () => {
   it('lists the tracked fields a write gives a new value', () => {
-    expect(trackedChanges(loans, null, { balance: 18250.4, minimum: 212 })).toEqual([
-      { key: 'balance', value: 18250.4 },
+    expect(trackedChanges(loans, null, { balance: 9400.4, minimum: 212 })).toEqual([
+      { key: 'balance', value: 9400.4 },
     ]);
-    expect(trackedChanges(loans, { balance: 18250.4 }, { balance: 18250.4 })).toEqual([]);
-    expect(trackedChanges(loans, { balance: 18250.4 }, { balance: 18000 })).toEqual([
-      { key: 'balance', value: 18000 },
+    expect(trackedChanges(loans, { balance: 9400.4 }, { balance: 9400.4 })).toEqual([]);
+    expect(trackedChanges(loans, { balance: 9400.4 }, { balance: 9200 })).toEqual([
+      { key: 'balance', value: 9200 },
     ]);
-    expect(trackedChanges(loans, { balance: 18250.4 }, { balance: null })).toEqual([]);
+    expect(trackedChanges(loans, { balance: 9400.4 }, { balance: null })).toEqual([]);
   });
 });
 

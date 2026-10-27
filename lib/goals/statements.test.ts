@@ -10,7 +10,7 @@ import {
   statementSources,
 } from '@/lib/goals/statements';
 
-// The loans collection as it stands on the live account (plan #1023).
+// A loans collection of the shape plan #1023 describes.
 const FIELDS: CollectionField[] = [
   { key: 'name', type: 'text', label: 'Loan' },
   { key: 'servicer', type: 'text', label: 'Servicer' },
@@ -30,16 +30,16 @@ const FIELDS: CollectionField[] = [
   { key: 'next_due', type: 'date', label: 'Next payment due' },
 ];
 
-const GRAD_PLUS = {
-  name: 'Grad PLUS 2024–25',
-  servicer: 'Edfinancial',
-  balance: 80080.21,
-  rate: 9.08,
-  minimum: 988,
-  loan_id: '*****8042P25G01426001',
+const GRAD_LOAN = {
+  name: 'Graduate loan 2024–25',
+  servicer: 'Brightline',
+  balance: 42000,
+  rate: 8.4,
+  minimum: 520,
+  loan_id: '*****5170P25G01000001',
   status: 'Deferred',
-  principal: 68610,
-  interest: 11470.21,
+  principal: 36000,
+  interest: 6000,
   next_due: '2026-12-18',
 };
 
@@ -47,7 +47,7 @@ function record(over: Partial<CollectionRecord>): CollectionRecord {
   return {
     id: 'r1',
     collectionId: 'c1',
-    data: GRAD_PLUS,
+    data: GRAD_LOAN,
     version: 1,
     position: 0,
     source: 'pasted',
@@ -63,11 +63,11 @@ function kind(over: Partial<LearnedKind>): LearnedKind {
   return {
     id: 'k1',
     collectionId: 'c1',
-    name: 'Edfinancial statement',
+    name: 'Brightline statement',
     recognise: '',
     fieldNotes: {},
     skipped: [],
-    senders: ['Edfinancial', 'edfinancial.com'],
+    senders: ['Brightline', 'brightline.example'],
     lastReadAt: null,
     ...over,
   };
@@ -77,20 +77,20 @@ const LOANS = { id: 'c1', name: 'loans', shape: 'list' as const, fields: FIELDS 
 
 describe('ordinaryLimit', () => {
   it("is a month's payment plus a month's interest on the balance", () => {
-    // 988 + 80,080.21 × 9.08% / 12 = 988 + 605.94
-    expect(ordinaryLimit(FIELDS, GRAD_PLUS)).toBe(1593.94);
+    // 520 + 42,000 × 8.4% / 12 = 520 + 294
+    expect(ordinaryLimit(FIELDS, GRAD_LOAN)).toBe(814);
   });
 
   it('is only the interest when no payment is set', () => {
     const unsub = {
-      ...GRAD_PLUS,
+      ...GRAD_LOAN,
       minimum: null,
-      balance: 23549.6,
-      principal: 20500,
-      interest: 3049.6,
-      rate: 8.08,
+      balance: 12000,
+      principal: 11000,
+      interest: 1000,
+      rate: 6,
     };
-    expect(ordinaryLimit(FIELDS, unsub)).toBe(158.57);
+    expect(ordinaryLimit(FIELDS, unsub)).toBe(60);
   });
 
   it('is null when the row has no tracked money value', () => {
@@ -101,31 +101,31 @@ describe('ordinaryLimit', () => {
 describe('checkChange', () => {
   it('lets a month of interest and a new due date through', () => {
     const after = {
-      balance: 80686.15,
-      interest: 12076.15,
+      balance: 42294,
+      interest: 6294,
       next_due: '2027-01-18',
       as_of: '2026-10-02',
     };
-    expect(checkChange(FIELDS, GRAD_PLUS, after)).toEqual({ ordinary: true });
+    expect(checkChange(FIELDS, GRAD_LOAN, after)).toEqual({ ordinary: true });
   });
 
   it('lets a payment through', () => {
-    expect(checkChange(FIELDS, GRAD_PLUS, { balance: 79092.21 })).toEqual({ ordinary: true });
+    expect(checkChange(FIELDS, GRAD_LOAN, { balance: 41480 })).toEqual({ ordinary: true });
   });
 
   it('holds a balance that moved by more than a payment and interest', () => {
-    const check = checkChange(FIELDS, GRAD_PLUS, { balance: 70080.21 });
+    const check = checkChange(FIELDS, GRAD_LOAN, { balance: 32000 });
     expect(check.ordinary).toBe(false);
     if (!check.ordinary) expect(check.reason).toContain('Balance moved by $10,000.00');
   });
 
   it('holds a change of status or payment amount', () => {
-    expect(checkChange(FIELDS, GRAD_PLUS, { status: 'Repayment' }).ordinary).toBe(false);
-    expect(checkChange(FIELDS, GRAD_PLUS, { minimum: 1020 }).ordinary).toBe(false);
+    expect(checkChange(FIELDS, GRAD_LOAN, { status: 'Repayment' }).ordinary).toBe(false);
+    expect(checkChange(FIELDS, GRAD_LOAN, { minimum: 560 }).ordinary).toBe(false);
   });
 
   it('ignores values that did not change or that the statement left out', () => {
-    expect(checkChange(FIELDS, GRAD_PLUS, { status: 'Deferred', rate: null })).toEqual({
+    expect(checkChange(FIELDS, GRAD_LOAN, { status: 'Deferred', rate: null })).toEqual({
       ordinary: true,
     });
   });
@@ -133,9 +133,9 @@ describe('checkChange', () => {
 
 describe('gmailQuery', () => {
   it('searches one sender, or several joined with OR, quoting names with a space', () => {
-    expect(gmailQuery(['Edfinancial'], '2026-09-18')).toBe('from:Edfinancial after:2026/09/18');
-    expect(gmailQuery(['edfinancial.com', 'Nelnet Servicing'], '2026-09-18')).toBe(
-      'from:(edfinancial.com OR "Nelnet Servicing") after:2026/09/18',
+    expect(gmailQuery(['Brightline'], '2026-09-18')).toBe('from:Brightline after:2026/09/18');
+    expect(gmailQuery(['brightline.example', 'Northstar Servicing'], '2026-09-18')).toBe(
+      'from:(brightline.example OR "Northstar Servicing") after:2026/09/18',
     );
   });
 });
@@ -156,18 +156,18 @@ describe('statementSources', () => {
     expect(sources[0]).toMatchObject({
       name: 'loans',
       idKey: 'loan_id',
-      senders: ['Edfinancial', 'edfinancial.com'],
+      senders: ['Brightline', 'brightline.example'],
       // The row was saved on 25 Sep, and the search reaches a week back from today at least.
-      query: 'from:(Edfinancial OR edfinancial.com) after:2026/09/22',
+      query: 'from:(Brightline OR brightline.example) after:2026/09/22',
     });
     expect(sources[0].rows).toEqual([
       {
         recordId: 'r1',
-        idValue: '*****8042P25G01426001',
-        label: 'Grad PLUS 2024–25',
+        idValue: '*****5170P25G01000001',
+        label: 'Graduate loan 2024–25',
         asOf: '2026-09-25',
-        tracked: { balance: 80080.21, principal: 68610, interest: 11470.21 },
-        limit: 1593.94,
+        tracked: { balance: 42000, principal: 36000, interest: 6000 },
+        limit: 814,
       },
     ]);
   });
@@ -233,11 +233,11 @@ describe('statementLines', () => {
       }),
     ).join('\n');
     expect(lines).toContain(
-      'Search Gmail for: from:(Edfinancial OR edfinancial.com) after:2026/09/22',
+      'Search Gmail for: from:(Brightline OR brightline.example) after:2026/09/22',
     );
-    expect(lines).toContain('"Edfinancial statement" (goals.document_kinds id k1)');
+    expect(lines).toContain('"Brightline statement" (goals.document_kinds id k1)');
     expect(lines).toContain(
-      '*****8042P25G01426001, Grad PLUS 2024–25 (goals.records id r1), figures as of 2026-09-25: balance 80080.21, principal 68610, interest 11470.21; straight in when each money value moves by no more than $1,593.94',
+      '*****5170P25G01000001, Graduate loan 2024–25 (goals.records id r1), figures as of 2026-09-25: balance 42000, principal 36000, interest 6000; straight in when each money value moves by no more than $814.00',
     );
     expect(lines).toContain('"Reading new');
   });

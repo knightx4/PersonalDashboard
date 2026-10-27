@@ -64,7 +64,7 @@ const STEP = (id: string): EvidenceStep => ({
 const ITEM = (id: string): EvidenceItem => ({
   source: 'gmail',
   id,
-  state: { kind: 'email', from: 'Kroll', subject: `Subject ${id}` },
+  state: { kind: 'email', from: 'Northwind', subject: `Subject ${id}` },
   line: `Email ${id}`,
 });
 
@@ -117,9 +117,9 @@ describe('evidenceSteps', () => {
 
 describe('bearsOnQuestion', () => {
   it('names the step and its done-when, and says what does not count', () => {
-    const q = bearsOnQuestion({ ...STEP('a'), title: 'Apply to Kroll', acceptance: 'Applied.' });
+    const q = bearsOnQuestion({ ...STEP('a'), title: 'Apply to Northwind', acceptance: 'Applied.' });
     expect(q.type).toBe('yes-no');
-    expect(q.question).toContain('"Apply to Kroll" (done when: Applied.)');
+    expect(q.question).toContain('"Apply to Northwind" (done when: Applied.)');
     expect(q.question).toContain('different company, person, account or task');
   });
 });

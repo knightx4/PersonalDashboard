@@ -139,7 +139,7 @@ describe('goals history', () => {
 
   it('records every table in the schema, not only the tree', async () => {
     const [reading] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into readings (user_id, item_id, value) values (${userA}, ${goalA}, 18250.40)
+      insert into readings (user_id, item_id, value) values (${userA}, ${goalA}, 9400.40)
       returning id`);
     const rows = await historyOf(reading.id);
     expect(rows).toHaveLength(1);
@@ -628,7 +628,7 @@ describe('approval once per goal (plan #932)', () => {
     const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
       insert into items (user_id, level, area_id, title)
       values (${userA}, 'goal', ${areaA}, 'Lower the loan rate') returning id`);
-    const acts = 'Sends the hardship request to Nelnet from your Gmail.';
+    const acts = 'Sends the hardship request to Northstar from your Gmail.';
 
     await expect(
       asClaude((tx) => tx`
@@ -652,7 +652,7 @@ describe('approval once per goal (plan #932)', () => {
 
     await asUser(userA, (tx) => tx`select settle_proposal(${step.id}, true)`);
     await expect(
-      asClaude((tx) => tx`update items set acts = 'Sends it to Navient too.' where id = ${step.id}`),
+      asClaude((tx) => tx`update items set acts = 'Sends it to Brightline too.' where id = ${step.id}`),
     ).rejects.toThrow(/may not change what a live step does/);
 
     // A live step with no effect outside the plan cannot be given one either.
@@ -1110,9 +1110,9 @@ describe('weekly suggestions (plan #934)', () => {
       asClaude((tx) => tx`
         insert into suggestions (user_id, item_id, kind, title, detail, url, place)
         values (${userA}, ${goalA}, 'job_leads', ${title}, 'Fits the target.',
-                'https://example.test/jobs/1', 'New York')`);
-    await lead('Senior Associate, Kroll');
-    await lead('Senior Associate, Kroll (again)');
+                'https://example.test/jobs/1', 'Springfield')`);
+    await lead('Senior Associate, Northwind');
+    await lead('Senior Associate, Northwind (again)');
     await asClaude((tx) => tx`
       insert into suggestions (user_id, kind, title, url)
       values (${userA}, 'reading', 'A book', 'https://example.test/book')`);
@@ -1123,8 +1123,8 @@ describe('weekly suggestions (plan #934)', () => {
     expect(rows).toEqual([
       {
         kind: 'apply',
-        headline: 'Senior Associate, Kroll',
-        location: 'New York',
+        headline: 'Senior Associate, Northwind',
+        location: 'Springfield',
         found_in: 'Weekly goals run for Pay off the debts',
         goal_item_id: goalA,
       },
@@ -1186,7 +1186,7 @@ describe('collections and records (plan #953)', () => {
       detail: 'rate',
       constraint_name: 'records_values',
     });
-    await expect(addLoan({ balance: 18250.405 })).rejects.toThrow(/Balance must be an amount of money/);
+    await expect(addLoan({ balance: 9400.405 })).rejects.toThrow(/Balance must be an amount of money/);
     await expect(addLoan({ kind: 'State' })).rejects.toThrow(/Kind must be one of its options/);
     await expect(addLoan({ colour: 'blue' })).rejects.toThrow(/Loans has no field colour/);
     // Claude writing straight through SQL is held to the same check.
@@ -1197,17 +1197,17 @@ describe('collections and records (plan #953)', () => {
   });
 
   it('writes a reading when a tracked field changes, and only then', async () => {
-    const loan = await addLoan({ name: 'Loan 1', balance: 18250.4, rate: 6.8 });
+    const loan = await addLoan({ name: 'Loan 1', balance: 9400.4, rate: 6.8 });
     await asUser(userA, (tx) => tx`
       update records set data = data || '{"rate": 7.1}'::jsonb where id = ${loan}`);
     await asUser(userA, (tx) => tx`
-      update records set data = data || '{"balance": 18000}'::jsonb where id = ${loan}`);
+      update records set data = data || '{"balance": 9200}'::jsonb where id = ${loan}`);
 
     const readings = await admin<{ value: string; field: string; item_id: string | null }[]>`
       select value::text, field, item_id from readings where record_id = ${loan} order by created_at`;
     expect(readings).toEqual([
-      { value: '18250.4', field: 'balance', item_id: null },
-      { value: '18000', field: 'balance', item_id: null },
+      { value: '9400.4', field: 'balance', item_id: null },
+      { value: '9200', field: 'balance', item_id: null },
     ]);
     const history = await historyOf(loan);
     expect(history.map((h) => [h.table_name, h.action, h.actor])).toEqual([
@@ -1936,37 +1936,37 @@ describe('worked-out answers on an information step (plan #989)', () => {
     it('judges a written answer by the routine’s verdict on its meaning (plan #1036)', async () => {
       const { step, loans } = await closedLoans();
       const servicer = await answer(step, 'servicer', sourcesOf(loans));
-      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update answers set answer = 'Northstar' where id = ${servicer}`;
       await admin`update items set status = 'done' where id = ${step}`;
 
       // Reworded, same servicer: the routine says so and the step stays closed.
-      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+      await admin`update answers set answer = 'Northstar Servicing', meaning_changed = false,
                   meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
       expect(await statusOf(step)).toBe('done');
       expect(await changeOf(servicer)).toEqual({ changed: false, changed_record_id: null });
 
       // Another servicer: the step reopens and keeps the routine's reason.
-      await admin`update answers set answer = 'MOHELA', meaning_changed = true,
-                  meaning_reason = 'The loans moved from Nelnet to MOHELA.' where id = ${servicer}`;
+      await admin`update answers set answer = 'Brightline', meaning_changed = true,
+                  meaning_reason = 'The loans moved from Northstar to Brightline.' where id = ${servicer}`;
       expect(await statusOf(step)).toBe('open');
       expect((await changeOf(servicer)).changed).toBe(true);
       expect(await verdictOf(servicer)).toEqual({
         meaning_changed: true,
-        meaning_reason: 'The loans moved from Nelnet to MOHELA.',
+        meaning_reason: 'The loans moved from Northstar to Brightline.',
       });
     });
 
     it('drops a verdict the rewrite did not renew, and falls back to the wording', async () => {
       const { step, loans } = await closedLoans();
       const servicer = await answer(step, 'servicer', sourcesOf(loans));
-      await admin`update answers set answer = 'Nelnet' where id = ${servicer}`;
+      await admin`update answers set answer = 'Northstar' where id = ${servicer}`;
       await admin`update items set status = 'done' where id = ${step}`;
-      await admin`update answers set answer = 'Nelnet Servicing', meaning_changed = false,
+      await admin`update answers set answer = 'Northstar Servicing', meaning_changed = false,
                   meaning_reason = 'The same servicer, named in full.' where id = ${servicer}`;
       expect(await statusOf(step)).toBe('done');
 
       // A rewrite with no verdict of its own: the old one judged another answer.
-      await admin`update answers set answer = 'MOHELA' where id = ${servicer}`;
+      await admin`update answers set answer = 'Brightline' where id = ${servicer}`;
       expect(await verdictOf(servicer)).toEqual({ meaning_changed: null, meaning_reason: null });
       expect(await statusOf(step)).toBe('open');
 
@@ -2238,7 +2238,7 @@ describe('Claude closes a step of yours from evidence (plan #1082)', () => {
     await asClaude((tx) => tx`update items set status = 'done' where id = ${draft}`);
     expect((await row(draft)).status).toBe('done');
     await asClaude((tx) => tx`
-      update items set status = 'done', evidence = 'An email from Nelnet on 20 September confirms autopay is on.',
+      update items set status = 'done', evidence = 'An email from Northstar on 20 September confirms autopay is on.',
                        evidence_source = 'gmail'
       where id = ${autopay}`);
     expect(await row(phase)).toEqual({ status: 'done', evidence: null, evidence_source: null });
@@ -2627,7 +2627,7 @@ describe('a goal’s number from its collection (plan #1024)', () => {
     collection = c.id;
     const rows = await asUser(userA, (tx) => tx<{ id: string }[]>`
       insert into records (user_id, collection_id, data) values
-        (${userA}, ${collection}, '{"name": "A", "balance": 80080.21}'::jsonb),
+        (${userA}, ${collection}, '{"name": "A", "balance": 42000}'::jsonb),
         (${userA}, ${collection}, '{"name": "B", "balance": 124304.41}'::jsonb)
       returning id`);
     [first, second] = rows.map((r) => r.id);
@@ -2697,7 +2697,7 @@ describe('help kinds Claude proposes when mapping (plan #1029)', () => {
     const [goal] = await asUser(userA, (tx) => tx<{ id: string }[]>`
       insert into items (user_id, level, area_id, title)
       values (${userA}, 'goal', ${areaA}, 'Get plugged into the city') returning id`);
-    const proposal = [{ kind: 'events', note: 'Brooklyn, weeknights' }];
+    const proposal = [{ kind: 'events', note: 'Eastside, weeknights' }];
 
     await asClaude((tx) => tx`
       update items set proposed_help_kinds = ${tx.json(proposal)} where id = ${goal.id}`);

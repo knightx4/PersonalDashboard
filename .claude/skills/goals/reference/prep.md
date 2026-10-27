@@ -77,7 +77,7 @@ Examples that get none:
 - "Clear off the couch", "move skis under bed", "Put the rugs down", "Break
   down the empty boxes and mailers": physical work that nothing written would
   speed up.
-- "Read the ULURP primer and try explaining it": the reading is the step.
+- "Read the zoning primer and try explaining it": the reading is the step.
 - "Recall last names for Chad, Nicole, Kate and Neil": only the person knows.
 
 Where the line falls is a judgement, so read the step's detail and the steps
@@ -98,10 +98,10 @@ follow them, and none when it is a first visit just to see the room.
   firm list is already on the goal, so "Call three staffing firms" needs
   nothing more.
 - a step whose own `detail` already carries what the prep would produce:
-  "Ask Kroll and Hebbia recruiters for base pay" has the question to ask
+  "Ask Northwind and Contoso recruiters for base pay" has the question to ask
   written in it.
 - a step that is only a send of something already written: "Send the
-  fractional offer to George Parkhurst" when the offer is on the goal.
+  fractional offer to Pat Quinn" when the offer is on the goal.
 - a step that already has a live prep step: one whose `prepares_id` names it
   and that is neither dropped nor archived. A done one counts, since what it
   produced is the prep. The database allows one live prep step per step.

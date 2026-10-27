@@ -110,7 +110,7 @@ service. Write the one sentence the owner reads before approving it.
 
 Say what working the step does, who it goes to, from where, and what
 changes, as far as the step says. Start with a verb in the present tense,
-for example "Sends the hardship request to Nelnet from your Gmail." or
+for example "Sends the hardship request to Northstar from your Gmail." or
 "Books a 30-minute call with the landlord through their portal." Address the
 owner as "you". Do not guess a name, address or account the step does not
 give; say "the landlord" rather than inventing one.

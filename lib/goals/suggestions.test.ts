@@ -97,7 +97,7 @@ describe('the brief', () => {
     id: 'g',
     title: 'Get plugged into city life',
     helpKinds: [
-      { kind: 'events', note: 'Brooklyn, weeknights' },
+      { kind: 'events', note: 'Eastside, weeknights' },
       { kind: 'volunteering', note: null },
     ],
     rhythms: [RHYTHM],
@@ -112,7 +112,7 @@ describe('the brief', () => {
   it('names each goal with its kinds and notes, its rhythms, and the run', () => {
     const text = weeklyRunText({ userId: 'u1', runId: 'run-9', goals: [CITY, LEARNING], past: [] });
     expect(text).toContain(
-      'Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Brooklyn, weeknights\n- volunteering\n',
+      'Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Eastside, weeknights\n- volunteering\n',
     );
     expect(text).toContain('Its live rhythms:\n- "One city event" (goals.items id r1), 1 a week');
     expect(text).toContain('Goal "Learn how cities are planned" (goals.items id l) asks for:\n- reading: urban planning history');
@@ -127,14 +127,14 @@ describe('the brief', () => {
       runId: 'run-9',
       goals: [CITY, LEARNING],
       past: [
-        suggestion({ title: 'Jazz at the park', reaction: 'going', attended: true, source: 'NYC Parks' }),
+        suggestion({ title: 'Jazz at the park', reaction: 'going', attended: true, source: 'Springfield Parks' }),
         suggestion({ title: 'The Power Broker', kind: 'reading', reaction: 'not_for_me', happensOn: null }),
         suggestion({ title: 'Book launch', reaction: 'ignored', happensOn: null }),
         suggestion({ title: 'Python course', kind: 'courses', reaction: 'going' }),
       ],
     });
     expect(text).toContain(
-      'events:\n- going, and went: "Jazz at the park" (NYC Parks, 2026-09-30)\n- ignored: "Book launch"\n',
+      'events:\n- going, and went: "Jazz at the park" (Springfield Parks, 2026-09-30)\n- ignored: "Book launch"\n',
     );
     expect(text).toContain('volunteering:\n- Nothing yet for this kind.');
     expect(text).toContain('reading:\n- not_for_me: "The Power Broker"\n');

@@ -17,9 +17,9 @@ person often reads only this, on a phone, so it has to stand alone: what you
 found, and what it means for the goal. The same sentences go in the file's
 `summary` and in the step's `result`.
 
-> FP&A and accounting roles answer and interview best. Strategic finance is
-> 43% of what you sent but converts at about the average, and AI expert gigs
-> and real estate barely answer at all.
+> Operations roles answer and interview best. Product roles are 40% of what
+> you sent but convert at about the average, and contract gigs and sales
+> barely answer at all.
 
 Not "This file analyses your applications by role family."
 
@@ -72,5 +72,5 @@ placeholders; where a fact is not findable, say so and leave a marked blank.
 A file is worked on over time. When a later step or run returns to the same
 question, update the file rather than writing a second one: rewrite the parts
 that changed, keep what still holds, and set `change_note` to one sentence on
-what changed ("Added the October applications; FP&A reply rate is now 61%").
+what changed ("Added the October applications; the operations reply rate is now 50%").
 Every earlier version stays readable.
