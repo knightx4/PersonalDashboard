@@ -4,7 +4,7 @@ import { todayInTimezone } from '@/lib/money';
 import { listAskChatsInRequest, loadAskMadeChanges } from '@/lib/talk/ask-request';
 import type { AskChat } from '@/lib/talk/ask-chats';
 import type { MadeChange } from '@/lib/talk/changes';
-import { DashChatsFrame } from './view';
+import { DashChatsFrame, WRITING_STYLE_HREF } from './view';
 import { switchableModules, moduleById, type ModuleId } from '@/lib/modules';
 import type { NavSection } from '@/components/shell/app-shell';
 import type { NavIconName } from '@/components/shell/nav-icons';
@@ -23,13 +23,14 @@ const WORKSPACE_ICONS: Record<ModuleId, NavIconName> = {
 };
 
 /**
- * The shell's column on Dash's page: Home and every workspace the account
- * has on, since Dash reads all of them and a chat often ends with going to
+ * The shell's column on Dash's page: Home, Dash's Writing style page, and
+ * every workspace the account has on, since Dash reads all of them and a chat often ends with going to
  * one. Without it the column stood empty beside the chats.
  */
 function workspaceSections(enabled: readonly ModuleId[] | undefined, owner: boolean): NavSection[] {
   return [
     { href: '/home', label: 'Home', icon: 'home', exact: true },
+    { href: WRITING_STYLE_HREF, label: 'Writing style', icon: 'writingStyle' },
     ...switchableModules(enabled, owner).flatMap((id): NavSection[] => {
       const workspace = moduleById(id);
       return workspace ? [{ href: workspace.home, label: workspace.label, icon: WORKSPACE_ICONS[id] }] : [];

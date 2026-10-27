@@ -156,6 +156,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.saved_views', reason: 'Saved list filters.' },
     { table: 'core.scope_days', reason: 'Steps under each open goal or feature at the end of each day, counted by the daily run from rows that are sources in their own modules.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
+    { table: 'core.writing_style', reason: 'Dash\'s analysis of how they write, read from their sent mail and shown on its own page; derived, and not read by anything else yet.' },
     { table: 'core.watch_readings', reason: 'Each reading a watch took, for its trend and alerts; the watch itself is the source.' },
     { table: 'public.profiles', reason: 'Display name and settings.' },
   ],

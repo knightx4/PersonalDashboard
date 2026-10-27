@@ -37,6 +37,7 @@ import {
   Newspaper,
   Mail,
   Megaphone,
+  Feather,
   Map,
   MapPin,
   Network,
@@ -201,6 +202,8 @@ export const NAV_ICONS = {
   insights: Sparkles,
   // The board's meetings (plan #2540.3): five advisors round a table.
   board: Users,
+  // Dash's Writing style page: how you write, read from your sent mail.
+  writingStyle: Feather,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;
