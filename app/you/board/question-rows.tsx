@@ -196,9 +196,10 @@ export function AskedRow({
 
   return (
     <li className="card-pad-x row-pad">
-      {/* On a phone the press goes under the question, so the question keeps the row's width. */}
-      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-        {body}
+      {/* The question keeps the row's full width; the press sits at the right of its details line, so it takes no line of its own. */}
+      <span className="line-clamp-2 block text-ui text-ink">{question.question}</span>
+      <div className="flex items-start gap-3">
+        <span className="min-w-0 flex-1 text-small text-ink-muted">{meta}</span>
         {canConvene && (
           <DashAction
             type="button"
@@ -206,7 +207,8 @@ export function AskedRow({
             variant="secondary"
             routine="board"
             what="Cost of asking the board now"
-            align="start"
+            align="end"
+            wrapperClassName="shrink-0"
             pending={pending}
             onClick={convene}
           >
