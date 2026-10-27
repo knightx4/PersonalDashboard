@@ -13,7 +13,6 @@ import { IconButton } from '@/components/ui/icon-button';
 import { LiveDot } from '@/components/ui/live-dot';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { Tooltip } from '@/components/ui/tooltip';
-import { cn } from '@/lib/cn';
 import {
   brainState,
   FOCUS_MAX,
@@ -262,9 +261,9 @@ function AdvisorRow({
     <li className="card-pad-x row-pad">
       <div className="flex min-h-11 items-start gap-3">
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2 text-ui text-ink">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui text-ink">
             {guest && <AdvisorMark name={advisor.name} />}
-            <span className="min-w-0 truncate">{advisor.name}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
             <BrainChip state={state} />
           </span>
           <span className="mt-0.5 block text-small text-ink-muted [overflow-wrap:anywhere]">
@@ -294,8 +293,8 @@ function AdvisorRow({
         </p>
       )}
       {guest && state.kind === 'failed' && (
-        <div className={cn('mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1')}>
-          <p className="min-w-0 flex-1 text-small text-danger [overflow-wrap:anywhere]">{state.why}</p>
+        <div className="mt-1.5 space-y-2">
+          <p className="text-small text-danger [overflow-wrap:anywhere]">{state.why}</p>
           <DashAction
             type="button"
             variant="secondary"
