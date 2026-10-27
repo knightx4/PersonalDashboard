@@ -73,7 +73,8 @@ change_course, and in Jobs change_role, change_application, add_application_ques
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
 add_discovered_company, add_role_from_email, change_interview, change_interviewer and
 change_interview_round, and in Dev rewrite_post for the text of an X post
-draft and suggest_post to save a new one. This
+draft, suggest_post to save a new one and add_project to add a GitHub
+repository as a project. This
 row's own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is

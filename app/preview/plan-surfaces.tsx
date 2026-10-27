@@ -1,4 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
+import { sectionSubject } from '@/lib/core/section-path';
 import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from '@/lib/plan/project-fixtures';
 import { PlanView } from '@/app/dev/plan/plan-view';
 import { SendScreenBack } from '@/app/dev/plan/send-back';
@@ -395,6 +398,7 @@ export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = 
     <ScopeLabelsProvider labels={scopeLabelsOf(project)}>
     <PageColumn className="space-y-6">
       <PageHeader
+        subject={sectionSubject('/dev/projects', 'Projects', { label: site.label, href: '/dev/projects/website' })}
         title={site.label}
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
       />
@@ -415,6 +419,12 @@ export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = 
         lastRuns={{}}
         commitChecks={{}}
         unfolded
+      />
+      {/* The project's own thread (plan #2553.5), empty. */}
+      <Thread
+        subject={threadRef('project', site.id)}
+        turns={[]}
+        placeholder="A note on this project, or a question for Dash about it."
       />
     </PageColumn>
     </ScopeLabelsProvider>

@@ -515,6 +515,16 @@ import {
   PostsXSurface,
 } from './posts-surfaces';
 import {
+  ProjectsAddErrorSurface,
+  ProjectsArchiveSurface,
+  ProjectsCommentsSurface,
+  ProjectsEmptySurface,
+  ProjectsNarrowTokenSurface,
+  ProjectsPickerSurface,
+  ProjectsSearchEmptySurface,
+  ProjectsSurface,
+} from './projects-surfaces';
+import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
@@ -10718,6 +10728,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevIdeasEmptySurface />,
+  },
+  {
+    /* Dev's Projects page (plan #2553.5): three projects, one failing on main, one never read, the longest name there is. Fixtures in projects-surfaces.tsx. */
+    id: 'dev-projects',
+    label: 'Dev · Projects',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSurface />,
+  },
+  {
+    /* The picker Add project opens, listing the repositories newest pushed first, with the ones added marked. */
+    id: 'dev-projects-picker',
+    label: 'Dev · Projects, Add project open',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsPickerSurface />,
+  },
+  {
+    /* The picker with a search that matches nothing. */
+    id: 'dev-projects-search-empty',
+    label: 'Dev · Projects, no repository matches',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSearchEmptySurface />,
+  },
+  {
+    /* The picker when GITHUB_READ_TOKEN sees only this app: the setting to change, and the typed owner/name. */
+    id: 'dev-projects-narrow-token',
+    label: 'Dev · Projects, token sees only this repository',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsNarrowTokenSurface />,
+  },
+  {
+    /* The picker after GitHub refused a typed repository. */
+    id: 'dev-projects-add-error',
+    label: 'Dev · Projects, GitHub refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsAddErrorSurface />,
+  },
+  {
+    /* A row's menu open on Archive's confirm. */
+    id: 'dev-projects-archive',
+    label: 'Dev · Projects, archive confirm',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsArchiveSurface />,
+  },
+  {
+    /* The comment mark on rows whose thread has comments. */
+    id: 'dev-projects-comments',
+    label: 'Dev · Projects, rows with comments',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsCommentsSurface />,
+  },
+  {
+    /* The page before any project is added. */
+    id: 'dev-projects-empty',
+    label: 'Dev · Projects, none yet',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsEmptySurface />,
   },
   {
     id: 'dev-project-plan',
