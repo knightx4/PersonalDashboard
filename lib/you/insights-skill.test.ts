@@ -59,7 +59,7 @@ describe('the insights skill', () => {
       ['Read what came before', ['where they are now', 'answer', 'verdict', 'knew it', 'prediction', 'already knows']],
       [
         'Read the core in full',
-        ['Me/', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
+        ['journal_folders', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
       ],
       ['Read what they did', ['four subagents', 'chats with Claude', 'owner-scoped selects', '10 to 20 findings']],
       [
@@ -120,7 +120,7 @@ describe('the insights skill', () => {
   });
 
   it('keeps secret notes out and scopes every write to the owner', () => {
-    expect(skill).toContain('Me/Passwords.md');
+    expect(skill).toContain("path !~* 'password'");
     for (const voice of ['private', 'audience', 'clipped', 'reference', 'secret'])
       expect(skill).toContain(`\`${voice}\``);
     expect(skill).toContain('Never read or quote a note tagged secret');
