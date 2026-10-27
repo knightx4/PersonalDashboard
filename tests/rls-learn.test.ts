@@ -2578,7 +2578,7 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
       returning id`;
     const notes: [string, string][] = [
-      ['Career/EY.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
+      ['Career/Halvorsen.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
       ['Career/Job Applications/Acme.md', '> [!NOTE] What they want\n> Someone who tests revenue in full.'],
     ];
     for (const [path, body] of notes) {
@@ -2634,7 +2634,7 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       select weight, basis from evidence_links
       where target_id = ${ideaId} and source_kind = 'work' order by weight desc, basis`;
     expect(links).toEqual([
-      { weight: 1, basis: 'From your note EY: "Took the lead on the revenue testing tool at work."' },
+      { weight: 1, basis: 'From your note Halvorsen: "Took the lead on the revenue testing tool at work."' },
       { weight: 1, basis: 'From your résumé: "Built an automated revenue testing system"' },
       { weight: 0.4, basis: 'From your application notes in Acme: "Someone who tests revenue in full."' },
     ]);

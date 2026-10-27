@@ -100,7 +100,7 @@ select source_table, source_ref, max(similarity) as best,
 from core.search_memory_from(
   '<user>',                -- the owner, always
   'obsidian.notes',        -- the row you found: its table, schema and all
-  'Bulk/Housing Policy Course.md',  -- and its ref (below)
+  'Courses/Statistics 101/Week 3.md',     -- and its ref (below)
   null,                    -- or '{obsidian.notes,job_search.thoughts}' to narrow
   50,                      -- passages back, at most 50
   0.53                     -- the floor
@@ -128,8 +128,8 @@ order by best desc;
 Rows found this way are read and judged the same as any other: read the
 note in full before relying on it, and keep it only if it changes the map.
 When you keep one, say in its `why` that the meaning search found it ("Found
-by meaning from Housing Policy Course: says the real problem is
-displacement."), so the person can see what the word search would have
+by meaning from Statistics 101 Week 3: says the sample was the real
+problem."), so the person can see what the word search would have
 missed.
 
 ### What is already on the goal
@@ -163,10 +163,10 @@ eight. A note that only mentions the subject is not context.
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
 insert into goals.context (user_id, item_id, source, ref, title, why, excerpt, status, run_id)
-values ('<user>', '<goal id>', 'obsidian.notes', 'Career/What I want next.md',
+values ('<user>', '<goal id>', 'obsidian.notes', 'Work/What I want next.md',
         'What I want next',
-        'Lists what you want from the next role: fieldwork, a public-sector employer, under an hour''s commute.',
-        'I want to be out in neighbourhoods at least two days a week. Public sector over consulting.',
+        'Lists what you want from the next role: a smaller team, time with customers, under an hour''s commute.',
+        'I want to spend at least two days a week with customers. A small team over a large one.',
         'proposed', '<the run id>')
 on conflict (item_id, source, ref) do nothing;
 ```

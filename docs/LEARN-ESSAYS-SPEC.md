@@ -2,7 +2,7 @@
 
 A writing mode in Learn. You write short essays, 200 to 2,000 words, about
 what you have been learning. Each one is a note in your vault from its first
-save, and the finished ones can go on alexrivera.dev. Dash helps with
+save, and the finished ones can go on your personal website. Dash helps with
 everything around the sentences: sharpening the question, finding what you
 already wrote and read, pointing at gaps, and checking claims. It does not
 write the essay.
@@ -241,7 +241,7 @@ Obsidian Authorship plugin both read it.
 
 ---
 Annotations: 0,1834 SHA-256 8642505e205f8a563b8b6c376bef88a1
-@Selvey: 0,1700
+@Alex: 0,1700
 &Dash <claude-sonnet-5-5>: 1700,96
 *Walzer - Spheres of Justice ch4: 1796,38
 ...
@@ -410,7 +410,7 @@ you tick: each note is a heading, the claim and a link back to the essay; the
 evidence item is one row in the bank whose story links to the essay, made
 once an essay. A stage a note already has beyond seedling is kept.
 
-"Publish" puts the essay on alexrivera.dev:
+"Publish" puts the essay on your personal website:
 
 - The site reads the same Supabase project as the dashboard, as its Ask my AI
   tables already do. Publishing copies the essay into a published snapshot, so

@@ -111,7 +111,7 @@ const minutes = parseMinutes({
     {
       key: 'd2',
       note: 'Back from last week because it has no vote yet.',
-      point: 'Does the hour in the studio come before the money numbers are entered?',
+      point: 'Does the hour in the workshop come before the money numbers are entered?',
       positions: [
         {
           seat: 'cfo',
@@ -120,17 +120,17 @@ const minutes = parseMinutes({
         },
         {
           seat: 'dreamer',
-          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the studio hour waited for it.',
-          receipts: [{ label: 'About me', link: '/vault/n/Me/About%20me.md' }],
+          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the workshop hour waited for it.',
+          receipts: [{ label: 'Morning routine', link: '/vault/n/Journal/Morning%20routine.md' }],
         },
       ],
     },
   ],
   dream: {
-    text: 'The song stays on the table. In [Personal goals](/vault/n/Me/Personal%20Goals.md) you wrote that you wanted to put something out, anything, even if it is not very good. Last Wednesday you opened the project and saved a forty-second loop, and it is the first file in that folder since June.',
+    text: 'The board game stays on the table. In [What I want next](/vault/n/Journal/What%20I%20want%20next.md) you wrote that you wanted to finish something, anything, even if it is not very good. Last Wednesday you opened the project and wrote a one-page rules draft, and it is the first file in that folder since June.',
     thread:
-      'Thirty minutes on Wednesday. Add one more part to the loop and export it, whatever state it is in.',
-    receipts: [{ label: 'Make a song and put it out', link: '/goals' }],
+      'Thirty minutes on Wednesday. Add one more rule to the draft and print it, whatever state it is in.',
+    receipts: [{ label: 'Make a board game and play it with friends', link: '/goals' }],
   },
   question:
     'If the recruiter says the first line still reads as a builder of tools, what would you lead with instead?',
@@ -149,7 +149,7 @@ const minutes = parseMinutes({
     },
     {
       key: 'r3',
-      what: 'Thirty minutes in the studio on Wednesday 4 Nov: one more part, then export.',
+      what: 'Thirty minutes in the workshop on Wednesday 4 Nov: one more rule, then print.',
       day: '2026-11-04',
       seats: ['dreamer'],
     },
@@ -164,7 +164,7 @@ const minutes = parseMinutes({
     },
     { seat: 'skeptic', text: 'Neither reply turns into a scheduled interview by 8 Nov.' },
     { seat: 'cfo', text: 'The card row still has no minimum on 8 Nov.' },
-    { seat: 'dreamer', text: 'A second export is in the song folder by 8 Nov.' },
+    { seat: 'dreamer', text: 'A second draft is in the game folder by 8 Nov.' },
   ],
   graded: [
     {
@@ -193,9 +193,9 @@ const minutes = parseMinutes({
     },
     {
       seat: 'dreamer',
-      text: 'The song step is still unanswered on 1 Nov.',
+      text: 'The board game step is still unanswered on 1 Nov.',
       grade: 'cant_tell',
-      fact: 'A loop was saved, but the step was not answered.',
+      fact: 'A draft was saved, but the step was not answered.',
     },
   ],
   memos_note:
@@ -236,16 +236,16 @@ const minutes = parseMinutes({
       prediction: 'The card row still has no minimum on 8 Nov.',
       rebuttal: {
         to: 'dreamer',
-        text: 'The studio hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
+        text: 'The workshop hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
       },
     },
     {
       seat: 'dreamer',
-      memo: 'A loop exists. It is forty seconds long and it is the first thing in that folder since June.',
-      prediction: 'A second export is in the song folder by 8 Nov.',
+      memo: 'A rules draft exists. It is one page long and it is the first thing in that folder since June.',
+      prediction: 'A second draft is in the game folder by 8 Nov.',
       rebuttal: {
         to: 'cfo',
-        text: 'The statement was opened last time only after you had made something. Put it after the studio, not before.',
+        text: 'The statement was opened last time only after you had made something. Put it after the workshop, not before.',
       },
     },
   ],
@@ -271,7 +271,7 @@ const calledMinutes = parseMinutes({
         {
           seat: 'mentor',
           stance: 'Take it, keep applying',
-          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
+          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend workshop hour.',
           receipts: [],
         },
         {
@@ -288,9 +288,9 @@ const calledMinutes = parseMinutes({
         },
         {
           seat: 'dreamer',
-          stance: 'Keep searching, with the song kept',
-          text: 'The song stays on the table either way. It would change if the contract allowed one free morning a week.',
-          receipts: [{ label: 'Personal goals', link: '/vault/n/Me/Personal%20Goals.md' }],
+          stance: 'Keep searching, with the game kept',
+          text: 'The board game stays on the table either way. It would change if the contract allowed one free morning a week.',
+          receipts: [{ label: 'What I want next', link: '/vault/n/Journal/What%20I%20want%20next.md' }],
         },
       ],
     },

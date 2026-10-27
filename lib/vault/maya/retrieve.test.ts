@@ -4,9 +4,9 @@ import { gatherMaterial, MAYA_RELATED_NOTES, type MayaConflict, type MayaRetriev
 /** The assembly over fake reads: what is kept, what is left out, and in what order. */
 
 const notes: Record<string, RawNote> = {
-  a: { id: 'a', path: 'Against.md', title: 'Against "Finding Yourself"', body: 'You become yourself in action.', blob_sha: 'sha-a' },
-  road: { id: 'road', path: 'Bulk/Road.md', title: 'Life is a road to the self', body: 'Act as the discovered self.' },
-  intro: { id: 'intro', path: 'Bulk/Intro.md', title: 'On Introspection', body: 'Come out of the maze.' },
+  a: { id: 'a', path: 'Against.md', title: 'Made, not found', body: 'You become yourself in action.', blob_sha: 'sha-a' },
+  road: { id: 'road', path: 'Bulk/Road.md', title: 'The self comes first', body: 'Act as the discovered self.' },
+  intro: { id: 'intro', path: 'Bulk/Intro.md', title: 'Looking inward', body: 'Come out of the maze.' },
   diary: { id: 'diary', path: 'Me/Diary.md', title: 'Diary', body: 'A journal entry about the self.' },
   keyed: { id: 'keyed', path: 'Keys.md', title: 'Keys', body: 'token sk-ant-123' },
   weak: { id: 'weak', path: 'Weak.md', title: 'Weak', body: 'Loosely related.' },
@@ -25,10 +25,10 @@ function ports(overrides: Partial<MayaRetrievePorts> = {}, conflicts: MayaConfli
     note: async (id) => all[id] ?? null,
     vector: async () => ({ vector: [0.1], model: 'voyage-4-lite' }),
     nearest: async () => [
-      { note_id: 'intro', path: 'Bulk/Intro.md', title: 'On Introspection', similarity: 0.77 },
+      { note_id: 'intro', path: 'Bulk/Intro.md', title: 'Looking inward', similarity: 0.77 },
       { note_id: 'diary', path: 'Me/Diary.md', title: 'Diary', similarity: 0.75 },
       { note_id: 'keyed', path: 'Keys.md', title: 'Keys', similarity: 0.7 },
-      { note_id: 'road', path: 'Bulk/Road.md', title: 'Life is a road to the self', similarity: 0.67 },
+      { note_id: 'road', path: 'Bulk/Road.md', title: 'The self comes first', similarity: 0.67 },
       { note_id: 'weak', path: 'Weak.md', title: 'Weak', similarity: 0.5 },
     ],
     notes: async (ids) => ids.flatMap((id) => (all[id] ? [all[id]!] : [])),

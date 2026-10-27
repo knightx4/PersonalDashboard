@@ -27,16 +27,16 @@ describe('pickMapTrialSample', () => {
   });
 
   it('leaves out the three notes the trial left out, whatever their hash', () => {
-    const withJournal = [...notes, { id: notes[0].id.replace(/0$/, 'f'), path: 'Me/Journal.md' }];
-    expect(pickMapTrialSample(withJournal).some((note) => note.path === 'Me/Journal.md')).toBe(false);
+    const withJournal = [...notes, { id: notes[0].id.replace(/0$/, 'f'), path: 'Journal/Journal.md' }];
+    expect(pickMapTrialSample(withJournal).some((note) => note.path === 'Journal/Journal.md')).toBe(false);
   });
 });
 
 describe('referenceFor', () => {
   it('reads the trial write-up: positions found, and evidence where it said so', () => {
-    expect(referenceFor('Pending/Order Without Design.md')).toEqual({ reference: 'read', evidence: null });
-    expect(referenceFor('Pending/WFH - Alexander Hamilton Case.md')).toEqual({ reference: 'read', evidence: true });
-    expect(referenceFor('Bulk/Bulk - Wiki/Places/Dallas.md')).toEqual({ reference: null, evidence: null });
+    expect(referenceFor('Ideas/Morning routine.md')).toEqual({ reference: 'read', evidence: null });
+    expect(referenceFor('Courses/Statistics 101/Case write-up.md')).toEqual({ reference: 'read', evidence: true });
+    expect(referenceFor('Places/Springfield.md')).toEqual({ reference: null, evidence: null });
   });
 });
 

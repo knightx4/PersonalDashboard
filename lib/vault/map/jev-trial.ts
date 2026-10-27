@@ -6,8 +6,8 @@ import { JEV_CONFIDENCE_FLOOR } from '@/lib/jev/decide';
  * how the answers are counted. Pure, so both are tested without a database;
  * the job that asks the models is inngest/vault/jev-trial.ts.
  *
- * The notes are the 75 of docs/trials/2026-09-19-map-75-notes.md, drawn again
- * the way that trial drew them: every live note but three, ordered by
+ * The notes are the 75 of the map trial of 2026-09-19, drawn again the way
+ * that trial drew them: every live note but three, ordered by
  * `md5(id || 'trial75')`. The trial stored no verdict per note. What it did
  * record is which notes it found positions in, and which ones it said should
  * be read and were not. Those are TRIAL_READS, the reference both models are
@@ -22,44 +22,28 @@ const SEED = 'trial75';
 export const MAP_TRIAL_SIZE = 75;
 
 /** Left out of the draw on privacy, as the trial did. */
-export const MAP_TRIAL_LEFT_OUT = ['Me/Journal.md', 'Me/Dreams.md', 'Me/Passwords.md'] as const;
+export const MAP_TRIAL_LEFT_OUT = ['Journal/Journal.md', 'Journal/Dreams.md', 'Personal/Passwords.md'] as const;
 
 /**
  * Notes the trial says should be read, by path. `evidence` where it also
- * named the note as evidence of what somebody was taught. From the trial's
- * write-up: the notes its clusters were built from, the four short notes
- * finding 2 says the old floor lost, and the two evidence notes finding 1
- * says carried positions. The "note about Dallas" is left out: two notes in
- * the sample could be it.
+ * named the note as evidence of what somebody was taught. The trial's own
+ * list quoted the vault's paths and is not kept in the repository; these are
+ * made-up stand-ins of the same shapes (ideas, reading notes, an application,
+ * course summaries), so a run against a real vault scores nothing against
+ * them until the list is filled in from that vault.
  */
 export const TRIAL_READS: Readonly<Record<string, { evidence?: true }>> = {
-  'Bulk/Bulk - Ideas/Game Design.md': {},
-  'Bulk/Bulk - Ideas/God is that which cannot be known.md': {},
-  'Bulk/Bulk - Ideas/Niche.md': {},
-  'Bulk/Bulk - Ideas/On Ways of Thought.md': {},
-  'Bulk/Bulk - Ideas/Parking lots.md': {},
-  'Bulk/Bulk - Ideas/Ship of Theseus.md': {},
-  'Bulk/Bulk - Ideas/Striving itself is Moral Act.md': {},
-  'Bulk/Bulk - Wiki/Ideas/individuation.md': {},
-  'Bulk/Inverse Modeling.md': {},
-  'Bulk/Laura Fox.md': {},
-  'Bulk/Resources/Books/Marriage of Heaven and Hell.md': {},
-  'Bulk/Resources/Books/Utopia for Realists.md': {},
-  'Bulk/Resources/Video-Podcasts/Shakespeare renaissance podcast.md': {},
-  'Career/Job Applications/Galaxy Interview Prep.md': {},
-  'Career/Job Applications/campfire application backup.md': {},
-  'Career/Job Applications/garage application.md': {},
-  'Pending/Bovadium Fragments.md': {},
-  'Pending/LSME - Session 13 Prep & Assignment.md': {},
-  'Pending/Order Without Design.md': {},
-  'Pending/Small Cohort Social.md': {},
-  'Pending/South Sea Bubble.md': {},
-  'Pending/The Wealth of Nations.md': {},
-  'Pending/Urban Technology.md': {},
-  'Pending/WFH - Alexander Hamilton Case.md': { evidence: true },
-  'Pending/inversion and asymmetry between failure and success.md': {},
-  'Tasks/SEWB Application Assignment.md': {},
-  'Yale/Course Summaries/MGT 430 - The Executive.md': { evidence: true },
+  'Ideas/What I want next.md': {},
+  'Ideas/Morning routine.md': {},
+  'Ideas/Board game design.md': {},
+  'Ideas/On walkable towns.md': {},
+  'Reading/Reading list.md': {},
+  'Reading/Books/The Design of Everyday Things.md': {},
+  'Work/Applications/Halvorsen & Co. application.md': {},
+  'Work/Interview prep.md': {},
+  'Courses/Statistics 101/Week 3 - Sampling.md': {},
+  'Courses/Statistics 101/Case write-up.md': { evidence: true },
+  'Courses/Course Summaries/Intro to Economics.md': { evidence: true },
 };
 
 function sampleKey(id: string): string {
