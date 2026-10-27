@@ -155,6 +155,13 @@ describe('postsRunText', () => {
     expect(text).toContain('3 to 5 drafts');
   });
 
+  it('does not limit a batch to what shipped since the last post', () => {
+    const text = postsRunText({ userId: 'u' });
+    expect(text).toContain('a step closed at any time');
+    expect(text).toContain('something near it');
+    expect(text).toContain('not a reason to write none');
+  });
+
   it('allows the screenshot commit and nothing else', () => {
     expect(postsRunText({ userId: 'u' })).toContain('screenshots under public/posts/');
   });
