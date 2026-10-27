@@ -51,7 +51,7 @@ function step(id: string, extra: Partial<Step> & { title: string }): Step {
 const forest = buildForest(
   [GOAL],
   [
-    step('draft', { title: 'Draft the letter to Edfinancial', position: 10 }),
+    step('draft', { title: 'Draft the letter to Brightline', position: 10 }),
     step('other', { title: 'List every balance', position: 20 }),
   ],
 );
