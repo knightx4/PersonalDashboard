@@ -33,7 +33,7 @@ describe('parseMetricForm', () => {
   it('reads a whole form, with the target optional', () => {
     expect(parseMetricForm(form(good), lists)).toEqual({
       ok: true,
-      value: { name: 'Applications per week', source: 'list', collectionId: 'jobs', dateField: 'applied', period: 'week', target: null },
+      value: { name: 'Applications per week', source: 'list', collectionId: 'jobs', dateField: 'applied', period: 'week', target: null, targetHigh: null },
     });
     const withTarget = parseMetricForm(form({ ...good, target: ' 5 ' }), lists);
     expect(withTarget.ok && withTarget.value.target).toBe(5);
@@ -42,7 +42,7 @@ describe('parseMetricForm', () => {
   it('reads a steps or files metric without a list', () => {
     expect(parseMetricForm(form({ name: 'Steps', source: 'steps', period: 'month', collectionId: 'people' }), lists)).toEqual({
       ok: true,
-      value: { name: 'Steps', source: 'steps', collectionId: null, dateField: null, period: 'month', target: null },
+      value: { name: 'Steps', source: 'steps', collectionId: null, dateField: null, period: 'month', target: null, targetHigh: null },
     });
     expect(parseMetricForm(form({ ...good, source: 'files' }), lists)).toMatchObject({
       ok: true,
@@ -94,7 +94,7 @@ describe('metricLine', () => {
   it('names closed steps and Dash files', () => {
     const counted = { ...metric, collectionId: null, dateField: null };
     expect(metricLine({ ...counted, source: 'steps', target: 3 }, lists)).toBe('Steps closed · weekly · aim 3');
-    expect(metricLine({ ...counted, source: 'files', period: 'month', target: null }, lists)).toBe('Dash files · monthly');
+    expect(metricLine({ ...counted, source: 'files', period: 'month', target: null, targetHigh: null }, lists)).toBe('Dash files · monthly');
   });
 
   it('says when the list or its date is gone', () => {

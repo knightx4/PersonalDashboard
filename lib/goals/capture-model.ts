@@ -55,6 +55,11 @@ Rules:
   carrying the progress: "moved two bags to the office" with only a "Living
   room" step is an add under it titled Move the bags to the office, text moved
   two bags, quantity 2, unit bags.
+- Time spent on something ("applied for 2h", "90 minutes cleaning") is
+  file_progress with the time as quantity and unit hours (90 minutes is 1.5
+  hours), on the step whose title names that work, never a close and never
+  an add marked done. When the sentence also says a piece of work was
+  finished, that is its own move as well.
 - When the message names the goal whose page it was written on, file against
   that goal unless the sentence plainly concerns another.
 - Never invent refs. If nothing fits, make no move and only answer: the

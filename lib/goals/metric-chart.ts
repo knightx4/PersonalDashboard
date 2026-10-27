@@ -26,6 +26,8 @@ export type MetricChart = {
   high: number;
   /** The target as a part of the scale's top, or null with no target. */
   targetShare: number | null;
+  /** The top of a range aim as a part of the scale's top, or null. */
+  targetHighShare: number | null;
   /** Everything counted in the bars drawn. */
   total: number;
   /** The latest period's count. */
@@ -58,21 +60,24 @@ export function metricChart(
   counts: readonly PeriodCount[],
   period: MetricPeriod,
   target: number | null,
+  targetHigh: number | null = null,
 ): MetricChart | null {
   if (counts.length === 0) return null;
   const shown = counts.slice(-METRIC_BARS);
   const most = Math.max(0, ...shown.map((c) => c.count));
-  const high = Math.max(1, most, target ?? 0);
+  const top = target === null ? null : targetHigh;
+  const high = Math.max(1, most, target ?? 0, top ?? 0);
   const bars = shown.map((c) => ({
     ...c,
     share: c.count / high,
     label: periodLabel(period, c.startsOn),
   }));
-  const total = shown.reduce((sum, c) => sum + c.count, 0);
+  const total = Math.round(shown.reduce((sum, c) => sum + c.count, 0) * 100) / 100;
   return {
     bars,
     high,
     targetShare: target === null ? null : target / high,
+    targetHighShare: top === null ? null : top / high,
     total,
     latest: shown[shown.length - 1].count,
   };
@@ -97,7 +102,10 @@ export function metricSummary(chart: MetricChart, period: MetricPeriod): string 
 }
 
 /** The target as its line is labelled: "Target 3 a week". */
-export function targetLine(target: number, period: MetricPeriod): string {
+export function targetLine(target: number, period: MetricPeriod, targetHigh: number | null = null): string {
+  if (targetHigh !== null && targetHigh > target) {
+    return `Target ${formatNumber(target)}–${formatNumber(targetHigh)} a ${period}`;
+  }
   return `Target ${formatNumber(target)} a ${period}`;
 }
 
