@@ -7,7 +7,6 @@ import {
   aimText,
   GRID_WEEKS,
   hoursText,
-  isWeekend,
   paceText,
   shadeOf,
   type HoursPage,
@@ -180,7 +179,7 @@ function DayByDay({ page }: { page: HoursPage }) {
         <p className="flex items-center gap-1.5 text-small text-ink-muted">
           <span>0 h</span>
           {SHADES.map((shade) => (
-            <span key={shade} aria-hidden className={cn('size-2.5 rounded-[2px]', shade)} /* ui-ok: a key to the day cells' shades, drawn as the cells are */ />
+            <span key={shade} aria-hidden className={cn('size-2.5', shade)} />
           ))}
           <span className="tabular">{hoursText(page.dayHigh)}</span>
         </p>
@@ -195,10 +194,7 @@ function DayByDay({ page }: { page: HoursPage }) {
                 {days.map((day, i) => (
                   <span
                     key={day}
-                    className={cn(
-                      'text-center text-micro leading-none text-ink-muted',
-                      isWeekend(day) && 'opacity-60',
-                    )}
+                    className="text-center text-micro leading-none text-ink-muted"
                   >
                     {WEEKDAY[i]}
                   </span>
@@ -277,7 +273,7 @@ function DayRow({
             {days.slice(w * 7, w * 7 + 7).map((day, i) => {
               const hours = grid[w * 7 + i];
               if (day > today) {
-                return <span key={day} className="aspect-square rounded-[2px] border border-border" /* ui-ok: a day still to come, a chart mark */ />;
+                return <span key={day} className="aspect-square border border-border" /* ui-ok: a day still to come, a chart mark */ />;
               }
               return (
                 <Tooltip
@@ -288,7 +284,7 @@ function DayRow({
                 >
                   <span
                     className={cn(
-                      'block aspect-square w-full rounded-[2px]', // ui-ok: a day's cell is a chart mark, too small for the control radius
+                      'block aspect-square w-full',
                       SHADES[shadeOf(hours, high)],
                       day === today && 'outline outline-1 outline-offset-0 outline-ink',
                     )}
