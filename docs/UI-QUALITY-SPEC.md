@@ -20,7 +20,7 @@ the building follow it the first time.
 
 ## What happens today
 
-The tools are already here. `app/dev/ui/laws.ts` holds 27 design laws, and
+The tools are already here. `app/dev/ui/laws.ts` holds 19 design laws, and
 `npm run check:ui` holds the ones a search of the code can see, against
 `scripts/ui-baseline.json`. `app/preview/surfaces.tsx` renders real components
 with fixtures, and `scripts/shoot.ts` photographs every surface at 390 and
