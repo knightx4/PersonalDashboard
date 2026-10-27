@@ -147,6 +147,16 @@ export const youActions: ModuleActions = {
       'theirs',
       "Whether the chair may bring a guest in is the person's own call on who sits on their board (plan #2561.7).",
     ),
+    createBoardPanel: none(
+      'theirs',
+      "A panel is the person's own grouping of who they want to hear from; they make and name it themselves (plan #2561.12).",
+    ),
+    renameBoardPanel: none('theirs', "Naming a panel is the person's own grouping of advisors (plan #2561.12)."),
+    setBoardPanelAdvisors: none(
+      'theirs',
+      "Who sits on a panel is the person's own call on whom to hear from (plan #2561.12).",
+    ),
+    deleteBoardPanel: none('deletes'),
   },
   'app/you/details/actions.ts': {
     saveDetailsForm: none(

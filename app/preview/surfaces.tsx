@@ -23,7 +23,7 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
-import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview } from './you-board-advisor-surfaces';
+import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -9893,6 +9893,39 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouBoardAdvisorsLoadingPreview />,
+  },
+  {
+    id: 'you-board-panel',
+    label: 'You · Board, one panel of advisors',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-panel-empty',
+    label: 'You · Board, a panel just made with no advisors',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-panel-delete',
+    label: 'You · Board, deleting a panel',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview state="delete" />
+      </div>
+    ),
   },
   {
     id: 'you-board-meeting-advisor',

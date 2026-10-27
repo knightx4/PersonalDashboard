@@ -29,6 +29,7 @@ import type { PersonAsk } from '@/lib/you/board-asks';
 import { nextReview, type DecisionReview } from '@/lib/you/board-reviews';
 import { AskQuestionRow, groupByQuestion, type AskAnswerAction } from './ask-rows';
 import { ReviewRow, type ReviewAnswerAction } from './review-rows';
+import type { BoardPanel } from '@/lib/you/board-panels';
 import { useAskBoard, type AskActions, type AskStart } from './ask-board';
 import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
@@ -54,6 +55,7 @@ export function BoardListView({
   names = {},
   reviewError,
   advisors = [],
+  panels = [],
   decisions = [],
   nextMeeting,
   timezone = 'UTC',
@@ -75,6 +77,8 @@ export function BoardListView({
   reviewError?: string;
   /** The active roster, for the compose card's advisors. */
   advisors?: readonly BoardAdvisor[];
+  /** Their panels of advisors, one press each on the compose card (listPanels). */
+  panels?: readonly BoardPanel[];
   /** Every question they decided, newest first (listDecisions). */
   decisions?: readonly BoardDecision[];
   /** The day of the next weekly meeting in their zone (nextMeetingDay). */
@@ -91,7 +95,7 @@ export function BoardListView({
   const states = meetings.map((meeting) => meetingState(meeting, now));
   const running = states.some((state) => state.kind === 'running');
   useRefreshWhileRunning(running);
-  const ask = useAskBoard({ advisors, actions, start });
+  const ask = useAskBoard({ advisors, panels, actions, start });
   const header = (
     <PageHeader
       title="Board"
@@ -239,9 +243,7 @@ export function BoardListView({
           )}
         </ul>
       </Card>
-      <div className="mt-3 text-small text-ink-muted">
-        {`Next meeting ${nextDay}, 6:41 PM`}
-      </div>
+      <div className="mt-3 text-small text-ink-muted">{`Next meeting ${nextDay}, 6:41 PM`}</div>
     </PageColumn>
   );
 }
@@ -263,12 +265,21 @@ const together = (phrase: string) => phrase.replace(/ /g, ' ');
  * (plan #2561.8), kept in one piece so a wrap never splits the date.
  */
 export function decisionMeta(decision: BoardDecision): string {
-  const next = nextReview(decision.decidedAt, (decision.reviewed ?? []).map((at) => ({ at })));
+  const next = nextReview(
+    decision.decidedAt,
+    (decision.reviewed ?? []).map((at) => ({ at })),
+  );
   const option = decision.options.find((o) => o.letter === decision.chosen);
   return [
     decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle',
-    option ? `You chose ${decision.chosen}, ${shortOption(option.text)}` : `You chose ${decision.chosen}`,
-    together(next ? `Check back ${heldOnLabel(next.due).replace(/ \d{4}$/, '')}` : 'Checked back at 30 and 90 days'),
+    option
+      ? `You chose ${decision.chosen}, ${shortOption(option.text)}`
+      : `You chose ${decision.chosen}`,
+    together(
+      next
+        ? `Check back ${heldOnLabel(next.due).replace(/ \d{4}$/, '')}`
+        : 'Checked back at 30 and 90 days',
+    ),
   ].join(' · ');
 }
 

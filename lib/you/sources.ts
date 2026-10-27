@@ -233,6 +233,7 @@ export const youSources: ModuleSources = {
     { table: 'you.board_meetings', reason: 'Minutes Dash wrote for the board meetings; Goals reading them would cite Dash to itself.' },
     { table: 'you.board_marks', reason: 'Their votes, answers and ticks on the board\'s minutes, read by the next board meeting, not by Goals.' },
     { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
+    { table: 'you.board_panels', reason: 'Named groups of advisors the person picks when asking the board, which is a setting of the board, not something they wrote, wanted or did.' },
     { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },
     // Lines from their private notes for the insights run (plan #2413.8).

@@ -181,6 +181,8 @@ export type QuestionInput = {
   context: string;
   lean: string;
   advisors: readonly string[];
+  /** Seats to leave out of this one question; the other seats sit as always (plan #2561.12). */
+  seatsOff?: readonly string[];
 };
 
 export type CleanQuestion = {
@@ -189,6 +191,7 @@ export type CleanQuestion = {
   context: string | null;
   lean: string | null;
   advisors: string[];
+  seats_off: string[];
 };
 
 /** 1000 as "1,000". */
@@ -233,6 +236,10 @@ export function cleanQuestion(
   if (advisors.some((key) => !known.has(key)))
     return { ok: false, error: 'One of the advisors you picked is not on your board.' };
 
+  const seatsOff = [...new Set(input.seatsOff ?? [])];
+  if (seatsOff.some((key) => !SEAT_ORDER.includes(key)))
+    return { ok: false, error: 'Only one of the five seats can be turned off.' };
+
   return {
     ok: true,
     value: {
@@ -241,6 +248,7 @@ export function cleanQuestion(
       context: context || null,
       lean: /^[A-Z]$/i.test(lean) ? lean.toUpperCase() : lean || null,
       advisors,
+      seats_off: seatsOff,
     },
   };
 }

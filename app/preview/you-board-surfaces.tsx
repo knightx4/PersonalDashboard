@@ -14,6 +14,7 @@ import {
   type MeetingActions,
   type MeetingOpen,
 } from '@/app/you/board/[id]/meeting-view';
+import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import type { DecisionReview } from '@/lib/you/board-reviews';
 import {
@@ -352,7 +353,9 @@ export function YouBoardMeetingPreview({
   return (
     <MeetingView
       meeting={shown}
-      minutes={state === 'ready' ? minutes : state === 'called' ? calledMinutes : parseMinutes(null)}
+      minutes={
+        state === 'ready' ? minutes : state === 'called' ? calledMinutes : parseMinutes(null)
+      }
       marks={state === 'ready' ? marks : []}
       scorecard={scorecard}
       subject={{
@@ -360,7 +363,12 @@ export function YouBoardMeetingPreview({
         path: [
           ...subject.path.slice(0, 2),
           {
-            label: state === 'ready' ? 'Board meeting 1 Nov 2026' : state === 'called' ? CALLED_DECISION : 'Board meeting',
+            label:
+              state === 'ready'
+                ? 'Board meeting 1 Nov 2026'
+                : state === 'called'
+                  ? CALLED_DECISION
+                  : 'Board meeting',
             href: `/you/board/${ID}`,
           },
         ],
@@ -420,7 +428,9 @@ const advisors: BoardAdvisor[] = sortAdvisors([
 const CONTRACT_QUESTION =
   'Should I take the three-month contract at the analytics firm, or keep the search full time?';
 
-const question = (over: Partial<BoardQuestion> & Pick<BoardQuestion, 'id' | 'question'>): BoardQuestion => ({
+const question = (
+  over: Partial<BoardQuestion> & Pick<BoardQuestion, 'id' | 'question'>,
+): BoardQuestion => ({
   options: [],
   context: null,
   lean: null,
@@ -460,7 +470,8 @@ const suggestions: BoardQuestion[] = [
 const asked: BoardQuestion[] = [
   question({
     id: '00000000-0000-4000-8000-0000000000e3',
-    question: 'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    question:
+      'Which of the two final rounds do I prepare for first, given both are on the same week?',
     options: [
       { letter: 'A', text: 'The bank, which pays more' },
       { letter: 'B', text: 'The fintech, which I want more' },
@@ -479,7 +490,8 @@ const asked: BoardQuestion[] = [
 const decisions: BoardDecision[] = [
   {
     id: '00000000-0000-4000-8000-0000000000e6',
-    question: 'Should I take the three-month contract at the analytics firm, or keep the search full time?',
+    question:
+      'Should I take the three-month contract at the analytics firm, or keep the search full time?',
     options: [
       { letter: 'A', text: 'Take the contract, full time, from 16 November' },
       { letter: 'B', text: 'Keep the search full time and say no' },
@@ -506,7 +518,8 @@ const decisions: BoardDecision[] = [
   },
   {
     id: '00000000-0000-4000-8000-0000000000e8',
-    question: 'Is the Saturday course worth £60 a month while there is no income, given the first pay cheque is not due until January?',
+    question:
+      'Is the Saturday course worth £60 a month while there is no income, given the first pay cheque is not due until January?',
     options: [
       { letter: 'A', text: 'Keep it' },
       { letter: 'B', text: 'Pause it until the first pay cheque' },
@@ -543,7 +556,8 @@ const boardAsks: PersonAsk[] = [
   },
   {
     questionId: '00000000-0000-4000-8000-0000000000e3',
-    question: 'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    question:
+      'Which of the two final rounds do I prepare for first, given both are on the same week?',
     id: 'a1',
     text: 'Has the bank said when it will decide, and does the fintech know about the bank?',
     askedIn: ['00000000-0000-4000-8000-0000000000b1'],
@@ -557,7 +571,8 @@ const boardAsks: PersonAsk[] = [
 export const boardReviews: DecisionReview[] = [
   {
     questionId: '00000000-0000-4000-8000-0000000000e9',
-    question: 'Should I take the part-time analytics contract while I keep searching, or hold out for a permanent role?',
+    question:
+      'Should I take the part-time analytics contract while I keep searching, or hold out for a permanent role?',
     options: [
       { letter: 'A', text: 'Take the contract, three days a week' },
       { letter: 'B', text: 'Hold out for a permanent role' },
@@ -582,7 +597,8 @@ export const boardReviews: DecisionReview[] = [
   },
   {
     questionId: '00000000-0000-4000-8000-0000000000ea',
-    question: 'Should I move the Saturday course to the evening cohort so weekends stay free for the studio?',
+    question:
+      'Should I move the Saturday course to the evening cohort so weekends stay free for the studio?',
     options: [
       { letter: 'A', text: 'Move to the evening cohort' },
       { letter: 'B', text: 'Keep Saturdays' },
@@ -601,6 +617,30 @@ export const boardReviews: DecisionReview[] = [
     outcome: null,
     answeredAt: null,
     grades: [],
+  },
+];
+
+/** The seeded four panels, as the compose card offers them. */
+export const PREVIEW_PANELS: BoardPanel[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000f1',
+    name: 'Money',
+    advisors: ['cfo', 'buffett', 'dalio', 'dimon'],
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f2',
+    name: 'Career',
+    advisors: ['hiring_manager', 'mentor', 'skeptic', 'dimon'],
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f3',
+    name: 'Building',
+    advisors: ['jobs', 'da_vinci', 'skeptic', 'dreamer'],
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f4',
+    name: 'Life',
+    advisors: ['mentor', 'dreamer', 'franklin', 'washington'],
   },
 ];
 
@@ -662,6 +702,7 @@ export function YouBoardListPreview({
       meetings={meetings}
       questions={questions}
       advisors={advisors}
+      panels={PREVIEW_PANELS}
       asks={state === 'asks' || state === 'asks-error' ? boardAsks : []}
       decisions={state === 'empty' ? [] : decisions}
       nextMeeting="2026-11-08"
@@ -669,7 +710,11 @@ export function YouBoardListPreview({
       now={NOW}
       actions={listActions}
       start={start}
-      asksError={state === 'asks-error' ? 'This question changed while you were looking. Read the page again.' : undefined}
+      asksError={
+        state === 'asks-error'
+          ? 'This question changed while you were looking. Read the page again.'
+          : undefined
+      }
       reviews={state === 'reviews' || state === 'reviews-error' ? boardReviews : []}
       reviewError={state === 'reviews-error' ? 'Your answer was not saved. Try again.' : undefined}
     />

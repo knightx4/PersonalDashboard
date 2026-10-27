@@ -20,6 +20,7 @@ import {
   type BoardAdvisor,
   type QuestionInput,
 } from '@/lib/you/board-questions';
+import { panelPicked, panelSeats, type BoardPanel } from '@/lib/you/board-panels';
 import { AdvisorMark } from './advisor-mark';
 
 /**
@@ -43,7 +44,7 @@ export type AskStart = 'closed' | 'form' | 'error';
 /** A question that was saved but whose meeting did not start: the row it is on shows why. */
 export type AskNotice = { questionId: string; error: string };
 
-const BLANK: QuestionInput = { question: '', options: ['', ''], context: '', lean: '', advisors: [] };
+const BLANK: QuestionInput = { question: '', options: ['', ''], context: '', lean: '', advisors: [], seatsOff: [] };
 
 /** What the gallery draws in the open card: as long as a real question gets. */
 export const SAMPLE_QUESTION: QuestionInput = {
@@ -57,7 +58,8 @@ export const SAMPLE_QUESTION: QuestionInput = {
   context:
     'The contract pays £4,200 a month for three months. Savings cover five months at the current spend. Two finance roles are at the final round.',
   lean: 'A',
-  advisors: ['cfo', 'buffett'],
+  advisors: ['cfo', 'buffett', 'dalio', 'dimon'],
+  seatsOff: ['skeptic'],
 };
 
 /** The gallery's refused question: one option given, which cannot be queued. */
@@ -70,10 +72,12 @@ export const SAMPLE_ERROR = 'Give at least two options, or leave them all blank 
 
 export function useAskBoard({
   advisors,
+  panels = [],
   actions,
   start = 'closed',
 }: {
   advisors: readonly BoardAdvisor[];
+  panels?: readonly BoardPanel[];
   actions: AskActions;
   start?: AskStart;
 }) {
@@ -131,6 +135,7 @@ export function useAskBoard({
         setError(null);
       }}
       advisors={advisors}
+      panels={panels}
       error={error}
       pending={pending}
       onSubmit={submit}
@@ -145,6 +150,7 @@ export function AskBoardForm({
   value,
   onChange,
   advisors,
+  panels = [],
   error,
   pending,
   onSubmit,
@@ -153,6 +159,7 @@ export function AskBoardForm({
   value: QuestionInput;
   onChange: (value: QuestionInput) => void;
   advisors: readonly BoardAdvisor[];
+  panels?: readonly BoardPanel[];
   error: string | null;
   pending: AskWhen | null;
   onSubmit: (when: AskWhen) => void;
@@ -177,13 +184,19 @@ export function AskBoardForm({
         ? value.advisors.filter((k) => k !== key)
         : [...value.advisors, key],
     });
+  const seatsOff = value.seatsOff ?? [];
+  const toggleSeat = (key: string) =>
+    set({ seatsOff: seatsOff.includes(key) ? seatsOff.filter((k) => k !== key) : [...seatsOff, key] });
+  const offered = advisors.map((a) => a.key);
   const seats = advisors.filter((a) => a.kind === 'seat');
   const guests = advisors.filter((a) => a.kind === 'guest');
   const lettered = value.options.flatMap((o, i) => (o.trim() ? [OPTION_LETTERS[i]] : []));
   const leanLetter = /^[A-D]$/i.test(value.lean.trim()) ? value.lean.trim().toUpperCase() : '';
+  // Whom the person named: a panel's members, seats included. The seats sit either way unless turned off.
   const picked = value.advisors
-    .map((key) => advisors.find((a) => a.key === key)?.name)
-    .filter((name): name is string => Boolean(name));
+    .map((key) => advisors.find((a) => a.key === key))
+    .flatMap((a) => (a ? [a.name] : []));
+  const leftOut = seatsOff.flatMap((key) => advisors.find((a) => a.key === key)?.name ?? []);
 
   return (
     <Card id="ask-board" padding="standard">
@@ -315,10 +328,30 @@ export function AskBoardForm({
         {advisors.length > 0 && (
           <fieldset>
             <legend className="sr-only">Advisors to hear from</legend>
+            {panels.length > 0 && (
+              <div className="mb-2">
+                <div role="group" aria-label="Panel" className="flex flex-wrap gap-2">
+                  {panels.map((panel) => {
+                    const on = panelPicked(panel, value.advisors, offered);
+                    return (
+                      <ToggleChip
+                        key={panel.id}
+                        on={on}
+                        disabled={panelSeats(panel, offered).length === 0}
+                        onClick={() => set({ advisors: on ? [] : panelSeats(panel, offered) })}
+                      >
+                        {panel.name}
+                      </ToggleChip>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3">
               <p className="min-w-0 text-ui text-ink">
                 <span className="text-small font-medium text-ink-muted">Advisors </span>
-                {picked.length > 0 ? picked.join(', ') : 'the board chooses, the five seats and guests where they fit'}
+                {picked.length > 0 ? `${picked.length} chosen` : 'the board chooses'}
+                {leftOut.length > 0 && <span className="text-ink-muted">{` · without ${leftOut.join(', ')}`}</span>}
               </p>
               <Button
                 type="button"
@@ -333,12 +366,15 @@ export function AskBoardForm({
             </div>
             {choosing && (
               <div id="ask-advisors" className="mt-2 space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {seats.map((a) => (
-                    <ToggleChip key={a.key} on={value.advisors.includes(a.key)} onClick={() => toggle(a.key)}>
-                      {a.name}
-                    </ToggleChip>
-                  ))}
+                <div>
+                  <p className="mb-1 text-small text-ink-muted">The five seats sit unless you turn one off</p>
+                  <div className="flex flex-wrap gap-2">
+                    {seats.map((a) => (
+                      <ToggleChip key={a.key} on={!seatsOff.includes(a.key)} onClick={() => toggleSeat(a.key)}>
+                        {a.name}
+                      </ToggleChip>
+                    ))}
+                  </div>
                 </div>
                 {guests.length > 0 && (
                   <div>

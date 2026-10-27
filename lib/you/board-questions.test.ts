@@ -27,7 +27,7 @@ describe('cleanQuestion', () => {
     const r = cleanQuestion(input({ question: '  Take the\n contract? ' }), roster);
     expect(r).toEqual({
       ok: true,
-      value: { question: 'Take the contract?', options: [], context: null, lean: null, advisors: [] },
+      value: { question: 'Take the contract?', options: [], context: null, lean: null, advisors: [], seats_off: [] },
     });
   });
 
@@ -58,6 +58,14 @@ describe('cleanQuestion', () => {
       error: 'There is no option C to lean towards.',
     });
     expect(cleanQuestion(input({ advisors: ['dalio'] }), roster).ok).toBe(false);
+  });
+
+  it('keeps the seats turned off for the question and refuses a guest as one', () => {
+    expect(cleanQuestion(input({ seatsOff: ['skeptic', 'skeptic'] }), roster)).toMatchObject({
+      ok: true,
+      value: { seats_off: ['skeptic'] },
+    });
+    expect(cleanQuestion(input({ seatsOff: ['buffett'] }), roster).ok).toBe(false);
   });
 
   it('keeps a lean in words', () => {

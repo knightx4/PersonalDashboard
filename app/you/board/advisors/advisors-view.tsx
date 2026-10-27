@@ -1,7 +1,9 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { AlertTriangle, Check, RotateCcw, X } from 'lucide-react';
+import { AlertTriangle, Check, Plus, RotateCcw, X } from 'lucide-react';
+import { ListRow } from '@/components/patterns/list-detail';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
@@ -20,6 +22,7 @@ import {
   type BrainState,
   type RosterAdvisor,
 } from '@/lib/you/board-advisors';
+import { panelNames, type BoardPanel } from '@/lib/you/board-panels';
 import { AdvisorMark } from '../advisor-mark';
 import { useRefreshWhileRunning } from '../refresh-while-running';
 
@@ -37,6 +40,8 @@ export type AdvisorActions = {
   add: (input: { name: string; focus: string }) => Promise<{ error: string | null; saved?: boolean }>;
   retry: (id: string) => Promise<{ error: string | null }>;
   setActive: (id: string, active: boolean) => Promise<{ error: string | null }>;
+  /** Make an empty panel; the view opens it to be named. */
+  createPanel: () => Promise<{ error: string | null; panelId?: string }>;
 };
 
 /** How the press starts: closed, with the card open and filled, or refusing a name (the gallery draws each). */
@@ -48,12 +53,15 @@ export const SAMPLE_ADD_ERROR = 'Marcus Aurelius is already on your board.';
 
 export function AdvisorsView({
   advisors,
+  panels = [],
   now,
   actions,
   subject,
   start = 'closed',
 }: {
   advisors: readonly RosterAdvisor[];
+  /** Their panels, each opening on its own page. */
+  panels?: readonly BoardPanel[];
   /** When the page was read, for whether a build is still going. */
   now: number;
   actions: AdvisorActions;
@@ -177,6 +185,17 @@ export function AdvisorsView({
       )}
       <Card padding="none">
         <ul className="divide-y divide-border">
+          <Group title="Panels" count={panels.length}>
+            {panels.map((panel) => (
+              <ListRow
+                key={panel.id}
+                href={`/you/board/advisors/panels/${panel.id}`}
+                title={panel.name}
+                meta={panelNames(panel, advisors).join(', ') || 'No advisors yet'}
+              />
+            ))}
+            <NewPanelRow create={actions.createPanel} />
+          </Group>
           <Group title="Seats" count={seats.length}>
             {seats.map((advisor) => (
               <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
@@ -340,5 +359,44 @@ function BrainStatus({ state }: { state: BrainState }) {
       <AlertTriangle aria-hidden strokeWidth={1.75} className="size-3.5" />
       Build failed
     </span>
+  );
+}
+
+/** The last row of the Panels group: makes an empty panel and opens it, where it is named and filled. */
+function NewPanelRow({ create }: { create: AdvisorActions['createPanel'] }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [, startTransition] = useTransition();
+  const press = () => {
+    setPending(true);
+    setError(null);
+    startTransition(async () => {
+      const result = await create();
+      setPending(false);
+      if (result.error || !result.panelId) {
+        setError(result.error ?? 'The panel was not made. Try again.');
+        return;
+      }
+      router.push(`/you/board/advisors/panels/${result.panelId}`);
+    });
+  };
+  return (
+    <li>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={press}
+        className="card-pad-x row-pad flex min-h-11 w-full items-center gap-2 text-left text-ui text-ink-muted hover:bg-sunken disabled:opacity-60"
+      >
+        <Plus aria-hidden strokeWidth={1.75} className="size-4 shrink-0" />
+        {pending ? 'Making…' : 'New panel'}
+      </button>
+      {error && (
+        <div className="card-pad-x pb-2">
+          <FieldError>{error}</FieldError>
+        </div>
+      )}
+    </li>
   );
 }
