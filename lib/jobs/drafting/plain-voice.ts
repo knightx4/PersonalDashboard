@@ -2,8 +2,8 @@
  * The voice rules both answer drafters share (lib/jobs/drafting/draft-application.ts
  * and lib/jobs/evidence/draft.ts).
  *
- * Drafts kept reaching for lines that sound written: "Rogo is building AI for
- * the people I most want to work around", "I know the work Rogo is taking off
+ * Drafts kept reaching for lines that sound written: "Contoso is building AI for
+ * the people I most want to work around", "I know the work Contoso is taking off
  * analysts' desks", "about as squarely there as a company gets". The person
  * would rather an answer said less than said those. So every sentence carries
  * something real (about them, or about the company and role from the posting
@@ -20,16 +20,16 @@ export const PLAIN_VOICE = `Their voice: say less, and only what they would say 
   off a paragraph is cut. With no limit, 120 words that say something beat
   230 that perform.
 - No hooks or framing lines. Say a thing about the company as a plain fact
-  ("Rogo's customers are banks and PE funds"), not dressed up as a feeling
-  ("Rogo is building AI for the people I most want to work around").
+  ("Contoso's customers are banks and PE funds"), not dressed up as a feeling
+  ("Contoso is building AI for the people I most want to work around").
 - Never claim familiarity or insight as a line of its own ("I know the work
-  Rogo is taking off analysts' desks", "I understand what this team needs",
+  Contoso is taking off analysts' desks", "I understand what this team needs",
   "That's how I work"). Show it with the fact and stop.
 - No superlatives or ranking about the company or the fit ("about as
   squarely there as a company gets", "exactly the kind of", "the part I'm
   best suited to", "what pulls me most").
 - No staged setups and payoffs: "What made it stick was…", "The role itself
-  pulls me most.", "As a CPA, I don't trust a number I can't trace. Buyers
+  pulls me most.", "As an auditor, I don't trust a number I can't trace. Buyers
   don't either." No aphorisms, no closing line that sums up.
 - No feelings they have not stated in their material, comments or replies:
   do not write that they love, are drawn to, are pulled by or most want

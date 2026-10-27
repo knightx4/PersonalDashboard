@@ -1231,7 +1231,7 @@ const companyPanels = {
       { url: 'https://example.com/press-2024', title: 'Fund moves risk in house', kind: 'news', publisher: 'Risk.net', publishedOn: '2024-11-03', note: null },
       { url: 'https://example.com/careers', title: 'Market Data Engineer', kind: 'posting', publisher: null, publishedOn: null, note: null },
     ],
-    drafts: { whyMe: 'Three years auditing revenue systems at EY, and a revenue tool built from scratch: both are about making a pile of inputs trustworthy.' },
+    drafts: { whyMe: 'Three years auditing revenue systems at Halvorsen & Co., and a reconciliation tool built from scratch: both are about making a pile of inputs trustworthy.' },
     error: null,
     runUrl: null,
     requestedAt: '2026-10-01T09:00:00.000Z',
@@ -1481,13 +1481,13 @@ const settings = {
   careerGoals: [
     {
       id: 'th-3',
-      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in Denver, hybrid at most three days in. Not crypto.',
       written: '28 Sep 2026',
       edited: '2 Oct 2026',
     },
     {
       id: 'th-1',
-      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      body: 'Leaving audit. Not sure yet whether to stay in finance.',
       written: '6 Jul 2026',
       edited: null,
     },
@@ -3767,19 +3767,19 @@ const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => wi
   id: 'op-1',
   kind: 'apply',
   headline: 'Deployment Strategist',
-  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Mosaic's AI deal models. The $10B take-private work gives you standing with those users.",
-  move: "1. Lead with the take-private and acquisition work at EY. 2. Say you want the strategy side of deployment. 3. Find someone on Mosaic's deployment team for a referral.",
+  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Contoso's AI deal models. Your audit work on deal clients gives you standing with those users.",
+  move: "1. Lead with the acquisition audits at Halvorsen & Co. 2. Say you want the strategy side of deployment. 3. Find someone on Contoso's deployment team for a referral.",
   channel: null,
   message: null,
-  url: 'https://jobs.ashbyhq.com/mosaic/1',
+  url: 'https://jobs.ashbyhq.com/contoso/1',
   location: 'New York City, on-site',
-  companyName: 'Mosaic',
-  companySlug: 'mosaic',
+  companyName: 'Contoso',
+  companySlug: 'contoso',
   personName: null,
   personTitle: null,
   sourceUrl: null,
   searchQuery: null,
-  foundIn: "Search for roles like Concourse's, on request",
+  foundIn: "Search for roles like Northwind's, on request",
   contact: null,
   scores: {
     workplace: { value: 'on_site', confidence: 0.95 },
@@ -3813,11 +3813,11 @@ const recommendedRoles: OpenSuggestion[] = [
   recommendedOpening({}),
   recommendedOpening({
     id: 'op-2',
-    companyName: 'Moment',
+    companyName: 'Fabrikam',
     companySlug: null,
     location: 'New York, on-site',
     why: 'Act as the general manager of each customer, from first demo to expansion, with large investment and wealth firms. Strategic and ownership-heavy. Posted at $200K to $300K plus equity and bonus.',
-    move: '1. Frame your MBA and startup advising as running an engagement end to end. 2. Show one thing you built. 3. Look for a Yale SOM alum at Moment or its investors.',
+    move: '1. Frame your MBA and startup advising as running an engagement end to end. 2. Show one thing you built. 3. Look for a Riverside School of Management alum at Fabrikam or its investors.',
     scores: {
       workplace: { value: 'on_site', confidence: 0.95 },
       seniority: { value: 'senior', confidence: 0.6 },
@@ -3839,7 +3839,7 @@ const recommendedRoles: OpenSuggestion[] = [
     companySlug: 'openai',
     headline: 'Deployment Lead, Financial Services',
     location: 'New York City, hybrid',
-    why: 'Work inside banks, asset managers and private capital firms to map workflows and lead AI rollouts. A stretch on seniority, but the same work as Concourse at a larger scale. Posted at $230K to $294K.',
+    why: 'Work inside banks, asset managers and private capital firms to map workflows and lead AI rollouts. A stretch on seniority, but the same work as Northwind at a larger scale. Posted at $230K to $294K.',
     foundIn: "On OpenAI's own job board",
     origin: 'board',
     postingRead: true,
@@ -3894,7 +3894,7 @@ const recommendedRoles: OpenSuggestion[] = [
     location: 'New York or remote',
     workMode: null,
     url: 'https://northwind.example/careers',
-    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your EY work covered.",
+    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your audit work covered.",
     move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Northwind Analytics to your companies. 3. Apply on their own site.",
     foundIn: 'Found on Hacker News',
     origin: 'discovered',
@@ -3947,11 +3947,11 @@ const recommendedPeople: OpenSuggestion[] = [
   recommendedOpening({
     id: 'pe-1',
     kind: 'reach_out',
-    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Mosaic',
-    why: 'She moved from EY Transaction Services to Mosaic last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
-    move: 'Message her on LinkedIn, name the take-private work you did together on, and ask for twenty minutes.',
+    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Contoso',
+    why: 'She moved from Halvorsen & Co. Transaction Services to Contoso last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
+    move: 'Message her on LinkedIn, name the acquisition audit you worked on together, and ask for twenty minutes.',
     channel: 'linkedin',
-    message: 'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
+    message: 'Hi Priya, it has been a while since the acquisition audit at Halvorsen & Co. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
     url: null,
     location: null,
     personName: 'Priya Raghunathan',
@@ -4030,7 +4030,7 @@ const discoveredCompanies: DiscoveredCompany[] = [
     website: 'https://liveflow.io',
     source: 'yc',
     description: 'AI-ERP and FP&A platform for finance teams.',
-    reason: 'Your modeling and CPA background fit finance teams as users, with real AI product work.',
+    reason: 'Your modeling and audit background fit finance teams as users, with real AI product work.',
     score: 92,
     stage: 'Early',
     locations: ['New York, NY, USA'],
@@ -4284,7 +4284,7 @@ const followUpRows: FollowUp[] = [
     roleId: 'role-1',
     role: 'Strategic Finance Associate',
     companyId: 'co-1',
-    company: 'Ramp',
+    company: 'Globex',
     status: 'submitted',
     submittedAt: '2026-10-24T15:00:00Z',
     triedAt: '2026-10-24T16:00:00Z',
@@ -4293,13 +4293,13 @@ const followUpRows: FollowUp[] = [
         contactId: 'c-1',
         name: 'Rae Patel',
         title: 'Talent Partner, Finance',
-        email: 'rae@ramp.example',
+        email: 'rae@globex.example',
         why: 'Rae Patel wrote to you about this application.',
         draft: {
           id: 't-1',
           channel: 'email',
           message:
-            "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nSelvey",
+            "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nAlex",
         },
       }),
       followUpPerson({
@@ -6633,7 +6633,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <NewVaultNote />
@@ -6652,7 +6652,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <QuickNoteRow
@@ -6674,7 +6674,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <QuickNoteRow waiting={0} writable={false} startOpen />
@@ -6837,7 +6837,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <PageHeader title="Work & school" />
-        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-ey" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-audit" />
       </>
     ),
   },

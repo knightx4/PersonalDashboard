@@ -28,19 +28,19 @@ const job = (fields: Partial<Job> & Pick<Job, 'id' | 'employer'>): Job => ({
 });
 
 export const workHistoryJobs: Job[] = sortJobs([
-  job({ id: 'j-advisor', employer: 'Stealth startup', title: 'Strategic Finance Advisor (part-time)', place: 'New Haven, CT', started: '2025-02', position: 0 }),
+  job({ id: 'j-advisor', employer: 'Stealth startup', title: 'Strategic Finance Advisor (part-time)', place: 'Portland, OR', started: '2025-02', position: 0 }),
   job({
-    id: 'j-ey',
-    employer: 'Ernst & Young Global Limited, Assurance Services Practice',
+    id: 'j-audit',
+    employer: 'Halvorsen & Co. Partners LLP, Audit and Assurance Services Practice',
     title: 'Assurance Senior',
-    place: 'Dallas, TX',
+    place: 'Denver, CO',
     started: '2020-09',
     ended: '2023-07',
-    note: 'Built the automated revenue testing tool the firm later rolled out to other engagements.',
+    note: 'Led year-end inventory counts for three manufacturing clients and trained the new staff on them.',
     edited: true,
     position: 1,
   }),
-  job({ id: 'j-intern', employer: 'Deloitte', title: 'Audit Intern', place: 'Houston, TX', started: '2019-06', ended: '2019-08', position: 2 }),
+  job({ id: 'j-intern', employer: 'Marlow Partners', title: 'Audit Intern', place: 'Denver, CO', started: '2019-06', ended: '2019-08', position: 2 }),
   job({ id: 'j-shop', employer: 'Corner bookshop', started: '2014', ended: '2016', edited: true, resume_id: null, resume_hash: null }),
 ]);
 

@@ -61,7 +61,7 @@ export const MAX_LOOKUPS = 12;
  * cache read counted at a tenth, as it is priced (budgetTokens). Counted in
  * full, the rules and tools alone, about 76,000 tokens by October 2026,
  * spent the budget in two calls: "what roles have I applied to at
- * Concourse" was told to answer after three lookups, with nothing found yet.
+ * Northwind" was told to answer after three lookups, with nothing found yet.
  */
 export const INPUT_BUDGET = 150_000;
 
@@ -298,7 +298,7 @@ const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them 
 /**
  * Sent beside the refused lookups when the model was told to answer and
  * looked something up instead. With the tool results alone, the call after
- * them came back with a single token and no words (the Concourse question,
+ * them came back with a single token and no words (the Northwind question,
  * 21 October 2026).
  */
 const ANSWER_IN_WORDS = 'Write your answer to them now, in words, from what you have found. Say plainly what you could not check.';

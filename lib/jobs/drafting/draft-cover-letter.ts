@@ -79,8 +79,8 @@ their material says they are writing to).
 
 1. Two or three plain sentences, nothing performed.
    a. Who they are and the role, with credentials from the résumé: "I'm a
-      CPA and Yale MBA with three years at EY, applying for the Strategic
-      Finance Lead, Value role at Faire in New York."
+      CPA and MBA with three years in audit, applying for the Finance
+      Manager role at Northwind in Denver."
    b. The part of their background this posting most needs, as the kind of
       work and where it was: the clients, the industry, what they focused
       on. Never a specific deal, number, result or story; the résumé
@@ -100,15 +100,15 @@ their material says they are writing to).
    ("The role works directly with the practitioners using the product"),
    and ask them why this role in asks.
    Nothing about the company beyond its name, its team and what the posting
-   says it and the role do. An opening they approved:
+   says it and the role do. An opening of the right shape, for an
+   invented applicant:
 
-   "I'm a CPA and Yale MBA with three years at EY, applying for the
-   Strategic Finance Lead, Value role at Faire in New York. At EY I worked
-   mostly on large software companies, and at Yale I focused on corporate
-   finance and investing. I care about local business, enough to volunteer
-   on placemaking projects and take urban planning courses on my own time,
-   so I'd like to do this work for a company built around independent
-   shops."
+   "I'm a CPA and MBA with three years in audit, applying for the Finance
+   Manager role at Northwind in Denver. In audit I worked mostly on
+   regional manufacturers, and in my MBA I focused on corporate finance.
+   I care about how small suppliers stay afloat, enough to volunteer with a
+   local business association on my own time, so I'd like to do this work
+   for a company whose customers are independent suppliers."
 2. When the role is about AI or mentions it, the AI paragraph. Open on one
    thing the posting says about AI, automation, tooling or how the work gets
    done, in plain words. Then something building with AI has shown them,
@@ -136,12 +136,12 @@ their material says they are writing to).
    considering their application. Then "Sincerely," on its own line, a
    blank line, and their full name. A close they approved:
 
-   "I would welcome the chance to talk about the Strategic Finance Lead
-   role and how I could contribute to the team. Thank you for your time
+   "I would welcome the chance to talk about the Finance Manager role
+   and how I could contribute to the team. Thank you for your time
    and for considering my application."
 
-This AI paragraph is from a letter they approved; match its register in
-whichever paragraphs you write:
+This AI paragraph, from an invented applicant's letter, shows the register;
+match it in whichever paragraphs you write:
 
 "The posting also asks how AI can improve every workflow. Building with AI
 has made me ask why each step of a process exists, when before I'd have just

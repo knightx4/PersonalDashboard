@@ -109,7 +109,7 @@ export function profileText(profile: LearnerProfile): string {
 
 const REASON_RULES = `THE REASON is one sentence, at most 30 words, about the person rather than
 the video. It names, in its own words and inside quotation marks, the track,
-goal or theme the video serves: 'Serves your "Startup Finance / FP&A" track:
+goal or theme the video serves: 'Serves your "Small Business Finance" track:
 walks through a three-statement model.' For a skip it names what the video
 misses, or says it touches none of them: 'Touches none of your tracks, goals
 or ideas; a gaming stream.' Never "this video", never hype, no em dashes.`;

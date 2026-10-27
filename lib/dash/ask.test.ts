@@ -1171,7 +1171,7 @@ describe('questions that need several lookups (plan #1437)', () => {
   });
 });
 
-describe('a long prompt read from the cache (the Concourse question, 21 October 2026)', () => {
+describe('a long prompt read from the cache (the Northwind question, 21 October 2026)', () => {
   // The rules and tools were about 76,000 tokens, read from the cache on
   // every call after the first.
   const cached = { input_tokens: 2, output_tokens: 100, cache_read_input_tokens: 76_000, cache_creation_input_tokens: 800 };
@@ -1189,11 +1189,11 @@ describe('a long prompt read from the cache (the Concourse question, 21 October 
       round('u2'),
       round('u3'),
       round('u4'),
-      { ...reply([use('a', 'answer', { answer: 'Two roles at Concourse.', cited: [] })]), usage: cached },
+      { ...reply([use('a', 'answer', { answer: 'Two roles at Northwind.', cited: [] })]), usage: cached },
     ]);
     const { execute, calls } = stubExecute();
     const answer = await answerQuestion({
-      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      turns: [{ role: 'user', body: 'what roles have i applied to at northwind' }],
       today: '2026-10-21',
       execute,
       anthropicApiKey: 'k',
@@ -1202,7 +1202,7 @@ describe('a long prompt read from the cache (the Concourse question, 21 October 
     expect(sent).toHaveLength(5);
     // Counted in full, the third round's lookup was refused unrun.
     expect(calls).toHaveLength(4);
-    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'Two roles at Concourse.' });
+    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'Two roles at Northwind.' });
   });
 
   it('asks for the answer in words beside the refused lookups, and once more when that comes back empty', async () => {
@@ -1213,14 +1213,14 @@ describe('a long prompt read from the cache (the Concourse question, 21 October 
       return execute(name, input);
     };
     const { client, sent } = stubClient([
-      reply([use('u1', 'search', { query: 'Concourse' })]),
+      reply([use('u1', 'search', { query: 'Northwind' })]),
       // Past the time budget it looks something up instead of answering.
       reply([use('u2', 'open_row', { table: 'job_search.companies', ref: 'c-1' })]),
       reply([], 'end_turn'),
       reply([{ type: 'text', text: 'I found the company but not its roles.' }], 'end_turn'),
     ]);
     const answer = await answerQuestion({
-      turns: [{ role: 'user', body: 'what roles have i applied to at concourse' }],
+      turns: [{ role: 'user', body: 'what roles have i applied to at northwind' }],
       today: '2026-10-21',
       execute: timed,
       anthropicApiKey: 'k',
