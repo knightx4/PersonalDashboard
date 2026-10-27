@@ -65,7 +65,23 @@ describe('boardBrief', () => {
   });
 });
 
+describe('boardBrief with questions', () => {
+  it('adds the questions line after the called line, in order', () => {
+    const lines = boardBrief({ meetingId: 'm1', userId: 'u1', decision: 'Take it?', questionIds: ['q1', 'q2'] }).split('\n');
+    expect(lines.slice(3)).toEqual(['called: Take it?', 'questions q1, q2']);
+  });
+});
+
 describe('callBoardMeeting', () => {
+  it('names the question in the brief and takes a question longer than a decision line', async () => {
+    const { client } = fakeYou();
+    const fetch = okFetch();
+    const long = 'a'.repeat(DECISION_MAX + 100);
+    const r = await callBoardMeeting({ client, userId: 'u1', decision: long, questionIds: ['q1'], routine, now: NOW, fetch });
+    expect(r).toEqual({ started: true, meetingId: 'meet-new' });
+    expect(sentText(fetch).split('\n').at(-1)).toBe('questions q1');
+  });
+
   it('queues a called row naming the decision, fires the brief and saves the run url', async () => {
     const { client, calls } = fakeYou();
     const fetch = okFetch();

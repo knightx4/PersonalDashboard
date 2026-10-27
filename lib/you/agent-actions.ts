@@ -104,9 +104,21 @@ export const youActions: ModuleActions = {
       'theirs',
       'Ticking a resolution done is the person saying they did it; the next meeting reads the tick.',
     ),
-    callMeeting: none(
+    askBoard: none(
       'spends',
-      'Calling a meeting starts a long Dash session on the account, which spends money the person chooses to spend (plan #2540.5).',
+      'Asking the board is the person putting their own question; Convene now starts a long Dash session on the account, which spends money the person chooses to spend (plan #2561.4).',
+    ),
+    acceptSuggestion: none(
+      'spends',
+      "Taking up one of the board's suggested questions is the person's choice of what the board works on, and Ask now starts a paid Dash session (plan #2561.4).",
+    ),
+    dismissSuggestion: none(
+      'theirs',
+      "Turning down a suggested question is the person's call on what the board should not spend its time on.",
+    ),
+    conveneQuestion: none(
+      'spends',
+      'Convening the board now about a queued question starts a long Dash session on the account, which spends money the person chooses to spend (plan #2561.4).',
     ),
     makeResolutionTodo: none(
       'theirs',

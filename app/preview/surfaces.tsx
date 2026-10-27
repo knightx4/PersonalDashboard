@@ -9511,10 +9511,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouInsightsLoadingPreview />,
   },
   {
-    /* Board (plan #2540.3): the board's meetings newest first, each row saying
-     * how far through its minutes the person is; a called meeting first. */
+    /* Board (plans #2540.3 and #2561.4): one surface in three groups, the
+     * board's suggested questions with Ask now, Save for Sunday and Dismiss,
+     * the questions asked with their state, then the meetings newest first. */
     id: 'you-board',
-    label: 'You · Board, four meetings',
+    label: 'You · Board, suggestions, questions and meetings',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9525,7 +9526,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-empty',
-    label: 'You · Board, no meetings yet',
+    label: 'You · Board, nothing asked, suggested or held yet',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9536,7 +9537,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-running',
-    label: 'You · Board, a meeting being held',
+    label: 'You · Board, a question convened now, its meeting being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9578,11 +9579,11 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Call a meeting (plan #2540.5): the line for the decision open under the
-     * header, the notice when a meeting is already running, and the minutes
-     * of a called meeting, whose one disagreement holds each seat's vote. */
-    id: 'you-board-call',
-    label: 'You · Board, the decision line open',
+    /* Ask the board (plan #2561.4): the compose card open under the header,
+     * filled as far as a real question goes, and the card with a question
+     * that was saved but whose meeting could not start. */
+    id: 'you-board-ask',
+    label: 'You · Board, Ask the board open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9592,24 +9593,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'you-board-call-error',
-    label: 'You · Board, the decision line with a failed start',
+    id: 'you-board-ask-error',
+    label: 'You · Board, a question whose meeting could not start',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardListPreview start="error" />
-      </div>
-    ),
-  },
-  {
-    id: 'you-board-call-running',
-    label: 'You · Board, pressing Call a meeting while one runs',
-    module: 'you',
-    width: 'page',
-    render: () => (
-      <div className={SHELL_FOOT}>
-        <YouBoardListPreview state="running" start="running" />
       </div>
     ),
   },
