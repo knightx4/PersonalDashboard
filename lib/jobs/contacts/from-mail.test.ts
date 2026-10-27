@@ -41,7 +41,7 @@ describe('telling a person from a mailbox', () => {
     // The two attendees on every slot of a Greenhouse superday. Both were
     // recorded as members of the panel: neither is separated by a dot, and
     // `schedule` was a spelling the set did not have.
-    expect(isPersonalAddress('galaxyinterviews@galaxydigital.io')).toBe(false);
+    expect(isPersonalAddress('globexinterviews@globexdigital.com')).toBe(false);
     expect(isPersonalAddress('schedule@lily.greenhouse.io')).toBe(false);
     expect(isPersonalAddress('talentacquisition@ramp.com')).toBe(false);
   });
@@ -55,7 +55,7 @@ describe('telling a person from an organisation', () => {
 
   it('rejects the names that are departments', () => {
     for (const name of [
-      'Kalshi Hiring Team',
+      'Acme Robotics Hiring Team',
       'Greenhouse Notifications',
       'Ramp Recruiting',
       'Talent Acquisition',
@@ -114,7 +114,7 @@ describe('the sender of a message', () => {
     expect(
       contactFromSender({
         classification: 'recruiter_outreach',
-        fromAddress: 'Kalshi Hiring Team <no-reply@ashbyhq.com>',
+        fromAddress: 'Acme Robotics Hiring Team <no-reply@ashbyhq.com>',
       }),
     ).toBeNull();
   });
@@ -130,7 +130,7 @@ describe('the sender of a message', () => {
     expect(
       contactFromSender({
         classification: 'scheduling',
-        fromAddress: 'Selvey Knight <me@example.com>',
+        fromAddress: 'Alex Rivera <me@example.com>',
         selfAddress: 'me@example.com',
       }),
     ).toBeNull();
@@ -142,11 +142,11 @@ describe('the sender of a message', () => {
     expect(
       contactFromSender({
         classification: 'recruiter_outreach',
-        fromAddress: '"Anthony Greenfield, CPA" <hit-reply@linkedin.com>',
+        fromAddress: '"Morgan Hale, CPA" <hit-reply@linkedin.com>',
         replyToAddress:
-          '"Anthony Greenfield, CPA" <023c3819-d05e-4381-a7aa-19a044f834fb@reply.linkedin.com>',
+          '"Morgan Hale, CPA" <00000000-0000-4000-8000-0000000000aa@reply.linkedin.com>',
       }),
-    ).toEqual({ fullName: 'Anthony Greenfield, CPA', email: null, relationship: 'recruiter' });
+    ).toEqual({ fullName: 'Morgan Hale, CPA', email: null, relationship: 'recruiter' });
   });
 
   it('takes the name from one header and the address from the other', () => {
@@ -155,10 +155,10 @@ describe('the sender of a message', () => {
     expect(
       contactFromSender({
         classification: 'scheduling',
-        fromAddress: '"Sam Young (via Calendly)" <notifications@calendly.com>',
-        replyToAddress: 'sam@levelcfo.com',
+        fromAddress: '"Riley Park (via Calendly)" <notifications@calendly.com>',
+        replyToAddress: 'riley@contoso.com',
       }),
-    ).toEqual({ fullName: 'Sam Young', email: 'sam@levelcfo.com', relationship: 'recruiter' });
+    ).toEqual({ fullName: 'Riley Park', email: 'riley@contoso.com', relationship: 'recruiter' });
   });
 
   it('records nobody from a service account shaped like a name', () => {
@@ -174,8 +174,8 @@ describe('the sender of a message', () => {
     expect(
       contactFromSender({
         classification: 'interview_invite',
-        fromAddress: 'Workday Notifications <PJTPartners@myworkday.com>',
-        replyToAddress: 'HR@pjtpartners.com',
+        fromAddress: 'Workday Notifications <GlobexPartners@myworkday.com>',
+        replyToAddress: 'HR@globexpartners.com',
       }),
     ).toBeNull();
   });
@@ -183,7 +183,7 @@ describe('the sender of a message', () => {
 
 describe('the smaller readers', () => {
   it('strips the tool out of a display name', () => {
-    expect(stripVia('Sam Young (via Calendly)')).toBe('Sam Young');
+    expect(stripVia('Riley Park (via Calendly)')).toBe('Riley Park');
     expect(stripVia('Dana Whitfield (on behalf of Ramp)')).toBe('Dana Whitfield');
     expect(stripVia('Dana Whitfield')).toBe('Dana Whitfield');
   });
@@ -236,8 +236,8 @@ describe('the people on an invite', () => {
   it('records nobody from the scheduling robot the superday invited', () => {
     expect(
       contactsFromInvite({
-        interviewerNames: ['Galaxy Interviews', ''],
-        interviewerEmails: ['galaxyinterviews@galaxydigital.io', 'schedule@lily.greenhouse.io'],
+        interviewerNames: ['Globex Interviews', ''],
+        interviewerEmails: ['globexinterviews@globexdigital.com', 'schedule@lily.greenhouse.io'],
       }),
     ).toEqual([]);
   });
@@ -245,23 +245,23 @@ describe('the people on an invite', () => {
 
 describe('the people a body named', () => {
   it('records a panel that has no addresses at all', () => {
-    expect(contactsFromNames(['Ryan Kleiner', 'Bill Burt'])).toEqual([
-      { fullName: 'Ryan Kleiner', email: null, relationship: 'interviewer' },
-      { fullName: 'Bill Burt', email: null, relationship: 'interviewer' },
+    expect(contactsFromNames(['Tom Becker', 'Dana Ortiz'])).toEqual([
+      { fullName: 'Tom Becker', email: null, relationship: 'interviewer' },
+      { fullName: 'Dana Ortiz', email: null, relationship: 'interviewer' },
     ]);
   });
 
   it('drops departments, blanks and repeats', () => {
     expect(
-      contactsFromNames(['Ryan Kleiner', 'Hiring Team', null, ' ryan  kleiner ']),
+      contactsFromNames(['Tom Becker', 'Hiring Team', null, ' tom  becker ']),
     ).toHaveLength(1);
   });
 
   it('reads who takes one slot out of its label', () => {
-    const panel = ['Ryan Kleiner', 'Bill Burt', 'Jiaying Wang', 'Joe Koyfman'];
-    expect(namesInLabel(panel, 'Interview with Jiaying Wang, Joe Koyfman')).toEqual([
-      'Jiaying Wang',
-      'Joe Koyfman',
+    const panel = ['Tom Becker', 'Dana Ortiz', 'Priya Shah', 'Sam Novak'];
+    expect(namesInLabel(panel, 'Interview with Priya Shah, Sam Novak')).toEqual([
+      'Priya Shah',
+      'Sam Novak',
     ]);
     expect(namesInLabel(panel, 'Onsite loop')).toEqual([]);
     expect(namesInLabel(panel, null)).toEqual([]);

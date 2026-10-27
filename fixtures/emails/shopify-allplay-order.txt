@@ -1,26 +1,26 @@
-Subject: Order #431949 confirmed
+Subject: Order #900142 confirmed
 From: Allplay <help@allplay.com>
 
 Thank you for your purchase!
 
 Allplay
 
-Order #431949
+Order #900142
 
 ----------------------------
 Thank you for your purchase!
 ----------------------------
 
-Hi Selvey, your order is getting ready to be shipped. We're
+Hi Alex, your order is getting ready to be shipped. We're
 excited to get it to your door as quickly as possible and will
 notify you when it has been sent.
 
 View your order 
-( https://boardgametables.myshopify.com/14361788473/orders/dab6b68832f16fccfbfbbacb4adf42e9/authenticate?key=shcct_ejgrdmlBYlA3NkhrQUlUYndadmlkR1dnL3Jsbi8rQjFraFNwYjUyd0p3RktwQ0FZVzNpL3VzYU1qMC9kcGdic2k0L3VuZlQ5cG8yL3k0SUVhVUpvMjAzWGNFdFJ2dlVyUlJkRlY0aWZlV1FqZ2h4ZExNamdmQ1V0MmtMZXRqY2tVVU5DUWt0eFZxNnp6YXdsbE83NG1ZTTA2aEZkMGpSR2cyVzNrcWFRQUR5NitqSzhCeUlic2JMNHA1SWN4anZjRXFFdXdjblpLZ0pQcURMeXFOZUdmR3ZUbzNscmtCdnRtU2VPQXlad1hzL3AxK0RlaENTTDBKV1VaV2NmMG9qQVg3dTk5bE53cnhraVhkMXdNWTl5bm9BUUlhTGVENkNKV1huTkkxSjlwQktxUEx1VW8ydzdtZ1pkekNPWjNpTVI0V0lwRG41NlhEbWYveTl0dEpINkRwZjUzcVdkRmpINXRBdmNJQmM1dmtZaXJMQmV4aUZCVzBCRFFCVG1nYjFaaFNtWkJWM21lb3ZDT0ZCc29nVDNWM1V2YzBWcFpVSlZMNTRtb1ZXcEI0K1FkcnBmRTlXWkNmS2ZzNmJoNnJWR05WN3RJa1RsUzlHSzJmVFpKTGoxeXFYS25TVmQ5dWhwTXRsM01hUUVVMVd3L3Q4MjVuVVJKTFNoU3RxUXNJSk4zL3pnVUZEUWRtUEw4K2RzbnlVL2cwMEk1dVI5Z2tFRFExZU1BMlZHQ2ZUMUFoU3FnZVpPd2ljU1R0bVBKWi9XZUNWKzlRPT0tLXVpVExjV2s1S2JycHZhQ0wtLXBNc3N5OU1IbnhKcmorS2ZQVDVHNFE9PQ&syclid=c6dce024-1ff5-432b-9798-809a897fbe07 )
+( https://boardgametables.myshopify.com/10000000001/orders/00000000000000000000000000000142/authenticate?key=shcct_RkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZ&syclid=00000000-0000-4000-8000-000000000001 )
 
 
 or Visit our store 
-( https://boardgametables.myshopify.com?syclid=d81644a5-b931-4e28-ab14-93c61974d781 )
+( https://boardgametables.myshopify.com?syclid=00000000-0000-4000-8000-000000000002 )
 
 
 Order summary
@@ -52,7 +52,7 @@ Gift card
 
 $99.00
 
-Visa (ending in 2441)
+Visa (ending in 4242)
 
 $17.00
 
@@ -62,17 +62,17 @@ Customer information
 Shipping address
 ----------------
 
-Selvey Knight
-8340 Rolling Acres Trl
-Boerne TX 78015
+Alex Rivera
+12 Elm St
+Springfield OR 97477
 United States
 
 Billing address
 ---------------
 
-Selvey Knight
-8340 Rolling Acres Trail
-Fair Oaks Ranch TX 78015
+Alex Rivera
+88 Cedar Lane
+Riverside CA 92501
 United States
 
 Shipping method

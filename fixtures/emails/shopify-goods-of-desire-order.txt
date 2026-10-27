@@ -1,5 +1,5 @@
-Subject: Order #11888 confirmed
-From: Goods of Desire <store+7386935@t.shopifyemail.com>
+Subject: Order #10042 confirmed
+From: Goods of Desire <store+1000042@t.shopifyemail.com>
 
 Thank you for placing your order with Goods of Desire!
 
@@ -9,33 +9,33 @@ Date 05/22/2026
 
 Shipping address
 
-Selvey Cole Knight
+Alex J Rivera
 
-2108827770
+5415550142
 
-selveyknight4@gmail.com
+alex.rivera@example.com
 
-8340 Rolling Acres Trail
+12 Elm Street
 
-Boerne
+Springfield
 
-Texas
-78015
+Oregon
+97477
 
 United States
 
 Billing address
 
-Selvey Knight
+Alex Rivera
 
-2108827770
+5415550142
 
-8340 Rolling Acres Trail
+88 Cedar Lane
 
-Fair Oaks Ranch
+Riverside
 
-Texas
-78015
+California
+92501
 
 United States
 

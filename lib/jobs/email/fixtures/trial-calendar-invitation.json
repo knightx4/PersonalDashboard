@@ -1,0 +1,6 @@
+{
+  "classification": "interview_invite",
+  "ats": "unknown",
+  "tier": "subject_heuristic",
+  "note": "A calendar invitation for an in-person panel, so the interview is booked. The envelope is modeled on one from the Jev trial (docs/trials/2026-09-29-jev-job-email.md), with the company, names and addresses changed. The body was not fetched: Gmail was not reachable from the session that wrote this, and the ledger never stores one, so the fixture holds only what the rules read from the envelope."
+}

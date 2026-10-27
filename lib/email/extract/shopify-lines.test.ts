@@ -105,7 +105,7 @@ describe('heuristicExtractOrder Allplay fixture', () => {
     const applied = applyExtraction(raw);
     expect(applied.ok).toBe(true);
     if (applied.ok) {
-      expect(applied.order.externalOrderNumber).toBe('431949');
+      expect(applied.order.externalOrderNumber).toBe('900142');
       expect(applied.order.totalCents).toBe(11600);
       expect(applied.order.shippingCents).toBe(1700);
       expect(applied.order.lines).toHaveLength(1);
@@ -129,7 +129,7 @@ describe('heuristicExtractOrder Goods of Desire fixture', () => {
       text: body,
       merchantSlug: 'shopify',
       merchantName: 'Shopify',
-      fromAddress: 'Goods of Desire <store+7386935@t.shopifyemail.com>',
+      fromAddress: 'Goods of Desire <store+1000042@t.shopifyemail.com>',
       // Forwarded later — body "Date 05/22/2026" must win.
       receivedAt: new Date('2026-08-20T04:20:32Z'),
     });
@@ -143,7 +143,7 @@ describe('heuristicExtractOrder Goods of Desire fixture', () => {
     const applied = applyExtraction(raw);
     expect(applied.ok).toBe(true);
     if (applied.ok) {
-      expect(applied.order.externalOrderNumber).toBe('11888');
+      expect(applied.order.externalOrderNumber).toBe('10042');
       expect(applied.order.currency).toBe('HKD');
       expect(applied.order.lines).toHaveLength(1);
       expect(applied.order.lines[0]?.name).toMatch(/Mahjong/i);

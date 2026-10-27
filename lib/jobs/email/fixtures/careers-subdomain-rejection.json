@@ -1,0 +1,8 @@
+{
+  "classification": "rejection",
+  "ats": "unknown",
+  "tier": "A",
+  "company": "Hooli",
+  "role": "Finance & Strategy Analyst",
+  "note": "Modeled on real mail, with the names changed. The subject is indistinguishable from a confirmation -- 'Your application for our X role' -- so the body is the only thing that decides. Sent from the company's own careers subdomain rather than an ATS."
+}
