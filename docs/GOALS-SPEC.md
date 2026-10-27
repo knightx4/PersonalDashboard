@@ -439,17 +439,18 @@ Plan #2503. A goal is active or passive, stored in `goals.items.activity`
 (null reads as active). A passive goal is one the person keeps in view
 without working on it now, so it asks for no attention:
 
-- None of its steps or rhythms appear in Do next, even when it has a due
-  date, and it is listed under Other goals (`homeLists` in
-  `lib/goals/home.ts`).
+- Nothing of it reaches the Goals Inbox, its badge or Do next: no step,
+  rhythm, question, ask, flag, proposal or did-you-go row, and no Dash step
+  stuck on a question for the person (`withoutPassiveGoals` in
+  `lib/goals/inbox.ts`, applied in `loadHome`). Its due date is ignored, and
+  it is listed under Passive goals (`homeLists` in `lib/goals/home.ts`).
+  Its page still lists everything on it.
 - On Todo it keeps only the steps the person sent there. A step Dash sent
   leaves Todo while the goal is passive, and Dash sends none
   (`todoSteps` in `lib/goals/todo.ts`).
 - It gets no verdict: the morning brief leaves it out, its pace is not
   read, and the pages show no older verdict on it (`reviewGoals` and
   `standingReviews` in `lib/goals/reviews.ts`).
-- Questions, asks, flags and proposals waiting on approval still show in Do
-  next, since they hold up work.
 
 What is coming up under a passive goal is mentioned, and nothing more (plan
 #2503.5). A step of the person's due within seven days, and a suggestion
