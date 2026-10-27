@@ -562,9 +562,9 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 
 ### `you.details` (You)
 
-Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.
+Their own details, one row: name, email, phone, mailing address, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.
 
-- Search: `title`, `phone`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
+- Search: `title`, `full_name`, `email`, `phone`, `mailing_address`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
 - Name a row by `title`; link it by `user_id`
 - Scoped to the person by `user_id`, not user_id
 - Opens at `/you/details`
