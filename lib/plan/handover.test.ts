@@ -3,6 +3,7 @@ import type { PlanData, PlanItem } from './load';
 
 const plan: { data: PlanData } = { data: { items: [], dependencies: [] } };
 const started: string[] = [];
+const routines: unknown[] = [];
 
 vi.mock('./load', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./load')>()),
@@ -13,8 +14,9 @@ vi.mock('./runs', async (importOriginal) => ({
   loadLastRuns: vi.fn(async () => ({})),
   reshapeUnderway: vi.fn(async () => false),
   endRunsOnStep: vi.fn(async () => undefined),
-  startRoutineRun: vi.fn(async (input: { text: string }) => {
+  startRoutineRun: vi.fn(async (input: { text: string; routine: unknown }) => {
     started.push(input.text);
+    routines.push(input.routine);
     return { ok: true, detail: 'Started.' };
   }),
 }));
@@ -107,6 +109,66 @@ describe('where a row is built', () => {
     const sections = buildPlanTree({ items: site, dependencies: [], projects: PROJECT_FIXTURES });
     const built = builderFor(sections, findNode(sections, 't')!);
     expect(built).toMatchObject({ ok: true, project: { id: 'website' }, routine: { id: 'trig_site' } });
+    vi.unstubAllEnvs();
+  });
+
+  it('sends a project with no routine of its own to the shared routine, naming its repository', async () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
+    plan.data = { items: site, dependencies: [], projects: PROJECT_FIXTURES };
+    const sections = buildPlanTree(plan.data);
+    expect(builderFor(sections, findNode(sections, 't')!)).toMatchObject({
+      ok: true,
+      project: { id: 'website' },
+      routine: { id: 'trig_projects', token: 'projects-token' },
+    });
+
+    const sent = await handStepToClaude({ supabase, userId: 'u', id: 't' });
+    expect(sent).toMatchObject({ ok: true, outline: '2000.1' });
+    expect(routines.at(-1)).toEqual({ id: 'trig_projects', token: 'projects-token' });
+    expect(started[0]).toContain('call add_repo for knightx4/selveyknightwebsite with push access');
+    expect(started[0]).toContain('register_repo_root');
+    expect(started[0]).toContain("this checkout's scripts/plan.ts");
+    expect(started[0]).toContain('.claude/skills/plan/reference/project-routine.md');
+    expect(started[0]).toMatch(/Build plan step #2000\.1, "Site step"/);
+    vi.unstubAllEnvs();
+  });
+
+  it("names a project's check command for the session to run before it merges", async () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    const checked = [{ ...PROJECT_FIXTURES[0], routineEnv: null, checkCommand: 'npm test' }];
+    plan.data = { items: site, dependencies: [], projects: checked };
+    await handStepToClaude({ supabase, userId: 'u', id: 't' });
+    expect(started[0]).toContain('run `npm test` in that repository');
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps the website's own routine and its old preamble while that routine is set", async () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'site-token');
+    plan.data = { items: site, dependencies: [], projects: PROJECT_FIXTURES };
+    await handStepToClaude({ supabase, userId: 'u', id: 't' });
+    expect(routines.at(-1)).toEqual({ id: 'trig_site', token: 'site-token' });
+    expect(started[0]).toContain('Work in that repository');
+    expect(started[0]).not.toContain('add_repo');
+    vi.unstubAllEnvs();
+  });
+
+  it('refuses a project when neither its own routine nor the shared one is set', () => {
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', '');
+    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
+    const sections = buildPlanTree({ items: site, dependencies: [], projects: PROJECT_FIXTURES });
+    expect(builderFor(sections, findNode(sections, 't')!)).toEqual({
+      ok: false,
+      error:
+        'selveyknight.com has no routine to build it yet: ' +
+        'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
+    });
     vi.unstubAllEnvs();
   });
 

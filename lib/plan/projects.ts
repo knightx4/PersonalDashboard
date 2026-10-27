@@ -14,11 +14,12 @@
  * the list a caller loaded, once per request, with `loadDevProjects` (or with
  * the plan, which carries it as `PlanData.projects`).
  *
- * A row may still name the environment variables holding its own routine
- * (`routineEnv`), because a routine's token is scoped to that routine (see
- * lib/feedback/routine.ts). Neither falls back to the plan routine's: that
- * routine checks out this repository, and a website step built there would
- * land in the wrong repo.
+ * Every project's steps go to one shared routine (`projectsRoutine` in
+ * lib/feedback/routine.ts, plan #2553.3), which adds the project's
+ * repository to its session. A row may still name the environment variables
+ * holding a routine of its own (`routineEnv`), preferred while its id is set.
+ * Neither falls back to the plan routine's: that routine builds in this
+ * repository, and a website step built there would land in the wrong repo.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { MODULES, isModuleId, type ModuleId } from '@/lib/modules';
@@ -232,4 +233,62 @@ export function rootScopes(
 export function repoForScope(scope: PlanScope | null, projects: readonly DevProject[]): Repo {
   const project = isProjectScope(scope) ? projectById(projects, scope) : undefined;
   return project ? project.repo : REPO;
+}
+
+/** How far up `loadProjectStepIds` climbs before giving up on a root. */
+const MAX_PLAN_DEPTH = 12;
+
+/**
+ * Which of these plan rows sit under a project, read up their trees to the
+ * root (`rootScopes`), one request per level.
+ *
+ * What the run sweeps use to tell a project's run from this app's (plan
+ * #2553.3): one shared routine builds every project, so the routine a run
+ * went to no longer says where it pushes, and the step it was sent at does.
+ * A read that fails is logged and reads as none under a project, which
+ * judges those runs by this repository's pushes, as before there were
+ * projects.
+ */
+export async function loadProjectStepIds(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any>,
+  userId: string,
+  ids: readonly string[],
+): Promise<Set<string>> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (wanted.length === 0) return new Set();
+  try {
+    type Row = { id: string; parentId: string | null; module: string | null };
+    const rows = new Map<string, Row>();
+    let frontier = wanted;
+    for (let depth = 0; frontier.length > 0 && depth < MAX_PLAN_DEPTH; depth++) {
+      const { data, error } = await supabase
+        .from('plan_items')
+        .select('id, parent_id, module')
+        .eq('user_id', userId)
+        .in('id', frontier);
+      if (error) throw new Error(error.message);
+      for (const row of (data ?? []) as Array<{
+        id: string;
+        parent_id: string | null;
+        module: string | null;
+      }>) {
+        rows.set(row.id, { id: row.id, parentId: row.parent_id, module: row.module });
+      }
+      frontier = [
+        ...new Set(
+          [...rows.values()]
+            .map((row) => row.parentId)
+            .filter((id): id is string => !!id && !rows.has(id)),
+        ),
+      ];
+    }
+    const roots = rootScopes([...rows.values()]);
+    return new Set(wanted.filter((id) => isProjectScope(roots.get(id) ?? null)));
+  } catch (err) {
+    console.error(
+      `the runs' projects could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+    return new Set();
+  }
 }
