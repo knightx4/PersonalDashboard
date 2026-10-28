@@ -1,7 +1,8 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
@@ -255,6 +256,18 @@ function PersonBlock({
   const key = (kind: string) => `${kind}:${person.contactId}`;
   const reach = person.linkedinUrl ?? linkedinSearchUrl(`${person.name} ${company}`);
 
+  function changeChannel(channel: string) {
+    if (!draft) return;
+    const before = draft.channel;
+    onError(null);
+    onPatch({ draft: { ...draft, channel } });
+    void saveFollowUpChannel(draft.id, channel).then((result) => {
+      if (!result.error) return;
+      onPatch({ draft: { ...draft, channel: before } });
+      onError(`Not changed: ${result.error}`);
+    });
+  }
+
   function markSent() {
     if (!draft) return;
     onError(null);
@@ -310,33 +323,27 @@ function PersonBlock({
 
       {draft && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             {/* How it goes is yours to pick (note a790ab92); Dash starts it as a LinkedIn message. */}
-            <span className="flex min-w-0 items-center gap-2 text-small text-ink-muted">
-              <Select
-                value={draft.channel}
-                aria-label={`How the note to ${person.name} goes`}
-                className="w-auto"
-                disabled={busy}
-                onChange={(event) => {
-                  const channel = event.target.value;
-                  const before = draft.channel;
-                  onError(null);
-                  onPatch({ draft: { ...draft, channel } });
-                  void saveFollowUpChannel(draft.id, channel).then((result) => {
-                    if (!result.error) return;
-                    onPatch({ draft: { ...draft, channel: before } });
-                    onError(`Not changed: ${result.error}`);
-                  });
-                }}
-              >
-                {NOTE_CHANNELS.map((channel) => (
-                  <option key={channel} value={channel}>
-                    {CHANNEL_WORDS[channel]}
-                  </option>
-                ))}
-              </Select>
-              <span className="shrink-0">not sent yet</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1 text-small text-ink-muted">
+              <ActionMenu
+                label={`How the note to ${person.name} goes`}
+                align="start"
+                triggerClassName="-ml-1.5 h-auto w-auto gap-1 px-1.5 py-0.5 text-small text-ink-muted"
+                trigger={
+                  <>
+                    <span>{CHANNEL_WORDS[draft.channel] ?? 'Message'}</span>
+                    <ChevronDown className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                  </>
+                }
+                items={NOTE_CHANNELS.map((channel) => ({
+                  id: channel,
+                  label: CHANNEL_WORDS[channel],
+                  disabled: busy || channel === draft.channel,
+                  onSelect: () => changeChannel(channel),
+                }))}
+              />
+              <span>not sent yet</span>
             </span>
             <CopyText text={text} what="note" />
           </div>
