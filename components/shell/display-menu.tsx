@@ -367,7 +367,8 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
           aria-hidden
         />
         <span className="truncate">{view.name}</span>
-        {view.isDefault && <span className="shrink-0 text-small text-ink-muted">opens here</span>}
+        {/* Said by the accent pin beside it; the words stay for screen readers. */}
+        {view.isDefault && <span className="sr-only">, opens here</span>}
       </Link>
 
       {/* The three things you can do to a saved view. Shown on hover and on
