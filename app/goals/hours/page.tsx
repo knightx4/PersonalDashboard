@@ -9,6 +9,7 @@ import { hoursPage } from '@/lib/goals/hours';
 import { loadHoursMetrics } from '@/lib/goals/hours-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { HoursView } from './hours-view';
+import { LogHours } from './log-hours';
 
 export const metadata = { title: 'Hours' };
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * day, how each has gone week by week, and each one's twelve-week chart. The
  * hours are logged from the capture box ("applied 2h, cleaned 1h") as
  * progress on a goal's steps; a goal's Hours logged metric is what puts it
- * here.
+ * here. The slot at the top logs today's hours the same way.
  */
 export default async function HoursPage() {
   const user = await requireUser();
@@ -31,8 +32,11 @@ export default async function HoursPage() {
     <PageColumn>
       <PageHeader
         title="Hours"
-        description="The time you log on your goals, against each week's aim. Write it in the capture box on Now: applied 2h, cleaned 1.5h."
+        description="The time you log on your goals, against each week's aim. Log it below, or in the capture box on Now: applied 2h, cleaned 1.5h."
       />
+      <div className="mb-4">
+        <LogHours />
+      </div>
       {metrics.length === 0 ? (
         <EmptyState
           icon={Clock}

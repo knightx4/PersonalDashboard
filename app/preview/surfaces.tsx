@@ -11,6 +11,7 @@ import {
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
+import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -4446,6 +4447,25 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Outreach tab's channel menu open on Rae's note (note a790ab92):
+     * every way the note can go, the one it goes by now marked. */
+    id: 'jobs-role-outreach-channel',
+    label: 'Role · Outreach · How the note goes',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <FollowUpCard
+        initial={followUpRows[0]}
+        timezone="UTC"
+        channelMenuOpen
+        contacts={[
+          { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+          { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+        ]}
+      />
+    ),
+  },
+  {
     id: 'jobs-role-answers',
     label: 'Role · Answers',
     module: 'jobs',
@@ -4787,6 +4807,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
+  },
+  {
+    /* The saved views on their own button (note 1e926155), its panel open:
+     * one view in force, one that the list opens on, and the save line. */
+    id: 'jobs-pipeline-views',
+    label: 'Pipeline · Table · Saved views',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PipelinePage
+        rows={pipelineRows}
+        params={{ view: 'table', ready: 'yes' }}
+        savedViews={[
+          { id: 'v-1', list: '/jobs/pipeline', name: 'Ready to send', query: 'view=table&ready=yes', isDefault: false },
+          { id: 'v-2', list: '/jobs/pipeline', name: 'Everything live', query: 'view=table', isDefault: true },
+        ]}
+        openPanel="views"
+      />
+    ),
+  },
+  {
+    /* The Display panel open beside it: sort, group and columns, and no
+     * saved views, which have their own button now. */
+    id: 'jobs-pipeline-display',
+    label: 'Pipeline · Table · Display',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} openPanel="display" />,
   },
   {
     /* The table with a column's menu open (note f05f5f04): its sort, then
@@ -5253,6 +5301,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalHoursSurface />,
+  },
+  {
+    /* The Hours page's slot opened, to log today's hours (note 3eb2c302). */
+    id: 'goals-hours-log',
+    label: 'Goals · Hours, logging today',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface logOpen />,
   },
   {
     id: 'goals-metrics-tooltip',

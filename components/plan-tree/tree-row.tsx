@@ -176,6 +176,12 @@ export function titleHead(title: string): string {
  */
 export type TreeRowFrameParts = {
   status: ReactNode;
+  /**
+   * The same status menu, its word drawn with a chevron, for the Status fact
+   * beside the page: the glyph alone did not read as something to press
+   * (note 823e48a7).
+   */
+  statusPicker: ReactNode;
   title: ReactNode;
   menu: ReactNode;
   /** The notices and the panel: the detail, done-when, facts and files. */
@@ -530,6 +536,24 @@ export function TreeRow<E extends TreeCatalogEntry>({
       }
     />
   );
+  // The Status fact on a page's frame opens the same menu, with the word.
+  const statusPicker = frame ? (
+    <ActionMenu
+      label={`Change status of #${node.outline} ${node.title}`}
+      items={statusMenu}
+      align="start"
+      triggerClassName={cn(
+        '-ml-1.5 h-auto w-auto gap-1 px-1.5 py-0.5 text-ui font-medium',
+        TONE_TEXT[health.tone],
+      )}
+      trigger={
+        <>
+          <span>{health.word}</span>
+          <ChevronDown className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+        </>
+      }
+    />
+  ) : null;
   const healthMenu = health.title ? (
     <Tooltip label={health.title} className="justify-self-start">
       <span className="inline-flex">{healthTrigger}</span>
@@ -1060,6 +1084,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   if (heading && frame) {
     return frame({
       status: healthMenu,
+      statusPicker,
       title: row.editing && titleEditor ? titleEditor : headingTitle,
       menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
       overview,

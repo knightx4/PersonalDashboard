@@ -112,7 +112,6 @@ export function StepPage({
   // The open sub-steps the tab lists as rows: the step's own, not every
   // level beneath, as the properties count them (plan #2373.2).
   const open = openSubsteps(row);
-  const facts = stepFactParts(row);
   // Counted as the questions' own label counts them, which the page's heading replaces.
   const unanswered = row.children.filter(
     (child) => child.kind === 'decision' && !isClosed(child.status) && !isDismissed(child),
@@ -133,34 +132,37 @@ export function StepPage({
       index={substeps.findIndex((sibling) => sibling.id === row.id)}
       count={substeps.length}
       page
-      frame={({ status, title, menu, ...parts }) => (
-        <TabbedDetail
-          // The path down to the step, through every step it sits under (plan #1622).
-          subject={{ ref: null, path: crumbs ?? [] }}
-          // The status you press, then the title, as the goal's hexagon and title.
-          lead={status}
-          title={title}
-          description={<span className="text-small">{stepLine(row, timeZone)}</span>}
-          actions={menu}
-          glance={facts.glance}
-          detailCount={facts.detailCount}
-          properties={facts.properties}
-          tabs={tabs}
-          label="Step"
-          className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
-        >
-          <OpenTab
-            tab={tab}
-            parts={parts}
-            stepId={row.id}
-            unanswered={unanswered}
-            hasQuestions={row.children.some((child) => child.kind === 'decision')}
-            hasEdges={row.dependsOn.length + row.waitingOn.length + row.blocks.length > 0}
-            history={history}
-            hasSubsteps={row.children.some((child) => child.kind !== 'decision')}
-          />
-        </TabbedDetail>
-      )}
+      frame={({ status, statusPicker, title, menu, ...parts }) => {
+        const facts = stepFactParts(row, statusPicker);
+        return (
+          <TabbedDetail
+            // The path down to the step, through every step it sits under (plan #1622).
+            subject={{ ref: null, path: crumbs ?? [] }}
+            // The status you press, then the title, as the goal's hexagon and title.
+            lead={status}
+            title={title}
+            description={<span className="text-small">{stepLine(row, timeZone)}</span>}
+            actions={menu}
+            glance={facts.glance}
+            detailCount={facts.detailCount}
+            properties={facts.properties}
+            tabs={tabs}
+            label="Step"
+            className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
+          >
+            <OpenTab
+              tab={tab}
+              parts={parts}
+              stepId={row.id}
+              unanswered={unanswered}
+              hasQuestions={row.children.some((child) => child.kind === 'decision')}
+              hasEdges={row.dependsOn.length + row.waitingOn.length + row.blocks.length > 0}
+              history={history}
+              hasSubsteps={row.children.some((child) => child.kind !== 'decision')}
+            />
+          </TabbedDetail>
+        );
+      }}
     />
   );
 }
@@ -187,7 +189,7 @@ function OpenTab({
   history,
 }: {
   tab: StepTab;
-  parts: Omit<TreeRowFrameParts, 'status' | 'title' | 'menu'>;
+  parts: Omit<TreeRowFrameParts, 'status' | 'statusPicker' | 'title' | 'menu'>;
   stepId: string;
   hasSubsteps: boolean;
   /** How many of the step's questions wait on an answer, said beside their heading. */
@@ -290,7 +292,9 @@ function OpenTab({
         <OverviewPart
           id="step-questions"
           title="Questions"
-          count={unanswered > 0 ? <span className="text-caution">{unanswered} unanswered</span> : null}
+          count={
+            unanswered > 0 ? <span className="text-caution">{unanswered} unanswered</span> : null
+          }
         >
           {parts.questions}
         </OverviewPart>

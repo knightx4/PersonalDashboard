@@ -7,7 +7,7 @@ import { PipelineFocus } from '@/components/jobs/pipeline/focus';
 import { RolesTable } from '@/components/jobs/pipeline/table';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
 import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
-import { DisplayMenu } from '@/components/shell/display-menu';
+import { DisplayMenu, ViewsMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageHeader } from '@/components/shell/page-header';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -64,6 +64,7 @@ export function PipelinePage({
   hasInbox = false,
   timezone = 'UTC',
   openColumn,
+  openPanel,
 }: {
   /** Every application, live and closed, with its fit and chance. */
   rows: readonly PipelineRow[];
@@ -77,6 +78,8 @@ export function PipelinePage({
   timezone?: string;
   /** For the gallery: the table column whose filter menu is drawn open. */
   openColumn?: string;
+  /** For the gallery: the Views or Display panel drawn open. */
+  openPanel?: 'views' | 'display';
 }) {
   if (rows.length === 0) {
     return (
@@ -126,7 +129,11 @@ export function PipelinePage({
         <>
           <AskDashRowsButton filter={askFilter} count={filtered.length} className="max-sm:hidden" />
           <PipelineViewToggle view={state.view} params={params} />
-          {state.view === 'table' && <DisplayMenu menu={menu} className="max-sm:hidden" />}
+          {/* Saved views on their own button beside Display (note 1e926155). */}
+          {state.view === 'table' && <ViewsMenu menu={menu} initialOpen={openPanel === 'views'} className="max-sm:hidden" />}
+          {state.view === 'table' && (
+            <DisplayMenu menu={menu} views={false} initialOpen={openPanel === 'display'} className="max-sm:hidden" />
+          )}
           <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
         </>
       }
@@ -154,7 +161,18 @@ export function PipelinePage({
         </div>
         <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />
         {/* Display comes down here too, so Add a role keeps the switcher's line. */}
-        {state.view === 'table' && <DisplayMenu menu={menu} className="sm:hidden" wordClassName="sr-only" />}
+        {state.view === 'table' && (
+          <ViewsMenu menu={menu} initialOpen={openPanel === 'views'} className="sm:hidden" wordClassName="sr-only" />
+        )}
+        {state.view === 'table' && (
+          <DisplayMenu
+            menu={menu}
+            views={false}
+            initialOpen={openPanel === 'display'}
+            className="sm:hidden"
+            wordClassName="sr-only"
+          />
+        )}
       </div>
     </div>
   );
