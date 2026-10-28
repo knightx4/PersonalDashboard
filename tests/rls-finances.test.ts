@@ -157,6 +157,14 @@ describe('account shapes', () => {
                 values (${userA}, 'Student loan 1', 'loan', 'import', 5.05, 21500, '2026-11-15')`;
     await admin`insert into accounts (user_id, name, kind, source, credit_limit_cents)
                 values (${userA}, 'Apple Card', 'credit_card', 'import', 1200000)`;
+    // A card's statement, due date and purchase APR from /liabilities/get (plan #2593.4).
+    await admin`insert into accounts (user_id, name, kind, source, interest_rate, minimum_payment_cents,
+                                      next_payment_due_on, statement_balance_cents, last_statement_on)
+                values (${userA}, 'Sapphire', 'credit_card', 'manual', 21.49, 2000, '2026-11-07', 170877, '2026-10-10')`;
+    await expect(
+      admin`insert into accounts (user_id, name, kind, source, statement_balance_cents)
+            values (${userA}, 'Brokerage', 'brokerage', 'manual', 100)`,
+    ).rejects.toThrow();
     await expect(
       admin`insert into accounts (user_id, name, kind, source, interest_rate)
             values (${userA}, 'Savings', 'savings', 'manual', 4.1)`,
