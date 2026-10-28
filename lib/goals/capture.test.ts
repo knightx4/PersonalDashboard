@@ -541,6 +541,15 @@ describe('readings from capture (plan #930)', () => {
     expect(message).toContain('g2: Goal city (area: The city)');
   });
 
+  it('names the hours a goal tracks, so time on that work lands there', () => {
+    const goals = [goal('debt'), goal('city')];
+    const { byGoal } = buildForest(goals.map((g) => g.goal.id), [step('talk', 'city')]);
+    const context = captureContext(goals, byGoal, new Map(), {}, new Map([['city', ['Cleaning']]]));
+    const message = captureMessage(context, '5hr cleaning', '2026-10-28');
+    expect(message).toContain('g2: Goal city (area: The city; tracks hours: Cleaning)');
+    expect(message).toContain('g1: Goal debt (area: The city)');
+  });
+
   it('records a number against a goal with a unit, and refuses one without', () => {
     const planned = parseFiling(
       {
@@ -1138,6 +1147,14 @@ describe('asking once how far along a step is (plan #1280)', () => {
     const filed = await fileOn(context, { type: 'progress', step: bags.ref, text: 'moved two more' });
     expect(filed).not.toHaveProperty('ask_estimate');
     expect(estimateAsked(filed)).toBeNull();
+  });
+
+  it('does not ask after time spent, which is a tally of hours (goals 0089)', async () => {
+    const bags = tree({}).steps.find((s) => s.id === 'bags')!;
+    for (const unit of ['hours', 'h', 'minutes']) {
+      const filed = await fileOn(tree({}), { type: 'progress', step: bags.ref, text: 'sorted bags', quantity: 2, unit });
+      expect(estimateAsked(filed)).toBeNull();
+    }
   });
 
   it('does not ask on a step with a total, one this line sets, or the goal itself', async () => {
