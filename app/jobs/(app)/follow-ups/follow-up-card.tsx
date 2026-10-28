@@ -60,8 +60,11 @@ export function FollowUpCard({
   contacts = [],
   timezone,
   heading = 'People to reach out to',
+  channelMenuOpen = false,
 }: {
   initial: FollowUp;
+  /** For the gallery: the first note's channel menu drawn open. */
+  channelMenuOpen?: boolean;
   /** The person's contacts at the company, to link one by hand. */
   contacts?: readonly CompanyContact[];
   timezone: string;
@@ -128,6 +131,7 @@ export function FollowUpCard({
                   onRun={(kind, call) => run(kind, call)}
                   onPatch={(patch) => patchPerson(person.contactId, patch)}
                   onError={setError}
+                  channelMenuOpen={channelMenuOpen && person === followUp.people.find((p) => p.draft)}
                 />
               </li>
             ))}
@@ -237,6 +241,7 @@ function PersonBlock({
   onRun,
   onPatch,
   onError,
+  channelMenuOpen,
 }: {
   person: OutreachPerson;
   applicationId: string;
@@ -247,6 +252,7 @@ function PersonBlock({
   onRun: (kind: string, call: () => Promise<Result>) => void;
   onPatch: (patch: Partial<OutreachPerson>) => void;
   onError: (text: string | null) => void;
+  channelMenuOpen: boolean;
 }) {
   const draft = person.draft;
   // Keyed on the note by the list, so a fresh draft from the server (Write it
@@ -329,6 +335,7 @@ function PersonBlock({
               <ActionMenu
                 label={`How the note to ${person.name} goes`}
                 align="start"
+                defaultOpen={channelMenuOpen}
                 triggerClassName="-ml-1.5 h-auto w-auto gap-1 px-1.5 py-0.5 text-small text-ink-muted"
                 trigger={
                   <>
@@ -339,8 +346,11 @@ function PersonBlock({
                 items={NOTE_CHANNELS.map((channel) => ({
                   id: channel,
                   label: CHANNEL_WORDS[channel],
-                  disabled: busy || channel === draft.channel,
-                  onSelect: () => changeChannel(channel),
+                  current: channel === draft.channel,
+                  disabled: busy,
+                  onSelect: () => {
+                    if (channel !== draft.channel) changeChannel(channel);
+                  },
                 }))}
               />
               <span>not sent yet</span>

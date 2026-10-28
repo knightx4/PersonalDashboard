@@ -11,6 +11,7 @@ import {
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
+import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -4441,6 +4442,25 @@ export const SURFACES: readonly Surface[] = [
           { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
           { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
           { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
+        ]}
+      />
+    ),
+  },
+  {
+    /* The Outreach tab's channel menu open on Rae's note (note a790ab92):
+     * every way the note can go, the one it goes by now marked. */
+    id: 'jobs-role-outreach-channel',
+    label: 'Role · Outreach · How the note goes',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <FollowUpCard
+        initial={followUpRows[0]}
+        timezone="UTC"
+        channelMenuOpen
+        contacts={[
+          { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+          { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
         ]}
       />
     ),

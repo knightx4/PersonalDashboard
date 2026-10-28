@@ -51,7 +51,7 @@ export type ActionMenuItem = {
    * keeping. Ignored when `formAction` or `onSelect` is set.
    */
   href?: string;
-  /** Marks the link as the page you are already on. */
+  /** Marks the link as the page you are already on, or the choice already made. */
   current?: boolean;
 };
 
@@ -348,8 +348,9 @@ export function ActionMenu({
                   key={item.id}
                   type="button"
                   role="menuitem"
+                  aria-current={item.current ? 'true' : undefined}
                   disabled={item.disabled || pending}
-                  className={itemClass}
+                  className={cn(itemClass, item.current && 'font-medium text-accent')}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
