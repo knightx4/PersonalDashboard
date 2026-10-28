@@ -38,7 +38,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
   // the orders list is the page Shopping lands on now.
   shopping: [
-    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+    { href: '/shopping/orders', label: 'Now', icon: 'orders' },
     // The review queue keeps its address and lights the Inbox.
     { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },

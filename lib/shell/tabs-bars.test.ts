@@ -61,7 +61,7 @@ const BEFORE: Record<
     owner: false,
     badge: '/shopping/inbox',
     bar: [
-      { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+      { href: '/shopping/orders', label: 'Now', icon: 'orders' },
       {
         href: '/shopping/inbox',
         label: 'Inbox',
