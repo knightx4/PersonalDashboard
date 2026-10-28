@@ -184,6 +184,7 @@ describe('RLS coverage', () => {
       'subjects',
       'theme_fields',
       'topic_cells',
+      'topic_draft_requests',
       'topic_structure_pulls',
       'topics',
       'track_offers',
@@ -251,6 +252,21 @@ describe('what a chat adds (plan #1807)', () => {
         insert into reading_subjects (user_id, reading_id, subject_id)
         values (${userB}, ${readingA}, ${subjectB})`),
     ).rejects.toThrow();
+  });
+});
+
+describe('a topic waiting for the routine to draft it (learn 0193)', () => {
+  // A press queues its own; the routine's script works them with the service role.
+  it('lets a person queue and read only their own, one open request per ask', async () => {
+    await asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'DCF')`);
+    await expect(
+      asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, ' dcf ')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'WACC')`),
+    ).rejects.toThrow();
+    expect(await asUser(userA, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(0);
   });
 });
 
