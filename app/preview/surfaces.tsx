@@ -473,7 +473,19 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
-import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
+import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
+import {
+  FinancesSpendingCategoriesSurface,
+  FinancesSpendingChargesSurface,
+  FinancesSpendingErrorSurface,
+  FinancesSpendingLoadingSurface,
+  FinancesSpendingMerchantOpenSurface,
+  FinancesSpendingMerchantsSurface,
+  FinancesSpendingMonthEmptySurface,
+  FinancesSpendingMonthHeldSurface,
+  FinancesSpendingNoChargesSurface,
+  FinancesSpendingSurface,
+} from './finances-spending-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -10400,6 +10412,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <RecurringSurface />,
   },
   {
+    // Charges that repeat on the person's accounts with no mail behind them
+    // (plan #2593.7).
+    id: 'shopping-recurring-from-charges',
+    label: 'Finances · Recurring, with charges repeating on your accounts',
+    module: 'finances',
+    width: 'page',
+    render: () => <RecurringWithChargesSurface />,
+  },
+  {
     id: 'shopping-recurring-empty',
     label: 'Finances · Recurring with nothing found',
     module: 'finances',
@@ -12445,6 +12466,79 @@ export const SURFACES: readonly Surface[] = [
     module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardEmptySurface />,
+  },
+  /* Spending from bank and card transactions (plan #2593.7): each tab, and
+   * each hidden part on its own surface. Fixtures in
+   * app/preview/finances-spending-fixtures.ts. */
+  {
+    id: 'finances-spending',
+    label: 'Finances · Spending from transactions, each month',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingSurface />,
+  },
+  {
+    id: 'finances-spending-month-held',
+    label: 'Finances · Spending, a month pointed at',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthHeldSurface />,
+  },
+  {
+    id: 'finances-spending-month-empty',
+    label: 'Finances · Spending, a month with nothing posted',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthEmptySurface />,
+  },
+  {
+    id: 'finances-spending-categories',
+    label: 'Finances · Spending by category',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingCategoriesSurface />,
+  },
+  {
+    id: 'finances-spending-merchants',
+    label: 'Finances · Spending by merchant',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantsSurface />,
+  },
+  {
+    id: 'finances-spending-merchant-open',
+    label: 'Finances · Spending, one merchant’s charges open',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantOpenSurface />,
+  },
+  {
+    id: 'finances-spending-charges',
+    label: 'Finances · Spending, largest charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingChargesSurface />,
+  },
+  {
+    id: 'finances-spending-no-charges',
+    label: 'Finances · Spending, a period with no charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingNoChargesSurface />,
+  },
+  {
+    id: 'finances-spending-loading',
+    label: 'Finances · Spending loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingLoadingSurface />,
+  },
+  {
+    id: 'finances-spending-error',
+    label: 'Finances · Spending could not load',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingErrorSurface />,
   },
   /* Finances settings: the institutions linked through Plaid (plan #2593.3),
    * with each hidden part on its own surface. Fixtures in

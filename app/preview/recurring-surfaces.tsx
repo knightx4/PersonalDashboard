@@ -1,6 +1,8 @@
 import { RecurringPaymentsView } from '@/app/finances/recurring/recurring-view';
 import type { RecurringCharge, RecurringPayment } from '@/lib/recurring/load';
 import { buildRecurringView } from '@/lib/recurring/view';
+import { chargesNotInMail } from '@/lib/finances/spending/load';
+import type { RepeatingCharge } from '@/lib/finances/spending/model';
 
 /**
  * Shopping's Recurring page (plan #1126) with an ordinary mix: monthly and
@@ -85,6 +87,35 @@ const payments: RecurringPayment[] = [
 
 export function RecurringSurface() {
   return <RecurringPaymentsView view={buildRecurringView(payments, TODAY)} today={TODAY} />;
+}
+
+/**
+ * The same page with charges that repeat on the person's cards and accounts
+ * and no mail behind them (plan #2593.7): a gym, a utility, two
+ * subscriptions and a yearly membership, with rent left out because the
+ * mail already found it as Property management.
+ */
+function repeat(name: string, period: RepeatingCharge['period'], amountCents: number, monthlyCents: number, count: number, lastOn: string, nextOn: string): RepeatingCharge {
+  return { key: name.toLowerCase(), name, period, amountCents, monthlyCents, count, firstOn: '2025-12-01', lastOn, nextOn, recurringPaymentId: null };
+}
+
+const repeating: RepeatingCharge[] = [
+  repeat('Greystar Property Management', 'month', 210_000, 210_000, 10, '2026-09-02', '2026-10-02'),
+  repeat('Netflix', 'month', 1_599, 1_599, 10, '2026-09-14', '2026-10-14'),
+  repeat('PG&E', 'month', 9_240, 9_240, 10, '2026-09-11', '2026-10-11'),
+  repeat('Equinox Fitness Club Membership Dues', 'month', 24_500, 24_500, 10, '2026-09-05', '2026-10-05'),
+  repeat('Spotify', 'month', 1_199, 1_199, 10, '2026-09-21', '2026-10-21'),
+  repeat('Costco Wholesale Membership', 'year', 6_500, 542, 2, '2025-11-18', '2026-11-18'),
+];
+
+export function RecurringWithChargesSurface() {
+  return (
+    <RecurringPaymentsView
+      view={buildRecurringView(payments, TODAY)}
+      today={TODAY}
+      repeating={chargesNotInMail(repeating, payments)}
+    />
+  );
 }
 
 export function RecurringEmptySurface() {
