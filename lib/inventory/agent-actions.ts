@@ -105,6 +105,24 @@ export const shoppingActions: ModuleActions = {
   'app/shopping/inventory/item-actions.ts': {
     saveManualItem: tool('add_items'),
   },
+  'app/finances/settings/actions.ts': {
+    createLinkToken: none('outside', 'Opens Plaid Link, where the person signs in to their bank.'),
+    completeLink: none('outside', 'Finishes a Plaid Link the person completed in their own browser.'),
+    createFixToken: none('outside', 'Opens Plaid Link in update mode for the person to sign in again.'),
+    completeFix: none('outside', 'Finishes a Plaid sign-in the person completed in their own browser.'),
+  },
+  'app/finances/settings/import-actions.ts': {
+    previewImport: none('page', 'Reads a file the person picks in the page; nothing is saved.'),
+    commitImport: none('theirs', 'Adds a statement the person has just looked over in the preview.'),
+    addAccount: none('theirs', 'Adds an account the person types in, with the balance only they know.'),
+  },
+  'app/finances/accounts/actions.ts': {
+    addReading: none('theirs', 'A balance only the person can read off their statement.'),
+    tryMonthReviewAgain: none(
+      'spends',
+      'Writes a failed monthly review again with a Sonnet call; the daily run already retries it twice, so a further try is the person’s choice to pay for.',
+    ),
+  },
   'app/finances/recurring/actions.ts': {
     renameRecurringPayment: tool('change_recurring'),
     mergeRecurringPayment: { tool: 'change_recurring', note: 'Recorded with no Undo: the merge moves every charge and works the kept payment out again.' },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ageLabel,
+  dueSoon,
   freshness,
   grouped,
   investmentValue,
@@ -232,5 +233,33 @@ describe('summarize and grouped', () => {
     expect(byId.get('brk')!.balanceCents).toBe(700_000);
     expect(byId.get('brk')!.investment?.gainCents).toBe(100_000);
     expect(byId.get('chk')!.comments).toBe(2);
+  });
+});
+
+describe('dueSoon', () => {
+  const summaries = summarize(
+    [
+      account('card-soon', 'credit_card', { nextPaymentDueOn: '2026-11-03', statementBalanceCents: 21_180, minimumPaymentCents: 3_500 }),
+      account('card-first', 'credit_card', { nextPaymentDueOn: '2026-10-31', minimumPaymentCents: 2_500 }),
+      account('card-paid', 'credit_card', { nextPaymentDueOn: '2026-11-02', statementBalanceCents: 0 }),
+      account('card-late', 'credit_card', { nextPaymentDueOn: '2026-10-20', statementBalanceCents: 9_000 }),
+      account('loan-far', 'loan', { nextPaymentDueOn: '2026-11-21', minimumPaymentCents: 21_450 }),
+      account('loan-closed', 'loan', { nextPaymentDueOn: '2026-11-01', minimumPaymentCents: 100, closedOn: '2026-10-01' }),
+      account('checking', 'checking', { nextPaymentDueOn: '2026-11-01' }),
+    ],
+    [],
+    [],
+    TODAY,
+  );
+
+  it('lists open card and loan payments due within two weeks, soonest first', () => {
+    expect(dueSoon(summaries, TODAY).map((d) => [d.account.id, d.dueOn, d.amountCents])).toEqual([
+      ['card-first', '2026-10-31', 2_500],
+      ['card-soon', '2026-11-03', 21_180],
+    ]);
+  });
+
+  it('reaches further when asked', () => {
+    expect(dueSoon(summaries, TODAY, 30).map((d) => d.account.id)).toContain('loan-far');
   });
 });

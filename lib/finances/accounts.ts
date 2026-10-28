@@ -426,3 +426,40 @@ export function accountTitle(account: Pick<AccountRow, 'name' | 'mask'>): string
 }
 
 export const accountHref = (id: string) => `/finances/accounts/${id}`;
+
+/** How far ahead the Accounts page's rail lists payments coming due. */
+export const DUE_SOON_DAYS = 14;
+
+/** A card or loan payment coming due, as the rail lists it. */
+export type DuePayment = {
+  account: AccountSummary;
+  dueOn: string;
+  /** What is owed for it: a card's statement balance, else the minimum payment. */
+  amountCents: number | null;
+};
+
+/**
+ * Card and loan payments due from today to `days` ahead, soonest first
+ * (plan #2593.8.3). A closed account, or one with nothing to pay on its
+ * statement, is left out; an overdue date is not shown as coming.
+ */
+export function dueSoon(
+  accounts: readonly AccountSummary[],
+  today: string,
+  days: number = DUE_SOON_DAYS,
+): DuePayment[] {
+  const last = addDays(today, days);
+  return accounts
+    .flatMap((account): DuePayment[] => {
+      const dueOn = account.nextPaymentDueOn;
+      if (!dueOn || account.closedOn || !isOwed(account.kind)) return [];
+      if (dueOn < today || dueOn > last) return [];
+      const amountCents =
+        account.kind === 'credit_card'
+          ? (account.statementBalanceCents ?? account.minimumPaymentCents)
+          : account.minimumPaymentCents;
+      if (amountCents !== null && amountCents <= 0) return [];
+      return [{ account, dueOn, amountCents }];
+    })
+    .sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.account.name.localeCompare(b.account.name));
+}
