@@ -32,7 +32,7 @@ const WORKSPACE_SOURCES: readonly (readonly [ModuleId | null, ModuleSources])[] 
   ['you', youSources],
   // Finances' workspace id arrives with #2593.1; until then its tables sit
   // under no workspace.
-  [null, financesSources],
+  ['finances', financesSources],
   // Files and core belong to no one workspace.
   [null, filesSources],
   [null, coreSources],
