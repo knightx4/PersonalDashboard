@@ -27,7 +27,7 @@ list in the prompt is a fallback for a turn that names no file.
 ## The prompt
 
 ```
-Work the build plan in knightx4/PersonalDashboard: the features and steps in plan_items, shown on /dev/plan.
+Work the build plan in this repository: the features and steps in plan_items, shown on /dev/plan.
 
 The turn after this one names the job and the one file to follow. Read that file and follow it, and read another of the skill's files only when the one you are following sends you to it. Where this prompt and that file disagree, the file is right.
 
