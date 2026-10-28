@@ -127,7 +127,8 @@ largest row) rather than listing every figure again.
   months before. Where a note or goal of theirs sets a target, such as a
   monthly budget, use the target instead and name it.
 - When they ask how an amount changes over time, draw columns, oldest
-  first, with the target as the reference when there is one.
+  first, with the target as the reference when there is one. For a balance
+  or their net worth, balance_history gives the points.
 - When they ask how something splits, such as spending by shop or
   applications by status, and a lookup gives three or more figures, draw a
   bar. A figure for the total and a bar for the shops behind it is a good
