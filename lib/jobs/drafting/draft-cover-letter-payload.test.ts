@@ -190,15 +190,16 @@ describe('renderLetterRequest', () => {
   });
 
   it('sends their notes on building with AI, or says there are none', () => {
+    const aiRole = { ...material, role: { ...material.role, posting: 'Build with AI and LLMs.' } } as GatheredMaterial;
     const text = renderLetterRequest({
-      material,
+      material: aiRole,
       aiNotes: [
         { sourceTable: 'obsidian.notes', sourceRef: 'n1', title: 'speed vs system', text: 'Real tradeoff between speed and a good system.', similarity: 0.8 },
       ],
     });
     expect(text).toContain('## Their notes on building with AI');
     expect(text).toContain('From "speed vs system":\nReal tradeoff between speed and a good system.');
-    expect(renderLetterRequest({ material })).toContain('None found.');
+    expect(renderLetterRequest({ material: aiRole })).toContain('None found.');
   });
 
   it('says when there is nothing on file yet', () => {
@@ -216,19 +217,31 @@ describe('aiWeight', () => {
     expect(aiWeight(role('Build AI agents with LLMs. You will ship generative AI features and write prompts.'))).toBe('central');
   });
 
-  it('calls a passing mention or automation some', () => {
-    expect(aiWeight(role('Own the forecast. Comfort with AI tools a plus.'))).toBe('some');
-    expect(aiWeight(role('Own the forecast and automate the monthly close.'))).toBe('some');
+  it('calls a few mentions some', () => {
+    expect(aiWeight(role('Own the forecast. Use AI tools for research and validate what LLMs produce.'))).toBe('some');
+  });
+
+  it('calls one mention, or automation and coding tools alone, passing', () => {
+    expect(aiWeight(role('Own the forecast. Comfort with AI tools a plus.'))).toBe('passing');
+    expect(aiWeight(role('Own the forecast and automate the monthly close.'))).toBe('passing');
+    expect(aiWeight(role('Financial modeling; familiarity with coding or automation tools is preferred.'))).toBe('passing');
   });
 
   it('calls a posting with no AI none, without counting words that only contain the letters', () => {
     expect(aiWeight(role('Own the forecast, said the CFO. Work with sales agents and the HTML email team.'))).toBe('none');
   });
 
-  it('reads the requirements too', () => {
+  it('reads the requirements when there is no posting', () => {
     expect(
-      aiWeight({ ...role('Own the forecast.'), requirements: [requirement('Experience with machine learning', 'gap')] }),
-    ).toBe('some');
+      aiWeight({ ...role(''), requirements: [requirement('Experience with machine learning', 'gap')] }),
+    ).toBe('passing');
+  });
+
+  it('does not count a requirement lifted from the posting twice', () => {
+    const posting = 'Own the forecast. Use AI tools for analysis.';
+    expect(aiWeight({ ...role(posting), requirements: [requirement('Use AI tools for analysis', 'strong')] })).toBe(
+      'passing',
+    );
   });
 });
 
@@ -246,5 +259,41 @@ describe('renderLetterRequest and how much the role is about AI', () => {
     });
     expect(none).toContain('Paragraphs 2 and 3 are about the work the posting describes');
     expect(none).not.toContain('ask them for one');
+  });
+
+  it('sends their notes on AI only to a letter with an AI paragraph', () => {
+    const aiNotes = [{ title: 'Agents', path: 'AI/agents.md', text: 'Checks beat prompts.' }] as never;
+    const passing = renderLetterRequest({
+      material: { ...base, role: { requirements: [], posting: 'Familiarity with automation tools.' } } as unknown as GatheredMaterial,
+      aiNotes,
+    });
+    expect(passing).toContain('in passing');
+    expect(passing).not.toContain('Their notes on building with AI');
+
+    const some = renderLetterRequest({
+      material: { ...base, role: { requirements: [], posting: 'Use AI tools and LLMs.' } } as unknown as GatheredMaterial,
+      aiNotes,
+    });
+    expect(some).toContain('Their notes on building with AI');
+  });
+});
+
+describe('letter shapes', () => {
+  it('finds a place where two fields meet, in any words', () => {
+    const found = parseCoverLetterPayload(
+      { letter: 'I want a seat where AI and accounting meet.', evidence_item_ids: [], unsupported_claims: [], asks: [] },
+      [],
+      [],
+    );
+    expect(found.ok && found.draft.bannedFound).toEqual(['a seat where', 'where X and Y meet']);
+  });
+
+  it('leaves a plain preference alone', () => {
+    const found = parseCoverLetterPayload(
+      { letter: 'I want to work on AI products for finance teams. We should meet.', evidence_item_ids: [], unsupported_claims: [], asks: [] },
+      [],
+      [],
+    );
+    expect(found.ok && found.draft.bannedFound).toEqual([]);
   });
 });

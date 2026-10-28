@@ -25,6 +25,9 @@ export const PLAIN_VOICE = `Their voice: say less, and only what they would say 
 - Never claim familiarity or insight as a line of its own ("I know the work
   Contoso is taking off analysts' desks", "I understand what this team needs",
   "That's how I work"). Show it with the fact and stop.
+- Never place them where two fields meet ("where AI and finance meet", "at
+  the intersection of", "a seat where"). Say what they want plainly ("I want
+  to work on AI products for finance teams").
 - No superlatives or ranking about the company or the fit ("about as
   squarely there as a company gets", "exactly the kind of", "the part I'm
   best suited to", "what pulls me most").

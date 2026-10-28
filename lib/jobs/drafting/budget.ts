@@ -32,6 +32,8 @@ export const BUDGETS = {
   vaultPassage: 1_200,
   comments: 6_000,
   comment: 1_000,
+  /** A comment on the letter can be a whole letter pasted as the model to follow. */
+  letterComment: 3_000,
 } as const;
 
 /**

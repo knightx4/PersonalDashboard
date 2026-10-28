@@ -274,8 +274,10 @@ export function questionsFrom(
 /**
  * The person's own comments on each thread, oldest first, cut to the comment
  * budget across the application: the letter's first, then each question's in
- * order. Dash's replies are left out, so a draft does not lean on its own
- * earlier words. A failed read gives no comments rather than no draft.
+ * order. When a thread runs past the budget its newest comments are the ones
+ * kept, since the latest is usually what they are asking for now. Dash's
+ * replies are left out, so a draft does not lean on its own earlier words. A
+ * failed read gives no comments rather than no draft.
  */
 async function readComments(
   deps: GatherDeps,
@@ -293,19 +295,19 @@ async function readComments(
     return none;
   }
   let room = BUDGETS.comments;
-  const take = (ref: string): string[] => {
+  const take = (ref: string, each: number): string[] => {
     const kept: string[] = [];
-    for (const turn of threads.get(ref) ?? []) {
+    for (const turn of [...(threads.get(ref) ?? [])].reverse()) {
       if (turn.author !== 'me' || !turn.body.trim()) continue;
-      const body = cutText(turn.body, BUDGETS.comment);
+      const body = cutText(turn.body, each);
       if (body.length + 3 > room) break;
       room -= body.length + 3;
       kept.push(body);
     }
-    return kept;
+    return kept.reverse();
   };
-  const letter = take(letterRef);
-  const byAnswer = new Map(answerIds.map((id) => [id, take(threadRef('answer', id))]));
+  const letter = take(letterRef, BUDGETS.letterComment);
+  const byAnswer = new Map(answerIds.map((id) => [id, take(threadRef('answer', id), BUDGETS.comment)]));
   return { letter, byAnswer };
 }
 

@@ -13,7 +13,8 @@
  * The letter follows one template (docs/JOB-SEARCH-SPEC.md, Cover letters):
  * who they are and why this role, two middle paragraphs, and a conventional
  * close. How many of the middle paragraphs are about building with AI depends
- * on how much the posting is about AI (aiWeight): both, one, or none. The
+ * on how much the posting is about AI (aiWeight): both, one, or none, and a
+ * letter with none is not sent their notes on building with AI. The
  * résumé carries the stories.
  *
  * The model can ask the person things back. Their replies are stored on the
@@ -27,11 +28,13 @@ import { MODELS } from '@/lib/core/models';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 import {
+  aiWeight,
   coverLetterView,
   mergeAsks,
   parseCoverLetterPayload,
   renderLetterRequest,
   storedLetter,
+  wantsAiNotes,
   MAX_ASKS,
   type CoverLetterDraftView,
   type CoverLetterResult,
@@ -94,7 +97,11 @@ their material says they are writing to).
       company, their thinking about the search, their comments or replies.
       Use an earlier letter's reason, not its sentences; earlier letters
       predate this template. No contrast, no flourish, no claim about how
-      much they want the job.
+      much they want the job. Their notes about the search are for knowing
+      what they want, not lines to quote: say the preference the way they
+      would say it to a friend ("I want to work on AI products for finance
+      teams"), never as a place where two fields meet. When the role is not
+      about AI, the reason is not about AI either.
    When their material gives no reason for this role, write a neutral line
    about what the posting says the role does, claiming no motive for them
    ("The role works directly with the practitioners using the product"),
@@ -127,6 +134,9 @@ their material says they are writing to).
    posting describes, and how they approach that kind of work, from their
    material. A tool they built may appear here in one clause when it does
    that kind of work; the paragraph is not about AI.
+   When the request says AI comes up only in passing, both paragraphs are
+   about the work, and the posting's line about AI, automation or tools gets
+   one plain sentence at most.
    Never pad a paragraph with AI the role does not ask about, and never
    suggest the team should be using AI.
 4. A conventional close in two sentences, the same in every letter apart
@@ -158,6 +168,9 @@ What the letter never does:
   a result can appear in a clause at most.
 - Analyse the company's business for them, guess at its problems, or say
   what the team's work "really" is.
+- Place them where two fields meet, at an intersection, or in a "seat":
+  "where AI and finance meet", "at the intersection of", "a seat where".
+  Say the plain thing they want instead.
 - Set up a point with a colon, or use stock lines such as "most companies
   skip", "the question I keep coming back to", "the part I'd most want to
   own", "the kind of work I want to spend my time on" or "I'd bring X to Y".
@@ -300,13 +313,15 @@ export async function draftAndSaveCoverLetter(
   const { drafts: previous, error: loadError } = await loadDrafts(store, applicationId, 'cover_letter');
   if (loadError) return { ok: false, error: loadError };
   const earlierAsks = previous?.asks ?? [];
-  const aiNotes = await vaultPassages(deps, userId, AI_NOTES_QUESTION);
+  const aiNotes = wantsAiNotes(aiWeight(material.role))
+    ? (await vaultPassages(deps, userId, AI_NOTES_QUESTION)).passages
+    : [];
 
   const result = await writeCoverLetter(deps, {
     material,
     previousLetter: previous?.drafts[LETTER_KEY]?.answer ?? null,
     asks: earlierAsks,
-    aiNotes: aiNotes.passages,
+    aiNotes,
   });
   if (!result.ok) return result;
 

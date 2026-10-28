@@ -69,6 +69,13 @@ export function CoverLetter({
   const [pending, startTransition] = useTransition();
 
   const [draft, setDraft] = useState<CoverLetterDraftView | null>(initialDraft);
+  // A redraft asked for with @dash in the thread below arrives as a new
+  // initialDraft when the page redraws; it replaces the panel, not the editor.
+  const [shownDraft, setShownDraft] = useState(initialDraft?.letter ?? null);
+  if ((initialDraft?.letter ?? null) !== shownDraft) {
+    setShownDraft(initialDraft?.letter ?? null);
+    if (initialDraft) setDraft(initialDraft);
+  }
   // The draft's text is in the editor, waiting for Save. The panel steps
   // aside meanwhile, and Cancel brings it back.
   const [inserted, setInserted] = useState(false);

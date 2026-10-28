@@ -264,6 +264,27 @@ describe('gather', () => {
     expect(text).not.toContain('Noted.');
   });
 
+  it('keeps the newest comments on the letter when the thread runs long, and a pasted letter whole', async () => {
+    const pasted = `Like this one: ${'word '.repeat(400)}`;
+    const threads: ThreadReader = async () =>
+      new Map([
+        [
+          `job_search.applications:${APP}`,
+          [
+            ...Array.from({ length: 6 }, (_, i) => ({ author: 'me' as const, body: `old ${i} ${'x'.repeat(990)}` })),
+            { author: 'me' as const, body: pasted },
+          ],
+        ],
+      ]);
+    const result = await gather(deps(fixture(), { threads }), { userId: ME, applicationId: APP });
+    if (!result.ok) throw new Error(result.error);
+    const letter = result.material.letterComments;
+    expect(letter.at(-1)).toContain('Like this one:');
+    expect(letter.at(-1)).not.toContain('[…]');
+    expect(letter.at(-1)?.length).toBeGreaterThan(BUDGETS.comment);
+    expect(letter[0]).not.toContain('old 0');
+  });
+
   it('drafts without comments when the threads cannot be read', async () => {
     const threads: ThreadReader = async () => {
       throw new Error('core is down');

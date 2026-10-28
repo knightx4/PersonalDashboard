@@ -9,6 +9,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { OPEN_PATH, parseRef, refHref } from '@/lib/core/refs';
 import { COMMENT_MAX } from '@/lib/goals/comments';
 import { threadDashInRequest } from '@/lib/talk/ask-request';
+import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
+import { letterReply } from '@/lib/jobs/drafting/letter-thread';
 import { askDashOnRow } from '@/lib/thread/ask';
 import { addThreadTurn, removeThreadTurn, THREAD_ROW_NOT_YOURS } from '@/lib/thread/store';
 
@@ -19,7 +21,9 @@ import { addThreadTurn, removeThreadTurn, THREAD_ROW_NOT_YOURS } from '@/lib/thr
  * the row's ref, `body` the words. The database refuses a ref that is not the
  * account's (core.ref_owned), so nothing here lists which tables may hold a
  * thread. A comment tagged @dash gets its reply in the thread before this
- * returns (lib/thread/ask.ts).
+ * returns (lib/thread/ask.ts). Under an application, whose thread is its
+ * cover letter's, the reply is a redraft of the letter
+ * (lib/jobs/drafting/letter-thread.ts).
  */
 
 export type RowCommentState = { error?: string; message?: string };
@@ -69,6 +73,12 @@ export async function addRowComment(_prev: RowCommentState, form: FormData): Pro
     return { message: 'Saved.' };
   }
 
+  if (parsed.table === 'job_search.applications') {
+    const message = await redraftLetterInThread(core, user.id, ref, parsed.id);
+    redraw(ref);
+    return { message };
+  }
+
   const asked = await askDashOnRow({
     client: core,
     userId: user.id,
@@ -83,6 +93,26 @@ export async function addRowComment(_prev: RowCommentState, form: FormData): Pro
   // One redraw after the reply, so the question and its answer arrive together.
   redraw(ref);
   return { message: asked.ok ? asked.message : asked.error };
+}
+
+/** Redrafts the letter with the comment just saved, and writes the letter, or why there is none, into the thread. */
+async function redraftLetterInThread(
+  core: Awaited<ReturnType<typeof createCoreClient>>,
+  userId: string,
+  ref: string,
+  applicationId: string,
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const { draft, error } = apiKey
+    ? await draftCoverLetterFor(userId, apiKey, { applicationId })
+    : { draft: null, error: 'No ANTHROPIC_API_KEY on the deployment, so I cannot draft.' };
+  const body = draft ? letterReply(draft) : `I could not redraft the letter: ${error ?? 'no letter came back.'} Your comment is saved.`;
+  try {
+    await addThreadTurn(core, { userId, ref, author: 'claude', body });
+  } catch {
+    return draft ? 'Redrafted. The letter is beside the editor.' : body;
+  }
+  return draft ? 'Redrafted, and the letter is in the thread.' : body;
 }
 
 // latency: pending

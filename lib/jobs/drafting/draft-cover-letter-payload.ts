@@ -55,11 +55,30 @@ export const LETTER_BANNED = [
   'I am writing to apply',
   "I'd bring",
   'I would bring',
+  'intersection of',
+  'a seat where',
+];
+
+/**
+ * Shapes a phrase list cannot hold, each reported under its label. "Where AI
+ * and finance meet" came from a line in their own notes and went into every
+ * letter to an AI role; they do not want it in a letter in any form.
+ */
+const LETTER_BANNED_SHAPES: ReadonlyArray<{ label: string; pattern: RegExp }> = [
+  { label: 'where X and Y meet', pattern: /\bwhere\s+[\w-]+(?:\s+[\w-]+)?\s+and\s+[\w-]+(?:\s+[\w-]+)?\s+meet\b/i },
 ];
 
 /** The person's banned constructions, then the letter's own. */
 function letterBans(banned: readonly string[]): string[] {
   return [...banned, ...LETTER_BANNED];
+}
+
+/** Every banned construction in a letter: the phrases, then the shapes. */
+export function findLetterBans(letter: string, banned: readonly string[]): string[] {
+  return [
+    ...findBannedConstructions(letter, letterBans(banned)),
+    ...LETTER_BANNED_SHAPES.filter((shape) => shape.pattern.test(letter)).map((shape) => shape.label),
+  ];
 }
 
 /** At most this many questions back to the person in one round. */
@@ -106,7 +125,7 @@ export function parseCoverLetterPayload(
       unsupportedClaims: invented
         ? [...unsupported, 'Part of this cited an evidence item that does not exist.']
         : unsupported,
-      bannedFound: findBannedConstructions(parsed.data.letter, letterBans(banned)),
+      bannedFound: findLetterBans(parsed.data.letter, banned),
       asks: asks.slice(0, MAX_ASKS),
     },
   };
@@ -191,18 +210,21 @@ export function coverLetterView(
     words: countWords(entry.answer),
     evidenceItemIds: entry.evidence_item_ids,
     unsupportedClaims: entry.unsupported_claims,
-    bannedFound: findBannedConstructions(entry.answer, letterBans(banned)),
+    bannedFound: findLetterBans(entry.answer, banned),
     asks: stored.asks,
   };
 }
 
 /**
  * How much of the posting is about AI. A letter to an AI-heavy role spends
- * both middle paragraphs on building with AI; one to a role that mentions it
- * in passing spends one; one to a role that never mentions it writes about
- * the work and names their AI building in a clause at most.
+ * both middle paragraphs on building with AI; one to a role that asks about
+ * AI in a few places spends one. A role that mentions AI once, or only asks
+ * for automation or coding tools, gets a letter about the work, with that
+ * line answered in a sentence at most: a finance posting that wants
+ * "familiarity with automation tools" was getting a full paragraph about
+ * building with AI.
  */
-export type AiWeight = 'central' | 'some' | 'none';
+export type AiWeight = 'central' | 'some' | 'passing' | 'none';
 
 /**
  * Terms that mean AI itself. Case-sensitive for the acronyms, so "said" and
@@ -231,18 +253,25 @@ const AUTOMATION_TERMS = [/\bautomat(?:e|es|ed|ing|ion)\b/gi, /\bno-code\b/gi, /
 /** Mentions of AI at or above which the role is about AI. */
 export const AI_CENTRAL_MENTIONS = 4;
 
+/** Mentions of AI at or above which one middle paragraph is about it. */
+export const AI_SOME_MENTIONS = 2;
+
 function mentions(text: string, patterns: readonly RegExp[]): number {
   return patterns.reduce((sum, pattern) => sum + (text.match(pattern)?.length ?? 0), 0);
 }
 
-/** Read from the role's title, industry, posting and requirements; no model. */
+/**
+ * Read from the role's title, industry and posting; no model. The
+ * requirements are read only when there is no posting, since they are lifted
+ * from it and would count its lines twice.
+ */
 export function aiWeight(role: Pick<GatheredMaterial['role'], 'title' | 'industry' | 'posting' | 'requirements'>): AiWeight {
-  const text = [role.title, role.industry, role.posting, ...(role.requirements ?? []).map((r) => r.text)]
-    .filter(Boolean)
-    .join('\n');
+  const body = role.posting?.trim() ? [role.posting] : (role.requirements ?? []).map((r) => r.text);
+  const text = [role.title, role.industry, ...body].filter(Boolean).join('\n');
   const ai = mentions(text, AI_TERMS);
   if (ai >= AI_CENTRAL_MENTIONS) return 'central';
-  if (ai > 0 || mentions(text, AUTOMATION_TERMS) > 0) return 'some';
+  if (ai >= AI_SOME_MENTIONS) return 'some';
+  if (ai > 0 || mentions(text, AUTOMATION_TERMS) > 0) return 'passing';
   return 'none';
 }
 
@@ -250,10 +279,17 @@ const WEIGHT_GUIDE: Record<AiWeight, string> = {
   central:
     'AI is central to this role. Paragraphs 2 and 3 are both about building with AI, as the template describes.',
   some:
-    'The posting mentions AI, automation or tooling, but the role is not about AI. Paragraph 2 is the AI paragraph. Paragraph 3 is about the work the posting describes, not AI.',
+    'The posting asks about AI in a few places, but the role is not about AI. Paragraph 2 is the AI paragraph. Paragraph 3 is about the work the posting describes, not AI.',
+  passing:
+    'The posting mentions AI, automation or coding tools once, in passing. The role is not about AI. Paragraphs 2 and 3 are about the work the posting describes. One sentence in either may answer that line plainly, saying what they use or have built, with no observation about building with AI and no lean. Do not suggest the team should use AI.',
   none:
     'The posting does not mention AI or automation. Paragraphs 2 and 3 are about the work the posting describes. Building with AI appears at most once, as one thing they built named in a clause, and only where it serves that work. Do not suggest the team should use AI.',
 };
+
+/** Whether a letter at this weight has an AI paragraph, and so needs their notes on building with AI. */
+export function wantsAiNotes(weight: AiWeight): boolean {
+  return weight === 'central' || weight === 'some';
+}
 
 /** One question and its answer on this application. */
 function renderAnswered(question: GatheredQuestion): string {
@@ -302,11 +338,15 @@ export function renderLetterRequest(request: LetterRequest): string {
     matches.length > 0
       ? `## Where they match the role best\n\n${matches.map(renderMatch).join('\n')}`
       : '## Where they match the role best\n\nThe requirements have not been matched against their evidence yet; judge the fit from the material.',
-    aiNotes.length > 0
-      ? `## Their notes on building with AI\n\nThe letter's observations about AI come from here, said the way they said them.\n\n${aiNotes.map(renderVaultPassage).join('\n\n')}`
-      : weight === 'central'
-        ? '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds fewer than two.'
-        : '## Their notes on building with AI\n\nNone found. Take any observation about AI only from what the rest of their material says.',
+    // A letter with no AI paragraph is not sent their notes on AI, which
+    // only pulled it back towards one.
+    !wantsAiNotes(weight)
+      ? null
+      : aiNotes.length > 0
+        ? `## Their notes on building with AI\n\nThe letter's observations about AI come from here, said the way they said them.\n\n${aiNotes.map(renderVaultPassage).join('\n\n')}`
+        : weight === 'central'
+          ? '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds fewer than two.'
+          : '## Their notes on building with AI\n\nNone found. Take any observation about AI only from what the rest of their material says.',
     material.letterComments.length > 0
       ? `## Their comments on the cover letter\n\n${material.letterComments.map((comment) => `- ${comment}`).join('\n')}`
       : null,
