@@ -19,6 +19,7 @@ const WORKSPACE_ICONS: Record<ModuleId, NavIconName> = {
   news: 'newsletters',
   goals: 'goalsHome',
   you: 'personality',
+  finances: 'dashboard',
   dev: 'devHome',
 };
 

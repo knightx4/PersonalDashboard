@@ -616,6 +616,7 @@ import {
   DevUsageSurface,
 } from './dev-page-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
+import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -10387,18 +10388,20 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Shopping's Recurring page (plan #1126): the monthly figure, what is
-     * coming up with a price rise marked, and what stopped charging. */
+    /* The Recurring page (plan #1126), in Finances since plan #2593.1: the
+     * monthly figure, what is coming up with a price rise marked, and what
+     * stopped charging. The id keeps the Shopping name it was photographed
+     * under, so its history of rounds stays together. */
     id: 'shopping-recurring',
-    label: 'Shopping · Recurring payments',
-    module: 'shopping',
+    label: 'Finances · Recurring payments',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringSurface />,
   },
   {
     id: 'shopping-recurring-empty',
-    label: 'Shopping · Recurring with nothing found',
-    module: 'shopping',
+    label: 'Finances · Recurring with nothing found',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringEmptySurface />,
   },
@@ -12427,18 +12430,28 @@ export const SURFACES: readonly Surface[] = [
   /* The Shopping pages that had no picture (plan #1604). Fixtures in
    * shopping-page-surfaces.tsx. */
   {
+    // Spending, in Finances since plan #2593.1; the id is the one it was
+    // photographed under.
     id: 'shopping-dashboard',
-    label: 'Shopping · Dashboard, this month',
-    module: 'shopping',
+    label: 'Finances · Spending, this month',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardSurface />,
   },
   {
     id: 'shopping-dashboard-empty',
-    label: 'Shopping · Dashboard, no orders yet',
-    module: 'shopping',
+    label: 'Finances · Spending, no orders yet',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardEmptySurface />,
+  },
+  {
+    // Finances settings before any account is linked (plan #2593.1).
+    id: 'finances-settings',
+    label: 'Finances · Settings, nothing linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView />,
   },
   {
     id: 'shopping-order',

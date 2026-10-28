@@ -1,4 +1,4 @@
-import { RecurringPaymentsView } from '@/app/shopping/recurring/recurring-view';
+import { RecurringPaymentsView } from '@/app/finances/recurring/recurring-view';
 import type { RecurringCharge, RecurringPayment } from '@/lib/recurring/load';
 import { buildRecurringView } from '@/lib/recurring/view';
 

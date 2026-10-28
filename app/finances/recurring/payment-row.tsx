@@ -141,9 +141,12 @@ export function PaymentRow({
   }
 
   return (
-    <li className="row-pad flex items-start gap-3 px-4">
-      <div className="min-w-0 flex-1">
-        <form action={rename} className="-mx-1">
+    // The name, the amount and the menu share the first line; the details run
+    // the row's full width under them, so a date never wraps beside the
+    // amount on a phone (critic, plan #2593.1).
+    <li className="row-pad px-4">
+      <div className="flex items-start gap-3">
+        <form action={rename} className="-mx-1 min-w-0 flex-1">
           <input type="hidden" name="id" value={id} />
           <InlineInput
             ref={inputRef}
@@ -159,6 +162,10 @@ export function PaymentRow({
             className="truncate font-medium"
           />
         </form>
+        {amount}
+        <ActionMenu label={`${payee} actions`} items={items} />
+      </div>
+      <div className="min-w-0">
         {renameState.error && <p className="text-small text-danger">{renameState.error}</p>}
         {details}
         {panel === 'merge' && (
@@ -209,8 +216,6 @@ export function PaymentRow({
           />
         )}
       </div>
-      {amount}
-      <ActionMenu label={`${payee} actions`} items={items} />
     </li>
   );
 }

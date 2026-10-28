@@ -35,15 +35,15 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },
     { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
   ],
+  // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
+  // the orders list is the page Shopping lands on now.
   shopping: [
-    { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
+    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
     // The review queue keeps its address and lights the Inbox.
     { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
-    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
     { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
     { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-    { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
     { href: '/shopping/share', label: 'Share', icon: 'share' },
   ],
@@ -146,6 +146,12 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     { href: '/you/board', label: 'Board', icon: 'board' },
+  ],
+  // Spending first, as the page that answers where the money went; the
+  // accounts the later steps of plan #2593 add sit beside it.
+  finances: [
+    { href: '/finances/spending', label: 'Spending', icon: 'dashboard' },
+    { href: '/finances/recurring', label: 'Recurring', icon: 'recurring' },
   ],
   // Now, then the Inbox of questions a session needs answered. Then three
   // lists: what is being built (the plan leads, as the page worked from most

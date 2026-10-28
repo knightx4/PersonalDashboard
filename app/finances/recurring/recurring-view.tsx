@@ -1,6 +1,6 @@
 import { Repeat } from 'lucide-react';
 import { Figure } from '@/components/ui/figure';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -131,22 +131,10 @@ function nextLabel(row: RecurringRow, today: string, kind: 'active' | 'lapsed'):
   return `${row.kind === 'bill' ? 'Due' : 'Renews'} ${day(row.nextDate, today)}`;
 }
 
-function Section({
-  title,
-  note,
-  children,
-}: {
-  title: string;
-  note?: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <SectionHeading
-        title={title}
-        action={note && <p className="text-ui text-ink-muted">{note}</p>}
-        className="px-1"
-      />
+      <SectionHeading title={title} className="px-1" />
       <ul
         className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}
       >
@@ -211,12 +199,16 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
 
   return (
     <div className="space-y-8">
-      <Figure
-        label="You pay each month"
-        value={view.total.length > 0 ? totalLine(view.total) : formatMoney(0)}
-        caption={caption}
-        secondary={secondary}
-      />
+      {/* On a card like the lists below it, so no figure sits on the bare
+          page (critic, plan #2593.1). */}
+      <Card padding="standard">
+        <Figure
+          label="You pay each month"
+          value={view.total.length > 0 ? totalLine(view.total) : formatMoney(0)}
+          caption={caption}
+          secondary={secondary}
+        />
+      </Card>
 
       {view.active.length > 0 && (
         <Section title="Coming up">
@@ -233,7 +225,7 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
       )}
 
       {view.lapsed.length > 0 && (
-        <Section title="May have lapsed" note="A charge was expected and none has arrived since">
+        <Section title="May have lapsed">
           {view.lapsed.map((row) => (
             <Row
               key={row.id}

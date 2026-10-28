@@ -177,6 +177,7 @@ const CHECKS: Check[] = [
   { ink: '--c-w-news', grounds: [...GROUNDS, '--c-w-news-tint'], min: TEXT, why: 'news accent' },
   { ink: '--c-w-goals', grounds: [...GROUNDS, '--c-w-goals-tint'], min: TEXT, why: 'goals accent' },
   { ink: '--c-w-you', grounds: [...GROUNDS, '--c-w-you-tint'], min: TEXT, why: 'you accent' },
+  { ink: '--c-w-finances', grounds: [...GROUNDS, '--c-w-finances-tint'], min: TEXT, why: 'finances accent' },
   { ink: '--c-w-dev', grounds: [...GROUNDS, '--c-w-dev-tint'], min: TEXT, why: 'dev accent' },
   { ink: '--c-positive', grounds: [...GROUNDS, '--c-positive-tint'], min: TEXT, why: 'refunds and savings' },
   { ink: '--c-caution', grounds: [...GROUNDS, '--c-caution-tint'], min: TEXT, why: 'needs attention' },
@@ -244,6 +245,7 @@ CHECKS.push(
   { ink: '--c-w-news-lit', grounds: PAGE, min: TEXT, why: 'news accent on the page ground' },
   { ink: '--c-w-goals-lit', grounds: PAGE, min: TEXT, why: 'goals accent on the page ground' },
   { ink: '--c-w-you-lit', grounds: PAGE, min: TEXT, why: 'you accent on the page ground' },
+  { ink: '--c-w-finances-lit', grounds: PAGE, min: TEXT, why: 'finances accent on the page ground' },
   { ink: '--c-w-dev-lit', grounds: PAGE, min: TEXT, why: 'dev accent on the page ground' },
 );
 
@@ -265,6 +267,7 @@ for (const hue of [
   '--c-w-news',
   '--c-w-goals',
   '--c-w-you',
+  '--c-w-finances',
   '--c-w-dev',
 ] as const) {
   CHECKS.push({

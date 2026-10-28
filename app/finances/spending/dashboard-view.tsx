@@ -2,6 +2,7 @@ import { LayoutDashboard } from 'lucide-react';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { AimButton } from '@/components/shell/aim-button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SpendHeadline } from '@/components/dashboard/spend-headline';
 import { CategoryDonut } from '@/components/dashboard/category-donut';
@@ -77,17 +78,20 @@ export function DashboardView({
           </EmptyState>
         ) : (
           <div className="space-y-4">
-            <SpendHeadline
-              current={data.current}
-              previous={data.previous}
-              range={data.range}
-              period={data.period}
-              currency={data.currency}
-              valueOwnedCents={data.valueOwnedCents}
-              orderCount={data.orderCount}
-              returnableCount={data.returnable.length}
-            />
-            <div className="h-2" aria-hidden />
+            {/* On a card like the breakdowns below it, so no figure sits on the
+                bare page (critic, plan #2593.1). */}
+            <Card padding="standard">
+              <SpendHeadline
+                current={data.current}
+                previous={data.previous}
+                range={data.range}
+                period={data.period}
+                currency={data.currency}
+                valueOwnedCents={data.valueOwnedCents}
+                orderCount={data.orderCount}
+                returnableCount={data.returnable.length}
+              />
+            </Card>
 
             {showPeople && !personId && (
               <PersonBreakdown

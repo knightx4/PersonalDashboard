@@ -143,7 +143,7 @@ const minutes = parseMinutes({
     },
     {
       key: 'r2',
-      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/shopping/recurring).',
+      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/finances/recurring).',
       day: '2026-11-02',
       seats: ['cfo'],
     },
@@ -284,7 +284,7 @@ const calledMinutes = parseMinutes({
           seat: 'cfo',
           stance: 'Take it',
           text: 'Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
-          receipts: [{ label: 'Recurring', link: '/shopping/recurring' }],
+          receipts: [{ label: 'Recurring', link: '/finances/recurring' }],
         },
         {
           seat: 'dreamer',
