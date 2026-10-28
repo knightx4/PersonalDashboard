@@ -1123,8 +1123,10 @@ things, its `source` (plan #2397, migration goals 0089):
   under it, added up in hours in the period of the day it happened ("Hours
   logged · weekly · aim 10–15"). An entry counts when its unit is a unit of
   time (h, hrs, hours, min, minutes; `hoursOf` in `lib/goals/metrics.ts`),
-  and capture files "applied 2h" as 2 hours of progress on the step that
-  names the work.
+  and capture files "applied 2h" as 2 hours of progress under the goal
+  whose Hours logged metric names that work: filing is shown each goal's
+  line with "tracks hours: Applying", and logs each stretch of time once.
+  Time spent asks no "Roughly how far along?", since hours are a tally.
 
 The aim may be a range: `target` is its low end and `target_high` its top,
 which the form asks for as **Up to, for a range**. The chart draws a range
