@@ -262,7 +262,7 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/api/ask/voice/route.ts#POST':
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
-    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it. The finances review stage writes the review of the month before once a month (plan #2593.8.2), one Sonnet call a person, retried at most twice when it fails.',
   'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':

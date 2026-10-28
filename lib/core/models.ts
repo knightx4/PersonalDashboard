@@ -260,6 +260,8 @@ export const MODELS = {
   youCourseFileSummary: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
+  /** lib/finances/review/model.ts; one call a month per person (plan #2593.8.2) */
+  moneyReview: SONNET,
 } as const;
 
 export type ModelKey = keyof typeof MODELS;
