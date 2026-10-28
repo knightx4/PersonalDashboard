@@ -1,4 +1,5 @@
 import { HoursView } from '@/app/goals/hours/hours-view';
+import { LogHours } from '@/app/goals/hours/log-hours';
 import { hoursPage, type HoursMetric } from '@/lib/goals/hours';
 import { addDays } from '@/lib/todo/tasks/model';
 
@@ -61,5 +62,10 @@ const METRICS: HoursMetric[] = [
 ];
 
 export function GoalHoursSurface() {
-  return <HoursView page={hoursPage(METRICS, TODAY)} />;
+  return (
+    <div className="space-y-4">
+      <LogHours />
+      <HoursView page={hoursPage(METRICS, TODAY)} />
+    </div>
+  );
 }
