@@ -147,9 +147,10 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     { href: '/you/board', label: 'Board', icon: 'board' },
   ],
-  // Spending first, as the page that answers where the money went; the
-  // accounts the later steps of plan #2593 add sit beside it.
+  // Accounts first, with net worth at its top (plan #2593.6): what you hold,
+  // then where the money went, then what keeps charging.
   finances: [
+    { href: '/finances/accounts', label: 'Accounts', icon: 'accounts' },
     { href: '/finances/spending', label: 'Spending', icon: 'dashboard' },
     { href: '/finances/recurring', label: 'Recurring', icon: 'recurring' },
   ],

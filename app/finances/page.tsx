@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Finances opens on Spending, its first tab (plan #2593.1). */
+/** Finances opens on Accounts, its first tab (plan #2593.6). */
 export default function FinancesPage() {
-  redirect('/finances/spending');
+  redirect('/finances/accounts');
 }

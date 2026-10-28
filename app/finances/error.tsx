@@ -14,8 +14,8 @@ export default function Error({
       what="your finances"
       error={error}
       reset={reset}
-      backHref="/finances/spending"
-      backLabel="Back to spending"
+      backHref="/finances/accounts"
+      backLabel="Back to accounts"
     />
   );
 }

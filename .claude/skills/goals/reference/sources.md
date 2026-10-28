@@ -641,6 +641,7 @@ Their bank, card, brokerage and loan accounts, with credit limits and loan terms
 
 - Search: `name`, `official_name`, `institution_name`
 - Name a row by `name`; link it by `id`
+- Opens at `/finances/accounts/<id>`
 - Balances are in finances.balance_readings by account_id, one a day; for a credit card or a loan the balance is the amount owed.
 
 ### `finances.transactions` (Finances)

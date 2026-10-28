@@ -424,6 +424,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   answer: ROW_STORE,
   application: ROW_STORE,
   project: ROW_STORE,
+  account: ROW_STORE,
 };
 
 function DeleteComment({
