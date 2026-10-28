@@ -105,7 +105,7 @@ export const shoppingActions: ModuleActions = {
   'app/shopping/inventory/item-actions.ts': {
     saveManualItem: tool('add_items'),
   },
-  'app/shopping/recurring/actions.ts': {
+  'app/finances/recurring/actions.ts': {
     renameRecurringPayment: tool('change_recurring'),
     mergeRecurringPayment: { tool: 'change_recurring', note: 'Recorded with no Undo: the merge moves every charge and works the kept payment out again.' },
     moveRecurringCharges: { tool: 'change_recurring', note: 'Recorded with no Undo, as the mail reader records its own moves.' },

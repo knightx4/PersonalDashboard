@@ -320,7 +320,7 @@ export type ChargeCandidateRow = {
   created_at: string;
 };
 
-const RECURRING_HREF = '/shopping/recurring';
+const RECURRING_HREF = '/finances/recurring';
 
 /**
  * Bills due today or tomorrow, and price rises read since `since`. One of

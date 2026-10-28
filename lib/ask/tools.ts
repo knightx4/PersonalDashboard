@@ -649,6 +649,9 @@ export function lookupInScope(name: string, scope: ModuleId): boolean {
   if (!isAskToolName(name)) return true;
   if (name === 'search_mail' || name === 'read_mail') return false;
   if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text' || name === 'post_pictures') return scope === 'dev';
+  // Spending moved to Finances (plan #2593.1) but is still read from Shopping's
+  // orders, so the lookup belongs to both until it reads transactions.
+  if (name === 'spend_by_merchant' && scope === 'finances') return true;
   const { module } = LOOKUPS[name];
   return module === null || module === scope;
 }
@@ -666,6 +669,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   news: 'News',
   goals: 'Goals',
   you: 'You',
+  finances: 'Finances',
   dev: 'Dev',
 };
 

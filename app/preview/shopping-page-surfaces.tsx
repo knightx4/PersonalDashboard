@@ -1,4 +1,4 @@
-import { DashboardView } from '@/app/shopping/dashboard/dashboard-view';
+import { DashboardView } from '@/app/finances/spending/dashboard-view';
 import { OrderDetailView, type OrderDetail } from '@/app/shopping/orders/[id]/order-detail-view';
 import { ReturnsPageView } from '@/app/shopping/returns/returns-view';
 import { SavedItemView } from '@/app/shopping/saved/[id]/saved-item-view';

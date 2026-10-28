@@ -29,7 +29,7 @@ function revalidateReviewSurfaces(): void {
   revalidatePath('/shopping/review');
   revalidatePath('/shopping/orders');
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   // Layout reads the nav badge count.
   revalidatePath('/', 'layout');
 }

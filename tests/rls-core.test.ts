@@ -307,7 +307,7 @@ describe('day briefs', () => {
       update core.day_briefs
       set picks = ${admin.json([
         { key: 'task:1', kind: 'task', title: 'A', reason: 'Due today.', href: '/todo' },
-        { key: 'bill:2', kind: 'bill', title: 'B', reason: 'Due today.', href: '/shopping/recurring' },
+        { key: 'bill:2', kind: 'bill', title: 'B', reason: 'Due today.', href: '/finances/recurring' },
       ])}
       where id = ${id}`;
 
@@ -330,7 +330,7 @@ describe('day briefs', () => {
     expect(row.picks.map((p) => p.key)).toEqual(['task:1', 'bill:2']);
     expect(row.picks[0]).not.toHaveProperty('opened_at');
     expect(row.picks[1]).toHaveProperty('opened_at');
-    expect(row.picks[1]).toMatchObject({ title: 'B', href: '/shopping/recurring' });
+    expect(row.picks[1]).toMatchObject({ title: 'B', href: '/finances/recurring' });
   });
 });
 

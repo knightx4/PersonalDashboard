@@ -20,7 +20,7 @@ import {
 export type RecurringActionState = CorrectionResult;
 
 function refresh() {
-  revalidatePath('/shopping/recurring');
+  revalidatePath('/finances/recurring');
   revalidatePath('/todo');
 }
 

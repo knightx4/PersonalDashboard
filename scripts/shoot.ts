@@ -169,7 +169,7 @@ const RECORD = process.argv.includes('--record');
  * since a screenshot going on X should look like the app rather than a panel
  * cut out of it:
  *
- *   SHOOT_SHELL=/shopping/dashboard SHOOT_WIDTHS=laptop npm run shoot -- shopping-dashboard
+ *   SHOOT_SHELL=/finances/spending SHOOT_WIDTHS=laptop npm run shoot -- shopping-dashboard
  */
 const SHELL = process.env.SHOOT_SHELL?.trim() || null;
 

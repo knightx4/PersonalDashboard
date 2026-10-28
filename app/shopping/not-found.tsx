@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <NoLongerThere
       description={DELETED_OR_MOVED}
-      back={{ label: 'Back to the dashboard', href: '/shopping/dashboard' }}
+      back={{ label: 'Back to your orders', href: '/shopping/orders' }}
     />
   );
 }
