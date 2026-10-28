@@ -12602,6 +12602,58 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => <FinancesAccountsErrorSurface />,
   },
+  /* The monthly money review at the top of Accounts (plan #2593.8.3), each
+   * state and hidden part on its own surface. Fixtures in
+   * app/preview/finances-review-fixtures.ts. */
+  {
+    id: 'finances-review',
+    label: 'Finances · Accounts, the monthly review open with a comment',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="open" />,
+  },
+  {
+    id: 'finances-review-charges',
+    label: 'Finances · Accounts, the charges behind a review line',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="charges" />,
+  },
+  {
+    id: 'finances-review-account',
+    label: 'Finances · Accounts, the accounts behind net worth in the review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="account" />,
+  },
+  {
+    id: 'finances-review-quiet',
+    label: 'Finances · Accounts, a month with nothing in it',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="quiet" />,
+  },
+  {
+    id: 'finances-review-failed',
+    label: 'Finances · Accounts, a review Dash could not write',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="failed" />,
+  },
+  {
+    id: 'finances-review-first',
+    label: 'Finances · Accounts, before the first monthly review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="first" />,
+  },
+  {
+    id: 'finances-review-loading',
+    label: 'Finances · Accounts, the monthly review loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="loading" />,
+  },
   {
     id: 'finances-account-card',
     label: 'Finances · One credit card, with its statement and limit',

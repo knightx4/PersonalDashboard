@@ -105,6 +105,12 @@ export const shoppingActions: ModuleActions = {
   'app/shopping/inventory/item-actions.ts': {
     saveManualItem: tool('add_items'),
   },
+  'app/finances/accounts/actions.ts': {
+    tryMonthReviewAgain: none(
+      'spends',
+      'Writes a failed monthly review again with a Sonnet call; the daily run already retries it twice, so a further try is the person’s choice to pay for.',
+    ),
+  },
   'app/finances/recurring/actions.ts': {
     renameRecurringPayment: tool('change_recurring'),
     mergeRecurringPayment: { tool: 'change_recurring', note: 'Recorded with no Undo: the merge moves every charge and works the kept payment out again.' },

@@ -1,5 +1,6 @@
-import { Clock, Landmark } from 'lucide-react';
+import { ChevronRight, Clock, Landmark } from 'lucide-react';
 import { CommentCount } from '@/components/dev/comment-count';
+import { MainRail } from '@/components/patterns/main-rail';
 import { RowLink } from '@/components/shell/back-link';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
@@ -17,7 +18,10 @@ import { whenDate, whenMonth } from '@/lib/core/when';
 import {
   accountHref,
   accountTitle,
+  addDays,
   ageLabel,
+  dueSoon,
+  DUE_SOON_DAYS,
   grouped,
   isOwed,
   KIND_LABEL,
@@ -27,6 +31,7 @@ import {
   SOURCE_LABEL,
   STALE_AFTER_DAYS,
   type AccountSummary,
+  type DuePayment,
   type NetWorthPoint,
 } from '@/lib/finances/accounts';
 import type { AccountsRead } from '@/lib/finances/accounts-store';
@@ -53,6 +58,11 @@ const CHANGE_DAYS = 30;
  * a loan its rate, payment and payoff month, a brokerage its gain on cost.
  * Pressing a row opens the account.
  *
+ * The monthly review sits at the top of the main column (plan #2593.8.3),
+ * passed in as `review` so the page can stream it, and the rail beside it
+ * holds the card and loan payments due in the next two weeks (the
+ * main-plus-rail pattern). On a phone the rail follows the accounts.
+ *
  * Drawn from props, so the gallery draws it from fixtures. `chartActive` and
  * `staleOpenFor` hold a hidden part open for the gallery's shots.
  */
@@ -65,6 +75,7 @@ export function AccountsView({
   chartActive,
   staleOpenFor,
   failed = [],
+  review,
 }: {
   accounts: readonly AccountSummary[];
   /** Net worth a day, oldest first (netWorthSeries). */
@@ -78,6 +89,8 @@ export function AccountsView({
   staleOpenFor?: string;
   /** Reads behind the accounts that failed (loadAccountsPage). */
   failed?: readonly AccountsRead[];
+  /** The monthly review, or nothing (app/finances/accounts/month-review.tsx). */
+  review?: React.ReactNode;
 }) {
   const header = (
     <PageHeader
@@ -154,65 +167,126 @@ export function AccountsView({
   const count = `${accounts.length} ${accounts.length === 1 ? 'account' : 'accounts'}`;
 
   return (
-    <PageColumn>
-      {header}
-      {failure}
-      {banners}
-      {/* Without balances there is no net worth; the banner says so. */}
-      {!noBalances && (
-        <Card padding="standard" className="mb-6 space-y-4">
-          <Figure
-            label="Net worth"
-            value={dollars(now)}
-            aside={
-              change ? (
-                <FigureDelta
-                  label={dollars(Math.abs(change.cents))}
-                  direction={change.cents > 0 ? 'up' : change.cents < 0 ? 'down' : 'flat'}
-                  suffix={`since ${whenDate(change.since, { ...UTC, year: 'auto', now: today })}`}
-                />
-              ) : undefined
-            }
-            caption={`${dollars(now + owed)} held, less ${dollars(owed)} owed on cards and loans`}
-          />
-          <BalanceChart
-            points={netWorth}
-            initialActive={chartActive ?? null}
-            label={netWorthLabel(netWorth)}
-          />
+    <MainRail
+      main={
+        <>
+          {header}
+          {failure}
+          {banners}
+          {review}
+          {/* Without balances there is no net worth; the banner says so. */}
+          {!noBalances && (
+            <Card padding="standard" className="mb-6 space-y-4">
+              <Figure
+                label="Net worth"
+                value={dollars(now)}
+                aside={
+                  change ? (
+                    <FigureDelta
+                      label={dollars(Math.abs(change.cents))}
+                      direction={change.cents > 0 ? 'up' : change.cents < 0 ? 'down' : 'flat'}
+                      suffix={`since ${whenDate(change.since, { ...UTC, year: 'auto', now: today })}`}
+                    />
+                  ) : undefined
+                }
+                caption={`${dollars(now + owed)} held, less ${dollars(owed)} owed on cards and loans`}
+              />
+              <BalanceChart
+                points={netWorth}
+                initialActive={chartActive ?? null}
+                label={netWorthLabel(netWorth)}
+              />
+            </Card>
+          )}
+
+          <Card padding="none">
+            <ul>
+              {groups.map((group) => (
+                <li key={group.id} className="border-b border-border last:border-b-0">
+                  <div className="card-pad-x flex items-baseline justify-between gap-3 pb-1 pt-3">
+                    <SectionLabel as="h2">{group.label}</SectionLabel>
+                    <span className="tabular text-small text-ink-muted">
+                      {group.accounts.every((a) => a.balanceCents === null)
+                        ? '–'
+                        : dollars(group.totalCents)}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-border">
+                    {group.accounts.map((account) => (
+                      <AccountRowItem
+                        key={account.id}
+                        account={account}
+                        today={today}
+                        signInAt={account.linkId ? flagged.get(account.linkId) : undefined}
+                        staleOpen={staleOpenFor === account.id}
+                      />
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <p className="mt-3 text-small text-ink-muted">{count}</p>
+        </>
+      }
+      rail={<DueSoon payments={dueSoon(accounts, today)} today={today} />}
+    />
+  );
+}
+
+/** The rail: card and loan payments due in the next two weeks, soonest first. */
+function DueSoon({ payments, today }: { payments: readonly DuePayment[]; today: string }) {
+  return (
+    <section aria-labelledby="due-soon-heading" className="space-y-2">
+      <h2 id="due-soon-heading" className="px-1 text-ui font-semibold text-ink">
+        Due soon
+      </h2>
+      {payments.length === 0 ? (
+        <p className="px-1 text-small text-ink-muted">
+          No card or loan payment is due in the next {DUE_SOON_DAYS} days.
+        </p>
+      ) : (
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {payments.map((payment) => (
+              <li key={payment.account.id}>
+                <RowLink
+                  href={accountHref(payment.account.id)}
+                  className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ui text-ink">
+                      {accountTitle(payment.account)}
+                    </span>
+                    <span className="block text-small text-ink-muted">
+                      {dueWhen(payment.dueOn, today)}
+                    </span>
+                  </span>
+                  {payment.amountCents !== null && (
+                    <span className="tabular shrink-0 text-ui text-ink">
+                      {formatMoney(payment.amountCents)}
+                    </span>
+                  )}
+                  <ChevronRight
+                    aria-hidden
+                    strokeWidth={1.75}
+                    className="size-3.5 shrink-0 text-ink-muted"
+                  />
+                </RowLink>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
-
-      <Card padding="none">
-        <ul>
-          {groups.map((group) => (
-            <li key={group.id} className="border-b border-border last:border-b-0">
-              <div className="card-pad-x flex items-baseline justify-between gap-3 pb-1 pt-3">
-                <SectionLabel as="h2">{group.label}</SectionLabel>
-                <span className="tabular text-small text-ink-muted">
-                  {group.accounts.every((a) => a.balanceCents === null)
-                    ? '–'
-                    : dollars(group.totalCents)}
-                </span>
-              </div>
-              <ul className="divide-y divide-border">
-                {group.accounts.map((account) => (
-                  <AccountRowItem
-                    key={account.id}
-                    account={account}
-                    today={today}
-                    signInAt={account.linkId ? flagged.get(account.linkId) : undefined}
-                    staleOpen={staleOpenFor === account.id}
-                  />
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      </Card>
-      <p className="mt-3 text-small text-ink-muted">{count}</p>
-    </PageColumn>
+    </section>
   );
+}
+
+/** "Due today", "Due tomorrow", "Due Tue 3 Nov". */
+function dueWhen(dueOn: string, today: string): string {
+  if (dueOn === today) return 'Due today';
+  if (dueOn === addDays(today, 1)) return 'Due tomorrow';
+  return `Due ${whenDate(dueOn, { ...UTC, weekday: 'short', year: 'auto', now: today })}`;
 }
 
 /** "Balances and holdings could not be read." */

@@ -416,8 +416,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // change out. The brief's own estimate for a heavy week.
   'write-week-review': background(run(SONNET, 20_000, 2_000)),
   // The month's facts, each with its sentence and figures, about thirty
-  // short lines; a line per fact and an opening out.
-  'write-money-review': background(run(SONNET, 3_000, 1_500)),
+  // short lines; a line per fact and an opening out. The daily cron writes
+  // it, and Try again on a failed review starts it from a button (plan
+  // #2593.8.3), so it carries a hint.
+  'write-money-review': run(SONNET, 3_000, 1_500),
   // A week of Ask Dash chats, the person's turns whole and Dash's cut to 600
   // characters, about 70,000 characters; a short list of flags out.
   'check-ask-replies': background(run(HAIKU, 20_000, 600)),
