@@ -31,6 +31,8 @@ export type SettingsSection = {
   title: string;
   /** One line under the heading: what the section decides. */
   hint?: React.ReactNode;
+  /** The section's one action, on its heading's line, such as Link account. */
+  action?: React.ReactNode;
   /**
    * The section's fields. On a tabbed page only the open tab's is drawn, so
    * pass a function to keep a closed tab from rendering at all.
@@ -103,13 +105,14 @@ function Section({ section, tabbed }: { section: SettingsSection; tabbed?: boole
   if (tabbed) {
     return (
       <Card id={section.id} padding="dense" data-slot="section">
+        {section.action && <div className="mb-3 flex justify-end">{section.action}</div>}
         {section.hint && <p className="mb-3 text-small text-ink-muted">{section.hint}</p>}
         {content}
       </Card>
     );
   }
   return (
-    <CardSection id={section.id} title={section.title} hint={section.hint}>
+    <CardSection id={section.id} title={section.title} hint={section.hint} action={section.action}>
       {content}
     </CardSection>
   );

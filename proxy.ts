@@ -50,6 +50,10 @@ const PUBLIC_PATHS = [
   // authenticated by an HMAC over the fields it signs, checked in
   // lib/news/providers/mailgun.ts before anything is read out of the body.
   '/api/news/inbound',
+  // Plaid's webhooks about linked bank Items (plan #2593.3). Plaid carries no
+  // session; the route checks the Plaid-Verification JWT, its age and the
+  // body's hash before anything is read, and answers 401 otherwise.
+  '/api/finances/plaid/webhook',
   // The shared case page. Authorized by an unguessable, expiring slug and read
   // through one security definer function that checks both; see
   // supabase/migrations-job-search/0017_public_case_page.sql.

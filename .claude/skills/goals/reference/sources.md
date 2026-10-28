@@ -635,6 +635,30 @@ What they said to an advisor in a one-on-one talk, and what the advisor answered
 - Opens at `/you/board`
 - role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029).
 
+### `finances.accounts` (Finances)
+
+Their bank, card, brokerage and loan accounts, with credit limits and loan terms.
+
+- Search: `name`, `official_name`, `institution_name`
+- Name a row by `name`; link it by `id`
+- Opens at `/finances/accounts/<id>`
+- Balances are in finances.balance_readings by account_id, one a day; for a credit card or a loan the balance is the amount owed.
+
+### `finances.transactions` (Finances)
+
+Money into and out of their accounts: purchases, payments, transfers and pay.
+
+- Search: `description`, `merchant`, `category`
+- Name a row by `description`; link it by `id`
+- amount_cents is negative for money out and positive for money in. A card payment shows on both the bank account and the card.
+
+### `finances.holdings` (Finances)
+
+The investments in their brokerage accounts, with quantity, value and cost basis on a date.
+
+- Search: `security_name`, `ticker`
+- Name a row by `security_name`; link it by `id`
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
@@ -729,6 +753,15 @@ Every newsletter issue they receive, with its summary.
 - Name a row by `subject`; link it by `id`
 - Opens at `/news/i/<id>`
 - Leads only: an issue mentioning a subject says nothing about what they want.
+
+### `finances.month_reviews` (Finances)
+
+What Dash wrote about each month of their money: spending against the months before, new and changed subscriptions, unusual charges, interest, payments coming due and net worth.
+
+- Search: `summary`, `lines`
+- Name a row by `summary`; link it by `id`
+- Opens at `/finances/accounts`
+- The summary and lines are Dash's, not theirs: each line is {id, kind, text, transaction_ids, account_ids}, the finances.transactions and finances.accounts rows behind it. month is the first day of the month reviewed. status 'failed' means the run broke (error says how); source 'plain' means no model worded it.
 
 ### `core.observations` (Home)
 

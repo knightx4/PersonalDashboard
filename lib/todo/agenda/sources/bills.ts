@@ -65,7 +65,7 @@ export const billsSource: AgendaSource = {
       title: billTitle(row),
       day: row.next_date,
       at: null,
-      link: { href: '/shopping/recurring', label: 'Open Recurring' },
+      link: { href: '/finances/recurring', label: 'Open Recurring' },
       action: null,
       detail: row.kind === 'bill' ? 'Bill' : 'Subscription',
       completable: false,

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { normalizeTimeZone } from '@/lib/core/timezone';
+import { applyLinkedLoans, loadLinkedLoansOrNone } from '@/lib/goals/linked-loans';
 import { loadInformation, type CollectionInformation } from '@/lib/goals/collections-store';
 import { readQuestions, type StepAnswer, type StepQuestion } from '@/lib/goals/answers';
 import { loadAnswers } from '@/lib/goals/answers-store';
@@ -297,7 +298,9 @@ export async function loadGoalMap(
   collect(linked.map((entry) => entry.step));
   const [records, information, answers, threads] = await Promise.all([
     syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
-    loadInformation(client, collectionIds),
+    loadInformation(client, collectionIds).then(async (info) =>
+      applyLinkedLoans(info, await loadLinkedLoansOrNone(client, userId)),
+    ),
     loadAnswers(client, informationIds),
     loadThreads(client, itemIds),
   ]);

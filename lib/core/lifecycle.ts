@@ -347,6 +347,8 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  * LIFECYCLE_SOURCES, so a new one is decided when it is added.
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
+  links_status_ck: 'whether a Plaid link is working, failing or removed',
+  month_reviews_status_ck: 'whether the monthly money review was written or the run failed',
   email_account_status: 'connection state of a mailbox',
   sync_job_status: 'state of a background sync',
   sync_run_status: 'state of a background sync',

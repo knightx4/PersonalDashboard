@@ -473,7 +473,19 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
-import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
+import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
+import {
+  FinancesSpendingCategoriesSurface,
+  FinancesSpendingChargesSurface,
+  FinancesSpendingErrorSurface,
+  FinancesSpendingLoadingSurface,
+  FinancesSpendingMerchantOpenSurface,
+  FinancesSpendingMerchantsSurface,
+  FinancesSpendingMonthEmptySurface,
+  FinancesSpendingMonthHeldSurface,
+  FinancesSpendingNoChargesSurface,
+  FinancesSpendingSurface,
+} from './finances-spending-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -616,6 +628,13 @@ import {
   DevUsageSurface,
 } from './dev-page-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
+import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
+import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
+import { FinancesAccountsErrorSurface } from './finances-accounts-error-surface';
+import { AccountsSkeleton } from '@/app/finances/accounts/accounts-skeleton';
+import { FINANCES_LINKS, FINANCES_LINKS_NEEDS_SIGN_IN } from './finances-settings-fixtures';
+import { FinancesImportsSurface, FinancesKeptAccountSurface } from './finances-imports-surfaces';
+import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -10387,18 +10406,29 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Shopping's Recurring page (plan #1126): the monthly figure, what is
-     * coming up with a price rise marked, and what stopped charging. */
+    /* The Recurring page (plan #1126), in Finances since plan #2593.1: the
+     * monthly figure, what is coming up with a price rise marked, and what
+     * stopped charging. The id keeps the Shopping name it was photographed
+     * under, so its history of rounds stays together. */
     id: 'shopping-recurring',
-    label: 'Shopping · Recurring payments',
-    module: 'shopping',
+    label: 'Finances · Recurring payments',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringSurface />,
   },
   {
+    // Charges that repeat on the person's accounts with no mail behind them
+    // (plan #2593.7).
+    id: 'shopping-recurring-from-charges',
+    label: 'Finances · Recurring, with charges repeating on your accounts',
+    module: 'finances',
+    width: 'page',
+    render: () => <RecurringWithChargesSurface />,
+  },
+  {
     id: 'shopping-recurring-empty',
-    label: 'Shopping · Recurring with nothing found',
-    module: 'shopping',
+    label: 'Finances · Recurring with nothing found',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringEmptySurface />,
   },
@@ -12427,18 +12457,350 @@ export const SURFACES: readonly Surface[] = [
   /* The Shopping pages that had no picture (plan #1604). Fixtures in
    * shopping-page-surfaces.tsx. */
   {
+    // Spending, in Finances since plan #2593.1; the id is the one it was
+    // photographed under.
     id: 'shopping-dashboard',
-    label: 'Shopping · Dashboard, this month',
-    module: 'shopping',
+    label: 'Finances · Spending, this month',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardSurface />,
   },
   {
     id: 'shopping-dashboard-empty',
-    label: 'Shopping · Dashboard, no orders yet',
-    module: 'shopping',
+    label: 'Finances · Spending, no orders yet',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardEmptySurface />,
+  },
+  /* Spending from bank and card transactions (plan #2593.7): each tab, and
+   * each hidden part on its own surface. Fixtures in
+   * app/preview/finances-spending-fixtures.ts. */
+  {
+    id: 'finances-spending',
+    label: 'Finances · Spending from transactions, each month',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingSurface />,
+  },
+  {
+    id: 'finances-spending-month-held',
+    label: 'Finances · Spending, a month pointed at',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthHeldSurface />,
+  },
+  {
+    id: 'finances-spending-month-empty',
+    label: 'Finances · Spending, a month with nothing posted',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthEmptySurface />,
+  },
+  {
+    id: 'finances-spending-categories',
+    label: 'Finances · Spending by category',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingCategoriesSurface />,
+  },
+  {
+    id: 'finances-spending-merchants',
+    label: 'Finances · Spending by merchant',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantsSurface />,
+  },
+  {
+    id: 'finances-spending-merchant-open',
+    label: 'Finances · Spending, one merchant’s charges open',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantOpenSurface />,
+  },
+  {
+    id: 'finances-spending-charges',
+    label: 'Finances · Spending, largest charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingChargesSurface />,
+  },
+  {
+    id: 'finances-spending-no-charges',
+    label: 'Finances · Spending, a period with no charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingNoChargesSurface />,
+  },
+  {
+    id: 'finances-spending-loading',
+    label: 'Finances · Spending loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingLoadingSurface />,
+  },
+  {
+    id: 'finances-spending-error',
+    label: 'Finances · Spending could not load',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingErrorSurface />,
+  },
+  /* Finances accounts (plan #2593.6): every account grouped with net worth,
+   * one account's page per kind, and each hidden part on its own surface.
+   * Fixtures in app/preview/finances-accounts-fixtures.ts. */
+  {
+    id: 'finances-accounts',
+    label: 'Finances · Accounts, eight accounts and net worth',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface />,
+  },
+  {
+    id: 'finances-accounts-empty',
+    label: 'Finances · Accounts, nothing linked or imported yet',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface empty />,
+  },
+  {
+    id: 'finances-accounts-chart-hover',
+    label: 'Finances · Accounts, pointing at a day on the net worth chart',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface chartActive={300} />,
+  },
+  {
+    id: 'finances-accounts-stale',
+    label: 'Finances · Accounts, when a stale balance was last read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface staleOpen />,
+  },
+  {
+    id: 'finances-accounts-sign-in',
+    label: 'Finances · Accounts, Chase asking for its sign-in again',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface needsSignIn />,
+  },
+  {
+    id: 'finances-accounts-read-failed',
+    label: 'Finances · Accounts, balances that could not be read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface readFailed />,
+  },
+  {
+    id: 'finances-accounts-loading',
+    label: 'Finances · Accounts, loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <AccountsSkeleton />,
+  },
+  {
+    id: 'finances-accounts-error',
+    label: 'Finances · Accounts, a read that failed',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsErrorSurface />,
+  },
+  /* The monthly money review at the top of Accounts (plan #2593.8.3), each
+   * state and hidden part on its own surface. Fixtures in
+   * app/preview/finances-review-fixtures.ts. */
+  {
+    id: 'finances-review',
+    label: 'Finances · Accounts, the monthly review open with a comment',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="open" />,
+  },
+  {
+    id: 'finances-review-charges',
+    label: 'Finances · Accounts, the charges behind a review line',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="charges" />,
+  },
+  {
+    id: 'finances-review-account',
+    label: 'Finances · Accounts, the accounts behind net worth in the review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="account" />,
+  },
+  {
+    id: 'finances-review-quiet',
+    label: 'Finances · Accounts, a month with nothing in it',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="quiet" />,
+  },
+  {
+    id: 'finances-review-failed',
+    label: 'Finances · Accounts, a review Dash could not write',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="failed" />,
+  },
+  {
+    id: 'finances-review-first',
+    label: 'Finances · Accounts, before the first monthly review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="first" />,
+  },
+  {
+    id: 'finances-review-loading',
+    label: 'Finances · Accounts, the monthly review loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="loading" />,
+  },
+  {
+    id: 'finances-account-card',
+    label: 'Finances · One credit card, with its statement and limit',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="card" />,
+  },
+  {
+    id: 'finances-account-loan',
+    label: 'Finances · One student loan, with its payoff',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="goals" />,
+  },
+  {
+    id: 'finances-account-brokerage',
+    label: 'Finances · One brokerage account, with its holdings',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="brokerage" />,
+  },
+  /* Finances settings: the institutions linked through Plaid (plan #2593.3),
+   * with each hidden part on its own surface. Fixtures in
+   * app/preview/finances-settings-fixtures.ts. */
+  {
+    id: 'finances-settings',
+    label: 'Finances · Settings, two institutions linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface />,
+  },
+  {
+    id: 'finances-settings-empty',
+    label: 'Finances · Settings, nothing linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface empty />,
+  },
+  {
+    id: 'finances-settings-link-menu',
+    label: 'Finances · Settings, choosing what to link',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured menuOpen />,
+  },
+  {
+    id: 'finances-settings-row-menu',
+    label: 'Finances · Settings, a link row offering Fix sign-in',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured rowMenuOpen={FINANCES_LINKS[1]!.id} />
+    ),
+  },
+  {
+    id: 'finances-settings-near-limit',
+    label: 'Finances · Settings, a sign-in to repeat and 8 of 10 links used',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS_NEEDS_SIGN_IN} itemsUsed={8} configured />,
+  },
+  {
+    id: 'finances-settings-saving',
+    label: 'Finances · Settings, saving a new link',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        today={FINANCES_TODAY}
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{ kind: 'saving', institutionName: 'Nelnet' }}
+      />
+    ),
+  },
+  /* Accounts Plaid cannot reach (plan #2593.5): the import's hidden parts,
+   * adding an account by hand, and the pages of an imported and a manual
+   * account. Fixtures in app/preview/finances-imports-surfaces.tsx. */
+  {
+    id: 'finances-settings-import-preview',
+    label: 'Finances · Settings, an Apple Card statement ready to import',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="preview" />,
+  },
+  {
+    id: 'finances-settings-import-empty',
+    label: 'Finances · Settings, a statement with no transactions',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="empty" />,
+  },
+  {
+    id: 'finances-settings-import-error',
+    label: 'Finances · Settings, a file that is not a Wallet export',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="error" />,
+  },
+  {
+    id: 'finances-settings-add-account',
+    label: 'Finances · Settings, adding an account by hand',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface addOpen />,
+  },
+  {
+    id: 'finances-account-import',
+    label: 'Finances · Apple Card, from imported statements',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="import" />,
+  },
+  {
+    id: 'finances-account-manual',
+    label: 'Finances · A manual account asking for a new balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" />,
+  },
+  {
+    id: 'finances-account-manual-reading',
+    label: 'Finances · A manual account, adding a balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" readingOpen />,
+  },
+  {
+    id: 'finances-settings-error',
+    label: 'Finances · Settings, Plaid refused',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        today={FINANCES_TODAY}
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{
+          kind: 'error',
+          message: 'Chase is already linked. If its sign-in stopped working, use Fix sign-in on its row instead, which keeps the same link.',
+        }}
+      />
+    ),
   },
   {
     id: 'shopping-order',

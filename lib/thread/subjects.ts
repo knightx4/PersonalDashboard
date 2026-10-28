@@ -21,7 +21,9 @@ import type { CommentTarget } from '@/lib/comments/load';
  * about it (plan #1876.5), a topic in Learn, drafted or approved (plan
  * #2138.2), a lens, a subject or goal seen as topics to targets (plan
  * #2138.7), an X post draft (plan #2202.2), or an answer or the cover letter
- * on a job application (note be3c6616), or a Dev project (plan #2553.5).
+ * on a job application (note be3c6616), a Dev project (plan #2553.5), an
+ * account in Finances (plan #2593.6), or a monthly money review (plan
+ * #2593.8.3).
  */
 export type ThreadTarget =
   | CommentTarget
@@ -38,7 +40,9 @@ export type ThreadTarget =
   | 'lens'
   | 'answer'
   | 'application'
-  | 'project';
+  | 'project'
+  | 'account'
+  | 'review';
 
 /** The table each target's rows live in, which is the table half of its ref. */
 export const THREAD_TABLES = {
@@ -65,6 +69,10 @@ export const THREAD_TABLES = {
   application: 'job_search.applications',
   // A project Dev builds outside this app (plan #2553.5), keyed by its slug.
   project: 'public.dev_projects',
+  // A bank, card, brokerage or loan account in Finances (plan #2593.6).
+  account: 'finances.accounts',
+  // A monthly money review in Finances (plan #2593.8.3), one thread a month.
+  review: 'finances.month_reviews',
 } as const satisfies Record<ThreadTarget, string>;
 
 const TARGET_OF = new Map<string, ThreadTarget>(

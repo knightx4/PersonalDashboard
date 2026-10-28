@@ -113,6 +113,12 @@ vi.mock('@/inngest/jobs/cron/jd-backfill', () => ({
 vi.mock('@/inngest/jobs/company-boards', () => ({
   kickCompanyBoards: vi.fn(async () => ({ kicked: true })),
 }));
+vi.mock('@/inngest/finances/plaid-sync', () => ({
+  runPlaidSyncForAll: vi.fn(async () => ({ links: 0 })),
+}));
+vi.mock('@/inngest/finances/month-review', () => ({
+  runMonthReviews: vi.fn(async () => ({ reviewed: 0 })),
+}));
 vi.mock('@/inngest/vault/sync', () => ({
   runVaultSyncForAll: vi.fn(async () => ({
     connections: 1,

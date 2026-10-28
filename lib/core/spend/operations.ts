@@ -276,6 +276,13 @@ export const SPEND_OPERATIONS = {
     // name stays for the spend rows it already wrote.
     'write-insights',
   ],
+  finances: [
+    // The monthly money review of the month before (plan #2593.8.2). Sonnet,
+    // one call per person a month from the daily cron's finances-review
+    // stage, and again from Try again on a review that failed; none for a
+    // month with nothing in the person's accounts; background.
+    'write-money-review',
+  ],
 } as const;
 
 export type JobsOperation = (typeof SPEND_OPERATIONS.jobs)[number];
@@ -284,6 +291,7 @@ export type CoreOperation = (typeof SPEND_OPERATIONS.core)[number];
 export type NewsOperation = (typeof SPEND_OPERATIONS.news)[number];
 export type GoalsOperation = (typeof SPEND_OPERATIONS.goals)[number];
 export type YouOperation = (typeof SPEND_OPERATIONS.you)[number];
+export type FinancesOperation = (typeof SPEND_OPERATIONS.finances)[number];
 
 /** A module and one of its operations, as a pair that cannot be mismatched. */
 export type SpendOperation =
@@ -292,4 +300,5 @@ export type SpendOperation =
   | { module: 'core'; operation: CoreOperation }
   | { module: 'news'; operation: NewsOperation }
   | { module: 'goals'; operation: GoalsOperation }
-  | { module: 'you'; operation: YouOperation };
+  | { module: 'you'; operation: YouOperation }
+  | { module: 'finances'; operation: FinancesOperation };

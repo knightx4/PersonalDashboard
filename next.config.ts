@@ -87,6 +87,15 @@ const nextConfig: NextConfig = {
        * keeps its id.
        */
       { source: '/vault/education/:path*', destination: '/you/work/:path*', permanent: false },
+      /**
+       * Spending and Recurring moved from Shopping to Finances (plan
+       * #2593.1). Links already written into notes, briefs, todos and Dash's
+       * replies still open them; the query (?range=, ?person=) is carried
+       * across. The bare /dashboard of the oldest links reaches Shopping's
+       * old address above and comes on from there.
+       */
+      { source: '/shopping/dashboard/:path*', destination: '/finances/spending/:path*', permanent: false },
+      { source: '/shopping/recurring/:path*', destination: '/finances/recurring/:path*', permanent: false },
     ];
   },
 };

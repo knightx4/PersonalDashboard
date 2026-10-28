@@ -26,7 +26,7 @@ function revalidateReturnSurfaces(itemId: string, orderId?: string) {
   revalidatePath(`/shopping/inventory/${itemId}`);
   revalidatePath('/shopping/orders');
   if (orderId) revalidatePath(`/shopping/orders/${orderId}`);
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 }
 
 /** Toggle whether an owned inventory unit is planned for return. */
@@ -297,5 +297,5 @@ function revalidatePaths() {
   revalidatePath('/shopping/returns');
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 }

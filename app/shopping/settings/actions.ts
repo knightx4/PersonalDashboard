@@ -182,7 +182,7 @@ export async function resetInboxImport(accountId: string): Promise<{
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/orders');
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 
   return { ok: true, deletedOrders: toDelete.length };
 }
@@ -262,7 +262,7 @@ export async function reparseInboxOrders(accountId: string): Promise<{
     revalidatePath('/shopping/settings');
     revalidatePath('/shopping/orders');
     revalidatePath('/shopping/inventory');
-    revalidatePath('/shopping/dashboard');
+    revalidatePath('/finances/spending');
     revalidatePath('/shopping/review');
 
     return { ok: true, ...counters };
@@ -325,7 +325,7 @@ export async function createCustomCategory(
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   return { message: 'Category added. New imports can use it automatically.' };
 }
 
@@ -359,7 +359,7 @@ export async function renameCustomCategory(
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   return { message: 'Category renamed.' };
 }
 
@@ -375,7 +375,7 @@ export async function deleteCustomCategory(formData: FormData): Promise<void> {
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 }
 
 export type ListActionState = {

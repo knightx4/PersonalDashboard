@@ -19,6 +19,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
+import { accountsLookup, balanceHistoryLookup, transactionSpendLookup } from './finances';
 import { applicationAnswersLookup } from './answers';
 import { duplicateAnswersLookup } from './duplicate-answers';
 import { coursesLookup } from './courses';
@@ -57,6 +58,8 @@ export const ASK_TOOL_NAMES = [
   'table_info',
   'query_rows',
   'spend_by_merchant',
+  'accounts',
+  'balance_history',
   'job_applications',
   'application_answers',
   'duplicate_answers',
@@ -269,7 +272,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'spend_by_merchant',
     description:
-      'What the person spent on orders placed between two dates, by merchant and by month, from their order emails. Totals are per currency and leave out cancelled orders; refunds are reported separately, in the period they landed. Lists the orders counted (newest 50) and each merchant, each with a link. Use it for any question about spending, a shop, or a period\'s purchases; narrow to one shop with merchant.',
+      "What the person spent between two days. With bank or card accounts in Finances it reads their transactions: spent (charges less refunds, a refund counted in the month it landed), money in, and by month, by category and by merchant, leaving out card payments and transfers between their own accounts so a purchase is counted once; it lists the charges counted (newest 50), each linking to its account, and the Shopping orders they paid for. Without such accounts it reads the orders in their order emails instead, per currency, leaving out cancelled ones. Use it for any question about spending, a shop, a category such as groceries or a period's purchases, and answer from its totals: never add up transactions yourself. Narrow with merchant, category or account.",
     input_schema: {
       type: 'object',
       properties: {
@@ -277,10 +280,51 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         to: { ...DATE_FIELD, description: 'Last day, YYYY-MM-DD, inclusive. Defaults to today.' },
         merchant: {
           type: 'string',
-          description: 'Only merchants whose name contains this, ignoring case (for example "ebay").',
+          description: 'Only merchants whose name contains these words, ignoring case (for example "ebay").',
+        },
+        category: {
+          type: 'string',
+          description: 'Only this category of transaction, in words ("food and drink", "groceries", "travel"). Transactions only.',
+        },
+        account: {
+          type: 'string',
+          description: 'Only one account, by the ref accounts returned or words of its name ("sapphire"). Transactions only.',
         },
       },
       required: ['from'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'accounts',
+    description:
+      "Every account the person holds in Finances (checking, savings, credit cards, brokerage and loans) with its latest balance and the day it was read, whether that balance is stale, and their net worth now with how it moved over 30 and 365 days. A card or loan balance is the amount owed. Cards also give the limit used, the statement balance, the minimum payment and the day it is due; loans the rate, the payment and when they are paid off; brokerage the holdings' value and gain. Use it for \"how much is in checking\", \"what do I owe on my cards\", \"when is my card due\" or \"what is my net worth\", and for the refs balance_history and spend_by_merchant take.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['checking', 'savings', 'credit_card', 'brokerage', 'loan'],
+          description: 'Only accounts of this kind. Net worth still counts them all.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'balance_history',
+    description:
+      "How one account's balance, or their net worth, moved between two days: the balance at the start and end, the change, the highest and lowest day, and points to draw (every day for a short period, otherwise each month's last day). A card or loan balance is the amount owed, so a fall means less owed. Use it for \"how has my savings grown this year\" or \"how did my net worth change since March\". Leave account out for net worth.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: {
+          type: 'string',
+          description: 'The account, by the ref accounts returned or words of its name ("savings", "freedom"). Leave out for net worth.',
+        },
+        from: { ...DATE_FIELD, description: 'First day, YYYY-MM-DD. Defaults to a year before to.' },
+        to: { ...DATE_FIELD, description: 'Last day, YYYY-MM-DD. Defaults to today.' },
+      },
       additionalProperties: false,
     },
   },
@@ -598,7 +642,10 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   table_info: { run: tableInfoLookup, module: null },
   // Checks the workspace of the table it is given, below.
   query_rows: { run: queryRowsLookup, module: null },
-  spend_by_merchant: { run: spendLookup, module: 'shopping' },
+  // Reads transactions when Finances is on and holds them, orders otherwise (below).
+  spend_by_merchant: { run: spendAnyLookup, module: null },
+  accounts: { run: accountsLookup, module: 'finances' },
+  balance_history: { run: balanceHistoryLookup, module: 'finances' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   application_answers: { run: applicationAnswersLookup, module: 'jobs' },
   duplicate_answers: { run: duplicateAnswersLookup, module: 'jobs' },
@@ -637,6 +684,30 @@ async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Pr
 }
 
 /**
+ * Spending (plan #2593.8.1): from bank and card transactions when Finances is
+ * on and holds some, and from Shopping's orders otherwise, so a person who
+ * has linked no bank still gets an answer from their order emails.
+ */
+async function spendAnyLookup(ctx: AskContext, input: Record<string, unknown>): Promise<AskToolResult> {
+  if (ctx.enabledModules.includes('finances')) {
+    const fromTransactions = await transactionSpendLookup(ctx, input);
+    if (fromTransactions) return fromTransactions;
+  }
+  if (!ctx.enabledModules.includes('shopping')) {
+    return ctx.enabledModules.includes('finances')
+      ? { ok: true, rows: [], note: 'No bank or card transactions in Finances yet, so there is no spending to add up.' }
+      : { ok: false, error: 'The Finances and Shopping workspaces are switched off, so spending cannot be read.' };
+  }
+  if (typeof input.category === 'string' || typeof input.account === 'string') {
+    throw new AskInputError('category and account need bank or card transactions in Finances, and there are none yet.');
+  }
+  const fromOrders = await spendLookup(ctx, input);
+  if (!fromOrders.ok) return fromOrders;
+  const note = 'From order emails, since there are no bank or card transactions in Finances.';
+  return { ...fromOrders, note: fromOrders.note ? `${note} ${fromOrders.note}` : note };
+}
+
+/**
  * Whether a lookup is offered when the person keeps a question to one
  * workspace (plan #1899.5). A lookup bound to a workspace is offered in its
  * own. The ones that range over every workspace (search, recall, open_row,
@@ -649,6 +720,9 @@ export function lookupInScope(name: string, scope: ModuleId): boolean {
   if (!isAskToolName(name)) return true;
   if (name === 'search_mail' || name === 'read_mail') return false;
   if (name === 'read_spec' || name === 'read_dev_row' || name === 'find_dev_text' || name === 'post_pictures') return scope === 'dev';
+  // Spending lives in Finances (plan #2593.1) and falls back to Shopping's
+  // orders (spendAnyLookup), so it belongs to both.
+  if (name === 'spend_by_merchant') return scope === 'finances' || scope === 'shopping';
   const { module } = LOOKUPS[name];
   return module === null || module === scope;
 }
@@ -666,6 +740,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   news: 'News',
   goals: 'Goals',
   you: 'You',
+  finances: 'Finances',
   dev: 'Dev',
 };
 

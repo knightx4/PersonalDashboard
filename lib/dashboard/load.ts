@@ -44,7 +44,7 @@ export function dashboardHref(range: PresetRange, personId?: string | null): str
   // Carried on every range link too, so switching the period does not silently
   // drop you back to everyone's spending.
   if (personId) params.set('person', personId);
-  return `/shopping/dashboard?${params.toString()}`;
+  return `/finances/spending?${params.toString()}`;
 }
 
 export interface ReturnableRow {

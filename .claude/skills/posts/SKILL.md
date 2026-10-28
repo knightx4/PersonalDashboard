@@ -245,7 +245,7 @@ Every picture shows the whole app, never a panel on its own: the person asked
 for the sidebar and the top bar in every post's picture. `SHOOT_SHELL` puts
 the surface inside the shell (`app/preview/shell-frame.tsx`) and lights the
 row of the page it names, so set it to the route the surface stands for, such
-as `/shopping/dashboard` for `shopping-dashboard` or `/jobs/pipeline` for a
+as `/finances/spending` for `shopping-dashboard` or `/jobs/pipeline` for a
 pipeline surface. A surface whose `width` is `screen` is a page outside the
 shell and is shot without it.
 

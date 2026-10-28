@@ -19,6 +19,10 @@ import { sql } from './helpers/db';
  * which list_rows cannot filter on.
  */
 const UNLISTED: Record<string, string> = {
+  'finances.accounts': 'Read through the accounts and balance_history lookups and spend_by_merchant (lib/ask/finances.ts), not list_rows, so Dash cannot add up amount_cents by hand and count a card payment twice.',
+  'finances.transactions': 'Read through the accounts and balance_history lookups and spend_by_merchant (lib/ask/finances.ts), not list_rows, so Dash cannot add up amount_cents by hand and count a card payment twice.',
+  'finances.holdings': 'Read through the accounts and balance_history lookups and spend_by_merchant (lib/ask/finances.ts), not list_rows, so Dash cannot add up amount_cents by hand and count a card payment twice.',
+  'finances.month_reviews': 'Read through the accounts and balance_history lookups and spend_by_merchant (lib/ask/finances.ts), not list_rows, so Dash cannot add up amount_cents by hand and count a card payment twice.',
   'public.order_items': 'Owned through orders; spend_by_merchant and open_row on the order read them.',
 };
 

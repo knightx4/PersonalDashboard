@@ -190,6 +190,12 @@ export function lookupLabel(name: string, input: unknown): string {
       const shop = quoted(field(input, 'merchant'));
       return shop ? `Adding up spending at ${shop}` : 'Adding up spending';
     }
+    case 'accounts':
+      return 'Checking accounts and balances';
+    case 'balance_history': {
+      const account = quoted(field(input, 'account'));
+      return account ? `Reading the balance history of ${account}` : 'Reading net worth over time';
+    }
     case 'job_applications':
       return 'Checking job applications';
     case 'todos':

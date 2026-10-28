@@ -31,6 +31,7 @@ import {
   IdCard,
   Inbox,
   KanbanSquare,
+  Landmark,
   LayoutDashboard,
   Lightbulb,
   List,
@@ -86,6 +87,8 @@ export const NAV_ICONS = {
   returns: Undo2,
   // What you pay for again and again: subscriptions and bills (plan #1126).
   recurring: Repeat,
+  // Finances: every account held, with net worth (plan #2593.6).
+  accounts: Landmark,
   saved: Bookmark,
   share: Share2,
   // Jobs

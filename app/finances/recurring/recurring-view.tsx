@@ -1,6 +1,6 @@
 import { Repeat } from 'lucide-react';
 import { Figure } from '@/components/ui/figure';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -9,6 +9,7 @@ import { formatDay } from '@/lib/goals/dates';
 import { formatMoney } from '@/lib/money';
 import type { RecurringEvent, RecurringPeriod } from '@/lib/recurring/extraction';
 import type { MonthlyTotal, RecurringRow, RecurringView } from '@/lib/recurring/view';
+import type { RepeatingCharge } from '@/lib/finances/spending/model';
 import { PaymentRow, type ChargeChoice, type PaymentChoice } from './payment-row';
 
 /**
@@ -131,22 +132,46 @@ function nextLabel(row: RecurringRow, today: string, kind: 'active' | 'lapsed'):
   return `${row.kind === 'bill' ? 'Due' : 'Renews'} ${day(row.nextDate, today)}`;
 }
 
+/**
+ * A charge that repeats on a card or bank account and that no mail has
+ * explained (plan #2593.7): the merchant, how often and since when, when the
+ * next is due, and the usual amount.
+ */
+function RepeatingRow({ charge, today }: { charge: RepeatingCharge; today: string }) {
+  return (
+    <li className="flex items-start gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-body font-medium text-ink">{charge.name}</p>
+        <p className="truncate text-ui text-ink-muted">
+          Next about {day(charge.nextOn, today)} · {charge.count} charges
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="tabular text-body font-medium text-ink">
+          {formatMoney(charge.amountCents)}
+          <span className="font-normal text-ink-muted"> {PER[charge.period]}</span>
+        </p>
+        {charge.period !== 'month' && (
+          <p className="tabular text-ui text-ink-muted">{formatMoney(charge.monthlyCents)} a month</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
 function Section({
   title,
-  note,
+  count,
   children,
 }: {
   title: string;
-  note?: string;
+  /** A quiet fact beside the title. */
+  count?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="space-y-2">
-      <SectionHeading
-        title={title}
-        action={note && <p className="text-ui text-ink-muted">{note}</p>}
-        className="px-1"
-      />
+      <SectionHeading title={title} count={count} className="px-1" />
       <ul
         className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}
       >
@@ -156,10 +181,19 @@ function Section({
   );
 }
 
-export function RecurringPaymentsView({ view, today }: { view: RecurringView; today: string }) {
+export function RecurringPaymentsView({
+  view,
+  today,
+  repeating = [],
+}: {
+  view: RecurringView;
+  today: string;
+  /** Charges that repeat on the person's accounts and no mail explains. */
+  repeating?: readonly RepeatingCharge[];
+}) {
   const count =
     view.active.length + view.lapsed.length + view.cancelled.length + view.ignored.length;
-  if (count === 0) {
+  if (count === 0 && repeating.length === 0) {
     return (
       <EmptyState
         icon={Repeat}
@@ -211,12 +245,18 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
 
   return (
     <div className="space-y-8">
-      <Figure
-        label="You pay each month"
-        value={view.total.length > 0 ? totalLine(view.total) : formatMoney(0)}
-        caption={caption}
-        secondary={secondary}
-      />
+      {/* On a card like the lists below it, so no figure sits on the bare
+          page (critic, plan #2593.1). */}
+      {count > 0 && (
+        <Card padding="standard">
+          <Figure
+            label="You pay each month"
+            value={view.total.length > 0 ? totalLine(view.total) : formatMoney(0)}
+            caption={caption}
+            secondary={secondary}
+          />
+        </Card>
+      )}
 
       {view.active.length > 0 && (
         <Section title="Coming up">
@@ -232,8 +272,16 @@ export function RecurringPaymentsView({ view, today }: { view: RecurringView; to
         </Section>
       )}
 
+      {repeating.length > 0 && (
+        <Section title="Repeating on your accounts" count="not in the monthly total">
+          {repeating.map((charge) => (
+            <RepeatingRow key={charge.key} charge={charge} today={today} />
+          ))}
+        </Section>
+      )}
+
       {view.lapsed.length > 0 && (
-        <Section title="May have lapsed" note="A charge was expected and none has arrived since">
+        <Section title="May have lapsed">
           {view.lapsed.map((row) => (
             <Row
               key={row.id}
