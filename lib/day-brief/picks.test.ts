@@ -173,6 +173,25 @@ describe('reasonFor', () => {
     expect(
       reasonFor({ ...bill, event: 'trial_ending', dueIn: 1, amountCents: null } as Candidate, ZONE),
     ).toBe('The free trial ends tomorrow');
+    const card = {
+      kind: 'card',
+      key: 'card:a1:2026-10-01',
+      title: 'Sapphire ··4417',
+      href: '/finances/accounts/a1',
+      dueOn: '2026-10-01',
+      dueIn: 3,
+      amountCents: 41_200,
+      amountIs: 'statement',
+      minimumCents: 3_500,
+      currency: 'USD',
+    } as Candidate;
+    expect(reasonFor(card, ZONE)).toBe('$412.00 statement balance due Thursday 1 October, minimum $35.00');
+    expect(reasonFor({ ...card, dueIn: 1 } as Candidate, ZONE)).toBe(
+      '$412.00 statement balance due tomorrow, minimum $35.00',
+    );
+    expect(
+      reasonFor({ ...card, dueIn: 0, amountIs: 'minimum', amountCents: 3_500 } as Candidate, ZONE),
+    ).toBe('$35.00 minimum payment due today');
     expect(reasonFor(rise, ZONE)).toBe('Up from $12.00 to $15.00 a month');
     expect(reasonFor({ ...rise, startsOn: '2026-10-03' } as Candidate, ZONE)).toBe(
       'Up from $12.00 to $15.00 a month, from 3 October',

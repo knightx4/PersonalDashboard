@@ -182,6 +182,19 @@ export type Candidate =
       amountCents: number | null;
       currency: string | null;
     })
+  /** A card whose payment falls due today or within CARD_DUE_DAYS days (finances.accounts). */
+  | (CandidateBase & {
+      kind: 'card';
+      dueOn: string;
+      dueIn: number;
+      /** The statement balance, or the minimum payment when no statement balance is known. */
+      amountCents: number;
+      /** Which of the two amountCents is. */
+      amountIs: 'statement' | 'minimum';
+      /** The minimum payment, when amountCents is the statement balance and a minimum is known. */
+      minimumCents: number | null;
+      currency: string;
+    })
   /** A charge read since the last brief that costs more than the one before. */
   | (CandidateBase & {
       kind: 'price-rise';
@@ -372,6 +385,58 @@ export function chargeCandidates(
       currency: row.currency,
       period: row.period,
       startsOn: row.event === 'price_change' ? row.due_on : null,
+    });
+  }
+  return out;
+}
+
+/** How many days ahead a card's due date reaches the brief. */
+export const CARD_DUE_DAYS = 5;
+
+/** A credit card's payment details (finances.accounts), already limited to the person's own. */
+export type CardRow = {
+  id: string;
+  name: string;
+  mask: string | null;
+  currency: string;
+  next_payment_due_on: string | null;
+  minimum_payment_cents: number | null;
+  statement_balance_cents: number | null;
+};
+
+const CARDS_HREF = '/finances/accounts';
+
+/**
+ * Cards with a payment due from today through CARD_DUE_DAYS days ahead. The
+ * amount is the statement balance; a card with no statement balance (or one
+ * already paid down to nothing) falls back to its minimum, and a card with
+ * neither is left out rather than named with no figure. A due date already
+ * passed is not named: the sync has not yet read the payment, and saying it
+ * is due would be a guess.
+ */
+export function cardCandidates(rows: readonly CardRow[], today: string): Candidate[] {
+  const last = addDays(today, CARD_DUE_DAYS);
+  const out: Candidate[] = [];
+  for (const row of rows) {
+    const dueOn = row.next_payment_due_on;
+    if (!dueOn || dueOn < today || dueOn > last) continue;
+    const statement = row.statement_balance_cents;
+    const minimum = row.minimum_payment_cents != null && row.minimum_payment_cents > 0 ? row.minimum_payment_cents : null;
+    if (statement != null && statement <= 0) continue;
+    const amountIs = statement != null ? 'statement' : 'minimum';
+    const amountCents = statement ?? minimum;
+    if (amountCents == null) continue;
+    out.push({
+      kind: 'card',
+      key: `card:${row.id}:${dueOn}`,
+      title: row.mask ? `${row.name} ··${row.mask}` : row.name,
+      href: `${CARDS_HREF}/${row.id}`,
+      dueOn,
+      dueIn: Math.round((Date.parse(dueOn) - Date.parse(today)) / DAY_MS),
+      amountCents,
+      amountIs,
+      minimumCents: amountIs === 'statement' ? minimum : null,
+      currency: row.currency,
     });
   }
   return out;
