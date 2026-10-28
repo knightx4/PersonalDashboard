@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import { saveTouchEdit } from '@/lib/jobs/contacts/edit';
+import { saveTouchEdit, TOUCH_CHANNELS } from '@/lib/jobs/contacts/edit';
 import { addFollowUpPerson as addPerson, removeFollowUpPerson as removePerson, startOwnNote } from '@/lib/jobs/followup/choose';
 import { designateFollowUp, draftNote } from '@/lib/jobs/followup/designate';
 import { loadFollowUps, type FollowUp } from '@/lib/jobs/followup/load';
@@ -185,6 +185,18 @@ export async function saveFollowUpNote(touchId: string, message: string): Promis
   const user = await requireUser();
   const supabase = await createClient();
   const { error } = await saveTouchEdit(supabase, user.id, touchId, { message: message.trim() || null });
+  if (!error) refresh();
+  return { error };
+}
+
+/** Change how the note goes: a LinkedIn message, an email, a connection note (note a790ab92). */
+// latency: optimistic -- the choice is already on the page
+export async function saveFollowUpChannel(touchId: string, channel: string): Promise<{ error: string | null }> {
+  if (!Id.safeParse(touchId).success) return { error: 'That is not a draft.' };
+  if (!z.enum(TOUCH_CHANNELS).safeParse(channel).success) return { error: 'That is not a way to send it.' };
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await saveTouchEdit(supabase, user.id, touchId, { channel });
   if (!error) refresh();
   return { error };
 }

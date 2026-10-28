@@ -93,16 +93,14 @@ function whyFor(contact: FileContact, rank: number, company: string): string {
 }
 
 /**
- * How the note goes: email to whoever wrote by email or recruits, a LinkedIn
- * message to someone already connected, and otherwise email where there is
- * an address and a connection note where there is not.
+ * How the note goes: email to whoever wrote by email or recruits, and a
+ * LinkedIn message to everyone else. A connection note is rarely what is
+ * sent (note a790ab92), so it is never the default; the person picks it on
+ * the note when it is.
  */
 export function channelFor(contact: Pick<FileContact, 'email' | 'relationship' | 'status' | 'linkedinConnection'>, wroteByEmail = false): Channel {
   if (contact.email && (wroteByEmail || contact.relationship === 'recruiter')) return 'email';
-  if (contact.linkedinConnection || contact.status === 'connected' || contact.status === 'responded' || contact.status === 'met') {
-    return 'linkedin_dm';
-  }
-  return contact.email ? 'email' : 'linkedin_connect';
+  return 'linkedin_dm';
 }
 
 /** The recruiter or hiring manager on file for this application, or null. */

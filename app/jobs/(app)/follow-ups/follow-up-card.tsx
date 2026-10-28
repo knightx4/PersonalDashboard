@@ -19,6 +19,7 @@ import {
   findFollowUp,
   redraftFollowUp,
   removeFollowUpPerson,
+  saveFollowUpChannel,
   saveFollowUpNote,
   writeOwnFollowUp,
 } from './actions';
@@ -34,6 +35,9 @@ const CHANNEL_WORDS: Record<string, string> = {
   event: 'In person',
   other: 'Message',
 };
+
+/** The ways a note can go, in the order the picker offers them: a LinkedIn message first. */
+const NOTE_CHANNELS = ['linkedin_dm', 'email', 'linkedin_connect', 'intro', 'event', 'other'] as const;
 
 export type CompanyContact = { id: string; name: string; title: string | null };
 
@@ -307,7 +311,33 @@ function PersonBlock({
       {draft && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-small text-ink-muted">{CHANNEL_WORDS[draft.channel] ?? 'Message'}, not sent yet</span>
+            {/* How it goes is yours to pick (note a790ab92); Dash starts it as a LinkedIn message. */}
+            <span className="flex min-w-0 items-center gap-2 text-small text-ink-muted">
+              <Select
+                value={draft.channel}
+                aria-label={`How the note to ${person.name} goes`}
+                className="w-auto"
+                disabled={busy}
+                onChange={(event) => {
+                  const channel = event.target.value;
+                  const before = draft.channel;
+                  onError(null);
+                  onPatch({ draft: { ...draft, channel } });
+                  void saveFollowUpChannel(draft.id, channel).then((result) => {
+                    if (!result.error) return;
+                    onPatch({ draft: { ...draft, channel: before } });
+                    onError(`Not changed: ${result.error}`);
+                  });
+                }}
+              >
+                {NOTE_CHANNELS.map((channel) => (
+                  <option key={channel} value={channel}>
+                    {CHANNEL_WORDS[channel]}
+                  </option>
+                ))}
+              </Select>
+              <span className="shrink-0">not sent yet</span>
+            </span>
             <CopyText text={text} what="note" />
           </div>
           <Textarea
