@@ -159,7 +159,7 @@ export function PaymentRow({
             disabled={renaming}
             onBlur={commit}
             onKeyDown={onKeyDown}
-            className="truncate font-medium"
+            className="truncate font-medium max-sm:-my-[7px] max-sm:min-h-11"
           />
         </form>
         {amount}

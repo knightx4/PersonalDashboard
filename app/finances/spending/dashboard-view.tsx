@@ -70,6 +70,7 @@ export function DashboardView({
         {data.orderCount === 0 ? (
           <EmptyState
             icon={LayoutDashboard}
+            align="start"
             title="No spending to show yet"
             description="Connect an inbox and we will pull in your past orders automatically, or add one by hand to see how this looks."
             action={{ label: 'Connect an inbox', href: '/shopping/settings#inboxes' }}
