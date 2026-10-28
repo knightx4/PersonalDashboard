@@ -61,10 +61,10 @@ const METRICS: HoursMetric[] = [
   },
 ];
 
-export function GoalHoursSurface() {
+export function GoalHoursSurface({ logOpen = false }: { logOpen?: boolean }) {
   return (
     <div className="space-y-4">
-      <LogHours />
+      <LogHours initialOpen={logOpen} />
       <HoursView page={hoursPage(METRICS, TODAY)} />
     </div>
   );

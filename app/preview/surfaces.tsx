@@ -4789,6 +4789,34 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
+    /* The saved views on their own button (note 1e926155), its panel open:
+     * one view in force, one that the list opens on, and the save line. */
+    id: 'jobs-pipeline-views',
+    label: 'Pipeline · Table · Saved views',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PipelinePage
+        rows={pipelineRows}
+        params={{ view: 'table', ready: 'yes' }}
+        savedViews={[
+          { id: 'v-1', list: '/jobs/pipeline', name: 'Ready to send', query: 'view=table&ready=yes', isDefault: false },
+          { id: 'v-2', list: '/jobs/pipeline', name: 'Everything live', query: 'view=table', isDefault: true },
+        ]}
+        openPanel="views"
+      />
+    ),
+  },
+  {
+    /* The Display panel open beside it: sort, group and columns, and no
+     * saved views, which have their own button now. */
+    id: 'jobs-pipeline-display',
+    label: 'Pipeline · Table · Display',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} openPanel="display" />,
+  },
+  {
     /* The table with a column's menu open (note f05f5f04): its sort, then
      * the companies it can be narrowed to, one already chosen. */
     id: 'jobs-pipeline-column-menu',
@@ -5253,6 +5281,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalHoursSurface />,
+  },
+  {
+    /* The Hours page's slot opened, to log today's hours (note 3eb2c302). */
+    id: 'goals-hours-log',
+    label: 'Goals · Hours, logging today',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface logOpen />,
   },
   {
     id: 'goals-metrics-tooltip',

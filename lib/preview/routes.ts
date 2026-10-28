@@ -50,6 +50,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-pipeline-focus': ['/jobs/pipeline'],
   'jobs-pipeline-table': ['/jobs/pipeline'],
   'jobs-pipeline-column-menu': ['/jobs/pipeline'],
+  'jobs-pipeline-views': ['/jobs/pipeline'],
+  'jobs-pipeline-display': ['/jobs/pipeline'],
   'jobs-companies-table': ['/jobs/companies'],
   'jobs-companies-table-column-menu': ['/jobs/companies'],
   'jobs-companies-table-empty': ['/jobs/companies'],
@@ -73,6 +75,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'scope-burn-up': ['/goals/[goalId]', '/dev/plan/[number]'],
   'goals-metrics': ['/goals/[goalId]'],
   'goals-hours': ['/goals/hours'],
+  'goals-hours-log': ['/goals/hours'],
   'goals-metrics-tooltip': ['/goals/[goalId]'],
   'goals-metrics-empty': ['/goals/[goalId]'],
   'goals-metrics-error': ['/goals/[goalId]'],
@@ -1001,6 +1004,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // A goal's metrics as bar charts (plan #2084.2), drawn with each hidden part.
   'goals-metrics': ['app/goals/[goalId]/goal-metrics.tsx'],
   'goals-hours': ['app/goals/hours/hours-view.tsx'],
+  'goals-hours-log': ['app/goals/hours/log-hours.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // A ref link with its preview open, loading and gone (plan #1931.4).

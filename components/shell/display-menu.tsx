@@ -51,6 +51,7 @@ export function DisplayMenu({
   label = 'Display',
   align = 'end',
   views = true,
+  initialOpen = false,
   className,
   wordClassName,
 }: {
@@ -68,6 +69,8 @@ export function DisplayMenu({
    * them on their own button (ViewsMenu) passes false.
    */
   views?: boolean;
+  /** Drawn open, for the gallery. */
+  initialOpen?: boolean;
   className?: string;
   /** Classes for the word alone, such as hiding it on a phone where the header's line is full. */
   wordClassName?: string;
@@ -78,6 +81,7 @@ export function DisplayMenu({
       label={label}
       panelLabel="Display options"
       align={align}
+      initialOpen={initialOpen}
       className={className}
       wordClassName={wordClassName}
       // A property turned off leaves nothing behind on the rows to say so,
@@ -124,11 +128,14 @@ export function DisplayMenu({
 export function ViewsMenu({
   menu,
   align = 'end',
+  initialOpen = false,
   className,
   wordClassName,
 }: {
   menu: ListDisplayMenu;
   align?: 'start' | 'end';
+  /** Drawn open, for the gallery. */
+  initialOpen?: boolean;
   className?: string;
   wordClassName?: string;
 }) {
@@ -138,7 +145,11 @@ export function ViewsMenu({
       icon={Bookmark}
       label={inForce?.name ?? 'Views'}
       panelLabel="Saved views"
+      // Wider than Display's: each view's Pin, Delete and Rename keep their
+      // room while hidden, and the name needs what is left.
+      panelClassName="w-80"
       align={align}
+      initialOpen={initialOpen}
       className={className}
       wordClassName={cn('max-w-40 truncate', wordClassName)}
     >
@@ -156,7 +167,9 @@ function PanelButton({
   label,
   panelLabel,
   align,
+  initialOpen,
   className,
+  panelClassName = 'w-64',
   wordClassName,
   extra,
   children,
@@ -165,12 +178,14 @@ function PanelButton({
   label: string;
   panelLabel: string;
   align: 'start' | 'end';
+  initialOpen: boolean;
   className?: string;
+  panelClassName?: string;
   wordClassName?: string;
   extra?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -185,6 +200,7 @@ function PanelButton({
         aria-expanded={open}
         aria-haspopup="true"
         aria-controls={open ? panelId : undefined}
+        title={label}
         onClick={() => setOpen(!open)}
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
@@ -201,7 +217,7 @@ function PanelButton({
           padding="panel"
           tabIndex={-1}
           aria-label={panelLabel}
-          className="w-64 space-y-4"
+          className={cn(panelClassName, 'space-y-4')}
         >
           {children}
         </Popover>
