@@ -33,6 +33,7 @@ describe('coverage', () => {
       'balance_readings',
       'holdings',
       'links',
+      'plaid_events',
       'transactions',
     ]);
   });
