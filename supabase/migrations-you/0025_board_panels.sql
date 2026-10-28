@@ -64,7 +64,7 @@ cross join (values
   ('Building', array['jobs', 'da_vinci', 'skeptic', 'dreamer']),
   ('Life', array['mentor', 'dreamer', 'franklin', 'washington'])
 ) as p (name, advisors)
-where u.id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where u.id = core.dev_owner_id()
 on conflict do nothing;
 
 notify pgrst, 'reload schema';

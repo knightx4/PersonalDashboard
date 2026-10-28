@@ -58,7 +58,7 @@ from (values
   ('life', 'Where and how they live, and their time; relationships only if they ask.'),
   ('building', 'Projects and the things they make.')
 ) as t (name, topic)
-where p.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where p.user_id = core.dev_owner_id()
   and lower(p.name) = t.name
   and p.topic is null;
 
@@ -81,7 +81,7 @@ cross join (values
     'What do you assume here that you have not examined?',
     'Questioning assumptions and living by examined reasons, as Plato and Xenophon recorded him.')
 ) as g (key, name, question, focus)
-where u.id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where u.id = core.dev_owner_id()
 on conflict (user_id, key) do nothing;
 
 -- The three new panels.
@@ -96,7 +96,7 @@ cross join (values
   ('Hobbies', 'Music, art and what they do for its own sake.',
     array['da_vinci', 'richard_feynman', 'dreamer', 'cfo'])
 ) as p (name, topic, advisors)
-where u.id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where u.id = core.dev_owner_id()
 on conflict do nothing;
 
 notify pgrst, 'reload schema';

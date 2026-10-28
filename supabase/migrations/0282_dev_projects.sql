@@ -91,16 +91,7 @@ create policy dev_projects_delete on dev_projects for delete to authenticated
 grant select, insert, update, delete on dev_projects to authenticated;
 revoke all on table dev_projects from anon;
 
--- The website, as it was in the array, for the owner alone. A database without
--- that account (the local test one) gets no row.
-insert into dev_projects (
-  id, user_id, label, description, owner, repo, branch, url, skill,
-  set_up_at, routine_id_env, routine_token_env
-)
-select
-  'website', u.id, 'selveyknight.com', 'The personal website', 'knightx4',
-  'selveyknightwebsite', 'main', 'https://selveyknight.com', '.claude/skills/plan/SKILL.md',
-  now(), 'CLAUDE_WEBSITE_ROUTINE_ID', 'CLAUDE_WEBSITE_ROUTINE_TOKEN'
-from auth.users u
-where u.id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
-on conflict (user_id, id) do nothing;
+-- The owner's website project, which until now was a constant in the code,
+-- was inserted here for the owner alone when this ran. The statement was
+-- taken out of the file afterwards so the repository names no one's site; a
+-- new install adds its own projects on Dev -> Projects.

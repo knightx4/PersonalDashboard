@@ -62,6 +62,6 @@ insert into application_outreach (user_id, application_id, contact_id, why, chos
 select a.user_id, a.id, a.follow_up_contact_id, a.follow_up_why,
        case when a.follow_up_why = 'You chose them.' then 'person' else 'dash' end
 from applications a
-where a.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where a.user_id = core.dev_owner_id()
   and a.follow_up_contact_id is not null
 on conflict (application_id, contact_id) do nothing;

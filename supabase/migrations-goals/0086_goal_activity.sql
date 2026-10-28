@@ -25,7 +25,7 @@ alter table goals.items
 update goals.items
   set activity = 'active'
   where level = 'goal'
-    and user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+    and user_id = core.dev_owner_id();
 
 create or replace function goals.items_activity_default()
 returns trigger
