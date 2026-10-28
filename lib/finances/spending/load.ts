@@ -66,7 +66,7 @@ function toTransaction(row: TransactionRow): SpendTransaction {
   };
 }
 
-async function loadTransactions(
+export async function loadTransactions(
   supabase: SupabaseClient,
   userId: string,
   from: string,
@@ -103,7 +103,7 @@ async function loadAccounts(supabase: SupabaseClient, userId: string): Promise<S
   return (data ?? []) as AccountRow[];
 }
 
-async function loadOrders(
+export async function loadOrders(
   supabase: SupabaseClient,
   userId: string,
   from: string,
@@ -129,7 +129,7 @@ async function loadOrders(
   });
 }
 
-async function loadTimezone(supabase: SupabaseClient, userId: string): Promise<string> {
+export async function loadTimezone(supabase: SupabaseClient, userId: string): Promise<string> {
   const { data } = await supabase.from('profiles').select('timezone').eq('id', userId).single();
   return (data?.timezone as string | undefined) ?? 'UTC';
 }

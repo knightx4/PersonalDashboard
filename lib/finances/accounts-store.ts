@@ -68,7 +68,7 @@ function toAccount(row: AccountRecord): AccountRow {
 /** Rows per request: PostgREST's own cap. */
 const PAGE = 1000;
 
-async function readAllReadings(
+export async function readAllReadings(
   client: Client,
   userId: string,
   since: string,
@@ -139,6 +139,26 @@ async function readHoldings(
     valueCents: Number(h.value_cents),
     costBasisCents: num(h.cost_basis_cents),
     asOf: h.as_of,
+  }));
+}
+
+/** Every account the person holds, hidden ones included when asked, by name. */
+export async function loadAccountRows(
+  client: Client,
+  userId: string,
+  options: { hidden?: boolean } = {},
+): Promise<(AccountRow & { hidden: boolean })[]> {
+  let query = client
+    .schema(FINANCES_SCHEMA)
+    .from('accounts')
+    .select(`${ACCOUNT_COLUMNS}, hidden`)
+    .eq('user_id', userId);
+  if (!options.hidden) query = query.eq('hidden', false);
+  const { data, error } = await query.order('name');
+  if (error) throw new Error(`Reading accounts failed: ${error.message}`);
+  return ((data ?? []) as unknown as (AccountRecord & { hidden: boolean })[]).map((row) => ({
+    ...toAccount(row),
+    hidden: row.hidden,
   }));
 }
 
