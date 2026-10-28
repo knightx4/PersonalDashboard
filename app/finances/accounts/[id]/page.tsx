@@ -12,7 +12,11 @@ export const metadata = { title: 'Account' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** One account: its balance over time, recent transactions and holdings (plan #2593.6). */
+/**
+ * One account: its balance over time, recent transactions and holdings (plan
+ * #2593.6). The id may also be a Goals loan record's, read as an account
+ * (plan #2593.5).
+ */
 export default async function AccountPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
@@ -32,7 +36,13 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
       moreTransactions={data.moreTransactions}
       thread={data.thread}
       today={today}
-      subject={await rowSubject(toRef('finances.accounts', id))}
+      goalId={data.goalId}
+      // A Goals loan is no finances.accounts row; the view builds its path.
+      subject={
+        data.account.source === 'goals'
+          ? undefined
+          : await rowSubject(toRef('finances.accounts', id))
+      }
     />
   );
 }

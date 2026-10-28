@@ -13,6 +13,8 @@ const DAY_MS = 86_400_000;
 /** The line's stroke: a chart line, heavier than an icon's. */
 const LINE_WIDTH = 2;
 const UTC = { timeZone: 'UTC' } as const;
+/** Up to this many balances, each is marked with a dot (plan #2593.5). */
+const SPARSE_POINTS = 40;
 
 /** Whole dollars on the axis and in the caption: the cents are noise at this size. */
 const dollars = (cents: number) => formatMoney(cents, 'USD', { showCents: false });
@@ -144,6 +146,20 @@ export function BalanceChart({
                 />
               )}
             </svg>
+            {/* A balance read now and then (a statement, a typed update) is
+                marked where it was read, so the line is not taken for a
+                daily record. A daily series is too dense to mark. */}
+            {points.length <= SPARSE_POINTS &&
+              points.map((p, index) =>
+                index === (active ?? last) ? null : (
+                  <span
+                    key={p.day}
+                    aria-hidden
+                    className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent"
+                    style={{ left: pct(x(p.day), CHART.width), top: pct(y(p.cents), CHART.height) }}
+                  />
+                ),
+              )}
             <span
               aria-hidden
               className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface"

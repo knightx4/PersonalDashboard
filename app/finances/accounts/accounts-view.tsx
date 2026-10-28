@@ -217,7 +217,9 @@ export function AccountsView({
 
 /** "Balances and holdings could not be read." */
 function failedSentence(failed: readonly AccountsRead[]): string {
-  const names = failed.map((read) => (read === 'sign-ins' ? 'sign-in checks' : read));
+  const names = failed.map((read) =>
+    read === 'sign-ins' ? 'sign-in checks' : read === 'loans' ? 'student loans from Goals' : read,
+  );
   const list =
     names.length === 1
       ? names[0]
@@ -230,6 +232,8 @@ function failedConsequence(failed: readonly AccountsRead[]): string {
   if (failed.includes('balances'))
     return 'The accounts are listed without them, and net worth waits until they can be.';
   if (failed.includes('holdings')) return 'Brokerage gains are missing until they are.';
+  if (failed.includes('loans'))
+    return 'They are missing from the list and from net worth until they can be.';
   return 'A bank asking you to sign in again may not be shown.';
 }
 
