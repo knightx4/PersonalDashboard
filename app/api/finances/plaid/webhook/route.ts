@@ -1,10 +1,12 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
+import { runPlaidSyncForLink } from '@/inngest/finances/plaid-sync';
 import { plaidApi } from '@/lib/finances/plaid/client';
 import { isPlaidConfigured } from '@/lib/finances/plaid/env';
 import { createFinancesServiceClient } from '@/lib/finances/plaid/store';
 import {
   linkPatchFor,
   parseWebhook,
+  startsSync,
   tokenKeyId,
   verifyPlaidWebhook,
   type VerificationKey,
@@ -13,6 +15,8 @@ import {
 // node:crypto for the signature, and nothing here is ever cached.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Room for the link's sync, which runs after the response (plan #2593.4).
+export const maxDuration = 120;
 
 /**
  * Where Plaid sends webhooks about the person's Items (plan #2593.3). Public
@@ -85,6 +89,12 @@ export async function POST(request: NextRequest) {
   if (patch) {
     const { error } = await db.from('links').update(patch).eq('user_id', userId).eq('id', linkId);
     if (error) return NextResponse.json({ error: 'update failed' }, { status: 500 });
+  }
+
+  // The same run the morning cron makes, for this link alone, after Plaid has
+  // its 200 (plan #2593.4). A failure is recorded on the link by the run.
+  if (startsSync(hook)) {
+    after(() => runPlaidSyncForLink(linkId).catch(() => undefined));
   }
 
   return NextResponse.json({ ok: true });

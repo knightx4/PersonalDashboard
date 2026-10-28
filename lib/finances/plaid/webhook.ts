@@ -118,6 +118,25 @@ export function parseWebhook(body: string): PlaidWebhook | null {
 }
 
 /**
+ * Whether a webhook starts its link's sync at once (plan #2593.4): new or
+ * changed transactions, new holdings or liabilities, or a login repaired so
+ * the sync can run again. Everything else waits for the morning run.
+ */
+export function startsSync(hook: Pick<PlaidWebhook, 'webhook_type' | 'webhook_code'>): boolean {
+  switch (hook.webhook_type) {
+    case 'TRANSACTIONS':
+      return hook.webhook_code === 'SYNC_UPDATES_AVAILABLE';
+    case 'HOLDINGS':
+    case 'LIABILITIES':
+      return hook.webhook_code === 'DEFAULT_UPDATE';
+    case 'ITEM':
+      return hook.webhook_code === 'LOGIN_REPAIRED';
+    default:
+      return false;
+  }
+}
+
+/**
  * What a webhook changes on its link at once, before the sync reads it.
  * A login Plaid says must be repeated marks the link needing attention, which
  * puts Fix sign-in on its row; LOGIN_REPAIRED clears it.

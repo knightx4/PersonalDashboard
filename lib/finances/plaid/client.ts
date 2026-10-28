@@ -10,6 +10,7 @@ import {
 } from 'plaid';
 import { plaidEnv, type PlaidEnv } from './env';
 import type { PlaidPort } from './link';
+import type { SyncPlaidPort } from './sync';
 
 /** The Plaid API, keyed from the environment. */
 export function plaidApi(env: PlaidEnv = plaidEnv()): PlaidApi {
@@ -89,6 +90,36 @@ export function plaidPort(api: PlaidApi = plaidApi()): PlaidPort {
     },
     async removeItem(accessToken) {
       await api.itemRemove({ access_token: accessToken });
+    },
+  };
+}
+
+/** The calls the daily sync makes, against the real API (plan #2593.4). */
+export function syncPort(api: PlaidApi = plaidApi()): SyncPlaidPort {
+  const link = plaidPort(api);
+  return {
+    getAccounts: link.getAccounts,
+    async transactionsSync(accessToken, cursor) {
+      const { data } = await api.transactionsSync({
+        access_token: accessToken,
+        ...(cursor ? { cursor } : {}),
+        count: 500,
+      });
+      return {
+        added: data.added,
+        modified: data.modified,
+        removed: data.removed,
+        next_cursor: data.next_cursor,
+        has_more: data.has_more,
+      };
+    },
+    async getLiabilities(accessToken) {
+      const { data } = await api.liabilitiesGet({ access_token: accessToken });
+      return { credit: data.liabilities.credit ?? [], student: data.liabilities.student ?? [] };
+    },
+    async getHoldings(accessToken) {
+      const { data } = await api.investmentsHoldingsGet({ access_token: accessToken });
+      return { holdings: data.holdings, securities: data.securities };
     },
   };
 }

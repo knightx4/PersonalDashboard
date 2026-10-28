@@ -1,6 +1,24 @@
 import { createHash, generateKeyPairSync, sign } from 'crypto';
 import { describe, expect, it } from 'vitest';
-import { linkPatchFor, parseWebhook, tokenKeyId, verifyPlaidWebhook, type VerificationKey } from './webhook';
+import {
+  linkPatchFor,
+  parseWebhook,
+  startsSync,
+  tokenKeyId,
+  verifyPlaidWebhook,
+  type VerificationKey,
+} from './webhook';
+
+describe('startsSync', () => {
+  it('starts the link’s sync on news Plaid has, and leaves the rest to the morning', () => {
+    expect(startsSync({ webhook_type: 'TRANSACTIONS', webhook_code: 'SYNC_UPDATES_AVAILABLE' })).toBe(true);
+    expect(startsSync({ webhook_type: 'HOLDINGS', webhook_code: 'DEFAULT_UPDATE' })).toBe(true);
+    expect(startsSync({ webhook_type: 'LIABILITIES', webhook_code: 'DEFAULT_UPDATE' })).toBe(true);
+    expect(startsSync({ webhook_type: 'ITEM', webhook_code: 'LOGIN_REPAIRED' })).toBe(true);
+    expect(startsSync({ webhook_type: 'ITEM', webhook_code: 'ERROR' })).toBe(false);
+    expect(startsSync({ webhook_type: 'TRANSACTIONS', webhook_code: 'INITIAL_UPDATE' })).toBe(false);
+  });
+});
 
 const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const jwk = publicKey.export({ format: 'jwk' }) as { kty: string; crv: string; x: string; y: string };

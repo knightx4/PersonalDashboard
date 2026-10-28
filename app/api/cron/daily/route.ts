@@ -5,6 +5,7 @@ import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { kickCompanyBoards } from '@/inngest/jobs/company-boards';
 import { runRecurringReread } from '@/inngest/cron/recurring-reread';
+import { runPlaidSyncForAll } from '@/inngest/finances/plaid-sync';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
@@ -89,6 +90,10 @@ export async function GET(request: NextRequest) {
     // (plan #2535.2).
     { name: 'company-boards', run: () => kickCompanyBoards(origin) },
     { name: 'vault', run: () => runVaultSyncForAll() },
+    // Balances, transactions, card and loan details and holdings for every
+    // linked Plaid Item (plan #2593.4). A few seconds a link; nothing until
+    // Plaid's keys are set.
+    { name: 'finances-plaid', run: () => runPlaidSyncForAll() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
