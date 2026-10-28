@@ -237,7 +237,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const ROW = 'press flex items-center justify-between gap-2 rounded-control px-2 py-1.5 text-ui';
+// A thumb's height on a phone (44px), the panel's own on a laptop.
+const ROW = 'press flex min-h-11 items-center justify-between gap-2 rounded-control px-2 py-1.5 text-ui sm:min-h-0';
 
 /**
  * One sort or grouping. The chosen one carries `aria-current` and a tick as
@@ -308,7 +309,7 @@ function Views({ menu }: { menu: ListDisplayMenu }) {
           maxLength={60}
           placeholder="Save this as…"
           aria-label="Name for this view"
-          className="text-small"
+          className="min-h-11 text-small sm:min-h-0"
         />
         <Button type="submit" variant="ghost" size="xs" className="shrink-0">
           Save
@@ -356,7 +357,7 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
       <Link
         href={view.href}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 rounded-control px-1.5 py-1 text-ui hover:bg-sunken',
+          'flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-control px-1.5 py-1 text-ui hover:bg-sunken sm:min-h-0',
           view.inForce ? 'text-ink' : 'text-ink-muted',
         )}
         aria-current={view.inForce ? 'true' : undefined}
