@@ -8,14 +8,15 @@ import type { StepHandler } from './run';
  * (plan #2276.5): the draft_topics and write_units steps of a subject's
  * preparation.
  *
- * draft_topics goes down the stored territory a few topics at a time. Each
- * call splits the topics still to draft into lanes and drafts the lanes side
- * by side through the territory drafter (lib/learn/levels/territory-run.ts),
- * which writes each topic with its five checks as a draft for approval and
- * gives it its target on the subject's lens. The step records drafted and
- * remaining counts after each call, so the page shows "12 of 38 drafted", and
- * pauses for a fresh function when too little of the call is left for a draft
- * to finish. A topic the drafter turns down twice is given up on and named on
+ * draft_topics queues the stored territory's topics for the routine
+ * (learn 0193) through the territory drafter (lib/learn/levels/territory-run.ts),
+ * which drafts nothing itself: the routine's session writes each topic with
+ * its five checks, gives it its target on the subject's lens and approves it.
+ * The step then waits: it ends the call without starting another, and the
+ * routine's script (scripts/learn-drafts.ts) or the daily cron resumes it.
+ * Each resume records drafted and waiting counts, so the page shows "12 of 38
+ * drafted", and is done once nothing it queued is still waiting. A topic the
+ * routine could not draft is tried again once, then given up on and named on
  * the step, so one bad topic cannot hold the run.
  *
  * write_units then reads the opening topics, as drafted, and the opening lines
@@ -27,15 +28,7 @@ import type { StepHandler } from './run';
  * Pure apart from its ports, so the tests run both steps with fakes.
  */
 
-/** Lanes drafted side by side in one call; each lane is a pair of model calls at a time. */
-export const DRAFT_LANES = 4;
-/** Topics handed to one lane per call; the drafter stops early when the time is used. */
-export const TOPICS_PER_LANE = 3;
-/** A draft takes one to three minutes, so none is started with less than this left. */
-export const DRAFT_START_MS = 120_000;
-/** Kept back from a lane's budget, so its last draft ends before the call does. */
-export const DRAFT_FINISH_MS = 90_000;
-/** A topic the drafter turns down this many times is given up on. */
+/** A topic the routine turns down this many times is given up on. */
 export const DRAFT_TRIES = 2;
 /** Opening topics given to the units call. */
 export const OPENING_TOPICS = 12;
@@ -55,8 +48,10 @@ export type DraftTopicsPorts = {
   lens: (subject: { id: string; name: string }) => Promise<{ id: string; name: string }>;
   /** The asks already on the person's topics, for what is left to draft. */
   asked: () => Promise<(string | null)[]>;
-  /** Draft one lane of topics within the budget. */
-  draft: (territory: Territory, budgetMs: number) => Promise<LaneResult>;
+  /** Queue the territory's topics for the routine and start it; returns what could not be queued. */
+  draft: (territory: Territory, runId: string) => Promise<{ queued: number; failed: LaneResult['failed'] }>;
+  /** This run's requests still waiting for the routine, and the ones it could not draft since the last call. */
+  pending: (runId: string) => Promise<{ waiting: string[]; failed: { id: string; ask: string; detail: string }[] }>;
   /** Give every drafted territory topic its target on the lens; returns how many it has. */
   targets: (lensId: string, topics: readonly TerritoryTopic[]) => Promise<number>;
   /**
@@ -71,18 +66,11 @@ export type KeptDraft = { ask: string; name: string; reason: string };
 export type ApprovalResult = { approved: number; kept: KeptDraft[] };
 
 type GivenUp = { ask: string; detail: string; tries: number };
-type DraftDetail = { lens?: { id: string; name: string }; failed?: GivenUp[]; kept?: KeptDraft[] };
+/** `seen` is the failed requests already counted as a try, so a resume counts each once. */
+type DraftDetail = { lens?: { id: string; name: string }; failed?: GivenUp[]; kept?: KeptDraft[]; seen?: string[] };
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
-}
-
-/** The topics split round-robin into lanes, at most `perLane` each, in territory order. */
-export function lanesOf<T>(topics: readonly T[], lanes: number, perLane: number): T[][] {
-  const take = topics.slice(0, lanes * perLane);
-  const out: T[][] = Array.from({ length: Math.min(lanes, take.length) }, () => []);
-  take.forEach((topic, i) => out[i % out.length].push(topic));
-  return out;
 }
 
 export function draftTopicsStep(ports: DraftTopicsPorts): StepHandler {
@@ -91,6 +79,7 @@ export function draftTopicsStep(ports: DraftTopicsPorts): StepHandler {
     if (!territory) return { state: 'skipped', reason: 'No territory was laid out, so there are no topics to draft.' };
 
     const detail = (ctx.step.detail ?? {}) as DraftDetail;
+    const seen = new Set(detail.seen ?? []);
     const lens = detail.lens ?? (await ports.lens({ id: ctx.subject.id, name: ctx.subject.name }));
     const failed = new Map((detail.failed ?? []).map((f) => [f.ask.trim().toLowerCase(), f]));
     const gaveUp = (t: TerritoryTopic) => (failed.get(t.ask.trim().toLowerCase())?.tries ?? 0) >= DRAFT_TRIES;
@@ -104,12 +93,26 @@ export function draftTopicsStep(ports: DraftTopicsPorts): StepHandler {
     const record = (kept?: KeptDraft[]): Record<string, unknown> => ({
       lens,
       failed: [...failed.values()],
+      seen: [...seen],
       ...(kept ? { kept } : {}),
     });
 
     const left = topicsLeft(territory, await ports.asked());
-    const todo = left.filter((t) => !gaveUp(t));
-    if (todo.length === 0) {
+    const key = (ask: string) => ask.trim().toLowerCase();
+    const giveUp = (f: { ask: string; detail: string }) => {
+      const had = failed.get(key(f.ask));
+      failed.set(key(f.ask), { ask: f.ask, detail: f.detail.slice(0, 200), tries: (had?.tries ?? 0) + 1 });
+    };
+    const before = await ports.pending(ctx.run.id);
+    for (const f of before.failed) {
+      if (seen.has(f.id)) continue;
+      seen.add(f.id);
+      giveUp(f);
+    }
+    const waiting = new Set(before.waiting.map(key));
+    const todo = left.filter((t) => !gaveUp(t) && !waiting.has(key(t.ask)));
+
+    if (todo.length === 0 && waiting.size === 0) {
       const { counts, drafted, abandoned } = tally(left);
       const targeted = await ports.targets(lens.id, territory.topics);
       const { approved, kept } = await ports.approve(territory.topics);
@@ -125,44 +128,26 @@ export function draftTopicsStep(ports: DraftTopicsPorts): StepHandler {
       };
     }
 
-    const timeLeft = ctx.deadline - ctx.now();
-    if (timeLeft < DRAFT_START_MS) {
-      const { counts, drafted } = tally(left);
-      return {
-        state: 'more',
-        pause: true,
-        summary: `${drafted} of ${total} topics drafted; carrying on in a fresh call.`,
-        counts,
-        detail: record(),
-      };
+    let queued = 0;
+    if (todo.length > 0) {
+      // The lens may be named differently from when the territory was laid out.
+      const base: Territory = { ...territory, subjectLens: lens.name, kind: null };
+      const result = await ports.draft({ ...base, topics: todo }, ctx.run.id);
+      result.failed.forEach(giveUp);
+      queued = result.queued;
     }
-
-    // The lens may be named differently from when the territory was laid out.
-    const base: Territory = { ...territory, subjectLens: lens.name, kind: null };
-    const lanes = lanesOf(todo, DRAFT_LANES, TOPICS_PER_LANE);
-    const settled = await Promise.allSettled(lanes.map((topics) => ports.draft({ ...base, topics }, timeLeft - DRAFT_FINISH_MS)));
-    const rejected = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
-    if (rejected.length === settled.length) throw rejected[0].reason instanceof Error ? rejected[0].reason : new Error(String(rejected[0].reason));
-
-    let draftedNow = 0;
-    for (const lane of settled) {
-      if (lane.status !== 'fulfilled') continue;
-      draftedNow += lane.value.drafted.length;
-      for (const f of lane.value.failed) {
-        const key = f.ask.trim().toLowerCase();
-        const had = failed.get(key);
-        failed.set(key, { ask: f.ask, detail: f.detail.slice(0, 200), tries: (had?.tries ?? 0) + 1 });
-      }
+    const { counts, drafted } = tally(left);
+    const withDash = waiting.size + queued;
+    if (withDash === 0) {
+      // Every topic left failed to queue: try again in this call, until each is given up on.
+      return { state: 'more', summary: `${drafted} of ${total} topics drafted.`, counts, detail: record() };
     }
-    const drafted = new Set(
-      settled.flatMap((s) => (s.status === 'fulfilled' ? s.value.drafted.map((d) => d.ask.trim().toLowerCase()) : [])),
-    );
-    const stillLeft = left.filter((t) => !drafted.has(t.ask.trim().toLowerCase()));
-    const { counts } = tally(stillLeft);
     return {
       state: 'more',
-      summary: `${counts.drafted} of ${total} topics drafted.`,
-      counts: { ...counts, lastCall: draftedNow },
+      pause: true,
+      wait: true,
+      summary: `${drafted} of ${total} topics drafted; ${plural(withDash, 'topic')} with Dash in a routine.`,
+      counts: { ...counts, withDash },
       detail: record(),
     };
   };

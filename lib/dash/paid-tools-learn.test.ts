@@ -69,9 +69,9 @@ describe('Learn paid tools', () => {
     });
   });
 
-  it('refuses to draft with no model key', async () => {
+  it('queues a draft with no model key, since the routine writes it (learn 0193)', async () => {
     delete process.env.ANTHROPIC_API_KEY;
-    expect(await tool('draft_topic').prepare(context(), { name: 'DCF' })).toMatchObject({ ok: false });
+    expect(await tool('draft_topic').prepare(context(), { name: 'DCF' })).toMatchObject({ ok: true, line: 'Draft the topic DCF.' });
   });
 
   it('makes a subject with the units they named, in their order', async () => {

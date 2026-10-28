@@ -38,6 +38,8 @@ The skills fired this way so far:
 - `insights`: three to five deep insights about the person for the Insights
   tab of You, into `you.insights` under the `you.insight_runs` row the brief
   names (`insightsBrief` in `lib/you/insights.ts`).
+- `learn-drafts`: the Learn topics waiting to be drafted, into `learn.topics`
+  through `npm run learn:drafts` (`learn.topic_draft_requests`, learn 0193).
 
 ## How you read and write
 

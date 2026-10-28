@@ -29,6 +29,7 @@
     "note-report": "tsx --conditions=react-server scripts/learn-note-report.ts",
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
     "learn:prepare": "tsx --conditions=react-server scripts/learn-prepare-subject.ts",
+    "learn:drafts": "tsx --conditions=react-server scripts/learn-drafts.ts",
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
     "clips:cut": "tsx --conditions=react-server scripts/cut-clips.ts",

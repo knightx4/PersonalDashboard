@@ -4,13 +4,16 @@
  * path approves the draft with no one pressing Approve, marking any row that
  * cites no source personal first (plan #2356.6).
  *
- * The drafting call itself is stubbed: it lays the topic's rows into an
- * in-memory learn schema the way saveDraft would, and the real approval code
- * runs over them.
+ * Since learn 0193 each press queues the topic for the routine with what is
+ * done once it is kept (`after`), and the routine's save does it
+ * (settleDraftAfter). The queueing is stubbed: it records the request, and
+ * `routine()` keeps each queued topic's prepared rows in an in-memory learn
+ * schema the way saveDraft would, then runs the real settling over them.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeLearnClient, type FakeRow, type FakeTables } from './helpers/fake-learn-client';
 import type { Territory } from '@/lib/learn/levels/territory';
+import type { DraftAfter } from '@/lib/learn/levels/draft-request';
 
 const ME = '00000000-0000-4000-8000-000000000001';
 const BRIEF = '22222222-2222-4222-8222-222222222222';
@@ -20,17 +23,16 @@ const state = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, unknown>[]>,
   /** What the stubbed drafting call keeps, by the goal it is asked for. */
   drafts: {} as Record<string, { topic: Record<string, unknown>; cells: Record<string, unknown>[] }>,
-  cards: [] as string[],
-  afters: [] as (() => unknown)[],
+  /** What the presses queued for the routine. */
+  queued: [] as { goal: string; after: Record<string, unknown> }[],
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('next/navigation', () => ({ redirect: () => {} }));
-vi.mock('next/server', () => ({ after: (fn: () => unknown) => state.afters.push(fn) }));
-vi.mock('@/inngest/learn/feed-top-up', () => ({
-  writeCardsForBrief: async (_userId: string, briefId: string) => {
-    state.cards.push(briefId);
-  },
+vi.mock('@/inngest/learn/feed-top-up', () => ({ writeCardsForBrief: async () => undefined }));
+vi.mock('@/lib/feedback/routine', () => ({
+  goalsRoutine: () => ({ id: null, token: null }),
+  fireFeatureRoutine: async () => ({ ok: false, error: 'not in tests', status: null, body: null }),
 }));
 vi.mock('@/lib/auth/server', () => ({ requireUser: async () => ({ id: ME, email: 'me@example.com' }) }));
 vi.mock('@/lib/learn/auth/server', () => ({ createLearnClient: async () => fakeLearnClient(state.tables) }));
@@ -48,18 +50,41 @@ async function keepDraft(goal: string) {
   return { ok: true as const, id: draft.topic.id as string };
 }
 
-vi.mock('@/lib/learn/levels/draft-run', () => ({
-  runTopicDraft: async (_client: unknown, _userId: string, input: { goal: string }) => keepDraft(input.goal),
+type Queued = { goal: string; after: DraftAfter };
+
+vi.mock('@/lib/learn/levels/draft-run', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/learn/levels/draft-run')>()),
+  runTopicDraft: async (_client: unknown, _userId: string, input: { goal: string; after?: DraftAfter }) => {
+    state.queued.push({ goal: input.goal, after: input.after ?? {} });
+    return { ok: true, requestId: `req-${state.queued.length}`, fired: true, detail: 'Dash is drafting it.' };
+  },
+  fireDraftRoutine: async () => ({ ok: true, detail: 'started' }),
 }));
 vi.mock('@/lib/learn/briefs/topics-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/learn/briefs/topics-store')>()),
-  draftBriefTopic: async () => keepDraft('brief question'),
+  draftBriefTopic: async () => {
+    state.queued.push({ goal: 'brief question', after: { approve: true } });
+    return { ok: true, requestId: 'req-brief', fired: true, detail: 'Dash is drafting it.' };
+  },
 }));
 
 const { approveDrafts } = await import('@/lib/learn/levels/store');
 const { draftTopicFromGoal } = await import('@/app/learn/topics/actions');
 const { draftBriefTopics } = await import('@/app/learn/b/[id]/actions');
 const { draftTerritoryTick } = await import('@/lib/learn/levels/territory-run');
+const { settleDraftAfter } = await import('@/lib/learn/levels/draft-run');
+
+/** The routine: keeps each queued topic's prepared draft and settles it as its request says. Returns the ids kept. */
+async function routine(): Promise<string[]> {
+  const kept: string[] = [];
+  for (const request of state.queued.splice(0) as Queued[]) {
+    const draft = await keepDraft(request.goal);
+    if (!draft.ok) throw new Error(draft.detail);
+    await settleDraftAfter(fakeLearnClient(state.tables), ME, draft.id, request.after);
+    kept.push(draft.id);
+  }
+  return kept;
+}
 
 let next = 0;
 
@@ -112,8 +137,7 @@ beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = 'test-key';
   state.tables = { topics: [], topic_cells: [], cell_links: [] } satisfies FakeTables;
   state.drafts = {};
-  state.cards = [];
-  state.afters = [];
+  state.queued = [];
 });
 
 describe('approveDrafts', () => {
@@ -154,15 +178,18 @@ describe('approveDrafts', () => {
 });
 
 describe('a topic drafted from a goal on Topics', () => {
-  it('is approved when every row cites a source', async () => {
+  it('is queued for the routine, and approved once kept when every row cites a source', async () => {
     const id = prepare('DCF');
-    expect(await draftTopicFromGoal({}, form({ goal: 'DCF' }))).toBeUndefined();
+    expect(await draftTopicFromGoal({}, form({ goal: 'DCF' }))).toEqual({ queued: 'Dash is drafting it.' });
+    expect(state.queued).toEqual([{ goal: 'DCF', after: { approve: true } }]);
+    await routine();
     expect(topic(id)).toMatchObject({ status: 'approved' });
   });
 
   it('is approved with the row that cites nothing marked personal', async () => {
     const id = prepare('WACC', { uncitedLevel: 3 });
     await draftTopicFromGoal({}, form({ goal: 'WACC' }));
+    await routine();
     expect(topic(id)).toMatchObject({ status: 'approved' });
     expect(levels(id).find((c) => c.level === 3)).toMatchObject({ canonicality: 'personal' });
   });
@@ -178,19 +205,19 @@ describe('a topic drafted from a research brief', () => {
     state.tables.briefs = [{ id: BRIEF, user_id: ME, aim_id: null }];
   });
 
-  it('is approved, put on the goal’s lens, and has the brief’s cards written', async () => {
+  it('is approved and put on the goal’s lens once kept', async () => {
     const id = prepare('brief question', { drafting: fromBrief });
     await draftBriefTopics(BRIEF, AIM);
+    await routine();
     expect(topic(id)).toMatchObject({ status: 'approved' });
     expect(state.tables.lens_targets).toEqual([expect.objectContaining({ lens_id: 'goal-lens', topic_id: id })]);
     expect(state.tables.briefs[0]).toMatchObject({ aim_id: AIM });
-    for (const write of state.afters) await write();
-    expect(state.cards).toEqual([BRIEF]);
   });
 
   it('is approved and put on the goal’s lens when a row cites nothing, with that row marked personal', async () => {
     const id = prepare('brief question', { drafting: fromBrief, uncitedLevel: 1 });
     await draftBriefTopics(BRIEF, AIM);
+    await routine();
     expect(topic(id)).toMatchObject({ status: 'approved' });
     expect(levels(id).find((c) => c.level === 1)).toMatchObject({ canonicality: 'personal' });
     expect(state.tables.lens_targets).toEqual([expect.objectContaining({ lens_id: 'goal-lens', topic_id: id })]);
@@ -212,7 +239,7 @@ describe('a topic drafted in a territory tick', () => {
     ],
   };
 
-  it('is approved whether every row cites a source or one is marked personal', async () => {
+  it('is queued with its lens target, and approved once kept whether every row cites a source or one is marked personal', async () => {
     state.tables.area_check_articles = [];
     state.tables.lenses = [{ id: 'subject-lens', user_id: ME, origin: 'subject', name: 'Valuation' }];
     state.tables.lens_targets = [];
@@ -223,19 +250,22 @@ describe('a topic drafted in a territory tick', () => {
       { learn: fakeLearnClient(state.tables), jobs: {} as never },
       ME,
       territory,
-      { anthropicApiKey: 'test-key', budgetMs: 600_000 },
+      { anthropicApiKey: 'test-key' },
     );
-
-    expect(tick.drafted.map((d) => [d.id, d.approved])).toEqual([
-      [cited, true],
-      [uncited, true],
+    expect(tick).toMatchObject({ queued: 2, drafted: [], fired: { ok: true } });
+    expect(state.queued.map((q) => q.after)).toEqual([
+      { approve: true, lensTarget: { lensId: 'subject-lens', target: 3 } },
+      { approve: true, lensTarget: { lensId: 'subject-lens', target: 3 } },
     ]);
+
+    expect(await routine()).toEqual([cited, uncited]);
     expect(topic(cited)).toMatchObject({ status: 'approved' });
     expect(topic(uncited)).toMatchObject({ status: 'approved' });
     expect(levels(uncited).find((c) => c.level === 2)).toMatchObject({ canonicality: 'personal' });
+    expect(state.tables.lens_targets.map((t) => t.topic_id)).toEqual([cited, uncited]);
   });
 
-  it('drafts only the named area, and the first area with topics left when none is named (plans #2483.1, #2483.2)', async () => {
+  it('queues only the named area, and the first area with topics left when none is named (plans #2483.1, #2483.2)', async () => {
     const areaTerritory: Territory = {
       ...territory,
       areas: ['accounting', 'banking'],
@@ -250,13 +280,12 @@ describe('a topic drafted in a territory tick', () => {
     const discounting = prepare('Discounting');
     const multiples = prepare('Multiples');
     const clients = { learn: fakeLearnClient(state.tables), jobs: {} as never };
-    const input = { anthropicApiKey: 'test-key', budgetMs: 600_000 };
+    const input = { anthropicApiKey: 'test-key' };
 
-    const banking = await draftTerritoryTick(clients, ME, areaTerritory, { ...input, area: 'banking' });
-    expect(banking.drafted.map((d) => d.id)).toEqual([multiples]);
-    expect(banking.remaining).toBe(0);
+    await draftTerritoryTick(clients, ME, areaTerritory, { ...input, area: 'banking' });
+    expect(await routine()).toEqual([multiples]);
 
-    const rest = await draftTerritoryTick(clients, ME, areaTerritory, input);
-    expect(rest.drafted.map((d) => d.id)).toEqual([discounting]);
+    await draftTerritoryTick(clients, ME, areaTerritory, input);
+    expect(await routine()).toEqual([discounting]);
   });
 });

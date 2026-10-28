@@ -33,7 +33,7 @@ function AskButton() {
       hintFirst
       wrapperClassName="ml-auto"
     >
-      {pending ? 'Drafting the levels…' : 'Draft the topic'}
+      {pending ? 'Sending it to Dash…' : 'Draft the topic'}
     </DashAction>
   );
 }
@@ -74,6 +74,11 @@ export function GoalForm({
       {state.error && (
         <p role="alert" className="mt-1 text-small text-danger">
           {state.error}
+        </p>
+      )}
+      {state.queued && (
+        <p role="status" className="mt-1 text-small text-ink-muted">
+          {state.queued}
         </p>
       )}
 

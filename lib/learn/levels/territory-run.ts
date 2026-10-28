@@ -7,8 +7,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { approveDrafts } from '@/lib/learn/levels/store';
+import { fireDraftRoutine, runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { roleRequirementSourceFrom } from '@/lib/learn/levels/role-sources';
 import { territorySources, topicsLeft, type Territory } from '@/lib/learn/levels/territory';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
@@ -29,13 +28,12 @@ import {
 import { findStoredUnits, liveStoredUnitPorts, type StoredUnitsFound } from '@/lib/learn/levels/stored-sources-run';
 
 /**
- * Drafts a territory a few topics at a time (plan #2172.6). Each call goes
- * down the topics not yet drafted, compiling each with the two-draft call
- * from plan #2138.11 from the territory's sources, until the time is used.
- * Each draft is then pointed at the Level 4 frame topic it refines and given
- * its target on the subject's lens, and approved there and then (plan
- * #2356.2), any row that cites no source marked personal first (plan
- * #2356.6).
+ * Drafts a territory (plan #2172.6). Each call queues every topic not yet
+ * drafted for the routine (learn 0193), from the territory's sources, and
+ * starts the routine once. Each request carries what is done with its draft
+ * once kept: pointed at the Level 4 frame topic it refines, given its target
+ * on the subject's lens, and approved there and then (plan #2356.2), any row
+ * that cites no source marked personal first (plan #2356.6).
  *
  * Runs on the service role, so every read names the owner. A topic is found
  * again by the ask it was drafted from (`topics.asked`), so calling again
@@ -115,13 +113,14 @@ export async function withTerritoryStore(
   };
 }
 
-/** A draft takes one to three minutes; start another only while this much of the call is left. */
-const START_BEFORE_MS = 150_000;
-
 export type TerritoryTick = {
-  /** Each topic drafted this tick, and whether it was approved as it was kept. */
+  /** Always empty since learn 0193: topics are queued for the routine, which drafts and approves them. */
   drafted: { ask: string; id: string; name: string; approved: boolean }[];
   failed: { ask: string; detail: string }[];
+  /** Topics queued for the routine this tick. */
+  queued: number;
+  /** Whether the routine was started on them; null when nothing was queued. */
+  fired: { ok: boolean; detail: string } | null;
   remaining: number;
   /** What the structure store gave; null when no catalogue connection was given. */
   store: TerritoryStore | null;
@@ -132,16 +131,15 @@ export async function draftTerritoryTick(
   owner: string,
   territory: Territory,
   input: {
+    /** For the structure pull on the first tick; drafting itself spends nothing. */
     anthropicApiKey: string;
-    budgetMs: number;
-    now?: () => number;
     catalogue?: postgres.Sql;
     /** Draft only this area's remaining topics (plan #2483.1); the first area with topics left when absent. */
     area?: string;
+    /** The preparation run queuing them, so its step finds its own requests. */
+    preparationId?: string;
   },
 ): Promise<TerritoryTick> {
-  const now = input.now ?? Date.now;
-  const started = now();
   const { learn, jobs } = clients;
 
   const { data: had, error } = await learn.from('topics').select('asked').eq('user_id', owner);
@@ -206,9 +204,11 @@ export async function draftTerritoryTick(
   if (read?.store.unread) console.error('[learn territory] store', read.store.unread);
   const sources = read?.sources ?? given;
 
-  const out: TerritoryTick = { drafted: [], failed: [], remaining: left.length, store: read?.store ?? null };
+  // Queued for the routine (learn 0193), each with what was done here once it
+  // was drafted: the frame it refines, its target on the lens, approval.
+  const out: TerritoryTick = { drafted: [], failed: [], queued: 0, fired: null, remaining: left.length, store: read?.store ?? null };
   for (const topic of left) {
-    if (now() - started > Math.min(START_BEFORE_MS, input.budgetMs)) break;
+    const frame = frameId.get(topic.frame);
     const result = await runTopicDraft(
       learn,
       owner,
@@ -218,45 +218,20 @@ export async function draftTerritoryTick(
         sources,
         documents: read?.refs,
         canon: read?.canon,
-        anthropicApiKey: input.anthropicApiKey,
+        after: {
+          approve: true,
+          ...(frame ? { refinesArticleId: frame } : {}),
+          ...(lens.data ? { lensTarget: { lensId: lens.data.id as string, target: topic.target } } : {}),
+        },
       },
-      { owner, ledger },
+      { owner, hold: true, preparationId: input.preparationId },
     );
     if (!result.ok) {
       out.failed.push({ ask: topic.ask, detail: result.detail });
       continue;
     }
-    const { data: saved } = await learn
-      .from('topics')
-      .update({ refines_article_id: frameId.get(topic.frame) ?? null })
-      .eq('id', result.id)
-      .eq('user_id', owner)
-      .select('name, ceiling')
-      .single();
-    if (lens.data) {
-      const { error: targetError } = await learn.from('lens_targets').upsert(
-        {
-          user_id: owner,
-          lens_id: lens.data.id,
-          topic_id: result.id,
-          target_level: Math.min(topic.target, (saved?.ceiling as number | undefined) ?? topic.target),
-        },
-        { onConflict: 'lens_id,topic_id', ignoreDuplicates: true },
-      );
-      if (targetError) console.error('[learn territory] lens target', targetError.message);
-    }
-    // The draft is kept even if approving fails; the next approval pass takes it.
-    const approval = await approveDrafts(learn, [result.id]).catch((e: unknown) => {
-      console.error('[learn territory] approve', e instanceof Error ? e.message : e);
-      return null;
-    });
-    out.drafted.push({
-      ask: topic.ask,
-      id: result.id,
-      name: (saved?.name as string | undefined) ?? topic.ask,
-      approved: (approval?.length ?? 0) > 0,
-    });
-    out.remaining -= 1;
+    out.queued += 1;
   }
+  if (out.queued > 0) out.fired = await fireDraftRoutine(learn, owner);
   return out;
 }

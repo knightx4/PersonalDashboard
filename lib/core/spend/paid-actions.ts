@@ -32,15 +32,16 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
   // Naming a goal drafts its topic since the claims graph moved (plan #2138.4).
-  'app/learn/know/actions.ts#proposeGoal': ['draft-topic', 'embed-topic-scope'],
-  // Learn: a topic with ten levels (plan #2138.2). Drafting embeds the scope
-  // in the same press to find a topic it duplicates; a topic the draft's links
-  // need is drafted the same way.
-  'app/learn/topics/actions.ts#draftTopicFromGoal': ['draft-topic', 'embed-topic-scope'],
-  'app/learn/topics/[id]/actions.ts#draftWantedTopic': ['draft-topic', 'embed-topic-scope'],
+  // Learn: a topic with ten levels (plan #2138.2), and a topic the draft's
+  // links need. Each queues the topic for the routine (learn 0193), which
+  // drafts it with no API spend, so these name nothing and show no hint;
+  // they stay listed because Dash's draft_topic tool presses the first.
+  'app/learn/know/actions.ts#proposeGoal': [],
+  'app/learn/topics/actions.ts#draftTopicFromGoal': [],
+  'app/learn/topics/[id]/actions.ts#draftWantedTopic': [],
   // Moving one subject from the claims graph (plan #2138.4): the call placing
-  // its ideas, and each topic it names that the map lacks, drafted and embedded.
-  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics', 'draft-topic', 'embed-topic-scope'],
+  // its ideas. The topics it names that the map lacks go to the routine.
+  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics'],
   'app/learn/know/actions.ts#proposePrior': ['concepts-from-prior'],
   'app/learn/know/actions.ts#approvePrior': ['place-track'],
   'app/learn/know/actions.ts#proposeBrief': ['concepts-from-brief'],
@@ -54,8 +55,8 @@ export const PAID_ACTIONS = {
   'app/learn/b/[id]/actions.ts#retryBrief': ['research-topic'],
   // Finances: Try again on a monthly money review whose run failed (plan #2593.8.3)
   'app/finances/accounts/actions.ts#tryMonthReviewAgain': ['write-money-review'],
-  // Learn: a research brief's topic drafted under a goal (plan #2184.1)
-  'app/learn/b/[id]/actions.ts#draftBriefTopics': ['draft-topic', 'embed-topic-scope'],
+  // Learn: a research brief's topic drafted under a goal (plan #2184.1), by the routine (learn 0193)
+  'app/learn/b/[id]/actions.ts#draftBriefTopics': [],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
   // Learn: a question in the chat on a reading's page (plan #1876.5)

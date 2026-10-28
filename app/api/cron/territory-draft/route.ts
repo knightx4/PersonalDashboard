@@ -10,10 +10,9 @@ import { loadSubjectTerritory } from '@/lib/learn/prepare/store';
 import { TERRITORIES } from '@/lib/learn/levels/territories';
 import { draftTerritoryTick } from '@/lib/learn/levels/territory-run';
 
-// Two or three topics a call, each a pair of drafting calls side by side.
+// Queues the topics for the routine (learn 0193); only the first tick's structure pull calls a model.
 export const maxDuration = 300;
 
-const BUDGET_MS = 240_000;
 const ownerSchema = z.object({ userId: z.string() });
 const subjectSchema = z.string().uuid();
 
@@ -34,12 +33,11 @@ function catalogueOrNone() {
  * yet drafted (plan #2483.1), or, for an area listed as a territory of its
  * own, that territory (`?territory=business&area=saas` drafts saas-metrics,
  * plan #2483.3); `?subject=<id>` drafts the territory that subject's
- * preparation compiled from its stored documents (plan #2276.4). Call it until
- * `remaining` is zero; each call picks up the topics not yet drafted. Every
- * topic lands as a draft with its five checks, for the person to approve on
- * /learn/topics.
+ * preparation compiled from its stored documents (plan #2276.4). Each call
+ * queues the topics not yet drafted for the routine (learn 0193), which
+ * drafts each with its five checks and approves it.
  *
- * Fired by hand, never on a clock, because every call spends: with
+ * Fired by hand, never on a clock: with
  * `Authorization: Bearer $CRON_SECRET`, like the other cron routes, or from
  * SQL through pg_net with the secret from Vault.
  *
@@ -84,7 +82,7 @@ async function tick(request: NextRequest) {
       { learn, jobs: createJobsServiceSupabase() },
       owner.data.userId,
       territory,
-      { anthropicApiKey: apiKey, budgetMs: BUDGET_MS, catalogue: catalogueOrNone(), area },
+      { anthropicApiKey: apiKey, catalogue: catalogueOrNone(), area },
     );
     return NextResponse.json({ ok: true, territory: territory.key, ...(area ? { area } : {}), ...summary });
   } catch (err) {

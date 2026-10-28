@@ -3,16 +3,12 @@ import type { Territory, TerritoryTopic } from '@/lib/learn/levels/territory';
 import { curriculumPrompt } from '@/lib/learn/graph/curriculum';
 import type { StepContext, PreparationStepRow } from './run';
 import {
-  DRAFT_LANES,
-  DRAFT_START_MS,
   DRAFT_TRIES,
   draftTopicsStep,
-  lanesOf,
   openingTerritory,
   topicsNamed,
   writeUnitsStep,
   type DraftTopicsPorts,
-  type LaneResult,
   type SubjectUnit,
   type WriteUnitsPorts,
 } from './draft-steps';
@@ -57,50 +53,64 @@ function territory(count: number): Territory {
   };
 }
 
-/** Ports over an in-memory topic list: each lane drafts every topic it is handed. */
+/**
+ * Ports over an in-memory topic list and queue: draft queues every topic it is
+ * handed for the routine, and `routine()` drafts what waits, as its session
+ * would, or turns down the asks named.
+ */
 function draftPorts(t: Territory, over: Partial<DraftTopicsPorts> = {}) {
   const asked: string[] = [];
-  const draft = vi.fn(async (lane: Territory): Promise<LaneResult> => {
-    const drafted = lane.topics.map((x) => ({ ask: x.ask, id: `id-${x.ask}`, name: x.ask }));
-    asked.push(...drafted.map((d) => d.ask));
-    return { drafted, failed: [] };
+  const queue: string[] = [];
+  const failures: { id: string; ask: string; detail: string }[] = [];
+  const draft = vi.fn(async (lane: Territory, _runId: string) => {
+    queue.push(...lane.topics.map((x) => x.ask));
+    return { queued: lane.topics.length, failed: [] };
   });
+  const routine = (turnDown: string[] = []) => {
+    for (const ask of queue.splice(0)) {
+      if (turnDown.includes(ask)) failures.push({ id: `req-${failures.length}`, ask, detail: 'too vague' });
+      else asked.push(ask);
+    }
+  };
   const ports: DraftTopicsPorts = {
     territory: async () => t,
     lens: vi.fn(async () => ({ id: 'lens1', name: 'Beekeeping (renamed)' })),
     asked: async () => [...asked],
     draft,
+    pending: async () => ({ waiting: [...queue], failed: [...failures] }),
     targets: vi.fn(async (_lens: string, topics: readonly TerritoryTopic[]) => topics.length),
     approve: vi.fn(async (topics: readonly TerritoryTopic[]) => ({ approved: topics.length, kept: [] })),
     ...over,
   };
-  return { ports, draft, asked };
+  return { ports, draft, asked, routine };
 }
 
-describe('lanesOf', () => {
-  it('splits topics round-robin, at most perLane each', () => {
-    expect(lanesOf([1, 2, 3, 4, 5], 2, 2)).toEqual([[1, 3], [2, 4]]);
-    expect(lanesOf([1], 4, 3)).toEqual([[1]]);
-    expect(lanesOf([], 4, 3)).toEqual([]);
-  });
-});
-
 describe('draftTopicsStep', () => {
-  it('drafts lanes side by side and records drafted and remaining counts', async () => {
+  it('queues every topic left for the routine at once and waits for it', async () => {
     const { ports, draft } = draftPorts(territory(20));
     const out = await draftTopicsStep(ports)(ctx());
-    expect(draft).toHaveBeenCalledTimes(DRAFT_LANES);
-    // Each lane drafts under the lens's current name, with no kind so it never pulls.
+    expect(draft).toHaveBeenCalledTimes(1);
+    // Queued under the lens's current name, with no kind so it never pulls, and the run's id.
     expect(draft.mock.calls[0][0]).toMatchObject({ subjectLens: 'Beekeeping (renamed)', kind: null });
-    expect(out).toMatchObject({ state: 'more', summary: '12 of 20 topics drafted.', counts: { topics: 20, drafted: 12, remaining: 8 } });
+    expect(draft.mock.calls[0][0].topics).toHaveLength(20);
+    expect(draft.mock.calls[0][1]).toBe('r1');
+    expect(out).toMatchObject({
+      state: 'more',
+      pause: true,
+      wait: true,
+      summary: '0 of 20 topics drafted; 20 topics with Dash in a routine.',
+      counts: { topics: 20, drafted: 0, withDash: 20 },
+    });
     expect(out.state !== 'skipped' && out.detail).toMatchObject({ lens: { id: 'lens1' } });
   });
 
-  it('pauses for a fresh call when too little time is left to start a draft', async () => {
+  it('queues nothing again while the routine is still drafting', async () => {
     const { ports, draft } = draftPorts(territory(5));
-    const out = await draftTopicsStep(ports)(ctx({ now: 240_000 - DRAFT_START_MS + 1 }));
-    expect(draft).not.toHaveBeenCalled();
-    expect(out).toMatchObject({ state: 'more', pause: true, counts: { drafted: 0, remaining: 5 } });
+    const step = draftTopicsStep(ports);
+    await step(ctx());
+    const out = await step(ctx());
+    expect(draft).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({ state: 'more', wait: true, counts: { withDash: 5 } });
   });
 
   it('resumes from the lens it recorded and finishes with targets when none remain', async () => {
@@ -111,6 +121,15 @@ describe('draftTopicsStep', () => {
     expect(ports.lens).not.toHaveBeenCalled();
     expect(ports.targets).toHaveBeenCalledWith('lens1', t.topics);
     expect(out).toMatchObject({ state: 'done', counts: { drafted: 3, remaining: 0, targeted: 3 } });
+  });
+
+  it('finishes once the routine has drafted what it queued', async () => {
+    const { ports, routine } = draftPorts(territory(4));
+    const step = draftTopicsStep(ports);
+    const first = await step(ctx());
+    routine();
+    const out = await step(ctx({ detail: (first as { detail: Record<string, unknown> }).detail }));
+    expect(out).toMatchObject({ state: 'done', counts: { drafted: 4, remaining: 0 } });
   });
 
   it('approves the drafted topics when none remain and records the ones it kept as drafts', async () => {
@@ -130,43 +149,27 @@ describe('draftTopicsStep', () => {
     expect(ports.approve).not.toHaveBeenCalled();
   });
 
-  it('gives up on a topic the drafter turns down twice, so the run can finish', async () => {
-    const t = territory(2);
-    let detail: Record<string, unknown> = {};
-    const { ports, asked } = draftPorts(t, {
-      draft: async (lane) => {
-        const drafted = lane.topics.filter((x) => x.ask !== 'Topic 2').map((x) => ({ ask: x.ask, id: x.ask, name: x.ask }));
-        asked.push(...drafted.map((d) => d.ask));
-        return { drafted, failed: lane.topics.filter((x) => x.ask === 'Topic 2').map((x) => ({ ask: x.ask, detail: 'too vague' })) };
-      },
-    });
+  it('gives up on a topic the routine turns down twice, counting each turn-down once', async () => {
+    const { ports, routine } = draftPorts(territory(2));
     const step = draftTopicsStep(ports);
+    let detail: Record<string, unknown> = {};
     for (let i = 0; i < DRAFT_TRIES; i++) {
       const out = await step(ctx({ detail }));
       expect(out.state).toBe('more');
       detail = (out as { detail: Record<string, unknown> }).detail;
+      routine(['Topic 2']);
     }
     const out = await step(ctx({ detail }));
     expect(out).toMatchObject({ state: 'done', counts: { drafted: 1, failed: 1, remaining: 0 } });
     expect(out.state === 'done' && out.summary).toContain('1 topic could not be drafted');
+    // Read again, the same turn-downs are not counted twice.
+    const again = await step(ctx({ detail: (out as { detail: Record<string, unknown> }).detail }));
+    expect(again).toMatchObject({ state: 'done', counts: { failed: 1 } });
   });
 
-  it('keeps what the other lanes drafted when one lane throws', async () => {
-    let call = 0;
-    const { ports, asked } = draftPorts(territory(8), {
-      draft: async (lane) => {
-        if (call++ === 0) throw new Error('database blip');
-        asked.push(...lane.topics.map((x) => x.ask));
-        return { drafted: lane.topics.map((x) => ({ ask: x.ask, id: x.ask, name: x.ask })), failed: [] };
-      },
-    });
-    const out = await draftTopicsStep(ports)(ctx());
-    expect(out).toMatchObject({ state: 'more', counts: { drafted: 6, remaining: 2 } });
-  });
-
-  it('fails the step when every lane throws', async () => {
-    const { ports } = draftPorts(territory(4), { draft: async () => Promise.reject(new Error('no key')) });
-    await expect(draftTopicsStep(ports)(ctx())).rejects.toThrow('no key');
+  it('fails the step when queuing throws', async () => {
+    const { ports } = draftPorts(territory(4), { draft: async () => Promise.reject(new Error('database blip')) });
+    await expect(draftTopicsStep(ports)(ctx())).rejects.toThrow('database blip');
   });
 
   it('is skipped when no territory was stored', async () => {

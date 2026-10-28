@@ -260,7 +260,8 @@ describe('estimatePaidActions', () => {
     const costs = await estimatePaidActions(supabase, 'user', learn);
 
     expect(calls).toHaveLength(1);
-    expect(Object.keys(costs).sort()).toEqual([...learn].sort());
+    // A press that names nothing (a topic drafted by the routine, learn 0193) has no price.
+    expect(Object.keys(costs).sort()).toEqual(learn.filter((key) => PAID_ACTIONS[key].length > 0).sort());
     const plan = costs['app/learn/t/[id]/actions.ts#planTrack']!;
     // plan-topic measured, name-areas a guess: the sum is a guess.
     expect(plan.basis).toBe('guess');

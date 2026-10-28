@@ -172,7 +172,7 @@ function DraftItButton() {
       what="Cost of drafting it"
       hintFirst
     >
-      {pending ? 'Drafting…' : 'Draft it'}
+      {pending ? 'Sending…' : 'Draft it'}
     </DashAction>
   );
 }
@@ -193,6 +193,11 @@ export function WantedRow({ topicId, wanted }: { topicId: string; wanted: Wanted
         {state.error && (
           <p role="alert" className="mt-1 text-small text-danger">
             {state.error}
+          </p>
+        )}
+        {state.queued && (
+          <p role="status" className="mt-1 text-small text-ink-muted">
+            {state.queued}
           </p>
         )}
       </div>

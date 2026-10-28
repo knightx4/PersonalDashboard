@@ -404,6 +404,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.subject_sources', reason: 'Join rows naming the catalogue documents added to a subject; the documents are read through the catalogue.' },
     { table: 'learn.subject_preparations', reason: 'Bookkeeping for preparing a subject: which step its run is on and why it stopped.' },
     { table: 'learn.subject_preparation_steps', reason: 'Bookkeeping for preparing a subject: the steps of its run and what each produced.' },
+    { table: 'learn.topic_draft_requests', reason: 'Bookkeeping: a topic waiting for the routine to draft it; the drafted topic is in learn.topics.' },
     { table: 'learn.theme_fields', reason: 'Model placement of vault themes.' },
     { table: 'learn.track_offers', reason: 'Tracks the feed offered.' },
     { table: 'learn.transcript_calls', reason: 'Transcript fetch bookkeeping.' },

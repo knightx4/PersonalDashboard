@@ -1,25 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { draftPrompt, draftTopic } from './draft';
+import { DRAFT_TOOL, draftPrompt, readDraftReport } from './draft';
 
 /**
- * The drafting call around the rules in draft-payload.test.ts: what it is
- * told, that the spend is reported even when the draft is unusable, and that
- * a too-broad goal and a broken call stay two different answers.
+ * The drafting prompt and the check a written draft goes through, around the
+ * rules in draft-payload.test.ts: what the routine is told, that a draft is
+ * settled against the map, and that a too-broad goal and a malformed report
+ * stay two different answers. Nothing here calls a model (learn 0193).
  */
 
 vi.mock('server-only', () => ({}));
-
-function clientReturning(input: unknown, usage = { input_tokens: 10, output_tokens: 20 }) {
-  return {
-    messages: {
-      create: vi.fn().mockResolvedValue({
-        content: [{ type: 'tool_use', name: 'report_topic', input }],
-        usage,
-        stop_reason: 'tool_use',
-      }),
-    },
-  };
-}
 
 const DRAFT = {
   name: 'Discounted cash flow',
@@ -36,51 +25,28 @@ const DRAFT = {
 
 const MAP = [{ id: 't-return', name: 'Return', scope: 'What a return is.', ceiling: 6, approved: true }];
 
-describe('draftTopic', () => {
-  it('returns the draft and reports the spend', async () => {
-    const client = clientReturning(DRAFT);
-    const spent = vi.fn();
-    const result = await draftTopic({
-      goal: 'DCF',
-      map: MAP,
-      fields: [{ id: 'f-fin', slug: 'finance', name: 'Finance' }],
-      anthropicApiKey: 'test',
-      client: client as never,
-      onSpend: spent,
-    });
+describe('readDraftReport', () => {
+  it('settles a written draft against the map and the fields', () => {
+    const result = readDraftReport(DRAFT, { map: MAP, fields: [{ id: 'f-fin', slug: 'finance', name: 'Finance' }] });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.draft.cells).toHaveLength(2);
       expect(result.draft.links[0]).toMatchObject({ topicId: 't-return', fromLevel: 2, level: 2 });
       expect(result.draft.fieldIds).toEqual(['f-fin']);
     }
-    expect(spent).toHaveBeenCalledTimes(1);
   });
 
-  it('says a too-broad goal is too vague, and still reports the spend', async () => {
-    const spent = vi.fn();
-    const result = await draftTopic({
-      goal: 'finance',
-      map: [],
-      fields: [],
-      anthropicApiKey: 'test',
-      client: clientReturning({ ...DRAFT, too_vague: true }) as never,
-      onSpend: spent,
-    });
-    expect(result).toMatchObject({ ok: false, reason: 'too-vague' });
-    expect(spent).toHaveBeenCalledTimes(1);
+  it('says a too-broad goal is too vague', () => {
+    expect(readDraftReport({ ...DRAFT, too_vague: true }, { map: [], fields: [] })).toMatchObject({ ok: false, reason: 'too-vague' });
   });
 
-  it('reports a broken call as an error', async () => {
-    const client = { messages: { create: vi.fn().mockRejectedValue(new Error('boom')) } };
-    const result = await draftTopic({
-      goal: 'DCF',
-      map: [],
-      fields: [],
-      anthropicApiKey: 'test',
-      client: client as never,
-    });
-    expect(result).toEqual({ ok: false, reason: 'error', detail: 'boom' });
+  it('reports a malformed draft as an error', () => {
+    expect(readDraftReport({ name: 'DCF' }, { map: [], fields: [] })).toMatchObject({ ok: false, reason: 'error' });
+  });
+
+  it('gives the routine the tool the draft is written as', () => {
+    expect(DRAFT_TOOL.name).toBe('report_topic');
+    expect(DRAFT_TOOL.input_schema.required).toEqual(['name', 'scope', 'ceiling', 'levels']);
   });
 });
 
