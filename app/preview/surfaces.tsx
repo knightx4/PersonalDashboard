@@ -633,6 +633,8 @@ import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-acco
 import { FinancesAccountsErrorSurface } from './finances-accounts-error-surface';
 import { AccountsSkeleton } from '@/app/finances/accounts/accounts-skeleton';
 import { FINANCES_LINKS, FINANCES_LINKS_NEEDS_SIGN_IN } from './finances-settings-fixtures';
+import { FinancesImportsSurface, FinancesKeptAccountSurface } from './finances-imports-surfaces';
+import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -12614,7 +12616,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Finances · One student loan, with its payoff',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesAccountSurface kind="loan" />,
+    render: () => <FinancesKeptAccountSurface kind="goals" />,
   },
   {
     id: 'finances-account-brokerage',
@@ -12631,21 +12633,21 @@ export const SURFACES: readonly Surface[] = [
     label: 'Finances · Settings, two institutions linked',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured />,
+    render: () => <FinancesImportsSurface />,
   },
   {
     id: 'finances-settings-empty',
     label: 'Finances · Settings, nothing linked',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesSettingsView links={[]} itemsUsed={0} configured />,
+    render: () => <FinancesImportsSurface empty />,
   },
   {
     id: 'finances-settings-link-menu',
     label: 'Finances · Settings, choosing what to link',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured menuOpen />,
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured menuOpen />,
   },
   {
     id: 'finances-settings-row-menu',
@@ -12653,7 +12655,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'finances',
     width: 'page',
     render: () => (
-      <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured rowMenuOpen={FINANCES_LINKS[1]!.id} />
+      <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured rowMenuOpen={FINANCES_LINKS[1]!.id} />
     ),
   },
   {
@@ -12661,7 +12663,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Finances · Settings, a sign-in to repeat and 8 of 10 links used',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesSettingsView links={FINANCES_LINKS_NEEDS_SIGN_IN} itemsUsed={8} configured />,
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS_NEEDS_SIGN_IN} itemsUsed={8} configured />,
   },
   {
     id: 'finances-settings-saving',
@@ -12670,12 +12672,65 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <FinancesSettingsView
+        today={FINANCES_TODAY}
         links={FINANCES_LINKS}
         itemsUsed={2}
         configured
         initialPhase={{ kind: 'saving', institutionName: 'Nelnet' }}
       />
     ),
+  },
+  /* Accounts Plaid cannot reach (plan #2593.5): the import's hidden parts,
+   * adding an account by hand, and the pages of an imported and a manual
+   * account. Fixtures in app/preview/finances-imports-surfaces.tsx. */
+  {
+    id: 'finances-settings-import-preview',
+    label: 'Finances · Settings, an Apple Card statement ready to import',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="preview" />,
+  },
+  {
+    id: 'finances-settings-import-empty',
+    label: 'Finances · Settings, a statement with no transactions',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="empty" />,
+  },
+  {
+    id: 'finances-settings-import-error',
+    label: 'Finances · Settings, a file that is not a Wallet export',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="error" />,
+  },
+  {
+    id: 'finances-settings-add-account',
+    label: 'Finances · Settings, adding an account by hand',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface addOpen />,
+  },
+  {
+    id: 'finances-account-import',
+    label: 'Finances · Apple Card, from imported statements',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="import" />,
+  },
+  {
+    id: 'finances-account-manual',
+    label: 'Finances · A manual account asking for a new balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" />,
+  },
+  {
+    id: 'finances-account-manual-reading',
+    label: 'Finances · A manual account, adding a balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" readingOpen />,
   },
   {
     id: 'finances-settings-error',
@@ -12684,6 +12739,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <FinancesSettingsView
+        today={FINANCES_TODAY}
         links={FINANCES_LINKS}
         itemsUsed={2}
         configured

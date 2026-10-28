@@ -2,7 +2,10 @@ import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Property } from '@/components/shell/detail-layout';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { Thread } from '@/components/thread/thread';
+import { Banner } from '@/components/ui/banner';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import Link from '@/components/ui/link';
 import { SectionHeading } from '@/components/ui/section-heading';
 import type { DevComment } from '@/lib/comments/load';
 import { whenDate, whenMonth } from '@/lib/core/when';
@@ -12,18 +15,25 @@ import {
   ageLabel,
   balanceSeries,
   currentHoldings,
+  isOwed,
   KIND_LABEL,
   percentLabel,
   SOURCE_LABEL,
+  STALE_AFTER_DAYS,
   type AccountSummary,
   type Holding,
   type NetWorthPoint,
   type Reading,
 } from '@/lib/finances/accounts';
 import type { AccountTransaction } from '@/lib/finances/accounts-store';
+import { goalHref } from '@/lib/finances/goals-loans';
 import { formatMoney, formatNumber } from '@/lib/money';
 import { threadRef } from '@/lib/thread/subjects';
+import { AddReading } from './add-reading';
 import { BalanceChart } from './balance-chart';
+
+/** Where a statement is imported: the imports section of Finances settings. */
+export const IMPORT_HREF = '/finances/settings#imports';
 
 const UTC = { timeZone: 'UTC' } as const;
 const dollars = (cents: number) => formatMoney(cents, 'USD', { showCents: false });
@@ -35,7 +45,16 @@ const dollars = (cents: number) => formatMoney(cents, 'USD', { showCents: false 
  * balance over time, its holdings for a brokerage, its recent transactions,
  * and its thread.
  *
- * Drawn from props, so the gallery draws it from fixtures.
+ * An account not linked through Plaid keeps its balance another way, and
+ * the header's one action is that way (plan #2593.5): Add balance on a
+ * manual account, Import statement on an imported one, Open in Goals on a
+ * student loan read from Goals. Once the balance is older than 35 days a
+ * banner asks for a new one and carries the action instead. A Goals loan
+ * has no transactions of its own, and its comment box writes to its goal's
+ * thread, since the loan is a Goals record and not a finances.accounts row.
+ *
+ * Drawn from props, so the gallery draws it from fixtures. `readingOpen`
+ * holds the Add balance popover open for the gallery's shots.
  */
 export function AccountView({
   account,
@@ -46,6 +65,8 @@ export function AccountView({
   thread,
   today,
   subject,
+  goalId = null,
+  readingOpen = false,
 }: {
   account: AccountSummary;
   readings: readonly Reading[];
@@ -56,15 +77,31 @@ export function AccountView({
   today: string;
   /** The path from the catalogue (rowSubject); the gallery passes none and gets one built here. */
   subject?: Subject;
+  /** A Goals loan's goal, where its numbers are kept. */
+  goalId?: string | null;
+  readingOpen?: boolean;
 }) {
   const title = accountTitle(account);
   const day = (d: string) => whenDate(d, { ...UTC, year: 'auto', now: today });
   const series = balanceSeries(readings, account.id);
   const held = account.kind === 'brokerage' ? currentHoldings(holdings) : [];
 
+  const keeps = keepsBalance(account, goalId);
+  const asksForBalance = account.stale && keeps;
+  const action = (variant: 'primary' | 'secondary') => (
+    <KeepAction
+      account={account}
+      goalId={goalId}
+      today={today}
+      readingOpen={readingOpen}
+      variant={variant}
+    />
+  );
+
   const header = (
     <PageHeader
       title={title}
+      actions={keeps && !asksForBalance ? action('secondary') : undefined}
       description={
         account.officialName && account.officialName !== account.name
           ? account.officialName
@@ -72,7 +109,10 @@ export function AccountView({
       }
       subject={
         subject ?? {
-          ref: `finances.accounts:${account.id}`,
+          ref:
+            account.source === 'goals'
+              ? `goals.records:${account.id}`
+              : `finances.accounts:${account.id}`,
           path: [
             { label: 'Finances', href: '/finances/accounts' },
             { label: 'Accounts', href: '/finances/accounts' },
@@ -192,8 +232,27 @@ export function AccountView({
     );
   }
 
+  const stalePrompt = asksForBalance ? (
+    <Banner tone="warn">
+      <span className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <span>
+          <span className="font-medium">
+            {account.readOn
+              ? `This balance is ${ageLabel(account.ageDays).toLowerCase()}, from ${whenDate(account.readOn, UTC)}.`
+              : 'No balance yet.'}
+          </span>{' '}
+          {staleAsk(account.source)}
+        </span>
+        {action('primary')}
+      </span>
+    </Banner>
+  ) : null;
+
+  const listsTransactions = account.source === 'plaid' || account.source === 'import';
+
   return (
     <DetailPage header={header} details={<DetailFacts>{facts}</DetailFacts>}>
+      {stalePrompt}
       <section aria-labelledby="account-history" className="space-y-2">
         <SectionHeading id="account-history" title="Balance over time" />
         <Card padding="standard">
@@ -238,46 +297,139 @@ export function AccountView({
         </section>
       )}
 
-      <section aria-labelledby="account-transactions" className="space-y-2">
-        <SectionHeading
-          id="account-transactions"
-          title="Recent transactions"
-          count={
-            transactions.length > 0
-              ? moreTransactions
-                ? `latest ${transactions.length}`
-                : transactions.length
-              : undefined
-          }
-        />
-        {transactions.length === 0 ? (
+      {listsTransactions && (
+        <section aria-labelledby="account-transactions" className="space-y-2">
+          <SectionHeading
+            id="account-transactions"
+            title="Recent transactions"
+            count={
+              transactions.length > 0
+                ? moreTransactions
+                  ? `latest ${transactions.length}`
+                  : transactions.length
+                : undefined
+            }
+          />
+          {transactions.length === 0 ? (
+            <Card padding="standard">
+              <p className="text-ui text-ink-muted">
+                {account.source === 'plaid'
+                  ? 'None yet. They arrive with the next morning’s sync.'
+                  : 'None yet. They arrive when a statement is imported.'}
+              </p>
+            </Card>
+          ) : (
+            <Card padding="none">
+              <ul className="divide-y divide-border">
+                {transactions.map((t) => (
+                  <TransactionRow key={t.id} transaction={t} today={today} />
+                ))}
+              </ul>
+            </Card>
+          )}
+        </section>
+      )}
+
+      {account.source === 'goals' && (
+        // Goals keeps the loan's balance, rate and payment, not its payments.
+        <section aria-labelledby="account-payments" className="space-y-2">
+          <SectionHeading id="account-payments" title="Payments" />
           <Card padding="standard">
             <p className="text-ui text-ink-muted">
-              {account.source === 'plaid'
-                ? 'None yet. They arrive with the next morning’s sync.'
-                : 'None yet. They arrive when a statement is imported.'}
+              Payments show on the account they are paid from.
             </p>
           </Card>
-        ) : (
-          <Card padding="none">
-            <ul className="divide-y divide-border">
-              {transactions.map((t) => (
-                <TransactionRow key={t.id} transaction={t} today={today} />
-              ))}
-            </ul>
-          </Card>
-        )}
-      </section>
+        </section>
+      )}
 
-      <Card padding="dense" aria-label="Comments" role="region">
-        <Thread
-          subject={threadRef('account', account.id)}
-          turns={thread}
-          placeholder="A note on this account, or a question for Dash."
-        />
-      </Card>
+      {/* A Goals loan is no finances.accounts row, so its notes go on its goal's thread. */}
+      {(account.source !== 'goals' || goalId) && (
+        <Card padding="dense" aria-label="Comments" role="region">
+          <Thread
+            subject={
+              account.source === 'goals' && goalId
+                ? threadRef('goal', goalId)
+                : threadRef('account', account.id)
+            }
+            turns={thread}
+            placeholder={
+              account.source === 'goals'
+                ? 'A note on this loan, kept on its goal, or a question for Dash.'
+                : 'A note on this account, or a question for Dash.'
+            }
+          />
+        </Card>
+      )}
     </DetailPage>
   );
+}
+
+/** Whether an account has a way to take a new balance from this page. */
+function keepsBalance(account: AccountSummary, goalId: string | null): boolean {
+  return (
+    account.source === 'manual' ||
+    account.source === 'import' ||
+    (account.source === 'goals' && !!goalId)
+  );
+}
+
+/**
+ * How an account not linked through Plaid gets a new balance, as a button
+ * in the variant asked for: Add balance, Import statement or Open in Goals.
+ * Nothing for a linked account, or a Goals loan whose goal is not known.
+ */
+function KeepAction({
+  account,
+  goalId,
+  today,
+  readingOpen,
+  variant,
+}: {
+  account: AccountSummary;
+  goalId: string | null;
+  today: string;
+  readingOpen: boolean;
+  variant: 'primary' | 'secondary';
+}) {
+  if (account.source === 'manual')
+    return (
+      <AddReading
+        accountId={account.id}
+        accountName={accountTitle(account)}
+        owed={isOwed(account.kind)}
+        today={today}
+        variant={variant}
+        // The banner's button starts its line; the header's ends it.
+        anchor={variant === 'primary' ? 'trigger-below' : 'trigger-below-end'}
+        defaultOpen={readingOpen}
+      />
+    );
+  if (account.source === 'import')
+    return (
+      <Link href={IMPORT_HREF} className={buttonVariants({ variant, size: 'sm' })}>
+        Import statement
+      </Link>
+    );
+  if (account.source === 'goals' && goalId)
+    return (
+      <Link href={goalHref(goalId)} className={buttonVariants({ variant, size: 'sm' })}>
+        Open in Goals
+      </Link>
+    );
+  return null;
+}
+
+/** What the stale banner asks for, by where the balance comes from. */
+function staleAsk(source: AccountSummary['source']): string {
+  const every = `Finances asks for one at least every ${STALE_AFTER_DAYS[source]} days.`;
+  switch (source) {
+    case 'import':
+      return `Export last month's statement from Wallet and import it. ${every}`;
+    case 'goals':
+      return `It comes from the loan's row in Goals: add the latest servicer statement there. ${every}`;
+    default:
+      return `Add the balance from your latest statement. ${every}`;
+  }
 }
 
 function TransactionRow({
