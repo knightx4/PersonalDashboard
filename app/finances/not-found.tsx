@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <NoLongerThere
       description={DELETED_OR_MOVED}
-      back={{ label: 'Back to spending', href: '/finances/spending' }}
+      back={{ label: 'Back to accounts', href: '/finances/accounts' }}
     />
   );
 }

@@ -629,6 +629,9 @@ import {
 } from './dev-page-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
+import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
+import { FinancesAccountsErrorSurface } from './finances-accounts-error-surface';
+import { AccountsSkeleton } from '@/app/finances/accounts/accounts-skeleton';
 import { FINANCES_LINKS, FINANCES_LINKS_NEEDS_SIGN_IN } from './finances-settings-fixtures';
 import {
   NewsAllSurface,
@@ -12539,6 +12542,86 @@ export const SURFACES: readonly Surface[] = [
     module: 'finances',
     width: 'page',
     render: () => <FinancesSpendingErrorSurface />,
+  },
+  /* Finances accounts (plan #2593.6): every account grouped with net worth,
+   * one account's page per kind, and each hidden part on its own surface.
+   * Fixtures in app/preview/finances-accounts-fixtures.ts. */
+  {
+    id: 'finances-accounts',
+    label: 'Finances · Accounts, eight accounts and net worth',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface />,
+  },
+  {
+    id: 'finances-accounts-empty',
+    label: 'Finances · Accounts, nothing linked or imported yet',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface empty />,
+  },
+  {
+    id: 'finances-accounts-chart-hover',
+    label: 'Finances · Accounts, pointing at a day on the net worth chart',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface chartActive={300} />,
+  },
+  {
+    id: 'finances-accounts-stale',
+    label: 'Finances · Accounts, when a stale balance was last read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface staleOpen />,
+  },
+  {
+    id: 'finances-accounts-sign-in',
+    label: 'Finances · Accounts, Chase asking for its sign-in again',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface needsSignIn />,
+  },
+  {
+    id: 'finances-accounts-read-failed',
+    label: 'Finances · Accounts, balances that could not be read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface readFailed />,
+  },
+  {
+    id: 'finances-accounts-loading',
+    label: 'Finances · Accounts, loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <AccountsSkeleton />,
+  },
+  {
+    id: 'finances-accounts-error',
+    label: 'Finances · Accounts, a read that failed',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsErrorSurface />,
+  },
+  {
+    id: 'finances-account-card',
+    label: 'Finances · One credit card, with its statement and limit',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="card" />,
+  },
+  {
+    id: 'finances-account-loan',
+    label: 'Finances · One student loan, with its payoff',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="loan" />,
+  },
+  {
+    id: 'finances-account-brokerage',
+    label: 'Finances · One brokerage account, with its holdings',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="brokerage" />,
   },
   /* Finances settings: the institutions linked through Plaid (plan #2593.3),
    * with each hidden part on its own surface. Fixtures in

@@ -32,6 +32,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/dev/ui/review',
   '/dev/usage',
   '/finances',
+  '/finances/accounts',
+  '/finances/accounts/[id]',
   '/finances/recurring',
   '/finances/settings',
   '/finances/spending',

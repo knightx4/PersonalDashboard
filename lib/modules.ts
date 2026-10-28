@@ -246,10 +246,10 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'finances',
     prefix: '/finances',
-    // Spending, the page that answers "where did the money go" (plan #2593.1).
-    // It moved here from Shopping with Recurring; the old Shopping paths
-    // redirect (next.config.ts).
-    home: '/finances/spending',
+    // Accounts, every account held with net worth at the top (plan #2593.6).
+    // Spending and Recurring moved here from Shopping (plan #2593.1); the old
+    // Shopping paths redirect (next.config.ts).
+    home: '/finances/accounts',
     label: 'Finances',
     description: 'Accounts, spending and recurring payments',
     accent: '--color-w-finances',

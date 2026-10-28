@@ -316,6 +316,57 @@ export function LinkedAccountsList({ rowMenuOpen }: { rowMenuOpen?: string }) {
 }
 
 /**
+ * The banner the Accounts page shows for each link Plaid flagged
+ * (plan #2593.6): the institution asks for a new sign-in, so its balances
+ * have stopped, and Fix sign-in opens Link in update mode right there, the
+ * same as the settings row's. Draws nothing when no link needs one.
+ */
+export function SignInBanners() {
+  const { links, configured, phase, busy, startFix } = useLinking();
+  const flagged = links.filter((l) => l.needsUpdate);
+  if (flagged.length === 0 && phase.kind === 'idle') return null;
+
+  return (
+    <div className="space-y-3">
+      {flagged.map((link) => (
+        <Banner key={link.id} tone="warn">
+          <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <span>
+              <span className="font-medium">{link.institutionName} asks you to sign in again.</span>{' '}
+              {link.lastSyncedAt
+                ? `Its balances have not updated since ${whenDate(link.lastSyncedAt, DAY)}.`
+                : 'Its balances will not update until you do.'}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={busy || !configured}
+              onClick={() => startFix(link.id)}
+            >
+              {phase.kind === 'opening' ? <Loader2 className="size-4 animate-spin" strokeWidth={1.75} aria-hidden /> : null}
+              Fix sign-in
+            </Button>
+          </p>
+        </Banner>
+      ))}
+      {phase.kind === 'error' ? (
+        <Banner tone="bad" role="alert">
+          {phase.message}
+        </Banner>
+      ) : phase.kind === 'linked' ? (
+        <Banner tone="info" role="status">
+          {phase.message}
+        </Banner>
+      ) : phase.kind === 'saving' ? (
+        <Banner tone="info" role="status">
+          Saving {phase.institutionName}&rsquo;s sign-in&hellip;
+        </Banner>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * "Total Checking ··4417, Chase Savings ··9020 and 2 more" on a laptop, and
  * one account then the count on a phone, so the line stays one line. A name
  * is never split from its digits.
