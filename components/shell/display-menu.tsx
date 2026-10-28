@@ -2,7 +2,7 @@
 
 import Link from '@/components/ui/link';
 import { useActionState, useId, useRef, useState } from 'react';
-import { Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -50,6 +50,7 @@ export function DisplayMenu({
   menu,
   label = 'Display',
   align = 'end',
+  views = true,
   className,
   wordClassName,
 }: {
@@ -62,9 +63,112 @@ export function DisplayMenu({
    * passes `start` so the panel does not reach back past the page's gutter.
    */
   align?: 'start' | 'end';
+  /**
+   * Whether the saved views are a section of this panel. A page that draws
+   * them on their own button (ViewsMenu) passes false.
+   */
+  views?: boolean;
   className?: string;
   /** Classes for the word alone, such as hiding it on a phone where the header's line is full. */
   wordClassName?: string;
+}) {
+  return (
+    <PanelButton
+      icon={SlidersHorizontal}
+      label={label}
+      panelLabel="Display options"
+      align={align}
+      className={className}
+      wordClassName={wordClassName}
+      // A property turned off leaves nothing behind on the rows to say so,
+      // so the count is on the button rather than only inside the panel.
+      extra={menu.hiddenCount > 0 ? <span className="text-ink-muted">{menu.hiddenCount} hidden</span> : null}
+    >
+      {/* Empty on a list whose order is not the reader's to set -- a
+        * search ranked by relevance, say. An empty heading would offer a
+        * choice that is not there. */}
+      {menu.sorts.length > 0 && (
+        <Section title="Sort">
+          {menu.sorts.map((sort) => (
+            <ChoiceRow key={sort.id} choice={sort} />
+          ))}
+        </Section>
+      )}
+
+      {menu.groups.length > 0 && (
+        <Section title="Group">
+          {menu.groups.map((group) => (
+            <ChoiceRow key={group.id} choice={group} />
+          ))}
+        </Section>
+      )}
+
+      {menu.properties.length > 0 && (
+        <Section title="Properties">
+          {menu.properties.map((property) => (
+            <PropertyRow key={property.id} property={property} />
+          ))}
+        </Section>
+      )}
+
+      {views && <Views menu={menu} />}
+    </PanelButton>
+  );
+}
+
+/**
+ * The saved views on a button of their own, beside Display (note 1e926155):
+ * switching to a view is done far more often than changing a sort, so it is
+ * not two levels down. The button names the view in force, if one is.
+ */
+export function ViewsMenu({
+  menu,
+  align = 'end',
+  className,
+  wordClassName,
+}: {
+  menu: ListDisplayMenu;
+  align?: 'start' | 'end';
+  className?: string;
+  wordClassName?: string;
+}) {
+  const inForce = menu.views.find((view) => view.inForce);
+  return (
+    <PanelButton
+      icon={Bookmark}
+      label={inForce?.name ?? 'Views'}
+      panelLabel="Saved views"
+      align={align}
+      className={className}
+      wordClassName={cn('max-w-40 truncate', wordClassName)}
+    >
+      <Views menu={menu} />
+    </PanelButton>
+  );
+}
+
+/**
+ * A secondary button that opens a panel under it. Opening it needs
+ * JavaScript, which the choices inside do not (see DisplayMenu).
+ */
+function PanelButton({
+  icon: Icon,
+  label,
+  panelLabel,
+  align,
+  className,
+  wordClassName,
+  extra,
+  children,
+}: {
+  icon: typeof SlidersHorizontal;
+  label: string;
+  panelLabel: string;
+  align: 'start' | 'end';
+  className?: string;
+  wordClassName?: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -84,13 +188,9 @@ export function DisplayMenu({
         onClick={() => setOpen(!open)}
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
-        <SlidersHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className={wordClassName}>{label}</span>
-        {/* A property turned off leaves nothing behind on the rows to say so,
-          * so the count is on the button rather than only inside the panel. */}
-        {menu.hiddenCount > 0 && (
-          <span className="text-ink-muted">{menu.hiddenCount} hidden</span>
-        )}
+        {extra}
       </button>
 
       {open && (
@@ -100,37 +200,10 @@ export function DisplayMenu({
           anchor={align === 'end' ? 'trigger-below-end' : 'trigger-below'}
           padding="panel"
           tabIndex={-1}
-          aria-label="Display options"
+          aria-label={panelLabel}
           className="w-64 space-y-4"
         >
-          {/* Empty on a list whose order is not the reader's to set -- a
-            * search ranked by relevance, say. An empty heading would offer a
-            * choice that is not there. */}
-          {menu.sorts.length > 0 && (
-            <Section title="Sort">
-              {menu.sorts.map((sort) => (
-                <ChoiceRow key={sort.id} choice={sort} />
-              ))}
-            </Section>
-          )}
-
-          {menu.groups.length > 0 && (
-            <Section title="Group">
-              {menu.groups.map((group) => (
-                <ChoiceRow key={group.id} choice={group} />
-              ))}
-            </Section>
-          )}
-
-          {menu.properties.length > 0 && (
-            <Section title="Properties">
-              {menu.properties.map((property) => (
-                <PropertyRow key={property.id} property={property} />
-              ))}
-            </Section>
-          )}
-
-          <Views menu={menu} />
+          {children}
         </Popover>
       )}
     </div>
