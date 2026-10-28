@@ -33,6 +33,7 @@ describe('coverage', () => {
       'balance_readings',
       'holdings',
       'links',
+      'month_reviews',
       'plaid_events',
       'transactions',
     ]);
@@ -211,5 +212,38 @@ describe('account shapes', () => {
             values (${userA}, ${account.id}, 'VTI', 'Vanguard Total Stock Market ETF', 13, 380000, '2026-10-27')`,
     ).rejects.toThrow();
     expect(await asUser(userB, (tx) => tx`select id from holdings`)).toHaveLength(0);
+  });
+});
+
+describe('month reviews', () => {
+  it('keeps one review a month, readable by its owner only and written only by the server', async () => {
+    const lines = [{ id: 'spending', kind: 'spending', text: 'You spent $12.00.', transaction_ids: [], account_ids: [] }];
+    await admin`insert into month_reviews (user_id, month, status, source, summary, lines, written_at)
+                values (${userA}, '2026-10-01', 'written', 'plain', 'In October you spent $12.00.',
+                        ${admin.json(lines)}, now())`;
+    // A failed run keeps its error and no source.
+    await admin`insert into month_reviews (user_id, month, status, error)
+                values (${userB}, '2026-10-01', 'failed', 'model call failed')`;
+    // One a month, on its first day, and a written one says how it was written.
+    await expect(
+      admin`insert into month_reviews (user_id, month, status, source, written_at)
+            values (${userA}, '2026-10-01', 'written', 'plain', now())`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into month_reviews (user_id, month, status) values (${userA}, '2026-09-15', 'failed')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into month_reviews (user_id, month, status) values (${userA}, '2026-09-01', 'written')`,
+    ).rejects.toThrow();
+
+    expect(await asUser(userA, (tx) => tx`select summary from month_reviews`)).toEqual([
+      { summary: 'In October you spent $12.00.' },
+    ]);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into month_reviews (user_id, month, status) values (${userA}, '2026-08-01', 'failed')`,
+      ),
+    ).rejects.toThrow(/permission denied/);
   });
 });

@@ -5,6 +5,7 @@ import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { kickCompanyBoards } from '@/inngest/jobs/company-boards';
 import { runRecurringReread } from '@/inngest/cron/recurring-reread';
+import { runMonthReviews } from '@/inngest/finances/month-review';
 import { runPlaidSyncForAll } from '@/inngest/finances/plaid-sync';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
@@ -94,6 +95,11 @@ export async function GET(request: NextRequest) {
     // linked Plaid Item (plan #2593.4). A few seconds a link; nothing until
     // Plaid's keys are set.
     { name: 'finances-plaid', run: () => runPlaidSyncForAll() },
+    // After the sync, so the month's last transactions are in: the review of
+    // the month before, written once on the first day this runs in a month
+    // (plan #2593.8.2). One Sonnet call a person a month; a read of the
+    // stored row every other day, and nothing for anyone without accounts.
+    { name: 'finances-review', run: () => runMonthReviews() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },

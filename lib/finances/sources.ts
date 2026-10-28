@@ -1,6 +1,7 @@
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 
 const ACCOUNTS: Section = { href: '/finances/accounts', label: 'Accounts' };
+const FINANCES: Section = { href: '/finances', label: 'Finances' };
 
 /** A transaction or a holding opens on its account's page. */
 const onAccountPage = (title: string) => ({
@@ -66,6 +67,19 @@ export const financesSources: ModuleSources = {
       newest: 'as_of',
       parent: parentBy('account_id', 'finances.accounts'),
       page: onAccountPage('security_name'),
+    },
+    {
+      table: 'finances.month_reviews',
+      module: 'Finances',
+      holds: 'What Dash wrote about each month of their money: spending against the months before, new and changed subscriptions, unusual charges, interest, payments coming due and net worth.',
+      weight: 'incidental',
+      search: ['summary', 'lines'],
+      title: 'month',
+      newest: 'month',
+      facts: ['status', 'source'],
+      href: () => '/finances',
+      section: FINANCES,
+      note: "The summary and lines are Dash's, not theirs: each line is {id, kind, text, transaction_ids, account_ids}, the finances.transactions and finances.accounts rows behind it. month is the first day of the month reviewed. status 'failed' means the run broke (error says how); source 'plain' means no model worded it.",
     },
   ],
   notSources: [
