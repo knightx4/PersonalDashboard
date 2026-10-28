@@ -239,7 +239,10 @@ export async function writeCoverLetter(
       return { ok: false, error: 'Drafting is rate-limited right now.' };
     }
     if (error instanceof Anthropic.APIError) {
-      return { ok: false, error: `Draft failed (${error.status}).` };
+      // The API says why it refused a request; keep that, or a 400 cannot be traced.
+      const detail = (error.error as { error?: { message?: string } } | undefined)?.error?.message;
+      console.error('draft cover letter', error.status, detail ?? error.message);
+      return { ok: false, error: detail ? `Draft failed (${error.status}): ${detail}` : `Draft failed (${error.status}).` };
     }
     return { ok: false, error: error instanceof Error ? error.message : 'Draft failed.' };
   }
