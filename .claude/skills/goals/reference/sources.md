@@ -635,6 +635,29 @@ What they said to an advisor in a one-on-one talk, and what the advisor answered
 - Opens at `/you/board`
 - role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029).
 
+### `finances.accounts` (Finances)
+
+Their bank, card, brokerage and loan accounts, with credit limits and loan terms.
+
+- Search: `name`, `official_name`, `institution_name`
+- Name a row by `name`; link it by `id`
+- Balances are in finances.balance_readings by account_id, one a day; for a credit card or a loan the balance is the amount owed.
+
+### `finances.transactions` (Finances)
+
+Money into and out of their accounts: purchases, payments, transfers and pay.
+
+- Search: `description`, `merchant`, `category`
+- Name a row by `description`; link it by `id`
+- amount_cents is negative for money out and positive for money in. A card payment shows on both the bank account and the card.
+
+### `finances.holdings` (Finances)
+
+The investments in their brokerage accounts, with quantity, value and cost basis on a date.
+
+- Search: `security_name`, `ticker`
+- Name a row by `security_name`; link it by `id`
+
 ### `core.files` (Files)
 
 What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
