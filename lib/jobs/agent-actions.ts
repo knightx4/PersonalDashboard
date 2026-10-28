@@ -56,6 +56,7 @@ export const jobsActions: ModuleActions = {
     removeFollowUpPerson: none('theirs', 'The person taking someone off the list of who to reach out to.'),
     writeOwnFollowUp: none('own', 'A blank note the person writes themselves.'),
     redraftFollowUp: none('spends', 'Writes the note again with a model call; Dash can write one in Ask and keep it with change_touch.'),
+    saveFollowUpChannel: tool('change_touch'),
     saveFollowUpNote: tool('change_touch'),
   },
   'app/jobs/(app)/contacts/actions.ts': {
