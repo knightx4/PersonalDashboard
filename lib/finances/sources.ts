@@ -73,7 +73,7 @@ export const financesSources: ModuleSources = {
       holds: 'What Dash wrote about each month of their money: spending against the months before, new and changed subscriptions, unusual charges, interest, payments coming due and net worth.',
       weight: 'incidental',
       search: ['summary', 'lines'],
-      title: 'month',
+      title: 'summary',
       newest: 'month',
       facts: ['status', 'source'],
       href: () => '/finances/accounts',
