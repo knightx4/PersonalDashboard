@@ -214,10 +214,10 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-/** A detail as the list reads it: LinkedIn as a link, the rest as written. */
+/** A detail as the list reads it: LinkedIn and the website as links, the rest as written. */
 function readValue(key: DetailKey, value: string | null): React.ReactNode {
   if (value === null) return null;
-  if (key === 'linkedin_url') {
+  if (key === 'linkedin_url' || key === 'website_url') {
     return (
       <a
         href={linkedinHref(value)}
