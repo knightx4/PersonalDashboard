@@ -66,8 +66,16 @@ export const MAX_LOOKUPS = 12;
 export const INPUT_BUDGET = 150_000;
 
 /** What one call spends of INPUT_BUDGET: fresh input and cache writes in full, cache reads at a tenth. */
-export function budgetTokens(usage: { inputTokens: number; cachedInputTokens: number; cacheWriteTokens: number }): number {
-  return usage.inputTokens + usage.cacheWriteTokens + Math.ceil(usage.cachedInputTokens / 10);
+export function budgetTokens(
+  usage: { inputTokens: number; cachedInputTokens: number; cacheWriteTokens: number },
+  previousPrompt = 0,
+): number {
+  // Text the last call already sent and this one writes to the cache is read again, not new:
+  // a pasted PDF was billed as fresh input on call 1 and as a cache write on call 2, and spent
+  // the budget after two lookups (27 October 2026).
+  const fresh = usage.inputTokens + usage.cacheWriteTokens;
+  const again = Math.min(previousPrompt, fresh);
+  return fresh - again + Math.ceil((usage.cachedInputTokens + again) / 10);
 }
 /**
  * Time spent looking before it must answer. Ask runs in app/api/ask/route.ts,
@@ -936,6 +944,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   }
   let lookups = 0;
   let inputTokens = 0;
+  let previousPrompt = 0;
   // Set when a voice that chooses stopped without its answer: the next round must give it.
   let asked = false;
   // Set once a refusal made before any lookup has been sent back (LOOK_FIRST).
@@ -979,7 +988,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
-    inputTokens += budgetTokens(usage);
+    inputTokens += budgetTokens(usage, previousPrompt);
+    previousPrompt = usage.inputTokens + usage.cacheWriteTokens + usage.cachedInputTokens;
     if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');

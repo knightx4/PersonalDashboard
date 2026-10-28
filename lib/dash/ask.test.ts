@@ -1179,6 +1179,8 @@ describe('a long prompt read from the cache (the Northwind question, 21 October 
 
   it('counts a cache read at a tenth against the budget', () => {
     expect(budgetTokens({ inputTokens: 2, cachedInputTokens: 76_000, cacheWriteTokens: 800 })).toBe(8_402);
+    // A long message sent fresh and then cached is not new the second time.
+    expect(budgetTokens({ inputTokens: 2, cachedInputTokens: 79_668, cacheWriteTokens: 35_024 }, 113_837)).toBeLessThan(13_000);
     // Counted in full, two such calls spent it.
     expect(2 * (2 + 76_000 + 800)).toBeGreaterThan(INPUT_BUDGET);
   });
