@@ -55,5 +55,6 @@ export const financesSources: ModuleSources = {
   notSources: [
     { table: 'finances.links', reason: 'Plaid sign-ins and sync state.' },
     { table: 'finances.balance_readings', reason: 'Daily balances, read through finances.accounts.' },
+    { table: 'finances.plaid_events', reason: 'Webhooks Plaid sent, kept for the sync.' },
   ],
 };

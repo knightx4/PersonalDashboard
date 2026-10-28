@@ -617,6 +617,7 @@ import {
 } from './dev-page-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
+import { FINANCES_LINKS, FINANCES_LINKS_NEEDS_SIGN_IN } from './finances-settings-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -12445,13 +12446,76 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => <ShoppingDashboardEmptySurface />,
   },
+  /* Finances settings: the institutions linked through Plaid (plan #2593.3),
+   * with each hidden part on its own surface. Fixtures in
+   * app/preview/finances-settings-fixtures.ts. */
   {
-    // Finances settings before any account is linked (plan #2593.1).
     id: 'finances-settings',
+    label: 'Finances · Settings, two institutions linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured />,
+  },
+  {
+    id: 'finances-settings-empty',
     label: 'Finances · Settings, nothing linked',
     module: 'finances',
     width: 'page',
-    render: () => <FinancesSettingsView />,
+    render: () => <FinancesSettingsView links={[]} itemsUsed={0} configured />,
+  },
+  {
+    id: 'finances-settings-link-menu',
+    label: 'Finances · Settings, choosing what to link',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured menuOpen />,
+  },
+  {
+    id: 'finances-settings-row-menu',
+    label: 'Finances · Settings, a link row offering Fix sign-in',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView links={FINANCES_LINKS} itemsUsed={2} configured rowMenuOpen={FINANCES_LINKS[1]!.id} />
+    ),
+  },
+  {
+    id: 'finances-settings-near-limit',
+    label: 'Finances · Settings, a sign-in to repeat and 8 of 10 links used',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView links={FINANCES_LINKS_NEEDS_SIGN_IN} itemsUsed={8} configured />,
+  },
+  {
+    id: 'finances-settings-saving',
+    label: 'Finances · Settings, saving a new link',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{ kind: 'saving', institutionName: 'Nelnet' }}
+      />
+    ),
+  },
+  {
+    id: 'finances-settings-error',
+    label: 'Finances · Settings, Plaid refused',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{
+          kind: 'error',
+          message: 'Chase is already linked. If its sign-in stopped working, use Fix sign-in on its row instead, which keeps the same link.',
+        }}
+      />
+    ),
   },
   {
     id: 'shopping-order',
