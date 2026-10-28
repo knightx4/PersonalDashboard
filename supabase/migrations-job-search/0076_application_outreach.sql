@@ -62,6 +62,6 @@ insert into application_outreach (user_id, application_id, contact_id, why, chos
 select a.user_id, a.id, a.follow_up_contact_id, a.follow_up_why,
        case when a.follow_up_why = 'You chose them.' then 'person' else 'dash' end
 from applications a
-where a.user_id = core.dev_owner_id()
+where a.user_id = null::uuid /* the owner's id when this ran on the live database; a new install has no owner yet */
   and a.follow_up_contact_id is not null
 on conflict (application_id, contact_id) do nothing;
