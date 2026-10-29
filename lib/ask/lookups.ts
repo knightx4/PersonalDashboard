@@ -1009,12 +1009,14 @@ const RECALL_LANDING: Record<string, string> = {
   'learn.feed_cards': '/learn/now',
   'public.order_items': '/shopping/orders',
   'public.plan_items': '/dev/plan',
+  'you.dash_questions': '/you/answer',
 };
 
 /** What kind of thing each source is, for the model reading the result. */
 const RECALL_KINDS: Record<string, string> = {
   'obsidian.notes': 'Vault note',
   'you.transcripts': 'Transcript (courses taken)',
+  'you.dash_questions': 'Their answer to a question Dash asked',
   'job_search.thoughts': 'Job search thoughts',
   'job_search.notes': 'Job search note',
   'job_search.interviews': 'Interview notes',

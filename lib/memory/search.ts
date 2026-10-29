@@ -71,6 +71,8 @@ export const MEMORY_SOURCE_MODULES: Readonly<Record<string, ModuleId | null>> = 
   'obsidian.notes': 'vault',
   // One row per transcript, its courses as lines (plan #1309).
   'you.transcripts': 'you',
+  // Their answers to Dash's questions on the Answer tab (plan #2617.1).
+  'you.dash_questions': 'you',
   'job_search.thoughts': 'jobs',
   'job_search.notes': 'jobs',
   // Each interview round's notes, prep and questions (note 3d0b5fd8).
