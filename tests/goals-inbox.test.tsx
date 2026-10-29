@@ -24,6 +24,8 @@ vi.mock('@/app/goals/inbox/actions', () => ({
   snoozeInboxRowAction: vi.fn(),
   unsnoozeInboxRowAction: vi.fn(),
   leaveQuestionsAction: vi.fn(),
+  dismissStepNoticeAction: vi.fn(),
+  restoreStepNoticeAction: vi.fn(),
 }));
 vi.mock('@/app/goals/[goalId]/shaping-actions', () => ({
   askDashStepAction: vi.fn(),
@@ -186,6 +188,22 @@ describe('the Inbox page', () => {
     expect(html).toContain('id="inbox-actions"');
     expect(html).toContain('Pay the card');
     expect(html).toContain('Needs you: Which card has the lower rate?');
+  });
+
+  it('draws a step Dash finished as its notice, with Done to put it away (plan #2611.2)', () => {
+    const notice = item('f1', {
+      kind: 'finished',
+      title: 'Shortlist five companies',
+      detail: 'Globex is the strongest fit.',
+      action: 'Open',
+    });
+    const html = render({ groups: goalInboxGroups([notice], []) });
+    expect(html).toContain('Dash finished this');
+    expect(html).toContain('Shortlist five companies');
+    expect(html).toContain('Globex is the strongest fit.');
+    expect(html).toContain('href="/goals/g1/s/f1"');
+    expect(html).toContain('aria-label="Done: Shortlist five companies"');
+    expect(html).toContain('1 thing waiting on you');
   });
 
   it('says so when nothing is on you, and folds what was put off under Later', () => {

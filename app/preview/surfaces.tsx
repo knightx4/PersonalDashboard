@@ -5611,6 +5611,23 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsInboxSurface />,
   },
   {
+    /* The Goals Inbox with a finished step's Done showing, as hovering the
+     * row shows it on a laptop; a phone always shows it (plan #2611.2). */
+    id: 'goals-inbox-hover',
+    label: 'Goals · Inbox, a finished step hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface hover />,
+  },
+  {
+    /* The Goals Inbox with nothing on you, once the last notice is put away. */
+    id: 'goals-inbox-empty',
+    label: 'Goals · Inbox, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface empty />,
+  },
+  {
     /* The one Inbox component (plan #1937.4) from its row shape alone, as
      * every workspace's Inbox draws it: the three sections, the verbs, Later
      * and Decline, and the Later fold open. */

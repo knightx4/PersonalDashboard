@@ -106,6 +106,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-home': ['/goals'],
   'goals-home-passive': ['/goals'],
   'goals-inbox': ['/goals/inbox'],
+  'goals-inbox-hover': ['/goals/inbox'],
+  'goals-inbox-empty': ['/goals/inbox'],
   'inbox-page': ['/goals/inbox', '/dev/inbox'],
   'shopping-inbox': ['/shopping/inbox'],
   'jobs-inbox': ['/jobs/inbox'],

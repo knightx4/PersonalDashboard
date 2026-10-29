@@ -128,6 +128,7 @@ function act(kind: TodayKind, form: FormData): Promise<State> {
       return settleGoalAction({}, form);
     case 'breakdown':
     case 'plan':
+    case 'finished':
       return Promise.resolve({ error: 'Open it to look it over.' });
   }
 }
@@ -143,6 +144,7 @@ function hrefFor(item: TodayItem): string {
     case 'ask':
     case 'step':
     case 'rhythm':
+    case 'finished':
       return stepHref(item.goalId, item.id);
     default:
       return `/goals/${item.goalId}`;

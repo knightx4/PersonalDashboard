@@ -19,7 +19,13 @@ import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 import { loadMentionStates } from '@/lib/goals/mentions-store';
 import { passiveMentions, type MentionState, type PassiveMention } from '@/lib/goals/passive-mentions';
-import { suggestedItems, todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
+import {
+  finishedNotices,
+  suggestedItems,
+  todayRanked,
+  withPrepared,
+  type TodayItem,
+} from '@/lib/goals/today';
 import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
 import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
@@ -32,7 +38,8 @@ type Db = SupabaseClient<any, 'public'>;
 
 export type Home = {
   /**
-   * Everything on you, ranked, each step with what Dash prepared for it. The
+   * Everything on you, ranked, each step with what Dash prepared for it, then
+   * the notices of finished steps you asked about (finishedNotices). The
    * home splits it into Do next and the rest (homeLists in lib/goals/home.ts).
    */
   onYou: TodayItem[];
@@ -108,7 +115,9 @@ export async function loadHome(
     dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
   );
   return {
-    onYou,
+    // The notices of finished steps you asked about go last, whatever the
+    // goal's activity: you switched them on yourself (plan #2611.2).
+    onYou: [...onYou, ...finishedNotices(tree.goals, tree.byGoal, now)],
     goals,
     working: runs.filter((run) => isGoing(run, now)),
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),

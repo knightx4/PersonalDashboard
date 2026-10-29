@@ -53,6 +53,7 @@ export type GoalInboxGroup = {
 const GROUP_OF: Record<TodayKind, GoalInboxKey> = {
   step: 'actions',
   rhythm: 'actions',
+  finished: 'actions',
   question: 'questions',
   ask: 'questions',
   flag: 'questions',

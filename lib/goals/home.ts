@@ -246,11 +246,13 @@ export function homeLists(
       .filter((line) => line.goal.dueOn && !passive.has(line.goal.id))
       .map((line) => line.goal.id),
   );
+  // A finished step's notice is news, not work: it stays in the Inbox (plan #2611.2).
   const kept = ranked.filter(
     (item) =>
-      ANY_GOAL_KINDS.has(item.kind) ||
-      (item.onTodo === true && !(passive.has(item.goalId) && item.sentByDash === true)) ||
-      dated.has(item.goalId),
+      item.kind !== 'finished' &&
+      (ANY_GOAL_KINDS.has(item.kind) ||
+        (item.onTodo === true && !(passive.has(item.goalId) && item.sentByDash === true)) ||
+        dated.has(item.goalId)),
   );
   const doNext = kept.slice(0, cap);
   const listed = new Set(doNext.map((item) => item.goalId));

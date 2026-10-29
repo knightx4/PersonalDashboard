@@ -98,6 +98,7 @@ type ItemRow = {
   estimated_total?: number | string | null;
   total_unit?: string | null;
   notify_on_done?: boolean | null;
+  notice_seen_at?: string | null;
   activity?: string | null;
 };
 
@@ -128,7 +129,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, activity';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, notice_seen_at, activity';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -170,6 +171,7 @@ const toStep = (row: ItemRow): Step => ({
       : Number(row.estimated_total),
   totalUnit: row.total_unit ?? null,
   notifyOnDone: row.notify_on_done ?? false,
+  noticeSeenAt: row.notice_seen_at ?? null,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -854,6 +856,29 @@ export async function markStepNoticeSeen(
     .eq('status', 'done')
     .eq('notify_on_done', true)
     .is('notice_seen_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Undo a dismiss in the Goals Inbox (plan #2611.2): the notice of a finished
+ * step shows again. False when nothing changed.
+ */
+export async function clearStepNoticeSeen(
+  client: GoalsSupabaseClient,
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ notice_seen_at: null })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('level', 'step')
+    .eq('status', 'done')
+    .eq('notify_on_done', true)
+    .not('notice_seen_at', 'is', null)
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
