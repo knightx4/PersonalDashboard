@@ -434,6 +434,7 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashRowSurface,
   GoalDashStepNotifyErrorSurface,
   GoalDashStepSurface,
   GoalOpenedSurface,
@@ -5542,6 +5543,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalDashStepSurface />,
+  },
+  {
+    /* The same switch on the step's row in the goal list (plan #2611.3). */
+    id: 'goals-steps-dash-row',
+    label: 'Goal · the notify switch on a Dash step in the list',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashRowSurface />,
   },
   {
     /* That switch after a save that failed: off again, the reason beneath. */

@@ -89,6 +89,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-steps-tree-assignee-tip': ['/goals/[goalId]'],
   'goals-steps-tree-empty': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
+  'goals-steps-dash-row': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],
   'goals-substep': ['/goals/[goalId]/s/[stepId]'],
   'goals-step-menu': ['/goals/[goalId]/s/[stepId]'],
