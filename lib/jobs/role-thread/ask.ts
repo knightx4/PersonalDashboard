@@ -78,6 +78,12 @@ export type RoleAskInput = {
   client: AppSupabaseClient;
   userId: string;
   roleId: string;
+  /**
+   * Set when the question was asked under the cover letter of one
+   * application (note f0a52da9): the reply reads and writes that thread, and
+   * a letter goes into that application, rather than the role's latest.
+   */
+  applicationId?: string;
   /** The comment carrying the question, left out of the history. */
   commentId: string;
   question: string;
@@ -92,10 +98,17 @@ export type RoleAskInput = {
 
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
 
+/** The thread the question was asked in: the application's, or the role's. */
+function threadOf(input: RoleAskInput): string {
+  return input.applicationId
+    ? toRef('job_search.applications', input.applicationId)
+    : toRef(ROLE_THREAD_TABLE, input.roleId);
+}
+
 async function say(input: RoleAskInput, body: string, toolCalls?: readonly TalkToolCall[]): Promise<void> {
   await addThreadTurn(input.client, {
     userId: input.userId,
-    ref: toRef(ROLE_THREAD_TABLE, input.roleId),
+    ref: threadOf(input),
     author: 'claude',
     body,
     toolCalls,
@@ -140,23 +153,32 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       .eq('id', roleId)
       .eq('user_id', userId)
       .maybeSingle(),
-    // The latest attempt, which is the one the role page shows.
-    client
-      .from('applications')
-      .select('id, status, cover_letter')
-      .eq('role_id', roleId)
-      .eq('user_id', userId)
-      .order('attempt', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    // The application asked under, or else the latest attempt, which is the
+    // one the role page shows.
+    input.applicationId
+      ? client
+          .from('applications')
+          .select('id, status, cover_letter')
+          .eq('id', input.applicationId)
+          .eq('role_id', roleId)
+          .eq('user_id', userId)
+          .maybeSingle()
+      : client
+          .from('applications')
+          .select('id, status, cover_letter')
+          .eq('role_id', roleId)
+          .eq('user_id', userId)
+          .order('attempt', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
     client.from('evidence_items').select('id, title, body, context, metrics').eq('user_id', userId),
     client
       .from('profiles')
       .select('writing_style_notes, banned_constructions')
       .eq('id', userId)
       .maybeSingle(),
-    // The role's thread, from the shared store (plan #1470).
-    loadThread(client, toRef(ROLE_THREAD_TABLE, roleId), { userId }).then((data) => ({ data })),
+    // The thread asked in, from the shared store (plan #1470).
+    loadThread(client, threadOf(input), { userId }).then((data) => ({ data })),
   ]);
 
   if (roleError) throw new Error(roleError.message);
@@ -192,7 +214,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       body: note.body as string,
     }));
   const coverLetter = (application.cover_letter as string | null) ?? null;
-  const subjectRef = toRef(ROLE_THREAD_TABLE, roleId);
+  const subjectRef = threadOf(input);
 
   const message = roleReplyMessage(
     {
