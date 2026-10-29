@@ -15,7 +15,7 @@ import { Field, FieldError, Textarea, Input, Select } from '@/components/ui/fiel
 import { ROLE_KINDS, ROLE_KIND_LABELS, type RoleKind } from '@/lib/jobs/role-kind';
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
-import { experienceAsk, experienceRange } from '@/lib/jobs/jd/experience';
+import { experienceAsk, experienceShown } from '@/lib/jobs/jd/experience';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -34,6 +34,9 @@ export function Posting({
   compMinCents,
   compMaxCents,
   compSource,
+  experienceMinYears,
+  experienceMaxYears,
+  detailsEditing,
   requirements,
   requirementMatches,
   requirementMatchesAt,
@@ -102,6 +105,9 @@ export function Posting({
         compMinCents={compMinCents}
         compMaxCents={compMaxCents}
         compSource={compSource}
+        experienceMinYears={experienceMinYears}
+        experienceMaxYears={experienceMaxYears}
+        startEditing={detailsEditing}
         jdText={jdText}
       />
 
@@ -257,6 +263,9 @@ function RoleDetailsCard({
   compMinCents,
   compMaxCents,
   compSource,
+  experienceMinYears,
+  experienceMaxYears,
+  startEditing,
   jdText,
 }: {
   roleId: string;
@@ -267,11 +276,14 @@ function RoleDetailsCard({
   compMinCents: number | null;
   compMaxCents: number | null;
   compSource: string | null;
+  experienceMinYears: number | null;
+  experienceMaxYears: number | null;
+  startEditing?: boolean;
   /** Only to know whether the lookup is offered: it never overwrites one. */
   jdText: string;
 }) {
   const router = useRouter();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing ?? false);
   const [jdUrlDraft, setJdUrlDraft] = useState(jdUrl ?? '');
   const [locationDraft, setLocationDraft] = useState(location ?? '');
   const [kindDraft, setKindDraft] = useState<RoleKind>(kind);
@@ -282,6 +294,8 @@ function RoleDetailsCard({
   const [compMaxDraft, setCompMaxDraft] = useState(
     compMaxCents !== null ? String(Math.round(compMaxCents / 100)) : '',
   );
+  const [expMinDraft, setExpMinDraft] = useState(experienceMinYears !== null ? String(experienceMinYears) : '');
+  const [expMaxDraft, setExpMaxDraft] = useState(experienceMaxYears !== null ? String(experienceMaxYears) : '');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [lookup, setLookup] = useState<JdLookupResult | null>(null);
@@ -289,6 +303,7 @@ function RoleDetailsCard({
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
   const experience = experienceAsk(jdText);
+  const shownExperience = experienceShown({ min: experienceMinYears, max: experienceMaxYears }, experience);
 
   // The nightly pass walks six companies a night. A role you are looking at now
   // should not wait behind two hundred you are not, and the answer arrives in
@@ -309,6 +324,16 @@ function RoleDetailsCard({
       setError('Compensation has to be a number.');
       return;
     }
+    const expMin = expMinDraft.trim() ? Number(expMinDraft) : null;
+    const expMax = expMaxDraft.trim() ? Number(expMaxDraft) : null;
+    if ((expMin !== null && !Number.isFinite(expMin)) || (expMax !== null && !Number.isFinite(expMax))) {
+      setError('Experience has to be a number of years.');
+      return;
+    }
+    if (expMax !== null && expMin === null) {
+      setError('Give a minimum number of years too, or clear the maximum.');
+      return;
+    }
     const nextUrl = jdUrlDraft.trim() || null;
     startTransition(async () => {
       const result = await updateRole(roleId, {
@@ -318,6 +343,8 @@ function RoleDetailsCard({
         atsJobId: atsJobIdDraft.trim() || null,
         compMinCents: min,
         compMaxCents: max,
+        experienceMinYears: expMin,
+        experienceMaxYears: expMax,
         compSource:
           min !== null || max !== null
             ? ((compSource ?? 'recruiter') as 'posted' | 'recruiter' | 'estimate')
@@ -385,21 +412,23 @@ function RoleDetailsCard({
               ) : null
             }
           />
-          {/* Read from the description, so it has no field of its own to
-              edit: the range, then the lines it came from (note a7495ede). */}
+          {/* What you typed leads; the lines read from the description stay
+              beneath it as what the posting says (note a7495ede). */}
           <ValueRow
             label="Experience"
             value={
-              experience ? (
+              shownExperience ? (
                 <>
-                  {experienceRange(experience)}
-                  <ul className="mt-1 space-y-0.5">
-                    {experience.lines.map((line) => (
-                      <li key={line} className="text-small text-ink-muted">
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
+                  {shownExperience.range}
+                  {experience && (
+                    <ul className="mt-1 space-y-0.5">
+                      {experience.lines.map((line) => (
+                        <li key={line} className="text-small text-ink-muted">
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               ) : null
             }
@@ -479,6 +508,24 @@ function RoleDetailsCard({
               type="number"
               value={compMaxDraft}
               onChange={(event) => setCompMaxDraft(event.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field id={`expmin-${roleId}`} label="Experience min (years)">
+            <Input
+              type="number"
+              min={0}
+              value={expMinDraft}
+              onChange={(event) => setExpMinDraft(event.target.value)}
+            />
+          </Field>
+          <Field id={`expmax-${roleId}`} label="Experience max (years)">
+            <Input
+              type="number"
+              min={0}
+              value={expMaxDraft}
+              onChange={(event) => setExpMaxDraft(event.target.value)}
             />
           </Field>
         </div>

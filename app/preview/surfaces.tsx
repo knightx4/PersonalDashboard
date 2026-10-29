@@ -4424,7 +4424,31 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     // A lead, which opens on its posting.
     render: () => (
-      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
+    ),
+  },
+  {
+    /* The details card in edit mode: the experience years beside the comp
+     * ones, and the form's error line under them. */
+    id: 'jobs-role-posting-editing',
+    label: 'Role · Posting, editing details',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        detailsEditing
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
     ),
   },
   {

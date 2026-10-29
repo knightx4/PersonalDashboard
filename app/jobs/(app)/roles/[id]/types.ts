@@ -32,6 +32,8 @@ export interface PanelProps {
   /** Years of experience the person typed; null when not typed (read the description instead). */
   experienceMinYears: number | null;
   experienceMaxYears: number | null;
+  /** The gallery only: open the details card already in edit mode. */
+  detailsEditing?: boolean;
   requirements: Requirement[];
   /** The stored match, or null if this role has never been matched. */
   requirementMatches: RequirementMatch[] | null;

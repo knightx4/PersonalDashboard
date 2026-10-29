@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { experienceAsk, experienceRange } from '@/lib/jobs/jd/experience';
+import { experienceAsk, experienceRange, experienceShown } from '@/lib/jobs/jd/experience';
 
 const range = (text: string) => {
   const ask = experienceAsk(text);
@@ -55,5 +55,20 @@ describe('experienceAsk', () => {
       ),
     ).toBeNull();
     expect(experienceAsk(null)).toBeNull();
+  });
+});
+
+describe('experienceShown', () => {
+  const read = { min: 4, max: 8 };
+  it('leads with the typed range over the read one', () => {
+    expect(experienceShown({ min: 3, max: 5 }, read)).toEqual({ range: '3–5 years', typed: true });
+    expect(experienceShown({ min: 5, max: null }, read)).toEqual({ range: '5+ years', typed: true });
+  });
+  it('carries a typed value on a posting with no experience text', () => {
+    expect(experienceShown({ min: 3, max: 5 }, null)).toEqual({ range: '3–5 years', typed: true });
+  });
+  it('shows the read range when nothing is typed', () => {
+    expect(experienceShown({ min: null, max: null }, read)).toEqual({ range: '4–8 years', typed: false });
+    expect(experienceShown({ min: null, max: null }, null)).toBeNull();
   });
 });
