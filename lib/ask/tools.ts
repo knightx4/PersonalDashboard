@@ -490,7 +490,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   {
     name: 'read_spec',
-    description: `Read one of the specs on the Dev specs page, section by section: the documents the app is built against. Pass a query to get the sections that talk about it, each with its full text (up to 6,000 characters) and a link to that section on the spec's page, so you can quote the paragraph that answers the question. Leave the query out, or ask for something no section mentions, and it lists the spec's headings; pass one back as section to read it. Only for the owner of the app, with the Dev workspace on. The specs, by slug: ${specList()}.`,
+    description: `Read one of the specs on the Dev specs page, section by section: the documents the app is built against. Pass a query to get the sections that talk about it, each with its full text (up to 6,000 characters) and a link to that section on the spec's page, so you can quote the paragraph that answers the question. Leave the query out, or ask for something no section mentions, and it lists the spec's headings; pass one back as section to read it, or several anchors separated by commas to read them all in one lookup (a spec is cut into many sections; never read them one call at a time). Only for the owner of the app, with the Dev workspace on. The specs, by slug: ${specList()}.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -504,7 +504,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         },
         section: {
           type: 'string',
-          description: 'One section to read, by the section a heading list gave it.',
+          description: 'The section to read, by the section a heading list gave it. Several, separated by commas, are read together.',
         },
       },
       required: ['spec'],
