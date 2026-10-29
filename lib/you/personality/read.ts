@@ -1,5 +1,6 @@
 import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
 import { BIG_FIVE_FACTORS, FACTOR_WORDS, factorPercent } from './ipip';
+import { ENNEAGRAM_WORDS, enneagramLine, enneagramRanking } from './model';
 import type { PersonalityResult, ReadPoint } from './model';
 import type { TraitThemes } from './trait-themes';
 import { traitSentences } from './trait-themes';
@@ -36,6 +37,11 @@ export const MAX_POINTS = 8;
 /** Characters kept of one point. */
 export const POINT_CHARS = 400;
 
+/** Themes of a ranked result embedded to find notes, strongest first. */
+export const THEME_QUERIES = 5;
+/** Characters sent of what a report said about one theme, and of where it gets in the way. */
+export const THEME_CHARS = 700;
+
 /** Titles of notes read whatever the embedding finds: what you wrote about yourself. */
 export const PINNED_TITLES = ['About me'] as const;
 
@@ -53,6 +59,19 @@ export function readQueries(result: PersonalityResult): string[] {
     return [...BIG_FIVE_FACTORS.map((f) => sentences[f]), SELF_QUERY];
   }
   const own = [`${result.testName}: ${result.typedValue}.`, result.note ?? ''].join(' ').trim();
+  // The runner-up types matter as much as the top one, so each strong one
+  // finds its own notes too.
+  // Each ranked theme finds its own notes, as each Big Five trait does.
+  if (result.themes) {
+    const themed = result.themes
+      .slice(0, THEME_QUERIES)
+      .map((t) => [t.name, t.summary].filter(Boolean).join(': '));
+    return [own, ...themed, SELF_QUERY];
+  }
+  if (result.typeScores) {
+    const near = enneagramRanking(result.typeScores).slice(1, 3);
+    return [own, ...near.map((r) => `Enneagram type ${r.type}: ${ENNEAGRAM_WORDS[r.type]}.`), SELF_QUERY];
+  }
   return [own, SELF_QUERY];
 }
 
@@ -161,6 +180,22 @@ export function describeResult(
     }
   } else {
     lines.push(`${result.testName}: ${result.typedValue}, taken ${result.takenAt}, typed in from a test taken elsewhere.`);
+    if (result.themes) {
+      lines.push('Their themes, strongest first, with what the report said about them:');
+      result.themes.forEach((t, i) => {
+        const score = t.score === null ? '' : `, ${t.score} of 100`;
+        lines.push(`${i + 1}. ${t.name}${t.domain ? ` (${t.domain})` : ''}${score}${t.summary ? `: ${t.summary}` : ''}`);
+        const said = clip(t.insights.join(' '), THEME_CHARS);
+        if (said) lines.push(`   The report on them: ${said}`);
+        const risk = clip(t.blindSpots.join(' '), THEME_CHARS);
+        if (risk) lines.push(`   Where it can get in the way: ${risk}`);
+      });
+    }
+    if (result.typeScores) {
+      lines.push(
+        `Their score for every Enneagram type, out of 100, highest first: ${enneagramLine(result.typeScores)}. Read the strong runner-up types as well as the top one.`,
+      );
+    }
   }
   if (result.note) lines.push(`Their own line about it: ${result.note}`);
   const rest = others.filter((o) => o.id !== result.id);
@@ -170,7 +205,7 @@ export function describeResult(
       lines.push(
         o.kind === 'big_five'
           ? `- Big Five, ${o.takenAt}: ${BIG_FIVE_FACTORS.map((f) => `${FACTOR_WORDS[f].name} ${factorPercent(o.scores[f])}`).join(', ')}`
-          : `- ${o.testName}: ${o.typedValue}, ${o.takenAt}`,
+          : `- ${o.testName}: ${o.typedValue}, ${o.takenAt}${o.typeScores ? ` (every type, highest first: ${enneagramLine(o.typeScores)})` : ''}`,
       );
     }
   }

@@ -5,6 +5,7 @@ import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { isCompleteAnswers, scoreBigFive, IPIP_ITEM_COUNT } from './ipip';
 import {
   fromRow,
+  themesToRow,
   RESULT_COLUMNS,
   type BigFiveResult,
   type PersonalityResult,
@@ -107,6 +108,8 @@ export async function saveTypedResult(
       typed_value: input.typedValue,
       taken_at: input.takenAt,
       note: input.note,
+      type_scores: input.typeScores,
+      themes: input.themes ? themesToRow(input.themes) : null,
     })
     .select(RESULT_COLUMNS)
     .single();

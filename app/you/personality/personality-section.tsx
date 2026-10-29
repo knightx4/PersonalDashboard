@@ -18,6 +18,8 @@ import {
   type ReadStatus,
   type TypedResult,
 } from '@/lib/you/personality/model';
+import { EnneagramChart } from './enneagram-chart';
+import { ThemeList } from './theme-list';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
 import { Note } from '@/components/ui/note';
@@ -172,6 +174,8 @@ function TypedSlot({ slot, now }: { slot: Slot; now: number }) {
               <div key={t.id} className="space-y-1">
                 <p className="text-body font-medium text-ink">{t.typedValue}</p>
                 {t.note ? <p className="text-small text-ink-muted">{t.note}</p> : null}
+                {t.typeScores ? <EnneagramChart scores={t.typeScores} className="py-2" /> : null}
+                {t.themes ? <ThemeList themes={t.themes} className="py-2" /> : null}
                 <Disclosure title={`Dash on ${t.typedValue}`} meta={readMeta(t, status)}>
                   <PersonalityReadPanel
                     resultId={t.id}

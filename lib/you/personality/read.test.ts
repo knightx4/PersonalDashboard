@@ -31,6 +31,8 @@ const TYPED: TypedResult = {
   kind: 'mbti',
   testName: 'Myers-Briggs',
   typedValue: 'INTJ',
+  typeScores: null,
+  themes: null,
   takenAt: '2024-03-14',
   createdAt: '2026-10-07T18:00:00Z',
   note: 'From work.',
@@ -132,6 +134,59 @@ describe('the prompt', () => {
     expect(text).toMatch(/Extraversion 13 \(low/);
     expect(text).toMatch(/Myers-Briggs: INTJ/);
     expect(text).toMatch(/N1: "x"/);
+  });
+});
+
+describe('an Enneagram result with every score', () => {
+  const ENNEAGRAM: TypedResult = {
+    ...TYPED,
+    id: 'e1',
+    kind: 'enneagram',
+    testName: 'Enneagram',
+    typedValue: '5',
+    typeScores: [64, 60, 82, 35, 100, 18, 98, 45, 99],
+  };
+
+  it('gives every score in the prompt, highest first', () => {
+    expect(describeResult(ENNEAGRAM, [ENNEAGRAM])).toContain('5 at 100, 9 at 99, 7 at 98, 3 at 82');
+  });
+
+  it('looks for notes near the two strongest runner-up types too', () => {
+    const queries = readQueries(ENNEAGRAM);
+    expect(queries).toHaveLength(4);
+    expect(queries[1]).toContain('type 9');
+    expect(queries[2]).toContain('type 7');
+  });
+});
+
+describe('a result with ranked themes', () => {
+  const STRENGTHS: TypedResult = {
+    ...TYPED,
+    id: 's1',
+    kind: 'other',
+    testName: 'CliftonStrengths',
+    typedValue: 'Learner, Input',
+    themes: [
+      { name: 'Learner', domain: 'Strategic Thinking', summary: 'Loves to learn.', score: null, insights: ['Studies everything.'], blindSpots: ['Learns past the point of use.'], actions: [] },
+      { name: 'Input', domain: null, summary: null, score: 40, insights: [], blindSpots: [], actions: [] },
+    ],
+  };
+
+  it('looks for notes near each theme', () => {
+    expect(readQueries(STRENGTHS)).toEqual([
+      'CliftonStrengths: Learner, Input. From work.',
+      'Learner: Loves to learn.',
+      'Input',
+      SELF_QUERY,
+    ]);
+  });
+
+  it('gives each theme and what the report said in the prompt', () => {
+    const text = describeResult(STRENGTHS, [STRENGTHS]);
+    expect(text).toContain('1. Learner (Strategic Thinking): Loves to learn.');
+    expect(text).toContain('The report on them: Studies everything.');
+    expect(text).toContain('Where it can get in the way: Learns past the point of use.');
+    expect(text).toContain('2. Input, 40 of 100');
   });
 });
 

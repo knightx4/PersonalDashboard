@@ -13,6 +13,7 @@ import {
   parseTypedInput,
   type BigFiveResult,
   type TypedDraft,
+  type TypedField,
   type TypedResult,
 } from '@/lib/you/personality/model';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -49,7 +50,7 @@ export async function saveBigFiveAction(answers: number[]): Promise<SaveBigFiveS
 
 export type SaveTypedState =
   | { result: TypedResult }
-  | { error: string; field?: 'testName' | 'typedValue' | 'takenAt' | 'note' };
+  | { error: string; field?: TypedField };
 
 async function typedSave(
   draft: TypedDraft,
@@ -111,6 +112,8 @@ export async function restoreTypedAction(removed: TypedResult): Promise<SaveType
       typedValue: removed.typedValue,
       takenAt: removed.takenAt,
       note: removed.note ?? undefined,
+      typeScores: removed.typeScores ?? undefined,
+      themes: removed.themes,
     },
     { id: removed.id, read: false },
   );
