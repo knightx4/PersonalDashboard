@@ -1387,6 +1387,7 @@ const reviewRows: ReviewRow[] = [
     status: 'acknowledged',
     submittedAt: '2026-08-14T09:00:00.000Z',
     reason: 'Created from a confirmation email. Nobody has confirmed the details.',
+    gmailHref: 'https://mail.google.com/mail/#all/18f2a9c4d1e0b7a3',
     sortAt: '2026-08-14T09:00:00.000Z',
   },
   {

@@ -204,6 +204,8 @@ export const PAID_ACTIONS = {
   'app/dev/raised/actions.ts#decideRaise': ['reply-to-comment'],
   // Any other thread, a file's first (plan #1441): Dash's reply when tagged
   'app/thread-actions.ts#addRowComment': ['reply-to-comment'],
+  // ...and under a cover letter, the role's reply (note f0a52da9)
+  'app/thread-actions.ts#addRowComment:cover-letter': ['reply-to-role-comment'],
 
   // News: making the list of recommended newsletters. The view also presses
   // this once on its own, the first time it opens with no list stored.
