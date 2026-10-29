@@ -80,6 +80,8 @@ export interface ReviewApplicationRow {
   status: string;
   submittedAt: string | null;
   reason: string;
+  /** The email the application was inferred from, opened in Gmail (note d8d246b9). */
+  gmailHref: string | null;
   sortAt: string;
 }
 
@@ -214,9 +216,15 @@ export async function loadReviewQueue(
     roles: { id: string; title: string; companies: { name: string; domains: string[] | null } };
   };
 
-  const applications: ReviewApplicationRow[] = (
-    (applicationsResult.data ?? []) as unknown as AppRaw[]
-  ).map((raw) => ({
+  const appRaws = (applicationsResult.data ?? []) as unknown as AppRaw[];
+  const sourceMail = await sourceMailByApplication(
+    supabase,
+    accountIds,
+    inboxByAccount,
+    appRaws.map((raw) => raw.id),
+  );
+
+  const applications: ReviewApplicationRow[] = appRaws.map((raw) => ({
     kind: 'application' as const,
     id: raw.id,
     applicationId: raw.id,
@@ -230,6 +238,7 @@ export async function loadReviewQueue(
       raw.created_by === 'email_inferred'
         ? 'Created from a confirmation email. Check the role and the date.'
         : 'Flagged for review.',
+    gmailHref: sourceMail.get(raw.id) ?? null,
     sortAt: raw.created_at,
   }));
 
@@ -343,4 +352,36 @@ export function matchRoles(
     .sort((a, b) => a.rank - b.rank)
     .slice(0, limit)
     .map((entry) => entry.role);
+}
+
+/**
+ * The Gmail link for the earliest message each application was created from,
+ * so an inferred application can be checked against its email the way a held
+ * message can.
+ */
+export async function sourceMailByApplication(
+  supabase: AppSupabaseClient,
+  accountIds: string[],
+  inboxByAccount: Map<string, string | null>,
+  applicationIds: string[],
+): Promise<Map<string, string>> {
+  const hrefs = new Map<string, string>();
+  if (!accountIds.length || !applicationIds.length) return hrefs;
+  const { data } = await supabase
+    .from('inbox_messages')
+    .select('email_account_id, thread_id, provider_message_id, resulting_application_id')
+    .in('email_account_id', accountIds)
+    .in('resulting_application_id', applicationIds)
+    .order('received_at', { ascending: true });
+  for (const raw of (data ?? []) as Record<string, unknown>[]) {
+    const applicationId = raw.resulting_application_id as string;
+    if (hrefs.has(applicationId)) continue;
+    const href = gmailOpenUrl({
+      emailAddress: inboxByAccount.get(raw.email_account_id as string) ?? null,
+      threadId: (raw.thread_id as string) ?? null,
+      messageId: (raw.provider_message_id as string) ?? null,
+    });
+    if (href) hrefs.set(applicationId, href);
+  }
+  return hrefs;
 }
