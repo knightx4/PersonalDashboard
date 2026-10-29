@@ -35,15 +35,15 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },
     { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
   ],
+  // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
+  // the orders list is the page Shopping lands on now.
   shopping: [
-    { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
+    { href: '/shopping/orders', label: 'Now', icon: 'orders' },
     // The review queue keeps its address and lights the Inbox.
     { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
-    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
     { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
     { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-    { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
     { href: '/shopping/share', label: 'Share', icon: 'share' },
   ],
@@ -136,6 +136,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     // Everything on you across the goals. Its count is put on by the layout.
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
+    // The hours logged on every goal with an Hours logged metric, together.
+    { href: '/goals/hours', label: 'Hours', icon: 'goalsHours', exact: true },
   ],
   you: [
     { href: '/you/personality', label: 'Personality', icon: 'personality' },
@@ -143,7 +145,16 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/places', label: 'Places', icon: 'places' },
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+    // Dash's questions about you and your answers (plan #2617.2).
+    { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
     { href: '/you/board', label: 'Board', icon: 'board' },
+  ],
+  // Accounts first, with net worth at its top (plan #2593.6): what you hold,
+  // then where the money went, then what keeps charging.
+  finances: [
+    { href: '/finances/accounts', label: 'Accounts', icon: 'accounts' },
+    { href: '/finances/spending', label: 'Spending', icon: 'dashboard' },
+    { href: '/finances/recurring', label: 'Recurring', icon: 'recurring' },
   ],
   // Now, then the Inbox of questions a session needs answered. Then three
   // lists: what is being built (the plan leads, as the page worked from most
@@ -151,7 +162,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   // UI and Surfaces sit below them because they are the standard the work is
   // held to, not work. The changelog is near the end because it is looked up,
   // not worked, and Posts follows it since a post is written from it. No tab
-  // per module or per outside project: each would repeat the plan's sections
+  // per module or per outside project (Projects lists them all): each would repeat the plan's sections
   // (note 4308875b).
   dev: [
     // The route stays /dev/raised, so links already written into
@@ -159,6 +170,9 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/dev/raised', label: 'Now', icon: 'devHome' },
     { href: '/dev/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
+    // The repositories the plan builds in besides this one (plan #2553.5):
+    // one tab for all of them, so a project never gets a tab of its own.
+    { href: '/dev/projects', label: 'Projects', icon: 'project' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
     // Beside Ideas, since a takeaway is an idea someone else had (plan #1412).

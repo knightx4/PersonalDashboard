@@ -4,6 +4,7 @@ import {
   listPushes,
   refreshCommitChecks,
   refreshMainCheck,
+  refreshProjectMainChecks,
   refusalFor,
 } from '@/lib/plan/ci';
 
@@ -11,7 +12,7 @@ describe('refusalFor', () => {
   it('names the permission a refused workflow-runs read is short of', () => {
     const said = refusalFor(
       403,
-      '/repos/knightx4/PersonalDashboard/actions/runs?head_sha=a405587&per_page=100',
+      '/repos/example-owner/PersonalDashboard/actions/runs?head_sha=a405587&per_page=100',
     );
     expect(said).toContain('Actions: Read');
     expect(said).toContain('GITHUB_READ_TOKEN');
@@ -21,18 +22,18 @@ describe('refusalFor', () => {
 
   it('names Contents for the commit listing', () => {
     expect(
-      refusalFor(404, '/repos/knightx4/PersonalDashboard/commits?sha=main&per_page=100'),
+      refusalFor(404, '/repos/example-owner/PersonalDashboard/commits?sha=main&per_page=100'),
     ).toContain('Contents: Read');
   });
 
   it('asks for no particular permission where it does not know which', () => {
-    const said = refusalFor(403, '/repos/knightx4/PersonalDashboard/activity?per_page=100');
-    expect(said).toContain('knightx4/PersonalDashboard');
+    const said = refusalFor(403, '/repos/example-owner/PersonalDashboard/activity?per_page=100');
+    expect(said).toContain('example-owner/PersonalDashboard');
     expect(said).not.toContain(': Read"');
   });
 
   it('says an expired token is expired rather than unpermitted', () => {
-    const said = refusalFor(401, '/repos/knightx4/PersonalDashboard/activity');
+    const said = refusalFor(401, '/repos/example-owner/PersonalDashboard/activity');
     expect(said).toContain('401');
     expect(said).toMatch(/expired/);
   });
@@ -70,7 +71,7 @@ describe('listPushes', () => {
     expect(error).toBeNull();
     expect(pushes).toEqual([{ ref: 'main', sha: 'abc1234', at: '2026-09-17T11:50:00Z' }]);
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/repos/knightx4/PersonalDashboard/activity');
+    expect(url).toContain('/repos/example-owner/PersonalDashboard/activity');
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer ghp_test');
     vi.unstubAllEnvs();
   });
@@ -125,13 +126,20 @@ type Chain = {
  * commits, what is already known about them, and the rows it writes back.
  */
 function db(
-  steps: Array<{ commit_sha: string; completed_at?: string | null }>,
+  steps: Array<{
+    commit_sha: string;
+    completed_at?: string | null;
+    id?: string;
+    parent_id?: string | null;
+    module?: string | null;
+  }>,
   known: Array<{
     commit_sha: string;
     merge_sha: string | null;
     conclusion: string;
     checked_at: string;
   }> = [],
+  projects: Array<Record<string, unknown>> = [],
 ) {
   const upsert = vi.fn(async () => ({ error: null as null }));
   const answering = (result: unknown): Chain => {
@@ -149,7 +157,11 @@ function db(
   const supabase = {
     from: (table: string) =>
       answering(
-        table === 'plan_items' ? { data: steps, error: null } : { data: known, error: null },
+        table === 'plan_items'
+          ? { data: steps, error: null }
+          : table === 'dev_projects'
+            ? { data: projects, error: null }
+            : { data: known, error: null },
       ),
   };
   return { supabase, upsert };
@@ -397,7 +409,7 @@ describe('refreshMainCheck', () => {
     expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null, reason: null });
     // The deploy and migration readings beside it have tests of their own.
     expect(written(upsert)).toMatchObject({
-      repo: 'knightx4/PersonalDashboard',
+      repo: 'example-owner/PersonalDashboard',
       head_sha: MERGE,
       conclusion: 'failed',
       checked_at: new Date(NOW).toISOString(),
@@ -447,7 +459,7 @@ describe('refreshMainCheck', () => {
                 name: 'CI',
                 status: 'completed',
                 conclusion: 'failure',
-                html_url: 'https://github.com/knightx4/PersonalDashboard/actions/runs/42',
+                html_url: 'https://github.com/example-owner/PersonalDashboard/actions/runs/42',
               },
             ],
           }),
@@ -462,7 +474,7 @@ describe('refreshMainCheck', () => {
     expect(result.reason).toBe('Failed at check › Test.');
     const row = written(upsert);
     expect(row.reason).toBe('Failed at check › Test.');
-    expect(row.run_url).toBe('https://github.com/knightx4/PersonalDashboard/actions/runs/42');
+    expect(row.run_url).toBe('https://github.com/example-owner/PersonalDashboard/actions/runs/42');
     vi.unstubAllEnvs();
   });
 
@@ -713,5 +725,160 @@ describe('commitSubjects', () => {
     expect(await commitSubjects({ shas: ['', 'nope'], fetch: fetchFn as never })).toEqual({});
     expect(fetchFn).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
+  });
+});
+
+/** A Dev project's step is asked about in the project's repository (plan #2553.2). */
+describe('refreshCommitChecks for a project step', () => {
+  const WEBSITE = {
+    id: 'website',
+    label: 'alexrivera.dev',
+    owner: 'example-owner',
+    repo: 'alexrivera-site',
+    branch: 'main',
+  };
+
+  it("reads the website's main, not this app's, for a step under the website", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const sha = BRANCH.slice(0, 7);
+    const { supabase, upsert } = db(
+      [{ id: 'step-1', parent_id: null, module: 'website', commit_sha: sha }],
+      [],
+      [WEBSITE],
+    );
+    const fetchFn = github([{ status: 'completed', conclusion: 'success' }]);
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(result).toEqual({ checked: 1, error: null });
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.every((url) => url.includes('/repos/example-owner/alexrivera-site/'))).toBe(true);
+    const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ conclusion: string }>>>;
+    expect(rows[0].conclusion).toBe('passed');
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps this app's answers when the project's repository refuses", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = db(
+      [
+        { id: 'app-step', parent_id: null, module: 'dev', commit_sha: BRANCH.slice(0, 7) },
+        { id: 'site-step', parent_id: null, module: 'website', commit_sha: 'e'.repeat(7) },
+      ],
+      [],
+      [WEBSITE],
+    );
+    const fetchFn = vi.fn(async (url: string) => {
+      if (String(url).includes('alexrivera-site')) {
+        return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+      }
+      return String(url).includes('/actions/runs')
+        ? new Response(JSON.stringify({ workflow_runs: [] }), { status: 200 })
+        : new Response(JSON.stringify(MAIN), { status: 200 });
+    });
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(result.checked).toBe(1);
+    expect(result.error).toContain('example-owner/alexrivera-site');
+    const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ commit_sha: string }>>>;
+    expect(rows.map((row) => row.commit_sha)).toEqual([BRANCH.slice(0, 7)]);
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('refreshMainCheck for a project', () => {
+  it("stores the project's main under its own key, with no migrations reading", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const rpc = vi.fn();
+    const fetchFn = vi.fn(async (url: string) =>
+      String(url).includes('/actions/runs')
+        ? new Response(
+            JSON.stringify({ workflow_runs: [{ status: 'completed', conclusion: 'success' }] }),
+            { status: 200 },
+          )
+        : String(url).includes('/deployments')
+          ? new Response(JSON.stringify([]), { status: 200 })
+          : new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 }),
+    );
+
+    const result = await refreshMainCheck({
+      supabase: { from: () => ({ upsert }), rpc } as never,
+      now: Date.parse('2026-09-18T21:40:00.000Z'),
+      fetch: fetchFn as never,
+      repo: { owner: 'example-owner', repo: 'alexrivera-site', branch: 'main' },
+    });
+
+    expect(result).toMatchObject({ sha: MERGE, conclusion: 'passed', error: null });
+    const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
+    expect(row).toMatchObject({
+      repo: 'example-owner/alexrivera-site',
+      unapplied_migrations: null,
+      migrations_error: null,
+    });
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.every((url) => url.includes('/repos/example-owner/alexrivera-site/'))).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('refreshProjectMainChecks', () => {
+  function chain(data: unknown) {
+    const node: Record<string, unknown> = {};
+    for (const verb of ['select', 'eq', 'order']) node[verb] = () => node;
+    node.then = (resolve: (value: unknown) => unknown) =>
+      Promise.resolve({ data, error: null }).then(resolve);
+    return node;
+  }
+
+  it("reads the owner's active projects, one row each, and never another account's", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const eq = vi.fn();
+    const supabase = {
+      rpc: vi.fn(async () => ({ data: { userId: 'owner-1', email: 'o@example.com' }, error: null })),
+      from: (table: string) => {
+        if (table === 'plan_main_checks') return { upsert };
+        const node = chain([
+          { id: 'website', label: 'Site', owner: 'example-owner', repo: 'alexrivera-site' },
+          { id: 'old', label: 'Old', owner: 'example-owner', repo: 'old-site', archived_at: '2026-01-01' },
+        ]);
+        const plainEq = node.eq as () => unknown;
+        node.eq = (...args: unknown[]) => {
+          eq(...args);
+          return plainEq();
+        };
+        return node;
+      },
+    };
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+
+    const read = await refreshProjectMainChecks({
+      supabase: supabase as never,
+      now: Date.parse('2026-09-18T21:40:00.000Z'),
+      fetch: fetchFn as never,
+    });
+
+    expect(read).toBe(1);
+    expect(eq).toHaveBeenCalledWith('user_id', 'owner-1');
+    const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
+    expect(row.repo).toBe('example-owner/alexrivera-site');
+    vi.unstubAllEnvs();
+  });
+
+  it('reads nothing when the owner cannot be named', async () => {
+    const supabase = { rpc: vi.fn(async () => ({ data: null, error: null })), from: vi.fn() };
+    expect(await refreshProjectMainChecks({ supabase: supabase as never })).toBe(0);
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

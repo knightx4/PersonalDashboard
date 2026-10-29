@@ -290,6 +290,16 @@ describe('change_company and add_company write the company as their buttons do',
     const { byButton, byTool } = await bothWays(seed, () => addDiscoveredCompany(STARTUP), 'add_discovered_company', { startup_ref: STARTUP });
     expect(byTool).toEqual(byButton);
   });
+
+  it("sets the target titles as Find's field does", async () => {
+    const { saveAim } = await import('@/app/jobs/(app)/find/actions');
+    const form = new FormData();
+    form.set('field', 'targetTitles');
+    form.set('value', 'Strategic Finance, FP&A, Accounting');
+    const seed = (): FakeTables => ({ 'job_search.profiles': [{ id: ME, target_titles: ['Strategic Finance', 'FP&A'], excluded_industries: [] }] });
+    const { byButton, byTool } = await bothWays(seed, () => saveAim({}, form), 'change_search_aim', { add_target_titles: ['Accounting'] });
+    expect(byTool).toEqual(byButton);
+  });
 });
 
 const TOUCH = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -621,11 +631,11 @@ describe('the career tools write the rows Material and Settings do', () => {
     const form = new FormData();
     form.set('label', 'Data engineering, Oct 2026');
     form.set('notes', 'For platform roles');
-    form.set('textContent', 'Selvey Knight. Data engineer.');
+    form.set('textContent', 'Alex Rivera. Data engineer.');
     const { byButton, byTool } = await bothWays(materialSeed, () => addResumeVersion({}, form), 'add_resume_version', {
       label: 'Data engineering, Oct 2026',
       notes: 'For platform roles',
-      text_content: 'Selvey Knight. Data engineer.',
+      text_content: 'Alex Rivera. Data engineer.',
     });
     expect(byTool).toEqual(byButton);
   });

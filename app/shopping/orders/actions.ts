@@ -94,7 +94,7 @@ export async function excludeMerchantFromOrder(formData: FormData): Promise<void
 
   revalidatePath('/shopping/orders');
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   revalidatePath('/shopping/settings');
   revalidatePath('/shopping/review');
   redirect('/shopping/orders');
@@ -159,7 +159,7 @@ export async function softDeleteOrder(
   revalidatePath('/shopping/orders');
   revalidatePath(`/shopping/orders/${orderId}`);
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   revalidatePath('/shopping/returns');
   revalidatePath('/shopping/review');
   revalidatePath('/shopping/settings');
@@ -181,7 +181,7 @@ export async function restoreDeletedOrder(formData: FormData): Promise<void> {
   revalidatePath('/shopping/orders');
   revalidatePath(`/shopping/orders/${orderId}`);
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   revalidatePath('/shopping/returns');
   revalidatePath('/shopping/review');
   revalidatePath('/shopping/settings');
@@ -222,7 +222,7 @@ export async function permanentlyDeleteOrder(formData: FormData): Promise<void> 
 
   revalidatePath('/shopping/orders');
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   revalidatePath('/shopping/settings');
 }
 

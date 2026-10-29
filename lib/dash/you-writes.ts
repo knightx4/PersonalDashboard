@@ -26,6 +26,8 @@ import {
   type PlaceDraft,
   type PlaceRow,
 } from '@/lib/you/places';
+import { putQuestionToBoard } from '@/lib/you/board-ask';
+import { CONTEXT_MAX, LEAN_MAX, OPTION_MAX, OPTIONS_MAX, QUESTION_MAX } from '@/lib/you/board-questions';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -36,11 +38,15 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 dates or the note.
  *   set_detail    one of the fields they named themselves on Details, set by
  *                 its label, created when none has that label (plan #2531.3).
- *                 Never touches the six fixed details (plan #2124.3) and never
+ *                 Never touches the fixed details (plan #2124.3) and never
  *                 removes a field.
  *   save_about_me something they said about themselves in a chat with
  *                 Claude, in their words, with why it was saved
  *                 (you.claude_chats, you 0019), for the insights runs.
+ *   ask_board     a question put to the board with its options, context and
+ *                 the person's lean (plan #2561.10): queued for the Sunday
+ *                 meeting, or a meeting convened about it now when they said
+ *                 so. Through the Ask the board button's own function.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -347,6 +353,64 @@ async function saveAboutMe(env: YouWriteEnv, args: Args): Promise<YouMade> {
   };
 }
 
+const BOARD_PATHS = ['/you/board', '/home'];
+
+/** Why a question put to the board has no Undo: Dash never deletes, and a meeting may already hold it. */
+const BOARD_NO_UNDO =
+  'A question put to the board is on its agenda, and Dash does not delete rows. Open it on the Board tab.';
+
+async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
+  const question = textArg(args, 'question') ?? '';
+  const rawOptions = args.options;
+  if (rawOptions !== undefined && (!Array.isArray(rawOptions) || rawOptions.some((o) => typeof o !== 'string'))) {
+    throw new YouRefused('options must be a list of text, one per option.');
+  }
+  const when = textArg(args, 'when') ?? 'sunday';
+  if (when !== 'now' && when !== 'sunday') throw new YouRefused("when must be 'sunday' or 'now'.");
+
+  const put = await putQuestionToBoard({
+    client: env.you as YouSupabaseClient,
+    userId: env.userId,
+    question: {
+      question,
+      options: (rawOptions as string[] | undefined) ?? [],
+      context: textArg(args, 'context') ?? '',
+      lean: textArg(args, 'lean') ?? '',
+      advisors: [],
+    },
+    when,
+  });
+  if (!put.ok) throw new YouRefused(put.error);
+
+  const { question: row, convened, convening } = put;
+  const short = row.question.length > 80 ? `${row.question.slice(0, 79).trimEnd()}…` : row.question;
+  const rest = convened
+    ? ', and called a meeting on it now'
+    : convening
+      ? `, queued for the Sunday meeting (a meeting now did not start: ${convening})`
+      : ', queued for the Sunday meeting';
+  return {
+    kind: 'ask_board',
+    input: { verb: 'Asked the board', what: short, rest, href: '/you/board', where: 'Open the Board', paths: BOARD_PATHS },
+    subjectRef: toRef('you.board_questions', row.id),
+    op: 'insert',
+    before: null,
+    after: { ...row } as unknown as Row,
+    summary: `Dash asked the board "${short}"${rest}.`,
+    row: {
+      table: 'you.board_questions',
+      ref: row.id,
+      title: short,
+      href: '/you/board',
+      detail: {
+        options: row.options.map((o) => `${o.letter}: ${o.text}`).join(' | ') || 'the board will write them',
+        lean: row.lean,
+        meeting: convened ? 'called now' : 'next Sunday',
+      },
+    },
+  };
+}
+
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
 
 const FIELDS = {
@@ -438,7 +502,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
     name: 'set_detail',
     runs: noButton('The Details tab saves the whole list of their own fields at once; no button sets one by its name.'),
     description:
-      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their phone, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
+      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their name, email, phone, mailing address, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
     input_schema: {
       type: 'object',
       properties: {
@@ -449,6 +513,38 @@ export const YOU_WRITES: readonly YouWrite[] = [
       additionalProperties: false,
     },
     run: setDetail,
+  },
+  {
+    name: 'ask_board',
+    runs: sameAs(['app/you/board/actions.ts#askBoard', 'lib/you/board-ask.ts#putQuestionToBoard']),
+    description: `Put a question to the person's board of advisors (hiring manager, mentor, skeptic, CFO, dreamer, and any guests) on the Board tab, when they say "ask the board whether ...", "put this to the board" or the like. It is queued for the board's next Sunday meeting, and a meeting is called about it right now only when they say so ("ask the board now", "convene the board on this"): pass when 'now' then, never otherwise, since a meeting costs them a long run. Write question as one line from what they said, take options from the conversation (two to ${OPTIONS_MAX}, one line each; leave them out and the board writes them), put the numbers, limits and what success would look like in context, and pass their lean in lean when they gave one (an option's letter, or a line). Do not invent options, numbers or a lean they did not give. Then answer with the question and the link to it on the Board tab. Not for a decision they have already made, or a todo.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        question: { type: 'string', description: `The decision as one line, at most ${QUESTION_MAX} characters.` },
+        options: {
+          type: 'array',
+          items: { type: 'string', description: `One option, at most ${OPTION_MAX} characters.` },
+          description: `Two to ${OPTIONS_MAX} options in the order they gave them, lettered A to D. Leave out when they gave none.`,
+        },
+        context: {
+          type: 'string',
+          description: `What the board needs to know from the conversation: numbers, limits, deadline, what a good outcome is. At most ${CONTEXT_MAX} characters.`,
+        },
+        lean: {
+          type: 'string',
+          description: `Which way they lean, if they said: an option's letter, or a line. At most ${LEAN_MAX} characters.`,
+        },
+        when: {
+          type: 'string',
+          enum: ['sunday', 'now'],
+          description: "'sunday' (the default) queues it; 'now' convenes a meeting at once, only when they asked for that.",
+        },
+      },
+      required: ['question'],
+      additionalProperties: false,
+    },
+    run: askBoard,
   },
 ];
 
@@ -488,7 +584,12 @@ export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WR
       ok: true,
       ...result,
       input: result.input as unknown as Record<string, unknown>,
-      undo: result.kind === 'set_detail' ? { none: DETAIL_NO_UNDO } : null,
+      undo:
+        result.kind === 'set_detail'
+          ? { none: DETAIL_NO_UNDO }
+          : result.kind === 'ask_board'
+            ? { none: BOARD_NO_UNDO }
+            : null,
     };
   },
 }));

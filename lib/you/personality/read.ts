@@ -1,4 +1,4 @@
-import { whyNotRead } from '@/lib/vault/map/rules';
+import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
 import { BIG_FIVE_FACTORS, FACTOR_WORDS, factorPercent } from './ipip';
 import type { PersonalityResult, ReadPoint } from './model';
 import type { TraitThemes } from './trait-themes';
@@ -58,13 +58,16 @@ export function readQueries(result: PersonalityResult): string[] {
 
 /**
  * Whether a note may be sent. The map's rule (lib/vault/map/rules.ts) with
- * one difference: notes under Me/, which the map leaves out as journals, are
- * read here, because what you wrote about yourself is the point of the
- * comparison and the feature names "About me" as its source. Excluded
- * folders and notes holding a key are still never sent.
+ * one difference: notes in the folders the person marks as journals, which
+ * the map leaves out, are read here, because what you wrote about yourself is
+ * the point of the comparison and the feature names "About me" as its source.
+ * Folders the person leaves out and notes holding a key are still never sent.
  */
-export function mayRead(note: { path: string; body: string }): boolean {
-  const why = whyNotRead(note);
+export function mayRead(
+  note: { path: string; body: string },
+  rules: VaultRules = DEFAULT_VAULT_RULES,
+): boolean {
+  const why = whyNotRead(note, rules);
   return why === null || why.reason === 'journal';
 }
 
@@ -73,19 +76,20 @@ export type CandidateNote = { id: string; path: string; title: string; body: str
 /**
  * Choose the notes to send: the pinned ones first, then the nearest to each
  * text in turn, first of each list before the second of any, until there are
- * READ_NOTES. A note with nothing in it, or one that may not be sent, is
- * passed over.
+ * READ_NOTES. A note with nothing in it, or one that may not be sent under the
+ * person's `rules` (loadVaultRules), is passed over.
  */
 export function chooseNotes(
   pinned: readonly CandidateNote[],
   nearest: readonly (readonly CandidateNote[])[],
   limit = READ_NOTES,
+  rules: VaultRules = DEFAULT_VAULT_RULES,
 ): { note: CandidateNote; pinned: boolean }[] {
   const out: { note: CandidateNote; pinned: boolean }[] = [];
   const seen = new Set<string>();
   const take = (note: CandidateNote, isPinned: boolean) => {
     if (out.length >= limit || seen.has(note.id)) return;
-    if (!note.body.trim() || !mayRead(note)) return;
+    if (!note.body.trim() || !mayRead(note, rules)) return;
     seen.add(note.id);
     out.push({ note, pinned: isPinned });
   };

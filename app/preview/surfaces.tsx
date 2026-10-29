@@ -10,18 +10,23 @@ import {
   GoalMetricsSurface,
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
+import { GoalHoursSurface } from './goal-hours-surfaces';
+import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
+import { YouAnswerLoadingPreview, YouAnswerPreview } from './you-answer-surfaces';
 import {
   YouBoardListLoadingPreview,
   YouBoardListPreview,
   YouBoardMeetingLoadingPreview,
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
+import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -130,7 +135,7 @@ import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/mate
 import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
 import { FollowUpsView } from '@/app/jobs/(app)/follow-ups/view';
-import type { FollowUp } from '@/lib/jobs/followup/load';
+import type { FollowUp, OutreachPerson } from '@/lib/jobs/followup/load';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { ToastProvider } from '@/components/ui/toast';
@@ -430,6 +435,7 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashRowSurface,
   GoalDashStepNotifyErrorSurface,
   GoalDashStepSurface,
   GoalOpenedSurface,
@@ -470,7 +476,19 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
-import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
+import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
+import {
+  FinancesSpendingCategoriesSurface,
+  FinancesSpendingChargesSurface,
+  FinancesSpendingErrorSurface,
+  FinancesSpendingLoadingSurface,
+  FinancesSpendingMerchantOpenSurface,
+  FinancesSpendingMerchantsSurface,
+  FinancesSpendingMonthEmptySurface,
+  FinancesSpendingMonthHeldSurface,
+  FinancesSpendingNoChargesSurface,
+  FinancesSpendingSurface,
+} from './finances-spending-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { GoToSurface, LearnReviewListSurface } from './notes-batch-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -514,6 +532,16 @@ import {
   PostsWriteSurface,
   PostsXSurface,
 } from './posts-surfaces';
+import {
+  ProjectsAddErrorSurface,
+  ProjectsArchiveSurface,
+  ProjectsCommentsSurface,
+  ProjectsEmptySurface,
+  ProjectsNarrowTokenSurface,
+  ProjectsPickerSurface,
+  ProjectsSearchEmptySurface,
+  ProjectsSurface,
+} from './projects-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -603,6 +631,13 @@ import {
   DevUsageSurface,
 } from './dev-page-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
+import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
+import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
+import { FinancesAccountsErrorSurface } from './finances-accounts-error-surface';
+import { AccountsSkeleton } from '@/app/finances/accounts/accounts-skeleton';
+import { FINANCES_LINKS, FINANCES_LINKS_NEEDS_SIGN_IN } from './finances-settings-fixtures';
+import { FinancesImportsSurface, FinancesKeptAccountSurface } from './finances-imports-surfaces';
+import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
@@ -738,6 +773,8 @@ const rolePanels: PanelProps = {
   location: 'London, hybrid three days a week',
   kind: 'job',
   atsJobId: 'REQ-4471',
+  experienceMinYears: null,
+  experienceMaxYears: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',
@@ -1218,7 +1255,7 @@ const companyPanels = {
       { url: 'https://example.com/press-2024', title: 'Fund moves risk in house', kind: 'news', publisher: 'Risk.net', publishedOn: '2024-11-03', note: null },
       { url: 'https://example.com/careers', title: 'Market Data Engineer', kind: 'posting', publisher: null, publishedOn: null, note: null },
     ],
-    drafts: { whyMe: 'Three years auditing revenue systems at EY, and a revenue tool built from scratch: both are about making a pile of inputs trustworthy.' },
+    drafts: { whyMe: 'Three years auditing revenue systems at Halvorsen & Co., and a reconciliation tool built from scratch: both are about making a pile of inputs trustworthy.' },
     error: null,
     runUrl: null,
     requestedAt: '2026-10-01T09:00:00.000Z',
@@ -1354,6 +1391,7 @@ const reviewRows: ReviewRow[] = [
     status: 'acknowledged',
     submittedAt: '2026-08-14T09:00:00.000Z',
     reason: 'Created from a confirmation email. Nobody has confirmed the details.',
+    gmailHref: 'https://mail.google.com/mail/#all/18f2a9c4d1e0b7a3',
     sortAt: '2026-08-14T09:00:00.000Z',
   },
   {
@@ -1468,13 +1506,13 @@ const settings = {
   careerGoals: [
     {
       id: 'th-3',
-      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in Denver, hybrid at most three days in. Not crypto.',
       written: '28 Sep 2026',
       edited: '2 Oct 2026',
     },
     {
       id: 'th-1',
-      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      body: 'Leaving audit. Not sure yet whether to stay in finance.',
       written: '6 Jul 2026',
       edited: null,
     },
@@ -3315,9 +3353,13 @@ const youPlacesOnMap: Place[] = youPlaces.map((place) => {
   return at ? { ...place, latitude: at[0], longitude: at[1] } : place;
 });
 
-/** Six details filled in, LinkedIn typed without its scheme (plan #2124.2). */
+/** Every detail filled in, LinkedIn typed without its scheme (plan #2124.2). */
 const youDetails: Details = {
+  full_name: 'Christopher Alexander Montgomery-Whitfield',
+  email: 'chris.whitfield@example.com',
   phone: '+1 (415) 555-0142',
+  mailing_address: '1200 Larkin Street, Apt 4B, San Francisco, CA 94109',
+  website_url: 'chriswhitfield.example.com',
   linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
   citizenship: 'United States and Ireland',
   race: 'White',
@@ -3341,6 +3383,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+  { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
   { href: '/you/board', label: 'Board', icon: 'board' },
 ];
 
@@ -3754,19 +3797,19 @@ const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => wi
   id: 'op-1',
   kind: 'apply',
   headline: 'Deployment Strategist',
-  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Mosaic's AI deal models. The $10B take-private work gives you standing with those users.",
-  move: "1. Lead with the take-private and acquisition work at EY. 2. Say you want the strategy side of deployment. 3. Find someone on Mosaic's deployment team for a referral.",
+  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Contoso's AI deal models. Your audit work on deal clients gives you standing with those users.",
+  move: "1. Lead with the acquisition audits at Halvorsen & Co. 2. Say you want the strategy side of deployment. 3. Find someone on Contoso's deployment team for a referral.",
   channel: null,
   message: null,
-  url: 'https://jobs.ashbyhq.com/mosaic/1',
+  url: 'https://jobs.ashbyhq.com/contoso/1',
   location: 'New York City, on-site',
-  companyName: 'Mosaic',
-  companySlug: 'mosaic',
+  companyName: 'Contoso',
+  companySlug: 'contoso',
   personName: null,
   personTitle: null,
   sourceUrl: null,
   searchQuery: null,
-  foundIn: "Search for roles like Concourse's, on request",
+  foundIn: "Search for roles like Northwind's, on request",
   contact: null,
   scores: {
     workplace: { value: 'on_site', confidence: 0.95 },
@@ -3800,11 +3843,11 @@ const recommendedRoles: OpenSuggestion[] = [
   recommendedOpening({}),
   recommendedOpening({
     id: 'op-2',
-    companyName: 'Moment',
+    companyName: 'Fabrikam',
     companySlug: null,
     location: 'New York, on-site',
     why: 'Act as the general manager of each customer, from first demo to expansion, with large investment and wealth firms. Strategic and ownership-heavy. Posted at $200K to $300K plus equity and bonus.',
-    move: '1. Frame your MBA and startup advising as running an engagement end to end. 2. Show one thing you built. 3. Look for a Yale SOM alum at Moment or its investors.',
+    move: '1. Frame your MBA and startup advising as running an engagement end to end. 2. Show one thing you built. 3. Look for a Riverside School of Management alum at Fabrikam or its investors.',
     scores: {
       workplace: { value: 'on_site', confidence: 0.95 },
       seniority: { value: 'senior', confidence: 0.6 },
@@ -3826,7 +3869,7 @@ const recommendedRoles: OpenSuggestion[] = [
     companySlug: 'openai',
     headline: 'Deployment Lead, Financial Services',
     location: 'New York City, hybrid',
-    why: 'Work inside banks, asset managers and private capital firms to map workflows and lead AI rollouts. A stretch on seniority, but the same work as Concourse at a larger scale. Posted at $230K to $294K.',
+    why: 'Work inside banks, asset managers and private capital firms to map workflows and lead AI rollouts. A stretch on seniority, but the same work as Northwind at a larger scale. Posted at $230K to $294K.',
     foundIn: "On OpenAI's own job board",
     origin: 'board',
     postingRead: true,
@@ -3881,7 +3924,7 @@ const recommendedRoles: OpenSuggestion[] = [
     location: 'New York or remote',
     workMode: null,
     url: 'https://northwind.example/careers',
-    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your EY work covered.",
+    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your audit work covered.",
     move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Northwind Analytics to your companies. 3. Apply on their own site.",
     foundIn: 'Found on Hacker News',
     origin: 'discovered',
@@ -3934,11 +3977,11 @@ const recommendedPeople: OpenSuggestion[] = [
   recommendedOpening({
     id: 'pe-1',
     kind: 'reach_out',
-    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Mosaic',
-    why: 'She moved from EY Transaction Services to Mosaic last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
-    move: 'Message her on LinkedIn, name the take-private work you did together on, and ask for twenty minutes.',
+    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Contoso',
+    why: 'She moved from Halvorsen & Co. Transaction Services to Contoso last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
+    move: 'Message her on LinkedIn, name the acquisition audit you worked on together, and ask for twenty minutes.',
     channel: 'linkedin',
-    message: 'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
+    message: 'Hi Priya, it has been a while since the acquisition audit at Halvorsen & Co. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
     url: null,
     location: null,
     personName: 'Priya Raghunathan',
@@ -4017,7 +4060,7 @@ const discoveredCompanies: DiscoveredCompany[] = [
     website: 'https://liveflow.io',
     source: 'yc',
     description: 'AI-ERP and FP&A platform for finance teams.',
-    reason: 'Your modeling and CPA background fit finance teams as users, with real AI product work.',
+    reason: 'Your modeling and audit background fit finance teams as users, with real AI product work.',
     score: 92,
     stage: 'Early',
     locations: ['New York, NY, USA'],
@@ -4253,25 +4296,50 @@ const draftedAsks: PanelProps['dashAsks'] = [
  * one sent to a hiring manager Dash found, an application with nobody named
  * yet, and a role still to apply for.
  */
+const followUpPerson = (p: Partial<OutreachPerson> & Pick<OutreachPerson, 'contactId' | 'name'>): OutreachPerson => ({
+  title: null,
+  email: null,
+  linkedinUrl: null,
+  foundByDash: false,
+  why: null,
+  chosenBy: 'dash',
+  draft: null,
+  sent: null,
+  ...p,
+});
+
 const followUpRows: FollowUp[] = [
   {
     applicationId: 'fu-1',
     roleId: 'role-1',
     role: 'Strategic Finance Associate',
     companyId: 'co-1',
-    company: 'Ramp',
+    company: 'Globex',
     status: 'submitted',
     submittedAt: '2026-10-24T15:00:00Z',
-    person: { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance', email: 'rae@ramp.example', linkedinUrl: null, foundByDash: false },
-    why: 'Rae Patel wrote to you about this application.',
     triedAt: '2026-10-24T16:00:00Z',
-    draft: {
-      id: 't-1',
-      channel: 'email',
-      message:
-        "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nSelvey",
-    },
-    sent: null,
+    people: [
+      followUpPerson({
+        contactId: 'c-1',
+        name: 'Rae Patel',
+        title: 'Talent Partner, Finance',
+        email: 'rae@globex.example',
+        why: 'Rae Patel wrote to you about this application.',
+        draft: {
+          id: 't-1',
+          channel: 'email',
+          message:
+            "Subject: Strategic Finance Associate application\n\nHi Rae,\n\nI applied for the Strategic Finance Associate role on Friday. I spent three years building the planning model at Acme, which is most of what the posting describes, so this one stood out. If someone else is the right person for it, I'd be glad to know who.\n\nAlex",
+        },
+      }),
+      followUpPerson({
+        contactId: 'c-9',
+        name: 'Sam Ortiz',
+        title: 'Head of Strategic Finance',
+        why: 'You chose them.',
+        chosenBy: 'person',
+      }),
+    ],
   },
   {
     applicationId: 'fu-2',
@@ -4281,11 +4349,17 @@ const followUpRows: FollowUp[] = [
     company: 'Mercury',
     status: 'acknowledged',
     submittedAt: '2026-10-20T15:00:00Z',
-    person: { id: 'c-2', name: 'Dana Wu', title: 'Head of FP&A', email: null, linkedinUrl: null, foundByDash: true },
-    why: 'The posting says the role reports to the Head of FP&A, which is Dana Wu.',
     triedAt: '2026-10-20T16:00:00Z',
-    draft: null,
-    sent: { id: 't-2', channel: 'linkedin_connect', sentAt: '2026-10-21T09:00:00Z', respondedAt: null },
+    people: [
+      followUpPerson({
+        contactId: 'c-2',
+        name: 'Dana Wu',
+        title: 'Head of FP&A',
+        foundByDash: true,
+        why: 'The posting says the role reports to the Head of FP&A, which is Dana Wu.',
+        sent: { id: 't-2', channel: 'linkedin_connect', sentAt: '2026-10-21T09:00:00Z', respondedAt: null },
+      }),
+    ],
   },
   {
     applicationId: 'fu-3',
@@ -4295,11 +4369,8 @@ const followUpRows: FollowUp[] = [
     company: 'Plaid',
     status: 'submitted',
     submittedAt: '2026-10-25T15:00:00Z',
-    person: null,
-    why: null,
     triedAt: null,
-    draft: null,
-    sent: null,
+    people: [],
   },
   {
     applicationId: 'fu-4',
@@ -4309,11 +4380,8 @@ const followUpRows: FollowUp[] = [
     company: 'Brex',
     status: 'lead',
     submittedAt: null,
-    person: null,
-    why: null,
     triedAt: '2026-10-22T16:00:00Z',
-    draft: null,
-    sent: null,
+    people: [],
   },
 ];
 
@@ -4359,7 +4427,72 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     // A lead, which opens on its posting.
     render: () => (
-      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
+    ),
+  },
+  {
+    /* The details card in edit mode: the experience years beside the comp
+     * ones, and the form's error line under them. */
+    id: 'jobs-role-posting-editing',
+    label: 'Role · Posting, editing details',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        detailsEditing
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
+    ),
+  },
+  {
+    /* The Outreach tab: two people to reach out to, one with a note waiting,
+     * one named by hand with none yet, and the send log empty. */
+    id: 'jobs-role-outreach',
+    label: 'Role · Outreach',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="submitted"
+        defaultTab="outreach"
+        followUp={followUpRows[0]}
+        sends={[]}
+        companyContacts={[
+          { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+          { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+          { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
+        ]}
+      />
+    ),
+  },
+  {
+    /* The Outreach tab's channel menu open on Rae's note (note a790ab92):
+     * every way the note can go, the one it goes by now marked. */
+    id: 'jobs-role-outreach-channel',
+    label: 'Role · Outreach · How the note goes',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <FollowUpCard
+        initial={followUpRows[0]}
+        timezone="UTC"
+        channelMenuOpen
+        contacts={[
+          { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
+          { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+        ]}
+      />
     ),
   },
   {
@@ -4367,12 +4500,20 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    // An application being written, which opens on its questions.
+    // An application being written, which opens on its questions, with the
+    // line saying the company research has not been run (note 6b260c08).
     render: () => (
       <RoleDetailPanels
         {...rolePanels}
         status="drafting"
         defaultTab={defaultRoleTab('drafting')}
+        research={{
+          companyId: 'company-1',
+          companySlug: 'halloran-achterberg',
+          latestStatus: null,
+          readyAt: null,
+          available: true,
+        }}
       />
     ),
   },
@@ -4696,6 +4837,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
+  },
+  {
+    /* The saved views on their own button (note 1e926155), its panel open:
+     * one view in force, one that the list opens on, and the save line. */
+    id: 'jobs-pipeline-views',
+    label: 'Pipeline · Table · Saved views',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <PipelinePage
+        rows={pipelineRows}
+        params={{ view: 'table', ready: 'yes' }}
+        savedViews={[
+          { id: 'v-1', list: '/jobs/pipeline', name: 'Ready to send', query: 'view=table&ready=yes', isDefault: false },
+          { id: 'v-2', list: '/jobs/pipeline', name: 'Everything live', query: 'view=table', isDefault: true },
+        ]}
+        openPanel="views"
+      />
+    ),
+  },
+  {
+    /* The Display panel open beside it: sort, group and columns, and no
+     * saved views, which have their own button now. */
+    id: 'jobs-pipeline-display',
+    label: 'Pipeline · Table · Display',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} openPanel="display" />,
   },
   {
     /* The table with a column's menu open (note f05f5f04): its sort, then
@@ -5154,6 +5323,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricsSurface />,
   },
   {
+    /* The Hours page (goals 0089): twelve weeks of three hours metrics, this
+     * week against each aim's pace, four weeks day by day, the week-by-week
+     * table and each metric's chart. */
+    id: 'goals-hours',
+    label: 'Goals · Hours across the goals',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface />,
+  },
+  {
+    /* The Hours page's slot opened, to log today's hours (note 3eb2c302). */
+    id: 'goals-hours-log',
+    label: 'Goals · Hours, logging today',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface logOpen />,
+  },
+  {
     id: 'goals-metrics-tooltip',
     label: 'Goals · Metrics, a bar hovered',
     module: 'goals',
@@ -5386,6 +5573,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalDashStepSurface />,
   },
   {
+    /* The same switch on the step's row in the goal list (plan #2611.3). */
+    id: 'goals-steps-dash-row',
+    label: 'Goal · the notify switch on a Dash step in the list',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashRowSurface />,
+  },
+  {
     /* That switch after a save that failed: off again, the reason beneath. */
     id: 'goals-step-dash-notify-error',
     label: 'Goal · the notify switch, save failed',
@@ -5451,6 +5646,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsInboxSurface />,
+  },
+  {
+    /* The Goals Inbox with a finished step's Done showing, as hovering the
+     * row shows it on a laptop; a phone always shows it (plan #2611.2). */
+    id: 'goals-inbox-hover',
+    label: 'Goals · Inbox, a finished step hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface hover />,
+  },
+  {
+    /* The Goals Inbox with nothing on you, once the last notice is put away. */
+    id: 'goals-inbox-empty',
+    label: 'Goals · Inbox, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface empty />,
   },
   {
     /* The one Inbox component (plan #1937.4) from its row shape alone, as
@@ -6137,6 +6349,7 @@ export const SURFACES: readonly Surface[] = [
           'co-1': [
             { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
             { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
+            { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
           ],
           'co-3': [{ id: 'c-8', name: 'Lee Park', title: 'Recruiter' }],
         }}
@@ -6554,7 +6767,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <NewVaultNote />
@@ -6573,7 +6786,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <QuickNoteRow
@@ -6595,7 +6808,7 @@ export const SURFACES: readonly Surface[] = [
       <>
         <PageHeader
           title="Vault"
-          description="knightx4/notes · main"
+          description="alex-rivera/notes · main"
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <QuickNoteRow waiting={0} writable={false} startOpen />
@@ -6758,7 +6971,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <>
         <PageHeader title="Work & school" />
-        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-ey" />
+        <JobsSection jobs={workHistoryJobs} resume={workHistoryResume} changed={false} editing="j-audit" />
       </>
     ),
   },
@@ -9455,10 +9668,106 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouInsightsLoadingPreview />,
   },
   {
-    /* Board (plan #2540.3): the board's meetings newest first, each row saying
-     * how far through its minutes the person is; a called meeting first. */
+    /* Answer (plan #2617.2): Dash's questions about you, three waiting with
+     * a box and Skip each, four answers below with Edit, two skipped folded. */
+    id: 'you-answer',
+    label: 'You · Answer, three waiting and four answered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-empty',
+    label: 'You · Answer, before Dash has asked anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAnswerPreview empty />,
+  },
+  {
+    id: 'you-answer-answered',
+    label: 'You · Answer, nothing waiting',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview noneOpen />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-edit',
+    label: 'You · Answer, an answer being changed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview part="edit" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-skipped',
+    label: 'You · Answer, skipped open with one being answered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview noneOpen part="skipped" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-error',
+    label: 'You · Answer, an answer that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview part="error" />
+      </div>
+    ),
+  },
+  {
+    /* The Ask button's run going (plan #2617.3): Dash at work on the button
+     * and a line under the header with when it started. */
+    id: 'you-answer-running',
+    label: 'You · Answer, Dash writing new questions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-ask-failed',
+    label: 'You · Answer, the last run for new questions failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-loading',
+    label: 'You · Answer, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAnswerLoadingPreview />,
+  },
+  {
+    /* Board (plans #2540.3 and #2561.4): one surface in three groups, the
+     * board's suggested questions with Ask now, Save for Sunday and Dismiss,
+     * the questions asked with their state, then the meetings newest first. */
     id: 'you-board',
-    label: 'You · Board, four meetings',
+    label: 'You · Board, suggestions, questions and meetings',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9468,8 +9777,98 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* What the board asks the person (plan #2561.11): answer boxes under The
+     * board asks you, one asked a second time, one answered and waiting for
+     * the next meeting; and the same with a failed save. */
+    id: 'you-board-asks',
+    label: 'You · Board, the board asks you questions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="asks" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-asks-error',
+    label: 'You · Board, an answer to the board that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="asks-error" />
+      </div>
+    ),
+  },
+  {
+    /* The board checking back on decisions at 30 and 90 days (plan #2561.8):
+     * how each turned out with receipts, and the three presses to answer;
+     * and the same with a save that failed. */
+    id: 'you-board-reviews',
+    label: 'You · Board, the board checks back on two decisions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="reviews" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-reviews-error',
+    label: 'You · Board, an answer to a check-back that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="reviews-error" />
+      </div>
+    ),
+  },
+  {
+    /* What fell due, first on the tab (plan #2581.10): a forecast decision's
+     * check-back asked from its success measure before any meeting wrote
+     * it, a written one, a tripwire whose day came, and under the list each
+     * advisor's track record by topic. */
+    id: 'you-board-due',
+    label: 'You · Board, check-backs and a tripwire due, with track records',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="due" />
+      </div>
+    ),
+  },
+  {
+    /* A meeting that checked back on two decisions, one answered and graded,
+     * with the scorecard of whose picks held up by topic (plan #2561.8). */
+    id: 'you-board-meeting-reviewed',
+    label: 'You · Board, a meeting that checked back on decisions, with picks graded',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview reviewed />
+      </div>
+    ),
+  },
+  {
+    /* A verdict that names its assumptions (plan #2561.11). */
+    id: 'you-board-meeting-assumed',
+    label: 'You · Board, a verdict resting on stated assumptions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview assumed />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-empty',
-    label: 'You · Board, no meetings yet',
+    label: 'You · Board, nothing asked, suggested or held yet',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9480,7 +9879,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-running',
-    label: 'You · Board, a meeting being held',
+    label: 'You · Board, a question convened now, its meeting being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9522,11 +9921,11 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Call a meeting (plan #2540.5): the line for the decision open under the
-     * header, the notice when a meeting is already running, and the minutes
-     * of a called meeting, whose one disagreement holds each seat's vote. */
-    id: 'you-board-call',
-    label: 'You · Board, the decision line open',
+    /* Ask the board (plan #2561.4): the compose card open under the header,
+     * filled as far as a real question goes, and the card with a question
+     * that was saved but whose meeting could not start. */
+    id: 'you-board-ask',
+    label: 'You · Board, Ask the board open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9536,8 +9935,8 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'you-board-call-error',
-    label: 'You · Board, the decision line with a failed start',
+    id: 'you-board-ask-error',
+    label: 'You · Board, a question whose meeting could not start',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9547,13 +9946,35 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'you-board-call-running',
-    label: 'You · Board, pressing Call a meeting while one runs',
+    id: 'you-board-start',
+    label: 'You · Board, Start a meeting open',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouBoardListPreview state="running" start="running" />
+        <YouBoardListPreview meetingStart="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-start-error',
+    label: 'You · Board, a meeting that could not be started',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview meetingStart="error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-start-running',
+    label: 'You · Board, Start a meeting while one is running',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardListPreview state="running" meetingStart="running" />
       </div>
     ),
   },
@@ -9596,6 +10017,214 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouBoardMeetingLoadingPreview />,
+  },
+  {
+    /* A meeting held as a debate (plan #2561.5): each question's options,
+     * the grid of who scored what, then the rounds, with round 2 drawn as the
+     * exchanges between two advisors. Drawn finished, still being held with
+     * a question no advisor has reached, and with one advisor's thinking open. */
+    id: 'you-board-meeting-debate',
+    label: 'You · Board, a meeting held as a debate',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-debate-running',
+    label: 'You · Board, a debate still being held, one question not reached',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview state="running" />
+      </div>
+    ),
+  },
+  {
+    /* The verdict and the decision under a question (plan #2561.6): both
+     * questions decided, the first against the board; the form to change a
+     * decision; and the form with a save that failed. */
+    id: 'you-board-meeting-decided',
+    label: 'You · Board, both questions decided from their verdicts',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="made" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-change',
+    label: 'You · Board, changing a decision',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="open" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-decision-error',
+    label: 'You · Board, a decision that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview decision="error" />
+      </div>
+    ),
+  },
+  {
+    /* Make it happen (plan #2561.9): a decision made as the board recommended,
+     * offering the action and the conditions as todos, with a date read from
+     * the words; the steps choice with a goal picked; the same after a write
+     * that failed; and the card after the action was written, listing it. */
+    id: 'you-board-make',
+    label: 'You · Board, writing a decision as todos',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="todos" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-make-steps',
+    label: 'You · Board, writing a decision as steps under a goal',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="steps" />
+      </div>
+    ),
+  },
+  {
+    /* The steps choice after a write under a goal that had closed. */
+    id: 'you-board-make-steps-error',
+    label: 'You · Board, a decision whose goal had closed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="steps-error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-make-made',
+    label: 'You · Board, what a decision made',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview make="made" />
+      </div>
+    ),
+  },
+  {
+    /* Advisors (plan #2561.7): the five seats and every guest with the
+     * question each owns, a brain state and the switch for the chair. */
+    id: 'you-board-advisors',
+    label: 'You · Board, the advisors and their switches',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-add',
+    label: 'You · Board, Add advisor open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview start="form" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-building',
+    label: 'You · Board, a guest’s brain being built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-failed',
+    label: 'You · Board, a brain that failed to build, with retry',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisors-loading',
+    label: 'You · Board, advisors loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouBoardAdvisorsLoadingPreview />,
+  },
+  {
+    id: 'you-board-panel',
+    label: 'You · Board, one panel of advisors',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-panel-empty',
+    label: 'You · Board, a panel just made with no advisors',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-panel-delete',
+    label: 'You · Board, deleting a panel',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardPanelPreview state="delete" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-meeting-advisor',
+    label: 'You · Board, one advisor’s thinking open',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDebatePreview advisor="buffett" />
+      </div>
+    ),
   },
   {
     /* Details (plan #2124.2): the six facts a form asks for, read as a
@@ -9659,7 +10288,11 @@ export const SURFACES: readonly Surface[] = [
         editing
         state={{
           values: {
+            full_name: 'Christopher Alexander Montgomery-Whitfield',
+            email: 'chris.whitfield@example.com',
             phone: '+353 87 555 0199',
+            mailing_address: '1200 Larkin Street, Apt 4B, San Francisco, CA 94109',
+            website_url: 'chriswhitfield.example.com',
             linkedin_url: 'linkedin.com/in/christopher-alexander-montgomery-whitfield',
             citizenship: 'United States and Ireland',
             race: 'White',
@@ -9979,18 +10612,29 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Shopping's Recurring page (plan #1126): the monthly figure, what is
-     * coming up with a price rise marked, and what stopped charging. */
+    /* The Recurring page (plan #1126), in Finances since plan #2593.1: the
+     * monthly figure, what is coming up with a price rise marked, and what
+     * stopped charging. The id keeps the Shopping name it was photographed
+     * under, so its history of rounds stays together. */
     id: 'shopping-recurring',
-    label: 'Shopping · Recurring payments',
-    module: 'shopping',
+    label: 'Finances · Recurring payments',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringSurface />,
   },
   {
+    // Charges that repeat on the person's accounts with no mail behind them
+    // (plan #2593.7).
+    id: 'shopping-recurring-from-charges',
+    label: 'Finances · Recurring, with charges repeating on your accounts',
+    module: 'finances',
+    width: 'page',
+    render: () => <RecurringWithChargesSurface />,
+  },
+  {
     id: 'shopping-recurring-empty',
-    label: 'Shopping · Recurring with nothing found',
-    module: 'shopping',
+    label: 'Finances · Recurring with nothing found',
+    module: 'finances',
     width: 'page',
     render: () => <RecurringEmptySurface />,
   },
@@ -10672,11 +11316,82 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevIdeasEmptySurface />,
   },
   {
+    /* Dev's Projects page (plan #2553.5): three projects, one failing on main, one never read, the longest name there is. Fixtures in projects-surfaces.tsx. */
+    id: 'dev-projects',
+    label: 'Dev · Projects',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSurface />,
+  },
+  {
+    /* The picker Add project opens, listing the repositories newest pushed first, with the ones added marked. */
+    id: 'dev-projects-picker',
+    label: 'Dev · Projects, Add project open',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsPickerSurface />,
+  },
+  {
+    /* The picker with a search that matches nothing. */
+    id: 'dev-projects-search-empty',
+    label: 'Dev · Projects, no repository matches',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsSearchEmptySurface />,
+  },
+  {
+    /* The picker when GITHUB_READ_TOKEN sees only this app: the setting to change, and the typed owner/name. */
+    id: 'dev-projects-narrow-token',
+    label: 'Dev · Projects, token sees only this repository',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsNarrowTokenSurface />,
+  },
+  {
+    /* The picker after GitHub refused a typed repository. */
+    id: 'dev-projects-add-error',
+    label: 'Dev · Projects, GitHub refused',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsAddErrorSurface />,
+  },
+  {
+    /* A row's menu open on Archive's confirm. */
+    id: 'dev-projects-archive',
+    label: 'Dev · Projects, archive confirm',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsArchiveSurface />,
+  },
+  {
+    /* The comment mark on rows whose thread has comments. */
+    id: 'dev-projects-comments',
+    label: 'Dev · Projects, rows with comments',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsCommentsSurface />,
+  },
+  {
+    /* The page before any project is added. */
+    id: 'dev-projects-empty',
+    label: 'Dev · Projects, none yet',
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectsEmptySurface />,
+  },
+  {
     id: 'dev-project-plan',
     label: "Dev · A project's plan",
     module: 'dev',
     width: 'page',
     render: () => <ProjectPlanSurface />,
+  },
+  {
+    id: 'dev-project-plan-unread',
+    label: "Dev · A project's plan, main not readable",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface refused />,
   },
   {
     id: 'dev-raised',
@@ -11948,18 +12663,350 @@ export const SURFACES: readonly Surface[] = [
   /* The Shopping pages that had no picture (plan #1604). Fixtures in
    * shopping-page-surfaces.tsx. */
   {
+    // Spending, in Finances since plan #2593.1; the id is the one it was
+    // photographed under.
     id: 'shopping-dashboard',
-    label: 'Shopping · Dashboard, this month',
-    module: 'shopping',
+    label: 'Finances · Spending, this month',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardSurface />,
   },
   {
     id: 'shopping-dashboard-empty',
-    label: 'Shopping · Dashboard, no orders yet',
-    module: 'shopping',
+    label: 'Finances · Spending, no orders yet',
+    module: 'finances',
     width: 'page',
     render: () => <ShoppingDashboardEmptySurface />,
+  },
+  /* Spending from bank and card transactions (plan #2593.7): each tab, and
+   * each hidden part on its own surface. Fixtures in
+   * app/preview/finances-spending-fixtures.ts. */
+  {
+    id: 'finances-spending',
+    label: 'Finances · Spending from transactions, each month',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingSurface />,
+  },
+  {
+    id: 'finances-spending-month-held',
+    label: 'Finances · Spending, a month pointed at',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthHeldSurface />,
+  },
+  {
+    id: 'finances-spending-month-empty',
+    label: 'Finances · Spending, a month with nothing posted',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMonthEmptySurface />,
+  },
+  {
+    id: 'finances-spending-categories',
+    label: 'Finances · Spending by category',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingCategoriesSurface />,
+  },
+  {
+    id: 'finances-spending-merchants',
+    label: 'Finances · Spending by merchant',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantsSurface />,
+  },
+  {
+    id: 'finances-spending-merchant-open',
+    label: 'Finances · Spending, one merchant’s charges open',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingMerchantOpenSurface />,
+  },
+  {
+    id: 'finances-spending-charges',
+    label: 'Finances · Spending, largest charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingChargesSurface />,
+  },
+  {
+    id: 'finances-spending-no-charges',
+    label: 'Finances · Spending, a period with no charges',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingNoChargesSurface />,
+  },
+  {
+    id: 'finances-spending-loading',
+    label: 'Finances · Spending loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingLoadingSurface />,
+  },
+  {
+    id: 'finances-spending-error',
+    label: 'Finances · Spending could not load',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSpendingErrorSurface />,
+  },
+  /* Finances accounts (plan #2593.6): every account grouped with net worth,
+   * one account's page per kind, and each hidden part on its own surface.
+   * Fixtures in app/preview/finances-accounts-fixtures.ts. */
+  {
+    id: 'finances-accounts',
+    label: 'Finances · Accounts, eight accounts and net worth',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface />,
+  },
+  {
+    id: 'finances-accounts-empty',
+    label: 'Finances · Accounts, nothing linked or imported yet',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface empty />,
+  },
+  {
+    id: 'finances-accounts-chart-hover',
+    label: 'Finances · Accounts, pointing at a day on the net worth chart',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface chartActive={300} />,
+  },
+  {
+    id: 'finances-accounts-stale',
+    label: 'Finances · Accounts, when a stale balance was last read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface staleOpen />,
+  },
+  {
+    id: 'finances-accounts-sign-in',
+    label: 'Finances · Accounts, Chase asking for its sign-in again',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface needsSignIn />,
+  },
+  {
+    id: 'finances-accounts-read-failed',
+    label: 'Finances · Accounts, balances that could not be read',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface readFailed />,
+  },
+  {
+    id: 'finances-accounts-loading',
+    label: 'Finances · Accounts, loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <AccountsSkeleton />,
+  },
+  {
+    id: 'finances-accounts-error',
+    label: 'Finances · Accounts, a read that failed',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsErrorSurface />,
+  },
+  /* The monthly money review at the top of Accounts (plan #2593.8.3), each
+   * state and hidden part on its own surface. Fixtures in
+   * app/preview/finances-review-fixtures.ts. */
+  {
+    id: 'finances-review',
+    label: 'Finances · Accounts, the monthly review open with a comment',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="open" />,
+  },
+  {
+    id: 'finances-review-charges',
+    label: 'Finances · Accounts, the charges behind a review line',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="charges" />,
+  },
+  {
+    id: 'finances-review-account',
+    label: 'Finances · Accounts, the accounts behind net worth in the review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="account" />,
+  },
+  {
+    id: 'finances-review-quiet',
+    label: 'Finances · Accounts, a month with nothing in it',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="quiet" />,
+  },
+  {
+    id: 'finances-review-failed',
+    label: 'Finances · Accounts, a review Dash could not write',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="failed" />,
+  },
+  {
+    id: 'finances-review-first',
+    label: 'Finances · Accounts, before the first monthly review',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="first" />,
+  },
+  {
+    id: 'finances-review-loading',
+    label: 'Finances · Accounts, the monthly review loading',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountsSurface review="loading" />,
+  },
+  {
+    id: 'finances-account-card',
+    label: 'Finances · One credit card, with its statement and limit',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="card" />,
+  },
+  {
+    id: 'finances-account-loan',
+    label: 'Finances · One student loan, with its payoff',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="goals" />,
+  },
+  {
+    id: 'finances-account-brokerage',
+    label: 'Finances · One brokerage account, with its holdings',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesAccountSurface kind="brokerage" />,
+  },
+  /* Finances settings: the institutions linked through Plaid (plan #2593.3),
+   * with each hidden part on its own surface. Fixtures in
+   * app/preview/finances-settings-fixtures.ts. */
+  {
+    id: 'finances-settings',
+    label: 'Finances · Settings, two institutions linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface />,
+  },
+  {
+    id: 'finances-settings-empty',
+    label: 'Finances · Settings, nothing linked',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface empty />,
+  },
+  {
+    id: 'finances-settings-link-menu',
+    label: 'Finances · Settings, choosing what to link',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured menuOpen />,
+  },
+  {
+    id: 'finances-settings-row-menu',
+    label: 'Finances · Settings, a link row offering Fix sign-in',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS} itemsUsed={2} configured rowMenuOpen={FINANCES_LINKS[1]!.id} />
+    ),
+  },
+  {
+    id: 'finances-settings-near-limit',
+    label: 'Finances · Settings, a sign-in to repeat and 8 of 10 links used',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesSettingsView today={FINANCES_TODAY} links={FINANCES_LINKS_NEEDS_SIGN_IN} itemsUsed={8} configured />,
+  },
+  {
+    id: 'finances-settings-saving',
+    label: 'Finances · Settings, saving a new link',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        today={FINANCES_TODAY}
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{ kind: 'saving', institutionName: 'Nelnet' }}
+      />
+    ),
+  },
+  /* Accounts Plaid cannot reach (plan #2593.5): the import's hidden parts,
+   * adding an account by hand, and the pages of an imported and a manual
+   * account. Fixtures in app/preview/finances-imports-surfaces.tsx. */
+  {
+    id: 'finances-settings-import-preview',
+    label: 'Finances · Settings, an Apple Card statement ready to import',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="preview" />,
+  },
+  {
+    id: 'finances-settings-import-empty',
+    label: 'Finances · Settings, a statement with no transactions',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="empty" />,
+  },
+  {
+    id: 'finances-settings-import-error',
+    label: 'Finances · Settings, a file that is not a Wallet export',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface phase="error" />,
+  },
+  {
+    id: 'finances-settings-add-account',
+    label: 'Finances · Settings, adding an account by hand',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesImportsSurface addOpen />,
+  },
+  {
+    id: 'finances-account-import',
+    label: 'Finances · Apple Card, from imported statements',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="import" />,
+  },
+  {
+    id: 'finances-account-manual',
+    label: 'Finances · A manual account asking for a new balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" />,
+  },
+  {
+    id: 'finances-account-manual-reading',
+    label: 'Finances · A manual account, adding a balance',
+    module: 'finances',
+    width: 'page',
+    render: () => <FinancesKeptAccountSurface kind="manual" readingOpen />,
+  },
+  {
+    id: 'finances-settings-error',
+    label: 'Finances · Settings, Plaid refused',
+    module: 'finances',
+    width: 'page',
+    render: () => (
+      <FinancesSettingsView
+        today={FINANCES_TODAY}
+        links={FINANCES_LINKS}
+        itemsUsed={2}
+        configured
+        initialPhase={{
+          kind: 'error',
+          message: 'Chase is already linked. If its sign-in stopped working, use Fix sign-in on its row instead, which keeps the same link.',
+        }}
+      />
+    ),
   },
   {
     id: 'shopping-order',

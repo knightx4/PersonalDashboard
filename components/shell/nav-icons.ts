@@ -1,4 +1,5 @@
 import {
+  Timer,
   Activity,
   SendHorizontal,
   BarChart3,
@@ -17,6 +18,7 @@ import {
   GalleryHorizontalEnd,
   Gauge,
   Globe,
+  MessageCircleQuestionMark,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -30,6 +32,7 @@ import {
   IdCard,
   Inbox,
   KanbanSquare,
+  Landmark,
   LayoutDashboard,
   Lightbulb,
   List,
@@ -37,6 +40,7 @@ import {
   Newspaper,
   Mail,
   Megaphone,
+  Feather,
   Map,
   MapPin,
   Network,
@@ -84,6 +88,8 @@ export const NAV_ICONS = {
   returns: Undo2,
   // What you pay for again and again: subscriptions and bills (plan #1126).
   recurring: Repeat,
+  // Finances: every account held, with net worth (plan #2593.6).
+  accounts: Landmark,
   saved: Bookmark,
   share: Share2,
   // Jobs
@@ -185,6 +191,9 @@ export const NAV_ICONS = {
   // Every area and goal, for adding and arranging them; the home is the short
   // daily list, so this is the long one.
   goalsAll: List,
+  // The time you log on your goals against each week's aim: a stopwatch,
+  // since the hourglass is Waiting's and the calendar-clock Interviews'.
+  goalsHours: Timer,
   // Every run Claude made on your goals, newest first: a record of what was
   // done, so the same clock-and-arrow the changelog uses.
   goalsRuns: History,
@@ -199,8 +208,12 @@ export const NAV_ICONS = {
   places: MapPin,
   workSchool: GraduationCap,
   insights: Sparkles,
+  // Answer (plan #2617.2): Dash's questions about you, so a question in a bubble.
+  answer: MessageCircleQuestionMark,
   // The board's meetings (plan #2540.3): five advisors round a table.
   board: Users,
+  // Dash's Writing style page: how you write, read from your sent mail.
+  writingStyle: Feather,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

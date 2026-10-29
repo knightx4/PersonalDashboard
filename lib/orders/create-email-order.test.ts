@@ -70,7 +70,7 @@ describe('buildEmailOrder', () => {
             productUrl: 'https://www.amazon.com/dp/B09Z6YCQQR',
           },
         ],
-        externalOrderNumber: '114-9014714-4960229',
+        externalOrderNumber: '114-5550142-0000002',
       },
     });
     expect(bundle.orderItems).toHaveLength(2);

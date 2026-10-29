@@ -176,6 +176,7 @@ const CAPSULE_HUES: Record<ModuleId, string> = {
   news: 'bg-w-news-tint text-w-news',
   goals: 'bg-w-goals-tint text-w-goals',
   you: 'bg-w-you-tint text-w-you',
+  finances: 'bg-w-finances-tint text-w-finances',
   dev: 'bg-w-dev-tint text-w-dev',
 };
 

@@ -41,16 +41,16 @@ describe('parseJob', () => {
   const form = (values: Record<string, string>) => (field: string) => values[field] ?? '';
 
   it('keeps what was typed, with empty fields as none', () => {
-    expect(parseJob(form({ employer: ' EY ', title: 'Assurance Senior', started: '2020', ended: '' }))).toEqual({
+    expect(parseJob(form({ employer: ' Halvorsen & Co. ', title: 'Assurance Senior', started: '2020', ended: '' }))).toEqual({
       ok: true,
-      job: { employer: 'EY', title: 'Assurance Senior', place: null, note: null, started: '2020', ended: null },
+      job: { employer: 'Halvorsen & Co.', title: 'Assurance Senior', place: null, note: null, started: '2020', ended: null },
     });
   });
 
   it('names the field it refuses', () => {
     expect(parseJob(form({ employer: '' }))).toMatchObject({ ok: false, field: 'employer' });
-    expect(parseJob(form({ employer: 'EY', started: 'soon' }))).toMatchObject({ ok: false, field: 'started' });
-    expect(parseJob(form({ employer: 'EY', started: '2022', ended: '2020' }))).toMatchObject({ ok: false, field: 'ended' });
+    expect(parseJob(form({ employer: 'Halvorsen & Co.', started: 'soon' }))).toMatchObject({ ok: false, field: 'started' });
+    expect(parseJob(form({ employer: 'Halvorsen & Co.', started: '2022', ended: '2020' }))).toMatchObject({ ok: false, field: 'ended' });
   });
 });
 
@@ -78,14 +78,14 @@ describe('planRead', () => {
   it('replaces what Dash read before and keeps every row the person edited or added', () => {
     const plan = planRead(
       [
-        { id: 'dash', employer: 'EY', title: 'Senior', started: '2020', edited: false },
-        { id: 'mine', employer: 'Ernst & Young LLP', title: 'Senior', started: '2020', edited: true },
+        { id: 'dash', employer: 'Halvorsen', title: 'Senior', started: '2020', edited: false },
+        { id: 'mine', employer: 'Halvorsen & Co. LLP', title: 'Senior', started: '2020', edited: true },
         { id: 'added', employer: 'Corner shop', title: null, started: '2014', edited: true },
       ],
-      [read('Ernst & Young', '2020-06'), read('Stealth startup', '2025')],
+      [read('Halvorsen & Co.', '2020-06'), read('Stealth startup', '2025')],
     );
     expect(plan.remove).toEqual(['dash']);
-    // The person's EY row matches the read's EY row, so it is not added twice.
+    // The person's Halvorsen row matches the read's Halvorsen row, so it is not added twice.
     expect(plan.add).toEqual([read('Stealth startup', '2025')]);
     expect(plan.kept).toBe(2);
     expect(plan.confirmed).toEqual(['mine']);

@@ -16,8 +16,8 @@ set local goals.run_id = '<the run id>';
 insert into goals.records (user_id, collection_id, data, draft, source, source_ref,
                            as_of, position)
 values ('<user>', '<collection id>',
-        '{"loan_id": "<the loan ID>", "name": "Grad PLUS", "status": "Grace period",
-          "balance": 20512.40, "next_due": "2026-12-18"}'::jsonb,
+        '{"loan_id": "<the loan ID>", "name": "Graduate loan", "status": "Grace period",
+          "balance": 21500.00, "next_due": "2026-12-18"}'::jsonb,
         true, 'pasted', 'MyStudentData.txt, given to Dash on 2026-09-24', '2026-09-02', 10);
 ```
 
@@ -47,8 +47,8 @@ set local goals.run_id = '<the run id>';
 insert into goals.records (user_id, collection_id, data, draft, source, source_ref,
                            as_of, position)
 values ('<user>', '<collection id>',
-        '{"loan_id": "<the loan ID>", "name": "Direct Loan, subsidized", "servicer": "Nelnet",
-          "balance": 12480.22, "rate": 4.99, "minimum": 132.00}'::jsonb,
+        '{"loan_id": "<the loan ID>", "name": "Direct Loan, subsidized", "servicer": "Northstar",
+          "balance": 9400.00, "rate": 4.99, "minimum": 110.00}'::jsonb,
         true, 'gmail', '<the Gmail message id>', '<the statement date>', 10);
 ```
 
@@ -88,7 +88,7 @@ are yours to write and keep current.
   the step's questions gets a current answer with sources, the database
   closes the step (migrations-goals 0035); do not close it yourself.
 - `question` is the question as the step shows it; `answer` is one sentence
-  a person can act on ("18 Dec 2026, for both Grad PLUS loans; the
+  a person can act on ("18 Dec 2026, for both graduate loans; the
   Unsubsidized loans follow on 19 Dec."). Say "about" where an amount rests
   on an estimate.
 - `sources` lists every record you read, with the date of its figures:
@@ -99,7 +99,7 @@ are yours to write and keep current.
 - `kind` says what the answer states, and its value goes beside the
   wording: `date` with `value_date` (the day the answer gives, such as
   `2026-12-18` for the first payment), `amount` with `value_amount` (the
-  dollar figure, such as `2450` for the monthly total), or `text` with
+  dollar figure, such as `1520` for the monthly total), or `text` with
   neither (which company services the loans). Give the value the sentence
   states; where the sentence gives a range, give the figure it leads with.
   The database refuses a date or amount without its value. The value is what
@@ -107,7 +107,7 @@ are yours to write and keep current.
   is not a change.
 - Read the figures the way the collection's field notes explain them
   (`goals.document_kinds`), and check each against the row's status and
-  dates, never by the field name alone: a Grad PLUS "repayment begin date"
+  dates, never by the field name alone: a graduate loan's "repayment begin date"
   is its last disbursement, and the first payment is the next due date.
 
 ```sql
@@ -116,8 +116,8 @@ set local goals.run_id = '<the run id>';
 insert into goals.answers (user_id, item_id, key, question, answer, kind, value_amount,
                            sources, position, run_id)
 values ('<user>', '<step id>', 'monthly_total', 'What is the monthly total?',
-        'About $2,450 a month: $988 and $966 on the Grad PLUS loans, and about $250 on each Unsubsidized loan once it is scheduled.',
-        'amount', 2450,
+        'About $1,520 a month: $520 and $500 on the graduate loans, and about $250 on each Unsubsidized loan once it is scheduled.',
+        'amount', 1520,
         '[{"record_id": "<loan 1>", "as_of": "2026-09-02"}, {"record_id": "<loan 2>", "as_of": "2026-09-02"}]'::jsonb,
         20, '<the run id>')
 on conflict (item_id, key) do update
@@ -151,10 +151,10 @@ its meaning, and you are the judge (plan #1036). Each time you rewrite one,
 compare the new answer with `closed_answer` (or the answer as stored, when
 `closed_answer` is null) and write your verdict in the same statement:
 `meaning_changed` true or false, and `meaning_reason`, one line the person
-reads beside the old and new answer. "Nelnet" rewritten as "Nelnet
+reads beside the old and new answer. "Northstar" rewritten as "Northstar
 Servicing" names the same servicer: `meaning_changed = false`, reason "The
-same servicer, named in full." "MOHELA" names another: `meaning_changed =
-true`, reason "The loans moved from Nelnet to MOHELA." Only a change in
+same servicer, named in full." "Brightline" names another: `meaning_changed =
+true`, reason "The loans moved from Northstar to Brightline." Only a change in
 meaning reopens the step. A verdict belongs to the rewrite it came with, so
 write a fresh one every time; a rewrite that leaves the old verdict in place
 drops it, and the database then compares the wording (case and spacing
@@ -162,7 +162,7 @@ aside), which reopens the step on any rewording.
 
 ```sql
 update goals.answers
-   set answer = 'Nelnet Servicing', sources = '<the records read>'::jsonb,
+   set answer = 'Northstar Servicing', sources = '<the records read>'::jsonb,
        meaning_changed = false, meaning_reason = 'The same servicer, named in full.'
  where item_id = '<step id>' and key = 'servicer' and user_id = '<user>';
 ```

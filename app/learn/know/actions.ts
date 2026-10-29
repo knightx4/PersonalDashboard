@@ -18,8 +18,6 @@ import { makeCustomSubject } from '@/lib/learn/graph/curriculum-run';
 import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
-import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { classifyNote } from '@/lib/learn/vault/classify';
 import { goesToExtraction, type NoteClass } from '@/lib/learn/vault/classify-payload';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -41,7 +39,7 @@ import {
  * marked personal (plan #2356.6).
  */
 
-export type ProposeState = { error?: string };
+export type ProposeState = { error?: string; queued?: string };
 
 /** A form field that is either a uuid or left empty. */
 function optionalId(value: FormDataEntryValue | null): string | null {
@@ -60,39 +58,22 @@ export async function proposeGoal(_prev: ProposeState, formData: FormData): Prom
   const goal = GoalInput.safeParse(formData.get('goal') ?? '');
   if (!goal.success) return { error: goal.error.issues[0]?.message ?? 'Could not read that goal.' };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
-
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
 
   const supabase = await createLearnClient();
-  let id: string;
   try {
-    const result = await runTopicDraft(supabase, user.id, { goal: goal.data, anthropicApiKey: apiKey });
+    // Named on a subject's page, the topic joins that subject's lens once
+    // kept, the one lens its goals read too (plan #2138.7, #2302.3).
+    const result = await runTopicDraft(supabase, user.id, {
+      goal: goal.data,
+      after: { approve: true, ...(subjectId.success ? { subjectLens: subjectId.data } : {}) },
+    });
     if (!result.ok) return { error: result.detail };
-    id = result.id;
+    revalidatePath('/learn/topics');
+    return { queued: result.detail };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
-  // The draft is kept even if approving fails: its page says it is held.
-  await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) =>
-    console.error('[learn goal] approve on draft', error instanceof Error ? error.message : error),
-  );
-
-  // Named on a subject's page, the topic joins that subject's lens, the one
-  // lens its goals read too (plan #2138.7, #2302.3). The draft is kept even
-  // if this fails: it is on the map and can be added again.
-  if (subjectId.success) {
-    try {
-      await addToSubjectLens(supabase, user.id, subjectId.data, id);
-      revalidatePath('/learn/know');
-    } catch (error) {
-      console.error('[learn goal] subject lens', error instanceof Error ? error.message : error);
-    }
-  }
-
-  revalidatePath('/learn/topics');
-  redirect(`/learn/topics/${id}`);
 }
 
 /**

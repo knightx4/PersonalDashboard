@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { addressIsPublic, assertHostIsPublic } from '@/lib/net/public-address';
+import { appUserAgent } from '@/lib/net/user-agent';
 
 /**
  * Fetching somebody else's URL, safely.
@@ -169,7 +170,7 @@ export async function fetchDocument(rawUrl: string): Promise<FetchResult> {
           // Identify honestly, with a way to reach the operator. A source that
           // blocks this is entitled to. Wikimedia's User-Agent policy asks for
           // contact details and throttles requests that carry none.
-          'user-agent': 'PersonalTracker-Learn/1.0 (https://dash.selveyknight.com; one user)',
+          'user-agent': appUserAgent('PersonalTracker-Learn/1.0', 'one user'),
           accept: ALLOWED_TYPES.join(', '),
         },
         // No cookies, no credentials, ever. This is a public read.

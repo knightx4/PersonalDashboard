@@ -21,6 +21,7 @@ import {
   statedTotal,
   transcludedPages,
 } from '@/lib/learn/areas/level4';
+import { appUserAgent } from '@/lib/net/user-agent';
 
 /**
  * The import of Wikipedia's Level 4 topics (plan #2016.1).
@@ -55,7 +56,7 @@ export const REQUEST_GAP_MS = 1_500;
 
 const BACKOFF_MS = [15_000, 30_000, 60_000];
 
-const USER_AGENT = 'PersonalTracker-Learn/1.0 (https://dash.selveyknight.com; one user)';
+const USER_AGENT = appUserAgent('PersonalTracker-Learn/1.0', 'one user');
 
 export type ImportPorts = {
   /** A GET returning the status and body. Injected by the tests. */

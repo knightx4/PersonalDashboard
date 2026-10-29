@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['board_marks', 'board_meetings', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -658,6 +658,92 @@ describe('profile entries', () => {
   });
 });
 
+describe('dash questions', () => {
+  // migrations-you/0033 (plan #2617.1): Dash's questions on the Answer tab
+  // and what the person answered.
+  it('are read and written by their owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into dash_questions (user_id, question, why) values (${userA}, 'What rests you?', 'Few notes on rest.')`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from dash_questions`)).toEqual([]);
+    expect(await asUser(userA, (tx) => tx`select question, status from dash_questions`)).toEqual([
+      { question: 'What rests you?', status: 'open' },
+    ]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_questions (user_id, question) values (${userA}, 'Forged')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update dash_questions set answer = 'Not yours'`);
+    await asUser(userB, (tx) => tx`delete from dash_questions`);
+    expect(await admin`select answer from dash_questions where user_id = ${userA}`).toEqual([{ answer: null }]);
+  });
+
+  it('holds an answered question to an answer and a skipped one to its day', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into dash_questions (user_id, question) values (${userA}, 'Where is home?') returning id`;
+    await expect(admin`update dash_questions set status = 'answered' where id = ${row.id}`).rejects.toThrow();
+    await expect(
+      admin`update dash_questions set status = 'answered', answer = '  ', answered_at = now() where id = ${row.id}`,
+    ).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'skipped' where id = ${row.id}`).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'gone' where id = ${row.id}`).rejects.toThrow();
+    await admin`update dash_questions set status = 'answered', answer = 'Here', answered_at = now() where id = ${row.id}`;
+  });
+
+  it('gives Dash the answered ones only, the question as the title', async () => {
+    await admin`delete from dash_questions where user_id = ${userA}`;
+    await admin`
+      insert into dash_questions (user_id, question, status, answer, answered_at, skipped_at)
+      values (${userA}, 'What do you read?', 'answered', 'Mostly history.', now(), null),
+             (${userA}, 'Still open?', 'open', null, null, null),
+             (${userA}, 'Skipped?', 'skipped', null, null, now())`;
+    const rows = await admin<{ title: string; my_text: string | null; dash_text: string | null }[]>`
+      select title, my_text, dash_text from core.memory_sources(${userA}::uuid)
+       where source_table = 'you.dash_questions'`;
+    expect(rows).toEqual([{ title: 'Dash asked: What do you read?', my_text: 'Mostly history.', dash_text: null }]);
+    expect(
+      await admin`select 1 from core.memory_sources(${userB}::uuid) where source_table = 'you.dash_questions'`,
+    ).toHaveLength(0);
+  });
+});
+
+describe('dash question runs', () => {
+  // migrations-you/0034_dash_question_runs.sql (plan #2617.3): the run the
+  // Ask button starts, one open at a time, at most five questions each.
+  it('keeps a run to its owner and one open run per person', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into dash_question_runs (user_id) values (${userA}) returning id, status`,
+    );
+    expect(run.status).toBe('queued');
+    expect(await asUser(userB, (tx) => tx`select id from dash_question_runs`)).toEqual([]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_question_runs (user_id) values (${userA})`),
+    ).rejects.toThrow();
+    await expect(admin`insert into dash_question_runs (user_id) values (${userA})`).rejects.toThrow();
+    await admin`update dash_question_runs set status = 'ready', finished_at = now() where id = ${run.id}`;
+    await admin`insert into dash_question_runs (user_id) values (${userA})`;
+  });
+
+  it('refuses a sixth question from one run and a run of another person', async () => {
+    const [run] = await admin<{ id: string }[]>`
+      insert into dash_question_runs (user_id, status) values (${userB}, 'running') returning id`;
+    await admin`
+      insert into dash_questions (user_id, run_id, question)
+      select ${userB}, ${run.id}, 'Question ' || n from generate_series(1, 5) n`;
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userB}, ${run.id}, 'Sixth')`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question)
+            select ${userB}, ${run.id}, 'Batch ' || n from generate_series(1, 2) n`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userA}, ${run.id}, 'Not theirs')`,
+    ).rejects.toThrow();
+  });
+});
+
 describe('board meetings', () => {
   // migrations-you/0020_board_meetings.sql (plan #2540.1): the board's
   // minutes and the person's votes, answers and ticks on them.
@@ -737,5 +823,121 @@ describe('board meetings', () => {
     for (const run of bad) await expect(run()).rejects.toThrow();
     await admin`insert into board_meetings (user_id, kind, status, decision)
                 values (${userA}, 'called', 'failed', 'Take the job?')`;
+  });
+});
+
+describe('advisor chats, memory and forecasts', () => {
+  // migrations-you/0029_advisor_chats_and_forecasts.sql (plan #2581.1).
+  let advisorA = '';
+  let chatA = '';
+  let questionA = '';
+
+  it("keeps a chat, its messages and the advisor's memory to their owner only", async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'mentor', 'Mentor', 'seat', 'Ten years on?', ${admin.json({ style: 'notionists', seed: 'mentor' })})
+      returning id`;
+    advisorA = advisor.id;
+    const [chat] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_chats (user_id, advisor_id, title)
+                 values (${userA}, ${advisorA}, 'The offer') returning id, last_message_at`,
+    );
+    chatA = chat.id;
+    expect(chat.last_message_at).toBeNull();
+    const [message] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_messages (user_id, chat_id, role, text)
+                 values (${userA}, ${chatA}, 'person', 'Should I take it?') returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_memory (user_id, advisor_id, kind, text, source_message_id)
+                 values (${userA}, ${advisorA}, 'open_thread', 'Deciding on the offer.', ${message.id})`,
+    );
+    const [after] = await admin`select last_message_at from you.advisor_chats where id = ${chatA}`;
+    expect(after.last_message_at).not.toBeNull();
+    expect(await asUser(userB, (tx) => tx`select id from advisor_chats`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_messages`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_memory`)).toHaveLength(0);
+  });
+
+  it("does not let a user talk to or write into another account's advisor", async () => {
+    await expect(
+      asUser(userB, (tx) => tx`insert into advisor_chats (user_id, advisor_id) values (${userB}, ${advisorA})`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_messages (user_id, chat_id, role, text) values (${userB}, ${chatA}, 'person', 'Hi')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_memory (user_id, advisor_id, kind, text) values (${userB}, ${advisorA}, 'fact', 'x')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update advisor_memory set text = 'Not yours'`);
+    expect(await admin`select text from you.advisor_memory where user_id = ${userA}`).toEqual([
+      { text: 'Deciding on the offer.' },
+    ]);
+  });
+
+  it('refuses a message, a memory or an avatar of the wrong shape', async () => {
+    const bad = [
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, text) values (${userA}, ${chatA}, 'dash', 'x')`,
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, text) values (${userA}, ${chatA}, 'person', '  ')`,
+      () => admin`insert into you.advisor_memory (user_id, advisor_id, kind, text) values (${userA}, ${advisorA}, 'mood', 'x')`,
+      () => admin`update you.board_advisors set avatar = '{"style":"notionists"}'::jsonb where id = ${advisorA}`,
+      () => admin`update you.board_advisors set believability = '[]'::jsonb where id = ${advisorA}`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+
+  it("keeps a decision's premortem and tripwire, and refuses a bad one", async () => {
+    const [question] = await admin<{ id: string }[]>`
+      insert into you.board_questions (user_id, question, options, door, success_measure, decide_by,
+                                       premortem, tripwire, lean_probability, option_order)
+      values (${userA}, 'Take the offer?',
+              ${admin.json([{ letter: 'A', text: 'Take it' }, { letter: 'B', text: 'Stay' }])},
+              'one_way', 'Still glad of it in a year', '2026-11-15',
+              ${admin.json([{ advisor: 'mentor', text: 'The team left.' }])},
+              ${admin.json({ condition: 'No raise by March', check_on: '2027-03-01', status: 'watching' })},
+              0.6, ${admin.json({ mentor: ['B', 'A'] })})
+      returning id`;
+    questionA = question.id;
+    const bad = [
+      () => admin`update you.board_questions set door = 'revolving' where id = ${questionA}`,
+      () => admin`update you.board_questions set lean_probability = 1.2 where id = ${questionA}`,
+      () => admin`update you.board_questions set tripwire = '{"status":"watching"}'::jsonb where id = ${questionA}`,
+      () => admin`update you.board_questions set tripwire = '{"condition":"x","status":"gone"}'::jsonb where id = ${questionA}`,
+      () => admin`update you.board_questions set premortem = '{}'::jsonb where id = ${questionA}`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+
+  it('keeps a blind round-1 forecast, and refuses probabilities, ranges or budgets of the wrong shape', async () => {
+    const [meeting] = await admin<{ id: string }[]>`
+      insert into you.board_meetings (user_id, status, held_on, minutes)
+      values (${userA}, 'ready', '2026-10-27', ${admin.json({})}) returning id`;
+    let position = 0;
+    const turn = (round: number, blind: boolean, probabilities: object, ranges: object, budget: object) =>
+      admin`insert into you.board_turns (user_id, meeting_id, question_id, round, advisor_id, kind, text, position,
+                                         probabilities, ranges, budget, change_mind, assessment, model, blind)
+            values (${userA}, ${meeting.id}, ${questionA}, ${round}, ${advisorA}, 'opening', 'Take it.', ${position++},
+                    ${admin.json(probabilities as never)}, ${admin.json(ranges as never)}, ${admin.json(budget as never)},
+                    'A counter-offer', 'Ten years on?', 'claude-opus', ${blind})`;
+    await turn(1, true, { A: 0.7, B: 0.4 }, { A: { low: 0, high: 10, unit: 'percent raise' } }, { A: 70, B: 30 });
+    const bad = [
+      () => turn(2, true, { A: 0.7 }, { A: { low: 0, high: 1 } }, { A: 100 }),
+      () => turn(1, true, { A: 1.5 }, { A: { low: 0, high: 1 } }, { A: 100 }),
+      () => turn(1, true, { A: 'likely' }, { A: { low: 0, high: 1 } }, { A: 100 }),
+      () => turn(1, true, { A: 0.5 }, { A: { low: 5, high: 1 } }, { A: 100 }),
+      () => turn(1, true, { A: 0.5 }, { A: { low: 0 } }, { A: 100 }),
+      () => turn(1, true, { A: 0.5 }, { A: { low: 0, high: 1 } }, { A: 60, B: 30 }),
+      () => turn(1, true, { A: 0.5 }, { A: { low: 0, high: 1 } }, { A: 99.5, B: 0.5 }),
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
   });
 });

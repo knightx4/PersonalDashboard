@@ -347,7 +347,8 @@ export function InboxPage({
   /** What was put off, for the Later fold. */
   later?: readonly InboxLaterRow[];
   /** What the page says when nothing is on you. */
-  empty: { title: string; description: string };
+  /** `align: 'start'` sets the empty state's words on the left, as law 18 asks of lines meant to be read. */
+  empty: { title: string; description: string; align?: 'center' | 'start' };
   /** A press that acts on a whole section, opposite its heading (Dev's Approve all). */
   sectionActions?: Partial<Record<InboxSectionKey, ReactNode>>;
   /** Rows the workspace lists under the sections itself, which keep the empty state away. */
@@ -395,7 +396,7 @@ export function InboxPage({
   // total is one line after the last section (the list pattern's count).
   return (
     <div className="space-y-6">
-      {total + alsoWaiting === 0 && <EmptyState icon={InboxIcon} title={empty.title} description={empty.description} />}
+      {total + alsoWaiting === 0 && <EmptyState icon={InboxIcon} title={empty.title} description={empty.description} align={empty.align} />}
 
       {sections.map((section) => (
         <div key={section.key} id={inboxAnchor(section.key)} className="scroll-mt-bar">

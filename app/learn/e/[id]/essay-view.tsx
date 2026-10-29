@@ -573,6 +573,7 @@ export function EssayView({
   finishStage,
   publishView,
   path: subject,
+  site = null,
   initialView,
   planFrozen = false,
   attachedNotes = [],
@@ -598,6 +599,8 @@ export function EssayView({
   finishStage?: EssayStage;
   /** The path to the essay, from the page (rowSubject); the gallery passes none and keeps the link to Essays. */
   path?: PageSubject;
+  /** Their website as the Publish card names it (siteName), from their details. */
+  site?: string | null;
   /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
   publishView?: PublishView;
   /** The view to open on: from the page's `?view=`, or the gallery's. The draft once there is one, otherwise the notes. */
@@ -1026,6 +1029,7 @@ export function EssayView({
         canPublish={words > 0 && vault.kind !== 'saving'}
         onPublish={publish}
         initial={publishView}
+        site={site}
       />
     </div>
   );

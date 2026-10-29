@@ -2,6 +2,7 @@ import { courseHref, transcriptHref } from '@/lib/you/education';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
 import { profileHref } from '@/lib/you/profile-entries';
+import { ANSWER_HREF } from '@/lib/you/dash-questions';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
@@ -9,6 +10,8 @@ const DETAILS: Section = { href: '/you/details', label: 'Details' };
 const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
+const BOARD: Section = { href: '/you/board', label: 'Board' };
+const ANSWER: Section = { href: ANSWER_HREF, label: 'Answer' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -102,9 +105,9 @@ export const youSources: ModuleSources = {
     {
       table: 'you.details',
       module: 'You',
-      holds: 'Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.',
+      holds: 'Their own details, one row: name, email, phone, mailing address, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.',
       weight: 'record',
-      search: ['title', 'phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
+      search: ['title', 'full_name', 'email', 'phone', 'mailing_address', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'],
       title: 'title',
       // custom_fields is read as the JSON list, so Dash can answer from them.
       facts: ['custom_fields'],
@@ -194,6 +197,72 @@ export const youSources: ModuleSources = {
         'code is a certification\'s license number or a course\'s number. started and ended are "YYYY" or "YYYY-MM"; ' +
         'an honor\'s started is the day it was issued. Written by the LinkedIn import (plan #2432.7).',
     },
+    {
+      table: 'you.dash_questions',
+      module: 'You',
+      holds: 'Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.',
+      weight: 'record',
+      search: ['question', 'answer'],
+      title: 'question',
+      facts: ['status', 'answered_at'],
+      newest: 'created_at',
+      href: () => ANSWER_HREF,
+      section: ANSWER,
+      page: null,
+      note:
+        'question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: ' +
+        'only an answered row says anything about them, so leave open and skipped rows out. ' +
+        'answered_at is when they first answered; updated_at moves when they change the answer (you 0033).',
+    },
+    {
+      table: 'you.board_questions',
+      module: 'You',
+      holds: 'The decisions they put to their board: the question, its options, the way they were leaning, and what they decided.',
+      weight: 'intent',
+      search: ['question', 'context', 'lean', 'decision_note'],
+      title: 'question',
+      facts: ['status', 'source', 'decided_option', 'decided_at'],
+      newest: 'created_at',
+      href: () => '/you/board',
+      section: BOARD,
+      page: null,
+      note:
+        'options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. ' +
+        'source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. ' +
+        'verdict is the board\'s recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). ' +
+        'reviews is the board checking back 30 and 90 days after the decision: account is Dash\'s, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026). ' +
+        'door is one_way or two_way; success_measure, decide_by and lean_probability (0 to 1) are theirs; premortem and tripwire are written with the board (you 0029).',
+    },
+    {
+      table: 'you.advisor_chats',
+      module: 'You',
+      holds: 'The one-on-one talks they started with one of their advisors, by title.',
+      weight: 'record',
+      search: ['title'],
+      title: 'title',
+      facts: ['last_message_at'],
+      newest: 'last_message_at',
+      href: () => '/you/board',
+      section: BOARD,
+      page: null,
+      note: 'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).',
+    },
+    {
+      table: 'you.advisor_messages',
+      module: 'You',
+      holds: 'What they said to an advisor in a one-on-one talk, and what the advisor answered.',
+      weight: 'record',
+      search: ['text'],
+      title: 'text',
+      newest: 'created_at',
+      href: () => '/you/board',
+      section: BOARD,
+      page: null,
+      parent: parentBy('chat_id', 'you.advisor_chats'),
+      note:
+        'role is person (what they said) or advisor (written by Dash in the advisor\'s voice), so cite only role person as theirs. ' +
+        'chat_id points at you.advisor_chats (you 0029).',
+    },
   ],
   notSources: [
     {
@@ -211,8 +280,13 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+    { table: 'you.dash_question_runs', reason: 'Bookkeeping for the runs that write Dash\'s questions on the Answer tab.' },
     { table: 'you.board_meetings', reason: 'Minutes Dash wrote for the board meetings; Goals reading them would cite Dash to itself.' },
     { table: 'you.board_marks', reason: 'Their votes, answers and ticks on the board\'s minutes, read by the next board meeting, not by Goals.' },
+    { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
+    { table: 'you.board_panels', reason: 'Named groups of advisors the person picks when asking the board, which is a setting of the board, not something they wrote, wanted or did.' },
+    { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
+    { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },
     // Lines from their private notes for the insights run (plan #2413.8).
     {

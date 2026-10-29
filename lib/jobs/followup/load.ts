@@ -1,8 +1,9 @@
 /**
- * The follow-up on each application: the person named, why, the drafted note
- * and, once it went, when it was sent and whether they answered. Read by the
- * role page for one application and by the Follow-ups list for every
- * application about to go in or waiting on a reply (designate.ts writes it).
+ * The follow-up on each application: the people named to reach out to about
+ * it, why each, the note drafted to each and, once one went, when it was
+ * sent and whether they answered. Read by the role page's Outreach tab for
+ * one application and by the Follow-ups list for every application about to
+ * go in or waiting on a reply (designate.ts and choose.ts write it).
  */
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -11,17 +12,24 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 export const TO_APPLY_STATUSES = ['lead', 'drafting'] as const satisfies readonly ApplicationStatus[];
 export const APPLIED_STATUSES = ['submitted', 'acknowledged'] as const satisfies readonly ApplicationStatus[];
 
-export type FollowUpPerson = {
-  id: string;
+export type FollowUpNote = { id: string; channel: string; message: string };
+export type FollowUpSend = { id: string; channel: string; sentAt: string; respondedAt: string | null };
+
+/** One person to reach out to about the application, and the note to them. */
+export type OutreachPerson = {
+  contactId: string;
   name: string;
   title: string | null;
   email: string | null;
   linkedinUrl: string | null;
   foundByDash: boolean;
+  why: string | null;
+  chosenBy: 'dash' | 'person';
+  /** The note waiting to go, when there is one. */
+  draft: FollowUpNote | null;
+  /** The latest note that went to them about this application. */
+  sent: FollowUpSend | null;
 };
-
-export type FollowUpNote = { id: string; channel: string; message: string };
-export type FollowUpSend = { id: string; channel: string; sentAt: string; respondedAt: string | null };
 
 export type FollowUp = {
   applicationId: string;
@@ -31,37 +39,36 @@ export type FollowUp = {
   company: string;
   status: ApplicationStatus;
   submittedAt: string | null;
-  person: FollowUpPerson | null;
-  why: string | null;
+  /** When Dash last looked for someone, found or not. */
   triedAt: string | null;
-  /** The note waiting to go, when there is one. */
-  draft: FollowUpNote | null;
-  /** The latest note that went to the person about this application. */
-  sent: FollowUpSend | null;
+  /** In the order they were named. */
+  people: OutreachPerson[];
 };
 
 type AppRow = {
   id: string;
   status: ApplicationStatus;
   submitted_at: string | null;
-  created_at: string;
-  follow_up_why: string | null;
   follow_up_tried_at: string | null;
-  follow_up_contact_id: string | null;
   roles: { id: string; title: string; company_id: string; companies: { name: string } } | null;
-  contacts: {
-    id: string;
-    full_name: string;
-    title: string | null;
-    email: string | null;
-    linkedin_url: string | null;
-    found_by_dash: boolean;
-  } | null;
+  application_outreach: {
+    why: string | null;
+    chosen_by: string;
+    created_at: string;
+    contacts: {
+      id: string;
+      full_name: string;
+      title: string | null;
+      email: string | null;
+      linkedin_url: string | null;
+      found_by_dash: boolean;
+    } | null;
+  }[];
 };
 
-const SELECT = `id, status, submitted_at, created_at, follow_up_why, follow_up_tried_at, follow_up_contact_id,
+const SELECT = `id, status, submitted_at, created_at, follow_up_tried_at,
   roles!inner ( id, title, company_id, companies!inner ( name ) ),
-  contacts!applications_follow_up_contact_id_fkey ( id, full_name, title, email, linkedin_url, found_by_dash )`;
+  application_outreach ( why, chosen_by, created_at, contacts ( id, full_name, title, email, linkedin_url, found_by_dash ) )`;
 
 /**
  * The follow-ups for the applications named, or, with none named, for every
@@ -99,10 +106,28 @@ export async function loadFollowUps(
   }[];
 
   return apps.map((app) => {
-    const mine = touches.filter((t) => t.application_id === app.id && t.contact_id === app.follow_up_contact_id);
-    const draft = mine.find((t) => t.draft);
-    const sent = mine.find((t) => !t.draft);
     const role = app.roles!;
+    const people = [...(app.application_outreach ?? [])]
+      .filter((row) => row.contacts)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((row): OutreachPerson => {
+        const contact = row.contacts!;
+        const mine = touches.filter((t) => t.application_id === app.id && t.contact_id === contact.id);
+        const draft = mine.find((t) => t.draft);
+        const sent = mine.find((t) => !t.draft);
+        return {
+          contactId: contact.id,
+          name: contact.full_name,
+          title: contact.title,
+          email: contact.email,
+          linkedinUrl: contact.linkedin_url,
+          foundByDash: contact.found_by_dash === true,
+          why: row.why,
+          chosenBy: row.chosen_by === 'person' ? 'person' : 'dash',
+          draft: draft ? { id: draft.id, channel: draft.channel, message: draft.message ?? '' } : null,
+          sent: sent ? { id: sent.id, channel: sent.channel, sentAt: sent.sent_at, respondedAt: sent.responded_at } : null,
+        };
+      });
     return {
       applicationId: app.id,
       roleId: role.id,
@@ -111,20 +136,51 @@ export async function loadFollowUps(
       company: role.companies.name,
       status: app.status,
       submittedAt: app.submitted_at,
-      person: app.contacts
-        ? {
-            id: app.contacts.id,
-            name: app.contacts.full_name,
-            title: app.contacts.title,
-            email: app.contacts.email,
-            linkedinUrl: app.contacts.linkedin_url,
-            foundByDash: app.contacts.found_by_dash === true,
-          }
-        : null,
-      why: app.follow_up_why,
       triedAt: app.follow_up_tried_at,
-      draft: draft ? { id: draft.id, channel: draft.channel, message: draft.message ?? '' } : null,
-      sent: sent ? { id: sent.id, channel: sent.channel, sentAt: sent.sent_at, respondedAt: sent.responded_at } : null,
+      people,
     };
   });
+}
+
+/** The sends about one application, to anyone, newest first, for the Outreach tab's log. */
+export type OutreachSend = {
+  id: string;
+  contactId: string;
+  contactName: string;
+  channel: string;
+  sentAt: string;
+  respondedAt: string | null;
+  message: string | null;
+};
+
+export async function loadApplicationSends(
+  supabase: AppSupabaseClient,
+  userId: string,
+  applicationId: string,
+): Promise<OutreachSend[]> {
+  const { data } = await supabase
+    .from('contact_touches')
+    .select('id, contact_id, channel, sent_at, responded_at, message, contacts ( full_name )')
+    .eq('user_id', userId)
+    .eq('application_id', applicationId)
+    .eq('direction', 'outbound')
+    .eq('draft', false)
+    .order('sent_at', { ascending: false });
+  return ((data ?? []) as unknown as {
+    id: string;
+    contact_id: string;
+    channel: string;
+    sent_at: string;
+    responded_at: string | null;
+    message: string | null;
+    contacts: { full_name: string } | null;
+  }[]).map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    contactName: row.contacts?.full_name ?? 'Someone',
+    channel: row.channel,
+    sentAt: row.sent_at,
+    respondedAt: row.responded_at,
+    message: row.message,
+  }));
 }

@@ -153,7 +153,11 @@ export function serverEnv() {
       CLAUDE_BOARD_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the board routine. Scoped to it, not to the account. */
       CLAUDE_BOARD_ROUTINE_TOKEN: z.string().min(1).optional(),
-      /** The routine that builds selveyknight.com's plan steps (lib/plan/projects). No fallback. */
+      /** The shared routine that builds every Dev project's steps (plan #2553.3). No fallback. */
+      CLAUDE_PROJECTS_ROUTINE_ID: z.string().min(1).optional(),
+      /** Bearer for the projects routine. Scoped to it, not to the account. */
+      CLAUDE_PROJECTS_ROUTINE_TOKEN: z.string().min(1).optional(),
+      /** The website project's own routine, preferred over the shared one while it is set. */
       CLAUDE_WEBSITE_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the website routine. Scoped to it, not to the account. */
       CLAUDE_WEBSITE_ROUTINE_TOKEN: z.string().min(1).optional(),

@@ -347,11 +347,16 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  * LIFECYCLE_SOURCES, so a new one is decided when it is added.
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
+  links_status_ck: 'whether a Plaid link is working, failing or removed',
+  dash_questions_status_ck: 'whether a question Dash asked is still open, answered or skipped, kept on the Answer tab',
+  month_reviews_status_ck: 'whether the monthly money review was written or the run failed',
   email_account_status: 'connection state of a mailbox',
   sync_job_status: 'state of a background sync',
   sync_run_status: 'state of a background sync',
   vault_connection_status: 'connection state of a vault',
   parse_status: 'whether an email was read',
+  board_advisors_brain_status_ck: 'whether an advisor\'s brain is built, building or failed',
+  board_questions_status_ck: 'where a board question stands from suggested to decided, kept on the Board tab',
   import_runs_status_ck: 'whether an import is running, applied or failed',
   topics_status_ck: 'whether a topic is still a draft or approved to ask about',
   graph_moves_status_ck: 'whether a claims-graph subject has been moved onto topics',
@@ -371,6 +376,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   plan_runs_status_ck: 'state of a Dash run',
   company_research_status_ck: 'state of a Dash research run',
   insight_runs_status_ck: 'state of a Dash run',
+  dash_question_runs_status_ck: 'state of a Dash run',
   board_meetings_status_ck: 'state of a Dash run',
   insights_status_ck: 'whether Dash still shows an insight it wrote',
   runs_status_ck: 'state of a Dash run',
@@ -378,6 +384,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
   briefs_status_check: 'state of a research run',
   subject_preparations_status_ck: 'state of a subject\'s preparation run',
+  topic_draft_requests_status_ck: 'whether the routine has drafted a topic someone asked for',
   subject_preparation_steps_status_ck: 'state of a step in a subject\'s preparation run',
   video_transcripts_state_ck: 'state of a transcript fetch',
   inspiration_videos_transcript_state_ck: 'state of a transcript fetch',

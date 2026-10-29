@@ -84,7 +84,7 @@ export type LinkCompany =
        * A domain this message was sent from that the company record does not
        * carry yet -- set only when the match came from the name or the ATS
        * hint, not the domain itself. A recruiter's own address (emma@
-       * meetelise.com) is exactly as much the employer's domain as the ATS
+       * contoso.example) is exactly as much the employer's domain as the ATS
        * confirmation that first created the row (no-reply@ashbyhq.com), and
        * leaving it unlearned is why every later message from that recruiter
        * kept failing to link and spawning a new lead instead.

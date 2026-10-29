@@ -20,6 +20,7 @@ const BEFORE: Record<
       { href: '/dev/raised', label: 'Now', icon: 'devHome' },
       { href: '/dev/inbox', label: 'Inbox', icon: 'inbox', badge: 7 },
       { href: '/dev/plan', label: 'Plan', icon: 'plan' },
+      { href: '/dev/projects', label: 'Projects', icon: 'project' },
       { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
       { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
       { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
@@ -60,7 +61,7 @@ const BEFORE: Record<
     owner: false,
     badge: '/shopping/inbox',
     bar: [
-      { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
+      { href: '/shopping/orders', label: 'Now', icon: 'orders' },
       {
         href: '/shopping/inbox',
         label: 'Inbox',
@@ -68,11 +69,9 @@ const BEFORE: Record<
         alsoMatches: ['/shopping/review'],
         badge: 7,
       },
-      { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
       { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
       { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-      { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
       { href: '/shopping/share', label: 'Share', icon: 'share' },
     ],

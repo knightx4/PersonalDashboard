@@ -13,6 +13,7 @@ import 'server-only';
 
 import { assertPublicUrl, ScrapeUrlError } from '@/lib/saved/scrape-product';
 import { parsePriceHtml, type ParsePriceOptions, type PriceReading } from '@/lib/watch/parse-price';
+import { appContactUrl } from '@/lib/net/user-agent';
 
 export type { PriceReading, PriceDetail, PriceListing, ParsePriceOptions } from '@/lib/watch/parse-price';
 export { parsePriceHtml } from '@/lib/watch/parse-price';
@@ -23,8 +24,7 @@ const MAX_BODY_BYTES = 3_000_000;
 const MAX_REDIRECTS = 5;
 
 /** Browsers get the full page; some resale sites serve bots a stub. */
-const USER_AGENT =
-  'Mozilla/5.0 (compatible; DashWatch/1.0; +https://github.com/knightx4/ShoppingManager)';
+const USER_AGENT = `Mozilla/5.0 (compatible; DashWatch/1.0; +${appContactUrl()})`;
 
 export async function readLowestPrice(
   rawUrl: string,

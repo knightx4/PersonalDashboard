@@ -30,6 +30,9 @@ export const SPEC_TABLE = 'docs.specs';
 /** The most sections one read returns, so a broad query cannot carry a whole spec. */
 export const MAX_SPEC_SECTIONS = 3;
 
+/** The most sections one read by anchor returns. */
+export const MAX_READ_SECTIONS = 8;
+
 /** The most characters of one section a read returns. */
 export const SECTION_CHARS = 6000;
 
@@ -154,14 +157,30 @@ export async function readSpecLookup(ctx: AskContext, input: Input): Promise<Ask
   });
 
   if (anchor) {
-    const section = sections.find((s) => s.anchor === anchor.toLowerCase());
-    if (!section) return headings(`${spec.title} has no section ${anchor}. Its headings are listed; read one by its section.`);
-    const { text, clipped } = sectionText(section.body, query ? queryWords(query) : []);
-    return {
-      ok: true,
-      rows: [sectionRow(spec, section, { heading: section.heading, text })],
-      note: clipped ? `The section is longer than ${SECTION_CHARS} characters and was cut.` : undefined,
-    };
+    // Several anchors in one call ("a, b, c") read several sections in one
+    // lookup: a guide cut into six `##` sections took six of the twelve
+    // lookups an answer has.
+    const wanted = anchor.split(/[\s,]+/).filter(Boolean).slice(0, MAX_READ_SECTIONS);
+    const found = wanted.map((a) => sections.find((s) => s.anchor === a.toLowerCase()));
+    const missing = wanted.filter((_, i) => !found[i]);
+    if (missing.length === wanted.length) {
+      return headings(`${spec.title} has no section ${missing.join(', ')}. Its headings are listed; read one by its section.`);
+    }
+    const words = query ? queryWords(query) : [];
+    let clippedAny = false;
+    const rows = found.flatMap((section) => {
+      if (!section) return [];
+      const { text, clipped } = sectionText(section.body, words);
+      clippedAny ||= clipped;
+      return [sectionRow(spec, section, { heading: section.heading, text })];
+    });
+    const note = [
+      clippedAny ? `A section longer than ${SECTION_CHARS} characters was cut.` : null,
+      missing.length > 0 ? `${spec.title} has no section ${missing.join(', ')}.` : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return { ok: true, rows, note: note || undefined };
   }
 
   // "What does the writing guide say about em dashes" names the spec as well

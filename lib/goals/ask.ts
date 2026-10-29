@@ -43,6 +43,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import { checkRecord } from '@/lib/goals/collections';
+import { applyLinkedLoans, loadLinkedLoansOrNone } from '@/lib/goals/linked-loans';
 import { addRecord, loadCollectionsForGoal, loadInformation } from '@/lib/goals/collections-store';
 import {
   commentRunText,
@@ -212,7 +213,13 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
   // which are usually the same ones.
   const served = await loadCollectionsForGoal(input.client, input.goalId);
   const extra = served.filter((c) => !map.information[c.id]).map((c) => c.id);
-  const information = { ...map.information, ...(await loadInformation(input.client, extra)) };
+  const information = {
+    ...map.information,
+    ...applyLinkedLoans(
+      await loadInformation(input.client, extra),
+      await loadLinkedLoansOrNone(input.client, input.userId),
+    ),
+  };
   const collections: ReplyCollection[] = Object.values(information).map(
     ({ collection, records }) => ({
       id: collection.id,

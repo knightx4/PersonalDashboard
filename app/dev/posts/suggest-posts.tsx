@@ -11,7 +11,7 @@ import { suggestPosts, type PostsActionState } from './actions';
 
 /**
  * Suggest posts (plan #1419): start a Dash run that drafts three to five X
- * posts about what shipped since the last posted one.
+ * posts about building the app, recent work first.
  *
  * While a run is going the button is held off and says so, and the page
  * refreshes itself every fifteen seconds, which is how the drafts appear

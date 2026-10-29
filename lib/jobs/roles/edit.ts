@@ -45,6 +45,24 @@ export function descriptionUpdate(description: string | null, payGiven: boolean)
   return { update, payFromPosting };
 }
 
+/**
+ * Check the years of experience a person typed. Each is a whole number from 0
+ * to 60 or null, and a maximum cannot be below the minimum. Returns the message
+ * to show, or null when the pair is fine.
+ */
+export function experienceYearsError(min: number | null, max: number | null): string | null {
+  for (const n of [min, max]) {
+    if (n === null) continue;
+    if (!Number.isInteger(n)) return 'Years of experience must be a whole number.';
+    if (n < 0) return 'Years of experience cannot be negative.';
+    if (n > 60) return 'Years of experience cannot be more than 60.';
+  }
+  if (min !== null && max !== null && max < min) {
+    return 'The most years cannot be below the least.';
+  }
+  return null;
+}
+
 export type RoleEditError = { message: string; code?: string };
 
 /** Said when the company a role moves to already holds the same posting. */

@@ -36,6 +36,8 @@ const FILL: Record<string, (user: string, id: string) => Record<string, unknown>
   'core.conversations': (_, id) => ({ subject_kind: 'ask', subject_ref: id }),
   'core.year_reviews': () => ({ year: 2025, totals: '{}' }),
   'core.week_reviews': () => ({ week: '2026-09-27', facts: '{}', source: 'plain' }),
+  'finances.month_reviews': () => ({ status: 'written', source: 'plain', written_at: '2026-10-01T00:00:00Z' }),
+  'finances.accounts': () => ({ source: 'manual', plaid_account_id: null, link_id: null }),
   'goals.items': () => ({ level: 'goal', area_id: randomUUID(), parent_id: null, kind: null }),
   'job_search.companies': () => ({ slug: 'a-company' }),
   'you.personality_results': () => ({ kind: 'mbti', typed_value: 'INTJ' }),
@@ -195,7 +197,9 @@ describe('refs against the database', () => {
     expect(tables).toEqual(expect.arrayContaining(['public.orders', 'public.plan_items', 'goals.items']));
   });
 
-  it.each(PAGES.map((entry) => [entry.table, entry] as const))(
+  // A project is keyed by a slug, not a uuid (plan #2553.1): the generic row
+  // this writes would need a slug id, so dev_projects is checked on its own.
+  it.each(PAGES.filter((entry) => entry.table !== 'public.dev_projects').map((entry) => [entry.table, entry] as const))(
     '%s resolves a real ref to its page and title, and a missing one to no longer there',
     async (table, { page }) => {
       const titleColumn = typeof page.title === 'string' ? page.title : null;

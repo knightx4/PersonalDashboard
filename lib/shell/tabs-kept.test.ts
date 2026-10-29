@@ -15,6 +15,8 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
     { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
+    // Added after the move, for the hours logged across the goals (goals 0089).
+    { href: '/goals/hours', label: 'Hours', icon: 'goalsHours', exact: true },
   ],
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
@@ -49,6 +51,7 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
     { href: '/you/places', label: 'Places', icon: 'places' },
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+    { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
     { href: '/you/board', label: 'Board', icon: 'board' },
   ],
   home: [
@@ -71,7 +74,7 @@ describe('the bars Goals, News, Todo, Vault, You and Home kept (plan #2208.3)', 
 
   it("puts the Goals Inbox count on the Inbox tab alone, and none when the read failed", () => {
     const counted = withBadges(tabsFor('goals', true), { '/goals/inbox': 4 });
-    expect(counted.map((tab) => tab.badge)).toEqual([undefined, 4, undefined]);
+    expect(counted.map((tab) => tab.badge)).toEqual([undefined, 4, undefined, undefined]);
     const failed = withBadges(tabsFor('goals', true), { '/goals/inbox': undefined });
     expect(failed).toEqual(BEFORE.goals);
   });

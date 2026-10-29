@@ -65,7 +65,8 @@ import { TAB_PARAM, tabFrom } from '@/lib/tabs';
 import { deletePlanItem } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
-import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
+import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL } from './step-forms';
+import { useScopeLabel } from './scope-labels';
 import { when } from './plan-run-status';
 import { FeatureUpdate, UpdateOverdue } from './feature-update';
 import { FeatureActivity } from './feature-activity';
@@ -150,6 +151,7 @@ export function FeaturePage({
 }) {
   const router = useRouter();
   const search = useSearchParams();
+  const scopeLabel = useScopeLabel();
   const tab = tabFrom(search.get(TAB_PARAM), FEATURE_TABS);
   const stepsView = stepsViewFrom(search.get(STEPS_VIEW_PARAM));
   const held = heldFrom(search.get(HELD_PARAM));

@@ -106,7 +106,7 @@ export type KindRead = {
 export function kindsPrompt(kinds: LearnedKind[], fields: CollectionField[]): string {
   const naming = `In kind, say what kind of document this is:
 
-- name: what someone would call it, in a few words, naming who issues it where that tells kinds apart ("NSLDS loan export", "Nelnet monthly statement", "Acme pay stub").
+- name: what someone would call it, in a few words, naming who issues it where that tells kinds apart ("NSLDS loan export", "Northstar monthly statement", "Acme pay stub").
 - recognise: one or two lines on how to tell another document of the same kind: its title or header line, who issues it, its layout or columns. Not the figures, which change from one to the next.
 - labels: for each form field you filled, the label in the document its value came from, exactly as the document writes it.`;
   if (kinds.length === 0) return naming;

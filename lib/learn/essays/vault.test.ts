@@ -141,7 +141,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
 
     expect(result).toMatchObject({
@@ -185,7 +185,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!first.ok) throw new Error(first.error);
 
@@ -196,7 +196,7 @@ describe('saveEssayToVault', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
 
     expect(second).toMatchObject({ ok: true, path: first.path, commitSha: 'commit-2' });
@@ -216,7 +216,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
       stage: 'seedling',
     });
     if (!first.ok) throw new Error(first.error);
@@ -230,7 +230,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!draft.ok) throw new Error(draft.error);
     expect(w2.files.get(draft.path)!.text).toContain('stage: draft\n');
@@ -240,7 +240,7 @@ describe('saveEssayToVault', () => {
       blobSha: draft.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
       stage: 'seedling',
     });
     if (!finished.ok) throw new Error(finished.error);
@@ -253,7 +253,7 @@ describe('saveEssayToVault', () => {
       blobSha: finished.blobSha,
       today: '2026-10-14',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
       stage: 'seedling',
     });
     expect(again).toMatchObject({ ok: true, commitSha: null, stage: 'seedling' });
@@ -267,7 +267,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!first.ok) throw new Error(first.error);
     const again = await saveEssayToVault(w.ports, {
@@ -276,7 +276,7 @@ describe('saveEssayToVault', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(again).toMatchObject({ ok: true, commitSha: null });
     expect(w.commits).toHaveLength(1);
@@ -290,7 +290,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!first.ok) throw new Error(first.error);
     const theirs = w.files.get(first.path)!.text.replace('wears out.', 'wears out, they wrote.');
@@ -302,7 +302,7 @@ describe('saveEssayToVault', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
 
     expect(result).toMatchObject({ ok: false, reason: 'changed' });
@@ -318,7 +318,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!first.ok) throw new Error(first.error);
     w.files.set(first.path, { text: 'changed in Obsidian', blob: 'blob-theirs' });
@@ -329,7 +329,7 @@ describe('saveEssayToVault', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(result).toMatchObject({ ok: false, reason: 'changed' });
     expect(w.files.get(first.path)!.text).toBe('changed in Obsidian');
@@ -343,7 +343,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     const stale = await saveEssayToVault(w.ports, {
       id: 'essay-1',
@@ -351,7 +351,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(stale).toMatchObject({ ok: false, reason: 'changed' });
     expect(w.commits).toHaveLength(1);
@@ -370,7 +370,7 @@ describe('saveEssayToVault', () => {
       blobSha: 'blob-gone',
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(result).toMatchObject({ ok: true, path: 'Essays/Why money is the odd good out.md' });
     expect(w.stored[0]).toMatchObject({ noteId: 'note-1', slug: 'money-odd-good-out' });
@@ -388,7 +388,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(result).toMatchObject({ ok: true, path: 'Essays/Why money is the odd good out 2.md' });
 
@@ -398,7 +398,7 @@ describe('saveEssayToVault', () => {
       blobSha: null,
       today: '2026-10-12',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(empty).toMatchObject({ ok: false, reason: 'empty' });
   });
@@ -421,7 +421,7 @@ describe('the authorship block (plan #1868)', () => {
       blobSha: null,
       today: '2026-10-12',
       marks,
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!result.ok) throw new Error(result.error);
     const file = w.files.get(result.path)!.text;
@@ -429,7 +429,7 @@ describe('the authorship block (plan #1868)', () => {
     expect(blockMatches(block)).toBe(true);
     const [mark] = blockMarks(block);
     expect(block.text.slice(mark!.from, mark!.to)).toBe(REPHRASED);
-    expect(file).toMatch(/\n@Selvey: 0,\d+ \d+,\d+\n&Dash <claude-sonnet-5-5>: \d+,62\n\.\.\.\n$/);
+    expect(file).toMatch(/\n@Alex: 0,\d+ \d+,\d+\n&Dash <claude-sonnet-5-5>: \d+,62\n\.\.\.\n$/);
     // The frontmatter is counted: the person's first range starts at the file's first character.
     expect(block.authors[0]!.ranges[0]!.start).toBe(0);
     expect(w.stored[0]!.authorship.find((range) => range.author === 'dash')).toMatchObject({
@@ -447,7 +447,7 @@ describe('the authorship block (plan #1868)', () => {
       blobSha: null,
       today: '2026-10-12',
       marks,
-      self: 'Selvey',
+      self: 'Alex',
     });
     if (!first.ok) throw new Error(first.error);
     const same = await saveEssayToVault(w.ports, {
@@ -456,7 +456,7 @@ describe('the authorship block (plan #1868)', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks,
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(same).toMatchObject({ ok: true, commitSha: null });
 
@@ -466,7 +466,7 @@ describe('the authorship block (plan #1868)', () => {
       blobSha: first.blobSha,
       today: '2026-10-13',
       marks: [],
-      self: 'Selvey',
+      self: 'Alex',
     });
     expect(cleared).toMatchObject({ ok: true, commitSha: 'commit-2' });
     const file = w.files.get(first.path)!.text;

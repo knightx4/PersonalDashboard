@@ -1,4 +1,4 @@
--- Publishing an essay for selveyknight.com to read (plan #1863.11; spec
+-- Publishing an essay for the owner's website to read (plan #1863.11; spec
 -- docs/LEARN-ESSAYS-SPEC.md, "Finishing and publishing", rule R4).
 --
 -- Publish copies the essay into a snapshot on its row: the body with the
@@ -15,7 +15,7 @@
 -- the whole decision about what an anonymous caller sees, and it is all here:
 --
 --   * only the owner's essays (public.owner_email(), migration 0085), since
---     selveyknight.com is the owner's site and two other accounts sign in;
+--     the website is the owner's and two other accounts sign in;
 --   * only rows with a snapshot, a slug and a published stage, so a draft
 --     cannot come back however its row is edited;
 --   * only the snapshot columns: never draft_body, the brief, the authorship
@@ -83,7 +83,7 @@ as $$
 $$;
 
 comment on function public.published_essays() is
-  'The owner''s published essays for selveyknight.com, newest first, without bodies (plan #1863.11). Open to anon.';
+  'The owner''s published essays for their website, newest first, without bodies (plan #1863.11). Open to anon.';
 
 -- One published essay of the owner's by its slug, with the snapshot body.
 create or replace function public.published_essay(p_slug text)

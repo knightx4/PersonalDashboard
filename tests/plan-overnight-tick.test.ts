@@ -1075,7 +1075,7 @@ describe('runOvernightTick', () => {
     });
     expect(upsert).toHaveBeenCalledTimes(1);
     expect((upsert.mock.calls as unknown as unknown[][])[0]?.[0]).toMatchObject({
-      repo: 'knightx4/PersonalDashboard',
+      repo: 'example-owner/PersonalDashboard',
       head_sha: HEAD,
       conclusion: 'passed',
     });

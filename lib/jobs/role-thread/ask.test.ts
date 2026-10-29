@@ -214,4 +214,41 @@ describe('Dash on a role', () => {
     expect((await undoDashAction(state.dash, action.id as string)).ok).toBe(true);
     expect(state.tables['job_search.applications'][0].cover_letter).toBe('The letter I wrote myself.');
   });
+
+  it('writes the letter from the thread under the cover letter, and replies there (note f0a52da9)', async () => {
+    const state = setup('The letter I wrote myself.');
+    const OLDER = '00000000-0000-4000-8000-000000000204';
+    state.tables['job_search.applications'].push(
+      { id: OLDER, user_id: ME, role_id: ROLE, attempt: 0, status: 'closed', cover_letter: 'An old letter.', updated_at: '2026-09-01T09:00:00Z' },
+    );
+    const thread = `job_search.applications:${OLDER}`;
+    state.tables['core.conversation_turns'].push(
+      { id: 'q2', user_id: ME, ref: thread, author: 'me', role: 'user', body: '@dash make it shorter', created_at: '2026-10-03T09:00:00Z' },
+    );
+    const { client, sent } = model([
+      call('w', 'write_cover_letter', { cover_letter: 'Dear Acme, shorter.' }),
+      call('a', 'answer', { answer: 'Shortened it.', cited: [] }),
+    ]);
+
+    const outcome = await askDashOnRole({
+      client: state.client,
+      userId: ME,
+      roleId: ROLE,
+      applicationId: OLDER,
+      commentId: 'q2',
+      question: 'make it shorter',
+      apiKey: 'key',
+      dash: state.dash,
+      dashThread: state.dashThread,
+      anthropic: client,
+    });
+
+    expect(outcome).toEqual({ ok: true, message: 'Cover letter written, under Application.' });
+    expect(sent[0].tools.map((t) => t.name)).toContain('write_cover_letter');
+    const letters = Object.fromEntries(state.tables['job_search.applications'].map((a) => [a.id, a.cover_letter]));
+    expect(letters).toEqual({ [APPLICATION]: 'The letter I wrote myself.', [OLDER]: 'Dear Acme, shorter.' });
+    const said = state.tables['core.conversation_turns'].filter((n) => n.author === 'claude');
+    expect(said.map((n) => n.ref)).toEqual([thread]);
+    expect(replies(state.tables)).toEqual([]);
+  });
 });

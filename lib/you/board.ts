@@ -109,6 +109,10 @@ export type BoardMinutes = {
   scorecard: BoardScore[];
   memos: BoardMemo[];
   memosNote: string | null;
+  /** New-form minutes (plan #2561.3): the question ids in the order debated. */
+  agenda: string[];
+  /** New-form minutes: who sat and why, guests left out, questions skipped. */
+  chairNote: string | null;
 };
 
 export type BoardMeeting = {
@@ -122,6 +126,8 @@ export type BoardMeeting = {
   requestedAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /** The panel a meeting started by hand was held for (plan #2576.3); null for no panel. */
+  panelName?: string | null;
 };
 
 export type BoardMark = {
@@ -266,6 +272,8 @@ export function parseMinutes(value: unknown): BoardMinutes {
       ];
     }),
     memosNote: textOrNull(row.memos_note),
+    agenda: list(row.agenda).filter((id): id is string => typeof id === 'string'),
+    chairNote: textOrNull(row.chair_note),
   };
 }
 
@@ -293,6 +301,7 @@ function meetingOf(row: Record<string, unknown>): BoardMeeting {
     requestedAt: String(row.requested_at ?? ''),
     startedAt: textOrNull(row.started_at),
     finishedAt: textOrNull(row.finished_at),
+    panelName: textOrNull(row.panel_name),
   };
 }
 
@@ -312,7 +321,7 @@ function markOf(row: Record<string, unknown>): BoardMark | null {
 }
 
 const MEETING_COLUMNS =
-  'id, kind, decision, status, held_on, error, run_url, requested_at, started_at, finished_at';
+  'id, kind, decision, status, held_on, error, run_url, requested_at, started_at, finished_at, panel_name';
 const MARK_COLUMNS = 'kind, item, value, note, todo_id, marked_at';
 
 // ---------------------------------------------------------------------------
@@ -324,6 +333,19 @@ const MARK_COLUMNS = 'kind, item, value, note, todo_id, marked_at';
  * rest, then by the day it was held. Only the parts of the minutes the rows
  * count are read, so the list does not carry every memo.
  */
+/** Whether a meeting is queued or running now, for a press that starts one. */
+export async function hasOpenMeeting(client: YouSupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('board_meetings')
+    .select('id')
+    .eq('user_id', userId)
+    .in('status', ['queued', 'running'])
+    .gt('requested_at', new Date(Date.now() - MEETING_STALE_AFTER_MS).toISOString())
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
 export async function listBoardMeetings(
   client: YouSupabaseClient,
   userId: string,
@@ -525,9 +547,12 @@ export function heldOnLabel(day: string): string {
 }
 
 /** What a meeting is called: the minutes' title, or the decision a called meeting was about. */
-export function meetingTitle(meeting: Pick<BoardMeeting, 'kind' | 'decision' | 'heldOn'>): string {
+export function meetingTitle(
+  meeting: Pick<BoardMeeting, 'kind' | 'decision' | 'heldOn'> & { panelName?: string | null },
+): string {
   if (meeting.kind === 'called' && meeting.decision) return meeting.decision;
-  return meeting.heldOn ? `Board meeting ${heldOnLabel(meeting.heldOn)}` : 'Board meeting';
+  const base = meeting.panelName ? `${meeting.panelName} panel meeting` : 'Board meeting';
+  return meeting.heldOn ? `${base} ${heldOnLabel(meeting.heldOn)}` : base;
 }
 
 /** A meeting's link text with the links taken out, for a todo's title: "[note](/x)" reads "note". */

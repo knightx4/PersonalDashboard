@@ -79,8 +79,8 @@ describe('the prompt', () => {
     expect(labels.notes.get(N_PASSION)).toBe(PASSION_ID);
     expect([...labels.notes.values()]).not.toContain(SUBJECT_ID);
     expect(labels.positions.get('P1')).toBe('pos-discovered');
-    expect(prompt).toContain('THE NOTE: Against "Finding Yourself"');
-    expect(prompt).toContain(`[${N_ESSAY}] Life is a road to the self`);
+    expect(prompt).toContain('THE NOTE: Made, not found');
+    expect(prompt).toContain(`[${N_ESSAY}] The self comes first`);
     expect(prompt).toContain('- P1 and P2: Whether the self comes before action.');
     expect(prompt).not.toMatch(/note-road|pos-discovered/);
   });
@@ -129,7 +129,7 @@ describe('thoughtFromMaterial', () => {
     });
     expect(out.thought.points).toHaveLength(1);
     expect(out.thought.points[0]!.notes).toEqual([
-      { noteId: ESSAY_ID, title: 'Life is a road to the self', quote: ESSAY_ACTION, point: 'Kept.' },
+      { noteId: ESSAY_ID, title: 'The self comes first', quote: ESSAY_ACTION, point: 'Kept.' },
     ]);
     expect(out.report.droppedQuotes).toBe(3);
     expect(out.report.droppedPoints).toBe(1);
@@ -148,7 +148,7 @@ describe('thoughtFromMaterial', () => {
     expect(out.thought.points).toEqual([]);
     expect(out.body).toBe('');
     expect(out.points).toEqual([]);
-    expect(out.question).toBe('Against "Finding Yourself"');
+    expect(out.question).toBe('Made, not found');
   });
 
   it('refuses a synthesis unless its positions were a retrieved conflict', async () => {
@@ -234,7 +234,7 @@ describe('thoughtFromMaterial', () => {
     });
     expect(out.body.length).toBeLessThanOrEqual(MAYA_BODY_MAX);
     expect(out.body.startsWith('1. Claim 1.')).toBe(true);
-    expect(thoughtBody(out.thought)).toContain(`From your note "Life is a road to the self": "${ESSAY_ACTION}"`);
+    expect(thoughtBody(out.thought)).toContain(`From your note "The self comes first": "${ESSAY_ACTION}"`);
   });
 });
 

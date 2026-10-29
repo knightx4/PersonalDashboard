@@ -168,8 +168,8 @@ describe('uiGuardSql', () => {
   });
 
   it('takes a named account, and refuses anything that could break out of the quotes', () => {
-    expect(uiGuardSql(1, ['a'], 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685')).toContain(
-      "c.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'",
+    expect(uiGuardSql(1, ['a'], '7c9e6679-7425-40de-944b-e07fc1f90ae7')).toContain(
+      "c.user_id = '7c9e6679-7425-40de-944b-e07fc1f90ae7'",
     );
     expect(() => uiGuardSql(1, ["a'; select 1"])).toThrow();
     expect(() => uiGuardSql(1, ['a'], "x' or 1=1")).toThrow();

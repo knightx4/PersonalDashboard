@@ -6,7 +6,7 @@
 /** The PKCE verifier, kept on the browser between /api/x/connect and the callback. */
 export const X_VERIFIER_COOKIE = 'x_oauth_verifier';
 
-/** Registered on the X app as https://dash.selveyknight.com/api/x/callback (step #1816). */
+/** Registered on the X app as <the app's address>/api/x/callback (step #1816). */
 export const xCallbackPath = '/api/x/callback';
 
 export const X_CONNECT_PATH = '/api/x/connect';

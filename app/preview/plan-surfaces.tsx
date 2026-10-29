@@ -1,5 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
-import { projectById } from '@/lib/plan/projects';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
+import { sectionSubject } from '@/lib/core/section-path';
+import { PROJECT_FIXTURES, WEBSITE_FIXTURE } from '@/lib/plan/project-fixtures';
 import { PlanView } from '@/app/dev/plan/plan-view';
 import { SendScreenBack } from '@/app/dev/plan/send-back';
 import { FeaturePage } from '@/app/dev/plan/feature-page';
@@ -12,13 +15,16 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
-import { applyView, assigneeTitle, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
+import { applyView, assigneeTitle, buildPlanTree, flatten, scopeLabelsOf, summarize } from '@/lib/plan/tree';
+import { ScopeLabelsProvider } from '@/app/dev/plan/scope-labels';
 import { placeCheckBacks } from '@/lib/plan/check-backs';
 import { PageColumn } from '@/components/shell/page-width';
 import { AssigneeCell, type AssigneeWho } from '@/components/plan-tree/assignee-cell';
 import { ColumnHeader, ROW_GRID } from '@/components/plan-tree/grid';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { ProjectMainLine } from '@/app/dev/plan/project-main-line';
+import type { MainCheck } from '@/lib/plan/main-check';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -203,6 +209,7 @@ const items: PlanItem[] = [
 const whole = buildPlanTree({
   items,
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
+  projects: PROJECT_FIXTURES,
   // Put down until a day, so the tree draws the clock beside the dashed wait.
   checkWaits: [
     { id: 'check-week', planItemId: 'checked-later', title: 'A week of goal steps exists.', dueAt: '2026-10-26T06:00:00Z' },
@@ -324,7 +331,7 @@ const projectItems: PlanItem[] = [
     module: 'website',
     title: 'Publish the writing page with the three essays already drafted',
     detail: 'The site gets a writing page listing each essay with its date.',
-    acceptance: 'selveyknight.com/writing lists the three essays, newest first.',
+    acceptance: 'alexrivera.dev/writing lists the three essays, newest first.',
     priority: 1,
     size: 'm',
   }),
@@ -356,15 +363,49 @@ const projectItems: PlanItem[] = [
   }),
 ];
 
-const project = buildPlanTree({ items: projectItems, dependencies: [] });
-const site = projectById('website')!;
+const project = buildPlanTree({ items: projectItems, dependencies: [], projects: PROJECT_FIXTURES });
+const site = WEBSITE_FIXTURE;
 
-export function ProjectPlanSurface() {
+/** When the project's main was read, and the clock the page drew it by. */
+const PROJECT_MAIN_NOW = Date.parse('2026-10-26T09:02:00Z');
+
+const projectMainPassed: MainCheck = {
+  sha: 'e81f2a94c0d3b6a7f5e2c1d0b9a8f7e6d5c4b3a2',
+  conclusion: 'passed',
+  checkedAt: '2026-10-26T09:00:00Z',
+  error: null,
+  reason: null,
+  runUrl: null,
+  deployState: 'deployed',
+  deployUrl: null,
+  deployError: null,
+  unapplied: null,
+  migrationsError: null,
+};
+
+/** The reading a token that cannot see the project's repository leaves. */
+const projectMainRefused: MainCheck = {
+  ...projectMainPassed,
+  sha: null,
+  conclusion: null,
+  deployState: null,
+  error:
+    'GITHUB_READ_TOKEN is missing a permission (404). Give it access to alex-rivera/alexrivera-site in the token\'s settings, then redeploy.',
+};
+
+export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = {}) {
   return (
+    <ScopeLabelsProvider labels={scopeLabelsOf(project)}>
     <PageColumn className="space-y-6">
       <PageHeader
+        subject={sectionSubject('/dev/projects', 'Projects', { label: site.label, href: '/dev/projects/website' })}
         title={site.label}
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
+      />
+      <ProjectMainLine
+        check={refused ? projectMainRefused : projectMainPassed}
+        repo={`${site.repo.owner}/${site.repo.repo}`}
+        now={PROJECT_MAIN_NOW}
       />
       <PlanView
         basePath="/dev/projects/website"
@@ -379,7 +420,14 @@ export function ProjectPlanSurface() {
         commitChecks={{}}
         unfolded
       />
+      {/* The project's own thread (plan #2553.5), empty. */}
+      <Thread
+        subject={threadRef('project', site.id)}
+        turns={[]}
+        placeholder="A note on this project, or a question for Dash about it."
+      />
     </PageColumn>
+    </ScopeLabelsProvider>
   );
 }
 
@@ -412,7 +460,7 @@ const stopItems: PlanItem[] = [
   }),
 ];
 
-const stopTree = buildPlanTree({ items: stopItems, dependencies: [] });
+const stopTree = buildPlanTree({ items: stopItems, dependencies: [], projects: PROJECT_FIXTURES });
 
 /**
  * A shot, drawn as a page in miniature so the gallery needs no bucket.
@@ -530,7 +578,7 @@ const changedItems: PlanItem[] = [
   }),
 ];
 
-const changedTree = buildPlanTree({ items: changedItems, dependencies: [] });
+const changedTree = buildPlanTree({ items: changedItems, dependencies: [], projects: PROJECT_FIXTURES });
 
 /**
  * A phone screen in miniature, so the gallery needs no bucket. `crowded` is
@@ -811,6 +859,7 @@ for (const fixture of featureItems) {
 const featureTree = buildPlanTree({
   items: featureItems,
   dependencies: [dep('feat', 'other'), dep('feat-table', 'feat-page')],
+  projects: PROJECT_FIXTURES,
 });
 const featureSection = featureTree.find((section) => section.module === 'dev');
 const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');

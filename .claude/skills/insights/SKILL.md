@@ -1,6 +1,6 @@
 ---
 name: insights
-description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in Me/, the journal and daily notes in full, send four subagents to read what they did across jobs, goals, Learn, spending, app use and timing, and what they said in their chats with Claude, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
+description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in the journal folders, the journal and daily notes in full, send four subagents to read what they did across jobs, goals, Learn, spending, app use and timing, and what they said in their chats with Claude, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
 ---
 
 # Writing deep insights about the person
@@ -34,7 +34,7 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 Work these in order. Each has its section below.
 
 1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
-2. **Read the core in full**: the private notes in Me/, the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
+2. **Read the core in full**: the private notes in the journal folders (`journal_folders` on their `obsidian.vault_connections` row), the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: four subagents at once, one of them on their chats with Claude, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
@@ -182,10 +182,11 @@ misreading, and a card built on it is dropped.
 
 Then make a list of what the person already knows about themselves, so no
 card tells them something they wrote down. Read in full their own
-self-descriptions: `Me/About me.md`, `Me/Autobio.md`, `Me/Notes to Self.md`,
-`Me/mantras.md`, `Me/Personal Goals.md`, `Me/My favorite things.md`,
-`Me/Interests Index.md`, `Me/live me.md`, and any other note in Me/ whose
-title says it is about who they are. Their personality results
+self-descriptions: every note in the journal folders whose title says it is
+about who they are (an about-me note, an autobiography, notes to self, a list
+of mottos, personal goals, favourite things, an index of interests), wherever
+the person keeps them. List the paths found this run in the summary, so the
+next run starts from them. Their personality results
 (`you.personality_results`: `kind`, `test_name`, the five scores,
 `typed_value`, `note`, `taken_at`) go on the list too. A card may start from
 something on this list; it may not stop there.
@@ -210,11 +211,11 @@ where table_schema = 'obsidian' and table_name = 'notes' and column_name in ('vo
   as what they think. Treat `audience` notes (applications, essays, posts)
   as what they wrote to persuade someone: a position that appears only in
   `audience` notes is a claim to test, not a belief.
-- Without it: never read `Me/Passwords.md`, any note tagged `secret`, or one
-  whose title or opening holds logins, passwords or keys; skip notes tagged
+- Without it: never read any note tagged `secret`, or one whose title, path
+  or opening holds logins, passwords or keys; skip notes tagged
   `clipped`, and treat `Bulk/Bulk - Wiki`, `Resources/` and course summaries
-  as clipped. Treat `Career/` applications and MBA essays as written for an
-  audience.
+  as clipped. Treat `Career/` applications and admissions essays as written
+  for an audience.
 
 Either way, never quote a secret note, and say in the run's summary when the
 voice tags were not there yet.
@@ -225,7 +226,7 @@ select id, path, title, first_written_at, first_written_source, git_updated_at,
        char_length(body) as chars
 from obsidian.notes
 where user_id = '<user_id>' and deleted_at is null
-  and path <> 'Me/Passwords.md'
+  and path !~* 'password'
   and coalesce(frontmatter ->> 'tags', '') !~* '\m(secret|clipped)\M'
   -- and voice is distinct from 'secret' and voice is distinct from 'clipped'
 order by path;
@@ -233,7 +234,7 @@ order by path;
 
 Read, in full:
 
-1. **Every private note in Me/**, including the trip notes and the people
+1. **Every private note in the journal folders**, including the trip notes and the people
    notes, which hold the most unguarded writing in the vault. Read the
    people notes for what they say about the person, not about the others
    (step 6).
@@ -254,10 +255,9 @@ Read, in full:
 3. **The daily notes**, whose file name is a date
    (`path ~ '(^|/)\d{4}-\d{2}-\d{2}\.md$'`).
 4. **The notes those link to.** Follow the `[[wiki links]]` out of what you
-   read in 1 to 3, one step. In the first session these were Rest in
-   reason, Lightning as an analogy, On Introspection, Against Finding
-   Yourself, Forgetting the Self and travel thoughts; read whatever this
-   run's reading links to.
+   read in 1 to 3, one step. In the first session these were short essays
+   and travel notes the journal pointed to; read whatever this run's
+   reading links to.
 5. **The Inbox** (`path like 'Inbox/%'`): what they wrote most recently and
    have not filed.
 6. **What a chat saved about them.** Rows of `you.claude_chats` with
@@ -422,7 +422,7 @@ Every card has three layers, saved in this order:
   a job lead, an essay in draft.
 
 **The deeper layer may not rest on their self-descriptions.** The list from
-step 1 (About me, Notes to Self, mantras, personality results) can be where
+step 1 (the about-me note, notes to self, mottos, personality results) can be where
 a card starts or a receipt in the saw layer. It cannot be the mechanism.
 "You don't like waiting, so you build when waiting" hands their own line back
 to them, and they knew it already. The 19 October cards did this, and that is
@@ -503,7 +503,7 @@ Write each card in the person's own words where possible, to them as "you".
 - `layers`: `[{"depth": "saw", "text": ...}, {"depth": "deeper", ...}, {"depth": "further", ...}]`.
 - `receipts`: every source the card relies on, each
   `{"source", "row_id", "quote", "link"}`. `source` is the table
-  (`job_search.applications`) or the vault path (`Me/Notes to Self.md`);
+  (`job_search.applications`) or the vault path (`Journal/Notes to self.md`);
   `row_id` the row's id or null for a note; `quote` the words or the number
   relied on; `link` where it opens in the app: a note at
   `/vault/n/<path, each segment URL-encoded>`, a role at
@@ -512,7 +512,7 @@ Write each card in the person's own words where possible, to them as "you".
   dropped when the tab reads it.
 - **Links in the text.** In the layers and `live_ref`, link what you cite
   where you cite it, as `[words](link)` with the same link as its receipt:
-  "your [journal on 25 January 2025](/vault/n/Me/Journal.md) says ...".
+  "your [journal on 25 January 2025](/vault/n/Journal/Journal.md) says ...".
   Every note, role, goal or page a layer names gets a link the first time it
   is named. Encode `(` and `)` in a link as `%28` and `%29`. The tab also
   links a receipt's exact quote or note title where the text repeats it, but

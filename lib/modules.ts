@@ -21,6 +21,7 @@ export type ModuleId =
   | 'news'
   | 'goals'
   | 'you'
+  | 'finances'
   | 'dev';
 
 export type AppModule = {
@@ -110,6 +111,7 @@ export type MarkShape =
   | 'envelope'
   | 'summit'
   | 'person'
+  | 'wallet'
   | 'terminal';
 
 export interface MarkKey {
@@ -139,7 +141,8 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'shopping',
     prefix: '/shopping',
-    home: '/shopping/dashboard',
+    // The orders list, since Spending moved to Finances (plan #2593.1).
+    home: '/shopping/orders',
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
@@ -239,6 +242,23 @@ export const MODULES: readonly AppModule[] = [
     // the caution amber at 49; the contrast check's accent-to-meaning
     // distance is what keeps You's colour reading as a place, not a warning.
     key: { shape: 'person', from: '#fb923c', to: '#c2410c' },
+  },
+  {
+    id: 'finances',
+    prefix: '/finances',
+    // Accounts, every account held with net worth at the top (plan #2593.6).
+    // Spending and Recurring moved here from Shopping (plan #2593.1); the old
+    // Shopping paths redirect (next.config.ts).
+    home: '/finances/accounts',
+    label: 'Finances',
+    description: 'Accounts, spending and recurring payments',
+    accent: '--color-w-finances',
+    // Green, at OKLCH hue 135: the widest gap left on the circle, between
+    // News' gold at 90 and Goals' emerald at 162, and the colour of money.
+    // It is a deep leaf green rather than the lime both Goals and You moved
+    // away from. The deep stop is the paper theme's --c-w-finances.
+    key: { shape: 'wallet', from: '#8fd46a', to: '#456e2c' },
+    settings: { href: '/finances/settings', hint: 'Linked bank, card and brokerage accounts' },
   },
   {
     id: 'dev',

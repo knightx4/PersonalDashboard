@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { goalInboxCount, goalInboxGroups } from '@/lib/goals/inbox';
+import { goalInboxCount, goalInboxGroups, withoutPassiveGoals } from '@/lib/goals/inbox';
 import type { DashLaneItem } from '@/lib/goals/lanes';
 import type { TodayItem } from '@/lib/goals/today';
 
@@ -24,6 +24,8 @@ vi.mock('@/app/goals/inbox/actions', () => ({
   snoozeInboxRowAction: vi.fn(),
   unsnoozeInboxRowAction: vi.fn(),
   leaveQuestionsAction: vi.fn(),
+  dismissStepNoticeAction: vi.fn(),
+  restoreStepNoticeAction: vi.fn(),
 }));
 vi.mock('@/app/goals/[goalId]/shaping-actions', () => ({
   askDashStepAction: vi.fn(),
@@ -80,6 +82,37 @@ describe('sorting what is on you', () => {
     expect(groups[1].dash.map((d) => d.id)).toEqual(['d1']);
     expect(groups[2].items.map((i) => i.id)).toEqual(['c']);
     expect(goalInboxCount(onYou, [blocked, { ...blocked, id: 'd2', needs: null }])).toBe(5);
+  });
+});
+
+describe('a passive goal', () => {
+  it('puts nothing on the Inbox: no step, question, flag or proposal, and no Dash question', () => {
+    const goals = [
+      { goal: { id: 'g1', activity: 'active' } },
+      { goal: { id: 'quiet', activity: 'passive' } },
+    ];
+    const onQuiet = { goalId: 'quiet', goalTitle: 'Know ten people in the scene' };
+    const rows = [
+      ...onYou,
+      item('s2', onQuiet),
+      item('s3', { ...onQuiet, onTodo: true }),
+      item('q2', { ...onQuiet, kind: 'question', action: 'Answer' }),
+      item('f2', { ...onQuiet, kind: 'flag', action: 'Answer' }),
+      item('p2', { ...onQuiet, kind: 'park', action: 'Later' }),
+      item('w2', { ...onQuiet, kind: 'went', action: 'Answer' }),
+    ];
+    const dashSteps = [blocked, { ...blocked, ...onQuiet, id: 'd2' }, { ...blocked, ...onQuiet, id: 'd3', needs: null }];
+    const kept = withoutPassiveGoals(goals, rows, dashSteps);
+    expect(kept.onYou.map((i) => i.id)).toEqual(['a', 'q', 'f', 'c']);
+    // Dash's own step under it stays in its lane; the one asking you leaves.
+    expect(kept.dash.map((d) => d.id)).toEqual(['d1', 'd3']);
+    expect(goalInboxCount(kept.onYou, kept.dash)).toBe(5);
+  });
+
+  it('reads a goal with no activity as active', () => {
+    const kept = withoutPassiveGoals([{ goal: { id: 'g1' } }], onYou, [blocked]);
+    expect(kept.onYou).toHaveLength(4);
+    expect(kept.dash).toHaveLength(1);
   });
 });
 
@@ -155,6 +188,22 @@ describe('the Inbox page', () => {
     expect(html).toContain('id="inbox-actions"');
     expect(html).toContain('Pay the card');
     expect(html).toContain('Needs you: Which card has the lower rate?');
+  });
+
+  it('draws a step Dash finished as its notice, with Done to put it away (plan #2611.2)', () => {
+    const notice = item('f1', {
+      kind: 'finished',
+      title: 'Shortlist five companies',
+      detail: 'Globex is the strongest fit.',
+      action: 'Open',
+    });
+    const html = render({ groups: goalInboxGroups([notice], []) });
+    expect(html).toContain('Dash finished this');
+    expect(html).toContain('Shortlist five companies');
+    expect(html).toContain('Globex is the strongest fit.');
+    expect(html).toContain('href="/goals/g1/s/f1"');
+    expect(html).toContain('aria-label="Done: Shortlist five companies"');
+    expect(html).toContain('1 thing waiting on you');
   });
 
   it('says so when nothing is on you, and folds what was put off under Later', () => {

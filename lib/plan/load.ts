@@ -3,7 +3,7 @@ import { threadFrom, type DevComment } from '@/lib/comments/load';
 import { loadTableThreads } from '@/lib/thread/store';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { readAll } from '@/lib/learn/db/read-all';
-import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
+import { loadDevProjects, storedScopeOf, type DevProject, type PlanScope } from '@/lib/plan/projects';
 
 /** The table plan rows live in, the table half of a plan row's ref. */
 const PLAN_TABLE = 'public.plan_items';
@@ -294,6 +294,12 @@ export type PlanData = {
   dependencies: PlanDependency[];
   /** The waiting check-backs on plan rows. Absent reads as none. */
   checkWaits?: PlanCheckWait[];
+  /**
+   * The account's projects (lib/plan/projects), read with the rows, so every
+   * reader of the plan has them without a second load. Absent reads as none:
+   * a project's rows are then drawn under their bare id.
+   */
+  projects?: readonly DevProject[];
 };
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
@@ -319,7 +325,7 @@ export async function loadPlan(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<PlanData> {
-  const [rows, deps, threads, checks] = await Promise.all([
+  const [rows, deps, threads, checks, projects] = await Promise.all([
     readAll<Record<string, unknown>>((from, to) =>
       supabase
         .from('plan_items')
@@ -343,6 +349,7 @@ export async function loadPlan(
     // one read keyed by ref rather than a ref per row.
     loadTableThreads(supabase, PLAN_TABLE, { userId }),
     loadCheckWaits(supabase, userId),
+    loadDevProjects(supabase, userId),
   ]);
 
   return {
@@ -353,6 +360,7 @@ export async function loadPlan(
       dependsOnId: row.depends_on_id as string,
     })),
     checkWaits: checks,
+    projects,
   };
 }
 
@@ -414,7 +422,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
   return {
     id: row.id as string,
     number: Number(row.number ?? 0),
-    module: planScopeOf(scope),
+    module: storedScopeOf(scope),
     parentId: (row.parent_id as string | null) ?? null,
     title: row.title as string,
     summary: (row.summary as string | null) ?? null,

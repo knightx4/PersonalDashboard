@@ -35,7 +35,9 @@ describe('the gate question', () => {
 describe('gateRefusal', () => {
   it('refuses what the map refuses', () => {
     expect(gateRefusal({ path: 'Me/Thoughts.md', body: LONG })?.reason).toBe('journal');
-    expect(gateRefusal({ path: 'Career/Job Applications/Acme.md', body: LONG })?.reason).toBe('excluded');
+    expect(
+      gateRefusal({ path: 'Career/Job Applications/Acme.md', body: LONG }, { journalFolders: ['Me'], excludedFolders: ['Career/Job Applications'] })?.reason,
+    ).toBe('excluded');
     expect(gateRefusal({ path: 'Ideas/Keys.md', body: `${LONG} sk-ant-abc123` })?.reason).toBe('credential');
   });
 

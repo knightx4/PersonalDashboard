@@ -18,7 +18,7 @@ import { CLASSIFICATIONS, type MessageClassification } from './classify';
  * application to its interview stage (eventKindFor gives interview_scheduled),
  * and finding a time is `scheduling`, which only moves it to in_process. The
  * pilot's first wording had them nearly the other way round
- * (docs/trials/2026-09-29-jev-job-email.md).
+ * (a trial write-up, not kept in the repository because it quoted the person's own data).
  */
 
 export type JevJobEmailLabel = MessageClassification | 'other';

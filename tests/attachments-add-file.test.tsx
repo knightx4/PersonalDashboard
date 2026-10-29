@@ -10,7 +10,7 @@ vi.mock('@/lib/auth/client', () => ({ createClient: () => ({}) }));
 import { AddFile, filesFromPaste } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 
-const USER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+const USER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
 function shot(n: number): UploadedAttachment {
   return {

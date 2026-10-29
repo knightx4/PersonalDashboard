@@ -6,6 +6,12 @@ import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
  * type are the person's own results, which no agent enters for them.
  */
 export const youActions: ModuleActions = {
+  'app/you/answer/actions.ts': {
+    answerQuestion: none('own', "An answer to a question Dash asked is the person's own words; Dash does not answer for them."),
+    skipQuestion: none('own', "Skipping a question Dash asked is the person's own choice."),
+    editAnswer: none('own', "An answer is the person's own words; Dash does not rewrite it."),
+    askDash: none('spends', 'Starts a Dash run that writes new questions, a model cost the person chooses to start with the button.'),
+  },
   'app/you/personality/actions.ts': {
     saveBigFiveAction: none('own'),
     saveTypedAction: none(
@@ -50,7 +56,7 @@ export const youActions: ModuleActions = {
     ),
     renameCourseWeekAction: none(
       'theirs',
-      'Corrects the topic Dash read for a week; the person\'s correction is what a later read keeps, so it is theirs to make.',
+      "Corrects the topic Dash read for a week; the person's correction is what a later read keeps, so it is theirs to make.",
     ),
     removeCourseWeekAction: none(
       'theirs',
@@ -91,6 +97,22 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
+  'app/you/board/review-actions.ts': {
+    answerBoardReview: none(
+      'theirs',
+      "How a decision turned out is the person's own verdict on it; the advisors' picks are graded, or their forecasts scored, from that answer (plans #2561.8, #2581.10).",
+    ),
+    answerBoardTripwire: none(
+      'theirs',
+      "Whether what would reopen a decision has happened is the person's own call on the tab; the Sunday meeting checks it from their rows otherwise (plan #2581.10).",
+    ),
+  },
+  'app/you/board/make-actions.ts': {
+    makeDecisionHappen: none(
+      'theirs',
+      'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
+    ),
+  },
   'app/you/board/actions.ts': {
     voteOnDisagreement: none(
       'theirs',
@@ -104,19 +126,69 @@ export const youActions: ModuleActions = {
       'theirs',
       'Ticking a resolution done is the person saying they did it; the next meeting reads the tick.',
     ),
-    callMeeting: none(
+    askBoard: tool('ask_board'),
+    answerBoardAsk: none(
+      'theirs',
+      "An answer to what the board asked is the person's own words, which the next meeting reads first (plan #2561.11).",
+    ),
+    acceptSuggestion: none(
       'spends',
-      'Calling a meeting starts a long Dash session on the account, which spends money the person chooses to spend (plan #2540.5).',
+      "Taking up one of the board's suggested questions is the person's choice of what the board works on, and Ask now starts a paid Dash session (plan #2561.4).",
+    ),
+    dismissSuggestion: none(
+      'theirs',
+      "Turning down a suggested question is the person's call on what the board should not spend its time on.",
+    ),
+    conveneQuestion: none(
+      'spends',
+      'Convening the board now about a queued question starts a long Dash session on the account, which spends money the person chooses to spend (plan #2561.4).',
+    ),
+    startMeeting: none(
+      'spends',
+      'Starting a meeting by hand, for a panel or none, starts a long Dash session on the account, which spends money the person chooses to spend (plan #2576.3).',
+    ),
+    decideQuestion: none(
+      'theirs',
+      "Deciding a debated question, or putting it off or turning it down, is the person's own call on the board's verdict; the next meeting reads it and Dash does not decide for them (plan #2561.6).",
     ),
     makeResolutionTodo: none(
       'theirs',
       'Making a resolution a todo is the person taking up what the board proposed, an approval Dash does not give for them.',
     ),
+    addBoardAdvisor: none(
+      'spends',
+      "Adding a guest is the person's choice of who sits on their board, and it starts a Dash session on the account that builds the brain from their public work (plan #2561.7).",
+    ),
+    retryAdvisorBrain: none(
+      'spends',
+      'Retrying a failed brain starts the same paid Dash session again, which the person chooses to spend (plan #2561.7).',
+    ),
+    setAdvisorActive: none(
+      'theirs',
+      "Whether the chair may bring a guest in is the person's own call on who sits on their board (plan #2561.7).",
+    ),
+    createBoardPanel: none(
+      'theirs',
+      "A panel is the person's own grouping of who they want to hear from; they make and name it themselves (plan #2561.12).",
+    ),
+    renameBoardPanel: none(
+      'theirs',
+      "Naming a panel is the person's own grouping of advisors (plan #2561.12).",
+    ),
+    setBoardPanelAdvisors: none(
+      'theirs',
+      "Who sits on a panel is the person's own call on whom to hear from (plan #2561.12).",
+    ),
+    deleteBoardPanel: none('deletes'),
   },
   'app/you/details/actions.ts': {
+    letterheadAction: none(
+      'page',
+      'Reads their name and contact details for the cover letter PDF the roles page builds in the browser; an agent reads you.details directly.',
+    ),
     saveDetailsForm: none(
       'own',
-      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
+      'Your name, contact details, website, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
     ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).

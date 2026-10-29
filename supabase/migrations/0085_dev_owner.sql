@@ -45,7 +45,10 @@ immutable
 parallel safe
 set search_path = public, pg_temp
 as $$
-  select 'selveyknight4@gmail.com'::text;
+  -- Was the owner's address. 0284 moved the owner into core.app_settings, and
+  -- this body was emptied afterwards so the repository names nobody; the live
+  -- database had applied it long before.
+  select null::text;
 $$;
 
 comment on function public.owner_email() is

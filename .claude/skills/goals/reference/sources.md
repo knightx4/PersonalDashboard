@@ -180,6 +180,15 @@ Things they want to buy, saved from shops, with their notes.
 - Name a row by `title`; link it by `id`
 - Opens at `/shopping/saved/<id>`
 
+### `you.board_questions` (You)
+
+The decisions they put to their board: the question, its options, the way they were leaning, and what they decided.
+
+- Search: `question`, `context`, `lean`, `decision_note`
+- Name a row by `question`; link it by `id`
+- Opens at `/you/board`
+- options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. verdict is the board's recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). reviews is the board checking back 30 and 90 days after the decision: account is Dash's, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026). door is one_way or two_way; success_measure, decide_by and lean_probability (0 to 1) are theirs; premortem and tripwire are written with the board (you 0029).
+
 ### `core.conversation_turns` (Learn)
 
 What they asked or explained, and what Dash replied, turn by turn.
@@ -553,9 +562,9 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 
 ### `you.details` (You)
 
-Their own details, one row: phone, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.
+Their own details, one row: name, email, phone, mailing address, LinkedIn address, citizenship, race, gender and sexuality, as they wrote them, and any fields they named themselves.
 
-- Search: `title`, `phone`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
+- Search: `title`, `full_name`, `email`, `phone`, `mailing_address`, `linkedin_url`, `citizenship`, `race`, `gender`, `sexuality`
 - Name a row by `title`; link it by `user_id`
 - Scoped to the person by `user_id`, not user_id
 - Opens at `/you/details`
@@ -607,6 +616,57 @@ The schools, certifications, honors, skills and courses on their LinkedIn profil
 - Name a row by `name`; link it by `id`
 - Opens at `/you/work#profile-<id>`
 - kind is school, certification, honor, skill or course. detail is a school's degree or a certification's authority; code is a certification's license number or a course's number. started and ended are "YYYY" or "YYYY-MM"; an honor's started is the day it was issued. Written by the LinkedIn import (plan #2432.7).
+
+### `you.dash_questions` (You)
+
+Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.
+
+- Search: `question`, `answer`
+- Name a row by `question`; link it by `id`
+- Opens at `/you/answer`
+- question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: only an answered row says anything about them, so leave open and skipped rows out. answered_at is when they first answered; updated_at moves when they change the answer (you 0033).
+
+### `you.advisor_chats` (You)
+
+The one-on-one talks they started with one of their advisors, by title.
+
+- Search: `title`
+- Name a row by `title`; link it by `id`
+- Opens at `/you/board`
+- advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).
+
+### `you.advisor_messages` (You)
+
+What they said to an advisor in a one-on-one talk, and what the advisor answered.
+
+- Search: `text`
+- Name a row by `text`; link it by `id`
+- Opens at `/you/board`
+- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029).
+
+### `finances.accounts` (Finances)
+
+Their bank, card, brokerage and loan accounts, with credit limits and loan terms.
+
+- Search: `name`, `official_name`, `institution_name`
+- Name a row by `name`; link it by `id`
+- Opens at `/finances/accounts/<id>`
+- Balances are in finances.balance_readings by account_id, one a day; for a credit card or a loan the balance is the amount owed.
+
+### `finances.transactions` (Finances)
+
+Money into and out of their accounts: purchases, payments, transfers and pay.
+
+- Search: `description`, `merchant`, `category`
+- Name a row by `description`; link it by `id`
+- amount_cents is negative for money out and positive for money in. A card payment shows on both the bank account and the card.
+
+### `finances.holdings` (Finances)
+
+The investments in their brokerage accounts, with quantity, value and cost basis on a date.
+
+- Search: `security_name`, `ticker`
+- Name a row by `security_name`; link it by `id`
 
 ### `core.files` (Files)
 
@@ -702,6 +762,15 @@ Every newsletter issue they receive, with its summary.
 - Name a row by `subject`; link it by `id`
 - Opens at `/news/i/<id>`
 - Leads only: an issue mentioning a subject says nothing about what they want.
+
+### `finances.month_reviews` (Finances)
+
+What Dash wrote about each month of their money: spending against the months before, new and changed subscriptions, unusual charges, interest, payments coming due and net worth.
+
+- Search: `summary`, `lines`
+- Name a row by `summary`; link it by `id`
+- Opens at `/finances/accounts`
+- The summary and lines are Dash's, not theirs: each line is {id, kind, text, transaction_ids, account_ids}, the finances.transactions and finances.accounts rows behind it. month is the first day of the month reviewed. status 'failed' means the run broke (error says how); source 'plain' means no model worded it.
 
 ### `core.observations` (Home)
 

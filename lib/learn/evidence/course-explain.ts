@@ -95,7 +95,7 @@ export function testedWords(level: number): string {
 
 /**
  * The reason beside a tested mark, as the link's basis:
- * "from MGT 847 Private Equity, H, 2025, and your explanation of it: tested at level 2."
+ * "from FIN 610 Private Equity, H, 2025, and your explanation of it: tested at level 2."
  */
 export function testedBasis(course: Pick<CourseSource, 'code' | 'title' | 'grade' | 'year'>, level: number): string {
   return `${courseBasis(course)}, and your explanation of it: ${testedWords(level)}.`;

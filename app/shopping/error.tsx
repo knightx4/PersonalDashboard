@@ -14,8 +14,8 @@ export default function Error({
       what="your shopping"
       error={error}
       reset={reset}
-      backHref="/shopping/dashboard"
-      backLabel="Back to the dashboard"
+      backHref="/shopping/orders"
+      backLabel="Back to your orders"
     />
   );
 }

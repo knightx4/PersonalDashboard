@@ -1,6 +1,7 @@
 import type { RunQuestion } from '@/lib/core/run-questions';
 import type { DashLaneItem } from './lanes';
 import type { TodayItem, TodayKind } from './today';
+import { toGoalActivity } from './tree';
 
 /**
  * Everything on you in Goals, sorted for the Inbox tab by what finishes each
@@ -52,6 +53,7 @@ export type GoalInboxGroup = {
 const GROUP_OF: Record<TodayKind, GoalInboxKey> = {
   step: 'actions',
   rhythm: 'actions',
+  finished: 'actions',
   question: 'questions',
   ask: 'questions',
   flag: 'questions',
@@ -68,6 +70,30 @@ const TITLE: Record<GoalInboxKey, [string, string]> = {
   questions: ['Questions for you', 'Need your answer'],
   review: ['To review', 'Need your yes'],
 };
+
+/**
+ * What is on you and what Dash is stuck on, less every row from a passive
+ * goal (plan #2503). A passive goal asks for nothing, so none of its steps,
+ * rhythms, questions, flags, proposals or did-you-go rows reach the Inbox,
+ * its badge or Do next; its dated events come up only as mentions on the
+ * home. A step of one you sent to Todo yourself stays on Todo
+ * (lib/goals/todo.ts), and the goal's page still lists everything.
+ */
+export function withoutPassiveGoals(
+  goals: readonly { goal: { id: string; activity?: unknown } }[],
+  onYou: readonly TodayItem[],
+  dash: readonly DashLaneItem[],
+): { onYou: TodayItem[]; dash: DashLaneItem[] } {
+  const passive = new Set(
+    goals.filter(({ goal }) => toGoalActivity(goal.activity) === 'passive').map(({ goal }) => goal.id),
+  );
+  return {
+    onYou: onYou.filter((item) => !passive.has(item.goalId)),
+    // Dash's own steps on a passive goal stay in its lane; one stuck on a
+    // question for you does not, since the question would be asking.
+    dash: dash.filter((item) => !(item.needs && passive.has(item.goalId))),
+  };
+}
 
 /**
  * The rows to fold: each goal's questions when it has two or more, and the

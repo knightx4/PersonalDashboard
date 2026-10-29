@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { checkDraft, sourceProblems } from './post-check';
+import { describe, expect, it, vi } from 'vitest';
+import { checkDraft, projectAvoidTerms, sourceProblems } from './post-check';
 import {
   angleFromPost,
   isUploadedPostImage,
@@ -77,14 +77,35 @@ describe('checkDraft', () => {
       'Mail me at someone@example.org',
       'It cost $4.20 to run',
       'The session cse_014oQRvbBBfKriJ3vXwUdUjn did it',
-      'Project asjztutnqxbecruvyrbj is the database',
       'It now tracks my loan payments',
-      'The site at selveyknight is live',
       'Call 0161 496 0000 today',
     ];
     for (const post of cases) {
       expect(checkDraft({ angle: 'a', posts: [post] }).ok, post).toBe(false);
     }
+  });
+
+  it('refuses the project ref the environment names', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abcdefghijklmnop.supabase.co');
+    try {
+      expect(
+        checkDraft({ angle: 'a', posts: ['Project abcdefghijklmnop is the database'] }).ok,
+      ).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses a project's host and repository when they are passed in", () => {
+    const avoid = projectAvoidTerms([
+      {
+        url: 'https://alexrivera.dev',
+        repo: { owner: 'arivera', repo: 'alexrivera-site', branch: 'main' },
+      },
+    ]);
+    expect(checkDraft({ angle: 'a', posts: ['The site at alexrivera is live'] }, avoid).ok).toBe(
+      false,
+    );
   });
 
   it('refuses a term the caller passes in, as a whole word', () => {
@@ -153,6 +174,13 @@ describe('postsRunText', () => {
     expect(text).toContain('.claude/skills/posts/SKILL.md');
     expect(text).toContain('docs/X-POSTS.md');
     expect(text).toContain('3 to 5 drafts');
+  });
+
+  it('does not limit a batch to what shipped since the last post', () => {
+    const text = postsRunText({ userId: 'u' });
+    expect(text).toContain('a step closed at any time');
+    expect(text).toContain('something near it');
+    expect(text).toContain('not a reason to write none');
   });
 
   it('allows the screenshot commit and nothing else', () => {

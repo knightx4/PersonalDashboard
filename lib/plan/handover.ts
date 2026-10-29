@@ -18,8 +18,13 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { planRoutine, projectRoutine, type RoutineTarget } from '@/lib/feedback/routine';
-import { projectById, type DevProject } from './projects';
+import {
+  ownProjectRoutine,
+  planRoutine,
+  projectRoutine,
+  type RoutineTarget,
+} from '@/lib/feedback/routine';
+import { isProjectScope, type DevProject } from './projects';
 import {
   betweenStepsRefusal,
   claimIsLive,
@@ -54,34 +59,80 @@ type Db = SupabaseClient<any, 'public'>;
  *
  * Read off the top of the row's tree, because that is what files it under a
  * section on the plan page; a step's own column can disagree with its root.
- * A project whose routine is not configured is refused rather than sent on:
- * with no id, the routine call falls back to the plan routine, which would
- * build the step in this repository.
+ * A project's row goes to its own routine when it has one set, and to the
+ * shared projects routine otherwise (plan #2553.3). One with neither is
+ * refused rather than sent on: with no id, the routine call falls back to the
+ * plan routine, which would build the step in this repository.
  */
 export function builderFor(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): { ok: true; project: DevProject | null; routine: RoutineTarget } | { ok: false; error: string } {
-  const project = projectById(topFeatureOf(sections, node).module) ?? null;
-  if (!project) return { ok: true, project: null, routine: planRoutine() };
+  const scope = topFeatureOf(sections, node).module;
+  if (!isProjectScope(scope)) return { ok: true, project: null, routine: planRoutine() };
+  // The project comes off the section the plan filed the row under, which the
+  // plan's loader filled from dev_projects. A project scope with no project
+  // behind it (archived, or the list unread) is refused: the plan routine
+  // would build it in this repository.
+  const project = sections.find((section) => section.module === scope)?.project ?? null;
+  if (!project) {
+    return { ok: false, error: `There is no project "${scope}" to build this in.` };
+  }
   const routine = projectRoutine(project);
-  if (!routine.id) {
+  if (!routine.id || !routine.token) {
     return {
       ok: false,
-      error: `${project.label} has no routine to build it yet: set ${project.routineEnv.id} and ${project.routineEnv.token}.`,
+      error:
+        `${project.label} has no routine to build it yet: ` +
+        'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
     };
   }
   return { ok: true, project, routine };
 }
 
-/** The sentence that tells a project's session where it is and what to read. */
+/**
+ * What tells a project's session where it is and what to read, ahead of the
+ * brief.
+ *
+ * A project with a routine of its own is checked out by that routine, so its
+ * session is only told which repository it is in. The shared routine checks
+ * out this repository, so its session is told to add the project's beside it
+ * and build there, keeping this checkout for the plan rows
+ * (.claude/skills/plan/reference/project-routine.md).
+ */
 export function projectPreamble(project: DevProject): string {
   const { owner, repo, branch } = project.repo;
+  const where = `${owner}/${repo}`;
+  const site = project.url ? ` (${project.url})` : '';
+  if (ownProjectRoutine(project)) {
+    return (
+      `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
+      `dashboard. Work in that repository and follow its ${project.skill}. Merge each closed ` +
+      `step to ${branch} and push. Plan rows are read and written through the Supabase ` +
+      'connector, as that skill says.\n\n'
+    );
+  }
+  const check = project.checkCommand
+    ? `Before merging a closed step to ${branch} there, run \`${project.checkCommand}\` in that ` +
+      'repository and merge only when it passes; then push. '
+    : `Merge each closed step to ${branch} there and push. `;
+  // Until its set-up step closes, nothing records how the repository is
+  // checked (plan #2553.6, lib/plan/project-setup.ts).
+  const setUp = project.setUpAt
+    ? ''
+    : `${project.label} has not been set up for Dash yet. If this step is under its Set up feature, ` +
+      'follow "Setting up a new project" in project-routine.md and record what you find with ' +
+      `npx tsx scripts/plan.ts project-ready ${project.id} --check "<command>". `;
   return (
-    `This step belongs to ${project.label}, the repository ${owner}/${repo} ` +
-    `(${project.url}), not to the dashboard. Work in that repository and follow its ` +
-    `${project.skill}. Merge each closed step to ${branch} and push. Plan rows are read ` +
-    'and written through the Supabase connector, as that skill says.\n\n'
+    `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
+    'dashboard this session checked out. Follow .claude/skills/plan/reference/project-routine.md. ' +
+    `First call add_repo for ${where} with push access, clone it beside this checkout, call ` +
+    'register_repo_root on the clone, and build there: the code, the commits and the checks are ' +
+    `that repository's, and its ${project.skill} says how a step is built in it. ` +
+    'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
+    `both. ${check}${setUp}` +
+    'If add_repo is refused, do not build anywhere else: write a setup step for the person with ' +
+    'the remedy the tool returned, as project-routine.md says, and stop.\n\n'
   );
 }
 

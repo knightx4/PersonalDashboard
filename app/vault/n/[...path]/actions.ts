@@ -12,6 +12,7 @@ import { keepTickedMap } from '@/lib/vault/map/keep';
 import { noteMapSchema, type NoteMapProposal } from '@/lib/vault/map/proposal';
 import { quoteInNote } from '@/lib/vault/map/rules';
 import { loadNearestThemeNames, loadThemeNames, offerThemes } from '@/lib/vault/map/themes';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { loadNote } from '@/lib/vault/notes/load';
 import { askMayaAbout } from '@/lib/vault/maya/ask-run';
 import { revalidatePath } from 'next/cache';
@@ -71,9 +72,10 @@ export async function proposeMap(
   if (!note) return { error: 'That note is not in the vault any more.' };
 
   const embedSpend = collectSpend();
-  const [nearest, strongest] = await Promise.all([
+  const [nearest, strongest, rules] = await Promise.all([
     loadNearestThemeNames(supabase, note, { onSpend: embedSpend.sink }),
     loadThemeNames(supabase),
+    loadVaultRules(supabase, user.id),
   ]);
   await recordLearnSpend(user.id, 'embed-map', embedSpend.reports);
   const existingThemes = offerThemes(nearest, strongest);
@@ -84,6 +86,7 @@ export async function proposeMap(
     existingThemes,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
+    rules,
   });
   await recordLearnSpend(user.id, 'map-note', spend.reports);
 

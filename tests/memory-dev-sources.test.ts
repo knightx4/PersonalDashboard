@@ -10,8 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-core';
 
-/** The owner's address, from 0085. */
-const OWNER_EMAIL = 'selveyknight4@gmail.com';
+const OWNER_EMAIL = 'dev-owner@example.com';
 
 type Source = {
   user_id: string;
@@ -40,6 +39,10 @@ beforeAll(async () => {
   await truncateAll();
   owner = await createUser(OWNER_EMAIL);
   other = await createUser('dev-other@example.com');
+  // The owner is whoever core.app_settings names (0284).
+  await admin`
+    insert into core.app_settings (singleton, owner_user_id) values (true, ${owner})
+    on conflict (singleton) do update set owner_user_id = excluded.owner_user_id`;
 
   const [idea] = await admin<{ id: string }[]>`
     insert into ideas (user_id, body, source) values (${owner}, 'The ideas list should group by workspace.', 'me') returning id`;

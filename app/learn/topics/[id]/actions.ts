@@ -2,16 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { after } from 'next/server';
-import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
-import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { checksFromText } from '@/lib/learn/levels/draft-payload';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { readDrafting } from '@/lib/learn/levels/draft-sources';
-import { markPersonal, mergeDraftInto, settleWanted, type CitedRowKind } from '@/lib/learn/levels/store';
+import { markPersonal, mergeDraftInto, type CitedRowKind } from '@/lib/learn/levels/store';
 import { rewriteCell } from '@/lib/learn/levels/store-page';
 import { carryLensTargets } from '@/lib/learn/levels/lens-store';
 
@@ -47,7 +44,7 @@ export async function mergeTopicDraft(_prev: MergeState, formData: FormData): Pr
   redirect(`/learn/topics/${intoId.data}`);
 }
 
-export type WantedState = { error?: string };
+export type WantedState = { error?: string; queued?: string };
 
 const WantedInput = z.object({
   topicId: z.string().uuid(),
@@ -65,11 +62,7 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
   });
   if (!input.success) return { error: 'Could not work out which topic to draft.' };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
-
   const supabase = await createLearnClient();
-  let id: string;
   try {
     // A topic a draft's links need is drafted from the sources that draft was.
     const { data: parent } = await supabase.from('topics').select('drafting').eq('id', input.data.topicId).maybeSingle();
@@ -80,30 +73,15 @@ export async function draftWantedTopic(_prev: WantedState, formData: FormData): 
       sources: drafting ? { sources: drafting.sources, performances: drafting.performances } : undefined,
       // A topic a brief's draft needs is from that brief too (plan #2184.1).
       ...(drafting?.brief ? { brief: drafting.brief } : {}),
-      anthropicApiKey: apiKey,
+      // Once kept: the wanted entry settled, and approved (plan #2356.2).
+      after: { approve: true, wanted: { topicId: input.data.topicId, name: input.data.name } },
     });
     if (!result.ok) return { error: result.detail };
-    id = result.id;
-    await settleWanted(supabase, user.id, { topicId: input.data.topicId, name: input.data.name, draftId: id });
+    revalidatePath('/learn/topics');
+    return { queued: result.detail };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
-  // Approved as soon as it is kept (plan #2356.2), uncited rows marked
-  // personal; the draft stays if approving fails, and its page says it is held.
-  const approval = await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) => {
-    console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error);
-    return null;
-  });
-  if (approval?.brief) {
-    const { briefId } = approval.brief;
-    after(() => writeCardsForBrief(user.id, briefId).then(() => undefined));
-    revalidatePath(`/learn/b/${briefId}`);
-    revalidatePath('/learn/now');
-  }
-
-  revalidatePath('/learn/topics');
-  revalidatePath(`/learn/topics/${input.data.topicId}`);
-  redirect(`/learn/topics/${id}`);
 }
 
 export type RewordState = { error?: string; saved?: boolean };

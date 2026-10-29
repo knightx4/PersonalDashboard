@@ -19,11 +19,18 @@ import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 import { loadMentionStates } from '@/lib/goals/mentions-store';
 import { passiveMentions, type MentionState, type PassiveMention } from '@/lib/goals/passive-mentions';
-import { suggestedItems, todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
+import {
+  finishedNotices,
+  suggestedItems,
+  todayRanked,
+  withPrepared,
+  type TodayItem,
+} from '@/lib/goals/today';
 import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
 import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
 import { snoozeRefOf, withoutSnoozed } from '@/lib/goals/inbox-snooze';
+import { withoutPassiveGoals } from '@/lib/goals/inbox';
 import type { RunQuestion } from '@/lib/core/run-questions';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,7 +38,8 @@ type Db = SupabaseClient<any, 'public'>;
 
 export type Home = {
   /**
-   * Everything on you, ranked, each step with what Dash prepared for it. The
+   * Everything on you, ranked, each step with what Dash prepared for it, then
+   * the notices of finished steps you asked about (finishedNotices). The
    * home splits it into Do next and the rest (homeLists in lib/goals/home.ts).
    */
   onYou: TodayItem[];
@@ -99,14 +107,22 @@ export async function loadHome(
     };
   });
   const holders = goalHolders({ goals, byGoal: tree.byGoal, onYou: ranked, runs, now });
-  const onYou = await withoutSnoozedRows(supabase, ranked, now);
+  // A passive goal puts nothing on you (plan #2503): its rows leave here, so
+  // the Inbox, its badge and Do next all go without them.
+  const { onYou, dash } = withoutPassiveGoals(
+    tree.goals,
+    await withoutSnoozedRows(supabase, ranked, now),
+    dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
+  );
   return {
-    onYou,
+    // The notices of finished steps you asked about go last, whatever the
+    // goal's activity: you switched them on yourself (plan #2611.2).
+    onYou: [...onYou, ...finishedNotices(tree.goals, tree.byGoal, now)],
     goals,
     working: runs.filter((run) => isGoing(run, now)),
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
     preparable: preparableSteps({ byGoal: tree.byGoal, onYou: ranked, runs, now }),
-    dash: dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
+    dash,
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
     waitingRuns,
     suggested: suggestedItems({ goals: tree.goals, byGoal: tree.byGoal, suggestions: input.suggestions }),

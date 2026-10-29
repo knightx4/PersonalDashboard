@@ -261,7 +261,7 @@ const FACT_MAX = 220;
  * The first sentence of a result, as plain text: markdown marks taken off,
  * the first paragraph that is not a heading, cut where the first sentence ends: a stop
  * followed by a space and a capital, a digit or a dollar sign, or by the end
- * of the paragraph, so "$118,000.50" and "e.g. this" are not cut.
+ * of the paragraph, so "$95,000.50" and "e.g. this" are not cut.
  */
 export function firstSentence(markdown: string): string {
   const paragraph =

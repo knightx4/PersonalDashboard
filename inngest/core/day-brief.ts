@@ -16,8 +16,10 @@ import { normalizeTimeZone } from '@/lib/core/timezone';
 import {
   agendaCandidates,
   agendaFacts,
+  cardCandidates,
   briefDay,
   candidatesSince,
+  CARD_DUE_DAYS,
   chargeCandidates,
   collectCandidates,
   dashResultCandidates,
@@ -27,6 +29,7 @@ import {
   replyCandidates,
   waitedOnStep,
   type BriefFact,
+  type CardRow,
   type Candidate,
   type ChargeCandidateRow,
   type DashResultRow,
@@ -35,6 +38,7 @@ import {
   type ReplyRow,
 } from '@/lib/day-brief/facts';
 import { addDays } from '@/lib/todo/tasks/model';
+import { FINANCES_SCHEMA } from '@/lib/finances/db/schema-name';
 import { runDraftsFor, type DraftsResult } from '@/lib/drafts/run';
 import { draftPorts } from '@/inngest/core/drafts';
 import { BRIEF_MODEL, choosePicks, writeBrief } from '@/lib/day-brief/model';
@@ -250,6 +254,58 @@ async function readCharges(
   }));
 }
 
+/**
+ * Credit cards with a payment date in the next few days. Hidden and closed
+ * accounts are left out, and so is any card behind a link that needs a new
+ * sign-in or has failed: its figures are old, and a stale amount named as due
+ * would mislead.
+ */
+async function readCards(clients: AgendaClients, userId: string, day: string): Promise<CardRow[]> {
+  const finances = (await clients.shopping()).schema(FINANCES_SCHEMA);
+  const [cards, links] = await Promise.all([
+    finances
+      .from('accounts')
+      .select('id, name, mask, currency, link_id, next_payment_due_on, minimum_payment_cents, statement_balance_cents')
+      .eq('user_id', userId)
+      .eq('kind', 'credit_card')
+      .eq('hidden', false)
+      .is('closed_on', null)
+      .gte('next_payment_due_on', day)
+      .lte('next_payment_due_on', addDays(day, CARD_DUE_DAYS))
+      .limit(100),
+    finances
+      .from('links')
+      .select('id')
+      .eq('user_id', userId)
+      .or('needs_update.eq.true,status.neq.active'),
+  ]);
+  if (cards.error) throw new Error(`Reading the cards failed: ${cards.error.message}`);
+  if (links.error) throw new Error(`Reading the linked institutions failed: ${links.error.message}`);
+  const stale = new Set((links.data ?? []).map((link: { id: string }) => link.id));
+  type Row = {
+    id: string;
+    name: string;
+    mask: string | null;
+    currency: string;
+    link_id: string | null;
+    next_payment_due_on: string | null;
+    minimum_payment_cents: number | string | null;
+    statement_balance_cents: number | string | null;
+  };
+  const cents = (v: number | string | null) => (v === null ? null : Number(v));
+  return ((cards.data ?? []) as Row[])
+    .filter((row) => !row.link_id || !stale.has(row.link_id))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      mask: row.mask,
+      currency: row.currency,
+      next_payment_due_on: row.next_payment_due_on,
+      minimum_payment_cents: cents(row.minimum_payment_cents),
+      statement_balance_cents: cents(row.statement_balance_cents),
+    }));
+}
+
 /** The person's live goal items and the edges between them. */
 async function readGoalTree(
   clients: AgendaClients,
@@ -333,6 +389,7 @@ async function gatherDay(
       on('shopping')
         ? since.then(async (from) => chargeCandidates(await readCharges(clients, userId, day, from), day, from))
         : [],
+      on('finances') ? readCards(clients, userId, day).then((rows) => cardCandidates(rows, day)) : [],
       tree
         ? tree.then(({ items, dependencies }) => {
             const step = waitedOnStep(items, dependencies);

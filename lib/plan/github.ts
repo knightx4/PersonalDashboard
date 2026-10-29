@@ -16,11 +16,46 @@
  */
 const API = 'https://api.github.com';
 
-/** The repository the plan is built in. The app is the thing being checked. */
-export const REPO = { owner: 'knightx4', repo: 'PersonalDashboard', branch: 'main' };
+/** A repository and the branch that counts as shipped in it. */
+export type Repo = { owner: string; repo: string; branch: string };
 
-/** How `plan_main_checks` names that repository: its primary key. */
-export const REPO_KEY = `${REPO.owner}/${REPO.repo}`;
+/**
+ * The repository this app is built in, from the environment so the code names
+ * no one's account: APP_REPOSITORY ("owner/name"), else the repository Vercel
+ * deployed from (VERCEL_GIT_REPO_OWNER and VERCEL_GIT_REPO_SLUG), else the one
+ * a GitHub Actions run is in (GITHUB_REPOSITORY). With none of them the owner
+ * and name are empty, and every GitHub read below fails with GitHub's own
+ * not-found rather than reading someone else's repository.
+ */
+export function appRepo(env: Readonly<Record<string, string | undefined>> = process.env): Repo {
+  const vercel =
+    env.VERCEL_GIT_REPO_OWNER && env.VERCEL_GIT_REPO_SLUG
+      ? `${env.VERCEL_GIT_REPO_OWNER}/${env.VERCEL_GIT_REPO_SLUG}`
+      : '';
+  const named = env.APP_REPOSITORY?.trim() || vercel || env.GITHUB_REPOSITORY?.trim() || '';
+  const [owner = '', repo = ''] = named.split('/');
+  return { owner, repo, branch: 'main' };
+}
+
+/**
+ * This app's repository (`appRepo`). A plan step is built here unless its
+ * feature sits under a Dev project (lib/plan/projects), whose own repository
+ * every question below takes instead (plan #2553.2).
+ */
+export const REPO: Repo = appRepo();
+
+/** How `plan_main_checks` names a repository: its primary key. */
+export function repoKey(repo: Pick<Repo, 'owner' | 'repo'>): string {
+  return `${repo.owner}/${repo.repo}`;
+}
+
+/** This app's row in `plan_main_checks`. */
+export const REPO_KEY = repoKey(REPO);
+
+/** Whether a repository is this app's own, which alone has screens and migrations here. */
+export function isAppRepo(repo: Pick<Repo, 'owner' | 'repo'>): boolean {
+  return repoKey(repo).toLowerCase() === REPO_KEY.toLowerCase();
+}
 
 /** The token that may read this repository's checks. Set in Vercel. */
 export function readToken(): string | null {
@@ -60,14 +95,18 @@ const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
  * because it is the thing to search for if the sentence turns out wrong.
  */
 export function refusalFor(status: number, path: string): string {
+  // The repository the refused path is about, so a token that reads this app
+  // but not a project's repository is told which one it is missing.
+  const named = /^\/repos\/([^/]+)\/([^/?]+)/.exec(path);
+  const where = named ? `${named[1]}/${named[2]}` : REPO_KEY;
   if (status === 401) {
     return `GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. Set a new one in Vercel and redeploy.`;
   }
   if (status === 403 || status === 404) {
     const permission = PERMISSION_FOR.find(([fragment]) => path.includes(fragment))?.[1];
     const grant = permission
-      ? `Give it "${permission}" on ${REPO.owner}/${REPO.repo}`
-      : `Give it access to ${REPO.owner}/${REPO.repo}`;
+      ? `Give it "${permission}" on ${where}`
+      : `Give it access to ${where}`;
     return `GITHUB_READ_TOKEN is missing a permission (${status}). ${grant} in the token's settings, then redeploy.`;
   }
   return `GitHub answered ${status} for ${path}`;
@@ -129,18 +168,21 @@ const ON_MAIN: ReadonlySet<string> = new Set(['identical', 'behind']);
  */
 export async function commitOnMain(input: {
   sha: string;
+  /** The repository to ask about. This app's unless the step is a project's. */
+  repo?: Repo;
   fetch?: typeof globalThis.fetch;
 }): Promise<CommitLanding> {
+  const repo = input.repo ?? REPO;
   const token = readToken();
   if (!token) {
     return {
       onMain: null,
       status: null,
-      error: `No GITHUB_READ_TOKEN is set, so whether a commit is on ${REPO.branch} cannot be read.`,
+      error: `No GITHUB_READ_TOKEN is set, so whether a commit is on ${repo.branch} cannot be read.`,
     };
   }
 
-  const path = `/repos/${REPO.owner}/${REPO.repo}/compare/${REPO.branch}...${encodeURIComponent(input.sha)}`;
+  const path = `/repos/${repo.owner}/${repo.repo}/compare/${encodeURIComponent(repo.branch)}...${encodeURIComponent(input.sha)}`;
   try {
     const body = await ask<{ status?: string }>(path, token, input.fetch ?? globalThis.fetch);
     const status = body.status ?? null;
@@ -148,7 +190,7 @@ export async function commitOnMain(input: {
       return {
         onMain: null,
         status: null,
-        error: `GitHub compared ${REPO.branch} with ${input.sha} and said nothing about how the two stand.`,
+        error: `GitHub compared ${repo.branch} with ${input.sha} and said nothing about how the two stand.`,
       };
     }
     return { onMain: ON_MAIN.has(status), status, error: null };
@@ -181,15 +223,21 @@ export function closeRefusal(input: {
   branches?: readonly string[];
   /** What is being closed, as the sentence names it. A plan step by default. */
   what?: string;
+  /** The repository the commit was asked about. This app's by default. */
+  repo?: Repo;
 }): string | null {
   const what = input.what ?? 'the step';
+  const repo = input.repo ?? REPO;
+  // A project's branch is named with its repository, since "main" alone reads
+  // as this app's.
+  const branch = isAppRepo(repo) ? repo.branch : `${repo.branch} in ${repoKey(repo)}`;
   if (input.landing.onMain === true) return null;
 
   if (input.landing.onMain === null) {
     return (
-      `Whether ${input.sha} is on ${REPO.branch} could not be read, so this close was refused. ` +
+      `Whether ${input.sha} is on ${branch} could not be read, so this close was refused. ` +
       `${input.landing.error ?? 'GitHub said nothing.'} ` +
-      `Close ${what} from somewhere that can reach GitHub, once the work is on ${REPO.branch}.`
+      `Close ${what} from somewhere that can reach GitHub, once the work is on ${branch}.`
     );
   }
 
@@ -197,12 +245,16 @@ export function closeRefusal(input: {
   // because main does not carry the commit -- and a local checkout usually
   // lists both the branch and its remote.
   const branches = [...new Set(input.branches ?? [])].filter(
-    (branch) => branch !== REPO.branch && branch !== `origin/${REPO.branch}`,
+    (name) => name !== repo.branch && name !== `origin/${repo.branch}`,
   );
   const where =
-    branches.length > 0 ? `it is on ${branches.join(', ')}` : `no branch here carries it`;
+    branches.length > 0
+      ? `it is on ${branches.join(', ')}`
+      : isAppRepo(repo)
+        ? `no branch here carries it`
+        : `it is only on a branch there, or not pushed`;
   return (
-    `${input.sha} is not on ${REPO.branch} — ${where}. ` +
-    `Merge the work to ${REPO.branch}, then close ${what} against what landed.`
+    `${input.sha} is not on ${branch} — ${where}. ` +
+    `Merge the work to ${branch}, then close ${what} against what landed.`
   );
 }

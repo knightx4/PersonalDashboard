@@ -4,7 +4,30 @@ import { closeRefusal, commitOnMain, type CommitLanding } from '@/lib/plan/githu
 const answering = (body: unknown, status = 200) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status }));
 
+const WEBSITE = { owner: 'example-owner', repo: 'alexrivera-site', branch: 'main' };
+
 describe('commitOnMain', () => {
+  it("asks a project's repository when it is given one", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const fetchFn = answering({ status: 'behind' });
+    await commitOnMain({ sha: 'a405587', repo: WEBSITE, fetch: fetchFn as never });
+    const [url] = fetchFn.mock.calls[0] as unknown as [string];
+    expect(url).toContain('/repos/example-owner/alexrivera-site/compare/main...a405587');
+    vi.unstubAllEnvs();
+  });
+
+  it("names the project's repository when the token cannot read it", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const landing = await commitOnMain({
+      sha: 'a405587',
+      repo: WEBSITE,
+      fetch: answering({ message: 'Not Found' }, 404) as never,
+    });
+    expect(landing.onMain).toBeNull();
+    expect(landing.error).toContain('Give it access to example-owner/alexrivera-site');
+    vi.unstubAllEnvs();
+  });
+
   it('asks GitHub to compare main with the commit, with the key on it', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const fetchFn = answering({ status: 'behind' });
@@ -13,7 +36,7 @@ describe('commitOnMain', () => {
 
     expect(landing).toEqual({ onMain: true, status: 'behind', error: null });
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/repos/knightx4/PersonalDashboard/compare/main...a405587');
+    expect(url).toContain('/repos/example-owner/PersonalDashboard/compare/main...a405587');
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer ghp_test');
     vi.unstubAllEnvs();
   });
@@ -121,5 +144,23 @@ describe('closeRefusal', () => {
     });
     expect(said).toContain('could not be read');
     expect(said).toContain('GITHUB_READ_TOKEN');
+  });
+});
+
+describe('closeRefusal for a project', () => {
+  it("refuses a commit only on a branch there, naming the project's main", () => {
+    const said = closeRefusal({
+      sha: 'a405587',
+      landing: landing({ onMain: false, status: 'ahead' }),
+      repo: WEBSITE,
+    });
+    expect(said).toContain('is not on main in example-owner/alexrivera-site');
+    expect(said).toContain('only on a branch there');
+  });
+
+  it("lets a commit on the project's main through", () => {
+    expect(
+      closeRefusal({ sha: 'a405587', landing: landing({ onMain: true }), repo: WEBSITE }),
+    ).toBeNull();
   });
 });

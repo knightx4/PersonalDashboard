@@ -169,6 +169,9 @@ export function ArchivedNote({
   );
 }
 
+/** Dash's page of how the person writes, read from their sent mail. */
+export const WRITING_STYLE_HREF = '/ask/writing-style';
+
 /** On a phone, the way from an open chat back to the list it is drawn over. */
 export const CHATS_BACK = { href: '/ask', label: 'Chats' };
 

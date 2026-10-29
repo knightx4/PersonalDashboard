@@ -158,9 +158,8 @@ questions:
 - `requires` is about comprehension. Can you follow B without A?
 - `supports` is about justification. Is B true partly because A is?
 
-In `Bulk/Bulk - Ideas/On labor, jobs and working.md`, *"value created for
-yourself still counts as value"* is a premise of the twenty-hour work-split
-argument. You can follow the argument without the premise, so it is not
+In `Ideas/Morning routine.md`, *"a routine only counts if it survives a bad
+week"* is a premise of the argument for a shorter morning routine. You can follow the argument without the premise, so it is not
 `requires`, but the argument depends on it. In a map made mostly of positions,
 this is the structure that makes a position defensible, and the defend rung has
 nothing to read without it.
@@ -437,7 +436,7 @@ the first 1,500 characters, returning one of four classes:
 | `evidence` | produces no concepts, but raises confidence in concepts found elsewhere: coursework, transcripts, a CV, an application describing what you can do |
 | `operational` | skipped: logistics, meeting arrangements, task lists, contact details |
 
-> **Revised by the [75-note trial](trials/2026-09-19-map-75-notes.md), in two
+> **Revised by the 75-note trial, in two
 > places, and both for the same reason the folder rules were revised: a
 > routing rule was discarding material the node test would have handled.**
 >
@@ -465,15 +464,14 @@ the first 1,500 characters, returning one of four classes:
 > rounding error.
 
 **There is no folder routing.** The original design excluded whole paths such as
-`Me/` and application files, on the reasoning that a folder is a free and
+`Personal/` and application files, on the reasoning that a folder is a free and
 predictable filter. Two findings from the trial changed that:
 
-- `Me/People/Chewy.md` is a note about a conversation with a friend, mostly
-  wedding logistics and a phone call. It also contains *"cities should be built
-  for people, not cars — even if that costs efficiency, efficiency is not the
-  goal, the same way runs are not the goal in sabermetrics"*, which was among the
+- `Personal/Moving to Springfield.md` is a note about a house move, mostly
+  boxes, dates and a call with the landlord. It also contains *"a neighbourhood
+  is only walkable if the errands are, not just the parks"*, which was among the
   three best nodes in the sample. A folder rule would have discarded it.
-- A dated Armodafinil dosage log sat in an included folder and produced nothing,
+- A dated grocery-spending log sat in an included folder and produced nothing,
   because the node test rejected all of it.
 
 The node test filters personal content better than a folder does, in both
@@ -505,10 +503,10 @@ the opposite of what anybody would guess:
 
 | note | chars | sections | read |
 |---|---|---|---|
-| `Pending/Property and Regulation Study Guide.md` | 302,851 | 219 | 3.6% |
-| `Bulk/Strong Towns Housing Course.md` | 40,683 | 78 | 6% |
-| `Bulk/.../World building simulator.md` | 50,842 | 43 | 8% |
-| `Pending/Casanova … Lottery Passage.md` | 37,480 | 7 | **100%** |
+| `Courses/Statistics 101/Study guide.md` | 302,851 | 219 | 3.6% |
+| `Courses/Urban Planning Course.md` | 40,683 | 78 | 6% |
+| `Ideas/.../Board game design.md` | 50,842 | 43 | 8% |
+| `Reading/Copied book passage.md` | 37,480 | 7 | **100%** |
 
 **A well-structured note is punished hardest.** More headings means smaller
 sections, so ten of them is a smaller share of the note. The copied book
@@ -525,7 +523,7 @@ Three smaller faults in the same function:
 - **A single oversized block is never split.** The grouping loop only flushes
   when adding the *next* block would exceed the limit, so a block larger than
   the limit goes into a section alone.
-  `Pending/New Orleans Data Center Full Transcript.md` is 54,709 characters
+  `Work/Conference talk transcript.md` is 54,709 characters
   with one blank line in it, which becomes one section of 54,658 characters in
   a single call.
 - **Anything before the first heading is discarded.** The loop only collects
@@ -703,7 +701,7 @@ Agreed before anything runs, so the result can be judged.
 ## The 30-note trial
 
 Before the full pass, run Stages 1 to 3 over a stratified sample: ten from
-`Bulk`, ten from `Pending`, five from `Me` or `Yale`, and five at random from the
+`Ideas`, ten from `Reading`, five from `Personal` or `Courses`, and five at random from the
 rest. Cost is a few cents.
 
 What to look at, in order:
@@ -719,12 +717,12 @@ What to look at, in order:
 
 Any of these failing changes the design before $5 is spent on the wrong shape.
 
-The run against the live vault is written up in
-[trials/2026-09-16-map-30-notes.md](trials/2026-09-16-map-30-notes.md).
+The run against the live vault was done on 2026-09-16. Its write-up quoted the
+vault's notes, so it is not kept in the repository; what it changed is
+recorded in the revisions above.
 
 A second, larger run followed on 2026-09-19: 75 notes drawn at random rather
-than stratified, through Stages 0 to 2, written up in
-[trials/2026-09-19-map-75-notes.md](trials/2026-09-19-map-75-notes.md). It
+than stratified, through Stages 0 to 2. Its write-up is not kept either. It
 confirmed the node definition and the verbatim-quote rule, put `requires` at
 6% of edges where the design wants it rarest, and produced the two routing
 revisions above. Neither trial has been run through Haiku, so the model tier

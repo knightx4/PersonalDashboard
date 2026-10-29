@@ -35,9 +35,14 @@ every read and write to the `user_id` in the brief.
 The skills fired this way so far:
 
 - `company-research`: research on one company, into `job_search.company_research`.
+- `dash-questions`: up to five new questions about the person for the Answer
+  tab of You, into `you.dash_questions` under the `you.dash_question_runs` row
+  the brief names (`dashQuestionsBrief` in `lib/you/dash-questions-run.ts`).
 - `insights`: three to five deep insights about the person for the Insights
   tab of You, into `you.insights` under the `you.insight_runs` row the brief
   names (`insightsBrief` in `lib/you/insights.ts`).
+- `learn-drafts`: the Learn topics waiting to be drafted, into `learn.topics`
+  through `npm run learn:drafts` (`learn.topic_draft_requests`, learn 0193).
 
 ## How you read and write
 
@@ -85,7 +90,7 @@ select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'close_st
 
 When the step you close is a Dash step, its text opens with one plain
 sentence of what Dash did or found, such as "Found three Saturday volunteer
-sessions in Brooklyn, and the earliest is on 4 November." The notification
+sessions in Springfield, and the earliest is on 4 November." The notification
 shows that sentence with the step's title (`reference/working-steps.md`,
 step 3).
 
@@ -358,8 +363,8 @@ set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance, acts, status, position)
 values ('<user>', 'step', '<parent id>', 'claude', 'Send the hardship request',
-        'The request is in Nelnet''s inbox and the sent email is linked here.',
-        'Sends the hardship request drafted above to help@nelnet.net from your Gmail.',
+        'The request is in Northstar''s inbox and the sent email is linked here.',
+        'Sends the hardship request drafted above to help@northstar.example from your Gmail.',
         'proposed', 40);
 ```
 
@@ -399,7 +404,7 @@ no history trigger here, so no actor or run settings are needed.
 ```sql
 insert into public.raised_items (user_id, module, goal_id, title, detail, ask, source)
 values ('<user>', 'goals', '<goal id>',
-        '<what happened, in one line: Nelnet moved your due date to the 28th>',
+        '<what happened, in one line: Northstar moved your due date to the 28th>',
         '<where you saw it and what it changes: the September statement; autopay still runs on the 15th>',
         '<what you want from them, if anything: Move autopay to the 28th?>',
         'goals run <run id>')
@@ -439,7 +444,7 @@ for the home, with no `item_id`, covering every goal.
 600. Write it for someone glancing at the top of the page:
 
 - Where the goal stands against its done-when, with the figure when there is
-  one ("Balance is $18,250, down $1,400 this month").
+  one ("Balance is $9,400, down $700 this month").
 - What changed since the last note: what you did, what they did, what came in.
   Link a file you wrote or revised.
 - What is waiting on them, most important first, by name ("Answer *Which lane

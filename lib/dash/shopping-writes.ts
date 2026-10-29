@@ -814,7 +814,7 @@ const ORDERS = 'public.orders';
 const orderHref = (id: string) => `/shopping/orders/${id}`;
 const REVIEW_HREF = '/shopping/review';
 /** The pages an order change shows on, as the order and review actions revalidate them. */
-const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/shopping/dashboard', '/shopping/review', '/shopping/settings'];
+const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/finances/spending', '/shopping/review', '/shopping/settings'];
 /** One selection's worth of review rows, as the queue's bulk bar takes. */
 export const REVIEW_MAX = 100;
 const MESSAGE_KEYS = ['parse_status', 'resulting_order_id', 'error'] as const;
@@ -1582,9 +1582,9 @@ async function changeSavedItem(env: ShoppingWriteEnv, args: Args): Promise<Shopp
 const RECURRING_CHANGES = ['rename', 'leave_out', 'count', 'merge', 'move'] as const;
 type RecurringChange = (typeof RECURRING_CHANGES)[number];
 const RECURRING = 'public.recurring_payments';
-const RECURRING_HREF = '/shopping/recurring';
+const RECURRING_HREF = '/finances/recurring';
 /** The Recurring page and the agenda, which lists bills and renewals by payee. */
-const RECURRING_PATHS = ['/shopping/recurring', '/todo'];
+const RECURRING_PATHS = ['/finances/recurring', '/todo'];
 /** What working a payment out again from its charges can change. */
 const SUMMARY_COLUMNS = ['status', 'amount_cents', 'currency', 'period', 'next_date', 'last_charged_on'] as const;
 export const MERGED_NO_UNDO =
@@ -1767,7 +1767,7 @@ async function changeRecurring(env: ShoppingWriteEnv, args: Args): Promise<Shopp
 
 const POLICIES_HREF = '/shopping/settings';
 /** Every page that reads a return window, as Shopping's settings refresh them. */
-const POLICY_PATHS = ['/shopping/settings', '/shopping/returns', '/shopping/inventory', '/shopping/orders', '/shopping/dashboard'];
+const POLICY_PATHS = ['/shopping/settings', '/shopping/returns', '/shopping/inventory', '/shopping/orders', '/finances/spending'];
 const windowWords = (days: unknown) => (typeof days === 'number' ? `a ${days}-day return window` : 'no return window');
 
 async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {
@@ -1909,7 +1909,7 @@ type PersonChange = (typeof PERSON_CHANGES)[number];
 const PEOPLE = 'core.people';
 const PEOPLE_HREF = '/shopping/settings';
 /** Every page that shows a person's name or badge, as the settings refresh them. */
-const PEOPLE_PATHS = ['/shopping/settings', '/shopping/orders', '/shopping/inventory', '/shopping/dashboard'];
+const PEOPLE_PATHS = ['/shopping/settings', '/shopping/orders', '/shopping/inventory', '/finances/spending'];
 
 function personName(value: string | undefined, key: string): string {
   const name = value?.replace(/\s+/g, ' ');
@@ -2463,13 +2463,13 @@ export const SHOPPING_WRITES: readonly ShoppingWrite[] = [
   {
     name: 'change_recurring',
     runs: sameAs(
-      ['app/shopping/recurring/actions.ts#renameRecurringPayment', 'lib/recurring/corrections.ts#renamePayment'],
-      ['app/shopping/recurring/actions.ts#mergeRecurringPayment', 'lib/recurring/corrections.ts#mergePayments'],
-      ['app/shopping/recurring/actions.ts#moveRecurringCharges', 'lib/recurring/corrections.ts#moveCharges'],
-      ['app/shopping/recurring/actions.ts#setRecurringCounted', 'lib/recurring/corrections.ts#setPaymentCounted'],
+      ['app/finances/recurring/actions.ts#renameRecurringPayment', 'lib/recurring/corrections.ts#renamePayment'],
+      ['app/finances/recurring/actions.ts#mergeRecurringPayment', 'lib/recurring/corrections.ts#mergePayments'],
+      ['app/finances/recurring/actions.ts#moveRecurringCharges', 'lib/recurring/corrections.ts#moveCharges'],
+      ['app/finances/recurring/actions.ts#setRecurringCounted', 'lib/recurring/corrections.ts#setPaymentCounted'],
     ),
     description:
-      "Tidy their recurring payments in Shopping, the subscriptions and bills read from their mail, when they ask. Name a payment by payment, the name it shows under on the Recurring page. change rename gives it rename_to as its name; leave_out takes it off the monthly total and the agenda, and count puts it back; merge folds it into the payment named by into, moving every charge there, when the two are the same thing under two names; move takes some of its charges, named by charged_on (the days they were charged, YYYY-MM-DD), to the payment named by into or to a new one named by new_payee, when one row holds more than one subscription. A merge and a move have no Undo, so say so. A refusal lists their payments and a payment's charges.",
+      "Tidy their recurring payments in Finances, the subscriptions and bills read from their mail, when they ask. Name a payment by payment, the name it shows under on the Recurring page. change rename gives it rename_to as its name; leave_out takes it off the monthly total and the agenda, and count puts it back; merge folds it into the payment named by into, moving every charge there, when the two are the same thing under two names; move takes some of its charges, named by charged_on (the days they were charged, YYYY-MM-DD), to the payment named by into or to a new one named by new_payee, when one row holds more than one subscription. A merge and a move have no Undo, so say so. A refusal lists their payments and a payment's charges.",
     input_schema: {
       type: 'object',
       properties: {

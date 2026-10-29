@@ -110,13 +110,13 @@ describe('runs', () => {
   });
 
   it('says which step a running run is on and when it last reported', () => {
-    const on = run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Draft the letter to Edfinancial' });
-    expect(runProgress(on, NOW)).toBe('on Draft the letter to Edfinancial, 3 minutes ago');
+    const on = run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Draft the letter to Brightline' });
+    expect(runProgress(on, NOW)).toBe('on Draft the letter to Brightline, 3 minutes ago');
     expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:30Z' }, NOW)).toBe(
-      'on Draft the letter to Edfinancial, just now',
+      'on Draft the letter to Brightline, just now',
     );
     expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:00Z' }, NOW)).toBe(
-      'on Draft the letter to Edfinancial, 1 minute ago',
+      'on Draft the letter to Brightline, 1 minute ago',
     );
     expect(runProgress(run({ lastSeenAt: '2026-09-24T11:57:00Z' }), NOW)).toBe('last reported 3 minutes ago');
     expect(runProgress(run(), NOW)).toBe('started 30 minutes ago');

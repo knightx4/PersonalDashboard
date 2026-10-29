@@ -1,10 +1,6 @@
 import 'server-only';
 
-import Anthropic from '@anthropic-ai/sdk';
-import { MODELS } from '@/lib/core/models';
-import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { whyMalformed } from '@/lib/learn/graph/chain-payload';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import {
   MAX_CHECKS,
   MIN_CHECKS,
@@ -19,10 +15,14 @@ import { LADDER } from '@/lib/learn/levels/ladder';
 
 /**
  * Drafting one topic with its ladder of levels (docs/LEARN-LEVELS-SPEC.md,
- * "Drafting a topic"): one model call, from a goal the person named.
+ * "Drafting a topic"): the prompt, the report's shape and the check a
+ * report goes through, from a goal the person named.
  *
- * Sonnet, for the reason lib/learn/graph/generate.ts gives: laying out what
- * teachers of a well-mapped field agree on needs judgment and no web search.
+ * Nothing here calls a model. Since 28 October 2026 a draft is written by the
+ * routine's session (.claude/skills/learn-drafts), which reads this prompt
+ * through scripts/learn-drafts.ts and hands its report back to
+ * readDraftReport: the API call cost about a dollar a topic, and a subject's
+ * preparation drafts forty (learn 0193).
  *
  * What goes in about the map is each topic's name, scope and ceiling, which
  * is what the call needs to link to the right one at the right level and not
@@ -38,12 +38,11 @@ import { LADDER } from '@/lib/learn/levels/ladder';
  * it cannot cite comes back uncited and is flagged on the approval screen.
  */
 
-const MODEL = MODELS.learnTopicDraft;
 const TOOL_NAME = 'report_topic';
 
 const LADDER_LINES = LADDER.map((l) => `${l.level} (${l.band}): you can ${l.can}`).join('\n');
 
-const SYSTEM = `You are drafting one topic for somebody's map of what they know.
+export const DRAFT_SYSTEM = `You are drafting one topic for somebody's map of what they know.
 
 A topic is something a person would name when saying what they know: Return,
 Beta, CAPM, DCF, Braess's paradox. Every topic shares the same ladder of ten
@@ -166,118 +165,91 @@ const LEVEL = { type: 'integer', minimum: 1, maximum: 10 } as const;
 const CITES = { type: 'array', items: { type: 'string' } } as const;
 const CANONICALITY = { type: 'string', enum: ['canonical', 'practitioner', 'emerging'] } as const;
 
-/** Draft a topic. Never throws. */
-export async function draftTopic(
-  input: DraftInput & { anthropicApiKey: string; client?: Anthropic; onSpend?: SpendSink },
-): Promise<DraftResult> {
-  const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
-
-  let response;
-  try {
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8192 + THINKING_ROOM,
-      system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the drafted topic with its levels and links.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              too_vague: { type: 'boolean' },
-              name: { type: 'string' },
-              scope: { type: 'string' },
-              ceiling: LEVEL,
-              fields: { type: 'array', items: { type: 'string' } },
-              cites: CITES,
-              canonicality: CANONICALITY,
-              levels: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    level: LEVEL,
-                    checks: { type: 'array', items: { type: 'string' } },
-                    cites: CITES,
-                    canonicality: CANONICALITY,
-                  },
-                  required: ['level', 'checks'],
-                },
-              },
-              links: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    from_level: LEVEL,
-                    topic: { type: 'string' },
-                    level: LEVEL,
-                    why: { type: 'string' },
-                    cites: CITES,
-                    canonicality: CANONICALITY,
-                  },
-                  required: ['from_level', 'topic', 'level'],
-                },
-              },
-              missing: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    scope: { type: 'string' },
-                    from_level: LEVEL,
-                    level: LEVEL,
-                    why: { type: 'string' },
-                    cites: CITES,
-                  },
-                  required: ['name', 'scope', 'from_level', 'level'],
-                },
-              },
-              performances: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    performance: { type: 'integer', minimum: 1 },
-                    level: { type: ['integer', 'null'], minimum: 1, maximum: 10 },
-                  },
-                  required: ['performance'],
-                },
-              },
-              out_of_scope: CITES,
-              checklist: { type: 'array', items: { type: 'string' } },
-            },
-            required: ['name', 'scope', 'ceiling', 'levels'],
+/** The tool the draft is reported through: its schema is the shape a routine's draft is written in. */
+export const DRAFT_TOOL = {
+  name: TOOL_NAME,
+  description: 'Report the drafted topic with its levels and links.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      too_vague: { type: 'boolean' },
+      name: { type: 'string' },
+      scope: { type: 'string' },
+      ceiling: LEVEL,
+      fields: { type: 'array', items: { type: 'string' } },
+      cites: CITES,
+      canonicality: CANONICALITY,
+      levels: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            level: LEVEL,
+            checks: { type: 'array', items: { type: 'string' } },
+            cites: CITES,
+            canonicality: CANONICALITY,
           },
+          required: ['level', 'checks'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
-      messages: [{ role: 'user', content: draftPrompt(input) }],
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return { ok: false, reason: 'error', detail: 'Rate limited. Try again shortly.' };
-    }
-    return {
-      ok: false,
-      reason: 'error',
-      detail: error instanceof Error ? error.message : 'Drafting the topic failed.',
-    };
-  }
+      },
+      links: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            from_level: LEVEL,
+            topic: { type: 'string' },
+            level: LEVEL,
+            why: { type: 'string' },
+            cites: CITES,
+            canonicality: CANONICALITY,
+          },
+          required: ['from_level', 'topic', 'level'],
+        },
+      },
+      missing: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            scope: { type: 'string' },
+            from_level: LEVEL,
+            level: LEVEL,
+            why: { type: 'string' },
+            cites: CITES,
+          },
+          required: ['name', 'scope', 'from_level', 'level'],
+        },
+      },
+      performances: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            performance: { type: 'integer', minimum: 1 },
+            level: { type: ['integer', 'null'], minimum: 1, maximum: 10 },
+          },
+          required: ['performance'],
+        },
+      },
+      out_of_scope: CITES,
+      checklist: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['name', 'scope', 'ceiling', 'levels'],
+  },
+};
 
-  // Before the reply is judged: an unusable draft still cost what it cost.
-  input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
-
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
-  }
-
-  const safe = draftPayloadSchema.safeParse(block.input);
+/**
+ * A reported draft checked and settled against the map, the fields and the
+ * sources: the schema, then normaliseDraft. Never throws.
+ */
+export function readDraftReport(
+  report: unknown,
+  input: Pick<DraftInput, 'map' | 'fields' | 'sources'>,
+): DraftResult {
+  const safe = draftPayloadSchema.safeParse(report);
   if (!safe.success) return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
-
   const result = normaliseDraft(safe.data, input.map, input.fields, input.sources ?? NO_SOURCES);
   if (!result.ok) {
     return { ok: false, reason: result.reason === 'too-vague' ? 'too-vague' : 'error', detail: result.detail };

@@ -1,11 +1,11 @@
-Subject: Order 5781 confirmed
+Subject: Order 9042 confirmed
 From: Ms Betters <hello@msbetters.us>
 
 Thank you for your purchase!
 
 Ms Betters
 
-Order 5781
+Order 9042
 
 ----------------------------
 Thank you for your purchase!
@@ -15,11 +15,11 @@ We're getting your order ready to be shipped. We will
 notify you when it has been sent.
 
 View your order 
-( https://msbetters.us/65678999804/orders/e4e268e9de09c108fd99c217460bbe12/authenticate?key=shcct_VXVLMXBGeFE3VDJJRjE0REkraDljMVpLTDhveENiUnJodFdBV1lsUkhobCtwZFczaW5CUjJFbjhOTnZ5WmFOcnhXQnBldDkyTW9UN3I0SWFwK0c2d0VBekxqQ0dNRU1zdGRIbHJLSkM1eVRlZVRCTzdEdUR6ODNBVjYvWVAwK2hjeDNNc2h0TG9idXBlWUtsNVRvU2FQU1NVUEN4ZGdqVGhwZlpEbllrUGh2UWkvWHp2eUhJclA3QnJ2TjVNM0krb2RGNFlnUHNhdkRJWHZJYlZBbFB0WUNGcG5wTnBubDAvN2Y2NkJrRHgrWk1vL0FWWFJyTXhWWmR4eEtJaXF0RmFMcGJZKzYxYzJ3dXBHcTZURUZVbTBpaTFudCt0NEhIU04xdm1KOTZESUpKMVpzMUFJemV3aXhJRVhOdnNWaHQ1NDA2bGRGcmZuZHdrb2E3bDJUNnV0UGdIWFc2VEM2aC8ybnEzSThrMTg1YmphaWJBRm1XY21YQmJ5cEFpVFVjN2U0WDd6Sm54bWxDVjU4SGVSek0wTUxUNnJka0p6bzQvSFJMQ2FHWEMxU3JGa1Z4QmZHNmNGOXJHeVYyS0E1NTV4TGhQZmZzWGJ4bTVqa1NVeThTT2lQdVJJc1dMT0RRNWQvTHFKbUZsWjY4ejdTNGpZRDJKa0w0K21rbFhKUTNSMWtZY2xVb2EvRVJKdmYyRDFZN1pESER2c3c1Y2ZnRTFqeXFLbCtWVlZ4aUQwTDZUS0pJdW95WHNNcWFlMzJtbW1PVG5BPT0tLStFOGp3Skh3TVdTclA1VzEtLWp5cDdjREJwOWkyK28wbXdqcWE4UUE9PQ&syclid=1c0998a1-f227-4c59-b79b-1c3ac83149b0 )
+( https://msbetters.us/10000000002/orders/00000000000000000000000000009042/authenticate?key=shcct_RkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZRkFLRVRPS0VORk9SVEVTVFNPTkxZ&syclid=00000000-0000-4000-8000-000000000003 )
 
 
 or Visit our store 
-( https://msbetters.us?syclid=95bffb19-e3ed-41d8-9ffa-7cdf5a180ed8 )
+( https://msbetters.us?syclid=00000000-0000-4000-8000-000000000004 )
 
 
 Order summary
@@ -53,25 +53,25 @@ Customer information
 Shipping address
 ----------------
 
-Selvey Knight
-797 State St
+Alex Rivera
+12 Elm St
 1
-New Haven CT 06511
+Springfield OR 97477
 United States
 
 Billing address
 ---------------
 
-Selvey Knight
-8340 Rolling Acres Trail
-Fair Oaks Ranch TX 78015
+Alex Rivera
+88 Cedar Lane
+Riverside CA 92501
 United States
 
 Payment
 -------
 
 Visa
-ending with 2441
+ending with 4242
 
 Shipping method
 ---------------

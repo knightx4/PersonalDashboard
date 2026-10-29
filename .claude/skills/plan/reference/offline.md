@@ -7,7 +7,7 @@ to reach the database. Then send the SQL below through
 `npx tsx scripts/sql.ts` (CLAUDE.md) against `plan_items` and
 `plan_dependencies` (both in `public`), and do not spend the session
 diagnosing it. Only when that cannot run either, use the **`Supabase`**
-connector (project ref `asjztutnqxbecruvyrbj`), with the care below. The
+connector (the project ref `npx tsx scripts/project-ref.ts` prints), with the care below. The
 brief a routine was fired with is the plan as it stood; trust it, and re-read
 the row before closing it.
 
@@ -32,7 +32,7 @@ working by hand, apply the same ones:
 
 ```sql
 -- the open steps, in reading order. Rows whose module is a project in
--- lib/plan/projects.ts ('website') are built from that project's own
+-- public.dev_projects ('website') are built from that project's own
 -- repository by its own routine, never from this one: leave them out.
 -- Name each step by its outline (o.outline, "1073.4"), the way the page and
 -- plan.ts do; the number is its identity in the database and is not what you

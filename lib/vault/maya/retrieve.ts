@@ -1,5 +1,6 @@
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { whyNotRead } from '@/lib/vault/map/rules';
+import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { readVector, RELATED_NOTE_MIN_SIMILARITY, type Vectorised } from '@/lib/vault/notes/related';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
 
@@ -114,14 +115,19 @@ export type MayaRetrievePorts = {
   positionsSharingThemes(noteId: string, positionIds: string[]): Promise<string[]>;
   positions(ids: string[]): Promise<RawPosition[]>;
   conflicts(ids: string[]): Promise<MayaConflict[]>;
+  /**
+   * The person's private folders (loadVaultRules). Asked only when the caller
+   * has not passed them; without either, the defaults apply.
+   */
+  rules?(): Promise<VaultRules>;
 };
 
 export type RetrieveResult =
   | { ok: true; material: MayaMaterial }
   | { ok: false; reason: 'not-found' | 'not-read'; detail: string };
 
-function readable(note: RawNote): boolean {
-  return whyNotRead({ path: note.path, body: note.body ?? '' }) === null;
+function readable(note: RawNote, rules: VaultRules): boolean {
+  return whyNotRead({ path: note.path, body: note.body ?? '' }, rules) === null;
 }
 
 function toNote(note: RawNote): MayaNote {
@@ -132,10 +138,15 @@ function toNote(note: RawNote): MayaNote {
  * Gather the material for one note. Errors from the ports are the caller's to
  * catch; `retrieveMaterial` below catches them.
  */
-export async function gatherMaterial(ports: MayaRetrievePorts, noteId: string): Promise<RetrieveResult> {
+export async function gatherMaterial(
+  ports: MayaRetrievePorts,
+  noteId: string,
+  givenRules?: VaultRules,
+): Promise<RetrieveResult> {
   const subject = await ports.note(noteId);
   if (!subject) return { ok: false, reason: 'not-found', detail: 'The note was not found.' };
-  const refusal = whyNotRead({ path: subject.path, body: subject.body ?? '' });
+  const rules = givenRules ?? (await ports.rules?.()) ?? DEFAULT_VAULT_RULES;
+  const refusal = whyNotRead({ path: subject.path, body: subject.body ?? '' }, rules);
   if (refusal) return { ok: false, reason: 'not-read', detail: refusal.detail };
 
   const bodies = new Map<string, MayaNote>();
@@ -152,7 +163,7 @@ export async function gatherMaterial(ports: MayaRetrievePorts, noteId: string): 
   const related: MayaRelatedNote[] = [];
   for (const row of candidates) {
     const note = fetched.get(row.note_id);
-    if (!note || !readable(note)) continue;
+    if (!note || !readable(note, rules)) continue;
     const shaped = toNote(note);
     bodies.set(shaped.id, shaped);
     related.push({ ...shaped, similarity: row.similarity });
@@ -179,7 +190,7 @@ export async function gatherMaterial(ports: MayaRetrievePorts, noteId: string): 
   const unseen = [...new Set(raw.flatMap((p) => p.sources.map((s) => s.note_id)))].filter((id) => !bodies.has(id));
   const refused = new Set<string>();
   for (const note of unseen.length > 0 ? await ports.notes(unseen) : []) {
-    if (readable(note)) bodies.set(note.id, toNote(note));
+    if (readable(note, rules)) bodies.set(note.id, toNote(note));
     else refused.add(note.id);
   }
   // A quote's note that could not be read at all is treated as refused.
@@ -247,8 +258,11 @@ function dedupeConflicts(conflicts: MayaConflict[]): MayaConflict[] {
 /** Reads through the vault client for one person. Every query names the account. */
 export function mayaRetrieveStore(vault: VaultSupabaseClient, userId: string): MayaRetrievePorts {
   const fail = (what: string, message: string) => new Error(`maya: reading ${what} failed (${message})`);
+  let rules: Promise<VaultRules> | null = null;
 
   return {
+    rules: () => (rules ??= loadVaultRules(vault, userId)),
+
     async note(noteId) {
       const { data, error } = await vault
         .from('notes')

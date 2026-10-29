@@ -54,7 +54,7 @@ const pursuit = (over: Partial<PipelineRow>): PipelineRow => ({
   applicationId: 'a1',
   roleId: 'r1',
   companyId: 'c1',
-  companyName: 'EliseAI',
+  companyName: 'Contoso',
   companySlug: 'eliseai',
   companyLogoUrl: null,
   companyDomains: [],
@@ -132,7 +132,7 @@ const task: Task = {
 describe('moves on Jobs, Todo and Shopping rows', () => {
   it('says a sent application waits on the company, on its pipeline card', () => {
     const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} />);
-    expect(html).toContain('Waiting on EliseAI');
+    expect(html).toContain('Waiting on Contoso');
     expect(html).toContain('text-caution');
   });
 
@@ -167,12 +167,12 @@ describe('moves on Jobs, Todo and Shopping rows', () => {
       for (const working of [['job_search.applications:a1'], ['job_search.roles:r1']]) {
         const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} working={working} />);
         expect(html).toContain('Dash is on it');
-        expect(html).not.toContain('Waiting on EliseAI');
+        expect(html).not.toContain('Waiting on Contoso');
       }
       const other = renderToStaticMarkup(
         <PipelineBoard rows={[pursuit({})]} working={['job_search.applications:a2']} />,
       );
-      expect(other).toContain('Waiting on EliseAI');
+      expect(other).toContain('Waiting on Contoso');
     });
 
     it('says Dash is on it on the todo row', () => {

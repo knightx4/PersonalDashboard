@@ -1,0 +1,4 @@
+From: Recruiter <recruiter@contoso.com>
+Reply-To: Recruiter <recruiter@contoso.com>
+Subject: Invitation: Interview with Contoso @ Fri Jul 24, 2026 1:30pm - 3:30pm (EDT) (candidate@example.com)
+

@@ -69,7 +69,7 @@ function hasSubsteps(node: Pick<GoalRowNode, 'children'>): boolean {
 }
 
 /** One fact about the step, as the frame draws it. */
-type Fact = { label: string; value: string; hint?: string; wide?: boolean };
+type Fact = { label: string; value: ReactNode; hint?: string; wide?: boolean };
 
 /**
  * Every fact the step has, in the order they are read: status, then
@@ -77,14 +77,18 @@ type Fact = { label: string; value: string; hint?: string; wide?: boolean };
  * rather than said as a dash, and none repeats what the Overview already
  * shows: whose step it is is the picker there, and what it needs is its
  * Needs line (plan #2373.3). The dates are changed in the Overview; these
- * only say them.
+ * only say them. Status is the one fact you change here: `status` is its
+ * menu (note 823e48a7), and without one it is the word.
  */
-function stepFacts(node: Pick<GoalRowNode, 'health' | 'step' | 'children'>): Fact[] {
+function stepFacts(
+  node: Pick<GoalRowNode, 'health' | 'step' | 'children'>,
+  status?: ReactNode,
+): Fact[] {
   const { step } = node;
   const split = splitWords(node);
   const progress = progressWords(node);
   const facts: (Fact | false | null)[] = [
-    { label: 'Status', hint: node.health.title, value: node.health.word },
+    { label: 'Status', hint: node.health.title, value: status ?? node.health.word },
     progress !== null && { label: 'Progress', value: progress },
     step.dueOn ? { label: 'Due', value: formatDay(step.dueOn) } : null,
     step.waitsUntil ? { label: 'Starts', value: formatDay(step.waitsUntil) } : null,
@@ -123,12 +127,15 @@ function FactList({ facts }: { facts: readonly Fact[] }) {
  * how many there are. A step with no more than three facts has no fold:
  * they are the one row on a phone, laid out as the glance is.
  */
-export function stepFactParts(node: Pick<GoalRowNode, 'health' | 'step' | 'children'>): {
+export function stepFactParts(
+  node: Pick<GoalRowNode, 'health' | 'step' | 'children'>,
+  status?: ReactNode,
+): {
   glance?: ReactNode;
   detailCount?: number;
   properties: ReactNode;
 } {
-  const facts = stepFacts(node);
+  const facts = stepFacts(node, status);
   const rest = facts.slice(GLANCE);
   if (rest.length === 0) {
     return {

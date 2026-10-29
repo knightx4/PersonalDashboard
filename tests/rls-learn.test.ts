@@ -184,6 +184,7 @@ describe('RLS coverage', () => {
       'subjects',
       'theme_fields',
       'topic_cells',
+      'topic_draft_requests',
       'topic_structure_pulls',
       'topics',
       'track_offers',
@@ -251,6 +252,21 @@ describe('what a chat adds (plan #1807)', () => {
         insert into reading_subjects (user_id, reading_id, subject_id)
         values (${userB}, ${readingA}, ${subjectB})`),
     ).rejects.toThrow();
+  });
+});
+
+describe('a topic waiting for the routine to draft it (learn 0193)', () => {
+  // A press queues its own; the routine's script works them with the service role.
+  it('lets a person queue and read only their own, one open request per ask', async () => {
+    await asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'DCF')`);
+    await expect(
+      asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, ' dcf ')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'WACC')`),
+    ).rejects.toThrow();
+    expect(await asUser(userA, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(0);
   });
 });
 
@@ -2578,7 +2594,7 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
       returning id`;
     const notes: [string, string][] = [
-      ['Career/EY.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
+      ['Career/Halvorsen.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
       ['Career/Job Applications/Acme.md', '> [!NOTE] What they want\n> Someone who tests revenue in full.'],
     ];
     for (const [path, body] of notes) {
@@ -2634,7 +2650,7 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       select weight, basis from evidence_links
       where target_id = ${ideaId} and source_kind = 'work' order by weight desc, basis`;
     expect(links).toEqual([
-      { weight: 1, basis: 'From your note EY: "Took the lead on the revenue testing tool at work."' },
+      { weight: 1, basis: 'From your note Halvorsen: "Took the lead on the revenue testing tool at work."' },
       { weight: 1, basis: 'From your résumé: "Built an automated revenue testing system"' },
       { weight: 0.4, basis: 'From your application notes in Acme: "Someone who tests revenue in full."' },
     ]);

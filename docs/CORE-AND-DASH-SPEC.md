@@ -57,7 +57,7 @@ own model, tools and limits.
 
 | Path | Model | Can read | Can write |
 |---|---|---|---|
-| Ask Dash (`lib/talk/ask.ts`) | Sonnet | 15 lookup tools across every workspace | 4 kinds of proposal |
+| Ask Dash (`lib/dash/ask.ts`) | Sonnet | 15 lookup tools across every workspace | 4 kinds of proposal |
 | @dash on dev rows (`lib/comments/ask.ts`) | Haiku | The row and its thread only | Ideas, notes, rewording, plan steps |
 | @dash on goals (`lib/goals/ask.ts`) | Haiku | The goal map and its collections | Facts into collections, step handover |
 | @dash on a role (`lib/jobs/role-thread`) | Sonnet | The role, evidence bank and profile | The cover letter |
@@ -128,7 +128,7 @@ What happens to the threads already written is the first decision below.
 | `on_you` | On you | Nothing happens until the person acts. |
 | `with_dash` | With Dash | Dash has it and will act on its next run. |
 | `dash_working` | Dash is on it | A Dash run on it is in progress now. |
-| `waiting` | Waiting on … | Someone else has to act. It names who, as a ref or a short text such as "recruiter at EliseAI". |
+| `waiting` | Waiting on … | Someone else has to act. It names who, as a ref or a short text such as "recruiter at Initech". |
 | `settled` | Done | |
 
 The plan's and goals' vocabularies map onto these, `with_claude` becomes
@@ -210,7 +210,7 @@ updated to use it.
 
 ## Part 6: One Dash
 
-`lib/dash/` holds one loop, grown from `lib/talk/ask.ts`, and one tool
+`lib/dash/` holds one loop, grown from the earlier `lib/talk/ask.ts`, and one tool
 registry. Every surface calls the same loop with a context: which surface, the
 subject ref and its thread if there is one, and the page the person is on.
 

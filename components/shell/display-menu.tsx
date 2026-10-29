@@ -2,7 +2,7 @@
 
 import Link from '@/components/ui/link';
 import { useActionState, useId, useRef, useState } from 'react';
-import { Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bookmark, Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -50,6 +50,8 @@ export function DisplayMenu({
   menu,
   label = 'Display',
   align = 'end',
+  views = true,
+  initialOpen = false,
   className,
   wordClassName,
 }: {
@@ -62,11 +64,128 @@ export function DisplayMenu({
    * passes `start` so the panel does not reach back past the page's gutter.
    */
   align?: 'start' | 'end';
+  /**
+   * Whether the saved views are a section of this panel. A page that draws
+   * them on their own button (ViewsMenu) passes false.
+   */
+  views?: boolean;
+  /** Drawn open, for the gallery. */
+  initialOpen?: boolean;
   className?: string;
   /** Classes for the word alone, such as hiding it on a phone where the header's line is full. */
   wordClassName?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  return (
+    <PanelButton
+      icon={SlidersHorizontal}
+      label={label}
+      panelLabel="Display options"
+      align={align}
+      initialOpen={initialOpen}
+      className={className}
+      wordClassName={wordClassName}
+      // A property turned off leaves nothing behind on the rows to say so,
+      // so the count is on the button rather than only inside the panel.
+      extra={menu.hiddenCount > 0 ? <span className="text-ink-muted">{menu.hiddenCount} hidden</span> : null}
+    >
+      {/* Empty on a list whose order is not the reader's to set -- a
+        * search ranked by relevance, say. An empty heading would offer a
+        * choice that is not there. */}
+      {menu.sorts.length > 0 && (
+        <Section title="Sort">
+          {menu.sorts.map((sort) => (
+            <ChoiceRow key={sort.id} choice={sort} />
+          ))}
+        </Section>
+      )}
+
+      {menu.groups.length > 0 && (
+        <Section title="Group">
+          {menu.groups.map((group) => (
+            <ChoiceRow key={group.id} choice={group} />
+          ))}
+        </Section>
+      )}
+
+      {menu.properties.length > 0 && (
+        <Section title="Properties">
+          {menu.properties.map((property) => (
+            <PropertyRow key={property.id} property={property} />
+          ))}
+        </Section>
+      )}
+
+      {views && <Views menu={menu} />}
+    </PanelButton>
+  );
+}
+
+/**
+ * The saved views on a button of their own, beside Display (note 1e926155):
+ * switching to a view is done far more often than changing a sort, so it is
+ * not two levels down. The button names the view in force, if one is.
+ */
+export function ViewsMenu({
+  menu,
+  align = 'end',
+  initialOpen = false,
+  className,
+  wordClassName,
+}: {
+  menu: ListDisplayMenu;
+  align?: 'start' | 'end';
+  /** Drawn open, for the gallery. */
+  initialOpen?: boolean;
+  className?: string;
+  wordClassName?: string;
+}) {
+  const inForce = menu.views.find((view) => view.inForce);
+  return (
+    <PanelButton
+      icon={Bookmark}
+      label={inForce?.name ?? 'Views'}
+      panelLabel="Saved views"
+      // Wider than Display's: each view's Pin, Delete and Rename keep their
+      // room while hidden, and the name needs what is left.
+      panelClassName="w-80"
+      align={align}
+      initialOpen={initialOpen}
+      className={className}
+      wordClassName={cn('max-w-40 truncate', wordClassName)}
+    >
+      <Views menu={menu} />
+    </PanelButton>
+  );
+}
+
+/**
+ * A secondary button that opens a panel under it. Opening it needs
+ * JavaScript, which the choices inside do not (see DisplayMenu).
+ */
+function PanelButton({
+  icon: Icon,
+  label,
+  panelLabel,
+  align,
+  initialOpen,
+  className,
+  panelClassName = 'w-64',
+  wordClassName,
+  extra,
+  children,
+}: {
+  icon: typeof SlidersHorizontal;
+  label: string;
+  panelLabel: string;
+  align: 'start' | 'end';
+  initialOpen: boolean;
+  className?: string;
+  panelClassName?: string;
+  wordClassName?: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(initialOpen);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -81,16 +200,13 @@ export function DisplayMenu({
         aria-expanded={open}
         aria-haspopup="true"
         aria-controls={open ? panelId : undefined}
+        title={label}
         onClick={() => setOpen(!open)}
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
-        <SlidersHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className={wordClassName}>{label}</span>
-        {/* A property turned off leaves nothing behind on the rows to say so,
-          * so the count is on the button rather than only inside the panel. */}
-        {menu.hiddenCount > 0 && (
-          <span className="text-ink-muted">{menu.hiddenCount} hidden</span>
-        )}
+        {extra}
       </button>
 
       {open && (
@@ -100,37 +216,10 @@ export function DisplayMenu({
           anchor={align === 'end' ? 'trigger-below-end' : 'trigger-below'}
           padding="panel"
           tabIndex={-1}
-          aria-label="Display options"
-          className="w-64 space-y-4"
+          aria-label={panelLabel}
+          className={cn(panelClassName, 'space-y-4')}
         >
-          {/* Empty on a list whose order is not the reader's to set -- a
-            * search ranked by relevance, say. An empty heading would offer a
-            * choice that is not there. */}
-          {menu.sorts.length > 0 && (
-            <Section title="Sort">
-              {menu.sorts.map((sort) => (
-                <ChoiceRow key={sort.id} choice={sort} />
-              ))}
-            </Section>
-          )}
-
-          {menu.groups.length > 0 && (
-            <Section title="Group">
-              {menu.groups.map((group) => (
-                <ChoiceRow key={group.id} choice={group} />
-              ))}
-            </Section>
-          )}
-
-          {menu.properties.length > 0 && (
-            <Section title="Properties">
-              {menu.properties.map((property) => (
-                <PropertyRow key={property.id} property={property} />
-              ))}
-            </Section>
-          )}
-
-          <Views menu={menu} />
+          {children}
         </Popover>
       )}
     </div>
@@ -148,7 +237,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const ROW = 'press flex items-center justify-between gap-2 rounded-control px-2 py-1.5 text-ui';
+// A thumb's height on a phone (44px), the panel's own on a laptop.
+const ROW = 'press flex min-h-11 items-center justify-between gap-2 rounded-control px-2 py-1.5 text-ui sm:min-h-0';
 
 /**
  * One sort or grouping. The chosen one carries `aria-current` and a tick as
@@ -219,7 +309,7 @@ function Views({ menu }: { menu: ListDisplayMenu }) {
           maxLength={60}
           placeholder="Save this as…"
           aria-label="Name for this view"
-          className="text-small"
+          className="min-h-11 text-small sm:min-h-0"
         />
         <Button type="submit" variant="ghost" size="xs" className="shrink-0">
           Save
@@ -267,7 +357,7 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
       <Link
         href={view.href}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 rounded-control px-1.5 py-1 text-ui hover:bg-sunken',
+          'flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-control px-1.5 py-1 text-ui hover:bg-sunken sm:min-h-0',
           view.inForce ? 'text-ink' : 'text-ink-muted',
         )}
         aria-current={view.inForce ? 'true' : undefined}
@@ -278,7 +368,8 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
           aria-hidden
         />
         <span className="truncate">{view.name}</span>
-        {view.isDefault && <span className="shrink-0 text-small text-ink-muted">opens here</span>}
+        {/* Said by the accent pin beside it; the words stay for screen readers. */}
+        {view.isDefault && <span className="sr-only">, opens here</span>}
       </Link>
 
       {/* The three things you can do to a saved view. Shown on hover and on

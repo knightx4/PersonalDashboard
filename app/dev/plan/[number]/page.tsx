@@ -17,14 +17,15 @@ import { loadFeatureUpdates } from '@/lib/plan/updates-load';
 import { featureRow } from '@/lib/plan/feature-table';
 import { updateOverdueDaysNow } from '@/lib/plan/updates';
 import { loadActivitySources } from '@/lib/plan/activity-load';
-import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
+import { buildPlanTree, flatten, planLiveness, scopeLabelsOf } from '@/lib/plan/tree';
 import { findFeature, stepRedirect } from '@/lib/plan/feature-page';
 import { CHECK_BACK_COLUMNS, checkBackFrom, placeCheckBacks } from '@/lib/plan/check-backs';
-import { projectById } from '@/lib/plan/projects';
+import { isProjectScope } from '@/lib/plan/projects';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import { catalogOf } from '../plan-catalog';
 import { numberFromRef, outlineIndex } from '@/lib/plan/ref';
 import { FeaturePage } from '../feature-page';
+import { ScopeLabelsProvider } from '../scope-labels';
 
 type Params = Promise<{ number: string }>;
 
@@ -132,9 +133,11 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   // A project's feature sends to the project's routine, and only once it is
   // set, as on the project's page.
-  const project = projectById(module);
-  const canSend = project
-    ? Boolean(projectRoutine(project).id && projectRoutine(project).token)
+  // The project comes off the section, which the plan's loader filled from
+  // dev_projects; a project scope with none behind it cannot be sent.
+  const project = sections.find((section) => section.module === module)?.project ?? null;
+  const canSend = isProjectScope(module)
+    ? Boolean(project && projectRoutine(project).id && projectRoutine(project).token)
     : Boolean(planRoutine().token);
 
   const overdueDays = updateOverdueDaysNow(
@@ -148,6 +151,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   return (
     <YourInitialProvider initial={initial}>
+    <ScopeLabelsProvider labels={scopeLabelsOf(sections)}>
     <FeaturePage
       feature={feature}
       module={module}
@@ -168,6 +172,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       comingBack={comingBack}
       scopeDays={scopeDays}
     />
+    </ScopeLabelsProvider>
     </YourInitialProvider>
   );
 }

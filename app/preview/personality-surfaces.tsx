@@ -138,7 +138,7 @@ const THEMES: TraitThemes = {
   ],
   agreeableness: [
     { id: '00000000-0000-4000-8000-000000000104', name: 'Friendship' },
-    { id: '00000000-0000-4000-8000-000000000105', name: 'Helping my brother through his first year at university' },
+    { id: '00000000-0000-4000-8000-000000000105', name: 'Volunteering at the Springfield food bank' },
     { id: '00000000-0000-4000-8000-000000000106', name: 'Trust' },
   ],
   conscientiousness: [
@@ -146,7 +146,7 @@ const THEMES: TraitThemes = {
     { id: '00000000-0000-4000-8000-000000000108', name: 'Weekly review' },
   ],
   emotional_stability: [
-    { id: '00000000-0000-4000-8000-000000000109', name: 'Anxiety' },
+    { id: '00000000-0000-4000-8000-000000000109', name: 'Stress before deadlines' },
     { id: '00000000-0000-4000-8000-000000000110', name: 'Stoicism' },
     { id: '00000000-0000-4000-8000-000000000111', name: 'Sleep' },
   ],
@@ -184,7 +184,7 @@ const READ: PersonalityRead = {
       note: {
         id: '00000000-0000-4000-8000-000000000201',
         title: 'On socialising and conversation',
-        path: 'Me/On socialising and conversation.md',
+        path: 'Journal/On socialising and conversation.md',
       },
     },
     {
@@ -193,17 +193,17 @@ const READ: PersonalityRead = {
       note: {
         id: '00000000-0000-4000-8000-000000000202',
         title: 'Notes to self',
-        path: 'Me/Notes to self.md',
+        path: 'Journal/Notes to self.md',
       },
     },
     {
       stance: 'agrees',
-      text: 'Intellect is your highest trait, and the note opens with reading philosophy late at night and keeping three books going at once.',
-      note: { id: '00000000-0000-4000-8000-000000000203', title: 'About me', path: 'Me/About me.md' },
+      text: 'Intellect is your highest trait, and the note opens with keeping three books going at once and a new subject every month.',
+      note: { id: '00000000-0000-4000-8000-000000000203', title: 'Reading list', path: 'Reading/Reading list.md' },
     },
     {
       stance: 'agrees',
-      text: 'Low Emotional stability matches what you wrote about lying awake replaying a conversation and rehearsing what you should have said.',
+      text: 'Low Emotional stability matches what you wrote about checking a finished report three times the night before it is due.',
       note: {
         id: '00000000-0000-4000-8000-000000000204',
         title: 'Why I keep a list of the books I will probably never finish, and why that is fine',

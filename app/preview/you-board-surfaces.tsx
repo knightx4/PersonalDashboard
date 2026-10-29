@@ -1,13 +1,25 @@
 'use client';
 
-import type { CallStart } from '@/app/you/board/call-meeting';
-import { BoardListView } from '@/app/you/board/board-list-view';
+import type { AskStart } from '@/app/you/board/ask-board';
+import type { StartStart } from '@/app/you/board/start-meeting';
+import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
+import {
+  sortAdvisors,
+  type BoardAdvisor,
+  type BoardDecision,
+  type BoardQuestion,
+} from '@/lib/you/board-questions';
 import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
 import {
   MeetingView,
   type MeetingActions,
   type MeetingOpen,
 } from '@/app/you/board/[id]/meeting-view';
+import type { BoardPanel } from '@/lib/you/board-panels';
+import type { PersonAsk } from '@/lib/you/board-asks';
+import type { DecisionReview } from '@/lib/you/board-reviews';
+import type { DueTripwire } from '@/lib/you/board-tripwires';
+import type { TrackRecord } from '@/lib/you/board-scoring';
 import {
   parseMinutes,
   scorecardFrom,
@@ -99,7 +111,7 @@ const minutes = parseMinutes({
     {
       key: 'd2',
       note: 'Back from last week because it has no vote yet.',
-      point: 'Does the hour in the studio come before the money numbers are entered?',
+      point: 'Does the hour in the workshop come before the money numbers are entered?',
       positions: [
         {
           seat: 'cfo',
@@ -108,17 +120,17 @@ const minutes = parseMinutes({
         },
         {
           seat: 'dreamer',
-          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the studio hour waited for it.',
-          receipts: [{ label: 'About me', link: '/vault/n/Me/About%20me.md' }],
+          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the workshop hour waited for it.',
+          receipts: [{ label: 'Morning routine', link: '/vault/n/Journal/Morning%20routine.md' }],
         },
       ],
     },
   ],
   dream: {
-    text: 'The song stays on the table. In [Personal goals](/vault/n/Me/Personal%20Goals.md) you wrote that you wanted to put something out, anything, even if it is not very good. Last Wednesday you opened the project and saved a forty-second loop, and it is the first file in that folder since June.',
+    text: 'The board game stays on the table. In [What I want next](/vault/n/Journal/What%20I%20want%20next.md) you wrote that you wanted to finish something, anything, even if it is not very good. Last Wednesday you opened the project and wrote a one-page rules draft, and it is the first file in that folder since June.',
     thread:
-      'Thirty minutes on Wednesday. Add one more part to the loop and export it, whatever state it is in.',
-    receipts: [{ label: 'Make a song and put it out', link: '/goals' }],
+      'Thirty minutes on Wednesday. Add one more rule to the draft and print it, whatever state it is in.',
+    receipts: [{ label: 'Make a board game and play it with friends', link: '/goals' }],
   },
   question:
     'If the recruiter says the first line still reads as a builder of tools, what would you lead with instead?',
@@ -131,13 +143,13 @@ const minutes = parseMinutes({
     },
     {
       key: 'r2',
-      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/shopping/recurring).',
+      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/finances/recurring).',
       day: '2026-11-02',
       seats: ['cfo'],
     },
     {
       key: 'r3',
-      what: 'Thirty minutes in the studio on Wednesday 4 Nov: one more part, then export.',
+      what: 'Thirty minutes in the workshop on Wednesday 4 Nov: one more rule, then print.',
       day: '2026-11-04',
       seats: ['dreamer'],
     },
@@ -152,7 +164,7 @@ const minutes = parseMinutes({
     },
     { seat: 'skeptic', text: 'Neither reply turns into a scheduled interview by 8 Nov.' },
     { seat: 'cfo', text: 'The card row still has no minimum on 8 Nov.' },
-    { seat: 'dreamer', text: 'A second export is in the song folder by 8 Nov.' },
+    { seat: 'dreamer', text: 'A second draft is in the game folder by 8 Nov.' },
   ],
   graded: [
     {
@@ -181,9 +193,9 @@ const minutes = parseMinutes({
     },
     {
       seat: 'dreamer',
-      text: 'The song step is still unanswered on 1 Nov.',
+      text: 'The board game step is still unanswered on 1 Nov.',
       grade: 'cant_tell',
-      fact: 'A loop was saved, but the step was not answered.',
+      fact: 'A draft was saved, but the step was not answered.',
     },
   ],
   memos_note:
@@ -224,16 +236,16 @@ const minutes = parseMinutes({
       prediction: 'The card row still has no minimum on 8 Nov.',
       rebuttal: {
         to: 'dreamer',
-        text: 'The studio hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
+        text: 'The workshop hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
       },
     },
     {
       seat: 'dreamer',
-      memo: 'A loop exists. It is forty seconds long and it is the first thing in that folder since June.',
-      prediction: 'A second export is in the song folder by 8 Nov.',
+      memo: 'A rules draft exists. It is one page long and it is the first thing in that folder since June.',
+      prediction: 'A second draft is in the game folder by 8 Nov.',
       rebuttal: {
         to: 'cfo',
-        text: 'The statement was opened last time only after you had made something. Put it after the studio, not before.',
+        text: 'The statement was opened last time only after you had made something. Put it after the workshop, not before.',
       },
     },
   ],
@@ -259,7 +271,7 @@ const calledMinutes = parseMinutes({
         {
           seat: 'mentor',
           stance: 'Take it, keep applying',
-          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
+          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend workshop hour.',
           receipts: [],
         },
         {
@@ -272,13 +284,13 @@ const calledMinutes = parseMinutes({
           seat: 'cfo',
           stance: 'Take it',
           text: 'Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
-          receipts: [{ label: 'Recurring', link: '/shopping/recurring' }],
+          receipts: [{ label: 'Recurring', link: '/finances/recurring' }],
         },
         {
           seat: 'dreamer',
-          stance: 'Keep searching, with the song kept',
-          text: 'The song stays on the table either way. It would change if the contract allowed one free morning a week.',
-          receipts: [{ label: 'Personal goals', link: '/vault/n/Me/Personal%20Goals.md' }],
+          stance: 'Keep searching, with the game kept',
+          text: 'The board game stays on the table either way. It would change if the contract allowed one free morning a week.',
+          receipts: [{ label: 'What I want next', link: '/vault/n/Journal/What%20I%20want%20next.md' }],
         },
       ],
     },
@@ -344,7 +356,9 @@ export function YouBoardMeetingPreview({
   return (
     <MeetingView
       meeting={shown}
-      minutes={state === 'ready' ? minutes : state === 'called' ? calledMinutes : parseMinutes(null)}
+      minutes={
+        state === 'ready' ? minutes : state === 'called' ? calledMinutes : parseMinutes(null)
+      }
       marks={state === 'ready' ? marks : []}
       scorecard={scorecard}
       subject={{
@@ -352,7 +366,12 @@ export function YouBoardMeetingPreview({
         path: [
           ...subject.path.slice(0, 2),
           {
-            label: state === 'ready' ? 'Board meeting 1 Nov 2026' : state === 'called' ? CALLED_DECISION : 'Board meeting',
+            label:
+              state === 'ready'
+                ? 'Board meeting 1 Nov 2026'
+                : state === 'called'
+                  ? CALLED_DECISION
+                  : 'Board meeting',
             href: `/you/board/${ID}`,
           },
         ],
@@ -393,12 +412,365 @@ const rows: BoardMeetingRow[] = [
   }),
 ];
 
+/** The roster as migrations-you/0022 seeds it: five seats and seven guests. */
+const advisors: BoardAdvisor[] = sortAdvisors([
+  { key: 'hiring_manager', name: 'Hiring manager', kind: 'seat', focus: null },
+  { key: 'mentor', name: 'Mentor', kind: 'seat', focus: null },
+  { key: 'skeptic', name: 'Skeptic', kind: 'seat', focus: null },
+  { key: 'cfo', name: 'CFO', kind: 'seat', focus: null },
+  { key: 'dreamer', name: 'Dreamer', kind: 'seat', focus: null },
+  { key: 'buffett', name: 'Warren Buffett', kind: 'guest', focus: null },
+  { key: 'dalio', name: 'Ray Dalio', kind: 'guest', focus: null },
+  { key: 'dimon', name: 'Jamie Dimon', kind: 'guest', focus: null },
+  { key: 'jobs', name: 'Steve Jobs', kind: 'guest', focus: null },
+  { key: 'da_vinci', name: 'Leonardo da Vinci', kind: 'guest', focus: null },
+  { key: 'franklin', name: 'Benjamin Franklin', kind: 'guest', focus: null },
+  { key: 'washington', name: 'George Washington', kind: 'guest', focus: null },
+]);
+
+const CONTRACT_QUESTION =
+  'Should I take the three-month contract at the analytics firm, or keep the search full time?';
+
+const question = (
+  over: Partial<BoardQuestion> & Pick<BoardQuestion, 'id' | 'question'>,
+): BoardQuestion => ({
+  options: [],
+  context: null,
+  lean: null,
+  advisors: [],
+  source: 'person',
+  status: 'queued',
+  meetingId: null,
+  createdAt: '2026-11-01T12:00:00Z',
+  ...over,
+});
+
+const suggestions: BoardQuestion[] = [
+  question({
+    id: '00000000-0000-4000-8000-0000000000e1',
+    source: 'board',
+    status: 'suggested',
+    question:
+      'Do you move to Chicago in the spring if the finance offer comes through, or ask to start remote until the lease ends in August?',
+    options: [
+      { letter: 'A', text: 'Move in March and break the lease' },
+      { letter: 'B', text: 'Ask to start remote until August' },
+      { letter: 'C', text: 'Turn down any role that will not allow it' },
+    ],
+  }),
+  question({
+    id: '00000000-0000-4000-8000-0000000000e2',
+    source: 'board',
+    status: 'suggested',
+    question: 'Is the Saturday course worth £60 a month while there is no income?',
+    options: [
+      { letter: 'A', text: 'Keep it' },
+      { letter: 'B', text: 'Pause it until the first pay cheque' },
+    ],
+  }),
+];
+
+const asked: BoardQuestion[] = [
+  question({
+    id: '00000000-0000-4000-8000-0000000000e3',
+    question:
+      'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    options: [
+      { letter: 'A', text: 'The bank, which pays more' },
+      { letter: 'B', text: 'The fintech, which I want more' },
+    ],
+    lean: 'B',
+    advisors: ['hiring_manager', 'buffett'],
+  }),
+  question({
+    id: '00000000-0000-4000-8000-0000000000e4',
+    question: 'Should I sell the car before the move or keep it for the first winter?',
+    status: 'deferred',
+  }),
+];
+
+/** Questions the person decided, one against the board's recommendation and one with no verdict recommendation. */
+const decisions: BoardDecision[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000e6',
+    question:
+      'Should I take the three-month contract at the analytics firm, or keep the search full time?',
+    options: [
+      { letter: 'A', text: 'Take the contract, full time, from 16 November' },
+      { letter: 'B', text: 'Keep the search full time and say no' },
+      { letter: 'C', text: 'Ask for three days a week and keep two for the search' },
+    ],
+    recommended: 'A',
+    chosen: 'C',
+    note: 'Asking for three days. If they say no I take A, with the evening in writing.',
+    decidedAt: '2026-11-01T20:15:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000e7',
+    question: 'Should the studio evening move from Thursday to Sunday morning?',
+    options: [
+      { letter: 'A', text: 'Move it to Sunday, 9 to 11' },
+      { letter: 'B', text: 'Keep Thursday evening' },
+    ],
+    recommended: 'A',
+    chosen: 'A',
+    note: null,
+    decidedAt: '2026-10-26T19:02:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000b0',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000e8',
+    question:
+      'Is the Saturday course worth £60 a month while there is no income, given the first pay cheque is not due until January?',
+    options: [
+      { letter: 'A', text: 'Keep it' },
+      { letter: 'B', text: 'Pause it until the first pay cheque' },
+    ],
+    recommended: null,
+    chosen: 'B',
+    note: null,
+    decidedAt: '2026-10-19T08:30:00Z',
+    meetingId: '00000000-0000-4000-8000-0000000000af',
+  },
+];
+
+/** What the board asks: a first ask, one asked a second time, one answered and waiting on the next meeting, one with a long question. */
+const boardAsks: PersonAsk[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e5',
+    question: CONTRACT_QUESTION,
+    id: 'a1',
+    text: 'What do you need to earn each month to stay on this search without borrowing?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b1'],
+    answer: null,
+    answeredAt: null,
+    readIn: null,
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e5',
+    question: CONTRACT_QUESTION,
+    id: 'a2',
+    text: 'By what date do you want an offer in your field, if the contract is not taken?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b0', '00000000-0000-4000-8000-0000000000b1'],
+    answer: null,
+    answeredAt: null,
+    readIn: null,
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e3',
+    question:
+      'Which of the two final rounds do I prepare for first, given both are on the same week?',
+    id: 'a1',
+    text: 'Has the bank said when it will decide, and does the fintech know about the bank?',
+    askedIn: ['00000000-0000-4000-8000-0000000000b1'],
+    answer: 'The bank decides by Friday 13 November. The fintech does not know.',
+    answeredAt: '2026-11-02T08:15:00Z',
+    readIn: null,
+  },
+];
+
+/** The board checking back (plan #2561.8): a 30-day check-back with receipts, and a 90-day one on a long question. */
+export const boardReviews: DecisionReview[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000e9',
+    question:
+      'Should I take the part-time analytics contract while I keep searching, or hold out for a permanent role?',
+    options: [
+      { letter: 'A', text: 'Take the contract, three days a week' },
+      { letter: 'B', text: 'Hold out for a permanent role' },
+    ],
+    chosen: 'A',
+    option: 'A',
+    decidedAt: '2026-10-02T19:10:00Z',
+    topic: 'work',
+    at: 30,
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+    writtenAt: '2026-11-01T18:55:00Z',
+    account:
+      'You started the contract on 5 October. Since then you sent 9 applications, down from 14 in the month before, and two reached a first interview. The contract paid £3,120 in October, which covered rent and the course with £410 left.',
+    receipts: [
+      { label: 'Roles, 9 applied since 5 Oct', link: '/jobs/roles' },
+      { label: 'Money, October', link: '/money' },
+    ],
+    ask: 'Taking the contract slowed the search and covered the month. Did it go well?',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+    scores: [],
+    successMeasure: null,
+    due: '2026-11-01',
+  },
+  {
+    questionId: '00000000-0000-4000-8000-0000000000ea',
+    question:
+      'Should I move the Saturday course to the evening cohort so weekends stay free for the studio?',
+    options: [
+      { letter: 'A', text: 'Move to the evening cohort' },
+      { letter: 'B', text: 'Keep Saturdays' },
+    ],
+    chosen: 'B',
+    option: 'B',
+    decidedAt: '2026-08-03T09:00:00Z',
+    topic: 'learning',
+    at: 90,
+    meetingId: '00000000-0000-4000-8000-0000000000b1',
+    writtenAt: '2026-11-01T18:56:00Z',
+    account:
+      'You kept Saturdays. Your course log shows 11 of 12 sessions attended, and the studio goal has no entry since 14 September.',
+    receipts: [{ label: 'Studio goal', link: '/goals' }],
+    ask: 'Keeping Saturdays held the course and stalled the studio. How did it go?',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+    scores: [],
+    successMeasure: null,
+    due: '2026-11-01',
+  },
+];
+
+/**
+ * What fell due (plan #2581.10): a forecast decision's 30-day check-back on
+ * its day, before any meeting wrote how it went, so it asks from the success
+ * measure; and the older written one.
+ */
+export const dueReviews: DecisionReview[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000eb',
+    question: 'Should I accept the fintech offer at £68,000 or wait two weeks for the bank’s final round?',
+    options: [
+      { letter: 'A', text: 'Accept the fintech offer now' },
+      { letter: 'B', text: 'Ask the fintech for two weeks and finish the bank’s process' },
+      { letter: 'C', text: 'Decline both and keep searching' },
+    ],
+    chosen: 'B',
+    option: 'B',
+    decidedAt: '2026-10-02T19:10:00Z',
+    topic: 'work',
+    at: 30,
+    meetingId: null,
+    writtenAt: null,
+    account: '',
+    receipts: [],
+    ask: '',
+    outcome: null,
+    answeredAt: null,
+    grades: [],
+    scores: [],
+    successMeasure: 'A signed offer at £70,000 or more, starting before February.',
+    due: '2026-11-01',
+  },
+  boardReviews[0],
+];
+
+/** A tripwire whose day has come. */
+export const dueTripwires: DueTripwire[] = [
+  {
+    questionId: '00000000-0000-4000-8000-0000000000ec',
+    question: 'Should I move to Lisbon in March, or stay in London until the contract ends?',
+    options: [
+      { letter: 'A', text: 'Move in March' },
+      { letter: 'B', text: 'Stay until the contract ends in June' },
+    ],
+    chosen: 'A',
+    condition:
+      'Fewer than two first interviews from the remote roles applied to in October, by 2 November.',
+    checkOn: '2026-11-02',
+    status: 'watching',
+    checkedAt: null,
+    fact: null,
+  },
+];
+
+/** Who has been right about what, closest first. */
+export const trackRecordsFixture: TrackRecord[] = [
+  {
+    advisor: 'cfo',
+    name: 'CFO',
+    scored: 8,
+    brier: 0.11,
+    topics: [
+      { topic: 'work', scored: 6, brier: 0.09, weight: 1.64 },
+      { topic: 'money', scored: 2, brier: 0.17, weight: 1 },
+    ],
+  },
+  {
+    advisor: 'hiring_manager',
+    name: 'Hiring manager',
+    scored: 6,
+    brier: 0.19,
+    topics: [{ topic: 'work', scored: 6, brier: 0.19, weight: 1.24 }],
+  },
+  {
+    advisor: 'richard_feynman',
+    name: 'Richard Feynman',
+    scored: 2,
+    brier: 0.22,
+    topics: [
+      { topic: 'learning', scored: 1, brier: 0.16, weight: 1 },
+      { topic: 'projects', scored: 1, brier: 0.28, weight: 1 },
+    ],
+  },
+  {
+    advisor: 'dreamer',
+    name: 'Dreamer',
+    scored: 7,
+    brier: 0.36,
+    topics: [
+      { topic: 'work', scored: 5, brier: 0.41, weight: 0.36 },
+      { topic: 'place', scored: 1, brier: 0.25, weight: 1 },
+      { topic: 'time', scored: 1, brier: 0.2, weight: 1 },
+    ],
+  },
+];
+
+/** The seeded four panels, as the compose card offers them. */
+export const PREVIEW_PANELS: BoardPanel[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000f1',
+    name: 'Money',
+    advisors: ['cfo', 'buffett', 'dalio', 'dimon'],
+    topic: 'Spending, saving, debt and income.',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f2',
+    name: 'Career',
+    advisors: ['hiring_manager', 'mentor', 'skeptic', 'dimon'],
+    topic: 'Work, the job search, skills and pay.',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f3',
+    name: 'Building',
+    advisors: ['jobs', 'da_vinci', 'skeptic', 'dreamer'],
+    topic: 'Projects and the things they make.',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000f4',
+    name: 'Life',
+    advisors: ['mentor', 'dreamer', 'franklin', 'washington'],
+    topic: 'Where and how they live, and their time; relationships only if they ask.',
+  },
+];
+
+const listActions: BoardListActions = {
+  answerAsk: async () => ({ error: null }),
+  answerReview: async () => ({ error: null }),
+  answerTripwire: async () => ({ error: null }),
+  ask: async () => ({ error: null, queued: true }),
+  start: async () => ({ error: null }),
+  accept: async () => ({ error: null }),
+  dismiss: async () => ({ error: null }),
+  convene: async () => ({ error: null }),
+};
+
 export function YouBoardListPreview({
   state = 'ready',
   start,
+  meetingStart,
 }: {
-  state?: 'ready' | 'running' | 'empty';
-  start?: CallStart;
+  state?: 'ready' | 'running' | 'empty' | 'asks' | 'asks-error' | 'reviews' | 'reviews-error' | 'due';
+  start?: AskStart;
+  meetingStart?: StartStart;
 }) {
   const meetings =
     state === 'empty'
@@ -408,8 +780,7 @@ export function YouBoardListPreview({
             row({
               id: '00000000-0000-4000-8000-0000000000d1',
               kind: 'called',
-              decision:
-                'Should I take the three-month contract at the analytics firm, or keep the search full time?',
+              decision: CONTRACT_QUESTION,
               status: 'running',
               heldOn: null,
               requestedAt: '2026-11-02T09:40:00Z',
@@ -419,14 +790,50 @@ export function YouBoardListPreview({
             ...rows.slice(1),
           ]
         : rows;
+  const questions =
+    state === 'empty'
+      ? []
+      : state === 'running'
+        ? [
+            ...suggestions,
+            question({
+              id: '00000000-0000-4000-8000-0000000000e5',
+              question: CONTRACT_QUESTION,
+              options: [
+                { letter: 'A', text: 'Take the contract' },
+                { letter: 'B', text: 'Keep the search full time' },
+              ],
+              lean: 'A',
+              createdAt: '2026-11-02T09:40:00Z',
+            }),
+            ...asked,
+          ]
+        : [...suggestions, ...asked];
   return (
     <BoardListView
       meetings={meetings}
+      questions={questions}
+      advisors={advisors}
+      panels={PREVIEW_PANELS}
+      asks={state === 'asks' || state === 'asks-error' ? boardAsks : []}
+      decisions={state === 'empty' ? [] : decisions}
       nextMeeting="2026-11-08"
       timezone="Europe/London"
       now={NOW}
-      actions={{ call: async () => ({ error: null }) }}
+      actions={listActions}
       start={start}
+      meetingStart={meetingStart}
+      asksError={
+        state === 'asks-error'
+          ? 'This question changed while you were looking. Read the page again.'
+          : undefined
+      }
+      reviews={
+        state === 'reviews' || state === 'reviews-error' ? boardReviews : state === 'due' ? dueReviews : []
+      }
+      tripwires={state === 'due' ? dueTripwires : []}
+      records={state === 'due' ? trackRecordsFixture : []}
+      reviewError={state === 'reviews-error' ? 'Your answer was not saved. Try again.' : undefined}
     />
   );
 }

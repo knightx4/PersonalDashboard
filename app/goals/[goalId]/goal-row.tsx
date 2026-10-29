@@ -916,10 +916,10 @@ export function GoalRow({
                 quiet
               />
             )}
-            {/* On an open Dash step's own page, a phone message when Dash
-                finishes it (plan #2376.2). */}
-            {page &&
-              step.kind === 'claude' &&
+            {/* On an open Dash step, in the list as on its own page, a phone
+                message when Dash finishes it (plans #2376.2 and #2611.3). */}
+            {step.kind === 'claude' &&
+              (page || step.status !== 'proposed') &&
               step.status !== 'done' &&
               step.status !== 'dropped' && <NotifySwitch node={step} />}
             {isDecision &&

@@ -48,11 +48,11 @@ function DraftButton({ forcePending }: { forcePending?: boolean }) {
       variant={pending ? 'ghost' : 'secondary'}
       pending={pending}
       paid="app/learn/topics/actions.ts#draftTopicFromGoal"
-      what="Cost of drafting the topic twice"
+      what="Cost of drafting the topic"
       hintFirst
       wrapperClassName="ml-auto"
     >
-      {pending ? 'Drafting it twice to compare…' : 'Draft the topic'}
+      {pending ? 'Sending it to Dash…' : 'Draft the topic'}
     </DashAction>
   );
 }
@@ -124,7 +124,7 @@ function SourceList({ shown, readOnly }: { shown?: ComposeShown['sources']; read
   );
 }
 
-function GoalBox({ shown, error }: { shown?: ComposeShown; error?: string }) {
+function GoalBox({ shown, error, queued }: { shown?: ComposeShown; error?: string; queued?: string }) {
   const { pending: sending } = useFormStatus();
   const pending = sending || shown?.pending === true;
   const [sourcesOpen, setSourcesOpen] = useState(shown?.sources !== undefined);
@@ -167,6 +167,10 @@ function GoalBox({ shown, error }: { shown?: ComposeShown; error?: string }) {
             <p role="alert" className="min-w-0 text-small text-danger">
               {error}
             </p>
+          ) : queued && !pending ? (
+            <p role="status" className="min-w-0 text-small text-ink-muted">
+              {queued}
+            </p>
           ) : (
             !pending && !sourcesOpen && <p className="min-w-0 text-small text-ink-muted">One topic, such as DCF.</p>
           )}
@@ -201,7 +205,7 @@ export function TopicsHeader({ shown }: { shown?: ComposeShown }) {
       />
       {open && (
         <form action={draft} className="mb-4" aria-label="Draft a topic">
-          <GoalBox shown={shown} error={shown?.error ?? state.error} />
+          <GoalBox shown={shown} error={shown?.error ?? state.error} queued={state.queued} />
         </form>
       )}
     </>

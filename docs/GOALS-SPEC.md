@@ -237,7 +237,7 @@ What waits on you:
   submitting a form or an application, booking or buying, posting or sharing,
   or changing your records outside Goals. It is a Claude step whose `acts`
   holds one sentence naming what working it does ("Sends the hardship request
-  to help@nelnet.net from your Gmail"). It arrives proposed, the row shows
+  to help@northstar.example from your Gmail"). It arrives proposed, the row shows
   the sentence with Approve and Turn down, and no run works it until you
   approve that step. The database refuses Claude writing such a step in any
   other status, opening one, or changing what a live step does.
@@ -246,8 +246,8 @@ What waits on you:
   Jev is asked about every open Claude step with no sentence. A step it gives
   a yes of 0.3 or more goes back to proposed with a sentence Haiku writes,
   through `goals.hold_acting_step` (`migrations-goals/0058`), which writes it
-  as the app rather than as Claude. The report-only trial is
-  `docs/trials/2026-09-29-goals-hold-acts.md`.
+  as the app rather than as Claude. The report-only trial's
+  write-up quoted the person's goals, so it is not kept in the repository.
 
 Claude may still not change a goal's done-when, drop one of your steps or
 answer a question for you. It asks those as a question step. The exception is
@@ -439,17 +439,18 @@ Plan #2503. A goal is active or passive, stored in `goals.items.activity`
 (null reads as active). A passive goal is one the person keeps in view
 without working on it now, so it asks for no attention:
 
-- None of its steps or rhythms appear in Do next, even when it has a due
-  date, and it is listed under Other goals (`homeLists` in
-  `lib/goals/home.ts`).
+- Nothing of it reaches the Goals Inbox, its badge or Do next: no step,
+  rhythm, question, ask, flag, proposal or did-you-go row, and no Dash step
+  stuck on a question for the person (`withoutPassiveGoals` in
+  `lib/goals/inbox.ts`, applied in `loadHome`). Its due date is ignored, and
+  it is listed under Passive goals (`homeLists` in `lib/goals/home.ts`).
+  Its page still lists everything on it.
 - On Todo it keeps only the steps the person sent there. A step Dash sent
   leaves Todo while the goal is passive, and Dash sends none
   (`todoSteps` in `lib/goals/todo.ts`).
 - It gets no verdict: the morning brief leaves it out, its pace is not
   read, and the pages show no older verdict on it (`reviewGoals` and
   `standingReviews` in `lib/goals/reviews.ts`).
-- Questions, asks, flags and proposals waiting on approval still show in Do
-  next, since they hold up work.
 
 What is coming up under a passive goal is mentioned, and nothing more (plan
 #2503.5). A step of the person's due within seven days, and a suggestion
@@ -1108,8 +1109,8 @@ the file.
 ### Metrics
 
 A metric counts something on the goal by week or by month, with an optional
-aim per period (feature #2084, `goals.metrics`). It counts one of three
-things, its `source` (plan #2397):
+aim per period (feature #2084, `goals.metrics`). It counts one of four
+things, its `source` (plan #2397, migration goals 0089):
 
 - **A list**: the records of one of the goal's lists, each in the period one
   of its date fields falls in ("Applications · Applied on · weekly · aim 5").
@@ -1118,6 +1119,19 @@ things, its `source` (plan #2397):
   ("Steps closed · weekly · aim 3").
 - **Dash files**: the files Dash wrote under the goal or one of its steps,
   each in the period it was filed ("Dash files · monthly").
+- **Hours logged**: the time logged as progress on the goal or any step
+  under it, added up in hours in the period of the day it happened ("Hours
+  logged · weekly · aim 10–15"). An entry counts when its unit is a unit of
+  time (h, hrs, hours, min, minutes; `hoursOf` in `lib/goals/metrics.ts`),
+  and capture files "applied 2h" as 2 hours of progress under the goal
+  whose Hours logged metric names that work: filing is shown each goal's
+  line with "tracks hours: Applying", and logs each stretch of time once.
+  Time spent asks no "Roughly how far along?", since hours are a tally.
+
+The aim may be a range: `target` is its low end and `target_high` its top,
+which the form asks for as **Up to, for a range**. The chart draws a range
+as a faint band from the low end up to the top, under the dashed line at
+the low end.
 
 The metrics sit in the properties column under **Metrics**, each as its name
 over that line (`metricLine` in `lib/goals/metric-form.ts`), with **Change**
@@ -1136,6 +1150,28 @@ metric with nothing counted yet says what it counts in place of the chart.
 The counts are worked out when the page is read and never stored
 (`lib/goals/metrics.ts`).
 
+### Hours
+
+**Hours** (`/goals/hours`, a tab of Goals) puts every weekly Hours logged
+metric on an open goal on one page (`lib/goals/hours.ts`), in four parts:
+
+- **This week**: each metric's hours so far on a bar scaled to the top of
+  its aim, the range as a band, and a tick at what the weekday pace expects
+  by today. The pace counts Monday to Friday, so an aim of 10 expects 2 by
+  the end of Monday and 10 by Friday; time at the weekend counts towards the
+  week but not the pace. Within half an hour of the pace reads On pace, and
+  a row for all of them together closes the card.
+- **Day by day**: the last four weeks, one cell a day for each metric and a
+  row for all of them, shaded on one scale so a long day reads the same in
+  every row.
+- **Week by week**: for each metric, its average a weekday over the last
+  four full weeks, last week, its best week of twelve, how many of the last
+  eight weeks reached the aim, and how many in a row up to last week did.
+- Each metric's twelve-week bar chart, as a goal's Overview draws it.
+
+Every part uses the accent alone, and the rows are told apart by name. With
+no hours metric yet the page says how to add one.
+
 ## Your examples, broken down
 
 These are the first goals to enter once it exists, and a check on whether the
@@ -1149,13 +1185,13 @@ for one number a month, the new balances. There is no bank connection.
 drafts applications as `claude` steps; you apply and interview. Progress is
 counted from Jobs.
 
-**Get plugged into city life in NYC** (The city). Outcomes such as knowing
+**Get plugged into city life** (The city). Outcomes such as knowing
 ten people in the scene by name, with a rhythm of one event a week inside,
 fed by the weekly research. Reading and courses go to Learn as linked aims.
 After a few events, a `decision` step asks whether the next move is more
 education or joining an organization, based on what you marked as worth it.
 
-**Make friends in New York** (Relationships). Mostly yours. A rhythm, a map of
+**Make friends in your city** (Relationships). Mostly yours. A rhythm, a map of
 steps, and credit from city events you attended. No people list for now.
 
 **Have good relationships** (Relationships). Starts as a title alone, refined
@@ -1336,8 +1372,8 @@ A closed step comes back when a new document changes one of its answers
 (plan #997). A date that moves at all, or an amount that moves by more than
 5% of the answer the step closed on, reopens it. A written answer reopens it
 only when its meaning changes, which the goals routine judges on each
-rewrite and stores with a one-line reason (plan #1036): "Nelnet" rewritten as
-"Nelnet Servicing" leaves the step closed, and "MOHELA" reopens it. A
+rewrite and stores with a one-line reason (plan #1036): "Northstar" rewritten as
+"Northstar Servicing" leaves the step closed, and "Brightline" reopens it. A
 rewrite that comes without a verdict is compared on its wording, case and
 spacing aside, so a change nobody judged still shows. The answer is marked
 changed, and the step shows what it said before, what moved (for a written
@@ -1363,7 +1399,7 @@ then the person does.
    row of the preview. A suggestion becomes the ID field only when the list
    has none. The read also warns about labels that do not mean what they
    say, such as an NSLDS "Repayment Begin Date" that is the last
-   disbursement date for a Grad PLUS loan; those are listed above the rows.
+   disbursement date for a graduate loan; those are listed above the rows.
 
    Saving a read teaches the collection that kind of document
    (`goals.document_kinds`). The reader names the kind ("NSLDS loan

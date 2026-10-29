@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
@@ -12,7 +12,6 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { SectionFold } from '@/components/ui/disclosure';
 import { Checkbox, FieldError, Label, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
-import { Markdown } from '@/components/ui/markdown';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { whenWeekday } from '@/lib/core/when';
@@ -28,15 +27,19 @@ import {
   type BoardMark,
   type BoardMeeting,
   type BoardMinutes,
-  type BoardReceipt,
   type BoardResolution,
   type BoardScore,
   type Grade,
   type MarkKind,
   type VoteValue,
 } from '@/lib/you/board';
+import { NO_DEBATE, type MeetingDebate } from '@/lib/you/board-debate';
+import { heldLine, topicsLine, type DecisionReview, type PickScore } from '@/lib/you/board-reviews';
+import { answerBoardReview } from '../review-actions';
+import { advisorName, ReviewRow, type ReviewAnswerAction } from '../review-rows';
 import {
   answerBoardQuestion,
+  decideQuestion,
   makeResolutionTodo,
   markResolution,
   voteOnDisagreement,
@@ -44,6 +47,10 @@ import {
 } from '../actions';
 import { useRefreshWhileRunning } from '../refresh-while-running';
 import { SeatLabel } from '../seat-label';
+import { AdvisorDrawer, QuestionDebate } from './debate';
+import type { MakeProps } from './make';
+import type { DecideAction } from './decision';
+import { Evidence, Prose } from './prose';
 
 /**
  * One board meeting (plan #2540.3), on the detail pattern
@@ -57,6 +64,11 @@ import { SeatLabel } from '../seat-label';
  * A meeting still being held shows that it is, with when it started, and the
  * page looks again every minute; one that failed shows its error and when it
  * was asked for.
+ *
+ * A meeting held as a debate (plan #2561.5) took up questions, and shows each
+ * one's scores and rounds (debate.tsx) in place of the disagreements, with
+ * the turns that have landed while it is still being held. A meeting written
+ * in the old minutes form took up none and keeps the view above.
  */
 
 export type MeetingActions = {
@@ -78,8 +90,17 @@ const REAL_ACTIONS: MeetingActions = {
   makeTodo: makeResolutionTodo,
 };
 
-/** For the gallery: draw a hidden part open. */
-export type MeetingOpen = { memos?: boolean };
+/** For the gallery: draw a hidden part open, the memos or one advisor's thinking by id. */
+export type MeetingOpen = {
+  memos?: boolean;
+  advisor?: string;
+  /** The decision form open under each verdict, or open with a failed save's error. */
+  decide?: 'open' | 'error';
+  /** The Make it happen card with a failed write's error showing (plan #2561.9). */
+  make?: 'error';
+};
+
+const DECIDE_ERROR = 'Your decision was not saved. Try again.';const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -106,19 +127,6 @@ function GradeMark({ grade }: { grade: Grade }) {
   );
 }
 
-/**
- * Markdown from the minutes, in the reading rhythm of a paragraph inside a
- * card. The size, colour and edges go on the wrapper: .jobs-prose inherits
- * its colour and size, and its rules outrank a utility on the same element.
- */
-function Prose({ markdown, className }: { markdown: string; className?: string }) {
-  return (
-    <div className={cn('text-body text-ink [overflow-wrap:anywhere]', className)}>
-      <Markdown markdown={markdown} className="jobs-prose" />
-    </div>
-  );
-}
-
 const capital = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
 
 const markKey = (kind: MarkKind, item: string) => `${kind}:${item}`;
@@ -132,16 +140,25 @@ export function MeetingView({
   meeting,
   minutes,
   marks: initialMarks,
+  debate = NO_DEBATE,
   scorecard,
   subject,
   timezone = 'UTC',
   now,
   actions = REAL_ACTIONS,
+  decide = decideQuestion,
+  make,
+  reviews = [],
+  picks = [],
+  names = {},
+  answerReview = answerBoardReview,
   open = {},
 }: {
   meeting: BoardMeeting;
   minutes: BoardMinutes;
   marks: readonly BoardMark[];
+  /** The questions the meeting took up and every turn on them; empty for the old minutes form. */
+  debate?: MeetingDebate;
   /** Each seat's hits and misses across every meeting (scorecardFrom). */
   scorecard: readonly BoardScore[];
   subject: Subject;
@@ -149,6 +166,17 @@ export function MeetingView({
   /** When the page was read, for whether a meeting is still running. */
   now: number;
   actions?: MeetingActions;
+  /** Saves a decision under a debated question's verdict (plan #2561.6); not part of the old view's actions. */
+  decide?: DecideAction;
+  /** Writes a decided question as todos or goal steps (plan #2561.9). */
+  make?: MakeProps;
+  /** The check-backs on earlier decisions this meeting wrote (plan #2561.8). */
+  reviews?: readonly DecisionReview[];
+  /** How often each advisor's pick held up, across every decision (loadPickScorecard). */
+  picks?: readonly PickScore[];
+  /** Every advisor's name by key (advisorNames). */
+  names?: Readonly<Record<string, string>>;
+  answerReview?: ReviewAnswerAction;
   open?: MeetingOpen;
 }) {
   const [marks, setMarks] = useState<ReadonlyMap<string, BoardMark>>(
@@ -156,6 +184,29 @@ export function MeetingView({
   );
   const state = meetingState(meeting, now);
   useRefreshWhileRunning(state.kind === 'running');
+  const [advisorId, setAdvisorId] = useState<string | null>(open.advisor ?? null);
+  const closeAdvisor = useCallback(() => setAdvisorId(null), []);
+  const shownAdvisor = advisorId ? debate.advisors.find((a) => a.id === advisorId) : undefined;
+  const isDebate = debate.questions.length > 0;
+  const questions = debate.questions.map((question, index) => (
+    <QuestionDebate
+      key={question.id}
+      question={question}
+      number={index + 1}
+      of={debate.questions.length}
+      advisors={debate.advisors}
+      running={state.kind === 'running'}
+      onOpen={setAdvisorId}
+      decide={decide}
+      decideOpen={open.decide !== undefined}
+      decideError={open.decide === 'error' ? DECIDE_ERROR : null}
+      make={make}
+      makeFailed={open.make === 'error' ? MAKE_ERROR : null}
+    />
+  ));
+  const drawer = shownAdvisor && (
+    <AdvisorDrawer advisor={shownAdvisor} debate={debate} onClose={closeAdvisor} />
+  );
 
   const keep = (kind: MarkKind, item: string, saved: BoardMark | null | undefined) =>
     setMarks((current) => {
@@ -175,7 +226,12 @@ export function MeetingView({
     <DetailFacts>
       <Property label="Held" value={meeting.heldOn ? heldOnLabel(meeting.heldOn) : 'Not yet'} />
       <Property label="Kind" value={meeting.kind === 'called' ? 'Called' : 'Weekly'} />
-      {ready ? (
+      {ready && isDebate ? (
+        <>
+          <Property label="Questions" value={String(debate.questions.length)} />
+          <Property label="Advisors" value={String(debate.advisors.length)} />
+        </>
+      ) : ready ? (
         <>
           <Property
             label="Your votes"
@@ -221,6 +277,8 @@ export function MeetingView({
             )}
           </p>
         </Card>
+        {questions}
+        {drawer}
       </DetailPage>
     );
   }
@@ -253,7 +311,27 @@ export function MeetingView({
         ) : undefined
       }
     >
-      {minutes.disagreements.length > 0 && (
+      {questions}
+
+      {reviews.length > 0 && (
+        <section aria-labelledby="board-reviews" className="space-y-3">
+          <SectionHeading id="board-reviews" title="Checking back" count={reviews.length} />
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {reviews.map((review) => (
+                <ReviewRow
+                  key={`${review.questionId}:${review.at}`}
+                  review={review}
+                  names={names}
+                  answer={answerReview}
+                />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+
+      {!isDebate && minutes.disagreements.length > 0 && (
         <section aria-labelledby="board-disagreements" className="space-y-3">
           <SectionHeading
             id="board-disagreements"
@@ -373,7 +451,7 @@ export function MeetingView({
         </section>
       )}
 
-      {(minutes.graded.length > 0 || minutes.gradedNote) && (
+      {(minutes.graded.length > 0 || (minutes.gradedNote && !isDebate)) && (
         <section aria-labelledby="board-graded" className="space-y-3">
           <SectionHeading id="board-graded" title="Last week’s predictions" />
           <Card padding="none">
@@ -410,7 +488,8 @@ export function MeetingView({
 
       <section aria-labelledby="board-scorecard" className="space-y-3">
         <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
-        <Scorecard scores={scorecard} />
+        <Scorecard scores={scorecard} bare={isDebate} />
+        {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
       </section>
 
       {minutes.memos.length > 0 && (
@@ -463,44 +542,16 @@ export function MeetingView({
           </div>
         </SectionFold>
       )}
-    </DetailPage>
-  );
-}
 
-/** The receipts a position or the dream rests on that its text does not already link. */
-function Evidence({
-  receipts,
-  written,
-}: {
-  receipts: readonly BoardReceipt[];
-  written: readonly string[];
-}) {
-  const linked = written.join('\n');
-  const left = receipts.filter((receipt) => !linked.includes(`](${receipt.link})`));
-  if (left.length === 0) return null;
-  return (
-    <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">
-      Rests on{' '}
-      {left.map((receipt, index) => (
-        <span key={receipt.link}>
-          {index > 0 && ', '}
-          {receipt.link.startsWith('/') ? (
-            <Link href={receipt.link} className={linkVariants()}>
-              {receipt.label}
-            </Link>
-          ) : (
-            <a
-              href={receipt.link}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={linkVariants()}
-            >
-              {receipt.label}
-            </a>
-          )}
-        </span>
-      ))}
-    </p>
+      {minutes.chairNote && (
+        <SectionFold title="From the chair">
+          <Card padding="standard">
+            <Prose markdown={minutes.chairNote} className={cn('text-ui')} />
+          </Card>
+        </SectionFold>
+      )}
+      {drawer}
+    </DetailPage>
   );
 }
 
@@ -830,8 +881,25 @@ function ResolutionRow({
 }
 
 /** Each seat's hits and misses, counted from every meeting's graded predictions. */
-function Scorecard({ scores }: { scores: readonly BoardScore[] }) {
+function Scorecard({
+  scores,
+  bare = false,
+}: {
+  scores: readonly BoardScore[];
+  /** A debate meeting: until something is graded, the line alone and no table of zeros. */
+  bare?: boolean;
+}) {
   const graded = scores.some((score) => score.hits || score.misses);
+  if (bare && !graded) {
+    return (
+      <Card padding="standard">
+        <p className="text-ui text-ink-muted">
+          No prediction has been graded yet. The first are graded at the meeting after the week they
+          cover.
+        </p>
+      </Card>
+    );
+  }
   return (
     <Card padding="none">
       <table className="w-full text-ui">
@@ -867,6 +935,53 @@ function Scorecard({ scores }: { scores: readonly BoardScore[] }) {
           cover.
         </p>
       )}
+    </Card>
+  );
+}
+
+/**
+ * How often each advisor's final pick held up once you said how a decision
+ * went (plan #2561.8), with the count by topic under each name. Drawn only
+ * once a pick is graded: the decisions' rows already say when the board
+ * checks back.
+ */
+function PickScorecard({
+  picks,
+  names,
+}: {
+  picks: readonly PickScore[];
+  names: Readonly<Record<string, string>>;
+}) {
+  return (
+    <Card padding="none">
+      <table className="w-full text-ui">
+        <caption className="sr-only">How often each advisor’s pick held up, by topic</caption>
+        <thead>
+          <tr className="border-b border-border text-left text-small text-ink-muted">
+            <th scope="col" className="card-pad-x py-2 font-medium">
+              Advisor
+            </th>
+            <th scope="col" className="card-pad-x py-2 pl-0 text-right font-medium">
+              Picks that held up
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {picks.map((score) => (
+            <tr key={score.advisor} className="align-top">
+              <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
+                <span className="block">{advisorName(score.advisor, names)}</span>
+                <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
+                  {topicsLine(score)}
+                </span>
+              </th>
+              <td className="tabular card-pad-x py-2 pl-0 text-right text-ink whitespace-nowrap">
+                {heldLine(score.held, score.graded)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Card>
   );
 }

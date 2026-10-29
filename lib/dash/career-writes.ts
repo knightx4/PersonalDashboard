@@ -8,6 +8,7 @@ import { APP_STORAGE_BUCKET, type AppSupabaseClient } from '@/lib/jobs/db/schema
 import { normalizeSkills } from '@/lib/jobs/evidence/propose-payload';
 import { RESUME_MAX_BYTES, resumePath } from '@/lib/jobs/resume-file';
 import { slugify } from '@/lib/jobs/slug';
+import { AIM_COLUMNS, parseAimList, saveAimList, type AimField } from '@/lib/jobs/aim';
 import { addThoughtRow, saveThoughtEdit, THOUGHT_MAX } from '@/lib/jobs/thoughts';
 import { addEvidenceItems } from '@/lib/jobs/evidence/bank';
 import { addResumeRow, pointResumeAt, SAME_LABEL } from '@/lib/jobs/resume-versions';
@@ -26,6 +27,7 @@ import type { JobsMade, JobsWrite, JobsWriteEnv } from './jobs-writes';
  *                           version's file.
  *   change_career_thought   a career goals entry written or edited.
  *   add_discovered_company  a startup Find discovered added to their companies.
+ *   change_search_aim       the target titles or excluded industries Find shows.
  *
  * They run in JOBS_WRITES (lib/dash/jobs-writes.ts), so Ask and the
  * connector both have them. All but the last add or change one row, and the
@@ -53,9 +55,11 @@ const EVIDENCE = 'job_search.evidence_items';
 const RESUMES = 'job_search.resume_versions';
 const THOUGHTS = 'job_search.thoughts';
 const WATCHLIST = 'job_search.watchlist_startups';
+const PROFILES = 'job_search.profiles';
 
 const EVIDENCE_HREF = '/jobs/material?part=evidence';
 const RESUMES_HREF = '/jobs/material?part=resumes';
+const FIND_HREF = '/jobs/find';
 const THOUGHTS_HREF = '/jobs/settings#career-goals';
 
 /** The limits the evidence form and the resume form set. */
@@ -325,6 +329,85 @@ async function changeCareerThought(env: JobsWriteEnv, args: Args): Promise<JobsM
 }
 
 // ---------------------------------------------------------------------------
+// change_search_aim
+// ---------------------------------------------------------------------------
+
+const AIM_ITEM_MAX = 80;
+const AIM_TEXT_MAX = 2000;
+const AIM_FIELDS: { field: AimField; arg: string; said: string }[] = [
+  { field: 'targetTitles', arg: 'target_titles', said: 'target titles' },
+  { field: 'excludedIndustries', arg: 'excluded_industries', said: 'excluded industries' },
+];
+
+/** A list argument as a list of words: an array, or the comma list Find's field takes. */
+function aimListOf(args: Args, key: string): string[] | null {
+  const value = args[key];
+  if (value === undefined || value === null) return null;
+  const raw = typeof value === 'string' ? parseAimList(value) : Array.isArray(value) ? value : null;
+  if (!raw || raw.some((entry) => typeof entry !== 'string')) throw new JobsRefused(`${key} must be a list of words, such as ["Accounting", "Controller"].`);
+  const list = (raw as string[]).map((entry) => entry.trim()).filter(Boolean);
+  if (list.some((entry) => entry.length > AIM_ITEM_MAX)) throw new JobsRefused(`Keep each entry in ${key} under ${AIM_ITEM_MAX} characters.`);
+  return list;
+}
+
+/**
+ * The titles Find aims at and the industries it never suggests, as Find's two
+ * fields save them. A list given replaces the one on the profile; add_ and
+ * remove_ lists change it by those entries alone, so the model need not read
+ * the list first.
+ */
+async function changeSearchAim(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
+  const { data, error } = await env.jobs.from('profiles').select('*').eq('id', env.userId).maybeSingle();
+  if (error) throw new Error(`Reading the profile failed: ${error.message}`);
+  if (!data) throw new JobsRefused('They have no job search profile yet.');
+  const before = data as Row;
+
+  const next: { field: AimField; said: string; list: string[] }[] = [];
+  let asked = false;
+  for (const { field, arg, said } of AIM_FIELDS) {
+    const whole = aimListOf(args, arg);
+    const add = aimListOf(args, `add_${arg}`);
+    const remove = aimListOf(args, `remove_${arg}`);
+    if (!whole && !add && !remove) continue;
+    asked = true;
+    const current = Array.isArray(before[AIM_COLUMNS[field]]) ? (before[AIM_COLUMNS[field]] as unknown[]).map(String) : [];
+    const lower = (entry: string) => entry.toLowerCase();
+    let list = whole ?? current;
+    if (remove) list = list.filter((entry) => !remove.map(lower).includes(lower(entry)));
+    for (const entry of add ?? []) if (!list.some((have) => lower(have) === lower(entry))) list = [...list, entry];
+    if (list.join(', ').length > AIM_TEXT_MAX) throw new JobsRefused(`Keep the ${said} under ${formatNumber(AIM_TEXT_MAX)} characters.`);
+    if (!sameList(current, list)) next.push({ field, said, list });
+  }
+  if (!asked) throw new JobsRefused('Give target_titles or excluded_industries, or add_ or remove_ of either.');
+  if (next.length === 0) throw new JobsRefused('Their lists already read that way.');
+
+  // The same writes as Find's two fields, one list at a time.
+  let after: Row = before;
+  for (const entry of next) {
+    const saved = await saveAimList(jobsDb(env), env.userId, entry.field, entry.list);
+    if (saved.error || !saved.row) throw new Error(`Saving the ${entry.said} failed: ${saved.error ?? 'no row'}`);
+    after = saved.row;
+  }
+  const what = next.map((entry) => `${entry.said}: ${entry.list.join(', ') || 'none'}`).join('; ');
+  return {
+    kind: 'change_search_aim',
+    input: { verb: 'Set', what, rest: ' on Find', href: FIND_HREF, where: 'Open Find', paths: ['/jobs/find', '/jobs/settings'] },
+    subjectRef: toRef(PROFILES, env.userId),
+    op: 'update',
+    before,
+    after,
+    summary: `Dash set their ${what}.`,
+    row: { table: PROFILES, ref: env.userId, title: 'Your search aim', href: FIND_HREF },
+    undo: null,
+  };
+}
+
+function sameList(current: unknown, next: string[]): boolean {
+  const have = Array.isArray(current) ? current.map(String) : [];
+  return have.length === next.length && have.every((entry, index) => entry === next[index]);
+}
+
+// ---------------------------------------------------------------------------
 // add_discovered_company
 // ---------------------------------------------------------------------------
 
@@ -567,6 +650,26 @@ export const CAREER_WRITES: readonly JobsWrite[] = [
       additionalProperties: false,
     },
     run: changeCareerThought,
+  },
+  {
+    name: 'change_search_aim',
+    runs: sameAs(['app/jobs/(app)/find/actions.ts#saveAim', 'lib/jobs/aim.ts#saveAimList']),
+    description:
+      'Change what the job search aims at when they ask, as the two fields on Jobs Find do: target_titles, the job titles the roles search keeps and scores (such as to allow accounting jobs, add "Accounting" and "Controller"), and excluded_industries, the industries it never suggests. To add or take off some entries, give add_target_titles / remove_target_titles (or the _excluded_industries pair) and the rest stays; to set the whole list, give target_titles or excluded_industries, which replaces it. Do this yourself; do not hand it on.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ...Object.fromEntries(
+          AIM_FIELDS.flatMap(({ arg, said }) => [
+            [arg, { type: 'array', items: { type: 'string' }, description: `The whole list of ${said}, replacing the one there.` }],
+            [`add_${arg}`, { type: 'array', items: { type: 'string' }, description: `Entries to add to the ${said}.` }],
+            [`remove_${arg}`, { type: 'array', items: { type: 'string' }, description: `Entries to take off the ${said}.` }],
+          ]),
+        ),
+      },
+      additionalProperties: false,
+    },
+    run: changeSearchAim,
   },
   {
     name: 'add_discovered_company',

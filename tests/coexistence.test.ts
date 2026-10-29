@@ -128,7 +128,7 @@ describe('coexistence with the commerce app in public', () => {
     const owners: Record<string, string[]> = {
       handle_new_user: [APP_SCHEMA, 'public'],
       handle_new_user_settings: ['core'],
-      touch_updated_at: ['core', 'goals', APP_SCHEMA, 'learn', 'news', 'obsidian', 'public', 'todo', 'you'],
+      touch_updated_at: ['core', 'finances', 'goals', APP_SCHEMA, 'learn', 'news', 'obsidian', 'public', 'todo', 'you'],
     };
 
     for (const [fn, expected] of Object.entries(owners)) {

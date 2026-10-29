@@ -61,7 +61,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
-import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
+import { loadDevProjects, planScopeOf, storedScopeOf, type PlanScope } from '@/lib/plan/projects';
 import { addThreadTurn } from '@/lib/thread/store';
 import {
   acceptedLine,
@@ -120,11 +120,17 @@ function revalidatePlan(): void {
   revalidatePath('/dev/inbox');
 }
 
-/** Empty string means "the app as a whole", the same as the ideas list. */
-const moduleField = z
-  .string()
-  .max(40)
-  .transform((value) => planScopeOf(value));
+/**
+ * Empty string means "the app as a whole", the same as the ideas list. Read
+ * against the account's projects in the action (`askedScope`), since which
+ * project ids exist is a read.
+ */
+const moduleField = z.string().max(40);
+
+/** The scope a form asked for: a workspace or an active project, anything else app-wide. */
+async function askedScope(supabase: Db, userId: string, value: string): Promise<PlanScope | null> {
+  return planScopeOf(value, await loadDevProjects(supabase, userId));
+}
 
 const statusField = z.enum(PLAN_STATUSES);
 
@@ -190,7 +196,7 @@ async function parentModule(
     .maybeSingle();
   if (!data) return { ok: false, error: 'That parent step does not exist.' };
   const scope = data.module as string | null;
-  return { ok: true, module: planScopeOf(scope) };
+  return { ok: true, module: storedScopeOf(scope) };
 }
 
 const addSchema = z.object({
@@ -235,7 +241,7 @@ export async function addPlanItem(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  let scope = parsed.data.module;
+  let scope = await askedScope(supabase, user.id, parsed.data.module);
   if (parsed.data.parent) {
     const parent = await parentModule(supabase, user.id, parsed.data.parent);
     if (!parent.ok) return { error: parent.error };
@@ -339,7 +345,7 @@ export async function updatePlanItem(
       return { error: 'A step cannot be its own parent.' };
     }
     const stored = current.module as string | null;
-    let scope: PlanScope | null = planScopeOf(stored);
+    let scope: PlanScope | null = storedScopeOf(stored);
     if (parsed.data.parent) {
       const parent = await parentModule(supabase, user.id, parsed.data.parent);
       if (!parent.ok) return { error: parent.error };
@@ -406,7 +412,7 @@ export async function addFeature(
   const parsed = featureSchema.safeParse(featureFields(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const scope = parsed.data.module;
+  const scope = await askedScope(supabase, user.id, parsed.data.module);
   const position = await nextPlanPosition(supabase, user.id, scope, null);
 
   const { data, error } = await supabase

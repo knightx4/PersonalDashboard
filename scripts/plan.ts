@@ -21,6 +21,9 @@
  *                                # something only the person can supply: one
  *                                # setup job of theirs, under the feature that
  *                                # ran into it, and #<n> waits on it
+ *   npx tsx scripts/plan.ts project-ready <project id> --check "<command>" | --no-check
+ *                                # a project's set-up step found how its repository
+ *                                # is checked: record the command and the set-up time
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
  *                                # file one follow-on, marked as your suggestion
@@ -106,14 +109,25 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { ideaDetailShortfall } from '../lib/ideas/body';
 import { isModuleId } from '../lib/modules';
-import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
+import {
+  PROJECT_COLUMNS,
+  isAppScope,
+  isPlanScope,
+  planScopeLabel,
+  planScopeOf,
+  projectById,
+  projectsFromRows,
+  repoForScope,
+  storedScopeOf,
+  type DevProject,
+} from '../lib/plan/projects';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
-import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
@@ -183,6 +197,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from '../lib/plan/tree';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -196,7 +211,7 @@ function connect() {
   // A cloud session's proxy carries HTTPS and not Postgres, so there each
   // statement goes through the REST API instead (lib/db/https-sql.ts).
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key)) as unknown as ReturnType<typeof postgres>;
   }
   if (!url) {
@@ -341,9 +356,18 @@ async function doneRefusal(
   number: number,
   commit: string,
 ): Promise<string | null> {
-  const landing = await commitOnMain({ sha: commit });
-  const refusal = closeRefusal({ sha: commit, landing, branches: branchesContaining(commit) });
+  // Asked of the repository the step was built in: its root feature's
+  // project's, or this one (plan #2553.2).
+  const repo = repoForScope(await rootScope(sql, userId, number), projects);
+  const app = isAppRepo(repo);
+  const landing = await commitOnMain({ sha: commit, repo });
+  // This checkout's branches say nothing about another repository's.
+  const branches = app ? branchesContaining(commit) : [];
+  const refusal = closeRefusal({ sha: commit, landing, branches, repo });
   if (refusal) return refusal;
+  // The screens and the design critic are this app's; a project's
+  // repository has its own checks.
+  if (!app) return null;
 
   let inputs: { files: string[]; surfaces: string[] };
   try {
@@ -360,6 +384,21 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/** The scope a step's root feature is filed under: a workspace, a project, or null. */
+async function rootScope(sql: Sql, userId: string, number: number): Promise<string | null> {
+  const rows = await sql<{ module: string | null }[]>`
+    with recursive up as (
+      select id, parent_id, module, 0 as depth from plan_items
+      where user_id = ${userId} and number = ${number}
+      union all
+      select p.id, p.parent_id, p.module, up.depth + 1 from plan_items p
+      join up on p.id = up.parent_id
+      where p.user_id = ${userId} and up.depth < 50
+    )
+    select module from up order by depth desc limit 1`;
+  return storedScopeOf(rows[0]?.module ?? null);
 }
 
 /**
@@ -406,6 +445,26 @@ async function resolveUser(sql: Sql): Promise<string> {
   return fail('More than one account here. Say which with --user <id or email>.');
 }
 
+/**
+ * The account's projects (lib/plan/projects), read once per run of the
+ * script and kept here, so every label and check in the run reads the same
+ * list. A read that fails reads as none, as it does on the page.
+ */
+let projects: DevProject[] = [];
+
+async function loadProjects(sql: Sql, userId: string): Promise<DevProject[]> {
+  try {
+    const rows = await sql.unsafe<Record<string, unknown>[]>(
+      `select ${PROJECT_COLUMNS} from dev_projects where user_id = $1 order by created_at, id`,
+      [userId],
+    );
+    return projectsFromRows(rows);
+  } catch (err) {
+    console.error(`The Dev projects could not be read: ${err instanceof Error ? err.message : 'failed'}`);
+    return [];
+  }
+}
+
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind,
@@ -419,6 +478,7 @@ async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   return {
     items: rows.map(planItemFromRow),
     dependencies: deps.map((d) => ({ id: d.id, itemId: d.item_id, dependsOnId: d.depends_on_id })),
+    projects,
   };
 }
 
@@ -621,7 +681,7 @@ function ideasFromFile(path: string): { body: string; module: PlanItem['module']
 }
 
 function moduleLabel(module: PlanItem['module']): string {
-  return planScopeLabel(module);
+  return planScopeLabel(module, projects);
 }
 
 /** Keep only the steps a predicate wants, and the way down to them. */
@@ -702,6 +762,7 @@ async function main(): Promise<void> {
   const [command = 'list', target, extra] = positional();
   const sql = connect();
   const userId = await resolveUser(sql);
+  projects = await loadProjects(sql, userId);
 
   try {
     // Every command names steps or reads a name, so the outlines are loaded
@@ -1168,8 +1229,8 @@ async function main(): Promise<void> {
       const parent = parentNumber ? await byNumber(sql, userId, parentNumber) : null;
       const moduleArg = arg('--module');
       // A plan step may belong to a project built elsewhere (lib/plan/projects).
-      if (moduleArg && !isPlanScope(moduleArg)) fail(`"${moduleArg}" is not a module or project.`);
-      const scope = parent ? parent.module : planScopeOf(moduleArg);
+      if (moduleArg && !isPlanScope(moduleArg, projects)) fail(`"${moduleArg}" is not a module or project.`);
+      const scope = parent ? parent.module : planScopeOf(moduleArg, projects);
       const priority = Number(arg('--priority') ?? 2);
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');
@@ -1379,6 +1440,37 @@ async function main(): Promise<void> {
         console.log(readable(line));
       }
       await checkRowWriting(sql, userId, row, { title, detail });
+      return;
+    }
+
+    /**
+     * A project's set-up step (plan #2553.6) found how its repository installs,
+     * tests and builds: the command goes on the project's row with the time,
+     * and every brief after this one tells the session to run it before
+     * merging (projectPreamble in lib/plan/handover.ts). --no-check records the
+     * set-up with no command, for a repository with nothing to run; the step
+     * says why.
+     */
+    if (command === 'project-ready') {
+      const usage = 'project-ready <project id> --check "<command>", or --no-check when it has nothing to run.';
+      const project = target ? projectById(projects, target.trim()) : undefined;
+      if (!project) {
+        fail(
+          `${target ? `"${target}" is not a project.` : 'Name the project.'} ${usage} ` +
+            `Projects: ${projects.map((p) => p.id).join(', ') || 'none'}.`,
+        );
+      }
+      const check = arg('--check')?.trim() || null;
+      if (!check && !has('--no-check')) fail(usage);
+      if (check && check.length > 500) fail('The check command holds at most 500 characters.');
+      await sql`
+        update dev_projects set check_command = ${check}, set_up_at = now()
+        where user_id = ${userId} and id = ${project.id}`;
+      console.log(
+        check
+          ? `${project.label} is set up. Its check command is now \`${check}\`, and every brief after this carries it.`
+          : `${project.label} is set up with no check command. Say on the step why there is none.`,
+      );
       return;
     }
 

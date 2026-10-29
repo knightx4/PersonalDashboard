@@ -22,4 +22,4 @@ comment on column core.account_settings.jev_enabled is
 -- The one account that agreed (#1163).
 update core.account_settings
    set jev_enabled = true
- where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+ where user_id = (select u.id from auth.users u where lower(u.email) = public.owner_email());

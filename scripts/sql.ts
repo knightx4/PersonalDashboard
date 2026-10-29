@@ -21,11 +21,17 @@
  * What it takes is narrower than the connector, on purpose
  * (lib/db/sql-guard.ts): a select, or an insert or update that names the
  * owner's user id. A delete, truncate or schema change is refused.
+ *
+ * Write `:owner` where the statement means the owner's id; it is read from
+ * the database (core.app_settings) and put in before the check:
+ *
+ *   npm run sql -- "select id, title from goals.goals where user_id = :owner"
  */
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
-import { sqlRefusal } from '../lib/db/sql-guard';
+import { OWNER_QUERY, sqlRefusal, withOwner } from '../lib/db/sql-guard';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 type Settings = Record<string, string>;
 
@@ -35,7 +41,7 @@ async function run(statement: string, settings: Settings): Promise<unknown[]> {
   const named = Object.keys(settings).length > 0;
   // A cloud session's proxy carries HTTPS and not Postgres.
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key, named ? settings : undefined)).unsafe(statement);
   }
   if (!url) {
@@ -81,10 +87,16 @@ async function main() {
     console.error('No statement given. Pass it as an argument, with --file, or on stdin.');
     process.exit(1);
   }
-  const refused = sqlRefusal(statement);
-  if (refused) {
-    console.error(refused);
-    process.exit(1);
+  // A plain read needs no owner; anything that names one, or writes, reads it first.
+  if (/:owner\b/.test(statement) || sqlRefusal(statement, null)) {
+    const [row] = (await run(OWNER_QUERY, {})) as Array<{ id?: string | null }>;
+    const owner = row?.id ?? null;
+    if (owner) statement = withOwner(statement, owner);
+    const refused = sqlRefusal(statement, owner);
+    if (refused) {
+      console.error(refused);
+      process.exit(1);
+    }
   }
 
   try {

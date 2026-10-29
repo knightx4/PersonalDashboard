@@ -196,6 +196,65 @@ export function coverLetterView(
   };
 }
 
+/**
+ * How much of the posting is about AI. A letter to an AI-heavy role spends
+ * both middle paragraphs on building with AI; one to a role that mentions it
+ * in passing spends one; one to a role that never mentions it writes about
+ * the work and names their AI building in a clause at most.
+ */
+export type AiWeight = 'central' | 'some' | 'none';
+
+/**
+ * Terms that mean AI itself. Case-sensitive for the acronyms, so "said" and
+ * "html" do not count; "agent" counts only as an AI agent, since postings
+ * also mean sales and insurance agents.
+ */
+const AI_TERMS = [
+  /\bA\.?I\b/g,
+  /\bML\b/g,
+  /\bLLMs?\b/g,
+  /\bGenAI\b/gi,
+  /\bartificial intelligence\b/gi,
+  /\bmachine learning\b/gi,
+  /\bgenerative\b/gi,
+  /\blanguage models?\b/gi,
+  /\bagentic\b/gi,
+  /\bAI agents?\b/gi,
+  /\bcopilots?\b/gi,
+  /\bprompt(?:s|ing)?\b/gi,
+  /\b(?:Claude|ChatGPT|GPT-?\d*|OpenAI|Anthropic|Gemini)\b/g,
+];
+
+/** How the work gets done, which a finance or ops posting often asks about without meaning AI. */
+const AUTOMATION_TERMS = [/\bautomat(?:e|es|ed|ing|ion)\b/gi, /\bno-code\b/gi, /\bscripting\b/gi];
+
+/** Mentions of AI at or above which the role is about AI. */
+export const AI_CENTRAL_MENTIONS = 4;
+
+function mentions(text: string, patterns: readonly RegExp[]): number {
+  return patterns.reduce((sum, pattern) => sum + (text.match(pattern)?.length ?? 0), 0);
+}
+
+/** Read from the role's title, industry, posting and requirements; no model. */
+export function aiWeight(role: Pick<GatheredMaterial['role'], 'title' | 'industry' | 'posting' | 'requirements'>): AiWeight {
+  const text = [role.title, role.industry, role.posting, ...(role.requirements ?? []).map((r) => r.text)]
+    .filter(Boolean)
+    .join('\n');
+  const ai = mentions(text, AI_TERMS);
+  if (ai >= AI_CENTRAL_MENTIONS) return 'central';
+  if (ai > 0 || mentions(text, AUTOMATION_TERMS) > 0) return 'some';
+  return 'none';
+}
+
+const WEIGHT_GUIDE: Record<AiWeight, string> = {
+  central:
+    'AI is central to this role. Paragraphs 2 and 3 are both about building with AI, as the template describes.',
+  some:
+    'The posting mentions AI, automation or tooling, but the role is not about AI. Paragraph 2 is the AI paragraph. Paragraph 3 is about the work the posting describes, not AI.',
+  none:
+    'The posting does not mention AI or automation. Paragraphs 2 and 3 are about the work the posting describes. Building with AI appears at most once, as one thing they built named in a clause, and only where it serves that work. Do not suggest the team should use AI.',
+};
+
 /** One question and its answer on this application. */
 function renderAnswered(question: GatheredQuestion): string {
   return `Q: ${question.text}\nA (${question.status ?? 'draft'}): ${question.answer}`;
@@ -233,8 +292,10 @@ export function renderLetterRequest(request: LetterRequest): string {
   const replies = (request.asks ?? []).filter((ask) => ask.reply !== null);
   const previous = request.previousLetter?.trim();
   const aiNotes = request.aiNotes ?? [];
+  const weight = aiWeight(material.role);
 
   return [
+    `## How much this role is about AI\n\n${WEIGHT_GUIDE[weight]}`,
     answered.length > 0
       ? `## The answers already on this application\n\nThe letter must agree with these and should not retell their stories.\n\n${answered.map(renderAnswered).join('\n\n')}`
       : '## The answers already on this application\n\nNone yet.',
@@ -243,7 +304,9 @@ export function renderLetterRequest(request: LetterRequest): string {
       : '## Where they match the role best\n\nThe requirements have not been matched against their evidence yet; judge the fit from the material.',
     aiNotes.length > 0
       ? `## Their notes on building with AI\n\nThe letter's observations about AI come from here, said the way they said them.\n\n${aiNotes.map(renderVaultPassage).join('\n\n')}`
-      : '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds fewer than two.',
+      : weight === 'central'
+        ? '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds fewer than two.'
+        : '## Their notes on building with AI\n\nNone found. Take any observation about AI only from what the rest of their material says.',
     material.letterComments.length > 0
       ? `## Their comments on the cover letter\n\n${material.letterComments.map((comment) => `- ${comment}`).join('\n')}`
       : null,

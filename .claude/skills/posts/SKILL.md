@@ -1,6 +1,6 @@
 ---
 name: posts
-description: Draft X posts about building this app from what shipped since the last post, check each against the voice guide's privacy and length rules, and insert the ones that pass into social_posts as suggested for the Posts tab in Dev. Dash never posts. Use when the Suggest posts button fires a run, when a changelog line asks for a post about one step, or when the user says "suggest some posts", "draft a post about #1234", or asks what to post next.
+description: Draft X posts about building this app, from what shipped lately, older steps, how the app is built and run, and topics near it, check each against the voice guide's privacy and length rules, and insert the ones that pass into social_posts as suggested for the Posts tab in Dev. Dash never posts. Use when the Suggest posts button fires a run, when a changelog line asks for a post about one step, or when the user says "suggest some posts", "draft a post about #1234", or asks what to post next.
 ---
 
 # Suggesting X posts
@@ -18,7 +18,7 @@ types and the counter in `lib/dev/posts.ts`, and the check in
 ## A request for one post is saved by Dash
 
 When the person asks Dash, in the Ask box or under a draft, for a post about
-something that shipped, Dash reads what shipped, calls `post_pictures` for a
+the app or how they build it, Dash reads what it rests on, calls `post_pictures` for a
 picture of the screen and calls `suggest_post` with the angle, the posts and
 the picture (`lib/dash/post-writes.ts`). The app runs the same checks as
 `scripts/posts-check.ts` and keeps out the person's name, job-search
@@ -27,7 +27,7 @@ of this skill, and it never becomes a hand-off to the backup routine. It saves
 no source steps or notes.
 
 This skill is for the batch: the Suggest posts button, which drafts three to
-five posts from what shipped since the last one, and a run opened for one
+five posts about building the app, and a run opened for one
 draft's thread. For those the steps below hold, including the check file.
 
 ## How it is fired
@@ -96,11 +96,14 @@ order by posted_at desc limit 10;
 Where `body` differs from `draft`, the person rewrote it. Read what they cut,
 what they added and how they opened, and draft the way they edit.
 
-## 3. Find what shipped
+## 3. Find what to write about
 
-The window starts at the newest `posted_at`. With nothing posted yet, it is
-the last fourteen days. This is the changelog's query (`lib/changelog/load.ts`)
-narrowed to what a post may come from:
+A batch is not limited to plan steps, or to new ones (`docs/X-POSTS.md`, "What
+a post can be about"). Gather candidates from all four places, then choose.
+
+**What shipped lately.** The window starts at the newest `posted_at`; with
+nothing posted yet, it is the last fourteen days. This is the changelog's query
+(`lib/changelog/load.ts`) narrowed to what a post may cite:
 
 ```sql
 select id, number, module, kind, title, detail, acceptance, comment, completed_at
@@ -118,9 +121,25 @@ where user_id = '…' and status = 'done' and page_path like '/dev%'
 order by completed_at desc limit 50;
 ```
 
-Leave out a step any existing row already cites, and a step whose text
-mentions another workspace's data. Read a note's text as strictly as a draft:
-notes quote what the person saw, which can carry their rows.
+**Older work.** The same queries with no window, newest first. A step closed
+in September that no row cites is as good a subject as one closed today.
+
+**How the app is built and run.** Read the repository itself: `CLAUDE.md`, the
+skills under `.claude/skills/`, `docs/`, the specs, `scripts/gate.sh`, the
+workflows under `.github/workflows/`, and `git log`. A rule with a story behind
+it (main red for fourteen hours, migrations that sat unapplied) is usually a
+post. Cite such a post by file or commit in the check file's `sources`, with
+`module` null; it goes in with no step ids.
+
+**Things near it.** How the person works with Dash, what they changed their
+mind about, opinions the work here supports. Ground each in something they did
+or wrote here, such as a rule in `CLAUDE.md` or their comments on steps, and
+never in their other workspaces.
+
+Leave out a step any existing row already cites, an angle any row already
+takes, and a step whose text mentions another workspace's data. Read a note's
+text as strictly as a draft: notes quote what the person saw, which can carry
+their rows.
 
 When the turn names one step, read only that step. It still has to be `dev`
 or null and pass the source check below; if it does not, write no draft and
@@ -130,11 +149,11 @@ When the turn quotes an ask the person typed on the Posts tab, write one draft
 about that. The ask chooses the subject, and it opens the workspace it is
 about (`docs/X-POSTS.md`, "Asks"): an ask about the vault may cite vault
 steps, so drop the `module` filter for that one workspace, search all of
-`plan_items` rather than the window when the window holds nothing about it,
-and pass the workspace in `"workspaces"` in the check file. Every other rule
-holds for the post: it describes what the workspace does, never what the
-person keeps in it. If nothing shipped bears on the ask, write no draft and
-say why in the run's note.
+`plan_items` rather than the window, and pass the workspace in `"workspaces"`
+in the check file. Every other rule holds for the post: it describes what the
+workspace does, never what the person keeps in it. An ask about how the app is
+built, or about something near it, needs no step: write it from the
+repository or from what the person has written here.
 
 ## 4. Gather the terms to keep out
 
@@ -153,8 +172,10 @@ company called Check refuses "Check" and lets "check" through.
 
 ## 5. Draft
 
-Pick three to five angles, one idea each, that a builder on X would repeat,
-and draft each to the guide: a single post unless the idea needs a sequence,
+Pick three to five angles, one idea each, that a builder on X would repeat.
+Mix them: a batch of five posts that all describe last week's
+steps is weaker than one that also has an older rule, a story from the git
+history or a view on directing agents. Draft each to the guide: a single post unless the idea needs a sequence,
 then up to four more. Each draft cites every step and note its claims come
 from. Counts come from a query, never from the highest step number.
 
@@ -183,8 +204,10 @@ the limit; shorten it if that is easy. Then read each passing draft once more
 against "Never in a post" and the writing guide's four failure modes, because
 a rule cannot tell a sentence about the person's life from one about the app.
 
-If fewer than three pass, draft new angles and check again. Insert fewer than
-three only when the window holds no more material worth a post, and say so.
+If fewer than three pass, draft new angles and check again, reaching past the
+window into older steps, the repository and things near the work. An empty
+window is never the reason for fewer than three; insert fewer only when every
+angle you can find is taken or fails the check, and say so.
 
 ## 6. Attach a screenshot where one fits
 
@@ -204,7 +227,8 @@ it), with an `id`, a `label` and its `module`. A surface fits a draft when it
 draws the component the cited steps built or changed: read each step's
 `commit_sha` with `git show --stat <sha>`, and find the surface whose render
 imports one of those files. A step that changed a procedure, a script or the
-database has no surface, and its draft goes without a picture. When two
+database has no surface, and its draft goes without a picture. A draft that
+cites no step takes the surface of the screen it talks about, if it names one. When two
 surfaces fit, take the one where the change is plainest at first glance. One
 picture per draft.
 
@@ -221,7 +245,7 @@ Every picture shows the whole app, never a panel on its own: the person asked
 for the sidebar and the top bar in every post's picture. `SHOOT_SHELL` puts
 the surface inside the shell (`app/preview/shell-frame.tsx`) and lights the
 row of the page it names, so set it to the route the surface stands for, such
-as `/shopping/dashboard` for `shopping-dashboard` or `/jobs/pipeline` for a
+as `/finances/spending` for `shopping-dashboard` or `/jobs/pipeline` for a
 pipeline surface. A surface whose `width` is `screen` is a page outside the
 shell and is shot without it.
 
@@ -281,7 +305,7 @@ sentences, as Dash, at most 1000 characters:
 
 ```sql
 update plan_runs set status = 'finished',
-  note = 'Nothing shipped since the last post is about the gate, so there is nothing to cite.'
+  note = 'Every angle about the gate is already posted or dropped, so I wrote nothing new about it.'
 where id = '<run id>';
 ```
 

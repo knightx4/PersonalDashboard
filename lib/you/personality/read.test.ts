@@ -61,7 +61,9 @@ describe('mayRead', () => {
   });
 
   it('never sends an excluded folder or a note holding a key', () => {
-    expect(mayRead({ path: 'Career/Job Applications/Acme.md', body: 'Dear…' })).toBe(false);
+    expect(
+      mayRead({ path: 'Career/Job Applications/Acme.md', body: 'Dear…' }, { journalFolders: ['Me'], excludedFolders: ['Career/Job Applications'] }),
+    ).toBe(false);
     expect(mayRead({ path: 'Ideas/x.md', body: 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789' })).toBe(false);
   });
 });

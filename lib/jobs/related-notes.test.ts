@@ -16,7 +16,7 @@ describe('firstSection', () => {
   });
 
   it('skips headings and stops once the opening is long enough', () => {
-    const about = `Galaxy is ${long('digital', 50)}.`;
+    const about = `Globex is ${long('digital', 50)}.`;
     const text = `Who We Are:\n\n${about}\n\nWhat We Value:\n\n${long('value', 80)}`;
     expect(firstSection(text)).toBe(about);
   });

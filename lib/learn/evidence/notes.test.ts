@@ -16,7 +16,7 @@ function match(overrides: Partial<NoteMatch> = {}): NoteMatch {
   return {
     concept_id: 'idea-1',
     note_id: 'note-1',
-    path: 'Yale/MGT 541/Discount rates.md',
+    path: 'Courses/Statistics 101/Discount rates.md',
     title: 'Discount rates',
     similarity: 0.7,
     created_at: ARRIVED,
@@ -27,20 +27,20 @@ function match(overrides: Partial<NoteMatch> = {}): NoteMatch {
 
 describe('noteWeight', () => {
   it('counts your own writing fully', () => {
-    expect(noteWeight(match({ path: 'Yale/MGT 541/Discount rates.md' }))).toBe(1);
-    expect(noteWeight(match({ path: 'Career/EY/Audit work.md' }))).toBe(1);
-    expect(noteWeight(match({ path: 'Me/Values.md' }))).toBe(1);
+    expect(noteWeight(match({ path: 'Courses/Statistics 101/Discount rates.md' }))).toBe(1);
+    expect(noteWeight(match({ path: 'Work/Halvorsen/Audit work.md' }))).toBe(1);
+    expect(noteWeight(match({ path: 'Personal/Values.md' }))).toBe(1);
   });
 
   it('counts a clipping in Bulk or Pending a quarter', () => {
     expect(CLIPPING_WEIGHT).toBe(0.25);
-    expect(noteWeight(match({ path: 'Bulk/Resources/Books/Utopia for Realists.md' }))).toBe(0.25);
-    expect(noteWeight(match({ path: 'Pending/South Sea Bubble.md' }))).toBe(0.25);
+    expect(noteWeight(match({ path: 'Bulk/Resources/Books/Reading list.md' }))).toBe(0.25);
+    expect(noteWeight(match({ path: 'Pending/Clipped article.md' }))).toBe(0.25);
     expect(noteWeight(match({ path: 'pending/lower case.md' }))).toBe(0.25);
   });
 
   it('counts a clipping you wrote into fully', () => {
-    const edited = match({ path: 'Pending/South Sea Bubble.md', written_at: '2026-09-20T08:00:00.000Z' });
+    const edited = match({ path: 'Pending/Clipped article.md', written_at: '2026-09-20T08:00:00.000Z' });
     expect(noteWeight(edited)).toBe(1);
   });
 
@@ -60,7 +60,7 @@ describe('noteBasis', () => {
   });
 
   it('falls back to the file name', () => {
-    expect(noteBasis(match({ title: '  ', path: 'Me/On risk.md' }))).toBe('you wrote about this in On risk');
+    expect(noteBasis(match({ title: '  ', path: 'Personal/On risk.md' }))).toBe('you wrote about this in On risk');
   });
 });
 
@@ -68,10 +68,10 @@ describe('noteLinkRows', () => {
   it('keeps the five closest notes per idea at 0.6 or above, with folder weights', () => {
     const matches = [
       ...Array.from({ length: 7 }, (_, i) =>
-        match({ note_id: `note-${i}`, similarity: 0.6 + i * 0.01, path: i % 2 ? 'Bulk/x.md' : 'Me/x.md' }),
+        match({ note_id: `note-${i}`, similarity: 0.6 + i * 0.01, path: i % 2 ? 'Bulk/x.md' : 'Personal/x.md' }),
       ),
       match({ note_id: 'too-far', similarity: 0.59 }),
-      match({ concept_id: 'idea-2', note_id: 'clip', path: 'Pending/Wealth of Nations.md' }),
+      match({ concept_id: 'idea-2', note_id: 'clip', path: 'Pending/Copied chapter.md' }),
     ];
     const rows = noteLinkRows('user-1', matches);
 

@@ -4,8 +4,8 @@
 --
 -- #1034 settled that a written answer reopens its closed step only when its
 -- meaning changes, and that the goals routine says whether it did, with one
--- line on why. "Nelnet" rewritten as "Nelnet Servicing" names the same
--- servicer and leaves the step closed; "MOHELA" names another and reopens it.
+-- line on why. "Northstar" rewritten as "Northstar Servicing" names the same
+-- servicer and leaves the step closed; "Brightline" names another and reopens it.
 -- 0037 compared written answers on their wording until this verdict was
 -- stored.
 --

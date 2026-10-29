@@ -76,6 +76,7 @@ describe('addMetric', () => {
       date_field: 'applied',
       period: 'week',
       target: 5,
+      target_high: null,
     });
   });
 

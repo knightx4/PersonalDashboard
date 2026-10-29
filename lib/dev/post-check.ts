@@ -1,12 +1,7 @@
-import { PROJECTS } from '@/lib/plan/projects';
+import type { DevProject } from '@/lib/plan/projects';
 import { ruleScores } from '@/lib/writing/check';
-import {
-  LINK_PATTERN,
-  MAX_THREAD_POSTS,
-  X_POST_LIMIT,
-  X_POST_MARGIN,
-  xLength,
-} from './posts';
+import { LINK_PATTERN, MAX_THREAD_POSTS, X_POST_LIMIT, X_POST_MARGIN, xLength } from './posts';
+import { supabaseProjectRef } from '@/lib/db/project';
 
 /**
  * The check every X draft passes before the posts run inserts it (plan #1417).
@@ -122,20 +117,19 @@ const THREAD_MARKER = /🧵|^\s*\d+\s?\/\s?\d*(\s|$)/;
 const EMOJI = /\p{Extended_Pictographic}/u;
 const EM_DASH = /—/;
 
-/** The Supabase project ref, kept out of posts by name. */
-const PROJECT_REF = 'asjztutnqxbecruvyrbj';
-
 /**
- * Terms every check refuses: the hosts of the projects the plan builds, which
- * carry the person's name, and the GitHub owners behind them.
+ * The hosts of these projects, which carry the person's name, and the GitHub
+ * owners and repositories behind them.
  */
-export function builtInAvoidTerms(): string[] {
-  const terms = new Set<string>([PROJECT_REF]);
-  for (const project of PROJECTS) {
+export function projectAvoidTerms(projects: ReadonlyArray<Pick<DevProject, 'url' | 'repo'>>): string[] {
+  const terms = new Set<string>();
+  for (const project of projects) {
     try {
-      const host = new URL(project.url).hostname.replace(/^www\./, '');
-      terms.add(host);
-      terms.add(host.split('.')[0]);
+      if (project.url) {
+        const host = new URL(project.url).hostname.replace(/^www\./, '');
+        terms.add(host);
+        terms.add(host.split('.')[0]);
+      }
     } catch {
       // A project without a parseable url has no host to keep out.
     }
@@ -143,6 +137,17 @@ export function builtInAvoidTerms(): string[] {
     terms.add(project.repo.repo);
   }
   return [...terms].filter((term) => term.length >= 3);
+}
+
+/**
+ * Terms every check refuses without being told: the Supabase project's ref,
+ * when the environment names one (lib/db/project.ts). The person's own name,
+ * sites and repositories come from their rows, through the caller's `avoid`
+ * (avoidTerms in lib/dash/post-writes.ts).
+ */
+export function builtInAvoidTerms(): string[] {
+  const ref = supabaseProjectRef();
+  return ref ? [ref] : [];
 }
 
 function escape(term: string): string {

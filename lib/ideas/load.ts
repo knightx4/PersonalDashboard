@@ -224,7 +224,12 @@ export const FILED_IDEAS_SQL = `select id, body from ideas
  * Newest first: the reason to open this page is usually the thought you had
  * last week, not the one you had in March.
  */
-export async function loadIdeas(supabase: SupabaseClient, userId: string): Promise<IdeaList> {
+/** `asOf` is the moment suggestions are aged against; the nightly digest passes its own clock. */
+export async function loadIdeas(
+  supabase: SupabaseClient,
+  userId: string,
+  asOf: Date = new Date(),
+): Promise<IdeaList> {
   const { data } = await supabase
     .from('ideas')
     .select(IDEA_COLUMNS)
@@ -239,6 +244,6 @@ export async function loadIdeas(supabase: SupabaseClient, userId: string): Promi
   // Each idea's thread, from the shared store (plan #1470).
   return ideaListFrom(
     (await withThreads(supabase, IDEAS_TABLE, rows, { userId })).map(ideaRowFrom),
-    new Date(),
+    asOf,
   );
 }

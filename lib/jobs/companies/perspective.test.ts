@@ -16,7 +16,7 @@ describe('company perspective', () => {
   it('counts only answers with words in them', () => {
     const perspective = perspectiveOf({
       perspective_business: 'Payments for clinics.',
-      perspective_why_me: 'Revenue audits at EY.',
+      perspective_why_me: 'Revenue audits at Halvorsen & Co.',
       perspective_next_move: '  ',
     });
     expect(answeredCount(perspective)).toBe(2);

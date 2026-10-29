@@ -66,8 +66,9 @@ import { ChannelPicker } from './channel-picker';
 import { HeaderFacts, RoleFacts } from './role-facts';
 import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 import { PageColumn } from '@/components/shell/page-width';
-import { loadFollowUps } from '@/lib/jobs/followup/load';
-import { FollowUpCard } from '../../follow-ups/follow-up-card';
+import { loadApplicationSends, loadFollowUps } from '@/lib/jobs/followup/load';
+import { goalsRoutine } from '@/lib/feedback/routine';
+import type { ResearchStatus } from '@/lib/jobs/companies/research';
 
 export const metadata = { title: 'Role' };
 
@@ -105,7 +106,7 @@ export default async function RoleDetailPage({
     .from('roles')
     .select(
       `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, jd_lookup_at, ats_job_id, seniority, location, work_mode, kind,
-       comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
+       comp_min_cents, comp_max_cents, comp_source, experience_min_years, experience_max_years, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, stage, ats_type, priority, logo_url, domains, website, careers_url )`,
     )
@@ -299,8 +300,12 @@ export default async function RoleDetailPage({
   }
 
   const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
-  // Who to tell about this application, and the note to them (lib/jobs/followup).
-  const [followUp] = await loadFollowUps(supabase, user.id, { applicationIds: [current.id as string] });
+  // Who to reach out to about this application, the note to each, and what
+  // went to anyone about it, for the Outreach tab (lib/jobs/followup).
+  const [[followUp], sends] = await Promise.all([
+    loadFollowUps(supabase, user.id, { applicationIds: [current.id as string] }),
+    loadApplicationSends(supabase, user.id, current.id as string),
+  ]);
   const requirements = (role.requirements as Requirement[] | null) ?? [];
 
   const evidence = (bank ?? []).map((item) => ({
@@ -429,6 +434,27 @@ export default async function RoleDetailPage({
     await workingRefsForPage(user.id),
     [rowRef('job_search.applications', current.id as string), rowRef('job_search.roles', id)],
   );
+
+  // Whether the company research routine has run on this company, for the
+  // line on the Application tab (note 6b260c08). The newest run says whether
+  // one is going; the newest finished one says when it was done.
+  const { data: researchRuns } = await supabase
+    .from('company_research')
+    .select('status, finished_at, requested_at')
+    .eq('company_id', company.id)
+    .eq('user_id', user.id)
+    .order('requested_at', { ascending: false })
+    .limit(10);
+  const researchReady = (researchRuns ?? []).find((run) => run.status === 'ready');
+  const research = {
+    companyId: company.id,
+    companySlug: company.slug,
+    latestStatus: ((researchRuns ?? [])[0]?.status as ResearchStatus | undefined) ?? null,
+    readyAt: researchReady
+      ? ((researchReady.finished_at ?? researchReady.requested_at) as string)
+      : null,
+    available: Boolean(goalsRoutine().id && goalsRoutine().token),
+  };
 
   // One column, facts above the tabs: a detail page reads top to bottom, and
   // a rail beside the tabs squeezed them off the edge at laptop width.
@@ -580,17 +606,6 @@ export default async function RoleDetailPage({
           timezone={timezone}
         />
 
-        {/* A closed application keeps the card only if someone was named. */}
-        {followUp && (roleStage(status) !== 'closed' || followUp.person) && (
-          <FollowUpCard
-            initial={followUp}
-            timezone={timezone}
-            contacts={(
-              (companyContacts ?? []) as unknown as Array<{ id: string; full_name: string; title: string | null }>
-            ).map((contact) => ({ id: contact.id, name: contact.full_name, title: contact.title }))}
-          />
-        )}
-
         <RelatedNotes notes={related} />
 
         {Boolean(role.jd_url) && !(role.jd_text as string | null)?.trim() && !role.jd_lookup_at && (
@@ -611,6 +626,8 @@ export default async function RoleDetailPage({
           compMinCents={(role.comp_min_cents as number) ?? null}
           compMaxCents={(role.comp_max_cents as number) ?? null}
           compSource={(role.comp_source as string) ?? null}
+          experienceMinYears={(role.experience_min_years as number) ?? null}
+          experienceMaxYears={(role.experience_max_years as number) ?? null}
           requirements={requirements}
           requirementMatches={requirementMatches}
           requirementMatchesAt={(role.requirement_matches_at as string) ?? null}
@@ -744,6 +761,9 @@ export default async function RoleDetailPage({
             }),
           }))}
           companyName={company.name}
+          research={research}
+          followUp={followUp}
+          sends={sends}
           matchCandidates={matchCandidates}
           otherAttempts={(applications ?? []).slice(1).map((attempt) => ({
             id: attempt.id as string,

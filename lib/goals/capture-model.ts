@@ -55,6 +55,15 @@ Rules:
   carrying the progress: "moved two bags to the office" with only a "Living
   room" step is an add under it titled Move the bags to the office, text moved
   two bags, quantity 2, unit bags.
+- Time spent on something ("applied for 2h", "90 minutes cleaning") is
+  file_progress with the time as quantity and unit hours (90 minutes is 1.5
+  hours), never a close and never an add marked done. A goal whose line says
+  "tracks hours: Cleaning" is where time on that work goes: file it on the
+  step under that goal that best fits, or on the goal itself when none does,
+  never on another goal. Each stretch of time is one move on one goal; never
+  file the same hours twice. Time of zero ("0h AI training") is not filed.
+  When the sentence also says a piece of work was finished, that is its own
+  move as well.
 - When the message names the goal whose page it was written on, file against
   that goal unless the sentence plainly concerns another.
 - Never invent refs. If nothing fits, make no move and only answer: the

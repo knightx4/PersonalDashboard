@@ -147,8 +147,8 @@ describe('the business territory (plan #2483.2)', () => {
 describe('texts by area (plan #2483.2)', () => {
   it('gives an area its own texts and those naming none', () => {
     const keys = (name?: string) => textsFor(BUSINESS, name).map((t) => t.key);
-    expect(keys('accounting')).toEqual(['osacct', 'mit501', 'mit535', 'yale816', 'yale815']);
-    expect(keys('corporate-finance')).toEqual(['osfin', 'yale541', 'yale423', 'yale847', 'yale816']);
+    expect(keys('accounting')).toEqual(['osacct', 'mit501', 'mit535', 'acc520', 'acc530']);
+    expect(keys('corporate-finance')).toEqual(['osfin', 'fin410', 'fin420', 'fin610', 'acc520']);
     expect(keys()).toHaveLength(BUSINESS.texts.length);
     const given = territorySources(BUSINESS, [null], 'accounting');
     expect(given.sources.map((s) => s.label)).toEqual(textsFor(BUSINESS, 'accounting').map((t) => t.label));

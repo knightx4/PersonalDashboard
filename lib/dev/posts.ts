@@ -5,8 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  *
  * The Posts tab in Dev has a Suggest posts button. It starts one run of the
  * plan routine (job `posts` in `plan_runs`) that follows
- * `.claude/skills/posts/SKILL.md`: it reads what shipped since the last post,
- * drafts three to five posts to `docs/X-POSTS.md`, checks each with
+ * `.claude/skills/posts/SKILL.md`: it reads what shipped lately, older work,
+ * how the app is built and what sits near it, drafts three to five posts to `docs/X-POSTS.md`, checks each with
  * `lib/dev/post-check.ts`, and inserts the ones that pass into
  * `social_posts` as suggested. Dash never posts; the person copies a draft,
  * posts it themselves and pastes the link back.
@@ -192,7 +192,12 @@ export const MAX_POST_ASK = 1000;
 
 function focusLine(focus: PostsRunFocus | null | undefined): string {
   if (!focus) {
-    return `Write ${MIN_SUGGESTIONS} to ${MAX_SUGGESTIONS} drafts about what shipped since the last posted row.`;
+    return (
+      `Write ${MIN_SUGGESTIONS} to ${MAX_SUGGESTIONS} drafts. What shipped since the last posted row comes first ` +
+      'when there is any, but a post may also come from a step closed at any time, from how the app is ' +
+      'built and run (the repository, its docs and skills, its history), or from something near it, such ' +
+      'as how the person works with Dash. A quiet week is not a reason to write none.'
+    );
   }
   if ('number' in focus) {
     return (
@@ -201,10 +206,11 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
     );
   }
   return (
-    'Write one draft about what the person asked for, quoted below. Find the shipped steps ' +
-    'and closed notes it is about and cite them. An ask may be about any workspace, and may ' +
+    'Write one draft about what the person asked for, quoted below. Cite the steps and closed ' +
+    'notes it is about where there are any; an ask needs no step behind it when it is about how ' +
+    'the app is built or something near it. An ask may be about any workspace, and may ' +
     'allow a picture with real data, as the skill\'s section on asks says; the other rules ' +
-    'still hold. If nothing shipped bears on it, write no draft and say why.\n\n' +
+    'still hold.\n\n' +
     focus.ask
       .split('\n')
       .map((line) => `> ${line}`)

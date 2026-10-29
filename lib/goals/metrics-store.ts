@@ -9,9 +9,12 @@ import {
   countByPeriod,
   countDaysByPeriod,
   dashFileDays,
+  loggedHourDays,
   metricInputError,
+  sumDaysByPeriod,
   type CountedFile,
   type CountedStep,
+  type LoggedEntry,
   type Metric,
   type MetricInput,
   type MetricPeriod,
@@ -39,10 +42,12 @@ type MetricRow = {
   date_field: string | null;
   period: MetricPeriod;
   target: number | null;
+  target_high: number | null;
   position: number;
 };
 
-const METRIC_COLUMNS = 'id, goal_id, name, source, collection_id, date_field, period, target, position';
+const METRIC_COLUMNS =
+  'id, goal_id, name, source, collection_id, date_field, period, target, target_high, position';
 
 const toMetric = (row: MetricRow): Metric => ({
   id: row.id,
@@ -53,6 +58,7 @@ const toMetric = (row: MetricRow): Metric => ({
   dateField: row.date_field,
   period: row.period,
   target: row.target,
+  targetHigh: row.target_high,
   position: row.position,
 });
 
@@ -64,6 +70,7 @@ const toRow = (input: MetricInput) => ({
   date_field: input.source === 'list' ? input.dateField : null,
   period: input.period,
   target: input.target,
+  target_high: input.target === null ? null : (input.targetHigh ?? null),
 });
 
 /**
@@ -173,7 +180,7 @@ type GoalStep = CountedStep & { id: string };
  * step under an archived step is out of view with it. A step linked in from
  * another goal (goals.item_goals) is that goal's and is not counted here.
  */
-async function loadGoalSteps(client: GoalsSupabaseClient, goalId: string): Promise<GoalStep[]> {
+export async function loadGoalSteps(client: GoalsSupabaseClient, goalId: string): Promise<GoalStep[]> {
   const { data, error } = await client
     .from('items')
     .select('id, parent_id, level, status, closed_at')
@@ -202,6 +209,31 @@ async function loadGoalSteps(client: GoalsSupabaseClient, goalId: string): Promi
     frontier = next;
   }
   return steps;
+}
+
+type EntryRow = { happened_on: string; quantity: number | string | null; unit: string | null };
+
+/**
+ * The live progress entries on the goal and on the given steps under it, as
+ * an hours metric reads them (migration goals 0089). Entries taken back are
+ * left out here, so loggedHourDays sees only what stands.
+ */
+export async function loadLoggedEntries(
+  client: GoalsSupabaseClient,
+  itemIds: string[],
+): Promise<LoggedEntry[]> {
+  const { data, error } = await client
+    .from('progress_entries')
+    .select('happened_on, quantity, unit')
+    .in('item_id', [...new Set(itemIds)])
+    .is('undone_at', null)
+    .not('quantity', 'is', null);
+  if (error) throw new Error(`Could not read the hours logged: ${error.message}`);
+  return ((data ?? []) as EntryRow[]).map((row) => ({
+    happenedOn: row.happened_on,
+    quantity: row.quantity === null ? null : Number(row.quantity),
+    unit: row.unit,
+  }));
 }
 
 type FileLinkRow = { target_id: string };
@@ -250,12 +282,13 @@ export async function loadMetricCounts(
     if (metric.source !== 'list' || !metric.collectionId || lists.has(metric.collectionId)) continue;
     lists.set(metric.collectionId, await loadRecords(client, metric.collectionId));
   }
-  // A files metric reads the steps too, for the files linked to them.
-  const wantsTree = metrics.some((m) => m.source === 'steps' || m.source === 'files');
-  const steps = wantsTree ?await loadGoalSteps(client, goal.id) : [];
-  const files = metrics.some((m) => m.source === 'files')
-    ? await loadGoalFiles(client, core, [goal.id, ...steps.map((step) => step.id)])
-    : [];
+  // A files metric reads the steps too, for the files linked to them, and an
+  // hours metric for the time logged on them.
+  const wantsTree = metrics.some((m) => m.source !== 'list');
+  const steps = wantsTree ? await loadGoalSteps(client, goal.id) : [];
+  const treeIds = [goal.id, ...steps.map((step) => step.id)];
+  const files = metrics.some((m) => m.source === 'files') ? await loadGoalFiles(client, core, treeIds) : [];
+  const entries = metrics.some((m) => m.source === 'hours') ? await loadLoggedEntries(client, treeIds) : [];
 
   const daysOf = (metric: Metric): string[] | null => {
     if (metric.source === 'steps') return closedStepDays(steps, timeZone);
@@ -265,6 +298,9 @@ export async function loadMetricCounts(
   return metrics.map((metric) => {
     const days = daysOf(metric);
     const common = { period: metric.period, goalStartedAt: goal.createdAt, now, timeZone };
+    if (metric.source === 'hours') {
+      return { ...metric, counts: sumDaysByPeriod({ amounts: loggedHourDays(entries), ...common }) };
+    }
     if (days) return { ...metric, counts: countDaysByPeriod({ days, ...common }) };
     if (!metric.collectionId || !metric.dateField) return { ...metric, counts: [] };
     return {

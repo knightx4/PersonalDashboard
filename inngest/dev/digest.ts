@@ -110,7 +110,7 @@ async function contextFor(input: {
 }): Promise<DigestContext> {
   const { supabase, userId, now, plan } = input;
   const [ideas, raised] = await Promise.all([
-    loadIdeas(supabase, userId),
+    loadIdeas(supabase, userId, now),
     loadRaised(supabase, userId),
   ]);
 

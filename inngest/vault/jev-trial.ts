@@ -20,7 +20,8 @@ import {
   type MapTrialAnswer,
   type MapTrialSummary,
 } from '@/lib/vault/map/jev-trial';
-import { tooShortForMap, whyNotRead } from '@/lib/vault/map/rules';
+import { tooShortForMap, whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 
 /**
  * The map trial on Jev and Haiku (plan #1168), run where the keys are.
@@ -78,6 +79,8 @@ export async function runMapJevTrial(opts: {
   const trial = opts.trial ?? JEV_MAP_TRIAL;
   const started = Date.now();
   const budgetMs = opts.budgetMs ?? DEFAULT_BUDGET_MS;
+  // The person's private folders, read once for the run.
+  const rules = await loadVaultRules(supabase, userId);
 
   const live: { id: string; path: string }[] = [];
   for (let from = 0; ; from += PAGE) {
@@ -133,10 +136,10 @@ export async function runMapJevTrial(opts: {
         trial,
         note_id: note.id,
         blob_sha: note.blob_sha,
-        ...referenceRow(note.path),
+        ...referenceRow(note.path, rules),
       };
 
-      const notRead = whyNotRead(note);
+      const notRead = whyNotRead(note, rules);
       const notSent =
         notRead && notRead.reason !== 'excluded'
           ? notRead.reason
@@ -213,10 +216,10 @@ export async function runMapJevTrial(opts: {
   return result;
 }
 
-function referenceRow(path: string) {
+function referenceRow(path: string, rules: VaultRules) {
   const { reference, evidence } = referenceFor(path);
   return {
-    excluded: whyNotRead({ path, body: '' })?.reason === 'excluded',
+    excluded: whyNotRead({ path, body: '' }, rules)?.reason === 'excluded',
     reference,
     reference_evidence: evidence,
   };

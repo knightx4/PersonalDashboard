@@ -66,7 +66,10 @@ const QUANTITY = {
   type: 'number',
   description: 'The amount alone, when the sentence gives one ("moved two bags" is 2).',
 } as const;
-const UNIT = { type: 'string', description: 'What was counted, such as bags, pages or rooms. Only with a quantity.' } as const;
+const UNIT = {
+  type: 'string',
+  description: 'What was counted, such as bags, pages or rooms; hours for time spent. Only with a quantity.',
+} as const;
 const TOTAL = {
   type: 'number',
   description:

@@ -177,6 +177,6 @@ describe('what a refusal says', () => {
   });
 
   it('links to the post the way the reads store it', () => {
-    expect(xPostUrl('selveybuilds', '123')).toBe('https://x.com/selveybuilds/status/123');
+    expect(xPostUrl('alexbuilds', '123')).toBe('https://x.com/alexbuilds/status/123');
   });
 });

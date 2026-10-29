@@ -228,7 +228,7 @@ export default function PrivacyPage() {
         #1289), which asks Jev (lib/vault/maya/gate.ts) before Maya writes. The
         map sweep's first read also goes to Jev for an account that has opted in
         (lib/vault/map/jev-question.ts, lib/jev/enabled.ts). The sweep skips what
-        rules.ts skips (the Me folder and notes with API keys), notes under 80
+        rules.ts skips (the folders you mark private and notes with API keys), notes under 80
         characters, and text past MAX_NOTE_READ_CHARS in
         lib/learn/graph/note-chunks.ts. Any new path that sends note text to a
         model has to be added here before it ships, along with what it skips.
@@ -317,21 +317,22 @@ export default function PrivacyPage() {
           sent.
         </li>
         <li>
-          For the map, from a sweep or from one note: any part of a note in your Me folder, which
-          holds your journals, of a note in Career/Job Applications, of a note that contains what looks like an API key, or of a note
-          under 80 characters. These are turned away before anything is sent.
+          For the map, from a sweep or from one note: any part of a note in a folder you mark as a
+          journal or leave out (Vault settings, Private folders), of a note that contains what looks
+          like an API key, or of a note under 80 characters. These are turned away before anything
+          is sent.
         </li>
         <li>For the map, the part of a note past its first 400,000 characters.</li>
         <li>
-          When asking Maya: any part of a note in your Me folder, of a note in Career/Job
-          Applications, or of a note that contains what looks like an API key, whether it is the
+          When asking Maya: any part of a note in a folder you mark as a journal or leave out, or
+          of a note that contains what looks like an API key, whether it is the
           note you asked about or one of your other notes. Such a note shows no way to ask Maya
           at all.
         </li>
         <li>
-          To Jev: the folder or file path of a note, or any part of a note in your Me folder, of a
-          note in Career/Job Applications, of a note that contains what looks like an API key, or
-          of a note under 80 characters. Maya does not write on such a note by itself.
+          To Jev: the folder or file path of a note, or any part of a note in a folder you mark as
+          a journal or leave out, of a note that contains what looks like an API key, or of a note
+          under 80 characters. Maya does not write on such a note by itself.
         </li>
       </ul>
       <p>

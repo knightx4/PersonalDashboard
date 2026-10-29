@@ -138,7 +138,7 @@ export function changePaths(change: DashChange): string[] {
         '/shopping/inventory',
         `/shopping/inventory/${change.input.id}`,
         '/shopping/orders',
-        '/shopping/dashboard',
+        '/finances/spending',
       ];
     case 'start_watch':
       return ['/home'];
@@ -163,7 +163,7 @@ export function changePaths(change: DashChange): string[] {
         '/shopping/inventory',
         '/shopping/sell',
         '/shopping/returns',
-        '/shopping/dashboard',
+        '/finances/spending',
         ...rows.flatMap((row) => (typeof row.id === 'string' ? [`/shopping/inventory/${row.id}`] : [])),
       ];
     }

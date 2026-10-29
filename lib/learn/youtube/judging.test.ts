@@ -90,7 +90,7 @@ const listRow = (videoId: string, title: string, extra: Row = {}): Row => ({
 });
 
 const profile: LearnerProfile = {
-  tracks: [{ name: 'Startup Finance / FP&A', note: null, frontier: [], settled: 2 }],
+  tracks: [{ name: 'Small Business Finance', note: null, frontier: [], settled: 2 }],
   goals: [],
   ideas: [],
 };
@@ -122,17 +122,17 @@ describe('judgeWatchLists', () => {
       if (tool === 'report_screen') {
         return toolReply(tool, {
           videos: [
-            { number: 1, decision: 'look', why: 'Serves your "Startup Finance / FP&A" track.' },
+            { number: 1, decision: 'look', why: 'Serves your "Small Business Finance" track.' },
             { number: 2, decision: 'skip', why: 'Touches none of your tracks, goals or ideas; a game run.' },
           ],
         });
       }
       if (request.messages[0].content.includes('A long lecture')) {
-        return toolReply(tool, { verdict: 'card', why: 'Serves your "Startup Finance / FP&A" track: forecasting.', windows: [{ window: 3, point: 'Forecasts roll forward.' }] });
+        return toolReply(tool, { verdict: 'card', why: 'Serves your "Small Business Finance" track: forecasting.', windows: [{ window: 3, point: 'Forecasts roll forward.' }] });
       }
       return toolReply(tool, {
         verdict: 'watch',
-        why: 'Serves your "Startup Finance / FP&A" track: builds the model live.',
+        why: 'Serves your "Small Business Finance" track: builds the model live.',
         best_from: 1,
         best_to: 2,
         windows: [{ window: 1, point: 'Sets up the sheet.' }],
@@ -246,12 +246,12 @@ describe('judgeWatchLists', () => {
       const tool = request.tools[0].name;
       systems.push(request.system);
       if (tool === 'report_screen') {
-        return toolReply(tool, { videos: [{ number: 1, decision: 'look', why: 'Serves your "Startup Finance / FP&A" track.' }] });
+        return toolReply(tool, { videos: [{ number: 1, decision: 'look', why: 'Serves your "Small Business Finance" track.' }] });
       }
       // Haiku says card even where Jev settled a watch: the settled verdict wins.
       return toolReply(tool, {
         verdict: 'card',
-        why: 'Serves your "Startup Finance / FP&A" track: builds the model live.',
+        why: 'Serves your "Small Business Finance" track: builds the model live.',
         best_from: 1,
         best_to: 2,
         windows: [{ window: 1, point: 'Sets up the sheet.' }],
@@ -284,7 +284,7 @@ describe('judgeWatchLists', () => {
     expect(byId.get('bbbbbbbbbbb')).toMatchObject({ verdict: null, why: null, screened_at: '2026-09-26T10:00:00.000Z' });
     // Your filing's channel: Jev is not asked, Haiku screens it.
     expect(asked).not.toContain('Gardening diary');
-    expect(byId.get('ccccccccccc')).toMatchObject({ verdict: null, why: 'Serves your "Startup Finance / FP&A" track.' });
+    expect(byId.get('ccccccccccc')).toMatchObject({ verdict: null, why: 'Serves your "Small Business Finance" track.' });
 
     // Second pass: a sure skip settled by Jev alone.
     expect(byId.get('ddddddddddd')).toMatchObject({
@@ -298,7 +298,7 @@ describe('judgeWatchLists', () => {
     expect(byId.get('eeeeeeeeeee')).toMatchObject({
       verdict: 'watch',
       judge_verdict: 'watch',
-      why: 'Serves your "Startup Finance / FP&A" track: builds the model live.',
+      why: 'Serves your "Small Business Finance" track: builds the model live.',
       best_start_seconds: 0,
     });
     // Unsure: Haiku judges it as before.

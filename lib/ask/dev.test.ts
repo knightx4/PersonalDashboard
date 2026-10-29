@@ -172,6 +172,15 @@ describe('read_spec', () => {
     }
   });
 
+  it('reads several sections in one lookup', async () => {
+    const result = await executeAskTool('read_spec', { spec: 'writing', section: 'opening, structure,nope' }, context());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.map((row) => row.ref)).toEqual(['writing#opening', 'writing#structure']);
+    expect(result.rows.every((row) => typeof row.detail?.text === 'string')).toBe(true);
+    expect(result.note).toContain('no section nope');
+  });
+
   it('cuts a long section from the paragraph that matches', async () => {
     const result = await executeAskTool('read_spec', { spec: 'writing', query: 'expiry rule' }, context());
     expect(result.ok).toBe(true);

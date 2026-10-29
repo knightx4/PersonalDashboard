@@ -21,8 +21,11 @@ import type { MainCheck } from '@/lib/plan/main-check';
  * exist. A table that is not there yet, a read that is refused, a session that
  * has expired -- all of them come back as null, which the dot draws as "not
  * read", which is true.
+ *
+ * `repo` is the row's "owner/repo" key: this app's for the status line, a Dev
+ * project's for that project's page (plan #2553.2).
  */
-export async function loadMainCheck(): Promise<MainCheck | null> {
+export async function loadMainCheck(repo: string = REPO_KEY): Promise<MainCheck | null> {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -30,7 +33,7 @@ export async function loadMainCheck(): Promise<MainCheck | null> {
       .select(
         'head_sha, conclusion, checked_at, error, reason, run_url, deploy_state, deploy_url, deploy_error, unapplied_migrations, migrations_error',
       )
-      .eq('repo', REPO_KEY)
+      .eq('repo', repo)
       .maybeSingle();
     if (error || !data) return null;
 

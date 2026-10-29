@@ -4,7 +4,8 @@ import { isUuid } from '@/lib/ask/db';
 import type { PostChangeInput, PostChangeKind } from '@/lib/ask/post-changes';
 import { toRef } from '@/lib/core/refs';
 import { rewritePostBody } from '@/lib/dev/post-body';
-import { checkDraft } from '@/lib/dev/post-check';
+import { checkDraft, projectAvoidTerms } from '@/lib/dev/post-check';
+import { loadDevProjects } from '@/lib/plan/projects';
 import { cleanThread, MAX_ANGLE, MAX_THREAD_POSTS, X_POST_LIMIT } from '@/lib/dev/posts';
 import { listPostPictures } from './post-pictures';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
@@ -179,10 +180,12 @@ async function rewritePost(ctx: DashWriteContext, args: Args): Promise<DashWrite
 /** The terms a post must not name, as the posts run gathers them for scripts/posts-check.ts. */
 async function avoidTerms(ctx: DashWriteContext): Promise<string[]> {
   const [pub, jobs] = await Promise.all([ctx.db('public'), ctx.db('job_search')]);
-  const [profile, companies, contacts] = await Promise.all([
+  const [profile, companies, contacts, projects] = await Promise.all([
     pub.from('profiles').select('display_name').eq('id', ctx.userId).maybeSingle(),
     jobs.from('companies').select('name').eq('user_id', ctx.userId),
     jobs.from('contacts').select('full_name').eq('user_id', ctx.userId),
+    // The projects Dev builds elsewhere (plan #2553.1): their hosts and owners.
+    loadDevProjects(pub, ctx.userId),
   ]);
   for (const read of [profile, companies, contacts]) {
     if (read.error) throw new Error(`Reading the terms to keep out failed: ${read.error.message}`);
@@ -192,6 +195,7 @@ async function avoidTerms(ctx: DashWriteContext): Promise<string[]> {
   if (typeof name === 'string') for (const word of name.split(/\s+/)) terms.add(word);
   for (const row of (companies.data ?? []) as Row[]) if (typeof row.name === 'string') terms.add(row.name);
   for (const row of (contacts.data ?? []) as Row[]) if (typeof row.full_name === 'string') terms.add(row.full_name);
+  for (const term of projectAvoidTerms(projects)) terms.add(term);
   return [...terms].map((t) => t.trim()).filter((t) => t.length >= 2);
 }
 
@@ -347,7 +351,7 @@ export const POST_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
     noButton(
       'No button saves a draft somebody wrote: Post about this on the changelog starts a posts run that drafts one (suggestPostAbout), which spends.',
     ),
-    `Save a new X post draft to the Posts tab in Dev, when they ask you for a post about something that shipped ("write a post about the new plan page"). Read what shipped first (the plan steps and changelog), and write about what the app does, never what they keep in it. Send angle as the one idea the post is about, in a short line, and posts as the text, one string per post in the thread, at most ${MAX_THREAD_POSTS}. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture the post_pictures lookup returned, of the screen the post is about, where one fits; leave it out otherwise. The draft waits on the Posts tab for them: you never post it.`,
+    `Save a new X post draft to the Posts tab in Dev, when they ask you for a post about the app, how they build it, or something near it ("write a post about the new plan page"). Read what it rests on first (the plan steps and changelog, where it is about something that shipped), and write about what the app does, never what they keep in it. Send angle as the one idea the post is about, in a short line, and posts as the text, one string per post in the thread, at most ${MAX_THREAD_POSTS}. Each post is at most ${X_POST_LIMIT} characters, with no links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture the post_pictures lookup returned, of the screen the post is about, where one fits; leave it out otherwise. The draft waits on the Posts tab for them: you never post it.`,
     {
       type: 'object',
       properties: {

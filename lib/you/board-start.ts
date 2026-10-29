@@ -6,6 +6,8 @@ import {
   MEETING_STALE_AFTER_MS,
   STALE_MEETING_ERROR,
 } from '@/lib/you/board';
+import { QUESTION_MAX } from '@/lib/you/board-questions';
+import type { BoardPanel } from '@/lib/you/board-panels';
 
 /**
  * Call a board meeting about one decision (plan #2540.5), as Look again starts
@@ -21,14 +23,38 @@ export function cleanDecision(text: string): string | null {
   return line ? line : null;
 }
 
-/** The brief the routine is fired with, in the shape the board skill reads. */
-export function boardBrief(input: { meetingId: string; userId: string; decision: string }): string {
+/**
+ * The brief the routine is fired with, in the shape the board skill reads.
+ * A meeting convened about questions asked on the tab (plan #2561.4) adds a
+ * `questions <id>, <id>` line, and those questions, in that order, are its
+ * whole agenda.
+ */
+export function boardBrief(input: {
+  meetingId: string;
+  userId: string;
+  /** The decision a called meeting is about; left out for a meeting started by hand with no decision. */
+  decision?: string;
+  questionIds?: readonly string[];
+  /** The panel a meeting started by hand is held for (plan #2576.3). */
+  panelId?: string;
+}): string {
   return [
     `Follow ${BOARD_SKILL_PATH}`,
     `Board meeting ${input.meetingId}`,
     `user_id ${input.userId}`,
-    `called: ${input.decision}`,
+    input.decision ? `called: ${input.decision}` : 'weekly',
+    ...(input.questionIds?.length ? [`questions ${input.questionIds.join(', ')}`] : []),
+    ...(input.panelId ? [`panel ${input.panelId}`] : []),
   ].join('\n');
+}
+
+function noRoutine(): CallBoardMeetingResult {
+  return {
+    started: false,
+    reason: 'no_routine',
+    error:
+      'Board meetings run on the board routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.',
+  };
 }
 
 export type CallBoardMeetingResult =
@@ -50,28 +76,49 @@ export async function callBoardMeeting(input: {
   userId: string;
   decision: string;
   routine: RoutineTarget;
+  /** The questions the meeting is about, asked on the tab; their text is the decision. */
+  questionIds?: readonly string[];
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<CallBoardMeetingResult> {
-  const { client, userId, routine } = input;
+  const { client, userId, routine, questionIds } = input;
   const decision = cleanDecision(input.decision);
   if (!decision) return { started: false, reason: 'invalid', error: 'Say what the decision is first.' };
-  if (decision.length > DECISION_MAX) {
+  if (decision.length > (questionIds?.length ? QUESTION_MAX : DECISION_MAX)) {
     return {
       started: false,
       reason: 'invalid',
       error: `Keep the decision to one line of at most ${DECISION_MAX} characters.`,
     };
   }
-  if (!routine.id || !routine.token) {
-    return {
-      started: false,
-      reason: 'no_routine',
-      error:
-        'Board meetings run on the board routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.',
-    };
-  }
+  if (!routine.id || !routine.token) return noRoutine();
 
+  return openAndFire({
+    client,
+    userId,
+    routine,
+    row: { kind: 'called', decision },
+    brief: (meetingId) => boardBrief({ meetingId, userId, decision, questionIds }),
+    now: input.now,
+    fetch: input.fetch,
+  });
+}
+
+/**
+ * Queue a meeting row, fire the routine with the brief for it, and record the
+ * run. The stale sweep, the one-open-meeting index and the failed fire are the
+ * same for a called meeting and one started by hand.
+ */
+async function openAndFire(input: {
+  client: YouSupabaseClient;
+  userId: string;
+  routine: RoutineTarget;
+  row: Record<string, unknown>;
+  brief: (meetingId: string) => string;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<CallBoardMeetingResult> {
+  const { client, userId, routine } = input;
   const now = input.now ?? Date.now();
   await client
     .from('board_meetings')
@@ -82,7 +129,7 @@ export async function callBoardMeeting(input: {
 
   const { data: row, error } = await client
     .from('board_meetings')
-    .insert({ user_id: userId, kind: 'called', decision, status: 'queued' })
+    .insert({ user_id: userId, ...input.row, status: 'queued' })
     .select('id')
     .single();
   if (error?.code === '23505') return { started: false, reason: 'running', error: MEETING_RUNNING_MESSAGE };
@@ -94,7 +141,7 @@ export async function callBoardMeeting(input: {
   const fired = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: boardBrief({ meetingId, userId, decision }),
+    text: input.brief(meetingId),
     fetch: input.fetch,
   });
 
@@ -121,4 +168,41 @@ export async function callBoardMeeting(input: {
       .eq('user_id', userId);
   }
   return { started: true, meetingId };
+}
+
+/**
+ * Start a meeting by hand from the Board tab (plan #2576.3): a weekly-kind
+ * meeting with no decision, held for one panel or for none. The panel's name,
+ * topic and advisor keys are copied onto the row now, so the meeting keeps what
+ * the person saw when they pressed the button; the board skill reads the panel
+ * from those columns alone (.claude/skills/board/SKILL.md, "A panel meeting").
+ * A panel with no topic is debated under its name.
+ */
+export async function startBoardMeeting(input: {
+  client: YouSupabaseClient;
+  userId: string;
+  routine: RoutineTarget;
+  panel: Pick<BoardPanel, 'id' | 'name' | 'topic' | 'advisors'> | null;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<CallBoardMeetingResult> {
+  const { client, userId, routine, panel } = input;
+  if (!routine.id || !routine.token) return noRoutine();
+  if (panel && panel.advisors.length === 0) {
+    return { started: false, reason: 'invalid', error: `${panel.name} has no advisors yet. Add some on its page first.` };
+  }
+  return openAndFire({
+    client,
+    userId,
+    routine,
+    row: {
+      kind: 'weekly',
+      ...(panel
+        ? { panel_id: panel.id, panel_name: panel.name, panel_topic: panel.topic, panel_advisors: panel.advisors }
+        : {}),
+    },
+    brief: (meetingId) => boardBrief({ meetingId, userId, panelId: panel?.id }),
+    now: input.now,
+    fetch: input.fetch,
+  });
 }

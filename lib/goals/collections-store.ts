@@ -48,6 +48,8 @@ export type CollectionRecord = {
   /** The date the values were current, as the document they were read from gives it (plan #985). */
   asOf: string | null;
   updatedAt: string;
+  /** Set when the balance shown is a linked loan account's latest reading (lib/goals/linked-loans.ts). */
+  linkedBalance?: { accountId: string; readOn: string };
 };
 
 /**

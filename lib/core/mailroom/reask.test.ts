@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { OWNER_ID, sqlRefusal } from '@/lib/db/sql-guard';
+import { sqlRefusal } from '@/lib/db/sql-guard';
+
+const OWNER_ID = '11111111-2222-3333-4444-555555555555';
 import { storedPilesStatement, updatePilesStatement } from './reask';
 
 const MESSAGE = '0b6f6f0e-6c1a-4c3e-9a51-7f1f1f1f1f1f';
@@ -9,7 +11,7 @@ describe('asking Jev again (plan #2520.1)', () => {
     const sql = storedPilesStatement(OWNER_ID, ['bill', 'order']);
     expect(sql).toContain(`core.mail_pile_comparison('${OWNER_ID}')`);
     expect(sql).toContain("array['bill', 'order']::text[]");
-    expect(sqlRefusal(sql)).toBeNull();
+    expect(sqlRefusal(sql, OWNER_ID)).toBeNull();
   });
 
   it('refuses a pile or account id it does not know', () => {
@@ -24,8 +26,10 @@ describe('asking Jev again (plan #2520.1)', () => {
     ]);
     expect(sql).toContain(`('${MESSAGE}'::uuid, 'bill', 0.99::real, 'jev-1.13.0')`);
     expect(sql).toContain(`core.mail_piles.user_id = '${OWNER_ID}'`);
-    expect(sqlRefusal(sql!)).toBeNull();
-    expect(sqlRefusal(sql!.replaceAll(OWNER_ID, '00000000-0000-0000-0000-000000000000'))).toMatch(/scoped to the owner/);
+    expect(sqlRefusal(sql!, OWNER_ID)).toBeNull();
+    expect(
+      sqlRefusal(sql!.replaceAll(OWNER_ID, '00000000-0000-0000-0000-000000000000'), OWNER_ID),
+    ).toMatch(/scoped to the owner/);
   });
 
   it('writes nothing when nothing changed, and refuses another account’s row', () => {

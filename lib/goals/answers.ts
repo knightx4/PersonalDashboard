@@ -220,7 +220,7 @@ function joinNames(names: string[]): string {
 
 /**
  * The line under an answer naming the rows it read and the date of their
- * figures: "From Grad PLUS 2024–25 and Grad PLUS 2025–26, figures as of
+ * figures: "From Graduate loan 2024–25 and Graduate loan 2025–26, figures as of
  * Sep 2, 2026". When the rows are of different dates each carries its own. A
  * row since archived is still counted, as "a row since archived".
  */

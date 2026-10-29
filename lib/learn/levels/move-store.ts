@@ -1,8 +1,7 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { embedOne } from '@/lib/learn/embed/embed';
-import { draftTopic } from '@/lib/learn/levels/draft';
+import { fireDraftRoutine, runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { assignConcepts } from '@/lib/learn/levels/move-call';
 import {
   downwardWhy,
@@ -15,7 +14,7 @@ import {
   type Placement,
   type Seat,
 } from '@/lib/learn/levels/move';
-import { approveDraft, loadFieldOptions, loadMapTopics, saveDraft } from '@/lib/learn/levels/store';
+import { loadMapTopics } from '@/lib/learn/levels/store';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
 /**
@@ -32,6 +31,8 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
  * concepts before writing them again, and topics an earlier try drafted are
  * on the map by then, so the call reuses them rather than drafting twice.
  *
+ * Topics the move needs are drafted by the routine (learn 0193) and approved
+ * as they are kept; the move stops until they are, and Try again finishes it.
  * Topics the move drafts are approved as they are kept. Every concept placed
  * on them was a claim the person had already approved on the claims graph,
  * and a map of drafts would ask nothing until each was approved by hand.
@@ -308,7 +309,8 @@ export async function moveSubject(
   subjectId: string,
   anthropicApiKey: string,
 ): Promise<MoveResult> {
-  let drafted = 0;
+  // Topics are drafted by the routine now (learn 0193), so a move drafts none itself.
+  const drafted = 0;
   const fail = async (detail: string): Promise<MoveResult> => {
     await recordMove(client, userId, subjectId, { status: 'failed', detail, drafted });
     return { ok: false, detail };
@@ -339,11 +341,10 @@ export async function moveSubject(
     }
 
     const ids = concepts.map((c) => c.id);
-    const [stateRows, edgeRows, map, fields] = await Promise.all([
+    const [stateRows, edgeRows, map] = await Promise.all([
       client.from('concept_state').select('concept_id, state, established, tested_at, declared_at, updated_at').in('concept_id', ids),
       client.from('concept_edges').select('prerequisite_id, dependent_id').eq('subject_id', subjectId),
       loadMapTopics(client),
-      loadFieldOptions(client),
     ]);
     if (stateRows.error) throw new Error(stateRows.error.message);
     if (edgeRows.error) throw new Error(edgeRows.error.message);
@@ -360,36 +361,25 @@ export async function moveSubject(
       return fail(`Dash left ${n} of ${concepts.length} ${concepts.length === 1 ? 'idea' : 'ideas'} without a topic. Press Try again.`);
     }
 
-    // Draft each topic the map lacks, and keep it approved.
+    // Each topic the map lacks is drafted by the routine (learn 0193) and
+    // approved as kept. The move waits for them: Try again once they are on
+    // Topics places the ideas on them, as an earlier try's drafts are.
     const madeId = new Map<string, string>();
-    for (const fresh of assignment.newTopics) {
-      const drafting = collectSpend();
-      const result = await draftTopic({
-        goal: fresh.name,
-        scope: fresh.scope,
-        map: await loadMapTopics(client),
-        fields,
-        anthropicApiKey,
-        onSpend: drafting.sink,
-      });
-      await recordLearnSpend(userId, 'draft-topic', drafting.reports);
-      if (!result.ok) return fail(`Dash could not draft ${fresh.name}. ${result.detail}`);
-
-      const embedding = collectSpend();
-      const embedded = await embedOne(result.draft.scope, { inputType: 'document', onSpend: embedding.sink });
-      await recordLearnSpend(userId, 'embed-topic-scope', embedding.reports);
-
-      const saved = await saveDraft(client, userId, {
-        draft: result.draft,
-        asked: null,
-        embedding: embedded.ok ? { vector: embedded.vector, model: embedded.model } : null,
-        // Approved in the same press, so every row needs a source (learn 0149):
-        // what it came from is the person's own subject on the claims graph.
-        uncited: { source: `Your claims graph subject ${subject.name}`, canonicality: 'personal' },
-      });
-      await approveDraft(client, saved.id, new Map());
-      madeId.set(fresh.name.toLowerCase(), saved.id);
-      drafted += 1;
+    if (assignment.newTopics.length > 0) {
+      for (const fresh of assignment.newTopics) {
+        const queued = await runTopicDraft(
+          client,
+          userId,
+          { goal: fresh.name, scope: fresh.scope, after: { approve: true } },
+          { hold: true },
+        );
+        if (!queued.ok) return fail(`Dash could not queue ${fresh.name}. ${queued.detail}`);
+      }
+      await fireDraftRoutine(client, userId);
+      const n = assignment.newTopics.length;
+      return fail(
+        `Dash is drafting the ${n === 1 ? 'topic' : `${n} topics`} this subject needs in a routine. Press Try again once ${n === 1 ? 'it is' : 'they are'} on Topics.`,
+      );
     }
 
     // Every placement's cell, clamped to the ceiling its topic came back with.
