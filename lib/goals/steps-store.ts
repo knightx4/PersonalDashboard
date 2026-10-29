@@ -835,6 +835,31 @@ export async function setStepNotify(
 }
 
 /**
+ * Record that the person has seen the notice of a finished step they asked to
+ * hear about (plan #2611.1): opening its page or dismissing it. Only a done
+ * step with notify_on_done on takes it, and only the first time, so the stamp
+ * keeps the moment it was first seen. False when nothing changed.
+ */
+export async function markStepNoticeSeen(
+  client: GoalsSupabaseClient,
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ notice_seen_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('level', 'step')
+    .eq('status', 'done')
+    .eq('notify_on_done', true)
+    .is('notice_seen_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
  * Make a step an information step by pointing it at a collection, or stop it
  * being one (plan #954). asksFor names the fields the step needs filled; null
  * for every field the form shows. False when no live step has that id.
