@@ -485,7 +485,7 @@ function RoleDetailsCard({
       <div className="space-y-2">
         <Field id={`jdurl-${roleId}`} label="Posting link">
           <Input
-            className="max-sm:h-11"
+            className="max-sm:min-h-11"
             type="url"
             value={jdUrlDraft}
             onChange={(event) => setJdUrlDraft(event.target.value)}
@@ -495,7 +495,7 @@ function RoleDetailsCard({
         {/* An accelerator or a fellowship goes through the same pipeline as a job. */}
         <Field id={`kind-${roleId}`} label="Kind">
           <Select
-            className="max-sm:h-11"
+            className="max-sm:min-h-11"
             value={kindDraft}
             onChange={(event) => setKindDraft(event.target.value as RoleKind)}
           >
@@ -508,14 +508,14 @@ function RoleDetailsCard({
         </Field>
         <Field id={`location-${roleId}`} label="Location">
           <Input
-            className="max-sm:h-11"
+            className="max-sm:min-h-11"
             value={locationDraft}
             onChange={(event) => setLocationDraft(event.target.value)}
           />
         </Field>
         <Field id={`ats-${roleId}`} label="ATS job id">
           <Input
-            className="max-sm:h-11"
+            className="max-sm:min-h-11"
             value={atsJobIdDraft}
             onChange={(event) => setAtsJobIdDraft(event.target.value)}
           />
@@ -523,7 +523,7 @@ function RoleDetailsCard({
         <div className="grid grid-cols-2 gap-2">
           <Field id={`compmin-${roleId}`} label="Comp min ($)">
             <Input
-              className="max-sm:h-11"
+              className="max-sm:min-h-11"
               type="number"
               value={compMinDraft}
               onChange={(event) => setCompMinDraft(event.target.value)}
@@ -531,7 +531,7 @@ function RoleDetailsCard({
           </Field>
           <Field id={`compmax-${roleId}`} label="Comp max ($)">
             <Input
-              className="max-sm:h-11"
+              className="max-sm:min-h-11"
               type="number"
               value={compMaxDraft}
               onChange={(event) => setCompMaxDraft(event.target.value)}
@@ -541,7 +541,7 @@ function RoleDetailsCard({
         <div className="grid grid-cols-2 gap-2">
           <Field id={`expmin-${roleId}`} label="Experience min (years)">
             <Input
-              className="max-sm:h-11"
+              className="max-sm:min-h-11"
               type="number"
               min={0}
               value={expMinDraft}
@@ -550,7 +550,7 @@ function RoleDetailsCard({
           </Field>
           <Field id={`expmax-${roleId}`} label="Experience max (years)">
             <Input
-              className="max-sm:h-11"
+              className="max-sm:min-h-11"
               type="number"
               min={0}
               value={expMaxDraft}
