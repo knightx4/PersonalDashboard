@@ -2,6 +2,7 @@ import { courseHref, transcriptHref } from '@/lib/you/education';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
 import { profileHref } from '@/lib/you/profile-entries';
+import { ANSWER_HREF } from '@/lib/you/dash-questions';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
@@ -10,6 +11,7 @@ const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
 const BOARD: Section = { href: '/you/board', label: 'Board' };
+const ANSWER: Section = { href: ANSWER_HREF, label: 'Answer' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -194,6 +196,23 @@ export const youSources: ModuleSources = {
         'kind is school, certification, honor, skill or course. detail is a school\'s degree or a certification\'s authority; ' +
         'code is a certification\'s license number or a course\'s number. started and ended are "YYYY" or "YYYY-MM"; ' +
         'an honor\'s started is the day it was issued. Written by the LinkedIn import (plan #2432.7).',
+    },
+    {
+      table: 'you.dash_questions',
+      module: 'You',
+      holds: 'Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.',
+      weight: 'record',
+      search: ['question', 'answer'],
+      title: 'question',
+      facts: ['status', 'answered_at'],
+      newest: 'created_at',
+      href: () => ANSWER_HREF,
+      section: ANSWER,
+      page: null,
+      note:
+        'question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: ' +
+        'only an answered row says anything about them, so leave open and skipped rows out. ' +
+        'answered_at is when they first answered; updated_at moves when they change the answer (you 0033).',
     },
     {
       table: 'you.board_questions',

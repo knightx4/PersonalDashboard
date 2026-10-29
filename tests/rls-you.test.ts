@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -655,6 +655,55 @@ describe('profile entries', () => {
         (tx) => tx`insert into profile_entries (user_id, kind, name) values (${userA}, 'skill', 'Forged')`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('dash questions', () => {
+  // migrations-you/0033 (plan #2617.1): Dash's questions on the Answer tab
+  // and what the person answered.
+  it('are read and written by their owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into dash_questions (user_id, question, why) values (${userA}, 'What rests you?', 'Few notes on rest.')`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from dash_questions`)).toEqual([]);
+    expect(await asUser(userA, (tx) => tx`select question, status from dash_questions`)).toEqual([
+      { question: 'What rests you?', status: 'open' },
+    ]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_questions (user_id, question) values (${userA}, 'Forged')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update dash_questions set answer = 'Not yours'`);
+    await asUser(userB, (tx) => tx`delete from dash_questions`);
+    expect(await admin`select answer from dash_questions where user_id = ${userA}`).toEqual([{ answer: null }]);
+  });
+
+  it('holds an answered question to an answer and a skipped one to its day', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into dash_questions (user_id, question) values (${userA}, 'Where is home?') returning id`;
+    await expect(admin`update dash_questions set status = 'answered' where id = ${row.id}`).rejects.toThrow();
+    await expect(
+      admin`update dash_questions set status = 'answered', answer = '  ', answered_at = now() where id = ${row.id}`,
+    ).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'skipped' where id = ${row.id}`).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'gone' where id = ${row.id}`).rejects.toThrow();
+    await admin`update dash_questions set status = 'answered', answer = 'Here', answered_at = now() where id = ${row.id}`;
+  });
+
+  it('gives Dash the answered ones only, the question as the title', async () => {
+    await admin`delete from dash_questions where user_id = ${userA}`;
+    await admin`
+      insert into dash_questions (user_id, question, status, answer, answered_at, skipped_at)
+      values (${userA}, 'What do you read?', 'answered', 'Mostly history.', now(), null),
+             (${userA}, 'Still open?', 'open', null, null, null),
+             (${userA}, 'Skipped?', 'skipped', null, null, now())`;
+    const rows = await admin<{ title: string; my_text: string | null; dash_text: string | null }[]>`
+      select title, my_text, dash_text from core.memory_sources(${userA}::uuid)
+       where source_table = 'you.dash_questions'`;
+    expect(rows).toEqual([{ title: 'Dash asked: What do you read?', my_text: 'Mostly history.', dash_text: null }]);
+    expect(
+      await admin`select 1 from core.memory_sources(${userB}::uuid) where source_table = 'you.dash_questions'`,
+    ).toHaveLength(0);
   });
 });
 
