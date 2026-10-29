@@ -18,6 +18,7 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
+import { YouAnswerLoadingPreview, YouAnswerPreview } from './you-answer-surfaces';
 import {
   YouBoardListLoadingPreview,
   YouBoardListPreview,
@@ -434,6 +435,7 @@ import {
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
+  GoalDashRowSurface,
   GoalDashStepNotifyErrorSurface,
   GoalDashStepSurface,
   GoalOpenedSurface,
@@ -771,6 +773,8 @@ const rolePanels: PanelProps = {
   location: 'London, hybrid three days a week',
   kind: 'job',
   atsJobId: 'REQ-4471',
+  experienceMinYears: null,
+  experienceMaxYears: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',
@@ -3379,6 +3383,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
+  { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
   { href: '/you/board', label: 'Board', icon: 'board' },
 ];
 
@@ -4422,7 +4427,31 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     // A lead, which opens on its posting.
     render: () => (
-      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
+    ),
+  },
+  {
+    /* The details card in edit mode: the experience years beside the comp
+     * ones, and the form's error line under them. */
+    id: 'jobs-role-posting-editing',
+    label: 'Role · Posting, editing details',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        detailsEditing
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
     ),
   },
   {
@@ -5544,6 +5573,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalDashStepSurface />,
   },
   {
+    /* The same switch on the step's row in the goal list (plan #2611.3). */
+    id: 'goals-steps-dash-row',
+    label: 'Goal · the notify switch on a Dash step in the list',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashRowSurface />,
+  },
+  {
     /* That switch after a save that failed: off again, the reason beneath. */
     id: 'goals-step-dash-notify-error',
     label: 'Goal · the notify switch, save failed',
@@ -5609,6 +5646,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsInboxSurface />,
+  },
+  {
+    /* The Goals Inbox with a finished step's Done showing, as hovering the
+     * row shows it on a laptop; a phone always shows it (plan #2611.2). */
+    id: 'goals-inbox-hover',
+    label: 'Goals · Inbox, a finished step hovered',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface hover />,
+  },
+  {
+    /* The Goals Inbox with nothing on you, once the last notice is put away. */
+    id: 'goals-inbox-empty',
+    label: 'Goals · Inbox, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface empty />,
   },
   {
     /* The one Inbox component (plan #1937.4) from its row shape alone, as
@@ -9612,6 +9666,101 @@ export const SURFACES: readonly Surface[] = [
     module: 'you',
     width: 'page',
     render: () => <YouInsightsLoadingPreview />,
+  },
+  {
+    /* Answer (plan #2617.2): Dash's questions about you, three waiting with
+     * a box and Skip each, four answers below with Edit, two skipped folded. */
+    id: 'you-answer',
+    label: 'You · Answer, three waiting and four answered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-empty',
+    label: 'You · Answer, before Dash has asked anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAnswerPreview empty />,
+  },
+  {
+    id: 'you-answer-answered',
+    label: 'You · Answer, nothing waiting',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview noneOpen />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-edit',
+    label: 'You · Answer, an answer being changed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview part="edit" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-skipped',
+    label: 'You · Answer, skipped open with one being answered',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview noneOpen part="skipped" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-error',
+    label: 'You · Answer, an answer that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview part="error" />
+      </div>
+    ),
+  },
+  {
+    /* The Ask button's run going (plan #2617.3): Dash at work on the button
+     * and a line under the header with when it started. */
+    id: 'you-answer-running',
+    label: 'You · Answer, Dash writing new questions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-ask-failed',
+    label: 'You · Answer, the last run for new questions failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="failed" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-loading',
+    label: 'You · Answer, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAnswerLoadingPreview />,
   },
   {
     /* Board (plans #2540.3 and #2561.4): one surface in three groups, the

@@ -17,6 +17,7 @@ import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
 import { GoalSuggestions } from '@/app/goals/[goalId]/goal-suggestions';
 import type { Suggestion } from '@/lib/goals/suggestions';
+import type { TodayItem } from '@/lib/goals/today';
 import { GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
@@ -471,16 +472,62 @@ export function GoalsHomeSurface({ passiveOpen = false }: { passiveOpen?: boolea
   return <HomeView {...home} timeZone="Europe/London" canRun passiveOpen={passiveOpen} />;
 }
 
-/** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
-export function GoalsInboxSurface() {
+/**
+ * Two steps Dash finished that you asked to be told about (plan #2611.2), as
+ * finishedNotices makes them: one with the first sentence of its result, one
+ * with a long title and nothing written.
+ */
+const FINISHED_NOTICES: TodayItem[] = [
+  {
+    kind: 'finished',
+    id: 'finished-rates',
+    title: 'Compare the balance transfer offers',
+    detail:
+      'The Barclaycard offer is the cheapest: 0% for 24 months with a 2.5% fee, about £90 on the balance.',
+    goalId: cards.id,
+    goalTitle: cards.title,
+    action: 'Open',
+    unblocks: 0,
+    on: null,
+  },
+  {
+    kind: 'finished',
+    id: 'finished-list',
+    title: 'Put together the list of research groups working on volatility models in London and Oxford',
+    detail: null,
+    goalId: job.id,
+    goalTitle: job.title,
+    action: 'Open',
+    unblocks: 0,
+    on: null,
+  },
+];
+
+/**
+ * The Inbox tab in Goals: the same rows as the home, grouped by what finishes
+ * each, with the steps Dash finished at the foot of Your actions. `hover`
+ * draws the first one's Done showing, as hovering the row shows it; `empty`
+ * draws the Inbox with nothing on you.
+ */
+export function GoalsInboxSurface({
+  hover = false,
+  empty = false,
+}: { hover?: boolean; empty?: boolean } = {}) {
   return (
     <PageColumn className="space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
-        laterOn={home.laterOn ?? []}
+        groups={
+          empty
+            ? goalInboxGroups([], [])
+            : goalInboxGroups([...home.onYou, ...FINISHED_NOTICES], home.dash ?? [], [
+                GOAL_RUN_QUESTION,
+              ])
+        }
+        laterOn={empty ? [] : (home.laterOn ?? [])}
         preparable={home.preparable ?? []}
         canRun
+        preview={hover ? { revealNoticeId: FINISHED_NOTICES[0].id } : undefined}
       />
     </PageColumn>
   );

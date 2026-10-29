@@ -348,6 +348,7 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   links_status_ck: 'whether a Plaid link is working, failing or removed',
+  dash_questions_status_ck: 'whether a question Dash asked is still open, answered or skipped, kept on the Answer tab',
   month_reviews_status_ck: 'whether the monthly money review was written or the run failed',
   email_account_status: 'connection state of a mailbox',
   sync_job_status: 'state of a background sync',
@@ -375,6 +376,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   plan_runs_status_ck: 'state of a Dash run',
   company_research_status_ck: 'state of a Dash research run',
   insight_runs_status_ck: 'state of a Dash run',
+  dash_question_runs_status_ck: 'state of a Dash run',
   board_meetings_status_ck: 'state of a Dash run',
   insights_status_ck: 'whether Dash still shows an insight it wrote',
   runs_status_ck: 'state of a Dash run',

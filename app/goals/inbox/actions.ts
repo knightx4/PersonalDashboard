@@ -9,6 +9,7 @@ import { dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
 import { leaveQuestions } from '@/lib/goals/shaping-store';
+import { clearStepNoticeSeen, markStepNoticeSeen } from '@/lib/goals/steps-store';
 import type { TodayKind } from '@/lib/goals/today';
 import { formatDay } from '@/lib/goals/dates';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -83,5 +84,41 @@ export async function leaveQuestionsAction(form: FormData): Promise<SnoozeState>
     return { message: closed === 1 ? 'Left 1 question as it was.' : `Left ${closed} questions as they were.` };
   } catch {
     return { error: 'Could not close those questions. Try again.' };
+  }
+}
+
+/**
+ * Done on the notice of a step Dash finished (plan #2611.2): the notice is
+ * marked seen, as opening the step marks it, and leaves the Inbox and its
+ * badge. Only a finished step of the signed-in account's that asked to be
+ * announced takes it.
+ */
+// latency: optimistic
+export async function dismissStepNoticeAction(form: FormData): Promise<SnoozeState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    const changed = await markStepNoticeSeen(await createGoalsClient(), id.data, user.id);
+    if (!changed) return { error: 'That notice was already gone.' };
+    revalidatePath('/goals', 'layout');
+    return { message: 'Done.' };
+  } catch {
+    return { error: 'Could not put that notice away. Try again.' };
+  }
+}
+
+/** Undo on that Done: the notice is back in the Inbox. */
+// latency: optimistic
+export async function restoreStepNoticeAction(form: FormData): Promise<SnoozeState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    await clearStepNoticeSeen(await createGoalsClient(), id.data, user.id);
+    revalidatePath('/goals', 'layout');
+    return { message: 'Brought back.' };
+  } catch {
+    return { error: 'Could not bring that notice back. Try again.' };
   }
 }
