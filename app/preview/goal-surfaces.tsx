@@ -404,6 +404,21 @@ export function GoalDashStepSurface() {
   );
 }
 
+/**
+ * The goal's list with every row opened and the switch on for Compare the
+ * transfer fees (plan #2611.3): it shows on that open Dash step only, not on
+ * the done or proposed Dash steps or on the steps that are yours.
+ */
+export function GoalDashRowSurface() {
+  return (
+    <StepTree
+      map={goalMapWith({ fees: { notifyOnDone: true, parentId: GOAL, position: 5 } })}
+      todoOn={false}
+      opened
+    />
+  );
+}
+
 /** The notification switch after a save that failed: back off, with the reason beneath. */
 export function GoalDashStepNotifyErrorSurface() {
   const fees = goalMapWith({}).steps.flatMap((one) => one.children).find((one) => one.id === 'fees');
