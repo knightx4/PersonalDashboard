@@ -2,7 +2,10 @@
 
 import { AnswerSkeleton } from '@/app/you/answer/answer-skeleton';
 import { AnswerView, type AnswerActions, type AnswerOpen } from '@/app/you/answer/answer-view';
+import { AskDash, AskDashStatus } from '@/app/you/answer/ask-dash';
+import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { DashQuestion } from '@/lib/you/dash-questions';
+import type { DashQuestionRun, QuestionRunState } from '@/lib/you/dash-questions-run';
 
 /**
  * The Answer tab in the gallery (plan #2617.2): three questions waiting,
@@ -124,17 +127,44 @@ function partOpen(part: AnswerPart | undefined): AnswerOpen {
   return {};
 }
 
+/** How Dash's run for new questions stands, by name (plan #2617.3). */
+export type AskPart = 'idle' | 'running' | 'failed';
+
+const fixtureRun: DashQuestionRun = {
+  id: '00000000-0000-4000-8000-000000002699',
+  status: 'running',
+  summary: null,
+  error: null,
+  runUrl: 'https://claude.ai/code/session_preview',
+  requestedAt: '2026-10-29T14:05:00Z',
+  finishedAt: null,
+};
+
+function runState(ask: AskPart): QuestionRunState {
+  if (ask === 'running') return { kind: 'running', run: fixtureRun };
+  if (ask === 'failed') {
+    const error =
+      'Dash could not start the run: the goals routine was busy, with too many sessions running on your plan. Wait a few minutes and ask again.';
+    return { kind: 'failed', run: { ...fixtureRun, status: 'failed', error }, error };
+  }
+  return { kind: 'ready', run: { ...fixtureRun, status: 'ready', runUrl: null } };
+}
+
 export function YouAnswerPreview({
   part,
   empty = false,
   noneOpen = false,
+  ask = 'idle',
 }: {
   part?: AnswerPart;
   /** No questions at all: before Dash has asked any. */
   empty?: boolean;
   /** Nothing waiting, with answers below. */
   noneOpen?: boolean;
+  /** The Ask button's run: none going, one going, or the last one failed. */
+  ask?: AskPart;
 }) {
+  const run = runState(ask);
   return (
     <AnswerView
       open={empty || noneOpen ? [] : open}
@@ -142,6 +172,14 @@ export function YouAnswerPreview({
       timezone="Europe/Dublin"
       actions={actions}
       show={partOpen(part)}
+      ask={<AskDash run={run} available onAsk={async () => ({ error: null })} />}
+      notice={
+        <AskDashStatus
+          run={run}
+          runWhen={formatDateTime(fixtureRun.requestedAt, 'Europe/Dublin', Date.parse('2026-10-29T15:00:00Z'))}
+          available
+        />
+      }
     />
   );
 }

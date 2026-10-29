@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { goalsRoutine } from '@/lib/feedback/routine';
 import { createYouClient } from '@/lib/you/auth/server';
 import {
   ANSWER_HREF,
@@ -11,6 +12,7 @@ import {
   skipDashQuestion,
   type DashQuestionResult,
 } from '@/lib/you/dash-questions';
+import { startQuestionRun } from '@/lib/you/dash-questions-run';
 
 /**
  * The Answer tab's three presses (plan #2617.2): answer an open or skipped
@@ -56,4 +58,25 @@ export async function skipQuestion(id: string): Promise<DashQuestionResult> {
 export async function editAnswer(id: string, answer: string): Promise<DashQuestionResult> {
   if (!isId(id)) return NOT_A_QUESTION;
   return run((client, userId) => editDashAnswer(client, userId, id, answer));
+}
+
+/**
+ * Ask Dash for new questions (plan #2617.3): a session on the goals routine
+ * that follows .claude/skills/dash-questions/SKILL.md and adds up to five.
+ * Refused while a run is already going.
+ */
+// latency: pending
+export async function askDash(): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  try {
+    const result = await startQuestionRun({
+      client: await createYouClient(),
+      userId: user.id,
+      routine: goalsRoutine(),
+    });
+    revalidatePath(ANSWER_HREF);
+    return { error: result.started ? null : result.error };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Dash could not start. Try again.' };
+  }
 }

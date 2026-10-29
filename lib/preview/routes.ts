@@ -442,6 +442,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-answer-skipped': ['/you/answer'],
   'you-answer-error': ['/you/answer'],
   'you-answer-loading': ['/you/answer'],
+  'you-answer-running': ['/you/answer'],
+  'you-answer-ask-failed': ['/you/answer'],
   'you-board': ['/you/board'],
   'you-board-empty': ['/you/board'],
   'you-board-asks': ['/you/board'],

@@ -9680,6 +9680,30 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Ask button's run going (plan #2617.3): Dash at work on the button
+     * and a line under the header with when it started. */
+    id: 'you-answer-running',
+    label: 'You · Answer, Dash writing new questions',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-answer-ask-failed',
+    label: 'You · Answer, the last run for new questions failed',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAnswerPreview ask="failed" />
+      </div>
+    ),
+  },
+  {
     id: 'you-answer-loading',
     label: 'You · Answer, loading',
     module: 'you',

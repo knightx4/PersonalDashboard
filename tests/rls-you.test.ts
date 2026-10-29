@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -704,6 +704,43 @@ describe('dash questions', () => {
     expect(
       await admin`select 1 from core.memory_sources(${userB}::uuid) where source_table = 'you.dash_questions'`,
     ).toHaveLength(0);
+  });
+});
+
+describe('dash question runs', () => {
+  // migrations-you/0034_dash_question_runs.sql (plan #2617.3): the run the
+  // Ask button starts, one open at a time, at most five questions each.
+  it('keeps a run to its owner and one open run per person', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into dash_question_runs (user_id) values (${userA}) returning id, status`,
+    );
+    expect(run.status).toBe('queued');
+    expect(await asUser(userB, (tx) => tx`select id from dash_question_runs`)).toEqual([]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_question_runs (user_id) values (${userA})`),
+    ).rejects.toThrow();
+    await expect(admin`insert into dash_question_runs (user_id) values (${userA})`).rejects.toThrow();
+    await admin`update dash_question_runs set status = 'ready', finished_at = now() where id = ${run.id}`;
+    await admin`insert into dash_question_runs (user_id) values (${userA})`;
+  });
+
+  it('refuses a sixth question from one run and a run of another person', async () => {
+    const [run] = await admin<{ id: string }[]>`
+      insert into dash_question_runs (user_id, status) values (${userB}, 'running') returning id`;
+    await admin`
+      insert into dash_questions (user_id, run_id, question)
+      select ${userB}, ${run.id}, 'Question ' || n from generate_series(1, 5) n`;
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userB}, ${run.id}, 'Sixth')`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question)
+            select ${userB}, ${run.id}, 'Batch ' || n from generate_series(1, 2) n`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userA}, ${run.id}, 'Not theirs')`,
+    ).rejects.toThrow();
   });
 });
 

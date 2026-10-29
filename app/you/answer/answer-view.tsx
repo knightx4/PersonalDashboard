@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError, Label, Textarea } from '@/components/ui/field';
+import { FieldError, Textarea } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { Stat } from '@/components/ui/stat';
 import { sectionSubject } from '@/lib/core/section-path';
@@ -23,8 +23,8 @@ import { answerQuestion, editAnswer, skipQuestion } from './actions';
 
 /**
  * You's Answer tab (plan #2617.2): the questions Dash has asked about you,
- * the open ones on top in the order it asked them, each with a box to answer
- * it and Skip; then what you answered, latest first, each with Edit; then the
+ * the open ones on top in the order it asked them, each with Answer, which
+ * opens its box (one at a time), and Skip; then what you answered, latest first, each with Edit; then the
  * skipped ones, folded, each of which can still be answered.
  *
  * The page re-reads after each press (the actions revalidate the tab), so a
@@ -32,7 +32,8 @@ import { answerQuestion, editAnswer, skipQuestion } from './actions';
  *
  * `ask` is the slot for the press that has Dash write new questions (plan
  * #2617.3): in the header while there is anything on the tab, in the empty
- * state while there is nothing.
+ * state while there is nothing. `notice` says how a run is going, under the
+ * header.
  */
 
 export type AnswerActions = {
@@ -64,6 +65,7 @@ export function AnswerView({
   past,
   timezone = 'UTC',
   ask,
+  notice,
   actions = REAL_ACTIONS,
   show = {},
 }: {
@@ -74,6 +76,8 @@ export function AnswerView({
   timezone?: string;
   /** The press that asks Dash for new questions (plan #2617.3). */
   ask?: React.ReactNode;
+  /** How Dash's run for new questions is going, under the header (plan #2617.3). */
+  notice?: React.ReactNode;
   actions?: AnswerActions;
   show?: AnswerOpen;
 }) {
@@ -81,6 +85,10 @@ export function AnswerView({
   const skipped = past.filter((q) => q.status === 'skipped');
   const nothing = open.length === 0 && past.length === 0;
   const errorFor = (id: string) => (show.error?.id === id ? show.error.message : null);
+  // One open question's box at a time; the rest stay a line or two each.
+  const [answeringId, setAnsweringId] = useState<string | null>(
+    show.error && open.some((q) => q.id === show.error?.id) ? show.error.id : null,
+  );
 
   const main = (
     <>
@@ -89,6 +97,7 @@ export function AnswerView({
         title="Answer"
         actions={nothing ? undefined : ask}
       />
+      {notice ? <div className="mb-5 empty:hidden">{notice}</div> : null}
       {nothing ? (
         <EmptyState
           size="box"
@@ -99,20 +108,10 @@ export function AnswerView({
         </EmptyState>
       ) : (
         <div className="space-y-8">
-          {/* No "(0)" when nothing waits (law 1): the empty box below says it. */}
-          <SectionFold
-            title="Waiting for you"
-            count={open.length || undefined}
-            remember="you.answer.open"
-          >
-            {open.length === 0 ? (
-              <EmptyState
-                size="box"
-                titleAs="h3"
-                title="Nothing waiting"
-                description="Every question Dash asked has an answer or a skip."
-              />
-            ) : (
+          {/* Left out when nothing waits (law 1): the page goes from the header,
+              with its Ask button, straight to the answers. */}
+          {open.length > 0 ? (
+            <SectionFold title="Waiting for you" count={open.length} remember="you.answer.open">
               <Card padding="none">
                 <ol className="divide-y divide-border">
                   {open.map((q) => (
@@ -120,6 +119,8 @@ export function AnswerView({
                       <OpenQuestion
                         question={q}
                         actions={actions}
+                        answering={answeringId === q.id}
+                        onAnswering={setAnsweringId}
                         initialError={errorFor(q.id)}
                         initialDraft={show.error?.id === q.id ? (show.error.draft ?? '') : ''}
                       />
@@ -127,8 +128,8 @@ export function AnswerView({
                   ))}
                 </ol>
               </Card>
-            )}
-          </SectionFold>
+            </SectionFold>
+          ) : null}
 
           {answered.length > 0 ? (
             <SectionFold
@@ -219,62 +220,70 @@ function Why({ why }: { why: string | null }) {
 function OpenQuestion({
   question,
   actions,
+  answering,
+  onAnswering,
   initialError,
   initialDraft = '',
 }: {
   question: DashQuestion;
   actions: AnswerActions;
+  /** Whether this question's box is the one open. */
+  answering: boolean;
+  /** Opens this question's box, closing any other, or closes it with null. */
+  onAnswering: (id: string | null) => void;
   initialError: string | null;
   initialDraft?: string;
 }) {
-  const [draft, setDraft] = useState(initialDraft);
-  const [error, setError] = useState<string | null>(initialError);
-  const [saving, startSaving] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [skipping, startSkipping] = useTransition();
-  const fieldId = `answer-${question.id}`;
-  const errorId = `${fieldId}-error`;
-  const settle = (result: DashQuestionResult) => setError(result.ok ? null : result.error);
   return (
-    <div className="space-y-3" data-answer-question>
+    <div className="space-y-2" data-answer-question>
       <div className="space-y-1">
-        <Label
-          htmlFor={fieldId}
-          className="text-body font-medium text-ink [overflow-wrap:anywhere]"
-        >
-          {question.question}
-        </Label>
+        <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">{question.question}</p>
         <Why why={question.why} />
       </div>
-      <Textarea
-        id={fieldId}
-        value={draft}
-        maxLength={ANSWER_MAX}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <FieldError id={errorId}>{error}</FieldError>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          pending={saving}
-          disabled={!draft.trim() || skipping}
-          onClick={() => startSaving(async () => settle(await actions.answer(question.id, draft)))}
-        >
-          Save answer
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          pending={skipping}
-          disabled={saving}
-          onClick={() => startSkipping(async () => settle(await actions.skip(question.id)))}
-        >
-          Skip
-        </Button>
-      </div>
+      {answering ? (
+        <AnswerBox
+          id={`answer-${question.id}`}
+          label={`Your answer to: ${question.question}`}
+          initial={initialDraft}
+          saveLabel="Save answer"
+          onSave={(answer) => actions.answer(question.id, answer)}
+          onCancel={() => onAnswering(null)}
+          initialError={initialError}
+        />
+      ) : (
+        <>
+          <FieldError>{error}</FieldError>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={skipping}
+              aria-label={`Answer: ${question.question}`}
+              onClick={() => onAnswering(question.id)}
+            >
+              Answer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              pending={skipping}
+              aria-label={`Skip: ${question.question}`}
+              onClick={() =>
+                startSkipping(async () => {
+                  const result = await actions.skip(question.id);
+                  setError(result.ok ? null : result.error);
+                })
+              }
+            >
+              Skip
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
