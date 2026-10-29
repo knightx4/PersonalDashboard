@@ -392,6 +392,15 @@ const ROW_STORE: CommentStore = {
 };
 
 /**
+ * An application's thread, under its cover letter: the same writes, answered
+ * by the role's reply so Dash can file the letter (note f0a52da9).
+ */
+const APPLICATION_STORE: CommentStore = {
+  ...ROW_STORE,
+  paid: 'app/thread-actions.ts#addRowComment:cover-letter',
+};
+
+/**
  * A reading's chat (plan #1876.5): everything written is answered, by Dash
  * reading the reading's text, before the write returns.
  */
@@ -422,7 +431,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   topic: ROW_STORE,
   lens: ROW_STORE,
   answer: ROW_STORE,
-  application: ROW_STORE,
+  application: APPLICATION_STORE,
   project: ROW_STORE,
   account: ROW_STORE,
   review: ROW_STORE,
