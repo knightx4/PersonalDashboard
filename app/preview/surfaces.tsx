@@ -771,6 +771,8 @@ const rolePanels: PanelProps = {
   location: 'London, hybrid three days a week',
   kind: 'job',
   atsJobId: 'REQ-4471',
+  experienceMinYears: null,
+  experienceMaxYears: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',
