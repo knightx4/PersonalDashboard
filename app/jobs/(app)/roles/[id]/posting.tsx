@@ -177,10 +177,7 @@ export function Posting({
         {bankSize === 0 && (
           <p className="mt-1 text-small text-ink-muted">
             Your evidence bank is empty, so there is nothing to match against.{' '}
-            <Link
-              href="/jobs/material?part=evidence"
-              className={linkVariants({ tone: 'quiet' })}
-            >
+            <Link href="/jobs/material?part=evidence" className={linkVariants({ tone: 'quiet' })}>
               Fill it in Material.
             </Link>
           </p>
@@ -294,8 +291,12 @@ function RoleDetailsCard({
   const [compMaxDraft, setCompMaxDraft] = useState(
     compMaxCents !== null ? String(Math.round(compMaxCents / 100)) : '',
   );
-  const [expMinDraft, setExpMinDraft] = useState(experienceMinYears !== null ? String(experienceMinYears) : '');
-  const [expMaxDraft, setExpMaxDraft] = useState(experienceMaxYears !== null ? String(experienceMaxYears) : '');
+  const [expMinDraft, setExpMinDraft] = useState(
+    experienceMinYears !== null ? String(experienceMinYears) : '',
+  );
+  const [expMaxDraft, setExpMaxDraft] = useState(
+    experienceMaxYears !== null ? String(experienceMaxYears) : '',
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [lookup, setLookup] = useState<JdLookupResult | null>(null);
@@ -303,7 +304,10 @@ function RoleDetailsCard({
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
   const experience = experienceAsk(jdText);
-  const shownExperience = experienceShown({ min: experienceMinYears, max: experienceMaxYears }, experience);
+  const shownExperience = experienceShown(
+    { min: experienceMinYears, max: experienceMaxYears },
+    experience,
+  );
 
   // The nightly pass walks six companies a night. A role you are looking at now
   // should not wait behind two hundred you are not, and the answer arrives in
@@ -326,7 +330,10 @@ function RoleDetailsCard({
     }
     const expMin = expMinDraft.trim() ? Number(expMinDraft) : null;
     const expMax = expMaxDraft.trim() ? Number(expMaxDraft) : null;
-    if ((expMin !== null && !Number.isFinite(expMin)) || (expMax !== null && !Number.isFinite(expMax))) {
+    if (
+      (expMin !== null && !Number.isFinite(expMin)) ||
+      (expMax !== null && !Number.isFinite(expMax))
+    ) {
       setError('Experience has to be a number of years.');
       return;
     }
@@ -390,7 +397,12 @@ function RoleDetailsCard({
             label="Posting link"
             value={
               jdUrl ? (
-                <a href={jdUrl} target="_blank" rel="noreferrer noopener" className={linkVariants()}>
+                <a
+                  href={jdUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={linkVariants()}
+                >
                   {jdUrl}
                 </a>
               ) : null
@@ -473,6 +485,7 @@ function RoleDetailsCard({
       <div className="space-y-2">
         <Field id={`jdurl-${roleId}`} label="Posting link">
           <Input
+            className="max-sm:h-11"
             type="url"
             value={jdUrlDraft}
             onChange={(event) => setJdUrlDraft(event.target.value)}
@@ -481,7 +494,11 @@ function RoleDetailsCard({
         </Field>
         {/* An accelerator or a fellowship goes through the same pipeline as a job. */}
         <Field id={`kind-${roleId}`} label="Kind">
-          <Select value={kindDraft} onChange={(event) => setKindDraft(event.target.value as RoleKind)}>
+          <Select
+            className="max-sm:h-11"
+            value={kindDraft}
+            onChange={(event) => setKindDraft(event.target.value as RoleKind)}
+          >
             {ROLE_KINDS.map((option) => (
               <option key={option} value={option}>
                 {ROLE_KIND_LABELS[option]}
@@ -490,14 +507,23 @@ function RoleDetailsCard({
           </Select>
         </Field>
         <Field id={`location-${roleId}`} label="Location">
-          <Input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} />
+          <Input
+            className="max-sm:h-11"
+            value={locationDraft}
+            onChange={(event) => setLocationDraft(event.target.value)}
+          />
         </Field>
         <Field id={`ats-${roleId}`} label="ATS job id">
-          <Input value={atsJobIdDraft} onChange={(event) => setAtsJobIdDraft(event.target.value)} />
+          <Input
+            className="max-sm:h-11"
+            value={atsJobIdDraft}
+            onChange={(event) => setAtsJobIdDraft(event.target.value)}
+          />
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field id={`compmin-${roleId}`} label="Comp min ($)">
             <Input
+              className="max-sm:h-11"
               type="number"
               value={compMinDraft}
               onChange={(event) => setCompMinDraft(event.target.value)}
@@ -505,6 +531,7 @@ function RoleDetailsCard({
           </Field>
           <Field id={`compmax-${roleId}`} label="Comp max ($)">
             <Input
+              className="max-sm:h-11"
               type="number"
               value={compMaxDraft}
               onChange={(event) => setCompMaxDraft(event.target.value)}
@@ -514,6 +541,7 @@ function RoleDetailsCard({
         <div className="grid grid-cols-2 gap-2">
           <Field id={`expmin-${roleId}`} label="Experience min (years)">
             <Input
+              className="max-sm:h-11"
               type="number"
               min={0}
               value={expMinDraft}
@@ -522,6 +550,7 @@ function RoleDetailsCard({
           </Field>
           <Field id={`expmax-${roleId}`} label="Experience max (years)">
             <Input
+              className="max-sm:h-11"
               type="number"
               min={0}
               value={expMaxDraft}
