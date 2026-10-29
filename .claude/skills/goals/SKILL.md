@@ -35,6 +35,9 @@ every read and write to the `user_id` in the brief.
 The skills fired this way so far:
 
 - `company-research`: research on one company, into `job_search.company_research`.
+- `dash-questions`: up to five new questions about the person for the Answer
+  tab of You, into `you.dash_questions` under the `you.dash_question_runs` row
+  the brief names (`dashQuestionsBrief` in `lib/you/dash-questions-run.ts`).
 - `insights`: three to five deep insights about the person for the Insights
   tab of You, into `you.insights` under the `you.insight_runs` row the brief
   names (`insightsBrief` in `lib/you/insights.ts`).
