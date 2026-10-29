@@ -772,6 +772,8 @@ const rolePanels: PanelProps = {
   location: 'London, hybrid three days a week',
   kind: 'job',
   atsJobId: 'REQ-4471',
+  experienceMinYears: null,
+  experienceMaxYears: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',
@@ -4424,7 +4426,31 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     // A lead, which opens on its posting.
     render: () => (
-      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
+    ),
+  },
+  {
+    /* The details card in edit mode: the experience years beside the comp
+     * ones, and the form's error line under them. */
+    id: 'jobs-role-posting-editing',
+    label: 'Role · Posting, editing details',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        experienceMinYears={3}
+        experienceMaxYears={5}
+        detailsEditing
+        status="lead"
+        defaultTab={defaultRoleTab('lead')}
+      />
     ),
   },
   {
