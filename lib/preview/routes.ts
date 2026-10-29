@@ -30,6 +30,7 @@
 export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-timeline': ['/jobs/roles/[id]'],
   'jobs-role-posting': ['/jobs/roles/[id]'],
+  'jobs-role-posting-editing': ['/jobs/roles/[id]'],
   'jobs-role-outreach': ['/jobs/roles/[id]'],
   'jobs-role-outreach-channel': ['/jobs/roles/[id]'],
   'jobs-role-answers': ['/jobs/roles/[id]'],
