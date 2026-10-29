@@ -123,6 +123,17 @@ describe('a change Dash proposes', () => {
       asUser(userA, (tx) => tx`update dash_actions set input = ${tx.json({ title: 'Other' })} where id = ${id}`),
     ).rejects.toThrow(/cannot be rewritten/);
   });
+
+  it('accepts Ask Dash changing the search aim', async () => {
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string }[]>`
+        insert into dash_actions (user_id, conversation_id, kind, input)
+        values (${userA}, ${conversationA}, 'change_search_aim', ${tx.json({ add_target_titles: ['Accounting'] })})
+        returning id`,
+    );
+    expect(row.id).toBeTruthy();
+  });
 });
 
 describe('an action from another surface', () => {
