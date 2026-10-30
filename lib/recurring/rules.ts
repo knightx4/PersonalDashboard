@@ -23,13 +23,17 @@ export type RecurringVerdict =
  * subdomain of it. A sender here is claimed on any money-shaped subject, not
  * only a subscription-shaped one, because "Your receipt" from Spotify is always
  * a subscription charge.
+ *
+ * Shortened in plan #1172.2.2: nytimes.com, xfinity.com, anthropic.com,
+ * microsoft.com and hulumail.com were taken out after Jev put every bill email
+ * from them in the bill pile at 0.8 or more. Their mail is still claimed by
+ * the subject rules below, and Jev sorts the rest.
  */
 export const KNOWN_BILLER_DOMAINS: readonly string[] = [
   // Streaming and media
   'netflix.com',
   'spotify.com',
   'hulu.com',
-  'hulumail.com',
   'disneyplus.com',
   'max.com',
   'hbomax.com',
@@ -39,7 +43,6 @@ export const KNOWN_BILLER_DOMAINS: readonly string[] = [
   'audible.com',
   'siriusxm.com',
   'patreon.com',
-  'nytimes.com',
   'wsj.com',
   'washingtonpost.com',
   'economist.com',
@@ -48,11 +51,9 @@ export const KNOWN_BILLER_DOMAINS: readonly string[] = [
   'ft.com',
   // Software
   'openai.com',
-  'anthropic.com',
   'notion.so',
   'dropbox.com',
   'adobe.com',
-  'microsoft.com',
   'canva.com',
   'grammarly.com',
   'duolingo.com',
@@ -74,7 +75,6 @@ export const KNOWN_BILLER_DOMAINS: readonly string[] = [
   'att-mail.com',
   't-mobile.com',
   'mintmobile.com',
-  'xfinity.com',
   'comcast.net',
   'spectrum.com',
   'spectrum.net',
