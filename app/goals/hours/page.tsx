@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { earliestProgressDay } from '@/lib/goals/capture';
 import { hoursPage } from '@/lib/goals/hours';
 import { loadHoursMetrics } from '@/lib/goals/hours-store';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -20,7 +21,8 @@ export const dynamic = 'force-dynamic';
  * day, how each has gone week by week, and each one's twelve-week chart. The
  * hours are logged from the capture box ("applied 2h, cleaned 1h") as
  * progress on a goal's steps; a goal's Hours logged metric is what puts it
- * here. The slot at the top logs today's hours the same way.
+ * here. The slot at the top logs hours the same way, for today or a day
+ * before it.
  */
 export default async function HoursPage() {
   const user = await requireUser();
@@ -35,7 +37,7 @@ export default async function HoursPage() {
         description="The time you log on your goals, against each week's aim. Log it below, or in the capture box on Now: applied 2h, cleaned 1.5h."
       />
       <div className="mb-4">
-        <LogHours />
+        <LogHours today={today} earliest={earliestProgressDay(today)} />
       </div>
       {metrics.length === 0 ? (
         <EmptyState

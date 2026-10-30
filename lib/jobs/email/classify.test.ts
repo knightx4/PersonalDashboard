@@ -203,6 +203,19 @@ describe('a known ATS domain never implies relevance on its own', () => {
   });
 });
 
+describe('a LinkedIn message reply (notes f28d2452, f41dac15)', () => {
+  it('reads "Message replied:" from hit-reply@linkedin.com as a reply, at tier A', () => {
+    const result = classifyMessage({
+      fromAddress: 'Avery Lane <hit-reply@linkedin.com>',
+      subject: 'Message replied: No implementation experience needed, just accounting depth',
+      bodyPreview: 'Avery replied to your conversation. Happy to introduce you to the team.',
+      companies: COMPANIES,
+    });
+    expect(result.classification).toBe('recruiter_reply');
+    expect(result.tier).toBe('A');
+  });
+});
+
 /**
  * interview_invite is a booked interview and scheduling is finding a time
  * (plan #1226). The pipeline moves an application to its interview stage on

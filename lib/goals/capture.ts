@@ -285,6 +285,26 @@ export function goalHintLine(context: CaptureContext, goalId: string | null | un
   );
 }
 
+/**
+ * The line telling the model which day a sentence is about, when the box it
+ * was written in let the person pick one (note 2653989d). Null for today, or
+ * for a day progressDay would not accept, so a stale or hand-edited day files
+ * on today as a line without one does.
+ */
+export function dayHintLine(day: string | null | undefined, today: string): string | null {
+  const picked = progressDay(day, today);
+  if (!picked || picked === today) return null;
+  return (
+    `This was logged for ${picked}, not today. Give every progress entry and count the day ${picked}, ` +
+    'unless the sentence plainly names another day.'
+  );
+}
+
+/** The earliest day a progress entry may be logged for, given today. */
+export function earliestProgressDay(today: string): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) - PROGRESS_DAY_MAX_AGE * DAY_MS).toISOString().slice(0, 10);
+}
+
 // ---------------------------------------------------------------------------
 // What the model returns, checked against what it was shown
 // ---------------------------------------------------------------------------
