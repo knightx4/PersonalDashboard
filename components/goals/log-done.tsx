@@ -153,7 +153,9 @@ export function LogDone({
       )}
       {open && (
         <form
-          className="flex items-center gap-2"
+          // With the date chip a phone puts the field on a line of its own, so
+          // the chip does not squeeze what is being typed.
+          className={cn('flex items-center gap-2', days && 'max-sm:flex-wrap')}
           onSubmit={(event) => {
             event.preventDefault();
             submit();
@@ -176,7 +178,7 @@ export function LogDone({
             placeholder={placeholder}
             aria-label="What did you do?"
             aria-invalid={error ? true : undefined}
-            className="min-w-0 flex-1 max-sm:min-h-11"
+            className={cn('min-w-0 flex-1 max-sm:min-h-11', days && 'max-sm:basis-full')}
           />
           {days && (
             <ChipInput
@@ -188,7 +190,8 @@ export function LogDone({
               max={days.today}
               required
               onChange={(event) => setDay(event.target.value)}
-              className="shrink-0 max-sm:min-h-11"
+              className="shrink-0 max-sm:mr-auto"
+              inputClassName="max-sm:min-h-11"
             />
           )}
           <PaidCostsProvider costs={costs ?? {}}>
