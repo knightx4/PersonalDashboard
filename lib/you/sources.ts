@@ -92,13 +92,13 @@ export const youSources: ModuleSources = {
     {
       table: 'you.personality_results',
       module: 'You',
-      holds: 'Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.',
+      holds: 'Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4, with every Enneagram score or a test\'s ranked themes where kept.',
       weight: 'record',
       search: ['test_name', 'typed_value', 'note', 'read_points'],
       title: 'test_name',
       href: () => '/you/personality',
       section: PERSONALITY,
-      note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
+      note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. type_scores (Enneagram only) is the score 0 to 100 for types 1 to 9 in order. themes is a test\'s themes strongest first, such as a CliftonStrengths top five or DISC styles, each {name, domain, summary, score, insights, blind_spots, actions}. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
     {
       table: 'you.details',
@@ -267,6 +267,7 @@ export const youSources: ModuleSources = {
     { table: 'you.board_panels', reason: 'Named groups of advisors the person picks when asking the board, which is a setting of the board, not something they wrote, wanted or did.' },
     { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
     { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
+    { table: 'you.personality_profiles', reason: 'Dash\'s analysis across their personality tests; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },
     // Lines from their private notes for the insights run (plan #2413.8).
     {

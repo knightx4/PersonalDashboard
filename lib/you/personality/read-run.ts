@@ -64,7 +64,7 @@ function toCandidate(note: RawNote): CandidateNote {
   };
 }
 
-async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: string[]): Promise<Map<string, CandidateNote>> {
+export async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: string[]): Promise<Map<string, CandidateNote>> {
   if (ids.length === 0) return new Map();
   const { data, error } = await vault
     .from('notes')
@@ -76,7 +76,7 @@ async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: strin
   return new Map(((data ?? []) as RawNote[]).map((n) => [n.id, toCandidate(n)]));
 }
 
-async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<CandidateNote[]> {
+export async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<CandidateNote[]> {
   const { data, error } = await vault
     .from('notes')
     .select('id, path, title, body')
@@ -87,7 +87,7 @@ async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<
   return ((data ?? []) as RawNote[]).map(toCandidate);
 }
 
-async function loadResults(you: YouSupabaseClient): Promise<PersonalityResult[]> {
+export async function loadResults(you: YouSupabaseClient): Promise<PersonalityResult[]> {
   const { data, error } = await you.from('personality_results').select(RESULT_COLUMNS);
   assertSchemaExposed(error, YOU_SCHEMA);
   if (error) throw new Error(`Reading your results failed: ${error.message}`);

@@ -128,6 +128,8 @@ export const MODELS = {
   learnGraphFromCourse: SONNET,
   /** lib/you/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
   youPersonalityRead: SONNET,
+  /** lib/you/personality/profile-run.ts, Dash's analysis across all the tests; Sonnet like the read of one */
+  youPersonalityProfile: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */

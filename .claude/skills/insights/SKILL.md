@@ -188,8 +188,15 @@ of mottos, personal goals, favourite things, an index of interests), wherever
 the person keeps them. List the paths found this run in the summary, so the
 next run starts from them. Their personality results
 (`you.personality_results`: `kind`, `test_name`, the five scores,
-`typed_value`, `note`, `taken_at`) go on the list too. A card may start from
-something on this list; it may not stop there.
+`typed_value`, `note`, `taken_at`, `type_scores`, `themes`) go on the list
+too, and so does Dash's newest analysis across them
+(`you.personality_profiles`, the newest row by `created_at`: `summary`,
+`agreements`, `tensions` with their verdicts, and `watch` with the number
+behind each). The person has read that analysis on the Personality tab, so a
+card that only repeats it tells them nothing; its tensions and `watch`
+patterns are good places to start digging, and a card that finds the record
+disagreeing with one says so. A card may start from something on this list;
+it may not stop there.
 
 ## 2. Read the core in full
 

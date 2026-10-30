@@ -6,6 +6,7 @@ import { MODELS } from '@/lib/core/models';
 import { IPIP_ITEM_COUNT } from '@/lib/you/personality/ipip';
 import type { BigFiveResult, PersonalityRead, TypedResult } from '@/lib/you/personality/model';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
+import type { PersonalityProfile } from '@/lib/you/personality/profile';
 
 /**
  * The Big Five test (plan #1632) in the surface gallery: the list with the
@@ -273,6 +274,45 @@ const TYPED_READ: TypedResult[] = [
   TYPED[1]!,
 ];
 
+/* Dash's analysis across the tests, at the top of the tab. */
+
+const PROFILE: PersonalityProfile = {
+  id: '00000000-0000-4000-8000-000000000301',
+  resultsKey: 'stale',
+  summary:
+    'Your tests agree that you think before you act and get your energy from ideas more than people. Where they split is how you treat people: the type tests call you detached, while DISC and your Agreeableness put care for others near the top, and your notes side with the second.',
+  agreements: [
+    {
+      text: 'Ideas come first for you: Intellect is your highest Big Five trait at 90, and Learner and Intellection lead your strengths.',
+      tests: ['Big Five', 'CliftonStrengths', 'Enneagram'],
+    },
+    {
+      text: 'You recharge alone. Extraversion is 23, and Myers-Briggs and the Enneagram both put you on the inward side.',
+      tests: ['Big Five', 'Myers-Briggs', 'Enneagram'],
+    },
+  ],
+  tensions: [
+    {
+      text: 'Myers-Briggs calls you a thinking type who keeps feelings out of decisions; DISC puts Support at 96 and your Agreeableness is 70.',
+      tests: ['Myers-Briggs', 'DISC', 'Big Five'],
+      verdict: 'Your note on the food bank says helping is what makes a week feel worth it, which sides with Support.',
+      note: {
+        id: '00000000-0000-4000-8000-000000000105',
+        title: 'Volunteering at the Springfield food bank',
+        path: 'Journal/Volunteering at the Springfield food bank.md',
+      },
+    },
+  ],
+  watch: [
+    {
+      text: 'Input and Learner warn of gathering more than you use. Your reading list bears it out.',
+      evidence: 'Learn readings: 15 saved and not started, 3 finished.',
+    },
+  ],
+  model: MODELS.youPersonalityProfile,
+  createdAt: '2026-10-07T18:45:00Z',
+};
+
 /** The Personality tab's header, as app/you/personality/page.tsx draws it. */
 function TabHeader() {
   return <PageHeader title="Personality" description="Your results from each test, side by side." />;
@@ -287,6 +327,7 @@ export function YouPersonalitySurface() {
         earlier={EARLIER}
         typed={TYPED_READ}
         themes={THEMES}
+        profile={{ profile: PROFILE, state: 'changed' }}
         now={NOW}
       />
     </>
@@ -313,7 +354,7 @@ export function YouPersonalityEmptySurface() {
   return (
     <>
       <TabHeader />
-      <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} now={NOW} />
+      <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} profile={{ profile: null, state: 'none' }} now={NOW} />
     </>
   );
 }

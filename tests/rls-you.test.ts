@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -38,6 +38,33 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r' and not c.relrowsecurity`;
     expect(rows).toEqual([]);
+  });
+});
+
+describe('the analysis across personality tests', () => {
+  // migrations-you/0035_personality_profiles.sql: one row per run, the
+  // newest shown on the Personality tab.
+  it('keeps an analysis for its owner only, and lets no one else write one for them', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_profiles (user_id, results_key, summary, model)
+                 values (${userA}, '2-abc', 'You think before you act.', 'test')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select summary from personality_profiles`)).toEqual([
+      { summary: 'You think before you act.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from personality_profiles`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into personality_profiles (user_id, results_key, summary, model)
+                   values (${userA}, '2-abc', 'Planted.', 'test')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_profiles (user_id, results_key, summary, model, tensions)
+            values (${userA}, '2-abc', 'x', 'test', '{}'::jsonb)`,
+    ).rejects.toThrow();
   });
 });
 

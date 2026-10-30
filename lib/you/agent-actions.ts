@@ -15,6 +15,10 @@ export const youActions: ModuleActions = {
     deleteTypedAction: none('deletes'),
     restoreTypedAction: none('theirs'),
     readAgainAction: tool('read_personality_again'),
+    writeProfileAction: none(
+      'spends',
+      'Writes Dash\'s analysis across all the tests, a Sonnet call offered on the Personality tab only when a test has changed since the last one.',
+    ),
   },
   // Transcripts and courses on Work & school, moved from the Vault (plan #1991.3).
   'app/you/work/actions.ts': {

@@ -488,6 +488,21 @@ as a comparison where a number moves.
   obsidian.vault_connections row: an about-me note, personal goals, an index of
   interests, notes to self, whatever they are called): ten lines at most,
   quoted, so the advisors know what the person says they want.
+- **How they tend to work.** The newest analysis across their personality
+  tests, from the Personality tab:
+
+  ```sql
+  select summary, agreements, tensions, watch, created_at
+  from you.personality_profiles
+  where user_id = '<user_id>'
+  order by created_at desc
+  limit 1;
+  ```
+
+  Give the summary, each tension with its verdict, and each pattern under
+  `watch` with its number, dated by `created_at`. It is Dash's reading of the
+  tests, not the person's words: say so, and let the record outweigh it.
+  With no row, leave the section out.
 - **Dreams.** For the dreamer, quotes with dates of ambitions, projects and
   "someday" lines from the journal folders, the journal and daily notes, any note in Ideas/
   or whose title suggests a project, and the strongest themes on the vault
@@ -539,6 +554,10 @@ advisor forecasts from, and all it reads in round 1. It holds:
    paragraph names (the hiring manager the pipeline, the CFO the money, the
    skeptic stated priorities beside where the hours went, the mentor the
    long record of notes, learning and goals, the dreamer the dreams).
+   The skeptic's and the mentor's slices also get the `watch` patterns and
+   the tensions from the personality analysis in `week.md`, where one bears
+   on the decision, so a known tendency (researching past the point of
+   deciding, say) is asked about rather than assumed.
 3. **Its memory**: its unretired `you.advisor_memory` rows, the oldest
    first, as what it already knows about the person.
 

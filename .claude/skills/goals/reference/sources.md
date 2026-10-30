@@ -553,12 +553,12 @@ The academic transcripts they have uploaded, one per school record, with the ori
 
 ### `you.personality_results` (You)
 
-Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
+Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4, with every Enneagram score or a test's ranked themes where kept.
 
 - Search: `test_name`, `typed_value`, `note`, `read_points`
 - Name a row by `test_name`; link it by `id`
 - Opens at `/you/personality`
-- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
+- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. type_scores (Enneagram only) is the score 0 to 100 for types 1 to 9 in order. themes is a test's themes strongest first, such as a CliftonStrengths top five or DISC styles, each {name, domain, summary, score, insights, blind_spots, actions}. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
 
 ### `you.details` (You)
 

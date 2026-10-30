@@ -258,6 +258,12 @@ export const SPEND_OPERATIONS = {
     // Personality tab asks for a fresh read. The notes are found with the
     // cached trait sentences, under 'embed-note-match'.
     'read-personality',
+    // Dash's analysis across all the personality tests, on the Personality
+    // tab. One Sonnet call each time the button there asks for it, which it
+    // offers only when a test was added, changed or deleted since the last.
+    // The notes are found with the cached test sentences, under
+    // 'embed-note-match'.
+    'personality-profile',
     // Dash's summary and key points for one file kept under a course (plan
     // #2401.4). One Haiku call per press of Summarise on the Work & school
     // tab, reading the whole file: a PDF or photo as itself, a deck or Word

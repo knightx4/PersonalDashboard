@@ -20,6 +20,8 @@ import {
 } from '@/lib/you/personality/model';
 import { EnneagramChart } from './enneagram-chart';
 import { ThemeList } from './theme-list';
+import { ProfilePanel } from './profile-panel';
+import type { PersonalityProfile, ProfileState } from '@/lib/you/personality/profile';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
 import { Note } from '@/components/ui/note';
@@ -210,6 +212,7 @@ export function PersonalitySection({
   earlier,
   typed,
   themes,
+  profile,
   now,
 }: {
   latest: BigFiveResult | null;
@@ -218,6 +221,8 @@ export function PersonalitySection({
   typed: TypedResult[];
   /** Null when the themes could not be matched. */
   themes: TraitThemes | null;
+  /** Dash's analysis across the tests and whether to offer it again; left out, no section. */
+  profile?: { profile: PersonalityProfile | null; state: ProfileState };
   /**
    * The time the page is drawn, which says whether a read is still coming.
    * The gallery passes a fixed one; the page leaves it to the clock.
@@ -227,6 +232,7 @@ export function PersonalitySection({
   const at = now ?? clock();
   return (
     <div id="personality" className="max-w-2xl space-y-4">
+      {profile ? <ProfilePanel profile={profile.profile} state={profile.state} /> : null}
       <TestSection
         title="Big Five"
         meta={latest ? `Taken ${formatDay(latest.takenAt, true)}` : undefined}
