@@ -1,12 +1,12 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { Undo2 } from 'lucide-react';
+import { CalendarDays, Undo2 } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { toggleChipClass } from '@/components/ui/chip';
-import { FieldError, Input } from '@/components/ui/field';
+import { ChipInput, FieldError, Input } from '@/components/ui/field';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
@@ -71,8 +71,15 @@ export function LogDone({
   initial = [],
   initialMessage,
   initialOpen = false,
+  days,
   className,
 }: {
+  /**
+   * Lets the box log for an earlier day (note 2653989d): a date chip beside
+   * the field, set to today and going back to `earliest`. Left out, the box
+   * logs for whatever day the sentence names, today by default.
+   */
+  days?: { today: string; earliest: string };
   /** The line the box is until it is pressed. */
   label?: string;
   /** Drawn open, for the gallery. */
@@ -87,6 +94,7 @@ export function LogDone({
 }) {
   const [open, setOpen] = useState(initialOpen);
   const [text, setText] = useState('');
+  const [day, setDay] = useState(days?.today ?? '');
   const [filed, setFiled] = useState<Filed[]>(initial);
   const [message, setMessage] = useState<string | undefined>(initialMessage);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +114,8 @@ export function LogDone({
   function submit() {
     if (pending || !text.trim()) return;
     start(async () => {
-      const result = await fileGoalCapture(text, null, goalId);
+      const earlier = days && day && day !== days.today ? day : null;
+      const result = await fileGoalCapture(text, null, goalId, earlier);
       if (result.error || !result.captureId) {
         setError(result.error ?? 'Nothing was filed.');
         setMessage(undefined);
@@ -169,6 +178,19 @@ export function LogDone({
             aria-invalid={error ? true : undefined}
             className="min-w-0 flex-1 max-sm:min-h-11"
           />
+          {days && (
+            <ChipInput
+              type="date"
+              aria-label="Day it happened"
+              icon={<CalendarDays className="size-4" strokeWidth={1.75} />}
+              value={day}
+              min={days.earliest}
+              max={days.today}
+              required
+              onChange={(event) => setDay(event.target.value)}
+              className="shrink-0 max-sm:min-h-11"
+            />
+          )}
           <PaidCostsProvider costs={costs ?? {}}>
             <DashAction
               type="submit"

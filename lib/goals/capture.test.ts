@@ -3,6 +3,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { askCaptureModel } from './capture-model';
 import {
   addedProgress,
+  dayHintLine,
+  earliestProgressDay,
   asksEstimate,
   CAPTURE_MOVE_TOOLS,
   captureContext,
@@ -1271,5 +1273,23 @@ describe('logging what you did, from Home and a goal (plan #1740)', () => {
     const { deps, asked } = stubs({ actions: [] }, { context: async () => home });
     await fileCapture('cleaned the bathroom', '2026-10-11', deps, null, 'gone');
     expect(asked[0]).not.toContain('written on the page');
+  });
+});
+
+describe('logging for an earlier day (note 2653989d)', () => {
+  it('tells the model the day picked, when it is not today', () => {
+    expect(dayHintLine('2026-10-27', '2026-10-30')).toContain('2026-10-27');
+    expect(dayHintLine('2026-10-30', '2026-10-30')).toBeNull();
+    expect(dayHintLine(null, '2026-10-30')).toBeNull();
+  });
+
+  it('adds nothing for a day in the future or past the oldest a day may go', () => {
+    expect(dayHintLine('2026-10-31', '2026-10-30')).toBeNull();
+    expect(dayHintLine(earliestProgressDay('2026-10-30'), '2026-10-30')).not.toBeNull();
+    expect(dayHintLine('2026-08-01', '2026-10-30')).toBeNull();
+  });
+
+  it('goes back sixty days', () => {
+    expect(earliestProgressDay('2026-10-30')).toBe('2026-08-31');
   });
 });
