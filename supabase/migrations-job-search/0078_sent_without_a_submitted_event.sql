@@ -239,10 +239,18 @@ $$;
 
 revoke all on function job_search.sync_application_state(uuid) from public, anon, authenticated;
 
-select job_search.sync_application_state(a.id)
-from job_search.applications a
-where a.user_id = core.dev_owner_id()
-  and a.submitted_at is null
-  and a.status not in ('lead', 'drafting');
+-- A database built from scratch runs this folder before core/0137 creates
+-- dev_owner_id(), and has no owner's rows to re-sync anyway.
+do $$
+begin
+  if to_regprocedure('core.dev_owner_id()') is not null then
+    perform job_search.sync_application_state(a.id)
+    from job_search.applications a
+    where a.user_id = core.dev_owner_id()
+      and a.submitted_at is null
+      and a.status not in ('lead', 'drafting');
+  end if;
+end;
+$$;
 
 commit;
