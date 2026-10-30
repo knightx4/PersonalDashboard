@@ -99,6 +99,8 @@ export type PipelineParams = {
   company?: string;
   page?: string;
   sort?: string;
+  /** `rev` runs the sort the other way (note fd6c7ef2). */
+  dir?: string;
   group?: string;
   hide?: string | string[];
 };

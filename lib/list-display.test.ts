@@ -293,3 +293,28 @@ describe('a saved arrangement', () => {
     expect(listDisplayMenu(spec, {}).views).toEqual([]);
   });
 });
+
+describe('reversing a sort (note fd6c7ef2)', () => {
+  it('runs the chosen sort the other way when the address says rev', () => {
+    const state = parseListDisplay(spec, { sort: 'total_desc', dir: 'rev' });
+    expect(state.reversed).toBe(true);
+    expect(sortRows(orders, state).map((order) => order.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('turns the sort in force round from its own choice, and back', () => {
+    const menu = listDisplayMenu(spec, { sort: 'total_desc' });
+    const chosen = menu.sorts.find((sort) => sort.id === 'total_desc');
+    expect(chosen?.href).toBe('/shopping/orders?sort=total_desc&dir=rev');
+    expect(chosen?.reversed).toBe(false);
+
+    const reversed = listDisplayMenu(spec, { sort: 'total_desc', dir: 'rev' });
+    expect(reversed.sorts.find((sort) => sort.id === 'total_desc')?.href).toBe('/shopping/orders?sort=total_desc');
+    expect(reversed.sortLabel).toBe('Total: high to low, reversed');
+  });
+
+  it('goes back to the natural order on a change of sort, and keeps it on any other change', () => {
+    const params = { sort: 'total_desc', dir: 'rev' };
+    expect(displayHref(spec, params, { sort: 'oldest' })).toBe('/shopping/orders?sort=oldest');
+    expect(displayHref(spec, params, { group: 'merchant' })).toBe('/shopping/orders?sort=total_desc&group=merchant&dir=rev');
+  });
+});

@@ -243,19 +243,24 @@ const ROW = 'press flex min-h-11 items-center justify-between gap-2 rounded-cont
 /**
  * One sort or grouping. The chosen one carries `aria-current` and a tick as
  * well as the tint, because a tint is not a fact anybody can hear and is not
- * one everybody can see either.
+ * one everybody can see either. Choosing the sort in force again turns it
+ * round (note fd6c7ef2), and the row says so when it has been.
  */
 function ChoiceRow({ choice }: { choice: DisplayChoice }) {
   return (
     <Link
       href={choice.href}
       aria-current={choice.chosen ? 'true' : undefined}
+      title={choice.reversed !== undefined ? 'Choose again to reverse the order' : undefined}
       className={cn(
         ROW,
         choice.chosen ? 'bg-accent-tint text-accent' : 'text-ink hover:bg-sunken',
       )}
     >
-      <span className="truncate">{choice.label}</span>
+      <span className="truncate">
+        {choice.label}
+        {choice.reversed && <span className="text-ink-muted">, reversed</span>}
+      </span>
       {choice.chosen && <Check className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />}
     </Link>
   );

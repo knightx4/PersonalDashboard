@@ -70,7 +70,7 @@ export type ListDisplaySpec<T> = {
   /** Defaults to no grouping. */
   defaultGroup?: string;
   /** Parameter names, for a page already using one of these for something else. */
-  params?: { sort?: string; group?: string; hidden?: string };
+  params?: { sort?: string; group?: string; hidden?: string; dir?: string };
 };
 
 /** The grouping id that means "do not group". Never declared by a page. */
@@ -79,7 +79,15 @@ export const NO_GROUP = 'none';
 /** The key of the bucket holding rows with no value for the grouping. */
 export const EMPTY_BUCKET_KEY = '';
 
-const DEFAULT_PARAM_NAMES = { sort: 'sort', group: 'group', hidden: 'hide' } as const;
+const DEFAULT_PARAM_NAMES = { sort: 'sort', group: 'group', hidden: 'hide', dir: 'dir' } as const;
+
+/**
+ * The value of the direction param that turns the chosen sort round (note
+ * fd6c7ef2). Each sort declares its own natural order, newest first for a
+ * date and A to Z for a name, so the param says "the other way" rather than
+ * ascending or descending.
+ */
+export const REVERSED = 'rev';
 
 /** What the URL currently asks for, once it has been checked against the spec. */
 export type ListDisplayState<T> = {
@@ -87,6 +95,8 @@ export type ListDisplayState<T> = {
   group: string;
   /** Hideable property ids, in the order the spec declares them. */
   hidden: string[];
+  /** True when the chosen sort runs the other way from its natural order. */
+  reversed: boolean;
   sortBy: SortDefinition<T> | null;
   groupBy: GroupDefinition<T> | null;
 };
@@ -155,6 +165,7 @@ export function parseListDisplay<T>(
     sort,
     group,
     hidden: parseHidden(spec, params[names.hidden]),
+    reversed: firstValue(params[names.dir]) === REVERSED,
     sortBy: spec.sorts.find((option) => option.id === sort) ?? null,
     groupBy: spec.groups?.find((option) => option.id === group) ?? null,
   };
@@ -173,10 +184,15 @@ export function visibleProperties<T>(
   return (spec.properties ?? []).filter((property) => !state.hidden.includes(property.id));
 }
 
-/** Sort a copy of the rows by the chosen sort. No sort chosen leaves the order alone. */
+/**
+ * Sort a copy of the rows by the chosen sort, turned round when the address
+ * asks for it. No sort chosen leaves the order alone.
+ */
 export function sortRows<T>(rows: readonly T[], state: ListDisplayState<T>): T[] {
   const copy = [...rows];
-  return state.sortBy ? copy.sort(state.sortBy.compare) : copy;
+  const sortBy = state.sortBy;
+  if (!sortBy) return copy;
+  return copy.sort(state.reversed ? (a, b) => sortBy.compare(b, a) : sortBy.compare);
 }
 
 /** One bucket of a grouped list, with its count and the subtotal the page works out. */
@@ -253,6 +269,11 @@ export type DisplayChange = {
   hidden?: readonly string[];
   /** Turn one property off, or back on. */
   toggleProperty?: string;
+  /**
+   * Run the sort the other way. Left out, a change of sort goes back to the
+   * new sort's natural order and anything else keeps the direction it had.
+   */
+  reversed?: boolean;
 };
 
 /**
@@ -277,10 +298,12 @@ export function displayHref<T>(
     asked[names.hidden] = toggleHidden(current.hidden, change.toggleProperty).join(',');
   }
   const next = parseListDisplay(spec, asked);
+  const reversed =
+    change.reversed ?? (change.sort !== undefined && next.sort !== current.sort ? false : current.reversed);
 
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === names.sort || key === names.group || key === names.hidden) continue;
+    if (key === names.sort || key === names.group || key === names.hidden || key === names.dir) continue;
     if (value == null) continue;
     for (const entry of Array.isArray(value) ? value : [value]) {
       if (entry !== '') query.append(key, entry);
@@ -289,6 +312,7 @@ export function displayHref<T>(
   if (next.sort && next.sort !== defaultSortId(spec)) query.set(names.sort, next.sort);
   if (next.group !== defaultGroupId(spec)) query.set(names.group, next.group);
   if (next.hidden.length > 0) query.set(names.hidden, next.hidden.join(','));
+  if (reversed && next.sortBy) query.set(names.dir, REVERSED);
 
   const qs = query.toString();
   return qs ? `${spec.pathname}?${qs}` : spec.pathname;
@@ -322,8 +346,11 @@ export function sameView(a: string, b: string): boolean {
   return normalise(a) === normalise(b);
 }
 
-/** One choice in the display control: a sort, or a grouping. */
-export type DisplayChoice = { id: string; label: string; href: string; chosen: boolean };
+/**
+ * One choice in the display control: a sort, or a grouping. On the sort in
+ * force, `href` turns it round and `reversed` says which way it runs now.
+ */
+export type DisplayChoice = { id: string; label: string; href: string; chosen: boolean; reversed?: boolean };
 
 /** One property switch, which is on or off rather than one of a set. */
 export type DisplayToggle = { id: string; label: string; href: string; hidden: boolean };
@@ -376,12 +403,17 @@ export function listDisplayMenu<T>(
   const query = currentQuery(params);
 
   return {
-    sorts: spec.sorts.map((sort) => ({
-      id: sort.id,
-      label: sort.label,
-      href: displayHref(spec, params, { sort: sort.id }),
-      chosen: sort.id === state.sort,
-    })),
+    sorts: spec.sorts.map((sort) => {
+      const chosen = sort.id === state.sort;
+      return {
+        id: sort.id,
+        label: sort.label,
+        // Choosing the sort already in force turns it round (note fd6c7ef2).
+        href: displayHref(spec, params, chosen ? { reversed: !state.reversed } : { sort: sort.id }),
+        chosen,
+        ...(chosen ? { reversed: state.reversed } : {}),
+      };
+    }),
     groups:
       groups.length === 0
         ? []
@@ -405,7 +437,7 @@ export function listDisplayMenu<T>(
       href: displayHref(spec, params, { toggleProperty: property.id }),
       hidden: state.hidden.includes(property.id),
     })),
-    sortLabel: state.sortBy?.label ?? null,
+    sortLabel: state.sortBy ? `${state.sortBy.label}${state.reversed ? ', reversed' : ''}` : null,
     groupLabel: state.groupBy?.label ?? null,
     hiddenCount: state.hidden.length,
     views: views.map((view) => ({
