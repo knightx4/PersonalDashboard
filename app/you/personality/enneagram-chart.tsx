@@ -78,7 +78,7 @@ export function EnneagramChart({
                 textAnchor="middle"
                 dominantBaseline="central"
                 className={cn(
-                  'text-[13px] tabular-nums',
+                  'text-small tabular-nums',
                   type === top ? 'fill-ink font-semibold' : 'fill-ink-muted',
                 )}
               >
