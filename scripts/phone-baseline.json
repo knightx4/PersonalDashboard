@@ -33,6 +33,9 @@
   "goals-steps-opened": {
     "targets": 4
   },
+  "goals-steps-dash-row": {
+    "targets": 4
+  },
   "jobs-interviews": {
     "targets": 4
   },

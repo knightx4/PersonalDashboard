@@ -234,6 +234,15 @@ function inferRejectionStage(
   }
 }
 
+/** The stages a hand move can only reach once the application has gone out. */
+const SENT_STAGES: readonly ApplicationStatus[] = [
+  'submitted',
+  'acknowledged',
+  'in_process',
+  'final_round',
+  'offer',
+];
+
 /**
  * Fold events forward into a status. The single definition of the state
  * machine on the TypeScript side.
@@ -263,6 +272,7 @@ export function deriveApplicationState(
   let override = opts.manualOverride ?? null;
   let status: ApplicationStatus = 'lead';
   let submittedAt: Date | null = null;
+  let sentSeenAt: Date | null = null;
   let confirmationReceivedAt: Date | null = null;
   let firstHumanResponseAt: Date | null = null;
   let closedAt: Date | null = null;
@@ -299,6 +309,14 @@ export function deriveApplicationState(
     }
     if (event.kind === 'confirmation') {
       confirmationReceivedAt = earliest(confirmationReceivedAt, event.occurredAt);
+      sentSeenAt = earliest(sentSeenAt, event.occurredAt);
+    }
+    if (
+      event.kind === 'status_override' &&
+      event.payload?.status &&
+      SENT_STAGES.includes(event.payload.status)
+    ) {
+      sentSeenAt = earliest(sentSeenAt, event.occurredAt);
     }
 
     if (event.kind === 'rejection') {
@@ -395,6 +413,12 @@ export function deriveApplicationState(
     status = 'ghosted';
     outcome = 'ghosted';
     closedAt = closedAt ?? new Date(lastEventAt.getTime() + threshold * DAY_MS);
+  }
+
+  // Sent with nothing recording the sending: the earliest confirmation, or a
+  // move by hand to a stage past sending, stands in for it (job_search 0078).
+  if (submittedAt === null && status !== 'lead' && status !== 'drafting') {
+    submittedAt = sentSeenAt;
   }
 
   return {

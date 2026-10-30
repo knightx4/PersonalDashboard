@@ -617,6 +617,15 @@ The schools, certifications, honors, skills and courses on their LinkedIn profil
 - Opens at `/you/work#profile-<id>`
 - kind is school, certification, honor, skill or course. detail is a school's degree or a certification's authority; code is a certification's license number or a course's number. started and ended are "YYYY" or "YYYY-MM"; an honor's started is the day it was issued. Written by the LinkedIn import (plan #2432.7).
 
+### `you.dash_questions` (You)
+
+Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.
+
+- Search: `question`, `answer`
+- Name a row by `question`; link it by `id`
+- Opens at `/you/answer`
+- question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: only an answered row says anything about them, so leave open and skipped rows out. answered_at is when they first answered; updated_at moves when they change the answer (you 0033).
+
 ### `you.advisor_chats` (You)
 
 The one-on-one talks they started with one of their advisors, by title.

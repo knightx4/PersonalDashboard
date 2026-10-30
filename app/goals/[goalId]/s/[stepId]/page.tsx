@@ -18,7 +18,7 @@ import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { stepRunViews, type GoalRun } from '@/lib/goals/shaping';
 import { loadStepRuns } from '@/lib/goals/shaping-store';
 import type { StepNode } from '@/lib/goals/steps';
-import { loadGoalMap } from '@/lib/goals/steps-store';
+import { loadGoalMap, markStepNoticeSeen } from '@/lib/goals/steps-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { StepPage } from '../../step-page';
 import { StepCloseRing } from './step-close';
@@ -88,6 +88,12 @@ export default async function StepOwnPage({
   if (!map) notFound();
   const step = findStep(map.steps, stepId);
   if (!step) notFound();
+
+  // Opening a finished step that asked to be announced marks its notice seen
+  // (plan #2611.1); a failed write leaves the page as it was.
+  if (step.status === 'done' && step.notifyOnDone) {
+    await markStepNoticeSeen(client, step.id, user.id).catch(() => false);
+  }
 
   const steps = allSteps(map.steps);
   const ids = steps.map((node) => node.id);

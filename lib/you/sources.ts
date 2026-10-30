@@ -2,6 +2,7 @@ import { courseHref, transcriptHref } from '@/lib/you/education';
 import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types';
 import { jobHref } from '@/lib/you/work-history';
 import { profileHref } from '@/lib/you/profile-entries';
+import { ANSWER_HREF } from '@/lib/you/dash-questions';
 
 /** The sections of You's nav its rows sit under (app/you/layout.tsx). */
 const PERSONALITY: Section = { href: '/you/personality', label: 'Personality' };
@@ -10,6 +11,7 @@ const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
 const BOARD: Section = { href: '/you/board', label: 'Board' };
+const ANSWER: Section = { href: ANSWER_HREF, label: 'Answer' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -196,6 +198,23 @@ export const youSources: ModuleSources = {
         'an honor\'s started is the day it was issued. Written by the LinkedIn import (plan #2432.7).',
     },
     {
+      table: 'you.dash_questions',
+      module: 'You',
+      holds: 'Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.',
+      weight: 'record',
+      search: ['question', 'answer'],
+      title: 'question',
+      facts: ['status', 'answered_at'],
+      newest: 'created_at',
+      href: () => ANSWER_HREF,
+      section: ANSWER,
+      page: null,
+      note:
+        'question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: ' +
+        'only an answered row says anything about them, so leave open and skipped rows out. ' +
+        'answered_at is when they first answered; updated_at moves when they change the answer (you 0033).',
+    },
+    {
       table: 'you.board_questions',
       module: 'You',
       holds: 'The decisions they put to their board: the question, its options, the way they were leaning, and what they decided.',
@@ -261,6 +280,7 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+    { table: 'you.dash_question_runs', reason: 'Bookkeeping for the runs that write Dash\'s questions on the Answer tab.' },
     { table: 'you.board_meetings', reason: 'Minutes Dash wrote for the board meetings; Goals reading them would cite Dash to itself.' },
     { table: 'you.board_marks', reason: 'Their votes, answers and ticks on the board\'s minutes, read by the next board meeting, not by Goals.' },
     { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
