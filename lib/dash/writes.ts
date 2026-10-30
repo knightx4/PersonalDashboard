@@ -32,6 +32,7 @@ import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
 import { GOALS_WRITE_TOOLS } from './goals-writes';
+import { GOAL_RUN_WRITE_TOOLS } from './goal-run-writes';
 import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 import { VAULT_WRITE_TOOLS } from './vault-writes';
 import { JOBS_WRITE_TOOLS } from './jobs-writes';
@@ -1282,6 +1283,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...NEWS_WRITE_TOOLS,
   // Goals' areas and goals, which the connector offers too (plan #1894.7.1).
   ...GOALS_WRITE_TOOLS,
+  // Starting the goals routine on a goal or a step, in the app only.
+  ...GOAL_RUN_WRITE_TOOLS,
   // Shopping's one-item and list changes, which the connector offers too (plan #1894.5.1).
   ...SHOPPING_WRITE_TOOLS,
   // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).

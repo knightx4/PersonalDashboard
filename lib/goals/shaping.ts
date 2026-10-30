@@ -168,7 +168,24 @@ export function goalRunText(input: {
   runId: string;
   /** The date an errand is due by (plan #1262); absent or null for an ordinary goal. */
   errandDueOn?: string | null;
+  /**
+   * What they asked for in Ask Dash when they started the run from there
+   * (start_goal_run), in their words; absent for the goal page's button.
+   */
+  asked?: string | null;
 }): string {
+  const asked = input.asked?.trim()
+    ? [
+        'They started this run from Ask Dash and asked, in their words:',
+        '',
+        ...input.asked.trim().split('\n').map((line) => `> ${line}`),
+        '',
+        'Map the goal as below, and make sure what you leave on it answers what they asked.',
+        'Research it asks for is a Dash step under the goal, worked in this same run as',
+        '"Working the ready steps" says, with what it found written to a file on the goal.',
+        '',
+      ]
+    : [];
   const errand = input.errandDueOn
     ? [
         `This goal is an errand, due on ${input.errandDueOn}. Map it as "An errand" under`,
@@ -180,6 +197,7 @@ export function goalRunText(input: {
   return [
     `Work on one goal: "${input.goalTitle}" (goals.items id ${input.goalId}).`,
     '',
+    ...asked,
     ...errand,
     'Follow .claude/skills/goals/SKILL.md. Read it first: it says how to map the whole path',
     'for a goal (phases, Claude steps, information steps pre-filled from Gmail, provisional',
@@ -303,6 +321,8 @@ export function approvalLine(input: {
   questions: number;
   /** Whether every step on the goal is finished or dropped (see `nothingOpen`). */
   nothingOpen?: boolean;
+  /** Whether the goal has no steps at all, so Dash has not mapped it yet. */
+  unmapped?: boolean;
 }): { text: string; approve: string | null } {
   const steps = (n: number) => `${n} ${n === 1 ? 'step' : 'steps'}`;
   const asks =
@@ -336,6 +356,9 @@ export function approvalLine(input: {
       approve: null,
     };
   }
+  if (input.unmapped && input.goalStatus === 'open') {
+    return { text: UNMAPPED, approve: null };
+  }
   if (input.nothingOpen && input.goalStatus === 'open') {
     return {
       text: 'Every step on this goal is finished, and the goal is not done yet. Ask Dash and it will lay out what comes next.',
@@ -343,6 +366,15 @@ export function approvalLine(input: {
     };
   }
   return { text: asks.trim(), approve: null };
+}
+
+/** What the goal page says over a goal with no steps, beside its Map it out button. */
+export const UNMAPPED =
+  'Dash has not mapped this goal yet. Map it out and Dash lays out the steps from here to done, using what your records hold and what it finds on the web, and asks only what it cannot work out.';
+
+/** The goal page's button that starts Dash on the goal: Map it out on a goal with no steps, Ask Dash once it has some. */
+export function workLabel(stepCount: number): string {
+  return stepCount === 0 ? 'Map it out' : 'Ask Dash';
 }
 
 /**

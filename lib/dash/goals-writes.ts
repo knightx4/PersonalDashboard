@@ -19,6 +19,7 @@ import {
   updateGoal,
 } from '@/lib/goals/store';
 import { stepHref } from '@/lib/goals/all-goals';
+import { approveGoal } from '@/lib/goals/shaping-store';
 import { MAX_QUESTIONS, MAX_QUESTION_LENGTH, questionKey, readQuestions, type StepQuestion } from '@/lib/goals/answers';
 import { checkRecord, type CollectionField, type RecordValues } from '@/lib/goals/collections';
 import { archiveRecord, restoreRecord } from '@/lib/goals/collections-store';
@@ -39,7 +40,9 @@ import {
   insertDependency,
   linkStep,
   moveStep,
+  moveStepToGoal,
   setStepArchived,
+  setStepOnTodo,
   setStepQuestions,
   setStepStatus,
   unlinkStep,
@@ -317,7 +320,7 @@ async function reportArea(
 // change_goal
 // ---------------------------------------------------------------------------
 
-const GOAL_CHANGES = ['edit', 'move_up', 'move_down', 'archive', 'restore', 'close', 'park', 'reopen'] as const;
+const GOAL_CHANGES = ['edit', 'move_up', 'move_down', 'archive', 'restore', 'close', 'park', 'reopen', 'approve'] as const;
 type GoalChange = (typeof GOAL_CHANGES)[number];
 
 function goalChange(args: Args): GoalChange {
@@ -379,7 +382,34 @@ async function changeGoal(env: GoalsWriteEnv, args: Args): Promise<GoalsMade> {
           ? changed('Parked', '', `Dash parked the goal "${title}". It is taken back up from All goals.`)
           : changed('Reopened', '', `Dash reopened the goal "${title}".`);
     }
+    case 'approve':
+      return approveOne(env, before);
   }
+}
+
+const APPROVE_UNDO =
+  'Approving opens the goal and every step Dash proposed under it, so it is not taken back from one row. Archive the steps you do not want on the goal.';
+
+/**
+ * Approve a goal, as its page's Approve button does (plan #2035.3, and the
+ * goal thread's approve_goal): the goal opens if Dash proposed it, every step
+ * Dash proposed under it goes live, and from then on Dash adds and reorders
+ * steps there without asking.
+ */
+async function approveOne(env: GoalsWriteEnv, before: Row): Promise<GoalsMade> {
+  const title = named(before.title, 'the goal');
+  if (before.status !== 'proposed' && before.approved_at != null) {
+    throw new GoalsRefused(`"${title}" is approved already, so nothing was changed.`);
+  }
+  const opened = await guarded('It could not be approved', async () => approveGoal(await env.write({}), before.id as string));
+  if (opened === null) throw new GoalsRefused('That goal is no longer there.');
+  const live = opened === 0 ? '' : ` ${opened} ${opened === 1 ? 'step' : 'steps'} Dash proposed ${opened === 1 ? 'is' : 'are'} now live.`;
+  return reportGoal(env, before, {
+    verb: 'Approved',
+    rest: '',
+    summary: `Dash approved the goal "${title}".${live}`,
+    undo: APPROVE_UNDO,
+  });
 }
 
 /** A goal's wording, due date, area or whether it is active, any of them in one write, as the page's edit is. */
@@ -473,6 +503,9 @@ const STEP_CHANGES = [
   'set_aside',
   'bring_back',
   'make_errand',
+  'move_to_goal',
+  'on_todo',
+  'off_todo',
 ] as const;
 type StepChange = (typeof STEP_CHANGES)[number];
 
@@ -625,7 +658,49 @@ async function changeGoalStep(env: GoalsWriteEnv, args: Args): Promise<GoalsMade
     }
     case 'make_errand':
       return makeErrand(env, before, goal, args);
+    case 'move_to_goal':
+      return moveToGoal(env, before, goal, args);
+    case 'on_todo':
+    case 'off_todo': {
+      const on = change === 'on_todo';
+      if (on && (before.kind !== 'mine' || status !== 'open')) {
+        throw new GoalsRefused('Only an open step of theirs goes on Todo: a step of Dash\'s, a question or a closed step does not.');
+      }
+      if (!(await guarded('It could not be changed', async () => setStepOnTodo(await client(), id, on)))) {
+        throw new GoalsRefused(on ? 'That step is on Todo already.' : 'That step is not on Todo.');
+      }
+      return on
+        ? changed('Put', ' on Todo', `Dash put the step "${title}" on Todo.`)
+        : changed('Took', ' off Todo', `Dash took the step "${title}" off Todo.`);
+    }
   }
+}
+
+const MOVE_TO_GOAL_UNDO =
+  'Moving a step to another goal changes its place in both, so it is moved back by asking Dash to move it to the first goal again.';
+
+/**
+ * The step, with its sub-steps, moved under another of their goals, as a goal
+ * comment's move_goal_step does (lib/goals/thread-acts.ts). No page has a
+ * button for it: the arrows move a step among its siblings.
+ */
+async function moveToGoal(env: GoalsWriteEnv, before: Row, goal: Row, args: Args): Promise<GoalsMade> {
+  const target = await ownGoal(env, text(args, 'goal_ref'));
+  if (target.id === goal.id && before.parent_id === goal.id) {
+    throw new GoalsRefused(`That step is under "${named(goal.title, 'that goal')}" already.`);
+  }
+  const moved = await guarded('It could not be moved', async () =>
+    moveStepToGoal(await env.write({}), before.id as string, target.id as string),
+  );
+  if (!moved) throw new GoalsRefused('That step or goal has just changed.');
+  const title = named(before.title, 'the step');
+  const to = named(target.title, 'the goal');
+  return reportStep(env, before, target, {
+    verb: 'Moved',
+    rest: ` to "${to}"`,
+    summary: `Dash moved the step "${title}" from "${named(goal.title, 'its goal')}" to "${to}", with its sub-steps.`,
+    undo: MOVE_TO_GOAL_UNDO,
+  });
 }
 
 const ERRAND_UNDO =
@@ -1801,9 +1876,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       ['app/goals/actions.ts#moveGoalAction', 'lib/goals/store.ts#moveGoal'],
       ['app/goals/actions.ts#archiveGoalAction', 'lib/goals/store.ts#setGoalArchived'],
       ['app/goals/actions.ts#settleGoalAction', 'lib/goals/store.ts#settleGoal'],
+      ['app/goals/[goalId]/shaping-actions.ts#approveGoalAction', 'lib/goals/shaping-store.ts#approveGoal'],
     ),
     description:
-      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, move it to another area, or mark it active or passive (change edit, with any of title, due_on, due_precision, area and activity), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
+      "Change one of the person's goals in Goals, when they ask: reword it, set or clear its due date, move it to another area, or mark it active or passive (change edit, with any of title, due_on, due_precision, area and activity), move it up or down in its area (move_up, move_down), archive it or bring it back (archive, restore), close it as done, park it for now, or take a parked or closed goal back up (close, park, reopen), or approve a goal Dash proposed or one not yet approved, which puts live every step Dash proposed under it (approve). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write the title as an outcome. The done-when is set_goal_done_when; a step under the goal is add_goal_step or close_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1844,9 +1920,10 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
       ['app/goals/home-actions.ts#setAsideAction', 'lib/core/snooze-days.ts#snoozeDay'],
       ['app/goals/home-actions.ts#restoreAsideAction', 'lib/goals/steps-store.ts#updateStep'],
       ['app/goals/home-actions.ts#bringBackAction', 'lib/goals/steps-store.ts#updateStep'],
+      ['app/goals/[goalId]/actions.ts#setStepOnTodoAction', 'lib/goals/steps-store.ts#setStepOnTodo'],
     ),
     description:
-      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), bring a set-aside step back now (bring_back), or make it its own errand, due on due_on or the step's own date, in area or the goal's, and archive the step (make_errand). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
+      "Change one of the person's steps under a goal, when they ask: reword it or change its detail, done-when, dates or kind (change edit, with any of title, detail, done_when, due_on, starts_on, kind, rhythm_count and rhythm_period; an empty detail, done_when or date clears it), drop it (drop), set a done, dropped or blocked step open again (reopen), block it with what it needs (block, with needs), move it up or down among its siblings (move_up, move_down), archive it or bring it back (archive, restore), count it towards another goal as well or no longer (count_towards, stop_counting, with goal_ref), or make it wait on another step until that one closes, or no longer (wait_on, stop_waiting, with other_step_ref), set it aside until a later day so it leaves Up next (set_aside, with until), bring a set-aside step back now (bring_back), or make it its own errand, due on due_on or the step's own date, in area or the goal's, and archive the step (make_errand), move it with its sub-steps under another of their goals (move_to_goal, with goal_ref), or put one of their own open steps on Todo or take it off (on_todo, off_todo). Name steps by the goals.items refs a lookup returned; look them up first. Marking a step done is close_goal_step; a new step is add_goal_step.",
     input_schema: {
       type: 'object',
       properties: {
@@ -1874,7 +1951,7 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
           enum: ['outside', 'steps'],
           description: 'For block: outside when it waits on them or something outside, steps when it clears itself once the steps it waits on close. Default outside.',
         },
-        goal_ref: { type: 'string', description: 'For count_towards and stop_counting: the goals.items ref of the other goal.' },
+        goal_ref: { type: 'string', description: 'For count_towards, stop_counting and move_to_goal: the goals.items ref of the other goal.' },
         other_step_ref: { type: 'string', description: 'For wait_on and stop_waiting: the goals.items ref of the step it waits on.' },
         until: {
           type: 'string',

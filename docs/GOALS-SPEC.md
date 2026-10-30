@@ -674,9 +674,18 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
 - **On request.** **Ask Dash** on a goal fires one run for it, and **Plan
-  this area** on an area fires one run proposing its goals. The same **Ask
+  this area** on an area fires one run proposing its goals. On a goal with
+  no steps yet the button reads **Map it out**, and the panel stands under
+  the status with a line saying what the run does. The same **Ask
   Dash** on a step works that step or phase on its own, or prepares one of
   your steps, as described in "Claude's own work" below.
+- **From the Ask Dash chat.** Asking Dash to map, plan or research a goal
+  starts the same goal run (`start_goal_run`, with what you asked for quoted
+  in the brief), and asking it to do or get ready a step is the step's Ask
+  Dash (`work_goal_step`, through `sendGoalStep`). Both are the owner's only,
+  as the buttons are. Whatever a comment on a goal can ask Dash to do, the
+  chat can do as well, on the goal or step it names
+  (`lib/dash/goal-thread-parity.test.ts`).
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers

@@ -35,6 +35,7 @@ export function GoalShaping({
   moreRuns,
   running: progress,
   canRun,
+  workLabel = 'Ask Dash',
   quiet = false,
 }: {
   goalId: string;
@@ -50,6 +51,8 @@ export function GoalShaping({
   running: string | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
+  /** The button's words: Map it out on a goal with no steps yet (workLabel in lib/goals/shaping.ts). */
+  workLabel?: string;
   /** Leave out the approval line while there is nothing to approve, and the run history always. */
   quiet?: boolean;
 }) {
@@ -77,7 +80,7 @@ export function GoalShaping({
         pending={starting}
         disabled={running}
       >
-        Ask Dash
+        {workLabel}
       </Button>
     </form>
   );

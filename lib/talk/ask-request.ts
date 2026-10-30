@@ -30,6 +30,8 @@ import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-answer';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { isOwner } from '@/lib/dev/owner';
+import { goalsRoutine } from '@/lib/feedback/routine';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
@@ -153,7 +155,14 @@ export async function askDashInRequest(input: {
       // A write runs as the person, through their own clients (plan #1440).
       write: (tool, args, seen) =>
         tool.apply(
-          { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, quickNotePorts: () => sessionInboxPorts(user.id) },
+          {
+            ...ctx,
+            seen,
+            goals: (history) => createGoalsClient(history),
+            createTask,
+            quickNotePorts: () => sessionInboxPorts(user.id),
+            goalRoutine: goalRoutineInRequest,
+          },
           args,
         ),
       // A paid press is checked and priced as the person, and only queued (plan #2228.1).
@@ -218,6 +227,15 @@ export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[
 }
 
 /**
+ * Whether the signed-in person may start the goals routine, and the routine
+ * it is fired at: the owner's account only, as the goal page's Ask Dash
+ * (app/goals/[goalId]/shaping-actions.ts). Only inside a request.
+ */
+async function goalRoutineInRequest() {
+  return { canRun: await isOwner(), routine: goalsRoutine() };
+}
+
+/**
  * What a thread needs to reply through the shared loop (plan #1465): the
  * signed-in person's lookups, their writes through their own clients, and
  * where a write's record is kept (core.dash_actions, surface 'thread').
@@ -237,6 +255,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           goals: (history) => createGoalsClient(history),
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
+          goalRoutine: goalRoutineInRequest,
           thread: acts,
         },
         args,

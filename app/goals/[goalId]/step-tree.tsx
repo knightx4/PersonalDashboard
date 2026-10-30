@@ -190,7 +190,11 @@ export function StepTree({
         <EmptyState
           icon={ListTree}
           title="No steps yet"
-          description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
+          description={
+            canRun
+              ? 'Press Map it out above and Dash lays the steps out, or add your own. Any step can hold sub-steps of its own.'
+              : 'Break the goal into the things that have to happen. Any step can hold sub-steps of its own.'
+          }
         />
         <StepComposer parentId={map.goal.id} label="Add a step" />
       </section>

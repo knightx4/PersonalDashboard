@@ -35,6 +35,7 @@ import {
   countOpenQuestions,
   countProposed,
   nothingOpen,
+  workLabel,
   runInFlight,
   runProgress,
   stepRunViews,
@@ -131,7 +132,9 @@ function shapingLines(
       proposed: countProposed(steps),
       questions: countOpenQuestions(steps),
       nothingOpen: nothingOpen(steps),
+      unmapped: steps.length === 0,
     }),
+    workLabel: workLabel(steps.length),
     runs: goalRunRows(history.runs, now, timeZone),
     moreRuns: history.more,
     running: running && lastRun ? runProgress(lastRun, now) : null,
@@ -521,13 +524,14 @@ export default async function GoalMapPage({
     ? shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)
     : null;
   // Dash's panel stands under the status while it has something to approve,
-  // a run is going, or every step is finished and the goal needs its next
-  // ones; otherwise it is Ask Dash alone, in the status card.
+  // a run is going, the goal has no steps yet, or every step is finished and
+  // the goal needs its next ones; otherwise it is Ask Dash alone, in the
+  // status card.
   const shapingUp = Boolean(
     shapingView &&
       (shapingView.approval.approve ||
         shapingView.running ||
-        (map.goal.status === 'open' && nothingOpen(map.steps))),
+        (map.goal.status === 'open' && (map.steps.length === 0 || nothingOpen(map.steps)))),
   );
   const shapingPanel = shapingView && (
     <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} quiet />

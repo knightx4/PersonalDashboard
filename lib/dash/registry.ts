@@ -16,6 +16,7 @@ import { PAID_TOOLS } from './paid-tools';
 import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
 import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import type { RoutineTarget } from '@/lib/feedback/routine';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -131,6 +132,14 @@ export type DashWriteContext = AskContext & {
    * #2473.5). Absent: the note is refused.
    */
   quickNotePorts?: () => Promise<CreateNotePorts>;
+  /**
+   * Whether this person may start the goals routine, and the routine it is
+   * fired at, for start_goal_run and work_goal_step (lib/dash/goal-run-writes.ts).
+   * Only the owner's account can, as on the goal page, since a run spends the
+   * owner's routine allowance. Absent where no run can be started, such as
+   * the connector, and then those tools say so.
+   */
+  goalRoutine?: () => Promise<{ canRun: boolean; routine: RoutineTarget }>;
 };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */

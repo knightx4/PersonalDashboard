@@ -74,6 +74,8 @@ export async function startGoalRun(input: {
   userId: string;
   /** `errandDueOn` is set for an errand, so the brief says to map it short (plan #1262). */
   goal: { id: string; title: string; errandDueOn?: string | null };
+  /** What they asked for when they started it from Ask Dash, passed into the brief. */
+  asked?: string | null;
   routine: RoutineTarget;
   /** Where the run was started, for the record of each step it holds (plan #1573). */
   surface: HoldSurface;
@@ -94,6 +96,7 @@ export async function startGoalRun(input: {
         userId,
         runId,
         errandDueOn: goal.errandDueOn,
+        asked: input.asked,
       }),
   });
   return result.ok

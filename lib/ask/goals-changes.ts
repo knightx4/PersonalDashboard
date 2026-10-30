@@ -32,9 +32,18 @@ export const GOALS_CHANGE_KINDS = [
 
 export type GoalsChangeKind = (typeof GOALS_CHANGE_KINDS)[number];
 
+/**
+ * The two that start the goals routine from Ask (lib/dash/goal-run-writes.ts):
+ * the goal page's Ask Dash and a step row's. In the app only, so not among
+ * the writes the connector shares.
+ */
+export const GOAL_RUN_CHANGE_KINDS = ['start_goal_run', 'work_goal_step'] as const;
+
+export type GoalRunChangeKind = (typeof GOAL_RUN_CHANGE_KINDS)[number];
+
 /** The same three-part sentence, link and pages a Learn change keeps. */
 export type GoalsChangeInput = LearnChangeInput;
 
-export function isGoalsChangeKind(kind: string): kind is GoalsChangeKind {
-  return (GOALS_CHANGE_KINDS as readonly string[]).includes(kind);
+export function isGoalsChangeKind(kind: string): kind is GoalsChangeKind | GoalRunChangeKind {
+  return (GOALS_CHANGE_KINDS as readonly string[]).includes(kind) || (GOAL_RUN_CHANGE_KINDS as readonly string[]).includes(kind);
 }

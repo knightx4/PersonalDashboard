@@ -4,7 +4,7 @@ import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
-import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { GOAL_RUN_CHANGE_KINDS, GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS, JOBS_MANY_ROW_KINDS } from '@/lib/ask/jobs-changes';
@@ -188,6 +188,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   ...YOU_CHANGE_KINDS,
   ...NEWS_CHANGE_KINDS,
   ...GOALS_CHANGE_KINDS,
+  ...GOAL_RUN_CHANGE_KINDS,
   ...SHOPPING_CHANGE_KINDS,
   ...VAULT_CHANGE_KINDS,
   ...JOBS_CHANGE_KINDS,
