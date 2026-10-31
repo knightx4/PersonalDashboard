@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadNextItem } from '@/lib/learn/next/choose-store';
 import type { NextItem } from '@/lib/learn/next/choose';
-import { placeLine, type SessionItem, type SessionStep } from '@/lib/learn/next/session';
+import { placeLine, type SessionItem, type SessionMode, type SessionStep } from '@/lib/learn/next/session';
 import { markLessonShown } from '@/lib/learn/next/session-store';
 import { loadPieceIdea, loadPieceRow } from '@/lib/learn/lessons/piece-store';
 import { loadPieceStanding } from '@/lib/learn/lessons/practice-store';
@@ -127,10 +127,11 @@ async function prepare(learn: Learn, userId: string, item: NextItem): Promise<Se
 /**
  * The next item to learn, written and ready to show. `skip` is every key the
  * session has shown, so it moves on rather than handing one back. Called as
- * each item shows, for the one after it; no button starts it.
+ * each item shows, for the one after it; no button starts it. A Quick learn
+ * session (`mode` lessons) is given lessons only.
  */
 // latency: pending
-export async function nextSessionItem(skip: string[]): Promise<SessionStep> {
+export async function nextSessionItem(skip: string[], mode: SessionMode = 'all'): Promise<SessionStep> {
   const user = await requireUser();
   const keys = Keys.safeParse(skip);
   if (!keys.success) return { ok: false, error: 'Could not tell what this session has shown.' };
@@ -140,7 +141,7 @@ export async function nextSessionItem(skip: string[]): Promise<SessionStep> {
   for (let tries = 0; tries < PASS_OVER_TRIES; tries++) {
     let item: NextItem | null;
     try {
-      item = await loadNextItem(learn, user.id, { skip: skipped });
+      item = await loadNextItem(learn, user.id, { skip: skipped, mode: mode === 'lessons' ? 'lessons' : 'all' });
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : 'Choosing what to learn next failed.' };
     }

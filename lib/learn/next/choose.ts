@@ -29,6 +29,9 @@
  * `skip` holds the keys of items passed over in this session, so Next moves on
  * from one you did not want rather than handing it straight back.
  *
+ * `chooseLesson` is the same choice with only lessons in it, for Quick learn
+ * on Now: something new to read, with no question or review asked first.
+ *
  * Pure: the reads are `choose-store.ts`.
  */
 
@@ -284,6 +287,80 @@ export function practiceQuestion(input: ChooseNextInput, skip: ReadonlySet<strin
     return { kind: 'level_lesson', key: levelLessonKey(cell.cellId), cell, lessonId, why };
   }
   return { kind: 'question', key: questionKey(cell.cellId), cell, why };
+}
+
+/** A piece's next unread lesson, passing over its check and task. Null once its lessons are done. */
+function pieceLesson(subject: SessionSubject, piece: SessionPiece, starting: boolean, skip: ReadonlySet<string>): NextItem | null {
+  if (piece.passed || lessonsDone(piece)) return null;
+  const step = pieceStep(subject, piece, starting, skip);
+  return step?.kind === 'lesson' ? step : null;
+}
+
+function subjectLesson(subject: SessionSubject, starting: boolean, skip: ReadonlySet<string>): NextItem | null {
+  for (const piece of subject.pieces) {
+    const step = pieceLesson(subject, piece, starting, skip);
+    if (step) return step;
+  }
+  return null;
+}
+
+/**
+ * The lowest level of any approved topic that has never been asked and is
+ * taught first (`teachesFirst`): its lesson, without the question after it.
+ */
+function levelLessonOnly(input: ChooseNextInput, skip: ReadonlySet<string>): NextItem | null {
+  const readings = readCells(input.map);
+  const approved = new Map(input.map.topics.filter((t) => t.approved).map((t) => [t.id, t]));
+  const cell = input.map.cells
+    .filter((c) => {
+      const topic = approved.get(c.topicId);
+      return topic !== undefined && c.level <= Math.min(topic.ceiling, ASK_CEILING) && teachesFirst(input, c.id, skip);
+    })
+    .sort(
+      (a, b) =>
+        a.level - b.level ||
+        approved.get(a.topicId)!.name.localeCompare(approved.get(b.topicId)!.name) ||
+        a.id.localeCompare(b.id),
+    )[0];
+  if (!cell) return null;
+  const topic = approved.get(cell.topicId)!;
+  const picked: PickedCell = {
+    cellId: cell.id,
+    topicId: topic.id,
+    topicName: topic.name,
+    level: cell.level,
+    reason: 'settle',
+    heldTo: topicLevel(input.map, readings, topic.id).level,
+    missed: false,
+    direction: null,
+    unlocks: 0,
+    heldSince: null,
+  };
+  const lessonId = input.levelLessons?.get(cell.id)?.id ?? null;
+  return { kind: 'level_lesson', key: levelLessonKey(cell.id), cell: picked, lessonId, why: whyLine(picked, input.now) };
+}
+
+/**
+ * Quick learn: the next lesson only, with no review, check, task or question.
+ * The next unread lesson in a subject you are on (passing over a check or
+ * task still open, to the next piece's lessons), then a topic level's lesson
+ * before its first question, then the first lesson of a subject not started.
+ * Null when every lesson there is has been read.
+ */
+export function chooseLesson(input: ChooseNextInput): NextItem | null {
+  const skip = input.skip ?? new Set<string>();
+  const ordered = orderSubjects(input.subjects);
+  for (const subject of ordered.filter(subjectStarted)) {
+    const step = subjectLesson(subject, false, skip);
+    if (step) return step;
+  }
+  const level = levelLessonOnly(input, skip);
+  if (level) return level;
+  for (const subject of ordered.filter((one) => !subjectStarted(one))) {
+    const step = subjectLesson(subject, true, skip);
+    if (step) return step;
+  }
+  return null;
 }
 
 export function chooseNext(input: ChooseNextInput): NextItem | null {

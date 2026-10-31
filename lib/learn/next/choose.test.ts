@@ -4,6 +4,7 @@ import type { CellEvidence, LevelCell, LevelTopic, TopicMap, Verdict } from '@/l
 import { RECHECK_EVERY } from '@/lib/learn/levels/pick';
 import {
   checkKey,
+  chooseLesson,
   chooseNext,
   lessonKey,
   levelLessonKey,
@@ -286,5 +287,46 @@ describe('chooseNext: nothing left', () => {
       }
     }
     expect(checked).toBe(states.length ** 4 * 4);
+  });
+});
+
+describe('chooseLesson: Quick learn gives lessons only', () => {
+  const started = (pieces: SessionPiece[]) => subject('fin', { lastWorked: OLD, pieces });
+
+  it('gives the next unread lesson, passing over a due review', () => {
+    const item = chooseLesson(input({ reviews: [review('r1')], subjects: [started([piece('p1')])] }));
+    expect(item).toMatchObject({ kind: 'lesson', pieceId: 'p1', conceptId: 'p1-a' });
+  });
+
+  it("passes over a piece's open check and task to the next piece's lessons", () => {
+    const item = chooseLesson(input({ subjects: [started([piece('p1', { checkAsked: true }), piece('p2')])] }));
+    expect(item).toMatchObject({ kind: 'lesson', pieceId: 'p2', conceptId: 'p2-a' });
+  });
+
+  it("teaches a topic level's lesson and never its question", () => {
+    const map = topicMap([MOATS]);
+    const item = chooseLesson(input({ map }));
+    expect(item).toMatchObject({ kind: 'level_lesson', cell: { topicId: 'moats', level: 1 } });
+    const cellId = item?.kind === 'level_lesson' ? item.cell.cellId : '';
+    const read = new Map([[cellId, { id: 'll-1', status: 'ready' as const, read: true }]]);
+    expect(chooseLesson(input({ map, levelLessons: read }))).toMatchObject({ kind: 'level_lesson', cell: { level: 2 } });
+  });
+
+  it('gives a subject you are on before a topic level, and a new subject after one', () => {
+    const map = topicMap([MOATS]);
+    expect(chooseLesson(input({ map, subjects: [started([piece('p1')])] }))).toMatchObject({ kind: 'lesson' });
+    expect(chooseLesson(input({ map, subjects: [subject('new')] }))).toMatchObject({ kind: 'level_lesson' });
+    expect(chooseLesson(input({ map: topicMap([MOATS], allShown([MOATS])), subjects: [subject('new')] }))).toMatchObject({
+      kind: 'lesson',
+      subjectId: 'new',
+      starting: true,
+    });
+  });
+
+  it('is null once every lesson is read, with questions still to ask', () => {
+    const subjects = [started([piece('p1', { lessons: [lesson('a', true)] })])];
+    const map = topicMap([DCF], cellsFor([DCF]).map((c) => ev(c.id, 'not_met')));
+    expect(chooseNext(input({ subjects, map }))?.kind).toBe('check');
+    expect(chooseLesson(input({ subjects, map }))).toBeNull();
   });
 });

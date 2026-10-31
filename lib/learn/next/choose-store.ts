@@ -8,7 +8,8 @@ import { loadGradeMap } from '@/lib/learn/levels/loader-grade';
 import { countAnswered, loadLensScope } from '@/lib/learn/levels/practice-store';
 import type { GradeMap } from '@/lib/learn/levels/grade';
 import { loadLevelLessonStates } from '@/lib/learn/levels/level-lesson-store';
-import { chooseNext, type ChooseNextInput, type NextItem, type SessionPiece, type SessionSubject } from './choose';
+import { chooseLesson, chooseNext, type ChooseNextInput, type NextItem, type SessionPiece, type SessionSubject } from './choose';
+import type { SessionMode } from './session';
 
 /**
  * The reads behind `chooseNext` (plan #2546.2): due reviews, the plans of
@@ -227,7 +228,8 @@ export async function loadChooseNextInput(
 export async function loadNextItem(
   learn: LearnSupabaseClient,
   userId: string,
-  options: { now?: Date; skip?: ReadonlySet<string> } = {},
+  options: { now?: Date; skip?: ReadonlySet<string>; mode?: SessionMode } = {},
 ): Promise<NextItem | null> {
-  return chooseNext(await loadChooseNextInput(learn, userId, options));
+  const input = await loadChooseNextInput(learn, userId, options);
+  return options.mode === 'lessons' ? chooseLesson(input) : chooseNext(input);
 }

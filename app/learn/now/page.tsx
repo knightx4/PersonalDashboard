@@ -24,7 +24,8 @@ import { NowView } from './now-view';
 import { WaitingStrip } from './waiting-strip';
 import { BriefsList } from './briefs-list';
 import { FoldCard } from './fold-card';
-import { loadNextItem } from '@/lib/learn/next/choose-store';
+import { loadChooseNextInput } from '@/lib/learn/next/choose-store';
+import { chooseLesson, chooseNext } from '@/lib/learn/next/choose';
 import { startLine, type StartLine } from '@/lib/learn/next/session';
 import { PieceFirst } from './todays-piece';
 import { loadTodaysPiece, type TodaysPiece } from '@/lib/learn/lessons/todays-piece-store';
@@ -94,6 +95,9 @@ function counted(rows: readonly unknown[] | null): () => Promise<number> {
  * promise a card, so the deck paints first and the notes stream in under the
  * card's material. Cards loaded later carry theirs.
  */
+/** What Start opens with, and Quick learn's lesson, which is the same item when Start opens on a lesson. */
+type NowStarts = { start: StartLine | null; lesson: StartLine | null; same: boolean };
+
 export default async function NowPage({
   searchParams,
 }: {
@@ -200,7 +204,7 @@ export default async function NowPage({
   // Today's piece leads (plan #2164.4), or the piece `?piece=` names. A piece
   // that cannot be read leaves the practice press first.
   const pinnedPiece = z.string().uuid().safeParse(firstParam(params.piece));
-  const [briefs, piece, prepared, preparing, start] = await Promise.all([
+  const [briefs, piece, prepared, preparing, starts] = await Promise.all([
     // The topics Dash researched for you (plan #2023.4).
     loadOpenBriefs(supabase).catch(orElse<BriefSummary[]>('briefs', [])),
     createCoreClient()
@@ -208,17 +212,27 @@ export default async function NowPage({
       .catch(orElse<TodaysPiece | null>('today’s piece', null)),
     preparedActiveSubjectIds(supabase, user.id).catch(orElse('prepared subjects', new Set<string>())),
     loadPreparingSubjects(supabase, user.id).catch(orElse<PreparingSubject[]>('preparing subjects', [])),
-    // What Start opens with, described from what is stored: choosing writes nothing.
-    loadNextItem(supabase, user.id)
-      .then((item): StartLine | null => (item ? startLine(item) : null))
-      .catch(orElse<StartLine | null>('what to start with', null)),
+    // What Start and Quick learn open with, described from what is stored: choosing writes nothing.
+    loadChooseNextInput(supabase, user.id)
+      .then((input): NowStarts => {
+        const next = chooseNext(input);
+        const lesson = chooseLesson(input);
+        return {
+          start: next ? startLine(next) : null,
+          lesson: lesson ? startLine(lesson) : null,
+          same: next !== null && lesson !== null && next.key === lesson.key,
+        };
+      })
+      .catch(orElse<NowStarts>('what to start with', { start: null, lesson: null, same: false })),
   ]);
   const queued = readings ?? [];
 
   return (
     <NowView
       header={header()}
-      start={start}
+      start={starts.start}
+      quickLearn={starts.lesson}
+      quickLearnSame={starts.same}
       today={<PieceFirst piece={piece} />}
       hasPiece={piece !== null}
       pieceTitle={piece?.kind === 'piece' ? piece.page.piece.title : null}

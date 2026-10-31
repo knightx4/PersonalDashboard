@@ -42,12 +42,20 @@ const START: StartLine = {
   place: 'Corporate strategy · Where an industry’s profits go',
 };
 
+const QUICK: StartLine = {
+  kind: 'lesson',
+  word: 'Lesson',
+  title: 'Why switching costs keep customers who are unhappy',
+  place: 'Corporate strategy · Lock-in',
+};
+
 /** A prepared subject's piece leads, with practice under it and three subjects still preparing beside. */
 export function NowPageSurface() {
   return (
     <NowView
       header={header}
       start={START}
+      quickLearn={QUICK}
       today={<TodaysPieceSurface />}
       hasPiece
       pieceTitle="Retention: who stays and what they pay"
@@ -67,6 +75,7 @@ export function NowPagePracticeSurface() {
     <NowView
       header={header}
       start={QUESTION}
+      quickLearn={START}
       today={null}
       hasPiece={false}
       prepared={1}
