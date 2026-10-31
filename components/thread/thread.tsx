@@ -594,6 +594,12 @@ type RowThreadProps = {
    * them. Only a goal's flag needs it: a raise whose answer starts a goals run.
    */
   store?: CommentStore;
+  /**
+   * Draw the comments without the fold whose line counts them, where the
+   * caller already heads the thread with its count: a step page's Comments
+   * (note 42b3d858).
+   */
+  unfolded?: boolean;
 };
 
 /**
@@ -613,6 +619,7 @@ function RowThread({
   composerOpen = false,
   titles,
   store,
+  unfolded = false,
 }: RowThreadProps) {
   const parsed = threadSubject(subject);
   if (!parsed) throw new Error(`Thread: ${subject} is not a row that has a thread`);
@@ -809,7 +816,7 @@ function RowThread({
 
   // A row with no comments on it is the button that starts one: a "0
   // comments" heading over it would announce that it has nothing to say.
-  if (shown.length === 0) return <div className="space-y-2">{messages}</div>;
+  if (shown.length === 0 || unfolded) return <div className="space-y-2">{messages}</div>;
 
   // A thread reads as a thread: a fold whose closed line carries the count and
   // the last turn (law 10), open by default. It sits on the ground of the card
