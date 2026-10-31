@@ -142,11 +142,31 @@ describe('StepPage', () => {
       rates: { runId: 'r1', running: null, error: null, summary: 'Wrote the call script.' },
     };
 
-    // Overview: the detail, and neither the sub-steps, the thread nor the run.
+    // Overview: the detail and the thread (note 42b3d858), and neither the sub-steps nor the run.
     const overview = page('rates', 'overview');
     expect(overview).toContain('Call each lender.');
+    // With no comments, the line that adds the first sits in the panel's card, unheaded.
+    expect(overview).toContain('Comment on this step');
+    expect(overview).not.toContain('Comments');
+    // With one, it is headed Comments with its count, and the fold does not count it again.
+    const commented = text(
+      renderToStaticMarkup(
+        <StepPage
+          map={{
+            ...map,
+            threads: {
+              call: [{ id: 'c1', author: 'me', body: 'In the drawer.', createdAt: '2026-09-20T09:00:00Z' }],
+            },
+          }}
+          stepId="call"
+          todoOn={false}
+        />,
+      ),
+    );
+    expect(commented).toContain('Comments 1');
+    expect(commented).toContain('In the drawer.');
+    expect(commented).not.toContain('1 comment You');
     expect(overview).not.toContain('Call the card company');
-    expect(overview).not.toContain('Add a comment');
 
     // Sub-steps: the open sub-steps under the goal page's columns, then the composer.
     const substeps = page('rates', 'substeps');
@@ -161,14 +181,14 @@ describe('StepPage', () => {
     expect(none).toContain('No sub-steps yet');
     expect(none).toContain('Add a sub-step');
 
-    // Activity: the run and the thread, and not the panel.
+    // Activity: the run, and neither the panel nor the thread.
     const activity = text(
       renderToStaticMarkup(
         <StepPage map={map} stepId="rates" todoOn={false} tab="activity" runs={runs} />,
       ),
     );
     expect(activity).toContain('Wrote the call script.');
-    expect(activity).toContain('Comment on this step');
+    expect(activity).not.toContain('Comment on this step');
     expect(activity).not.toContain('Call each lender.');
     expect(activity).not.toContain('Call the card company');
     expect(page('rates', 'activity')).toContain('Dash has not run on this step yet.');

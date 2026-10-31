@@ -110,10 +110,13 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'A step\'s Sub-steps tab should read as a goal\'s Steps tab: the same header and properties column, then the rows on one card under the column header, with the finished ones folded and the add line at the foot of the card.',
     from: '2373.3',
   },
+  // The thread moved to the Overview tab (note 42b3d858), so its surface
+  // reads against the Overview reference: the comments are one more part
+  // headed in small type on the page, on a card of its own.
   'goals-step-comments': {
-    pictures: ['docs/references/goals-step/activity-laptop.png', 'docs/references/goals-step/activity-phone.png'],
-    link: '/preview?s=goals-page-activity',
-    why: 'A step\'s Activity tab should read as a goal\'s: the same header and properties column, then the runs and the thread, each on its own card.',
+    pictures: ['docs/references/goals-step/overview-laptop.png', 'docs/references/goals-step/overview-phone.png'],
+    link: '/preview?s=goals-page-top',
+    why: 'A step\'s Overview should read as a goal\'s: the same header and properties column, then each part headed in small type on the page and on its own card, with the comments the last of them.',
     from: '2373.3',
   },
 };

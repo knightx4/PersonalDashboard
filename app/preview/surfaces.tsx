@@ -5508,9 +5508,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalStepMenuSurface />,
   },
   {
-    /* A step's page whose thread has a comment: the count on Activity (plan #2373.1). */
+    /* A step's page whose thread has a comment: Comments on its Overview (note 42b3d858). */
     id: 'goals-step-comments',
-    label: 'Goal · a step’s comments on its Activity tab',
+    label: 'Goal · a step’s comments on its Overview tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalStepCommentsSurface />,

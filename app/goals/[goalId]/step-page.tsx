@@ -119,9 +119,7 @@ export function StepPage({
   const tabs = STEP_TABS.map((tab) =>
     tab.id === 'substeps'
       ? { ...tab, count: open }
-      : tab.id === 'activity'
-        ? { ...tab, count: row.thread.length }
-        : tab,
+      : tab,
   );
 
   return (
@@ -157,6 +155,7 @@ export function StepPage({
               unanswered={unanswered}
               hasQuestions={row.children.some((child) => child.kind === 'decision')}
               hasEdges={row.dependsOn.length + row.waitingOn.length + row.blocks.length > 0}
+              comments={row.thread.length}
               history={history}
               hasSubsteps={row.children.some((child) => child.kind !== 'decision')}
             />
@@ -170,10 +169,11 @@ export function StepPage({
 /**
  * The open tab of a step's page (plan #2373.2), from the parts its row hands
  * the frame. Overview is the panel: the detail and done-when you edit, the
- * facts, what it waits on, its questions, Dash's draft and its files.
- * Sub-steps is the open sub-steps on the goal page's columns with the
- * finished ones folded at the foot, then the composer, or an empty state
- * that adds the first. Activity is the step's latest run and its thread.
+ * facts, what it waits on, its questions, Dash's draft and its files, then
+ * the step's comment thread at the foot (note 42b3d858). Sub-steps is the
+ * open sub-steps on the goal page's columns with the finished ones folded at
+ * the foot, then the composer, or an empty state that adds the first.
+ * Activity is the step's latest runs.
  *
  * Add a sub-step in the menu opens the composer on the Sub-steps tab, moving
  * there from another tab first.
@@ -186,6 +186,7 @@ function OpenTab({
   unanswered,
   hasQuestions,
   hasEdges,
+  comments,
   history,
 }: {
   tab: StepTab;
@@ -198,6 +199,8 @@ function OpenTab({
   hasQuestions: boolean;
   /** Whether the step waits on a step or one waits on it, which then get a part of their own. */
   hasEdges: boolean;
+  /** How many comments the step's thread holds, said beside its heading. */
+  comments: number;
   history?: { runs: GoalRunRow[]; more: boolean };
 }) {
   const router = useRouter();
@@ -227,8 +230,6 @@ function OpenTab({
             )}
           </Card>
         </section>
-        {/* The step's own thread, on the card's ground, as the goal's is on its Activity tab. */}
-        <Card padding="dense">{parts.thread}</Card>
       </div>
     );
   }
@@ -281,10 +282,11 @@ function OpenTab({
     <div className="space-y-6">
       <Card padding="none">
         <ul className="pt-2">{parts.overview}</ul>
-        {(!hasQuestions || !hasEdges) && (
+        {(!hasQuestions || !hasEdges || comments === 0) && (
           <div className="space-y-2 px-3 pb-3 empty:hidden">
             {!hasQuestions && parts.questions}
             {!hasEdges && parts.dependencies}
+            {comments === 0 && parts.thread}
           </div>
         )}
       </Card>
@@ -302,6 +304,14 @@ function OpenTab({
       {hasEdges && parts.dependencies && (
         <OverviewPart id="step-dependencies" title="Dependencies">
           {parts.dependencies}
+        </OverviewPart>
+      )}
+      {/* The step's comments, on the Overview beside what they are about
+          rather than behind Activity (note 42b3d858). With none, the line
+          that adds the first closes the panel's card, as Ask a question does. */}
+      {comments > 0 && (
+        <OverviewPart id="step-comments" title="Comments" count={comments}>
+          {parts.thread}
         </OverviewPart>
       )}
     </div>
