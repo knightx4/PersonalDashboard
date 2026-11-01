@@ -1,4 +1,5 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { areaNamesById } from '@/lib/you/areas';
 import { firedFrom, type FiredTripwire } from '@/lib/you/insight-fired';
 
 /**
@@ -75,6 +76,9 @@ export type Insight = {
   question: string | null;
   answer: string | null;
   answeredAt: string | null;
+  /** The Goals area it is about and that area's name; null before a run tags it (you 0036). */
+  areaId: string | null;
+  areaName: string | null;
 };
 
 export type InsightRun = {
@@ -90,7 +94,7 @@ export type InsightRun = {
 
 export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
-  'check_on, outcome, outcome_note, checked_at, question, answer, answered_at, ' +
+  'area_id, check_on, outcome, outcome_note, checked_at, question, answer, answered_at, ' +
   'insight_verdicts(verdict, note, decided_at), ' +
   'insight_tripwires(kind, last_fired_at, fired_evidence)';
 
@@ -192,6 +196,8 @@ export function insightFromRow(row: Record<string, unknown>): Insight | null {
     question: textOrNull(row.question),
     answer: textOrNull(row.answer),
     answeredAt: textOrNull(row.answered_at),
+    areaId: textOrNull(row.area_id),
+    areaName: null,
   };
 }
 
@@ -239,10 +245,12 @@ export async function listInsights(
     .in('status', [...statuses])
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Reading your insights failed: ${error.message}`);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).flatMap((row) => {
+  const insights = ((data ?? []) as unknown as Record<string, unknown>[]).flatMap((row) => {
     const insight = insightFromRow(row);
     return insight ? [insight] : [];
   });
+  const names = await areaNamesById(client, userId, insights.map((i) => i.areaId));
+  return insights.map((i) => ({ ...i, areaName: i.areaId ? (names.get(i.areaId) ?? null) : null }));
 }
 
 /** Their newest run, or null before the first. */

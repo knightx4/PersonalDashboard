@@ -65,6 +65,12 @@ describe('dashQuestionsBrief', () => {
       'Follow .claude/skills/dash-questions/SKILL.md\nQuestion run r1\nuser_id u1',
     );
   });
+
+  it('ends with a line saying so when the weekly check started it', () => {
+    expect(dashQuestionsBrief({ runId: 'r1', userId: 'u1', weekly: true }).split('\n').at(-1)).toBe(
+      'started by the weekly check',
+    );
+  });
 });
 
 describe('questionRunState', () => {

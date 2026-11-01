@@ -50,6 +50,11 @@ Question run <run id>
 user_id <uuid>
 ```
 
+The daily cron starts the same run by itself at most once a week, when fewer
+than three questions are open and the person answered or skipped one since the
+last run (`lib/you/dash-questions-triggers.ts`). Its brief ends with a fourth
+line, `started by the weekly check`; the work is the same either way.
+
 ```sql
 select id, status, requested_at from you.dash_question_runs
 where id = '<run id>' and user_id = '<user_id>';
