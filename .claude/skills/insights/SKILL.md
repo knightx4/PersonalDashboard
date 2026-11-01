@@ -1,6 +1,6 @@
 ---
 name: insights
-description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, read the private notes in the journal folders, the journal and daily notes in full, send four subagents to read what they did across jobs, goals, Learn, spending, app use and timing, and what they said in their chats with Claude, then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, and save each with its layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
+description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, their Goals areas with how many cards each already has, and their answers on the Ask tab, read the private notes in the journal folders, the journal and daily notes in full, send four subagents to read what they did area by area (career, goals and Learn; money, app use and timing; home, places, the city and music; their chats with Claude), then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, keep the cards to at least three areas with at most two in one, and save each with its area, layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
 ---
 
 # Writing deep insights about the person
@@ -13,6 +13,15 @@ pattern protects them from or costs them, tied to something live this week.
 They mark each card right, not quite, wrong or knew it, and the next run
 reads those marks. Dash also makes predictions from its cards, which stay
 hidden until a later run has checked them against the records.
+
+**Every run spreads across their life.** The person keeps their life in
+areas on Goals (`goals.areas`: Career, Money, Home, People and the rest),
+and each card names the one it is about (`you.insights.area_id`). The job
+search holds the most rows, so a run left to follow the evidence writes
+every card about Career. A run's cards cover at least three areas, no more
+than two are about any one, and the area that already has the most cards
+gets at most one (step 6). People, family, health, sleep and mood are in:
+the person asked for them (plan #2629.3).
 
 The method here is the one that produced the first eleven insights by hand
 on 18 October 2026, which the person rated well: the Galway theory of their
@@ -33,13 +42,13 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 
 Work these in order. Each has its section below.
 
-1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question, every earlier insight with its verdict (knew it included), check every prediction that is due, and list what the person already knows about themselves.
+1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question and on the Ask tab, every earlier insight with its verdict (knew it included), every Goals area with how many cards it already has (tagging earlier cards that have none), check every prediction that is due, and list what the person already knows about themselves.
 2. **Read the core in full**: the private notes in the journal folders (`journal_folders` on their `obsidian.vault_connections` row), the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
-3. **Read what they did**: four subagents at once, one of them on their chats with Claude, owner-scoped selects only, each returning 10 to 20 findings with counts, dates and short quotes.
+3. **Read what they did**: four subagents at once, grouped by area (career, goals and Learn; money, app use and timing; home, places, the city and music; their chats with Claude), each given the Ask tab answers, owner-scoped selects only, each returning 10 to 20 findings with counts, dates, short quotes and the area each is about.
 4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
 5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
-6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know. Label hunches, correct earlier cards, leave out relationships, health and family.
-7. **Write three to five cards** with layers, linked receipts, a confidence, the live thing each points at and a question for them to answer, plus one or two hidden predictions, then finish the run row with a two-sentence summary.
+6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know. Label hunches, correct earlier cards, read relationships, health and family as evidence like any other, then spread the cards: at least three areas, at most two in one area, at most one in the area with the most earlier cards.
+7. **Write three to five cards** with their area, layers, linked receipts, a confidence, the live thing each points at and a question for them to answer, plus one or two hidden predictions, then finish the run row with a two-sentence summary, a line for each card that touches health and a line naming any area left out.
 
 ## How you read and write
 
@@ -112,6 +121,21 @@ where user_id = '<user_id>' and answer is not null
 order by answered_at desc;
 ```
 
+Then their answers on the Ask tab of You, where Dash asks them about
+themselves without a card in front of it (`.claude/skills/dash-questions/`).
+These answers are often about the parts of their life the records hold
+least of, such as home, people and music, so they are the best lead into an
+area with few rows. Read every one in full, and hand them to every reader in
+step 3.
+
+```sql
+select q.id, q.question, q.why, q.answer, q.answered_at, a.name as area
+from you.dash_questions q
+left join goals.areas a on a.id = q.area_id and a.user_id = q.user_id
+where q.user_id = '<user_id>' and q.status = 'answered'
+order by q.answered_at desc;
+```
+
 Then read every insight written before, in every status, with its verdict.
 This is the list the run must not repeat.
 
@@ -149,6 +173,34 @@ cards that missed checked what they did against what they said they would
 (applications against their own rules, a side interest read as a career
 gap) and were true but no use, or missed the reason behind the choice.
 Aim at the first kind (step 4).
+
+**Their areas, and how many cards each already has.** Read every open area
+with its note (what the person wrote the area is for):
+
+```sql
+select a.id, a.name, a.note,
+       count(i.id) filter (where i.kind <> 'prediction' and i.status <> 'superseded') as earlier_cards
+from goals.areas a
+left join you.insights i on i.area_id = a.id and i.user_id = a.user_id
+where a.user_id = '<user_id>' and a.archived_at is null
+group by a.id, a.name, a.note, a.position
+order by a.position;
+```
+
+An earlier card with no area was written before cards carried one, or is
+about health, sleep or mood (step 6), which has no area. Before counting,
+give each untagged card the area its claim is about, so the counts the
+spread rule uses (step 6) are true. Family and friends are People. A card
+about health, sleep or mood stays with none, and so does one that fits no
+open area; say which in the summary.
+
+```sql
+update you.insights set area_id = '<area id>'
+where id = '<insight id>' and user_id = '<user_id>' and area_id is null;
+```
+
+Then run the count again and keep it: the area with the most earlier cards
+is the one the spread limits to one card in this run.
 
 **Check the predictions that are due.** A prediction (step 7) is saved with
 status `pending`, which the tab never shows, and `check_on`, the first day
@@ -243,8 +295,10 @@ Read, in full:
 
 1. **Every private note in the journal folders**, including the trip notes and the people
    notes, which hold the most unguarded writing in the vault. Read the
-   people notes for what they say about the person, not about the others
-   (step 6).
+   people notes for what they say about the person and how they are with
+   the people in their life, and the entries about family, health, sleep
+   and mood as evidence like any other (step 6). A card is about the person,
+   never a verdict on someone else.
 2. **The dated journal entries.** A note with `dated_entries` holds several
    entries, each `{date, offset, end}` with offsets in Unicode characters
    (`readDatedEntries` in `lib/vault/notes/first-written.ts`). Postgres
@@ -311,44 +365,62 @@ position held only in audience notes is a lead for a testable claim.
 
 ## 3. Read what they did
 
-Send four subagents in one message, so they run at the same time. Each
-gets the `user_id`, the rule that it runs owner-scoped selects through
-`npx tsx scripts/sql.ts` and nothing else (no inserts, no updates, no
-connector), the tables below as a starting point, and this request:
+Send four subagents in one message, so they run at the same time. They
+are grouped by area so that no one part of the person's life fills the
+reading: the job search holds the most rows, and here it is a third of one
+reader's brief. Each gets the `user_id`, the rule that it runs owner-scoped
+selects through `npx tsx scripts/sql.ts` and nothing else (no inserts, no
+updates, no connector), the list of open areas from step 1, every answer
+from the Ask tab (step 1), the tables below as a starting point, and this
+request:
 
 > Return 10 to 20 findings. Each names what you counted, the number, the
-> dates it spans, the table and row ids it came from, and a short quote
-> where one exists. Label anything you infer rather than count as a hunch.
-> Check a column against information_schema before relying on it. Leave out
-> relationships, health and family.
+> dates it spans, the table and row ids it came from, a short quote where
+> one exists, and the area it is about (one of the areas given, or
+> "health" for health, sleep and mood, or "none"). Label anything you infer
+> rather than count as a hunch. Check a column against information_schema
+> before relying on it. Read what concerns people, family, health, sleep
+> and mood as evidence like any other, and spread your findings across
+> every area your tables reach rather than stopping at the one with the
+> most rows. Use the Ask tab answers as leads: what they said there that
+> your tables can test.
 
-**(a) Jobs, goals and Learn.** Say-versus-do gaps: what `job_search.thoughts`
-and their goals say they want against the roles they applied to
-(`job_search.applications` joined to `job_search.roles`: `status`,
-`outcome`, `rejection_stage`, `excitement`, `submitted_at`, `closed_at`).
-Rules they wrote against roles they then applied to anyway. Where things
-stall: `goals.items` open longest, steps that slipped their `due_on`,
-`todo.tasks` opened and never closed. What got finished, and whether
-someone else was waiting on it. Effort by role (drafts, answers, cover
-letters per application). Learn: `learn.aims`, `learn.readings` started
-against finished, `learn.essays` drafted against published.
+**(a) Career, goals and Learn.** Three equal parts. The job search:
+say-versus-do gaps between what `job_search.thoughts` and their goals say
+they want and the roles they applied to (`job_search.applications` joined
+to `job_search.roles`: `status`, `outcome`, `rejection_stage`,
+`excitement`, `submitted_at`, `closed_at`), and effort by role (drafts,
+answers, cover letters per application). Goals in every area: `goals.items`
+by `area_id` (which areas have open goals, which have none, which have
+moved), steps that slipped their `due_on`, `todo.tasks` opened and never
+closed, what got finished and whether someone else was waiting on it.
+Learn: `learn.aims`, `learn.readings` started against finished,
+`learn.essays` drafted against published.
 
-**(b) Spending, app use and Ask Dash.** `public.orders` and
+**(b) Money, app use and timing.** `public.orders` and
 `public.recurring_payments` by month and merchant; `core.page_view_days`
 by workspace and day (what they open, what they never open);
 `core.conversations` and `core.conversation_turns` (role `user`) for what
-they ask Dash and when; `todo.tasks`; `you.personality_results`;
-`you.courses` grades by school and term; `you.places` and
-`you.work_history` for where they lived and worked when.
-
-**(c) Timing.** Give this one the dates you found in step 2 of each low
-(journal and daily notes that say so), and ask what happened in the days
-before each: orders, app use, messages to Dash, applications, rejections
-(`job_search.applications` with `outcome = 'rejected'`, by `closed_at`).
-Then the same for each burst of building, taken from
+they ask Dash and when; `you.personality_results`; `you.courses` grades by
+school and term. Then timing: give this reader the dates you found in step
+2 of each low (journal and daily notes that say so), and ask what happened
+in the days before each: orders, app use, messages to Dash, applications,
+rejections (`job_search.applications` with `outcome = 'rejected'`, by
+`closed_at`). Then the same for each burst of building, taken from
 `git log --since=<date> --format=%ad --date=short | sort | uniq -c` in this
 repository and `public.plan_items` by `updated_at`, and for each rejection:
-what came in the week after.
+what came in the week after. What the notes say of sleep and mood in those
+days counts.
+
+**(c) Home, places, the city and music.** `you.places` and
+`you.work_history` for where they lived and worked when, and how long each
+lasted; `public.orders` joined to `public.order_items` and
+`public.categories` by category (home, kitchen, clothing, gear, tickets),
+against the months they moved; `goals.items` in the Home, city, Music and
+People areas (whatever the areas from step 1 are called); and the vault
+notes by theme (`obsidian.themes` and the notes behind them) on home, the
+city, music and the people in their life. What they say they want from a
+place or a scene, against where their time and money go.
 
 **(d) Their chats with Claude.** `you.claude_chats` with
 `origin = 'export'` holds every message they wrote on claude.ai (never
@@ -364,7 +436,8 @@ page through by `said_at` in batches of a few hundred rather than search
 for words, since what matters is often phrased in ways no search would
 guess. A chat is where they are thinking before they have decided, so what
 they say there can differ from the note they wrote after; that difference
-is a lead.
+is a lead. Ask it to name each finding's area as well, since chats about
+code would otherwise all read as Career.
 
 If `you.claude_chats` holds no export rows, skip this reader and say in the
 run's summary that the chats have not been imported.
@@ -390,7 +463,11 @@ card's `kind` (`INSIGHT_KINDS` in `lib/you/insights.ts`):
 | Something that is missing: a want that dropped out of the notes, a page or workspace never opened, a person or subject never written about, a step never taken | `absence` |
 
 A prediction (step 7) is `prediction`. A card that fits none of these is `pattern`. Write down ten or more
-candidates before choosing; most will not survive steps 5 and 6.
+candidates before choosing; most will not survive steps 5 and 6. Note each
+candidate's area as you write it down, and have candidates in at least four
+areas, so the spread in step 6 has something to choose from. Where an area
+has none, look again in that area's notes, goals and Ask tab answers before
+giving up on it.
 
 **Aim at how they work, not at whether they kept to their word.** The cards
 that land describe the machinery: how they decide, what gives them energy
@@ -494,12 +571,32 @@ Then:
   earlier card misread the evidence (the first session took concert tickets
   for a live electronic set they performed), write the corrected card and
   supersede the old one.
-- **Leave out relationships, health and family** unless the person has
-  asked for them in a verdict note or the brief.
+- **Read relationships, health and family as evidence like any other.**
+  The person asked for every part of their life (plan #2629.3). A card
+  about how they are with family or friends is a People card. A card about
+  health, sleep or mood has no area. A card is still about the person: what
+  they do and why, never a judgement of someone in their life.
 - **Never read or quote a note tagged secret.**
 
-Keep three to five. If fewer than three survive, write the ones that do and
-say why in the summary; never pad.
+**Spread the cards across their areas.** Give every card still standing
+its area from step 1, or none for health, sleep and mood. Then keep three to
+five so that:
+
+- the cards cover **at least three areas**. Health, sleep and mood cards
+  count together as one more area, so two of them and a Career card make
+  two, not three;
+- **no more than two cards are about one area**;
+- the area with the most earlier cards (the count from step 1) gets **at
+  most one**. When two areas tie for most, the limit holds for both.
+
+Predictions take an area too, and do not count toward the spread.
+
+When the strongest cards break the rule, drop the weakest card in the area
+that is over and take the strongest card in an area not yet covered. Never
+weaken the filter above to fill an area: an area with too little evidence
+for a card that passes it is left out, and the summary names it with what
+was missing (step 7). If the cards that pass cover fewer than three areas,
+write the ones that do and say so in the summary; never pad.
 
 ## 7. Write the cards and finish the run
 
@@ -507,6 +604,8 @@ Write each card in the person's own words where possible, to them as "you".
 `claim` is one or two sentences (at most 1,000 characters).
 
 - `kind`: from step 4.
+- `area_id`: the id of the area from step 6, from the step 1 list of open
+  areas, or null for a card about health, sleep or mood.
 - `layers`: `[{"depth": "saw", "text": ...}, {"depth": "deeper", ...}, {"depth": "further", ...}]`.
 - `receipts`: every source the card relies on, each
   `{"source", "row_id", "quote", "link"}`. `source` is the table
@@ -551,8 +650,8 @@ the table and the count that will decide it. The person does not see it
 until a later run has checked it.
 
 ```sql
-insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, status, check_on)
-values ('<user_id>', '<run id>', 'prediction', $c$...$c$,
+insert into you.insights (user_id, run_id, area_id, kind, claim, layers, receipts, confidence, status, check_on)
+values ('<user_id>', '<run id>', '<area id>', 'prediction', $c$...$c$,
         $j$[ ... ]$j$::jsonb, $j$[ ... ]$j$::jsonb, 'medium', 'pending', '<yyyy-mm-dd>')
 returning id;
 ```
@@ -560,11 +659,15 @@ returning id;
 Write each card:
 
 ```sql
-insert into you.insights (user_id, run_id, kind, claim, layers, receipts, confidence, live_ref, question)
-values ('<user_id>', '<run id>', 'named_concept', $c$...$c$,
+insert into you.insights (user_id, run_id, area_id, kind, claim, layers, receipts, confidence, live_ref, question)
+values ('<user_id>', '<run id>', '<area id>', 'named_concept', $c$...$c$,
         $j$[ ... ]$j$::jsonb, $j$[ ... ]$j$::jsonb, 'medium', $l$...$l$, $q$...$q$)
 returning id;
 ```
+
+For a card about health, sleep or mood, write `null` in place of
+`'<area id>'`. The area id has to be one of the person's own areas: the key
+on `(area_id, user_id)` refuses another account's.
 
 A card that reworks one marked not quite, or corrects a wrong one,
 supersedes it once the new row exists:
@@ -576,7 +679,18 @@ where id = '<old id>' and user_id = '<user_id>';
 
 Finish the run row with a two-sentence summary of what the run read and
 what it found (say how many predictions it checked and how they came out,
-and how many it left pending; never say what a pending one predicts), then record it so Home lists it under what Dash did today:
+and how many it left pending; never say what a pending one predicts). After
+the two sentences, add a line for each of these that applies:
+
+- each card that touches health, sleep or mood, by the start of its claim,
+  so the person sees it is there before they open the tab in front of
+  someone: "Touches health: You sleep less in the weeks …";
+- each open area left without a card in this run, with what was missing:
+  "No card on Music: two notes and no orders or goals since 2024.";
+- the earlier cards tagged with an area in step 1, as a count, and any left
+  with none.
+
+Then record it so Home lists it under what Dash did today:
 
 ```sql
 select core.dash_before('you.insight_runs:<run id>');
@@ -590,7 +704,19 @@ select core.record_dash_action('<user_id>', 'you.insight_runs:<run id>',
 Read it back: the run is `ready`, and `select count(*) from you.insights
 where run_id = '<run id>' and user_id = '<user_id>'` is what you wrote,
 each with three layers, at least two receipts and, for every card that is
-not a prediction, a question.
+not a prediction, a question. Check the spread from the rows:
+
+```sql
+select coalesce(a.name, 'no area') as area, count(*) as cards
+from you.insights i
+left join goals.areas a on a.id = i.area_id and a.user_id = i.user_id
+where i.run_id = '<run id>' and i.user_id = '<user_id>' and i.kind <> 'prediction'
+group by 1 order by 2 desc;
+```
+
+At least three groups, none above two. If it is wrong, an `area_id` was
+missed or mistyped: fix the card with an update scoped to its id and the
+`user_id`.
 
 If the run cannot finish (the notes cannot be read, every candidate fails
 step 6), mark it failed with a sentence the person can act on, and keep any
