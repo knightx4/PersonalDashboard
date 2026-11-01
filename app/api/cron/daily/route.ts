@@ -25,6 +25,7 @@ import { runFigureBackfillDaily } from '@/inngest/learn/figure-backfill';
 import { runXReadsForAll } from '@/inngest/x/read';
 import { runInsightSignals } from '@/inngest/you/insight-signals';
 import { runInsightsTick } from '@/inngest/you/insights-tick';
+import { runDashQuestionsTick } from '@/inngest/you/dash-questions-tick';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -110,6 +111,10 @@ export async function GET(request: NextRequest) {
     // insights skill only when the last ready run is over 30 days old.
     { name: 'insight-signals', run: () => runInsightSignals() },
     { name: 'insights-monthly', run: () => runInsightsTick() },
+    // New questions for the Answer tab of You, at most weekly, only when
+    // fewer than three are open and one was answered or skipped since the
+    // last run (plan #2635.1).
+    { name: 'dash-questions-weekly', run: () => runDashQuestionsTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },

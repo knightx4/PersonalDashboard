@@ -174,6 +174,9 @@ vi.mock('@/inngest/you/insight-signals', () => ({
 vi.mock('@/inngest/you/insights-tick', () => ({
   runInsightsTick: vi.fn(async () => ({ skipped: 'the last run is less than a month old' })),
 }));
+vi.mock('@/inngest/you/dash-questions-tick', () => ({
+  runDashQuestionsTick: vi.fn(async () => ({ skipped: '3 questions are still open' })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
@@ -264,6 +267,8 @@ describe('the daily cron route', () => {
     // The insights stage runs once a day and starts the single call only
     // when the last ready run is over 30 days old (plan #2413.10).
     expect(body.results['insights-monthly']).toEqual({ skipped: 'the last run is less than a month old' });
+    // Dash's weekly questions are checked every morning (plan #2635.1).
+    expect(body.results['dash-questions-weekly']).toEqual({ skipped: '3 questions are still open' });
 
     // Each open goal and feature gets its step counts for the day (plan #1836).
     expect(body.results['scope-days']).toEqual({ written: 23 });
