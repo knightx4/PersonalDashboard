@@ -143,6 +143,15 @@ describe('safeLink', () => {
   });
 });
 
+describe('insightFromRow area', () => {
+  it('carries area_id and leaves an untagged card valid', () => {
+    expect(insightFromRow(row({ area_id: 'a1' }))?.areaId).toBe('a1');
+    const plain = insightFromRow(row());
+    expect(plain?.areaId).toBeNull();
+    expect(plain?.areaName).toBeNull();
+  });
+});
+
 describe('runFromRow', () => {
   it('reads an unknown status as failed', () => {
     expect(runFromRow({ id: 'r1', status: 'thinking', requested_at: 'now' }).status).toBe('failed');

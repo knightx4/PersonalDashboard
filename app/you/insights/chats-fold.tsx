@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import { formatDateInline } from '@/lib/jobs/applications/load';
@@ -78,7 +79,7 @@ export function ChatsFold({
 
   return (
     <SectionFold title="Your chats with Claude" hint={hint} defaultOpen={defaultOpen}>
-      <div className="mt-2 space-y-3">
+      <Card padding="standard" className="mt-2 space-y-3">
         <p className="text-ui text-ink-muted">
           Dash reads what you wrote in your claude.ai chats, never Claude&rsquo;s replies, to find what your notes
           leave out.
@@ -112,7 +113,7 @@ export function ChatsFold({
           </p>
         )}
         <FieldError>{error}</FieldError>
-      </div>
+      </Card>
     </SectionFold>
   );
 }
