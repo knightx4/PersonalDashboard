@@ -1,14 +1,12 @@
 /**
  * The cover letter as a one-page PDF, laid out like the Word letters it
- * replaces: US letter, a 1.5"
- * top margin and 1" elsewhere, Times 11pt single-spaced with a blank line
+ * replaces: US letter, 1" margins, Times 11pt single-spaced with a blank line
  * between paragraphs, and a rule with the contact line in 10pt pinned to the
- * foot of the first page.
+ * foot of the first page. The body stops at least BOTTOM_GAP above the rule.
  *
- * A letter too long for one page is fitted in steps, keeping the first that
- * fits: the top margin comes down to the usual 1", then the body goes to
- * 10.5pt, then to 10pt. One still too long at 10pt runs on to a second page
- * at that size.
+ * A letter too long for one page at 11pt is set at 10.5pt, and then at 10pt,
+ * keeping the first size that fits. One still too long at 10pt runs on to a
+ * second page at that size.
  *
  * The letter opens with the date and the company. A stored letter that
  * already carries a header has it dropped up to its salutation, so the date
@@ -25,14 +23,11 @@ import type { Letterhead } from '@/lib/you/details';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 
 const PAGE = { width: 612, height: 792 };
-const MARGIN = { top: 108, right: 72, bottom: 72, left: 72 };
-/** The layouts tried in turn until the letter fits on one page; the last is kept regardless. */
-const FITS = [
-  { size: 11, top: MARGIN.top },
-  { size: 11, top: 72 },
-  { size: 10.5, top: 72 },
-  { size: 10, top: 72 },
-];
+const MARGIN = { top: 72, right: 72, bottom: 72, left: 72 };
+/** The sizes tried in turn until the letter fits on one page; the last is kept regardless. */
+const SIZES = [11, 10.5, 10];
+/** The least room, in points, between the last line's baseline and the rule above the contact line. */
+const BOTTOM_GAP = 24;
 // Word's single spacing for Times New Roman: 1.15 of the point size.
 const LINE_SPACING = 1.15;
 const ASCENT = 0.891;
@@ -229,7 +224,7 @@ interface Layout {
   timeZone: string;
 }
 
-/** Builds the letter's PDF bytes in the first of FITS that keeps it on one page. */
+/** Builds the letter's PDF bytes in the first of SIZES that keeps it on one page. */
 export async function coverLetterPdf({
   letter,
   company,
@@ -246,18 +241,17 @@ export async function coverLetterPdf({
   timeZone: string;
 }): Promise<Uint8Array> {
   const layout = { letter, company, letterhead, date, timeZone };
-  for (const [i, fit] of FITS.entries()) {
-    const doc = await letterDoc(layout, fit.size, fit.top);
-    if (doc.getPageCount() === 1 || i === FITS.length - 1) return doc.save();
+  for (const [i, size] of SIZES.entries()) {
+    const doc = await letterDoc(layout, size);
+    if (doc.getPageCount() === 1 || i === SIZES.length - 1) return doc.save();
   }
   throw new Error('unreachable');
 }
 
-/** The letter laid out with its body at the given point size, below the given top margin. */
+/** The letter laid out with its body at the given point size. */
 async function letterDoc(
   { letter, company, letterhead, date, timeZone }: Layout,
   size: number,
-  top: number,
 ): Promise<PDFDocument> {
   const doc = await PDFDocument.create();
   const { signer, contact } = letterhead;
@@ -269,17 +263,17 @@ async function letterDoc(
   const first = doc.addPage([PAGE.width, PAGE.height]);
   let page = first;
   // Baseline of the next line, from the bottom of the page.
-  let y = PAGE.height - top - size * ASCENT;
+  let y = PAGE.height - MARGIN.top - size * ASCENT;
   const lineHeight = size * LINE_SPACING;
   const bodyWidth = PAGE.width - MARGIN.left - MARGIN.right;
   // The first page stops above the contact line; later pages at the margin.
-  const floor = () => (page === first && contact ? PAGE.height - RULE_TOP + 6 : MARGIN.bottom);
+  const floor = () => (page === first && contact ? PAGE.height - RULE_TOP + BOTTOM_GAP : MARGIN.bottom);
 
   const advance = () => {
     y -= lineHeight;
     if (y < floor()) {
       page = doc.addPage([PAGE.width, PAGE.height]);
-      y = PAGE.height - 72 - size * ASCENT;
+      y = PAGE.height - MARGIN.top - size * ASCENT;
     }
   };
   const blank = () => advance();
