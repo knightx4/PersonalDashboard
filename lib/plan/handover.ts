@@ -133,9 +133,8 @@ export function projectPreamble(project: DevProject): string {
     `that repository's, and its ${project.skill} says how a step is built in it. ` +
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
     `both. ${check}${setUp}` +
-    'If it is not checked out and add_repo is refused or missing, do not build anywhere else: ' +
-    `write a setup step for the person to add ${where} to the Plan step builder routine's ` +
-    'repositories on claude.ai, as project-routine.md says, and stop.\n\n'
+    'If it is not checked out or a push to it is refused, do not build anywhere else: ' +
+    'say exactly what was refused and stop.\n\n'
   );
 }
 

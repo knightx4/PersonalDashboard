@@ -177,20 +177,23 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
- * The routine that builds every project's steps: the plan routine (plan
- * #2553.3), so a new project needs nothing set up on claude.ai.
+ * Where a project's steps go when the project has no routine of its own: the
+ * projects dispatcher (.claude/skills/plan/reference/project-dispatch.md).
  *
- * A routine's session starts with only the repositories it was created with,
- * and only a session that starts with one gets add_repo. The shared projects
- * routine was created with none, so its runs could reach no project (runs of
- * 30 October and 1 November). The plan routine starts with this repository,
- * so its runs attach the project's repository with add_repo, which
- * .claude/settings.json allows without a prompt. The brief says the step is
- * the project's and names project-routine.md, which the plan routine's prompt
- * follows over its own, so nothing is built in this repository.
+ * No routine can build in a project's repository unless that repository is
+ * saved on the routine by hand: a routine's runs reach only the repositories
+ * saved on it, they get no add_repo, the fire API carries text alone, and the
+ * git proxy refuses a push to any repository outside the session's own
+ * (runs of 30 October and 1 November). A session started with the project's
+ * repository as its source can push to it, and the dispatcher, a standing
+ * session of this repository woken every hour, starts one for each queued
+ * run. So a run sent here is not fired: `startRoutineRun` records it, brief
+ * and all, and the dispatcher picks it up.
  */
+export const PROJECTS_DISPATCHER = 'projects-dispatcher';
+
 export function projectsRoutine(): RoutineTarget {
-  return planRoutine();
+  return { id: PROJECTS_DISPATCHER, token: PROJECTS_DISPATCHER };
 }
 
 /**

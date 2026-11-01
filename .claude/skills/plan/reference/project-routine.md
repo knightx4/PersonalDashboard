@@ -12,6 +12,11 @@ A project whose row names a routine of its own, with that routine's id set
 on the deployment, goes to that routine instead; the website keeps one until
 a step of its has been built end to end through this routine (#2553.4).
 
+A project with no routine of its own is not sent to a routine at all: its
+run is queued for the projects dispatcher, which starts a session on the
+project's repository (project-dispatch.md beside this file). What follows
+is the brief that session gets, and the old shared routine's prompt.
+
 The routine checks out this repository, not the project's. The turn the app
 sends opens with `projectPreamble` (`lib/plan/handover.ts`), which names the
 project's repository and tells the session to add it. The plan rows stay in
