@@ -40,6 +40,16 @@ describe('runConnectorWrite', () => {
       'close_goal_step',
       'set_goal_done_when',
       'change_items',
+      'add_todo',
+      'change_todo',
+      'close_todo',
+      'mark_returned',
+      'add_role_note',
+      'move_roles',
+      'write_prep_note',
+      'rewrite_post',
+      'suggest_post',
+      'add_project',
       'change_reading',
       'add_learn_track',
       'add_track_reading',
@@ -206,6 +216,51 @@ describe('the writes shared with Ask Dash', () => {
       ok: false,
       error: 'There is no todo of theirs with that ref. Look it up first.',
     });
+  });
+
+  it('adds a new todo, renames it and ticks it off, as Ask Dash does, each recorded for Undo', async () => {
+    const { tables, context } = await shared({ enabledModules: ['todo'], today: '2026-10-13', timezone: 'Europe/London' });
+    tables['todo.tasks'] = [];
+    tables['todo.task_tags'] = [];
+    const added = await runConnectorWrite(tool('add_todo'), context, { title: 'Call the dentist', due_on: '2026-10-13' });
+    expect(added).toMatchObject({ ok: true, rows: [{ table: 'todo.tasks' }] });
+    expect(tables['todo.tasks']).toEqual([expect.objectContaining({ user_id: ME, title: 'Call the dentist', due_on: '2026-10-13' })]);
+    const id = tables['todo.tasks'][0].id as string;
+    // It arrives tagged by its date, as add_todo in Ask Dash does.
+    expect(tables['todo.task_tags']).toEqual([expect.objectContaining({ task_id: id, tag: 'now' })]);
+    // The table's own defaults, which the in-memory database does not fill.
+    Object.assign(tables['todo.tasks'][0], { status: 'open', parent_id: null });
+
+    const renamed = await runConnectorWrite(tool('change_todo'), context, { todo_ref: id, title: 'Call the dentist about the crown' });
+    expect(renamed).toMatchObject({ ok: true });
+    expect(tables['todo.tasks'][0]).toMatchObject({ title: 'Call the dentist about the crown' });
+
+    const closed = await runConnectorWrite(tool('close_todo'), context, { todo_ref: id });
+    expect(closed).toMatchObject({ ok: true });
+    expect(tables['todo.tasks'][0]).toMatchObject({ status: 'done' });
+    expect(tables['core.dash_actions'].map((row) => [row.surface, row.kind])).toEqual([
+      ['routine', 'add_todo'],
+      ['routine', 'change_todo'],
+      ['routine', 'close_todo'],
+    ]);
+  });
+
+  it("refuses to tick off another person's todo", async () => {
+    const TASK = '00000000-0000-4000-8000-000000000e02';
+    const { tables, context } = await shared({ enabledModules: ['todo'], today: '2026-10-13' });
+    tables['todo.tasks'] = [{ id: TASK, user_id: 'someone else', title: 'Theirs', status: 'open', parent_id: null }];
+    const result = await runConnectorWrite(tool('close_todo'), context, { todo_ref: TASK });
+    expect(result).toEqual({ ok: false, error: 'That todo is not one of theirs, or it has been deleted.' });
+    expect(tables['todo.tasks'][0]).toMatchObject({ status: 'open' });
+    expect(tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('refuses a new todo when Todo is off', async () => {
+    const { tables, context } = await shared({ enabledModules: ['dev'], today: '2026-10-13' });
+    tables['todo.tasks'] = [];
+    const result = await runConnectorWrite(tool('add_todo'), context, { title: 'Call the dentist' });
+    expect(result.ok).toBe(false);
+    expect(tables['todo.tasks']).toEqual([]);
   });
 
   it('refuses a Todo change when Todo is off', async () => {
