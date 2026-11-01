@@ -134,8 +134,8 @@ export function projectPreamble(project: DevProject): string {
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
     `both. ${check}${setUp}` +
     'If it is not checked out and add_repo is refused or missing, do not build anywhere else: ' +
-    'write a setup step for the person with the remedy add_repo returned (usually installing ' +
-    `the Claude GitHub app on ${where}), as project-routine.md says, and stop.\n\n`
+    `write a setup step for the person to add ${where} to the Plan step builder routine's ` +
+    'repositories on claude.ai, as project-routine.md says, and stop.\n\n'
   );
 }
 

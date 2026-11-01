@@ -102,7 +102,7 @@ Before anything else:
 3. Call register_repo_root on the clone.
 4. Build there: the code, the commits, the checks and the merge to its main branch are that repository's. Its own plan skill, which the turn names, says how a step is built in it.
 
-If the repository is not checked out and add_repo is refused or not among your tools, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "<the remedy add_repo returned, as one line>" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
+If the repository is not checked out and add_repo is refused or not among your tools, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "Add <owner/repo> to the Plan step builder routine" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
 
 Keep this checkout for the plan rows: claim, close, block and write run lines with npx tsx scripts/plan.ts here, which reads the database for every project. Never commit to this repository from a project's run.
 

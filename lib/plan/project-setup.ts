@@ -31,6 +31,26 @@ export const SET_UP_SECTION = '"Setting up a new project" in .claude/skills/plan
 
 type Row = { title: string; detail: string; acceptance: string };
 
+/**
+ * The one thing only the person can do for a new project. A routine's runs
+ * reach only the repositories saved on it, the fire API carries text alone,
+ * and a run cannot attach another (no add_repo; the git proxy refuses a push
+ * to any repository outside the list). So the project's repository goes onto
+ * the plan routine, which every project step is sent to, by hand, once.
+ */
+export function routineAccessRow(project: DevProject): Row {
+  const where = `${project.repo.owner}/${project.repo.repo}`;
+  return {
+    title: `Add ${where} to the Plan step builder routine`,
+    detail:
+      `Open https://claude.ai/code/routines, choose Plan step builder (on demand), open the menu ` +
+      `next to its name and select Edit. Under Repository add ${where} and save. If it is not ` +
+      `offered, install the Claude GitHub app on it first (https://github.com/apps/claude). ` +
+      `Dash runs can reach only the repositories saved on that routine; nothing can add one for you.`,
+    acceptance: `${where} is one of the Plan step builder routine's repositories.`,
+  };
+}
+
 /** The feature and the step a new project starts with, worded for it. */
 export function setUpRows(project: DevProject): { feature: Row; step: Row } {
   const where = `${project.repo.owner}/${project.repo.repo}`;
@@ -104,5 +124,21 @@ export async function writeSetUpSteps(input: {
     position: 10,
   });
   if ('error' in step) return { error: `The set-up step was not written: ${step.error}` };
+
+  const access = await insertPlanItem(db, {
+    userId,
+    module: project.id,
+    parentId: feature.id,
+    ...routineAccessRow(project),
+    status: 'not_started',
+    kind: 'setup',
+    assignee: 'me',
+    position: 5,
+  });
+  if ('error' in access) return { error: `The routine step was not written: ${access.error}` };
+  const { error: waits } = await db
+    .from('plan_dependencies')
+    .insert({ user_id: userId, item_id: step.id, depends_on_id: access.id });
+  if (waits) return { error: `The set-up step could not be made to wait: ${waits.message}` };
   return step;
 }
