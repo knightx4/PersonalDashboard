@@ -10,7 +10,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { INTERVIEW_KIND_LABEL, INTERVIEW_KINDS, type InterviewKind } from '@/lib/jobs/interview-kinds';
 import { prepareRound } from '@/lib/jobs/interview/prepare-round';
 import { insertInterview, insertInterviewRound, nextRoundNumber } from '@/lib/jobs/interview/rounds';
-import { recordSessionSpend } from '@/lib/core/spend/session';
+import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -378,8 +378,15 @@ async function writePrepNote(ctx: DashWriteContext, args: Args): Promise<DashWri
     interviewId: lead.id,
     apiKey,
   });
-  // Recorded whether or not a note came back: the run was paid for.
-  await recordSessionSpend(ctx.userId, { module: 'jobs', operation: 'write-interview-prep' }, result.spend);
+  // Recorded whether or not a note came back: the run was paid for. Through
+  // the context's own core client, so the connector, which has no signed-in
+  // session, records it too.
+  await recordSpendReports(
+    (await ctx.db('core')) as unknown as SpendClient,
+    ctx.userId,
+    { module: 'jobs', operation: 'write-interview-prep' },
+    result.spend,
+  ).catch((error) => console.error('[spend] jobs/write-interview-prep', error instanceof Error ? error.message : error));
   if (result.error || !result.note) {
     throw new Refused(
       `No prep note was written for ${roundName} of ${roleTitle}: ${result.error ?? 'none came back.'} Tell them this in plain words.`,
