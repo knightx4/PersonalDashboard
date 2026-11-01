@@ -55,6 +55,7 @@ describe('add_project', () => {
     expect(tables['public.plan_items'].map((row) => row.title)).toEqual([
       'Set up',
       'Make example-owner/recipes ready for Dash to build in',
+      'Add example-owner/recipes to the Plan step builder routine',
     ]);
   });
 
