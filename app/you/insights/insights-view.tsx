@@ -9,7 +9,7 @@ import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
-import { Chip, type ChipTone } from '@/components/ui/chip';
+import { Chip, ToggleChip, type ChipTone } from '@/components/ui/chip';
 import { DashAction } from '@/components/ui/dash-action';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
@@ -18,6 +18,8 @@ import { FieldError, Label, Textarea } from '@/components/ui/field';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { formatDateInline } from '@/lib/jobs/applications/load';
+import { ANSWER_HREF } from '@/lib/you/dash-questions';
+import { areaChips, joinNames, uncoveredAreas, type LifeArea } from '@/lib/you/insight-areas';
 import { firedLine, firedSinceMark, type FiredTripwire } from '@/lib/you/insight-fired';
 import type {
   Insight,
@@ -60,6 +62,12 @@ import type { ChatStats } from '@/lib/you/claude-chats';
  * what happened and the evidence the nightly check recorded, folded. Marking
  * it again clears the line until the tripwire fires again.
  *
+ * Each card names the life area it is about (plan #2629.5). When the cards
+ * span two or more areas, a row of area chips above the deck narrows the deck
+ * and Earlier to one; cards with no area fall under All only. A line under
+ * the deck names the person's areas no insight is about yet and links to the
+ * Answer tab, where Dash asks about them.
+ *
  * Look again starts a run (startInsightRun), a session on the goals routine
  * that reads everything and takes a while; while one is queued or running a
  * banner takes the button's place and the page looks again every minute.
@@ -96,6 +104,8 @@ export type InsightsOpen = {
   now?: boolean;
   /** The chats import, folded open. */
   chats?: boolean;
+  /** The area chosen in the chips row, by id. */
+  area?: string;
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
@@ -177,6 +187,7 @@ export function InsightsView({
   now = { body: '', updatedAt: null },
   chats = { imported: 0, saved: 0, firstSaidAt: null, lastSaidAt: null, lastImportedAt: null },
   timezone = 'UTC',
+  areas = [],
   actions = REAL_ACTIONS,
   open = {},
 }: {
@@ -193,9 +204,12 @@ export function InsightsView({
   chats?: ChatStats;
   /** Their timezone, for the date on a card brought back. */
   timezone?: string;
+  /** Their open life areas (goals.areas), in their own order. */
+  areas?: readonly LifeArea[];
   actions?: InsightsActions;
   open?: InsightsOpen;
 }) {
+  const [area, setArea] = useState<string | null>(open.area ?? null);
   const [marks, setMarks] = useState<ReadonlyMap<string, InsightVerdict>>(new Map());
   const [choosing, setChoosing] = useState<{ id: string; verdict: WhyVerdict } | null>(() => {
     const first = insights.find((insight) => insight.status === 'shown' && !insight.verdict && !insight.fired.length);
@@ -231,6 +245,24 @@ export function InsightsView({
       return verdict && !isWaiting(insight) ? [{ insight, verdict }] : [];
     })
     .sort((a, b) => b.verdict.decidedAt.localeCompare(a.verdict.decidedAt));
+
+  // The area chips show only when the cards span two or more areas.
+  const chips = areaChips(insights, waiting);
+  const chosen = chips.length >= 2 ? (chips.find((chip) => chip.id === area) ?? null) : null;
+  const dealt = chosen ? waiting.filter((insight) => insight.areaId === chosen.id) : waiting;
+  const earlierShown = chosen ? earlier.filter(({ insight }) => insight.areaId === chosen.id) : earlier;
+  const uncovered = uncoveredAreas(areas, insights);
+  const uncoveredLine =
+    uncovered.length > 0 ? (
+      <Card padding="dense" data-insight-uncovered>
+        <p className="text-ui text-ink-muted">
+          No insight yet about {joinNames(uncovered.map((a) => a.name))}.{' '}
+          <Link href={ANSWER_HREF} className={linkVariants()}>
+            Tell Dash more on Answer
+          </Link>
+        </p>
+      </Card>
+    ) : null;
 
   const mark = (insight: Insight, verdict: Verdict, why?: string) => {
     const decided: InsightVerdict = { verdict, note: why?.trim() || null, decidedAt: new Date().toISOString() };
@@ -276,7 +308,7 @@ export function InsightsView({
     </DashAction>
   );
 
-  const items: DeckItem[] = waiting.map((insight) => {
+  const items: DeckItem[] = dealt.map((insight) => {
     const choice = choosing?.id === insight.id ? choosing.verdict : null;
     return {
       key: insight.id,
@@ -401,49 +433,87 @@ export function InsightsView({
         <NowFold initial={now} timezone={timezone} onSave={actions.saveNow} defaultOpen={open.now ?? (nothing || !now.body)} />
 
         {nothing ? (
-          <EmptyState
-            icon={Sparkles}
-            title="Nothing noticed yet"
-            description="When Dash notices something about you across your notes, tests and history, it will be written here with what it rests on."
-          >
-            {showLookAgain && lookAgainButton}
-          </EmptyState>
+          <>
+            <EmptyState
+              icon={Sparkles}
+              title="Nothing noticed yet"
+              description="When Dash notices something about you across your notes, tests and history, it will be written here with what it rests on."
+            >
+              {showLookAgain && lookAgainButton}
+            </EmptyState>
+            {uncoveredLine}
+          </>
         ) : (
-          <Deck
-            key={pass}
-            items={items}
-            countOnPhone={false}
-            forward="Later"
-            done={
-              <Card padding="standard">
-                {waiting.length === 0 ? (
-                  <EmptyState
-                    tone="finished"
-                    title="That is every insight"
-                    description="Your marks are kept under Earlier, and the next run reads them before it writes anything."
-                  />
-                ) : (
-                  <EmptyState
-                    tone="finished"
-                    title="That is every insight for now"
-                    description={`${waiting.length} left for later ${waiting.length === 1 ? 'waits' : 'wait'} for a mark.`}
-                  >
-                    <Button variant="secondary" size="sm" onClick={() => setPass((p) => p + 1)}>
-                      Go through them again
-                    </Button>
-                  </EmptyState>
-                )}
+          <div className="space-y-3">
+            {chips.length >= 2 && (
+              <div role="group" aria-label="Show insights about" className="flex flex-wrap gap-1.5" data-insight-areas>
+                {/* All, chosen by default, is drawn quiet: the accent is for an area picked. */}
+                <ToggleChip
+                  on={!chosen}
+                  onClick={() => setArea(null)}
+                  className={chosen ? undefined : 'bg-sunken text-ink'}
+                >
+                  All <span className="tabular">{waiting.length}</span>
+                </ToggleChip>
+                {chips.map((chip) => (
+                  <ToggleChip key={chip.id} on={chosen?.id === chip.id} onClick={() => setArea(chip.id)}>
+                    {chip.name}
+                    {chip.count > 0 && <span className="tabular">{chip.count}</span>}
+                  </ToggleChip>
+                ))}
+              </div>
+            )}
+            {chosen && dealt.length === 0 ? (
+              <Card padding="standard" data-insight-area-empty>
+                <EmptyState
+                  tone="finished"
+                  title={`No insight about ${chosen.name} waits for a mark`}
+                  description={earlierShown.length > 0 ? 'What you marked about it is under Earlier.' : undefined}
+                >
+                  <Button variant="secondary" size="sm" onClick={() => setArea(null)}>
+                    Show all
+                  </Button>
+                </EmptyState>
               </Card>
-            }
-          />
+            ) : (
+              <Deck
+                key={`${pass}-${chosen?.id ?? 'all'}`}
+                items={items}
+                countOnPhone={false}
+                forward="Later"
+                done={
+                  <Card padding="standard">
+                    {dealt.length === 0 ? (
+                      <EmptyState
+                        tone="finished"
+                        title="That is every insight"
+                        description="Your marks are kept under Earlier, and the next run reads them before it writes anything."
+                      />
+                    ) : (
+                      <EmptyState
+                        tone="finished"
+                        title="That is every insight for now"
+                        description={`${dealt.length} left for later ${dealt.length === 1 ? 'waits' : 'wait'} for a mark.`}
+                      >
+                        <Button variant="secondary" size="sm" onClick={() => setPass((p) => p + 1)}>
+                          Go through them again
+                        </Button>
+                      </EmptyState>
+                    )}
+                  </Card>
+                }
+              />
+            )}
+            {uncoveredLine}
+          </div>
         )}
 
         <ChatsFold stats={chats} timezone={timezone} actions={actions.chats} defaultOpen={open.chats} />
 
-        {earlier.length > 0 && (
-          <SectionFold title="Earlier" count={earlier.length} defaultOpen={open.earlier ?? false}>
+        {earlierShown.length > 0 && (
+          <SectionFold title="Earlier" count={earlierShown.length} defaultOpen={open.earlier ?? false}>
             <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border overflow-hidden')}>
-              {earlier.map(({ insight, verdict }) => (
+              {earlierShown.map(({ insight, verdict }) => (
                 <li key={insight.id} className="space-y-1 px-4 py-3">
                   <Chip tone={VERDICT_TONES[verdict.verdict]}>{VERDICT_LABELS[verdict.verdict]}</Chip>
                   <p className="text-body text-ink">{insight.claim}</p>
@@ -485,8 +555,15 @@ function InsightCard({
       className="space-y-4 max-lg:min-h-[calc(100svh-var(--dock-h)-env(safe-area-inset-bottom)-9rem)]"
     >
       <div className="space-y-1.5" data-insight-claim>
-        <p className="text-small text-ink-muted">
-          {capitalised(insight.kind)} · {CONFIDENCE_LABELS[insight.confidence]}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-ink-muted">
+          {insight.areaName && (
+            <Chip className="max-w-full" data-insight-area>
+              <span className="min-w-0 truncate">{insight.areaName}</span>
+            </Chip>
+          )}
+          <span>
+            {capitalised(insight.kind)} · {CONFIDENCE_LABELS[insight.confidence]}
+          </span>
         </p>
         <h2 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{insight.claim}</h2>
       </div>
@@ -772,7 +849,7 @@ function NowFold({
       hint={note.updatedAt ? `Updated ${formatDateInline(note.updatedAt, timezone)}` : 'Not written yet'}
       defaultOpen={defaultOpen}
     >
-      <div className="mt-2 space-y-2">
+      <Card padding="standard" className="mt-2 space-y-2">
         <Label htmlFor="insights-now" className="text-ui font-normal text-ink-muted">
           What is going on for you at the moment: money, what you are focused on, what you have decided against.
           Dash reads this before every run, so it does not take a choice you made for a gap.
@@ -782,7 +859,7 @@ function NowFold({
           Save
         </Button>
         <FieldError>{error}</FieldError>
-      </div>
+      </Card>
     </SectionFold>
   );
 }
