@@ -62,6 +62,10 @@ session is idle (`get_session`; read its last assistant message with
 - needs something only the person has: `npx tsx scripts/plan.ts needs
   "<what>" --for <outline> --detail "<where to go>"`.
 
+When the run was sent at a feature and every step under it is now done,
+close the feature too: `npx tsx scripts/plan.ts done <feature number>
+--commit <the last step's sha> --note "<one line>"`.
+
 Then end the run with the update its brief's "Ending this run" note gives.
 A worker that ended with nothing built: `npx tsx scripts/plan.ts stopped
 <number> --reason "<why, one line>"`.
