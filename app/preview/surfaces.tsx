@@ -9621,6 +9621,31 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // One area chosen in the chips row (plan #2629.5): the deck holds only
+    // the Career cards, and Earlier only the Career marks.
+    id: 'you-insights-area',
+    label: 'You · Insights, one area chosen',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ area: '00000000-0000-4000-8000-0000000000c1', earlier: true }} />
+      </div>
+    ),
+  },
+  {
+    // The chosen area has no card waiting: its one card is marked.
+    id: 'you-insights-area-empty',
+    label: 'You · Insights, the chosen area has nothing waiting',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview homeDone open={{ area: '00000000-0000-4000-8000-0000000000c3' }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-earlier',
     label: 'You · Insights, Earlier open with your marks',
     module: 'you',

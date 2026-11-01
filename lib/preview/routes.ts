@@ -435,6 +435,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-insights-fired': ['/you/insights'],
   'you-insights-fired-evidence': ['/you/insights'],
   'you-insights-earlier': ['/you/insights'],
+  'you-insights-area': ['/you/insights'],
+  'you-insights-area-empty': ['/you/insights'],
   'you-insights-running': ['/you/insights'],
   'you-insights-failed': ['/you/insights'],
   'you-insights-empty': ['/you/insights'],
