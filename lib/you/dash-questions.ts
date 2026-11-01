@@ -1,3 +1,4 @@
+import { areaNamesById } from '@/lib/you/areas';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 
 /**
@@ -23,6 +24,9 @@ export type DashQuestion = {
   answer: string | null;
   answeredAt: string | null;
   skippedAt: string | null;
+  /** The Goals area it is about and that area's name; null when it has none (you 0036). */
+  areaId: string | null;
+  areaName: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -35,12 +39,13 @@ export type DashQuestionRow = {
   answer: string | null;
   answered_at: string | null;
   skipped_at: string | null;
+  area_id?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export const DASH_QUESTION_COLUMNS =
-  'id, question, why, status, answer, answered_at, skipped_at, created_at, updated_at';
+  'id, question, why, status, answer, answered_at, skipped_at, area_id, created_at, updated_at';
 
 /** The limits the table's checks hold to. */
 export const QUESTION_MAX = 300;
@@ -61,6 +66,8 @@ export function dashQuestionFromRow(row: DashQuestionRow): DashQuestion {
     answer: row.answer,
     answeredAt: row.answered_at,
     skippedAt: row.skipped_at,
+    areaId: row.area_id ?? null,
+    areaName: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -99,7 +106,11 @@ export async function loadDashQuestions(
 ): Promise<{ open: DashQuestion[]; past: DashQuestion[] }> {
   const { data, error } = await client.from('dash_questions').select(DASH_QUESTION_COLUMNS).eq('user_id', userId);
   if (error) throw new Error(`Reading Dash's questions failed: ${error.message}`);
-  return splitDashQuestions(((data ?? []) as DashQuestionRow[]).map(dashQuestionFromRow));
+  const questions = ((data ?? []) as DashQuestionRow[]).map(dashQuestionFromRow);
+  const names = await areaNamesById(client, userId, questions.map((q) => q.areaId));
+  return splitDashQuestions(
+    questions.map((q) => ({ ...q, areaName: q.areaId ? (names.get(q.areaId) ?? null) : null })),
+  );
 }
 
 /**

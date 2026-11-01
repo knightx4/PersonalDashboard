@@ -48,6 +48,8 @@ const q = (id: string, extra: Partial<DashQuestion> = {}): DashQuestion => ({
   answer: null,
   answeredAt: null,
   skippedAt: null,
+  areaId: null,
+  areaName: null,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
   ...extra,
@@ -99,6 +101,28 @@ describe('loadDashQuestions', () => {
       expect.objectContaining({ id: 'q1', why: 'Your notes say little about rest.', status: 'open', answer: null }),
     ]);
     expect(past).toEqual([]);
+  });
+
+  it('loads a question with no area as one with no area name', async () => {
+    const { client } = fakeClient({
+      data: [
+        {
+          id: 'q2',
+          question: 'Q?',
+          why: null,
+          status: 'open',
+          answer: null,
+          answered_at: null,
+          skipped_at: null,
+          area_id: null,
+          created_at: '2026-10-29T00:00:00Z',
+          updated_at: '2026-10-29T00:00:00Z',
+        },
+      ],
+      error: null,
+    });
+    const { open } = await loadDashQuestions(client, 'u1');
+    expect(open[0]).toMatchObject({ areaId: null, areaName: null });
   });
 
   it('throws when the read fails', async () => {

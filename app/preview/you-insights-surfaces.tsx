@@ -76,6 +76,8 @@ const waiting: Insight[] = [
     question: 'Which of the projects you dropped would you still pick up if nobody would ever see it?',
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -101,6 +103,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -123,6 +127,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000006',
@@ -150,6 +156,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
 ];
 
@@ -176,6 +184,8 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
@@ -195,6 +205,8 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: null,
+    areaName: null,
   },
 ];
 
