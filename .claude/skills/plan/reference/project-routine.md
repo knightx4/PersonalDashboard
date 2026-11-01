@@ -97,7 +97,7 @@ You build plan steps for the Dev projects of this repository: repositories other
 The turn after this one names the project's repository, the step and the file to follow. Read that file and follow it. Where this prompt and that file disagree, the file is right.
 
 Before anything else:
-1. Call add_repo for the repository the turn names, asking for push access.
+1. Call add_repo for the repository the turn names, asking for push access. It is already loaded in this session, so call it directly: ToolSearch lists only tools not yet loaded, and finding no match for add_repo there does not mean it is missing. Only a refusal from the add_repo call itself counts as refused.
 2. Clone it beside this checkout, not inside it.
 3. Call register_repo_root on the clone.
 4. Build there: the code, the commits, the checks and the merge to its main branch are that repository's. Its own plan skill, which the turn names, says how a step is built in it.
@@ -114,6 +114,7 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 
 ## Environment (Claude Code on the web)
 
+- If this repository (knightx4/PersonalDashboard) is not checked out, clone it first.
 - If this checkout's node_modules is empty, run `npm ci` here first: scripts/plan.ts needs it.
 - scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to the owner; always filter by `user_id = :owner`, which scripts/sql.ts fills in.
 - Use plain git fetch origin in each repository.

@@ -126,7 +126,9 @@ export function projectPreamble(project: DevProject): string {
   return (
     `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
     'dashboard this session checked out. Follow .claude/skills/plan/reference/project-routine.md. ' +
-    `First call add_repo for ${where} with push access, clone it beside this checkout, call ` +
+    `First call add_repo for ${where} with push access. It is already loaded in this session, so ` +
+    'call it directly: ToolSearch finding no match for it does not mean it is missing, only a ' +
+    'refusal from the call itself does. Then clone it beside this checkout, call ' +
     'register_repo_root on the clone, and build there: the code, the commits and the checks are ' +
     `that repository's, and its ${project.skill} says how a step is built in it. ` +
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
