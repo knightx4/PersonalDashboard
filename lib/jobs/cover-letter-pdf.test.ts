@@ -87,7 +87,7 @@ describe('the download', () => {
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
   });
 
-  describe('a letter too long for one page at 11pt', () => {
+  describe('a letter too long for one page', () => {
     const para =
       'I led the operations team through a reorganisation that cut our close from ten days to four and kept every report on time.';
     const pages = async (paragraphs: number) => {
@@ -100,13 +100,15 @@ describe('the download', () => {
       return (await PDFDocument.load(bytes)).getPageCount();
     };
 
-    // Fourteen of these paragraphs run to a second page at 11pt.
-    it('is set half a point smaller to keep it on one page', async () => {
+    // Fourteen of these paragraphs run to a second page at 11pt under the
+    // 1.5" margin, and seventeen are too many even at 10pt.
+    it('is fitted onto one page by a smaller margin and type', async () => {
       expect(await pages(14)).toBe(1);
+      expect(await pages(16)).toBe(1);
     });
 
-    it('runs on to a second page when 10.5pt does not fit it either', async () => {
-      expect(await pages(15)).toBe(2);
+    it('runs on to a second page when 10pt does not fit it either', async () => {
+      expect(await pages(17)).toBe(2);
     });
   });
 });

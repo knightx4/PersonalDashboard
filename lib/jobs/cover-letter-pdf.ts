@@ -3,9 +3,12 @@
  * replaces: US letter, a 1.5"
  * top margin and 1" elsewhere, Times 11pt single-spaced with a blank line
  * between paragraphs, and a rule with the contact line in 10pt pinned to the
- * foot of the first page. A letter too long for one page at 11pt is laid out
- * again at 10.5pt, and keeps that size if it fits; one still too long at
- * 10.5pt runs on to a second page at that size.
+ * foot of the first page.
+ *
+ * A letter too long for one page is fitted in steps, keeping the first that
+ * fits: the top margin comes down to the usual 1", then the body goes to
+ * 10.5pt, then to 10pt. One still too long at 10pt runs on to a second page
+ * at that size.
  *
  * The letter opens with the date and the company. A stored letter that
  * already carries a header has it dropped up to its salutation, so the date
@@ -23,9 +26,13 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 
 const PAGE = { width: 612, height: 792 };
 const MARGIN = { top: 108, right: 72, bottom: 72, left: 72 };
-const SIZE = 11;
-/** The size a letter too long for one page at SIZE is tried at. */
-const SMALLER_SIZE = 10.5;
+/** The layouts tried in turn until the letter fits on one page; the last is kept regardless. */
+const FITS = [
+  { size: 11, top: MARGIN.top },
+  { size: 11, top: 72 },
+  { size: 10.5, top: 72 },
+  { size: 10, top: 72 },
+];
 // Word's single spacing for Times New Roman: 1.15 of the point size.
 const LINE_SPACING = 1.15;
 const ASCENT = 0.891;
@@ -222,7 +229,7 @@ interface Layout {
   timeZone: string;
 }
 
-/** Builds the letter's PDF bytes at 11pt, or at 10.5pt when 11pt runs past one page. */
+/** Builds the letter's PDF bytes in the first of FITS that keeps it on one page. */
 export async function coverLetterPdf({
   letter,
   company,
@@ -239,15 +246,18 @@ export async function coverLetterPdf({
   timeZone: string;
 }): Promise<Uint8Array> {
   const layout = { letter, company, letterhead, date, timeZone };
-  let doc = await letterDoc(layout, SIZE);
-  if (doc.getPageCount() > 1) doc = await letterDoc(layout, SMALLER_SIZE);
-  return doc.save();
+  for (const [i, fit] of FITS.entries()) {
+    const doc = await letterDoc(layout, fit.size, fit.top);
+    if (doc.getPageCount() === 1 || i === FITS.length - 1) return doc.save();
+  }
+  throw new Error('unreachable');
 }
 
-/** The letter laid out with its body at the given point size. */
+/** The letter laid out with its body at the given point size, below the given top margin. */
 async function letterDoc(
   { letter, company, letterhead, date, timeZone }: Layout,
   size: number,
+  top: number,
 ): Promise<PDFDocument> {
   const doc = await PDFDocument.create();
   const { signer, contact } = letterhead;
@@ -259,7 +269,7 @@ async function letterDoc(
   const first = doc.addPage([PAGE.width, PAGE.height]);
   let page = first;
   // Baseline of the next line, from the bottom of the page.
-  let y = PAGE.height - MARGIN.top - size * ASCENT;
+  let y = PAGE.height - top - size * ASCENT;
   const lineHeight = size * LINE_SPACING;
   const bodyWidth = PAGE.width - MARGIN.left - MARGIN.right;
   // The first page stops above the contact line; later pages at the margin.
