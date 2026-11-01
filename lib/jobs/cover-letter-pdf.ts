@@ -3,7 +3,9 @@
  * replaces: US letter, a 1.5"
  * top margin and 1" elsewhere, Times 11pt single-spaced with a blank line
  * between paragraphs, and a rule with the contact line in 10pt pinned to the
- * foot of the first page.
+ * foot of the first page. A letter too long for one page at 11pt is laid out
+ * again at 10.5pt, and keeps that size if it fits; one still too long at
+ * 10.5pt runs on to a second page at that size.
  *
  * The letter opens with the date and the company. A stored letter that
  * already carries a header has it dropped up to its salutation, so the date
@@ -22,8 +24,10 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 const PAGE = { width: 612, height: 792 };
 const MARGIN = { top: 108, right: 72, bottom: 72, left: 72 };
 const SIZE = 11;
+/** The size a letter too long for one page at SIZE is tried at. */
+const SMALLER_SIZE = 10.5;
 // Word's single spacing for Times New Roman: 1.15 of the point size.
-const LINE = SIZE * 1.15;
+const LINE_SPACING = 1.15;
 const ASCENT = 0.891;
 const BULLET_X = MARGIN.left + 18;
 const BULLET_TEXT_X = MARGIN.left + 36;
@@ -181,13 +185,13 @@ function words(runs: Run[], regular: PDFFont, bold: PDFFont): Word[] {
   return out;
 }
 
-function wrap(all: Word[], width: number): Word[][] {
+function wrap(all: Word[], width: number, size: number): Word[][] {
   const lines: Word[][] = [];
   let line: Word[] = [];
   let used = 0;
   for (const word of all) {
-    const space = line.length && word.space ? word.font.widthOfTextAtSize(' ', SIZE) : 0;
-    const w = word.font.widthOfTextAtSize(word.text, SIZE);
+    const space = line.length && word.space ? word.font.widthOfTextAtSize(' ', size) : 0;
+    const w = word.font.widthOfTextAtSize(word.text, size);
     if (line.length && used + space + w > width) {
       lines.push(line);
       line = [{ ...word, space: false }];
@@ -201,16 +205,24 @@ function wrap(all: Word[], width: number): Word[][] {
   return lines;
 }
 
-function drawLine(page: PDFPage, line: Word[], x: number, y: number) {
+function drawLine(page: PDFPage, line: Word[], x: number, y: number, size: number) {
   let at = x;
   for (const word of line) {
-    if (word.space) at += word.font.widthOfTextAtSize(' ', SIZE);
-    page.drawText(word.text, { x: at, y, size: SIZE, font: word.font, color: rgb(0, 0, 0) });
-    at += word.font.widthOfTextAtSize(word.text, SIZE);
+    if (word.space) at += word.font.widthOfTextAtSize(' ', size);
+    page.drawText(word.text, { x: at, y, size, font: word.font, color: rgb(0, 0, 0) });
+    at += word.font.widthOfTextAtSize(word.text, size);
   }
 }
 
-/** Builds the letter's PDF bytes. */
+interface Layout {
+  letter: string;
+  company: string;
+  letterhead: Letterhead;
+  date: Date;
+  timeZone: string;
+}
+
+/** Builds the letter's PDF bytes at 11pt, or at 10.5pt when 11pt runs past one page. */
 export async function coverLetterPdf({
   letter,
   company,
@@ -226,6 +238,17 @@ export async function coverLetterPdf({
   /** The zone today is read in for the date line. */
   timeZone: string;
 }): Promise<Uint8Array> {
+  const layout = { letter, company, letterhead, date, timeZone };
+  let doc = await letterDoc(layout, SIZE);
+  if (doc.getPageCount() > 1) doc = await letterDoc(layout, SMALLER_SIZE);
+  return doc.save();
+}
+
+/** The letter laid out with its body at the given point size. */
+async function letterDoc(
+  { letter, company, letterhead, date, timeZone }: Layout,
+  size: number,
+): Promise<PDFDocument> {
   const doc = await PDFDocument.create();
   const { signer, contact } = letterhead;
   doc.setTitle(`${signer ? `${signer} ` : ''}Cover Letter - ${company}`);
@@ -236,16 +259,17 @@ export async function coverLetterPdf({
   const first = doc.addPage([PAGE.width, PAGE.height]);
   let page = first;
   // Baseline of the next line, from the bottom of the page.
-  let y = PAGE.height - MARGIN.top - SIZE * ASCENT;
+  let y = PAGE.height - MARGIN.top - size * ASCENT;
+  const lineHeight = size * LINE_SPACING;
   const bodyWidth = PAGE.width - MARGIN.left - MARGIN.right;
   // The first page stops above the contact line; later pages at the margin.
   const floor = () => (page === first && contact ? PAGE.height - RULE_TOP + 6 : MARGIN.bottom);
 
   const advance = () => {
-    y -= LINE;
+    y -= lineHeight;
     if (y < floor()) {
       page = doc.addPage([PAGE.width, PAGE.height]);
-      y = PAGE.height - 72 - SIZE * ASCENT;
+      y = PAGE.height - 72 - size * ASCENT;
     }
   };
   const blank = () => advance();
@@ -262,8 +286,8 @@ export async function coverLetterPdf({
     const next = blocks[index + 1];
     if (block.kind === 'para') {
       for (const source of block.lines) {
-        for (const line of wrap(words(source, regular, bold), bodyWidth)) {
-          drawLine(page, line, MARGIN.left, y);
+        for (const line of wrap(words(source, regular, bold), bodyWidth, size)) {
+          drawLine(page, line, MARGIN.left, y, size);
           advance();
         }
       }
@@ -271,10 +295,11 @@ export async function coverLetterPdf({
       const lines = wrap(
         words(block.runs, regular, bold),
         PAGE.width - MARGIN.right - BULLET_TEXT_X,
+        size,
       );
       lines.forEach((line, i) => {
-        if (i === 0) page.drawText('•', { x: BULLET_X, y, size: SIZE, font: regular });
-        drawLine(page, line, BULLET_TEXT_X, y);
+        if (i === 0) page.drawText('•', { x: BULLET_X, y, size, font: regular });
+        drawLine(page, line, BULLET_TEXT_X, y, size);
         advance();
       });
     }
@@ -282,7 +307,7 @@ export async function coverLetterPdf({
     if (next && !(block.kind === 'bullet' && next.kind === 'bullet')) blank();
   });
 
-  if (!contact) return doc.save();
+  if (!contact) return doc;
   const ruleY = PAGE.height - RULE_TOP;
   first.drawLine({
     start: { x: MARGIN.left - 2.7, y: ruleY },
@@ -298,5 +323,5 @@ export async function coverLetterPdf({
     color: rgb(0, 0, 0),
   });
 
-  return doc.save();
+  return doc;
 }
