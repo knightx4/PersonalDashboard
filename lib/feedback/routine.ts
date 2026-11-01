@@ -177,21 +177,20 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
- * The one routine that builds every project's steps (plan #2553.3), so a new
- * project needs nothing set up on claude.ai. It checks out this repository,
- * adds the project's repository to the session, and builds there; its
- * standing prompt is .claude/skills/plan/reference/project-routine.md.
+ * The routine that builds every project's steps: the plan routine (plan
+ * #2553.3), so a new project needs nothing set up on claude.ai.
  *
- * No fallback to the plan routine or the shared token: the plan routine
- * builds in this repository, and a project's step built there would land in
- * the wrong place. With either unset a project with no routine of its own is
- * refused and nothing starts.
+ * A routine's session starts with only the repositories it was created with,
+ * and only a session that starts with one gets add_repo. The shared projects
+ * routine was created with none, so its runs could reach no project (runs of
+ * 30 October and 1 November). The plan routine starts with this repository,
+ * so its runs attach the project's repository with add_repo, which
+ * .claude/settings.json allows without a prompt. The brief says the step is
+ * the project's and names project-routine.md, which the plan routine's prompt
+ * follows over its own, so nothing is built in this repository.
  */
 export function projectsRoutine(): RoutineTarget {
-  return {
-    id: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_ID),
-    token: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_TOKEN),
-  };
+  return planRoutine();
 }
 
 /**
@@ -211,7 +210,7 @@ export function ownProjectRoutine(project: DevProject): RoutineTarget | null {
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan, a reply to a run's
  * question, and the overnight runner: the project's own when it has one, and
- * the shared projects routine otherwise.
+ * the plan routine otherwise.
  */
 export function projectRoutine(project: DevProject): RoutineTarget {
   return ownProjectRoutine(project) ?? projectsRoutine();

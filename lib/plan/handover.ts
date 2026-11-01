@@ -60,7 +60,7 @@ type Db = SupabaseClient<any, 'public'>;
  * Read off the top of the row's tree, because that is what files it under a
  * section on the plan page; a step's own column can disagree with its root.
  * A project's row goes to its own routine when it has one set, and to the
- * shared projects routine otherwise (plan #2553.3). One with neither is
+ * plan routine otherwise (plan #2553.3). One with neither is
  * refused rather than sent on: with no id, the routine call falls back to the
  * plan routine, which would build the step in this repository.
  */
@@ -84,7 +84,7 @@ export function builderFor(
       ok: false,
       error:
         `${project.label} has no routine to build it yet: ` +
-        'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
+        'set CLAUDE_PLAN_ROUTINE_ID and CLAUDE_PLAN_ROUTINE_TOKEN.',
     };
   }
   return { ok: true, project, routine };
@@ -134,8 +134,8 @@ export function projectPreamble(project: DevProject): string {
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
     `both. ${check}${setUp}` +
     'If it is not checked out and add_repo is refused or missing, do not build anywhere else: ' +
-    `write a setup step for the person to add ${where} to the Project step builder routine's ` +
-    'repositories on claude.ai, as project-routine.md says, and stop.\n\n'
+    'write a setup step for the person with the remedy add_repo returned (usually installing ' +
+    `the Claude GitHub app on ${where}), as project-routine.md says, and stop.\n\n`
   );
 }
 
