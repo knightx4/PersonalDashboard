@@ -8,7 +8,8 @@ import { insightRunState } from '@/lib/you/insights-run';
 /**
  * The Insights tab in the gallery (plan #2413.5): three insights waiting,
  * one marked wrong and one not quite under Earlier, and each hidden part
- * drawn open. The fixtures run long, as a run's prose does.
+ * drawn open. The fixtures run long, as a run's prose does. Each card is
+ * about a life area (plan #2629.5), and three areas have no insight yet.
  */
 
 const NOW = Date.parse('2026-10-18T09:00:00Z');
@@ -76,8 +77,8 @@ const waiting: Insight[] = [
     question: 'Which of the projects you dropped would you still pick up if nobody would ever see it?',
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -103,8 +104,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c3',
+    areaName: 'Home',
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -127,8 +128,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c4',
+    areaName: 'Learning',
   },
   {
     id: '00000000-0000-4000-8000-000000000006',
@@ -156,8 +157,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
 ];
 
@@ -184,8 +185,8 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
@@ -205,8 +206,8 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
-    areaId: null,
-    areaName: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
 ];
 
@@ -265,6 +266,24 @@ const withFired = (): Insight[] => {
   );
 };
 
+/** Their open areas in Goals: three with no insight yet, one of them long. */
+const areas = [
+  { id: '00000000-0000-4000-8000-0000000000c1', name: 'Career' },
+  { id: '00000000-0000-4000-8000-0000000000c2', name: 'Health' },
+  { id: '00000000-0000-4000-8000-0000000000c3', name: 'Home' },
+  { id: '00000000-0000-4000-8000-0000000000c4', name: 'Learning' },
+  { id: '00000000-0000-4000-8000-0000000000c5', name: 'Money' },
+  { id: '00000000-0000-4000-8000-0000000000c6', name: 'Friends, family and the people close to you' },
+];
+
+/** The Home card marked, so choosing Home finds nothing waiting (plan #2629.5). */
+const homeMarked = (): Insight[] =>
+  [...waiting, ...marked].map((card) =>
+    card.areaName === 'Home'
+      ? { ...card, verdict: { verdict: 'right', note: null, decidedAt: '2026-10-18T08:30:00Z' } }
+      : card,
+  );
+
 const run = (status: InsightRun['status'], error: string | null = null): InsightRun => ({
   id: '00000000-0000-4000-8000-0000000000aa',
   status,
@@ -282,6 +301,7 @@ export function YouInsightsPreview({
   empty = false,
   fired = false,
   prediction = false,
+  homeDone = false,
 }: {
   open?: InsightsOpen;
   state?: 'ready' | 'running' | 'failed';
@@ -290,6 +310,8 @@ export function YouInsightsPreview({
   fired?: boolean;
   /** The checked prediction at the front of the deck. */
   prediction?: boolean;
+  /** The one Home card already marked. */
+  homeDone?: boolean;
 }) {
   const latest =
     state === 'running'
@@ -302,7 +324,9 @@ export function YouInsightsPreview({
       insights={
         empty
           ? []
-          : fired
+          : homeDone
+            ? homeMarked()
+            : fired
             ? withFired()
             : prediction
               ? [...waiting.filter((i) => i.check), ...waiting.filter((i) => !i.check), ...marked]
@@ -323,6 +347,7 @@ export function YouInsightsPreview({
         lastImportedAt: '2026-10-20T09:30:00Z',
       }}
       timezone="Europe/London"
+      areas={areas}
       actions={actions}
       open={open}
     />
