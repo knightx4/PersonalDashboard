@@ -5,7 +5,8 @@ import { Check, ListTodo, MessageCircle, ThumbsDown, X } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { LinkedText } from '@/components/ui/linked-text';
 import { cn } from '@/lib/cn';
 import { whenAgo } from '@/lib/core/when';
 import type { CouncilNote, Reaction } from '@/lib/you/council-model';
@@ -82,13 +83,15 @@ export function NoteCard({
         {unread && <span className="ml-auto text-small font-medium text-accent">New</span>}
       </div>
 
-      <p className="whitespace-pre-line text-body text-ink">{note.text}</p>
+      <p className="whitespace-pre-line text-body text-ink">
+        <LinkedText text={note.text} refs={false} />
+      </p>
 
       {note.receipts.length > 0 && (
         <ul className="flex flex-wrap gap-x-3 gap-y-1 text-small">
           {note.receipts.map((r) => (
             <li key={r.link + r.label}>
-              <Link href={r.link} className="text-ink-muted underline decoration-border-strong underline-offset-2 hover:text-ink">
+              <Link href={r.link} className={linkVariants({ tone: 'quiet' })}>
                 {r.label}
               </Link>
             </li>
@@ -100,13 +103,9 @@ export function NoteCard({
         <p className="text-small text-ink-muted">
           {REACTION_LINE[note.reaction]}
           {note.reactionNote ? ` "${note.reactionNote}"` : ''}{' '}
-          <button
-            type="button"
-            className="underline decoration-border-strong underline-offset-2 hover:text-ink"
-            onClick={() => run(() => actions.react(note.id, null))}
-          >
+          <Button type="button" variant="link" onClick={() => run(() => actions.react(note.id, null))}>
             Undo
-          </button>
+          </Button>
         </p>
       )}
 

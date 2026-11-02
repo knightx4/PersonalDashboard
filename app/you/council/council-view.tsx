@@ -7,7 +7,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { whenAgo } from '@/lib/core/when';
 import { NOTES_PER_DAY, UNREAD_MAX, type CouncilNote, type Mentor } from '@/lib/you/council-model';
@@ -73,7 +73,7 @@ export function CouncilView({
 
       {due > 0 && (
         <Banner tone="warn" className="mb-4">
-          <Link href="/you/council/decisions" className="font-medium text-ink underline underline-offset-2">
+          <Link href="/you/council/decisions" className={cn(linkVariants(), 'font-medium')}>
             {due === 1 ? 'One decision is waiting on you' : `${due} decisions are waiting on you`}
           </Link>{' '}
           <span className="text-ink-muted">to say how it went, or whether a tripwire was crossed.</span>

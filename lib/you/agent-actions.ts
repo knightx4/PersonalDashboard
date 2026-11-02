@@ -117,6 +117,19 @@ export const youActions: ModuleActions = {
       'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
     ),
   },
+  // The Council's notes, talks and memory (you 0037).
+  'app/you/council/council-actions.ts': {
+    readCouncilNotes: none('own', "Marking a mentor's note read is the person's own reading; it is what lets the council write again."),
+    readMentor: none('page', "Opening a mentor's page reads their notes; it serves the page."),
+    reactToCouncilNote: none('theirs', "Whether a mentor's note was useful, or wrong, is the person's verdict on what Dash wrote in that mentor's voice."),
+    makeTodoFromNote: none('theirs', "Making a mentor's note a todo is the person taking up the advice, an approval Dash does not give for them."),
+    sendMentorMessage: none(
+      'spends',
+      "Sends the person's own message to a mentor and starts a Dash session on the board routine to write the reply.",
+    ),
+    setCommitment: none('own', 'Saying a commitment made to a mentor is done is the person\'s own account of what they did.'),
+    forgetMentorMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them.'),
+  },
   'app/you/council/actions.ts': {
     voteOnDisagreement: none(
       'theirs',

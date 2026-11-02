@@ -61,6 +61,7 @@ export function CouncilSkeleton() {
         <Skeleton className="h-3.5 w-3/4" />
       </Card>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* ui-ok: the Council's mentors are tiles in a grid, as the person asked, and this is their shape loading */}
         {[0, 1, 2, 3, 4, 5].map((tile) => (
           <Card key={tile} padding="standard" className="space-y-2">
             <Skeleton className="h-3.5 w-28" />

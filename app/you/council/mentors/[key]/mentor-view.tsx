@@ -10,7 +10,8 @@ import { Card, CardSection } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Checkbox, ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { LinkedText } from '@/components/ui/linked-text';
 import { cn } from '@/lib/cn';
 import { whenAgo, whenDay } from '@/lib/core/when';
 import type { Brain } from '@/lib/you/board-brain';
@@ -275,12 +276,14 @@ function MessageRow({
     <li className={cn('flex gap-2.5', mine && 'justify-end')}>
       {!mine && <MentorMark mentorKey={mentor.key} name={mentor.name} kind={mentor.kind} size="sm" className="mt-0.5" />}
       <div className={cn('max-w-prose space-y-1.5', mine && 'ml-10 rounded-card bg-sunken px-3 py-2 sm:ml-20')}>
-        <p className="whitespace-pre-line text-ui text-ink">{message.text}</p>
+        <p className="whitespace-pre-line text-ui text-ink">
+          <LinkedText text={message.text} refs={false} />
+        </p>
         {message.receipts.length > 0 && (
           <ul className="flex flex-wrap gap-x-3 gap-y-1 text-small">
             {message.receipts.map((r) => (
               <li key={r.link + r.label}>
-                <Link href={r.link} className="text-ink-muted underline decoration-border-strong underline-offset-2 hover:text-ink">
+                <Link href={r.link} className={linkVariants({ tone: 'quiet' })}>
                   {r.label}
                 </Link>
               </li>
