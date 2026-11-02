@@ -27,6 +27,7 @@ import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
 import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { APPLICATION_GUIDE } from '@/lib/jobs/drafting/application-guide';
 import { PLAIN_VOICE } from '@/lib/jobs/drafting/plain-voice';
 
 /** Writing in someone else's voice off their own material. Judgment again. */
@@ -66,6 +67,8 @@ all:
 - Anything the question asks for that the bank does not hold (a headcount, a
   date, a reason only they know): say what to add, and leave it out of the
   answer rather than guess it.
+
+${APPLICATION_GUIDE}
 
 ${PLAIN_VOICE}
 
