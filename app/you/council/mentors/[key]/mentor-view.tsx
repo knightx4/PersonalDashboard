@@ -8,7 +8,7 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { Checkbox, ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
+import { CheckRow, ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -195,6 +195,7 @@ export function MentorView({
               <ComposeBox>
                 <ComposeBody
                   aria-label={`Message to ${mentor.name}`}
+                  className="min-h-11"
                   placeholder={aboutNote ? 'What do you make of it?' : `Ask ${mentor.name} something`}
                   value={text}
                   maxLength={MESSAGE_MAX}
@@ -283,7 +284,7 @@ function MessageRow({
           <ul className="flex flex-wrap gap-x-3 gap-y-1 text-small">
             {message.receipts.map((r) => (
               <li key={r.link + r.label}>
-                <Link href={r.link} className={linkVariants({ tone: 'quiet' })}>
+                <Link href={r.link} className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}>
                   {r.label}
                 </Link>
               </li>
@@ -314,13 +315,14 @@ function CommitmentRow({
   const late = !done && item.dueOn && item.dueOn < new Date(now).toISOString().slice(0, 10);
   return (
     <li className="card-pad-x row-pad flex min-h-11 items-center gap-3">
-      <Checkbox
+      <CheckRow
+        className="min-w-0 flex-1"
         aria-label={done ? `Not done: ${item.text}` : `Done: ${item.text}`}
         checked={done}
         disabled={pending}
         onChange={() => startTransition(async () => void (await actions.commitment(item.id, !done, mentorKey)))}
+        title={<span className={done ? 'text-ink-muted line-through' : undefined}>{item.text}</span>}
       />
-      <span className={cn('min-w-0 flex-1 text-ui', done ? 'text-ink-muted line-through' : 'text-ink')}>{item.text}</span>
       {item.dueOn && (
         <span className={cn('tabular shrink-0 text-small', late ? 'text-caution' : 'text-ink-muted')}>
           {whenDay(item.dueOn, { timeZone: timezone, now })}

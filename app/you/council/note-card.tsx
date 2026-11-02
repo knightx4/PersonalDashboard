@@ -91,7 +91,7 @@ export function NoteCard({
         <ul className="flex flex-wrap gap-x-3 gap-y-1 text-small">
           {note.receipts.map((r) => (
             <li key={r.link + r.label}>
-              <Link href={r.link} className={linkVariants({ tone: 'quiet' })}>
+              <Link href={r.link} className={cn(linkVariants({ tone: 'quiet' }), 'press-area')}>
                 {r.label}
               </Link>
             </li>
