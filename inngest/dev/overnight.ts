@@ -15,7 +15,7 @@ import {
   type Push,
   type RunLiveness,
 } from '@/lib/plan/liveness';
-import { loadPlan } from '@/lib/plan/load';
+import { isClosed, loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
   OVERNIGHT_AT_ONCE,
@@ -25,7 +25,13 @@ import {
   stopOvernightRun,
   type OvernightRun,
 } from '@/lib/plan/overnight';
-import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
+import {
+  chooseOvernightFeature,
+  finishedFeatureLine,
+  finishedFeatures,
+  OVERNIGHT_NOTHING_READY,
+  type FinishedFeature,
+} from '@/lib/plan/overnight-choice';
 import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun, holdsSlot, IN_FLIGHT_LOOKBACK_MS } from '@/lib/plan/run-end';
 import {
@@ -345,6 +351,27 @@ export type OvernightFireChoice =
   | { act: 'end'; reason: string; passedOver: PassedOver[] };
 
 /**
+ * Whether an open step was added beneath the feature since the given instant.
+ *
+ * A session that closed nothing ran out of the work it was sent with. A step
+ * written beneath the feature afterwards is work it never saw, so holding the
+ * feature for the old session's failure holds the new step for no reason. On
+ * 2 November #2644.6 to #2644.8 were added under #2644 after a session sent
+ * at it had found nothing left to build, and the guard kept them from the
+ * runner.
+ */
+export function stepAddedSince(feature: PlanNode, since: string): boolean {
+  const at = new Date(since).getTime();
+  if (!Number.isFinite(at)) return false;
+  return flatten([feature]).some(
+    (node) =>
+      node.id !== feature.id &&
+      !isClosed(node.status) &&
+      new Date(node.createdAt).getTime() >= at,
+  );
+}
+
+/**
  * Whether the zero-progress guard holds a feature back, and until when.
  *
  * A feature whose last session closed nothing is held for
@@ -363,6 +390,7 @@ export function heldBack(
 ): PassedOver | null {
   if (!last || !closedNothingSince(feature, last)) return null;
   if (personAnsweredSince(feature, last)) return null;
+  if (stepAddedSince(feature, last)) return null;
   const said = {
     id: feature.id,
     number: feature.number,
@@ -524,6 +552,11 @@ export type OvernightPorts = {
   /** Put back the claims of sessions that died. Run on every tick of a running night. */
   sweepClaims: () => Promise<void>;
   /**
+   * Close the features whose steps are all done (`finishedFeatures`). Left
+   * out, nothing is closed; the runner still never sends them.
+   */
+  closeFinished?: (features: readonly FinishedFeature[]) => Promise<void>;
+  /**
    * Send the feature. `refused` says the feature itself cannot be taken --
    * a proposal, a re-shape rewriting it, a claim still live beneath it -- as
    * opposed to the send having broken, which is every feature's problem and
@@ -682,6 +715,24 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         );
   const lastFiredAt = thisRun(allFires);
   const previousFiredAt = thisRun(earlierFires);
+
+  // A feature whose steps are all done is closed here rather than sent: a
+  // session sent at it has nothing to build, and while it stays open every
+  // feature waiting on it waits too. The chooser already passes it over
+  // (`runnerOrder`), so a close that fails costs the features behind it one
+  // more tick, not a session. Logged and stepped over like the claim sweep.
+  const finished = finishedFeatures(sections);
+  if (finished.length > 0 && ports.closeFinished) {
+    try {
+      await ports.closeFinished(finished);
+    } catch (err) {
+      console.error(
+        `finished features could not be closed on the overnight tick: ${
+          err instanceof Error ? err.message : 'failed'
+        }`,
+      );
+    }
+  }
 
   // A refused feature is the same case as one whose last run closed nothing:
   // take it out of the tree and ask again.
@@ -1317,6 +1368,24 @@ function portsFor(input: {
     lastFiredAt: async () => (await readFires()).last,
     previousFiredAt: async () => (await readFires()).previous,
     runsInFlight: (run) => featureRunsInFlight({ supabase, userId, run, now, fetch: input.fetch }),
+    closeFinished: async (features) => {
+      const line = finishedFeatureLine(new Date(now).toISOString().slice(0, 10));
+      for (const feature of features) {
+        const update: Record<string, unknown> = {
+          status: 'done',
+          comment: feature.comment ? `${feature.comment}\n\n${line}` : line,
+        };
+        if (feature.commitSha) update.commit_sha = feature.commitSha;
+        const { error } = await supabase
+          .from('plan_items')
+          .update(update)
+          .eq('user_id', userId)
+          .eq('id', feature.id)
+          .in('status', ['not_started', 'in_progress']);
+        if (error) throw new Error(`#${feature.outline}: ${error.message}`);
+        console.log(`overnight: closed #${feature.outline}, every step beneath it done.`);
+      }
+    },
     sweepClaims: async () => {
       // The same sweep the daily cron runs, and every account's claims at once
       // -- a claim nobody is working is wrong in the same way in every account,
