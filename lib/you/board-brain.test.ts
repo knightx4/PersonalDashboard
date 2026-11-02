@@ -64,7 +64,7 @@ describe('checkBrain', () => {
     ]);
   });
 
-  it('only lets disagreements name other advisors on the board, a seat among them for a guest', () => {
+  it('only lets disagreements name other advisors on the council, a seat among them for a guest', () => {
     const b = goodBrain();
     b.disagreements = [
       { advisor: 'buffett', text: 'With himself.' },
@@ -72,7 +72,7 @@ describe('checkBrain', () => {
     ];
     expect(checkBrain(b, { key: 'buffett', roster: ROSTER })).toEqual([
       'disagreement 1 is with this advisor itself.',
-      'disagreement 2 names munger, who is not on the board.',
+      'disagreement 2 names munger, who is not on the council.',
       'no disagreement is with a seat; a guest needs at least one.',
     ]);
   });

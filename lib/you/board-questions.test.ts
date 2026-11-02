@@ -46,7 +46,7 @@ describe('cleanQuestion', () => {
     });
   });
 
-  it('refuses a blank question, one option, five options, a lean on no option and an advisor not on the board', () => {
+  it('refuses a blank question, one option, five options, a lean on no option and an advisor not on the council', () => {
     expect(cleanQuestion(input({ question: ' ' }), roster).ok).toBe(false);
     expect(cleanQuestion(input({ options: ['Only one', ''] }), roster)).toMatchObject({
       ok: false,
@@ -141,7 +141,7 @@ describe('the person’s decision (plan #2561.6)', () => {
     expect(decisionError({ kind: 'option', letter: 'B' }, options, 'fine')).toBeNull();
   });
 
-  it('reads a decided row with the board’s recommendation, and drops one without a choice', () => {
+  it('reads a decided row with the council’s recommendation, and drops one without a choice', () => {
     const row = {
       id: 'q1',
       question: 'Take it?',

@@ -101,7 +101,7 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
-  'app/you/board/review-actions.ts': {
+  'app/you/council/review-actions.ts': {
     answerBoardReview: none(
       'theirs',
       "How a decision turned out is the person's own verdict on it; the advisors' picks are graded, or their forecasts scored, from that answer (plans #2561.8, #2581.10).",
@@ -111,13 +111,13 @@ export const youActions: ModuleActions = {
       "Whether what would reopen a decision has happened is the person's own call on the tab; the Sunday meeting checks it from their rows otherwise (plan #2581.10).",
     ),
   },
-  'app/you/board/make-actions.ts': {
+  'app/you/council/make-actions.ts': {
     makeDecisionHappen: none(
       'theirs',
       'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
     ),
   },
-  'app/you/board/actions.ts': {
+  'app/you/council/actions.ts': {
     voteOnDisagreement: none(
       'theirs',
       "Siding with a seat on the board's disagreement is the person's own call; the next meeting reads it and Dash does not vote for them.",

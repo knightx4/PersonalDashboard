@@ -96,6 +96,14 @@ const nextConfig: NextConfig = {
        */
       { source: '/shopping/dashboard/:path*', destination: '/finances/spending/:path*', permanent: false },
       { source: '/shopping/recurring/:path*', destination: '/finances/recurring/:path*', permanent: false },
+      /**
+       * The Board tab became the Council. Its list of questions and meetings
+       * is now /you/council/decisions; a meeting, the roster and a panel
+       * keep their paths under /you/council. Links already written into
+       * notifications, minutes and Dash's replies still open them.
+       */
+      { source: '/you/board', destination: '/you/council', permanent: false },
+      { source: '/you/board/:path*', destination: '/you/council/:path*', permanent: false },
     ];
   },
 };

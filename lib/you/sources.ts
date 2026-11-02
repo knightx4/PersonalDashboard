@@ -10,7 +10,7 @@ const DETAILS: Section = { href: '/you/details', label: 'Details' };
 const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
-const BOARD: Section = { href: '/you/board', label: 'Board' };
+const BOARD: Section = { href: '/you/council', label: 'Council' };
 const ANSWER: Section = { href: ANSWER_HREF, label: 'Answer' };
 
 /**
@@ -223,7 +223,7 @@ export const youSources: ModuleSources = {
       title: 'question',
       facts: ['status', 'source', 'decided_option', 'decided_at'],
       newest: 'created_at',
-      href: () => '/you/board',
+      href: () => '/you/council',
       section: BOARD,
       page: null,
       note:
@@ -242,7 +242,7 @@ export const youSources: ModuleSources = {
       title: 'title',
       facts: ['last_message_at'],
       newest: 'last_message_at',
-      href: () => '/you/board',
+      href: () => '/you/council',
       section: BOARD,
       page: null,
       note: 'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).',
@@ -255,7 +255,7 @@ export const youSources: ModuleSources = {
       search: ['text'],
       title: 'text',
       newest: 'created_at',
-      href: () => '/you/board',
+      href: () => '/you/council',
       section: BOARD,
       page: null,
       parent: parentBy('chat_id', 'you.advisor_chats'),
@@ -286,6 +286,8 @@ export const youSources: ModuleSources = {
     { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
     { table: 'you.board_panels', reason: 'Named groups of advisors the person picks when asking the board, which is a setting of the board, not something they wrote, wanted or did.' },
     { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
+    { table: 'you.council_notes', reason: 'Advice the Council\'s mentors wrote unasked, by Dash in each mentor\'s voice, with the person\'s reaction; Goals reading it would cite Dash to itself.' },
+    { table: 'you.council_runs', reason: 'Bookkeeping for the board-routine sessions that write Council notes and mentors\' replies.' },
     { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.personality_profiles', reason: 'Dash\'s analysis across their personality tests; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },

@@ -174,6 +174,9 @@ vi.mock('@/inngest/you/insight-signals', () => ({
 vi.mock('@/inngest/you/insights-tick', () => ({
   runInsightsTick: vi.fn(async () => ({ skipped: 'the last run is less than a month old' })),
 }));
+vi.mock('@/inngest/you/council-tick', () => ({
+  runCouncilTick: vi.fn(async () => ({ skipped: '6 council notes are unread' })),
+}));
 vi.mock('@/inngest/you/dash-questions-tick', () => ({
   runDashQuestionsTick: vi.fn(async () => ({ skipped: '3 questions are still open' })),
 }));
@@ -269,6 +272,7 @@ describe('the daily cron route', () => {
     expect(body.results['insights-monthly']).toEqual({ skipped: 'the last run is less than a month old' });
     // Dash's weekly questions are checked every morning (plan #2635.1).
     expect(body.results['dash-questions-weekly']).toEqual({ skipped: '3 questions are still open' });
+    expect(body.results['council-advice']).toEqual({ skipped: '6 council notes are unread' });
 
     // Each open goal and feature gets its step counts for the day (plan #1836).
     expect(body.results['scope-days']).toEqual({ written: 23 });

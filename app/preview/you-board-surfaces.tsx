@@ -1,20 +1,20 @@
 'use client';
 
-import type { AskStart } from '@/app/you/board/ask-board';
-import type { StartStart } from '@/app/you/board/start-meeting';
-import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
+import type { AskStart } from '@/app/you/council/ask-board';
+import type { StartStart } from '@/app/you/council/start-meeting';
+import { BoardListView, type BoardListActions } from '@/app/you/council/board-list-view';
 import {
   sortAdvisors,
   type BoardAdvisor,
   type BoardDecision,
   type BoardQuestion,
 } from '@/lib/you/board-questions';
-import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
+import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/council/board-skeleton';
 import {
   MeetingView,
   type MeetingActions,
   type MeetingOpen,
-} from '@/app/you/board/[id]/meeting-view';
+} from '@/app/you/council/[id]/meeting-view';
 import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import type { DecisionReview } from '@/lib/you/board-reviews';
@@ -83,7 +83,7 @@ const meeting = (over: Partial<BoardMeeting> = {}): BoardMeeting => ({
 
 const minutes = parseMinutes({
   since:
-    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the board read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
+    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the council read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
   disagreements: [
     {
       key: 'd1',
@@ -102,7 +102,7 @@ const minutes = parseMinutes({
         },
         {
           seat: 'skeptic',
-          stance: 'arguing against the board’s shared view',
+          stance: 'arguing against the council’s shared view',
           text: 'Both of you assume the résumé was the problem. The two replies came from companies you had already spoken to in September, so they may be warm leads, and the rewrite may have changed nothing.',
           receipts: [{ label: 'September notes', link: '/vault/n/Jobs/September.md' }],
         },
@@ -127,7 +127,7 @@ const minutes = parseMinutes({
     },
   ],
   dream: {
-    text: 'The board game stays on the table. In [What I want next](/vault/n/Journal/What%20I%20want%20next.md) you wrote that you wanted to finish something, anything, even if it is not very good. Last Wednesday you opened the project and wrote a one-page rules draft, and it is the first file in that folder since June.',
+    text: 'The council game stays on the table. In [What I want next](/vault/n/Journal/What%20I%20want%20next.md) you wrote that you wanted to finish something, anything, even if it is not very good. Last Wednesday you opened the project and wrote a one-page rules draft, and it is the first file in that folder since June.',
     thread:
       'Thirty minutes on Wednesday. Add one more rule to the draft and print it, whatever state it is in.',
     receipts: [{ label: 'Make a board game and play it with friends', link: '/goals' }],
@@ -193,7 +193,7 @@ const minutes = parseMinutes({
     },
     {
       seat: 'dreamer',
-      text: 'The board game step is still unanswered on 1 Nov.',
+      text: 'The council game step is still unanswered on 1 Nov.',
       grade: 'cant_tell',
       fact: 'A draft was saved, but the step was not answered.',
     },
@@ -226,7 +226,7 @@ const minutes = parseMinutes({
       memo: 'Both replies were from companies you had spoken to before. What makes you sure it was the résumé?',
       rebuttal: {
         to: null,
-        stance: 'arguing against the board’s shared view',
+        stance: 'arguing against the council’s shared view',
         text: 'Everyone is reading two warm replies as proof. Send three cold applications first and see.',
       },
     },
@@ -289,7 +289,7 @@ const calledMinutes = parseMinutes({
         {
           seat: 'dreamer',
           stance: 'Keep searching, with the game kept',
-          text: 'The board game stays on the table either way. It would change if the contract allowed one free morning a week.',
+          text: 'The council game stays on the table either way. It would change if the contract allowed one free morning a week.',
           receipts: [{ label: 'What I want next', link: '/vault/n/Journal/What%20I%20want%20next.md' }],
         },
       ],
@@ -320,8 +320,9 @@ const subject = {
   ref: null,
   path: [
     { label: 'You', href: '/you' },
-    { label: 'Board', href: '/you/board' },
-    { label: 'Board meeting 1 Nov 2026', href: `/you/board/${ID}` },
+    { label: 'Council', href: '/you/council' },
+    { label: 'Decisions', href: '/you/council/decisions' },
+    { label: 'Council meeting 1 Nov 2026', href: `/you/council/${ID}` },
   ],
 };
 
@@ -368,11 +369,11 @@ export function YouBoardMeetingPreview({
           {
             label:
               state === 'ready'
-                ? 'Board meeting 1 Nov 2026'
+                ? 'Council meeting 1 Nov 2026'
                 : state === 'called'
                   ? CALLED_DECISION
-                  : 'Board meeting',
-            href: `/you/board/${ID}`,
+                  : 'Council meeting',
+            href: `/you/council/${ID}`,
           },
         ],
       }}
@@ -415,7 +416,7 @@ const rows: BoardMeetingRow[] = [
 /** The roster as migrations-you/0022 seeds it: five seats and seven guests. */
 const advisors: BoardAdvisor[] = sortAdvisors([
   { key: 'hiring_manager', name: 'Hiring manager', kind: 'seat', focus: null },
-  { key: 'mentor', name: 'Mentor', kind: 'seat', focus: null },
+  { key: 'mentor', name: 'Jerwyn the Elder', kind: 'seat', focus: null },
   { key: 'skeptic', name: 'Skeptic', kind: 'seat', focus: null },
   { key: 'cfo', name: 'CFO', kind: 'seat', focus: null },
   { key: 'dreamer', name: 'Dreamer', kind: 'seat', focus: null },
