@@ -75,7 +75,7 @@ export function NoteCard({
       <div className="flex items-center gap-2">
         {showAuthor && <MentorMark mentorKey={author.key} name={author.name} kind={author.kind} size="sm" />}
         {showAuthor ? (
-          <Link href={`/you/council/mentors/${author.key}`} className="text-ui font-semibold text-ink hover:underline">
+          <Link href={`/you/council/mentors/${author.key}`} className="press-area text-ui font-semibold text-ink hover:underline">
             {author.name}
           </Link>
         ) : null}
