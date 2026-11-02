@@ -25,6 +25,7 @@ import type {
   Insight,
   InsightConfidence,
   InsightDepth,
+  InsightLayer,
   InsightReceipt,
   InsightVerdict,
   NowNote,
@@ -50,7 +51,8 @@ import type { ChatStats } from '@/lib/you/claude-chats';
  * You's Insights tab (plan #2413.5): what Dash noticed about the person, one
  * insight at a time on the deck pattern (components/patterns/deck.tsx).
  *
- * Each card reads claim first, then the layers under it, then the evidence,
+ * Each card reads claim first, then its three levels (what Dash saw, why, what
+ * it means), each led by a one-sentence headline, then the evidence,
  * folded, each piece opening the note or row it came from. Right, Not quite
  * and Wrong sit in the deck's forward row; Right saves at once, the other two
  * open a line of why on the card first. A mark moves the deck on and puts
@@ -109,9 +111,9 @@ export type InsightsOpen = {
 };
 
 export const DEPTH_LABELS: Record<InsightDepth, string> = {
-  saw: 'What you wrote shows',
-  deeper: 'Under that',
-  further: 'Under that again',
+  saw: 'What Dash saw',
+  deeper: 'Why',
+  further: 'What it means for you',
 };
 
 const CONFIDENCE_LABELS: Record<InsightConfidence, string> = {
@@ -573,14 +575,9 @@ function InsightCard({
       {insight.check && <Checked insight={insight} check={insight.check} timezone={timezone} />}
 
       {insight.layers.length > 0 && (
-        <ol className="space-y-3">
+        <ol className="space-y-4" data-insight-levels>
           {insight.layers.map((layer, index) => (
-            <li key={index} className="space-y-0.5">
-              <p className="text-small font-medium text-ink-muted">{DEPTH_LABELS[layer.depth]}</p>
-              <p className="text-body text-ink [overflow-wrap:anywhere]">
-                <LinkedText text={layer.text} receipts={insight.receipts} />
-              </p>
-            </li>
+            <InsightLevel key={index} layer={layer} receipts={insight.receipts} />
           ))}
         </ol>
       )}
@@ -609,6 +606,34 @@ function InsightCard({
 
       {why}
     </Card>
+  );
+}
+
+/**
+ * One level of a card. Its headline, the level in one sentence, is the line
+ * the eye lands on; the evidence or reasoning under it is quieter, beside a
+ * rule that ties it to the headline. A level written before headlines shows
+ * its text at body weight, as it always did.
+ */
+function InsightLevel({ layer, receipts }: { layer: InsightLayer; receipts: InsightReceipt[] }) {
+  return (
+    <li className="space-y-1" data-insight-level={layer.depth}>
+      <p className="text-small font-medium text-ink-muted">{DEPTH_LABELS[layer.depth]}</p>
+      {layer.headline ? (
+        <>
+          <p className="text-body font-semibold text-ink [overflow-wrap:anywhere]" data-insight-headline>
+            {layer.headline}
+          </p>
+          <p className="border-l-2 border-border pl-3 text-ui text-ink-muted [overflow-wrap:anywhere]">
+            <LinkedText text={layer.text} receipts={receipts} />
+          </p>
+        </>
+      ) : (
+        <p className="text-body text-ink [overflow-wrap:anywhere]">
+          <LinkedText text={layer.text} receipts={receipts} />
+        </p>
+      )}
+    </li>
   );
 }
 

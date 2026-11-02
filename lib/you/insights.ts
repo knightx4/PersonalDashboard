@@ -43,7 +43,12 @@ export type PredictionCheck = {
   checkedAt: string | null;
 };
 
-export type InsightLayer = { depth: InsightDepth; text: string };
+/**
+ * One level of a card. headline is the level in one sentence, the line the tab
+ * shows largest; text is the evidence or reasoning under it. A card written
+ * before headlines (November 2026) has none, and the tab shows its text alone.
+ */
+export type InsightLayer = { depth: InsightDepth; headline: string | null; text: string };
 
 /** One piece of evidence: the table or vault path, the row, the words or number relied on, and a link. */
 export type InsightReceipt = {
@@ -123,7 +128,10 @@ export function safeLink(value: unknown): string | null {
   }
 }
 
-/** The layers in depth order, saw first; one of an unknown depth or with no text is dropped. */
+/**
+ * The layers in depth order, saw first, each with its headline when the run
+ * wrote one; one of an unknown depth or with no text is dropped.
+ */
 export function layersOf(value: unknown): InsightLayer[] {
   if (!Array.isArray(value)) return [];
   const layers = value.flatMap((entry) => {
@@ -131,7 +139,7 @@ export function layersOf(value: unknown): InsightLayer[] {
     const row = entry as Record<string, unknown>;
     const depth = oneOf(INSIGHT_DEPTHS, row.depth);
     const body = text(row.text).trim();
-    return depth && body ? [{ depth, text: body }] : [];
+    return depth && body ? [{ depth, headline: textOrNull(row.headline), text: body }] : [];
   });
   // A stable sort, so two layers at one depth keep the order they were written in.
   return layers
