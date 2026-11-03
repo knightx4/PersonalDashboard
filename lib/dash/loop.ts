@@ -727,6 +727,12 @@ export type DashRun = {
   files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
+  /**
+   * System text that changes from one answer to the next, sent after the
+   * date and outside the cache: a mentor's memory and the person's day
+   * (plan #2748.4), while the voice's system holds what stays the same.
+   */
+  contextBlocks?: readonly string[];
   execute: DashExecutor;
   /** Absent: every proposal is refused. */
   propose?: DashProposer;
@@ -903,6 +909,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
   if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
+  for (const text of input.contextBlocks ?? []) if (text.trim()) system.push({ type: 'text', text });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
