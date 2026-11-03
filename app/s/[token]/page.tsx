@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createSharePublicClient } from '@/lib/share/auth/public';
 import { loadSharePage } from '@/lib/share/read/load-disposition';
+import { KeepCurrent } from './keep-current';
 import { ShareForm } from './share-form';
 
 /**
@@ -53,5 +54,10 @@ export default async function SharePage({
   // guessing that the token they tried was once real.
   if (!page) notFound();
 
-  return <ShareForm token={token} page={page} />;
+  return (
+    <>
+      <KeepCurrent />
+      <ShareForm token={token} page={page} />
+    </>
+  );
 }
