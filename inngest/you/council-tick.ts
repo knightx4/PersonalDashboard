@@ -11,7 +11,8 @@ import { maybeStartAdviceRun } from '@/lib/you/council';
  * it asks lib/you/council.ts whether the owner's mentors may write: not while
  * a round is open, not twice in a day, and not while six notes are unread or
  * three were written today, so notes never pile up while the person is away.
- * When they may, it fires the board routine with the council skill's advice
+ * When they may, or when a mentor conversation is over and due a summary
+ * (plan #2748.8), it fires the board routine with the council skill's advice
  * brief. The stage costs a few reads; the session runs on the person's plan.
  */
 export async function runCouncilTick(deps?: {

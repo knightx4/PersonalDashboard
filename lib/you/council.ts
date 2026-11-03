@@ -11,6 +11,8 @@ import {
   memoryOf,
   messageOf,
   newestByAdvisor,
+  EPISODE_QUIET_MS,
+  episodeDue,
   NO_ROUTINE_ERROR,
   NOTE_COLUMNS,
   noteOf,
@@ -52,6 +54,9 @@ const strOrNull = (value: unknown): string | null => str(value) || null;
  *     reply takes a few minutes and costs no API spend.
  *   - Memory. What a mentor keeps between talks (you.advisor_memory), and
  *     the commitments the person made to one, which that mentor follows up.
+ *     Each daily round first summarises the conversations that ended
+ *     (you.advisor_episodes) and updates the mentors' memory from them, so
+ *     it is started whenever one is due, even with the note caps full.
  *
  * Every query names the person as well as relying on row level security, so
  * the same functions serve a service-role client. Rows written by a session
@@ -418,6 +423,9 @@ export type AdviceDecision = { start: true } | { start: false; skipped: string }
  *     note could be saved, so the round is not fired at all.
  *   - Someone can speak: every mentor on the council already has an unread
  *     note, or none is on it.
+ *   - Memory still runs: when a conversation is due a summary (plan
+ *     #2748.8), the round starts whatever the note caps say, and writes
+ *     the mentors' memory with no notes.
  */
 export function decideAdviceRun(input: {
   now: number;
@@ -426,6 +434,8 @@ export function decideAdviceRun(input: {
   writtenToday: number;
   /** Mentors on the council with no unread note. */
   free: number;
+  /** Mentor conversations over and due a summary. */
+  episodesDue?: number;
 }): AdviceDecision {
   const asked = input.latest ? Date.parse(input.latest.requestedAt) : NaN;
   if (input.latest && (input.latest.status === 'queued' || input.latest.status === 'running')) {
@@ -436,6 +446,7 @@ export function decideAdviceRun(input: {
   if (Number.isFinite(asked) && input.now - asked < ADVICE_GAP_MS) {
     return { start: false, skipped: 'a council round was asked for in the last day' };
   }
+  if ((input.episodesDue ?? 0) > 0) return { start: true };
   if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} council notes are unread` };
   if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has written its notes for today' };
   if (input.free <= 0) return { start: false, skipped: 'every mentor already has an unread note' };
@@ -454,7 +465,9 @@ export async function maybeStartAdviceRun(input: {
   const now = input.now ?? Date.now();
   const dayStart = new Date(now);
   dayStart.setUTCHours(0, 0, 0, 0);
-  const [latest, unread, today, roster] = await Promise.all([
+  const quietSince = new Date(now - EPISODE_QUIET_MS).toISOString();
+  const lately = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+  const [latest, unread, today, roster, episodes] = await Promise.all([
     client
       .from('council_runs')
       .select('status, requested_at')
@@ -470,8 +483,18 @@ export async function maybeStartAdviceRun(input: {
       .eq('user_id', userId)
       .gte('created_at', dayStart.toISOString()),
     client.from('board_advisors').select('id').eq('user_id', userId).eq('active', true),
+    // Over and unsummarised, or ended lately and perhaps grown after its
+    // summary; PostgREST cannot compare two columns, so episodeDue settles it.
+    client
+      .from('advisor_episodes')
+      .select('ended_at, summarised_at')
+      .eq('user_id', userId)
+      .lt('ended_at', quietSince)
+      .or(`summarised_at.is.null,ended_at.gt.${lately}`)
+      .order('ended_at', { ascending: false })
+      .limit(200),
   ]);
-  for (const r of [latest, unread, today, roster]) {
+  for (const r of [latest, unread, today, roster, episodes]) {
     if (r.error) throw new Error(`Reading the council failed: ${r.error.message}`);
   }
   const unreadBy = new Set(((unread.data ?? []) as { advisor_id: string }[]).map((r) => r.advisor_id));
@@ -483,6 +506,9 @@ export async function maybeStartAdviceRun(input: {
     unread: (unread.data ?? []).length,
     writtenToday: today.count ?? 0,
     free,
+    episodesDue: ((episodes.data ?? []) as { ended_at: string; summarised_at: string | null }[]).filter((e) =>
+      episodeDue({ endedAt: e.ended_at, summarisedAt: e.summarised_at }, now),
+    ).length,
   });
   if (!decision.start) return { skipped: decision.skipped };
 

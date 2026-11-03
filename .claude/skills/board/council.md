@@ -8,6 +8,9 @@ the Council. The decision meetings stay in `SKILL.md`.
   unasked, about something of theirs that changed.
 - **A reply.** One mentor answers the person's message in their running talk,
   and keeps what the talk settled in their memory.
+- **The overnight memory.** Before the round, every conversation that ended
+  since the last run gets a one-paragraph summary, and each mentor's memory
+  is brought up to date with what those conversations settled.
 
 The person asked for both. They want advice without having to ask, and a
 place for mentorship, so the notes and replies are about where they are
@@ -15,8 +18,9 @@ going over months, as well as this week's choices. They also asked that notes
 never pile up while they are away, so the caps below are theirs.
 
 **What you write:** the run row, at most three `you.council_notes` rows (the
-round) or one `you.advisor_messages` row (a reply), the mentor's
-`you.advisor_memory` rows, and the chat's reply state. Nothing else: no code,
+round) or one `you.advisor_messages` row (a reply), the mentors'
+`you.advisor_memory` rows, the summaries on `you.advisor_episodes` (the
+overnight memory), and the chat's reply state. Nothing else: no code,
 no commits, no other rows, no email, nothing deleted.
 
 In anything the person reads, the assistant is **Dash**; a mentor speaks as
@@ -90,6 +94,117 @@ Then add this, for every mentor, in place of the meeting's instructions:
 Run each mentor as its own subagent, briefed with only its paragraph, its
 brain, its memory and its slice, so the voices stay apart. Two notes in one
 round that could swap authors fail the round: rewrite one.
+
+## The overnight memory
+
+Every advice run does this first, before A1, whatever the caps say. The
+daily cron starts the run even when no note could be saved, so that the
+mentors still remember yesterday (`decideAdviceRun` in `lib/you/council.ts`).
+A reply reads the summaries of a thread's older conversations instead of
+their messages, so a conversation left without one is lost to the mentor.
+
+A thread is split into conversations (`you.advisor_episodes`, you 0038): a
+message more than three hours after the one before starts a new one. A
+conversation is over once its `ended_at` is three hours old, and is due when
+it has no summary or grew after it got one.
+
+### M1. Find what is due
+
+```sql
+select e.id, e.chat_id, e.started_at, e.ended_at, e.message_count, e.summary,
+       c.advisor_id, a.key, a.name
+from you.advisor_episodes e
+join you.advisor_chats c on c.id = e.chat_id and c.user_id = e.user_id
+join you.board_advisors a on a.id = c.advisor_id and a.user_id = c.user_id
+where e.user_id = :owner
+  and e.ended_at < now() - interval '3 hours'
+  and (e.summarised_at is null or e.summarised_at < e.ended_at)
+order by e.ended_at desc
+limit 30;
+```
+
+Newest first, at most thirty a night; the rest are due again tomorrow. When
+nothing is due, go to A1.
+
+### M2. Summarise each conversation
+
+Read its messages. They carry no episode id: take the chat's messages
+between the episode's first and last.
+
+```sql
+select m.id, m.role, m.kind, m.text, m.note_id, m.created_at
+from you.advisor_messages m
+where m.user_id = :owner and m.chat_id = '<chat id>'
+  and m.created_at between '<started_at>' and '<ended_at>'
+order by m.created_at, m.id;
+```
+
+A message with a `note_id` was about that Council note; read the note too.
+An episode that already has a summary grew after it: write the summary again
+over the whole conversation, not only the new part.
+
+Write one paragraph, at most 800 characters, addressed to the person as
+"you", in the past tense: what you raised, what the mentor said back, what
+you agreed to do and by when, and what was left open. Name the specific
+thing (the company, the goal, the sum) rather than its kind. Only what the
+messages say: no advice the mentor did not give, and no quotes longer than a
+few words.
+
+```sql
+update you.advisor_episodes
+set summary = $s$<the paragraph>$s$, summarised_at = now()
+where id = '<episode id>' and user_id = :owner
+returning id;
+```
+
+### M3. Bring each mentor's memory up to date
+
+For every mentor with a conversation summarised in M2, read their memory:
+
+```sql
+select id, kind, text, due_on, done_at, followed_up_at, source_message_id, created_at
+from you.advisor_memory
+where user_id = :owner and advisor_id = '<advisor id>' and retired_at is null
+order by kind, created_at;
+```
+
+Then compare it with the conversations, one mentor at a time. A reply may
+already have written some of this in R4; never write a row the memory
+already holds.
+
+- **Add** what the conversations created: a `commitment` you made (with
+  `due_on` when you named a day or a week, the last day of a week), an
+  `open_thread` left unanswered between you, a `fact` about you the mentor
+  did not know, a `preference` about how they should talk to you. Each is
+  one sentence, with the message it came from in `source_message_id`. At
+  most five new rows per mentor a night; keep the ones a mentor would most
+  regret forgetting.
+- **Close** what the conversations settled: a commitment you said is done
+  gets `done_at = now()`; an open thread that was answered, a commitment
+  you dropped, and a fact or preference that stopped being true get
+  `retired_at = now()`. Write the new fact as its own row rather than
+  editing the old one.
+- **Tidy**: two unretired rows that say the same thing, retire the older.
+
+```sql
+insert into you.advisor_memory (user_id, advisor_id, kind, text, source_message_id, due_on)
+values (:owner, '<advisor id>', '<kind>', $t$<one sentence>$t$, '<message id>', <'yyyy-mm-dd' or null>)
+returning id;
+```
+
+```sql
+update you.advisor_memory set done_at = now()
+where id = '<memory id>' and user_id = :owner and kind = 'commitment';
+```
+
+```sql
+update you.advisor_memory set retired_at = now()
+where id = '<memory id>' and user_id = :owner;
+```
+
+Then go on to A1, and put the counts in the run's summary, such as
+"Summarised 4 conversations with 3 mentors; memory gained 5 rows and closed
+2." When A1 finds no note can be written, that sentence is the summary.
 
 ## The daily round
 
