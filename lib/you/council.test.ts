@@ -5,6 +5,8 @@ import {
   adviceBrief,
   cleanMessage,
   decideAdviceRun,
+  EPISODE_QUIET_MS,
+  episodeDue,
   newestByAdvisor,
   noteOf,
   receiptsOf,
@@ -71,6 +73,34 @@ describe('when the daily round runs', () => {
   it('takes over from a round that stopped long ago', () => {
     const latest = { status: 'running', requestedAt: ago(Math.max(ADVICE_STALE_AFTER_MS, ADVICE_GAP_MS) + 60_000) };
     expect(decideAdviceRun({ ...quiet, latest })).toEqual({ start: true });
+  });
+});
+
+describe('the overnight memory pass', () => {
+  const quiet = { now: NOW, latest: null, unread: 0, writtenToday: 0, free: 16 };
+
+  it('runs while the note caps are full when a conversation is due a summary', () => {
+    expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX, episodesDue: 1 })).toEqual({ start: true });
+    expect(decideAdviceRun({ ...quiet, writtenToday: 3, free: 0, episodesDue: 2 })).toEqual({ start: true });
+    expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX, episodesDue: 0 }).start).toBe(false);
+  });
+
+  it('still runs once a day, and never two at once', () => {
+    const latest = { status: 'running', requestedAt: ago(60_000) };
+    expect(decideAdviceRun({ ...quiet, latest, episodesDue: 3 }).start).toBe(false);
+    const recent = { status: 'ready', requestedAt: ago(ADVICE_GAP_MS - 60_000) };
+    expect(decideAdviceRun({ ...quiet, latest: recent, episodesDue: 3 }).start).toBe(false);
+  });
+
+  it('summarises a conversation once three quiet hours have closed it', () => {
+    expect(episodeDue({ endedAt: ago(EPISODE_QUIET_MS - 60_000), summarisedAt: null }, NOW)).toBe(false);
+    expect(episodeDue({ endedAt: ago(EPISODE_QUIET_MS + 60_000), summarisedAt: null }, NOW)).toBe(true);
+  });
+
+  it('summarises again only a conversation that grew after its summary', () => {
+    const endedAt = ago(EPISODE_QUIET_MS + 60 * 60_000);
+    expect(episodeDue({ endedAt, summarisedAt: ago(60_000) }, NOW)).toBe(false);
+    expect(episodeDue({ endedAt, summarisedAt: ago(EPISODE_QUIET_MS + 2 * 60 * 60_000) }, NOW)).toBe(true);
   });
 });
 
