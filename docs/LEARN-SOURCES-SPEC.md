@@ -420,3 +420,9 @@ can be changed without touching what a reading points at.
 Steps 1 and 2 are a working feature on their own: material about parts of a
 subject your notes never covered, which is the thing the graph could not do
 before.
+
+## Rules
+
+**R1.** A recommended segment is ordered by rung fit, then link confidence,
+then length, and a segment already consumed or abandoned is left out.
+Checked by: audit.
