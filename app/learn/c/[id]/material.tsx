@@ -106,16 +106,20 @@ function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string })
 }
 
 /**
- * Why there is nothing, which is three problems with three different fixes.
+ * Why there is nothing to offer.
  *
  * The search runs when you press the button on the claim, so a claim with no
- * material is in one of three states and only the concept's search time tells
+ * links is in one of three states and only the concept's search time tells
  * them apart. Each line says which one you are in and what would change it,
  * and no line says anybody went looking unless somebody did.
  *
  * `never-searched` names what does the searching rather than the button above
  * it, because that button is only offered on a claim you are shaky on or wrong
  * about, and this line is shown on any claim with nothing.
+ *
+ * `all-consumed` is the one state where something was found: every link is a
+ * segment you finished or abandoned, so the list leaves them all out and this
+ * line says why the list is not there.
  */
 const ABSENCE: Record<MaterialAbsence, string> = {
   'never-searched':
@@ -124,6 +128,8 @@ const ABSENCE: Record<MaterialAbsence, string> = {
     'The catalogue was searched for this idea and nothing in it matched. More material has to be pulled in before that changes.',
   'catalogue-empty':
     'Nothing has been pulled into the catalogue yet, so there is nothing to match this idea against.',
+  'all-consumed':
+    'You have already read or given up on everything found for this idea, so none of it is offered again.',
 };
 
 /**
