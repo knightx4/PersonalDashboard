@@ -63,6 +63,17 @@ describe('https-sql', () => {
     expect(withParameters('$2 $1', [1, 2])).toBe('2 1');
   });
 
+  it('leaves dollar amounts alone in dollar-quoted text and in a statement with no values', async () => {
+    const { sql, sent } = client();
+    const prose = 'insert into ideas (body) values ($s$A $150,000 floor and a $3B deal$s$)';
+    await sql.unsafe(prose);
+    expect(sent[0].query).toBe(prose);
+    expect(withParameters('select $$costs $5$$, $q$and $12$q$, $1', ['x'])).toBe(
+      "select $$costs $5$$, $q$and $12$q$, 'x'",
+    );
+    expect(withParameters("select 'a $2', $1", [7])).toBe("select 'a $2', 7");
+  });
+
   it('tells a write from a read by its own words, not its values', () => {
     expect(returnsRows('update plan_items set status = _ where id = _')).toBe(false);
     expect(returnsRows('update plan_items set status = _ returning number')).toBe(true);
