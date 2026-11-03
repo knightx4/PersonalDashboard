@@ -1,9 +1,14 @@
 ---
 name: board
-description: Hold the person's board meeting over an agenda of their decisions. The chair takes up to three questions, triages each as a one-way or two-way door, and requires a success measure and a decide-by date (proposing them from the person's rows and asking under The board asks you when missing). A two-way door gets one or two advisors' quick take. A one-way door gets the full method - a separate pass widens and neutralises the options, each advisor sees them in its own shuffled order and answers its own assessment blind from its own slice of evidence with a probability, a 90% range and a 100-point budget per option (the skeptic and the dreamer on a different model), then the lean is revealed, the two most opposed advisors exchange at most two turns each (or one steelman when round 1 is unanimous), and every advisor writes a premortem from which the chair sets a tripwire. The verdict is the believability-weighted mean probability with the spread and the dissent in full, written to you.board_questions; turns go to you.board_turns and the minutes, a short digest on a weekly run, to you.board_meetings. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", when the Board tab fires it with "Board meeting <id>", or the user says "convene the board", "ask the board", or "what does the board think".
+description: Hold the person's board meeting over an agenda of their decisions. The chair takes up to three questions, triages each as a one-way or two-way door, and requires a success measure and a decide-by date (proposing them from the person's rows and asking under The board asks you when missing). A two-way door gets one or two advisors' quick take. A one-way door gets the full method - a separate pass widens and neutralises the options, each advisor sees them in its own shuffled order and answers its own assessment blind from its own slice of evidence with a probability, a 90% range and a 100-point budget per option (the skeptic and the dreamer on a different model), then the lean is revealed, the two most opposed advisors exchange at most two turns each (or one steelman when round 1 is unanimous), and every advisor writes a premortem from which the chair sets a tripwire. The verdict is the believability-weighted mean probability with the spread and the dissent in full, written to you.board_questions; turns go to you.board_turns and the minutes, a short digest on a weekly run, to you.board_meetings. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", when the Board tab fires it with "Board meeting <id>", or the user says "convene the board", "ask the board", or "what does the board think". The same routine writes the Council's daily notes and mentors' replies when the brief says "Follow .claude/skills/board/council.md".
 ---
 
 # The board
+
+The Board tab is now the **Council** (`/you/council`): the same advisors,
+read as mentors who write notes unasked and talk one to one
+(`council.md`), with the decisions this file works under Decisions
+(`/you/council/decisions`). Write "the council" where the person reads it.
 
 The board meets to help the person decide. Each meeting works an agenda of
 at most three questions, each with options, a measure of success and a date
@@ -59,7 +64,7 @@ interview them, whether the pipeline is converting (applications sent,
 replies, interviews, and where each one stalled), and what is weak in how
 they come across. You may be blunt about their materials and their numbers.
 
-**The mentor.** You have known this person for years and care where they are
+**Jerwyn the Elder** (the `mentor` seat; call him by name wherever the person reads it). You have known this person for years and care where they are
 in ten. Your horizon is five to ten years. Ask whether the choice builds
 toward a career they would want, or only toward the next job, and what they
 are not building that they will wish they had. You may be blunt about drift.
@@ -1042,7 +1047,7 @@ where user_id = '<user_id>' and status = 'open' and body like 'Board spread chec
 insert into public.feedback_items (user_id, kind, body, page_path)
 values ('<user_id>', 'bug',
   $n$Board spread check: the advisors' blind forecasts were within 0.15 of each other on every one-way decision for three meetings running (<the three dates>). Their slices or brains may be too alike; look at .claude/skills/board/SKILL.md step 3 and the brains in you.board_advisors.$n$,
-  '/you/board')
+  '/you/council')
 returning id;
 select core.record_dash_action('<user_id>', 'public.feedback_items:<id>', 'insert',
   'board_spread_note', $s$Dash filed a Dev note: the board's advisors have agreed too closely for three meetings.$s$);

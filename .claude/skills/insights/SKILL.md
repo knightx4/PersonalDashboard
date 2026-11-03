@@ -1,6 +1,6 @@
 ---
 name: insights
-description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, their Goals areas with how many cards each already has, and their answers on the Ask tab, read the private notes in the journal folders, the journal and daily notes in full, send four subagents to read what they did area by area (career, goals and Learn; money, app use and timing; home, places, the city and music; their chats with Claude), then take each candidate three layers down (what the evidence shows, the mechanism under it, what it protects them from or costs them this week), drop any card that restates one note or rests on numbers not checked in this run, keep the cards to at least three areas with at most two in one, and save each with its area, layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
+description: Write three to five deep insights about the person into you.insights for the Insights tab of You. Read every earlier insight and the person's verdicts first, their Goals areas with how many cards each already has, and their answers on the Ask tab, read the private notes in the journal folders, the journal and daily notes in full, send four subagents to read what they did area by area (career, goals and Learn; money, app use and timing; home, places, the city and music; their chats with Claude), then take each candidate three layers down (what the evidence shows, the mechanism under it, what it means for them this week), each led by a one-sentence headline, drop any card that restates one note or rests on numbers not checked in this run, keep the cards to at least three areas with at most two in one, and save each with its area, layers, linked evidence and a confidence. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/insights/SKILL.md" and names "Insight run <id>" (the monthly run or the Look again button), or the user says "write insights about me" or "look again".
 ---
 
 # Writing deep insights about the person
@@ -31,6 +31,79 @@ because the session read notes in full rather than in excerpts, tested what
 the person says about themselves against what the records show, and kept
 going past the layer that seemed deep enough.
 
+## What counts as an insight
+
+The person's verdicts up to 2 November 2026 say what an insight is, in their
+own words. Of 14 cards, 3 were marked right, 4 knew it and 7 not quite. What
+they wrote back:
+
+- "This isn't a useful insight. I want deeper things. This is so practical."
+  (their city steps, 2 November)
+- "This isn't a useful insight" (setting up their loan payments, 2 November)
+- "the final level isn't an insight it's a todo" (their essays, 2 November)
+- "factually true but not that helpful to know this" (their application
+  volume, 25 October)
+- "gets close and has interesting ideas but i dont really get anything
+  tangible out of it" (connections as their unnamed idea, 25 October)
+- "i feel like it is obvious, its because there is another person involved"
+  (asks of people going last, 27 October)
+- "I've evolved a bit to where I don't want to do city stuff at this point
+  in my career" and "that doesnt mean i should be applying to those jobs"
+  (cities, and the AI-assurance writing read as a career gap)
+
+They also said most cards have been boring data points, things they already
+knew, or noise from them not keeping Dash fully up to date. The cards missed
+in five ways, and each has a test that catches it.
+
+1. **Bookkeeping read as behaviour.** A step left open in Goals, a meeting
+   not logged, a field empty on every row, a goal with no done steps: these
+   measure how much of their life the person has typed into Dash, which is
+   a small part of it. "One of your nine city steps is done" says the step
+   list is out of date and nothing about them. The test: if the claim would
+   disappear after they spent ten minutes updating Dash, drop it. Counts of
+   goal steps, todos, empty fields and unlogged events may sit in the saw
+   layer only beside evidence that exists whether or not they log anything:
+   their own writing, chats, orders, sent applications and the replies to
+   them, git history, page views.
+2. **The last level is a to-do.** "Send the 22 leads", "publish On Learning
+   this week" and "apply for income-driven repayment" are instructions, and
+   Goals and Todo already hold those. The further level says what the
+   pattern means for them: what it has cost or protected them from over
+   years, what it predicts, which belief of theirs it undercuts, or how it
+   changes the way they should read a choice in front of them. A small test
+   they could run may sit in the detail under it, never in the headline. The
+   test: a further headline in the imperative, or one that names a task, is
+   rewritten.
+3. **A gap audit.** "You said X and did Y" holds the records up against a
+   plan and finds a shortfall. The person almost always knows why (money,
+   contract work, a change of mind), and the card reads as a telling-off.
+   The test: a card whose claim is a shortfall against their own goal, rule
+   or step is a lead into how they work, and is never saved as it stands.
+4. **The obvious mechanism.** Knew it came back for "you build Dash while
+   you wait" (their About me already says they hate waiting) and "asks of
+   people go last" (the reason anyone would give). The deeper level stopped
+   at the first explanation the person would give themselves. The test:
+   write down the reason they would give if asked. The deeper headline is a
+   different reason, or explains why that reason holds for them when it
+   does not for most people.
+5. **Interesting with nothing to hold.** Connections named a real structure
+   in their thinking and they got nothing from it. A shared structure has
+   to change how they see something specific they are doing or deciding.
+
+The three cards marked right had three things in common. Each explained
+several separate parts of their life with one cause ("one rule runs through
+your economics, your ideal city and Dash"). The cause was one they had not
+written down. And it changed how they would read something they do ("Dash
+outlasts your other projects because Dash takes the soldering"; "your
+biggest send days follow a run of rejections and get the fewest replies").
+Aim there: how they think, decide and react, what they value and where
+those values came from, what they protect without knowing it.
+
+**Read the three headlines alone.** Every level of a card has a one-sentence
+headline (step 5), and the card is ready only when those three sentences,
+read without the claim or the detail, tell the person something true about
+themselves that they had not put into words.
+
 **You change rows, not code.** Do not commit or push. Do not send email,
 post, or contact anyone. Do not delete anything.
 
@@ -40,14 +113,14 @@ sentences, no slogans, no "not X, it's Y", no em dashes for rhythm.
 
 ## Checklist
 
-Work these in order. Each has its section below.
+Read "What counts as an insight" above first. Then work these in order. Each has its section below.
 
 1. **Read what came before**: the brief, the run row, where they are now, every answer they wrote to a card's question and on the Ask tab, every earlier insight with its verdict (knew it included), every Goals area with how many cards it already has (tagging earlier cards that have none), check every prediction that is due, and list what the person already knows about themselves.
 2. **Read the core in full**: the private notes in the journal folders (`journal_folders` on their `obsidian.vault_connections` row), the dated journal entries, the daily notes, the notes those link to, the Inbox, and the vault map as leads. Skip clipped and secret notes.
 3. **Read what they did**: four subagents at once, grouped by area (career, goals and Learn; money, app use and timing; home, places, the city and music; their chats with Claude), each given the Ask tab answers, owner-scoped selects only, each returning 10 to 20 findings with counts, dates, short quotes and the area each is about.
-4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing.
-5. **Go down three layers, then one more**: saw, deeper, further, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description.
-6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know. Label hunches, correct earlier cards, read relationships, health and family as evidence like any other, then spread the cards: at least three areas, at most two in one area, at most one in the area with the most earlier cards.
+4. **Find candidates** where the strongest ones came from: a concept they named, a claim the records can test, a phrase that comes back, two positions that pull against each other, a want that recurs without action, one structure across unrelated interests, what precedes a low or a binge, and what is missing, starting from what they write and do, never from steps they left open in Goals.
+5. **Go down three layers, then one more**: saw, deeper, further, each with a one-sentence headline, each adding a source or an explanation the layer above lacked, and an outside search for the deeper layer, never their own self-description; the further layer says what the pattern means for them, never a task.
+6. **Filter hard**: drop a card that restates one note, has fewer than two sources and no span of time, rests on numbers not re-queried in this run, has a likelier other explanation, or fails the surprise check against what they already know, the bookkeeping test, the gap test, the to-do test or the first-reason test. Label hunches, correct earlier cards, read relationships, health and family as evidence like any other, then spread the cards: at least three areas, at most two in one area, at most one in the area with the most earlier cards.
 7. **Write three to five cards** with their area, layers, linked receipts, a confidence, the live thing each points at and a question for them to answer, plus one or two hidden predictions, then finish the run row with a two-sentence summary, a line for each card that touches health and a line naming any area left out.
 
 ## How you read and write
@@ -153,7 +226,10 @@ order by i.created_at desc;
   settled; a wrong one was wrong.
 - **Marked not quite**: rework it with the person's note in hand. The new
   card answers the note, and when it is saved the old one is superseded by
-  it (step 7).
+  it (step 7). When the note says the card was not useful, too practical or
+  a to-do, the subject was the wrong level: do not rework it unless the
+  reading finds something about how they think underneath it, and then the
+  new card is about that.
 - **Marked knew it**: true, and they already knew it. Never write it again,
   and treat it as a miss: the card told them nothing. Note what made it
   obvious (usually a deeper layer taken from their own notes) and make
@@ -166,13 +242,10 @@ order by i.created_at desc;
   plans, what they have moved on from. Treat what it says as fact for this
   run, the same as `you.now`.
 
-**What has landed and what has not.** Up to 25 October 2026 the cards
-marked right described how they think: one rule under their economics,
-their city and Dash; projects stalling once only plumbing is left. The
-cards that missed checked what they did against what they said they would
-(applications against their own rules, a side interest read as a career
-gap) and were true but no use, or missed the reason behind the choice.
-Aim at the first kind (step 4).
+**What has landed and what has not.** The section "What counts as an
+insight" above holds every verdict note up to 2 November 2026 and the five
+ways the cards missed. Read it again now, then read the verdicts written
+since, and add to that list in your head any new way a card missed.
 
 **Their areas, and how many cards each already has.** Read every open area
 with its note (what the person wrote the area is for):
@@ -469,6 +542,14 @@ areas, so the spread in step 6 has something to choose from. Where an area
 has none, look again in that area's notes, goals and Ask tab answers before
 giving up on it.
 
+**Start from what they write and do, not from what they told Dash to
+track.** The rows they keep in Goals and Todo are a partial and often stale
+copy of their life ("What counts as an insight", 1). A candidate whose
+evidence is mostly open steps, unlogged events or empty fields is dropped
+here, before any work goes into it. The best material is the writing
+(journal, notes, chats, answers) and what leaves a record by itself
+(orders, applications sent and answered, git history, page views).
+
 **Aim at how they work, not at whether they kept to their word.** The cards
 that land describe the machinery: how they decide, what gives them energy
 and what drains it, the rule they apply without saying it, what they reach
@@ -478,10 +559,12 @@ said X and did Y" is at most the saw layer; the card is the reason, and the
 reason has to be one they had not put into words. At most one card in a
 run may be mainly about such a gap.
 
-**Every card has to be usable.** The further layer ends in something they
-can do, test or decide differently this week, or a choice in front of them
-that the card reframes. "Close, but nothing tangible" is a miss even when
-the reading is right.
+**Every card has to be usable.** The further layer changes how they see
+something in front of them: a choice, a habit, a belief, a relationship.
+"Close, but nothing tangible" is a miss even when the reading is right, and
+so is a further layer that only hands them a task ("the final level isn't
+an insight it's a todo"). Being usable means they would think or decide
+differently after reading it, which is more than having a step to take.
 
 **Look for absences on purpose.** People see what they did and miss what
 they did not, so a zero is where a surprise most often is. At least two
@@ -501,9 +584,43 @@ Every card has three layers, saved in this order:
 - **deeper**: the mechanism underneath. It must add a source or an
   explanation the first layer did not have. A rephrasing of the first layer
   is not a second layer.
-- **further**: what the pattern protects them from or costs them, tied to
-  something live this week where one exists: an open deadline, a goal step,
-  a job lead, an essay in draft.
+- **further**: what the pattern protects them from or costs them, and what
+  that means for something live this week where one exists: an open
+  deadline, a decision, a job lead, an essay in draft. It is a consequence
+  or a reframing, never an instruction ("What counts as an insight", 2).
+
+**Every layer has a headline.** The tab shows each level as a label, then
+one sentence in bold, then the detail in smaller text under it. The
+headline is that sentence: the level said in one line, at most 160
+characters, to them as "you". The detail under it carries the quotes,
+numbers and links.
+
+- The **saw** headline states the pattern as a fact about them, with no
+  count in it unless the count is the surprise. "You stop a project on the
+  day only plumbing is left" is a headline; "43 steps closed by you and 90
+  by Dash" is a detail.
+- The **deeper** headline names the cause: a claim about how they work
+  that they have not written down, and never the first reason they would
+  give themselves ("What counts as an insight", 4).
+- The **further** headline says what follows for them: a cost, a thing it
+  protects, a belief of theirs it undercuts, or a new way to read a choice
+  in front of them. It is never in the imperative and never names a task.
+
+Before saving, read the three headlines of each card alone, one after
+another. They should read as a short argument that ends somewhere the
+person has not been. If any of them is a number, a summary of a note, or a
+to-do, rewrite it; if the three cannot be made to do that, the card is not
+an insight and is dropped.
+
+One card, written out so its headlines show the shape (it is the 19
+October card marked right, so it is settled and never written again):
+
+- saw: "You stop a project once what is left is plumbing and the
+  possibilities are used up."
+- deeper: "Dash has outlasted your other projects because you hand it the
+  tedious tail that ended them."
+- further: "What keeps Dash alive is also what keeps you from noticing
+  which parts of your life have no one to hand the tail to."
 
 **The deeper layer may not rest on their self-descriptions.** The list from
 step 1 (the about-me note, notes to self, mottos, personality results) can be where
@@ -542,7 +659,19 @@ Drop:
 - any card whose numbers were not re-queried in this run. A number a
   subagent gave you is re-run by you before it goes on a card; a number
   from an earlier insight is re-run too;
-- any card that fails the surprise check.
+- any card that fails the surprise check;
+- any card that fails the bookkeeping test: its claim would disappear if
+  they spent ten minutes bringing Goals and Todo up to date;
+- any card that is mainly a gap audit, a shortfall against their own goal,
+  rule or step, or a reading of a choice they made on purpose as a failure
+  (a verdict note or `you.now` that explains the choice settles it);
+- any card whose further headline is a task or is in the imperative, until
+  it is rewritten as what the pattern means for them;
+- any card whose deeper headline is the reason they would give if asked.
+
+These four are the ways the cards up to 2 November missed ("What counts as
+an insight"). Check every card against each one by name before step 7, and
+when a run drops a card on one of them, say so in the summary.
 
 **Other explanations.** For every card, write down the two likeliest other
 reasons for what the saw layer shows: money, time, a deliberate choice, a
@@ -593,7 +722,10 @@ Predictions take an area too, and do not count toward the spread.
 
 When the strongest cards break the rule, drop the weakest card in the area
 that is over and take the strongest card in an area not yet covered. Never
-weaken the filter above to fill an area: an area with too little evidence
+weaken the filter above to fill an area. The 2 November run did: its Money
+and city cards were built on open goal steps because the spread asked for
+those areas, and the person marked both not useful. An area whose only
+evidence is the state of its goal steps has no card this run: an area with too little evidence
 for a card that passes it is left out, and the summary names it with what
 was missing (step 7). If the cards that pass cover fewer than three areas,
 write the ones that do and say so in the summary; never pad.
@@ -606,7 +738,10 @@ Write each card in the person's own words where possible, to them as "you".
 - `kind`: from step 4.
 - `area_id`: the id of the area from step 6, from the step 1 list of open
   areas, or null for a card about health, sleep or mood.
-- `layers`: `[{"depth": "saw", "text": ...}, {"depth": "deeper", ...}, {"depth": "further", ...}]`.
+- `layers`: `[{"depth": "saw", "headline": ..., "text": ...}, {"depth": "deeper", "headline": ..., "text": ...}, {"depth": "further", "headline": ..., "text": ...}]`.
+  `headline` is the level's one sentence from step 5, plain text with no
+  links (the tab shows it as written); `text` is the detail under it, with
+  its links.
 - `receipts`: every source the card relies on, each
   `{"source", "row_id", "quote", "link"}`. `source` is the table
   (`job_search.applications`) or the vault path (`Journal/Notes to self.md`);
@@ -703,8 +838,19 @@ select core.record_dash_action('<user_id>', 'you.insight_runs:<run id>',
 
 Read it back: the run is `ready`, and `select count(*) from you.insights
 where run_id = '<run id>' and user_id = '<user_id>'` is what you wrote,
-each with three layers, at least two receipts and, for every card that is
-not a prediction, a question. Check the spread from the rows:
+each with three layers, a headline on every layer, at least two receipts
+and, for every card that is not a prediction, a question:
+
+```sql
+select i.id, l ->> 'depth' as depth, l ->> 'headline' as headline
+from you.insights i, jsonb_array_elements(i.layers) l
+where i.run_id = '<run id>' and i.user_id = '<user_id>' and i.kind <> 'prediction'
+order by i.id, l ->> 'depth';
+```
+
+Read the headlines in that list once more as the person will: three to a
+card, nothing else. A blank one, or one that is a number or a task, is
+fixed with an update scoped to the card's id and the `user_id`. Check the spread from the rows:
 
 ```sql
 select coalesce(a.name, 'no area') as area, count(*) as cards

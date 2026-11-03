@@ -101,7 +101,7 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
-  'app/you/board/review-actions.ts': {
+  'app/you/council/review-actions.ts': {
     answerBoardReview: none(
       'theirs',
       "How a decision turned out is the person's own verdict on it; the advisors' picks are graded, or their forecasts scored, from that answer (plans #2561.8, #2581.10).",
@@ -111,13 +111,26 @@ export const youActions: ModuleActions = {
       "Whether what would reopen a decision has happened is the person's own call on the tab; the Sunday meeting checks it from their rows otherwise (plan #2581.10).",
     ),
   },
-  'app/you/board/make-actions.ts': {
+  'app/you/council/make-actions.ts': {
     makeDecisionHappen: none(
       'theirs',
       'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
     ),
   },
-  'app/you/board/actions.ts': {
+  // The Council's notes, talks and memory (you 0037).
+  'app/you/council/council-actions.ts': {
+    readCouncilNotes: none('own', "Marking a mentor's note read is the person's own reading; it is what lets the council write again."),
+    readMentor: none('page', "Opening a mentor's page reads their notes; it serves the page."),
+    reactToCouncilNote: none('theirs', "Whether a mentor's note was useful, or wrong, is the person's verdict on what Dash wrote in that mentor's voice."),
+    makeTodoFromNote: none('theirs', "Making a mentor's note a todo is the person taking up the advice, an approval Dash does not give for them."),
+    sendMentorMessage: none(
+      'spends',
+      "Sends the person's own message to a mentor and starts a Dash session on the board routine to write the reply.",
+    ),
+    setCommitment: none('own', 'Saying a commitment made to a mentor is done is the person\'s own account of what they did.'),
+    forgetMentorMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them.'),
+  },
+  'app/you/council/actions.ts': {
     voteOnDisagreement: none(
       'theirs',
       "Siding with a seat on the board's disagreement is the person's own call; the next meeting reads it and Dash does not vote for them.",

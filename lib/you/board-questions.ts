@@ -216,7 +216,7 @@ export function cleanQuestion(
 
   const lines = input.options.map(oneLine).filter(Boolean);
   if (lines.length === 1)
-    return { ok: false, error: 'Give at least two options, or leave them all blank for the board to write.' };
+    return { ok: false, error: 'Give at least two options, or leave them all blank for the council to write.' };
   if (lines.length > OPTIONS_MAX) return { ok: false, error: `Give at most ${OPTIONS_MAX} options.` };
   if (lines.some((line) => line.length > OPTION_MAX))
     return { ok: false, error: `Keep each option to at most ${OPTION_MAX} characters.` };
@@ -234,7 +234,7 @@ export function cleanQuestion(
   const known = new Set(roster);
   const advisors = [...new Set(input.advisors)];
   if (advisors.some((key) => !known.has(key)))
-    return { ok: false, error: 'One of the advisors you picked is not on your board.' };
+    return { ok: false, error: 'One of the advisors you picked is not on your council.' };
 
   const seatsOff = [...new Set(input.seatsOff ?? [])];
   if (seatsOff.some((key) => !SEAT_ORDER.includes(key)))

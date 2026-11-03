@@ -214,6 +214,16 @@ describe('the insights skill', () => {
     expect(skill).toContain('No card on');
   });
 
+  it('gives every level a headline and holds each card to the tests the verdicts set', () => {
+    expect(skill).toContain('## What counts as an insight');
+    expect(skill).toContain('**Every layer has a headline.**');
+    expect(skill).toContain('{"depth": "saw", "headline": ..., "text": ...}');
+    expect(skill).toContain("l ->> 'headline' as headline");
+    const filter = skill.split('\n## 6. Filter hard\n')[1]?.split('\n## ')[0] ?? '';
+    for (const test of ['bookkeeping test', 'gap audit', 'imperative', 'the reason they would give'])
+      expect(filter).toContain(test);
+  });
+
   it('never repeats an insight already marked', () => {
     expect(skill).toContain('every status');
     expect(skill).toContain('Marked right or wrong');

@@ -35,14 +35,17 @@ const waiting: Insight[] = [
     layers: [
       {
         depth: 'saw',
+        headline: 'Every project you dropped stopped on the day it was ready to be shown.',
         text: 'Three side projects in your vault stop within a week of the note that says "show it to someone": the recipe site, the running log and the board game rules.',
       },
       {
         depth: 'deeper',
+        headline: 'Being judged is the part you step away from, not the work.',
         text: 'Each replacement was smaller and private. The judgement, more than the work, is what you step away from.',
       },
       {
         depth: 'further',
+        headline: 'The same reflex is probably shaping how you look for work.',
         text: 'Your Big Five puts neuroticism high and your notes on the job search say the same thing about interviews, so the pattern likely reaches past side projects into how you look for work.',
       },
     ],
@@ -86,8 +89,8 @@ const waiting: Insight[] = [
     kind: 'tension',
     claim: 'You say you want to live somewhere quiet, but every place you were happiest was in the middle of a city.',
     layers: [
-      { depth: 'saw', text: 'Your places list rates Lisbon and Chicago highest, and both were city-centre flats.' },
-      { depth: 'deeper', text: 'Quiet may stand in for having time of your own rather than for fewer people around.' },
+      { depth: 'saw', headline: null, text: 'Your places list rates Lisbon and Chicago highest, and both were city-centre flats.' },
+      { depth: 'deeper', headline: null, text: 'Quiet may stand in for having time of your own rather than for fewer people around.' },
     ],
     receipts: [
       { source: 'you.places', rowId: 'p2', quote: 'Lisbon, 5 of 5', link: '/you/places' },
@@ -113,8 +116,8 @@ const waiting: Insight[] = [
     kind: 'strength',
     claim: 'You finish courses you pick yourself and drop the ones someone else chose for you.',
     layers: [
-      { depth: 'saw', text: 'Four of the five courses you finished in Learn were ones you added; both you dropped came from work.' },
-      { depth: 'deeper', text: 'Choosing it is what keeps you going, more than the subject.' },
+      { depth: 'saw', headline: null, text: 'Four of the five courses you finished in Learn were ones you added; both you dropped came from work.' },
+      { depth: 'deeper', headline: null, text: 'Choosing it is what keeps you going, more than the subject.' },
     ],
     receipts: [{ source: 'learn.courses', rowId: 'c4', quote: '4 of 5 finished were added by you', link: null }],
     confidence: 'high',
@@ -137,8 +140,8 @@ const waiting: Insight[] = [
     kind: 'prediction',
     claim: 'Within five days of the next rejection, you will spend at least three late nights building Dash and send no applications.',
     layers: [
-      { depth: 'saw', text: 'After each of the last four rejections, late-night build sessions rose within the week and applications stopped.' },
-      { depth: 'deeper', text: 'Building gives a finished thing by morning when the search gives nothing back.' },
+      { depth: 'saw', headline: null, text: 'After each of the last four rejections, late-night build sessions rose within the week and applications stopped.' },
+      { depth: 'deeper', headline: null, text: 'Building gives a finished thing by morning when the search gives nothing back.' },
     ],
     receipts: [{ source: 'job_search.applications', rowId: 'a7', quote: '4 of 4 rejections followed by build nights', link: null }],
     confidence: 'medium',
@@ -168,7 +171,7 @@ const marked: Insight[] = [
     runId: null,
     kind: 'pattern',
     claim: 'You avoid the phone and do everything you can by email.',
-    layers: [{ depth: 'saw', text: 'Most of your job search replies are by email.' }],
+    layers: [{ depth: 'saw', headline: null, text: 'Most of your job search replies are by email.' }],
     receipts: [],
     confidence: 'medium',
     liveRef: null,
@@ -193,7 +196,7 @@ const marked: Insight[] = [
     runId: null,
     kind: 'value',
     claim: 'You care more about who you work with than about what the company makes.',
-    layers: [{ depth: 'saw', text: 'Your notes on companies mention the team before the product.' }],
+    layers: [{ depth: 'saw', headline: null, text: 'Your notes on companies mention the team before the product.' }],
     receipts: [],
     confidence: 'medium',
     liveRef: null,

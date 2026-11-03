@@ -1,6 +1,6 @@
 'use client';
 
-import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
+import { MeetingView, type MeetingActions } from '@/app/you/council/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
 import type { DecisionReview, PickScore } from '@/lib/you/board-reviews';
@@ -41,7 +41,7 @@ const advisorRows = [
   {
     id: A.mentor,
     key: 'mentor',
-    name: 'Mentor',
+    name: 'Jerwyn the Elder',
     kind: 'seat',
     question: 'Does this build toward a career you would want in ten years?',
     focus: 'Five to ten years: what you are building, and what you are not.',
@@ -592,10 +592,11 @@ export function YouBoardDebatePreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Decisions', href: '/you/council/decisions' },
           {
-            label: running ? 'Board meeting' : 'Board meeting 1 Nov 2026',
-            href: `/you/board/${MEETING}`,
+            label: running ? 'Council meeting' : 'Council meeting 1 Nov 2026',
+            href: `/you/council/${MEETING}`,
           },
         ],
       }}

@@ -114,9 +114,19 @@ describe('layersOf and receiptsOf', () => {
         null,
       ]),
     ).toEqual([
-      { depth: 'deeper', text: 'b' },
-      { depth: 'deeper', text: 'c' },
+      { depth: 'deeper', headline: null, text: 'b' },
+      { depth: 'deeper', headline: null, text: 'c' },
     ]);
+  });
+
+  it('keeps the headline a run wrote for a level, trimmed, and reads a blank one as none', () => {
+    expect(
+      layersOf([
+        { depth: 'saw', headline: '  You leave a city once it stops teaching you. ', text: 'a' },
+        { depth: 'deeper', headline: '   ', text: 'b' },
+        { depth: 'further', headline: 42, text: 'c' },
+      ]).map((layer) => layer.headline),
+    ).toEqual(['You leave a city once it stops teaching you.', null, null]);
   });
 
   it('keeps a receipt that names a source, with a number as its quote and an unsafe link dropped', () => {

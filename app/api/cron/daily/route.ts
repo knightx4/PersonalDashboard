@@ -26,6 +26,7 @@ import { runXReadsForAll } from '@/inngest/x/read';
 import { runInsightSignals } from '@/inngest/you/insight-signals';
 import { runInsightsTick } from '@/inngest/you/insights-tick';
 import { runDashQuestionsTick } from '@/inngest/you/dash-questions-tick';
+import { runCouncilTick } from '@/inngest/you/council-tick';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -115,6 +116,10 @@ export async function GET(request: NextRequest) {
     // fewer than three are open and one was answered or skipped since the
     // last run (plan #2635.1).
     { name: 'dash-questions-weekly', run: () => runDashQuestionsTick() },
+    // The Council's mentors write a few notes unasked (you 0037), after the
+    // goals stages so they read the morning's closed steps. Skipped while six
+    // notes are unread or three were written today.
+    { name: 'council-advice', run: () => runCouncilTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },
