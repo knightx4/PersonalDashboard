@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <NoLongerThere
       description={DELETED_OR_MOVED}
-      back={{ label: 'Back to your chats', href: '/ask' }}
+      back={{ label: 'Back to your chats', href: '/chat/dash' }}
     />
   );
 }

@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The app's own pages that core rows open under. They belong to no
  * workspace, so a path to one starts at Home (refPath in lib/core/refs.ts).
  */
-const ASK: Section = { href: '/ask', label: 'Questions to Dash' };
+const ASK: Section = { href: '/chat/dash', label: 'Questions to Dash' };
 const TIMELINE: Section = { href: '/timeline', label: 'Timeline' };
 const HOME: Section = { href: '/home', label: 'Home' };
 
@@ -28,7 +28,7 @@ export const coreSources: ModuleSources = {
       page: {
         title: 'title',
         reads: ['subject_kind', 'subject_ref'],
-        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
+        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/chat/dash/${row.subject_ref}` : null),
         section: ASK,
       },
       note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",

@@ -22,7 +22,7 @@ import { ReplyCharts } from '@/components/talk/reply-chart';
 import { PaidCard } from '@/components/talk/paid-card';
 import { paidCardHosts } from '@/lib/dash/paid-card';
 import type { ChangePresses } from '@/components/talk/dash-changes';
-import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/ask/actions';
+import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/chat/dash/actions';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';

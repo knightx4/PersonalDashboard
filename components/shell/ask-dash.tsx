@@ -61,7 +61,7 @@ import {
   rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
-} from '@/app/ask/actions';
+} from '@/app/chat/dash/actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
@@ -94,7 +94,7 @@ import type { DashChoiceId } from '@/lib/core/models';
 export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
 
 /**
- * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
@@ -909,7 +909,7 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip label="Open on Dash's page" align="end">
                 <Link
-                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  href={chatRef ? `/chat/dash/${chatRef}` : '/chat/dash'}
                   aria-label="Open on Dash's page"
                   className={iconButtonVariants()}
                 >
@@ -1077,7 +1077,7 @@ function Earlier({
         id="ask-dash-earlier"
         title="Earlier questions"
         action={
-          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
             All of them
           </Link>
         }
