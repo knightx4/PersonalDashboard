@@ -46,7 +46,8 @@ const BEFORE: Record<
         alsoMatches: ['/jobs/review'],
         badge: 7,
       },
-      { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+      // Returns to the view it was left on (note 978314f8).
+      { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
       { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
       { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
