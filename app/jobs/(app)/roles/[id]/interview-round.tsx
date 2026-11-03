@@ -258,6 +258,9 @@ export function InterviewGroupCard({
               <CollapsibleField label="Notes on this round" defaultOpen>
                 <EditableProse
                   label="Notes on this round"
+                  // Markdown, as each interview's own notes are (note 36b5c338).
+                  markdown
+                  expandable
                   value={notes}
                   startEditing={notes.trim() === ''}
                   placeholder="How the round went as a whole. Each interview keeps its own notes below."
