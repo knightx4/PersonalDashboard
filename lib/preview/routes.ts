@@ -738,6 +738,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-now-briefs': ['/learn/now'],
   'learn-concept': ['/learn/c/[id]'],
   'learn-concept-evidence': ['/learn/c/[id]'],
+  'learn-concept-all-consumed': ['/learn/c/[id]'],
   // /learn/save opened empty is the save box this surface draws above the lists.
   'learn-lists': ['/learn/lists', '/learn/save'],
   'learn-opening': ['/learn/opening/[id]'],

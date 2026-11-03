@@ -301,7 +301,11 @@ const dcfEvidence: EvidenceLink[] = [
   },
 ];
 
-export function LearnConceptEvidenceSurface() {
+export function LearnConceptEvidenceSurface({
+  material = { material: [], absence: null },
+}: {
+  material?: ClaimMaterialView;
+} = {}) {
   return (
     <ConceptPageView
       view={{
@@ -314,13 +318,21 @@ export function LearnConceptEvidenceSurface() {
       }}
       probes={[]}
       opening={null}
-      material={{ material: [], absence: null }}
+      material={material}
       notes={[]}
       evidence={dcfEvidence}
       timezone={ZONE}
       now={NOW}
     />
   );
+}
+
+/**
+ * The same idea once everything found for it has been read or given up on
+ * (plan #2741.1): the list is left out and the line under the button says why.
+ */
+export function LearnConceptAllConsumedSurface() {
+  return <LearnConceptEvidenceSurface material={{ material: [], absence: 'all-consumed' }} />;
 }
 
 // ---- Reading lists -----------------------------------------------------------
