@@ -22,6 +22,7 @@ import {
   undoDashChange,
 } from './actions';
 import { useState, useTransition } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PRESSES: ChangePresses = {
   confirm: confirmDashChange,
@@ -38,26 +39,17 @@ const EDITS: ChatEdits = {
 };
 
 /**
- * The Dash page's frame (plan #1899.2): the chats on the left and whichever
- * is open beside them, in the conversation pattern. On a phone the list is
- * the page at /ask, and a chat at /ask/<ref> is drawn in its place.
+ * Chat's Dash tab (plans #1899.2, #2748.1): the chats on the left and
+ * whichever is open beside them, in the conversation pattern. On a phone the
+ * list is the page at /chat/dash, and a chat at /chat/dash/<ref> is drawn in
+ * its place.
+ *
+ * The list is handed in rather than read here, so the layout can stream it:
+ * the pane, New chat and the open chat are drawn at once, and the rows land
+ * in the pane when they have been read (ChatsListSkeleton until then).
  */
-export function DashChatsFrame({
-  chats,
-  chatsFailed = false,
-  today,
-  made,
-  madeFailed = false,
-  children,
-}: {
-  chats: AskChat[];
-  chatsFailed?: boolean;
-  today: string;
-  made: MadeChange[];
-  madeFailed?: boolean;
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname() ?? '/ask';
+export function DashChatsFrame({ list, children }: { list: React.ReactNode; children: React.ReactNode }) {
+  const pathname = usePathname() ?? '/chat/dash';
   const newChat = useSearchParams()?.get('chat') === 'new';
   return (
     <Conversation
@@ -65,17 +57,63 @@ export function DashChatsFrame({
       fill
       open={openChatRef(pathname) !== null || newChat}
       newChat={{ href: NEW_CHAT_HREF, label: 'New chat' }}
-      list={
-        <>
-          {chatsFailed && (
-            <p className="mb-2 text-small text-danger">Your chats could not be read. Reload to try again.</p>
-          )}
-          <AskChats chats={chats} today={today} made={made} madeFailed={madeFailed} presses={PRESSES} edits={EDITS} />
-        </>
-      }
+      list={list}
     >
       {children}
     </Conversation>
+  );
+}
+
+/** The chats once read, or the line saying they could not be. */
+export function DashChatsList({
+  chats,
+  chatsFailed = false,
+  today,
+  made,
+  madeFailed = false,
+}: {
+  chats: AskChat[];
+  chatsFailed?: boolean;
+  today: string;
+  made: MadeChange[];
+  madeFailed?: boolean;
+}) {
+  return (
+    <AskChats
+      chats={chats}
+      failed={chatsFailed}
+      today={today}
+      made={made}
+      madeFailed={madeFailed}
+      presses={PRESSES}
+      edits={EDITS}
+    />
+  );
+}
+
+/** The list while the chats are read: the search, then rows under the groups they usually fall in. */
+export function ChatsListSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Reading your chats"
+      className="space-y-3 rounded-card bg-surface p-2 min-[720px]:rounded-none min-[720px]:bg-transparent min-[720px]:p-0"
+    >
+      <Skeleton className="h-9 w-full rounded-control" />
+      {(['Pinned', 'Today', 'This week'] as const).map((group, g) => (
+        <section key={group}>
+          <h3 className="px-2 text-small font-medium text-ink-muted">{group}</h3>
+          <ul className="mt-1 space-y-0.5">
+            {Array.from({ length: g === 0 ? 1 : 2 }, (_, i) => (
+              <li key={i} className="flex min-h-11 items-center gap-2 py-2 pl-2 pr-9">
+                <Skeleton className={i === 0 ? 'h-3.5 w-3/5' : 'h-3.5 w-1/2'} />
+                <Skeleton className="ml-auto h-3 w-10" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -170,16 +208,16 @@ export function ArchivedNote({
 }
 
 /** Dash's page of how the person writes, read from their sent mail. */
-export const WRITING_STYLE_HREF = '/ask/writing-style';
+export const WRITING_STYLE_HREF = '/chat/dash/writing-style';
 
 /** On a phone, the way from an open chat back to the list it is drawn over. */
-export const CHATS_BACK = { href: '/ask', label: 'Chats' };
+export const CHATS_BACK = { href: '/chat/dash', label: 'Chats' };
 
 /**
- * Where New chat goes: /ask itself, marked so a phone, whose /ask is the
+ * Where New chat goes: /chat/dash itself, marked so a phone, whose /chat/dash is the
  * list, draws the new chat over it (note bd8b9a15).
  */
-export const NEW_CHAT_HREF = '/ask?chat=new';
+export const NEW_CHAT_HREF = '/chat/dash?chat=new';
 
 /**
  * A new chat on the page (plan #1899.2): Dash's mark, what he can do, the box
@@ -212,7 +250,7 @@ export function NewDashChat() {
           turns={[]}
           ask={starter ?? undefined}
           onConversation={(ref) => {
-            router.replace(`/ask/${ref}`);
+            router.replace(`/chat/dash/${ref}`);
             router.refresh();
           }}
           onSend={() => setAsked(true)}

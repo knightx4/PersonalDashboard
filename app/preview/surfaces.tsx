@@ -476,6 +476,7 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
+import { ChatPeopleSurface } from './chat-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8537,7 +8538,7 @@ export const SURFACES: readonly Surface[] = [
      * the list, with the way back above its title. */
     id: 'ask-page',
     label: 'Dash · A chat open beside the list',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface />,
   },
@@ -8547,7 +8548,7 @@ export const SURFACES: readonly Surface[] = [
      * after them and the mark coming to rest. */
     id: 'ask-page-at-work',
     label: 'Dash · Dash at work in a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     interaction: {
       kind: 'press',
@@ -8556,16 +8557,63 @@ export const SURFACES: readonly Surface[] = [
       shows:
         'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
-    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
+    render: () => <DashPageSurface usedOpen={false} draft={AT_WORK_QUESTION} />,
   },
   {
     /* The same page at /ask, a new chat beside the list; on a phone the
      * list is the whole page. */
     id: 'ask-page-new',
     label: 'Dash · The list and a new chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* Chat's Dash tab with no chats yet (plan #2748.1): the list says so,
+     * and the new chat beside it is where the first one starts. */
+    id: 'ask-page-empty',
+    label: 'Dash · No chats yet',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="empty" />,
+  },
+  {
+    /* The chats could not be read (plan #2748.1): the line saying so above
+     * an empty list, and a new chat still open beside it. */
+    id: 'ask-page-failed',
+    label: 'Dash · The chats not read',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="failed" />,
+  },
+  {
+    /* The Dash tab while the chats are read (plan #2748.1): the list's pane
+     * with New chat and skeleton rows under its usual groups, and the new
+     * chat beside it with its box, as the layout streams them. */
+    id: 'ask-page-loading',
+    label: 'Dash · The list loading',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="loading" />,
+  },
+  {
+    /* Chat's People tab (plan #2748.1), where Chat opens: each mentor as a
+     * thread, newest note first, unread ones bold with a dot, one writing
+     * back, one with nothing yet and a guest not ready to talk. A row opens
+     * the mentor's page on the Council until #2748.6. */
+    id: 'chat-people',
+    label: 'Chat · People',
+    module: 'chat',
+    width: 'page',
+    render: () => <ChatPeopleSurface />,
+  },
+  {
+    /* People with no mentors on the council yet. */
+    id: 'chat-people-empty',
+    label: 'Chat · People, no mentors yet',
+    module: 'chat',
+    width: 'page',
+    render: () => <ChatPeopleSurface state="empty" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),
@@ -8573,7 +8621,7 @@ export const SURFACES: readonly Surface[] = [
      * used is folded too, to its button in the chat's header (#1899.4). */
     id: 'ask-page-hidden',
     label: 'Dash · The list hidden',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
   },
@@ -8584,7 +8632,7 @@ export const SURFACES: readonly Surface[] = [
      * phone has no room, so the chat shows the Used button. */
     id: 'ask-page-used',
     label: 'Dash · What Dash used, beside the chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} />,
   },
@@ -8618,6 +8666,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* @ and the start of a workspace's name in the box (plan #2748.1):
+     * Learn first in the menu, to keep the question to, then the rows. */
+    id: 'ask-box-workspaces',
+    label: 'Dash · @ keeps a question to a workspace',
+    module: 'chat',
+    width: 'page',
+    render: () => <AskBoxSurface open="workspaces" />,
+  },
+  {
     /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet
      * and Opus, each with a line on speed and cost, Sonnet ticked. */
     id: 'ask-dash-new-models',
@@ -8647,7 +8704,7 @@ export const SURFACES: readonly Surface[] = [
     /* The same list open on the Dash page, in an open chat's docked box. */
     id: 'ask-page-models',
     label: 'Dash · Choosing the model in a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} usedOpen={false} modelStart="open" />,
   },
@@ -8657,7 +8714,7 @@ export const SURFACES: readonly Surface[] = [
      * around it. On a phone the list is the page. */
     id: 'ask-page-search',
     label: 'Dash · Searching the chats',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="search" />,
   },
@@ -8665,7 +8722,7 @@ export const SURFACES: readonly Surface[] = [
     /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
     id: 'ask-page-menu',
     label: "Dash · A chat's menu",
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="menu" />,
   },
@@ -8673,7 +8730,7 @@ export const SURFACES: readonly Surface[] = [
     /* A chat being renamed in place in the list (plan #1899.6). */
     id: 'ask-page-rename',
     label: 'Dash · Renaming a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="rename" />,
   },
@@ -8682,7 +8739,7 @@ export const SURFACES: readonly Surface[] = [
      * #1899.6), with the line above it that puts it back. */
     id: 'ask-page-archived',
     label: 'Dash · An archived chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="archived" usedOpen={false} />,
   },
@@ -8736,7 +8793,7 @@ export const SURFACES: readonly Surface[] = [
      * phone and on a laptop with the list shown. */
     id: 'ask-page-used-sheet',
     label: 'Dash · What Dash used, as a sheet',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface sheetOpen />,
   },

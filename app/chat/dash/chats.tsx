@@ -1,18 +1,16 @@
 'use client';
 
 import { whenDate } from '@/lib/core/when';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import Link from '@/components/ui/link';
 import { cardVariants } from '@/components/ui/card';
-import { ToggleChip, toggleChipClass } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Input, InlineInput } from '@/components/ui/field';
 import { iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { useToast } from '@/components/ui/toast';
 import { MadeChanges } from '@/components/talk/made-changes';
 import type { ChangePresses } from '@/components/talk/dash-changes';
@@ -20,11 +18,9 @@ import { cn } from '@/lib/cn';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import { moduleById, type ModuleId } from '@/lib/modules';
 import {
-  chatChips,
   chatGroup,
   chatQuery,
   chatTitleFrom,
-  chipsThatFit,
   groupChats,
   splitArchived,
   type AskChat,
@@ -33,9 +29,9 @@ import type { MadeChange } from '@/lib/talk/changes';
 import { useClockNow } from '@/lib/use-clock-now';
 
 /**
- * The list of Dash's chats beside the open one on /ask (plan #1899.2): New
- * chat, the search box, the workspace chips that narrow the list, then the
- * chats grouped Pinned, Today, Yesterday, This week and Earlier. Each chat
+ * The list of Dash's chats beside the open one on Chat's Dash tab (plans
+ * #1899.2, #2748.1): New chat, the search box, then one list of chats, with no
+ * chips narrowing it to a workspace, grouped Pinned, Today, Yesterday, This week and Earlier. Each chat
  * can be pinned, renamed or archived from its menu (#1899.6); archived
  * chats are kept under Archived at the foot, beside every change Dash made
  * across all chats. One chat's changes are in the column beside it (#1899.4).
@@ -68,92 +64,10 @@ export function shortDay(day: string): string {
   return whenDate(day, { timeZone: 'UTC', year: 'never' });
 }
 
-/** The ref of the chat open at this address, or null on /ask itself. */
+/** The ref of the chat open at this address, or null on /chat/dash itself. */
 export function openChatRef(pathname: string): string | null {
-  const match = pathname.match(/^\/ask\/([^/?#]+)/);
+  const match = pathname.match(/^\/chat\/dash\/([^/?#]+)/);
   return match ? match[1] : null;
-}
-
-/** The gap between chips, in pixels: Tailwind's gap-1.5. */
-const CHIP_GAP = 6;
-
-/**
- * The workspace chips, as many as fit whole on the one line, then a More
- * chip holding the rest. Every chip is measured once in a hidden copy of the
- * row, and the line is re-counted whenever its width changes.
- */
-function WorkspaceChips({
-  chips,
-  only,
-  onPick,
-}: {
-  chips: ModuleId[];
-  only: ModuleId | null;
-  onPick: (id: ModuleId | null) => void;
-}) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState(chips.length);
-
-  useLayoutEffect(() => {
-    const row = rowRef.current;
-    const measure = measureRef.current;
-    if (!row || !measure) return;
-    const count = () => {
-      const widths = [...measure.children].map((child) => (child as HTMLElement).offsetWidth);
-      const more = widths.pop() ?? 0;
-      setFit(chipsThatFit(widths, row.clientWidth, more, CHIP_GAP));
-    };
-    count();
-    const observer = new ResizeObserver(count);
-    observer.observe(row);
-    return () => observer.disconnect();
-  }, [chips]);
-
-  const shown = chips.slice(0, fit);
-  const rest = chips.slice(fit);
-  const pickedInRest = only !== null && rest.includes(only);
-
-  const chip = (id: ModuleId) => (
-    <>
-      <WorkspaceDot id={id} className="size-2" />
-      {moduleById(id)?.label}
-    </>
-  );
-
-  return (
-    <div className="relative">
-      <div ref={rowRef} role="group" aria-label="Show chats that used" className="flex gap-1.5 overflow-hidden">
-        {shown.map((id) => (
-          <ToggleChip key={id} on={only === id} onClick={() => onPick(only === id ? null : id)}>
-            {chip(id)}
-          </ToggleChip>
-        ))}
-        {rest.length > 0 && (
-          <ActionMenu
-            label="More workspaces"
-            align="start"
-            trigger={pickedInRest ? chip(only) : <span>More</span>}
-            triggerClassName={cn(toggleChipClass(pickedInRest), 'w-auto')}
-            items={rest.map((id) => ({
-              id,
-              label: only === id ? `${moduleById(id)?.label}, shown` : (moduleById(id)?.label ?? id),
-              onSelect: () => onPick(only === id ? null : id),
-            }))}
-          />
-        )}
-      </div>
-      {/* Every chip at its own width, and More last, for counting what fits. */}
-      <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex w-0 gap-1.5 overflow-hidden">
-        {chips.map((id) => (
-          <span key={id} className={toggleChipClass(false)}>
-            {chip(id)}
-          </span>
-        ))}
-        <span className={toggleChipClass(false)}>More</span>
-      </div>
-    </div>
-  );
 }
 
 /** The search box above the list: finds a chat by its name or by anything said in it. */
@@ -277,16 +191,15 @@ function ChatRow({
   return (
     <li className="group relative">
       <Link
-        href={`/ask/${chat.ref}`}
+        href={`/chat/dash/${chat.ref}`}
         aria-current={on ? 'page' : undefined}
         className={cn(
           'flex min-h-11 items-start gap-2.5 rounded-control py-2 pl-2 pr-9 transition-colors duration-quick',
           on ? 'bg-accent-tint' : 'hover:bg-sunken',
         )}
       >
-        {/* The first workspace the chat used, or Dash's own mark for one
-            that used none, so a chat is found by its look before its name. */}
-        <ModuleMark module={chat.workspaces[0] ?? 'dash'} size="sm" className="mt-px" />
+        {/* A name and a day (plan #2748.1): the workspaces a chat used are
+            no longer drawn on its row, since Dash's tab is one list. */}
         <span className="block min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className={cn('min-w-0 flex-1 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
@@ -301,16 +214,8 @@ function ChatRow({
             <Marked text={snippet} match={match} />
           </span>
         )}
-        {(chat.workspaces.length > 0 || (snippet !== undefined && chat.archivedAt)) && (
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-small text-ink-muted">
-            {snippet !== undefined && chat.archivedAt && <span>Archived</span>}
-            {chat.workspaces.map((id) => (
-              <span key={id} className="inline-flex items-center gap-1">
-                <WorkspaceDot id={id} />
-                {moduleById(id)?.label}
-              </span>
-            ))}
-          </span>
+        {snippet !== undefined && chat.archivedAt && (
+          <span className="mt-0.5 block text-small text-ink-muted">Archived</span>
         )}
         </span>
       </Link>
@@ -334,6 +239,7 @@ export function AskChats({
   today,
   made,
   madeFailed = false,
+  failed = false,
   presses,
   edits,
   active: activeOverride,
@@ -348,6 +254,8 @@ export function AskChats({
   today: string;
   made: readonly MadeChange[];
   madeFailed?: boolean;
+  /** The chats could not be read: said in place of the empty list's line. */
+  failed?: boolean;
   presses: ChangePresses;
   edits: ChatEdits;
   /** The open chat's ref, for the gallery; read from the address otherwise. */
@@ -379,7 +287,6 @@ export function AskChats({
     [chats, overrides],
   );
 
-  const [only, setOnly] = useState<ModuleId | null>(null);
   const [renaming, setRenaming] = useState<string | null>(initialRenaming);
   const [query, setQuery] = useState(initialQuery);
   // What the server found, kept with the words it was asked for, so a result
@@ -389,9 +296,7 @@ export function AskChats({
   );
 
   const { listed, archived } = useMemo(() => splitArchived(all), [all]);
-  const chips = useMemo(() => chatChips(listed), [listed]);
-  const narrowed = (list: AskChat[]) => (only ? list.filter((chat) => chat.workspaces.includes(only)) : list);
-  const groups = useMemo(() => groupChats(narrowed(listed), today), [listed, today, only]); // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => groupChats(listed, today), [listed, today]);
 
   const searching = chatQuery(query);
   const hits = result && result.query === searching ? result.hits : null;
@@ -415,11 +320,11 @@ export function AskChats({
     if (!searching) return [];
     const said = new Map((hits ?? []).map((hit) => [hit.ref, hit.snippet]));
     const lower = searching.toLowerCase();
-    return narrowed(all)
+    return all
       .filter((chat) => said.has(chat.ref) || (chat.title ?? '').toLowerCase().includes(lower))
       .sort((a, b) => b.lastAt.localeCompare(a.lastAt))
       .map((chat) => ({ chat, snippet: said.get(chat.ref) ?? null }));
-  }, [searching, hits, all, only]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searching, hits, all]);
 
   function press(ref: string, change: Partial<AskChat>, run: () => ReturnType<ChatEdits['pin']>, done?: string, undo?: () => void) {
     const before = chats.find((chat) => chat.ref === ref);
@@ -488,19 +393,31 @@ export function AskChats({
     );
   }
 
-  const whenOf = (chat: AskChat) =>
-    chatGroup(chat.day, today) === 'Earlier' ? shortDay(chat.day) : commentWhen(chat.lastAt, now);
+  // "3h ago" within the week, then "2 Oct": one short form down the column.
+  // commentWhen answers a bare 2026-10-02 past a week, or before the clock is
+  // read, and that is drawn as the short day too (plan #2748.1).
+  const whenOf = (chat: AskChat) => {
+    if (chatGroup(chat.day, today) === 'Earlier') return shortDay(chat.day);
+    const since = commentWhen(chat.lastAt, now);
+    return since === chat.lastAt.slice(0, 10) ? shortDay(chat.day) : since;
+  };
 
   return (
-    <div className="space-y-3">
+    // On a phone the list is the page, so it sits on the surface its pane
+    // gives it from laptop width (plan #2748.1).
+    <div className="space-y-3 rounded-card bg-surface p-2 min-[720px]:rounded-none min-[720px]:bg-transparent min-[720px]:p-0">
       {chats.length > 0 && <ChatSearch value={query} onChange={setQuery} />}
 
-      {chips.length > 1 && <WorkspaceChips chips={chips} only={only} onPick={setOnly} />}
-
       {chats.length === 0 ? (
-        <p className="text-ui text-ink-muted">
-          No chats yet. Ask Dash anything about your dashboard and the chat is kept here.
-        </p>
+        <div className="px-2">
+          {failed ? (
+            <p className="text-ui text-danger">Your chats could not be read. Reload to try again.</p>
+          ) : (
+            <p className="text-ui text-ink-muted">
+              No chats yet. Ask Dash anything about your dashboard and the chat is kept here.
+            </p>
+          )}
+        </div>
       ) : searching ? (
         <section aria-label="Chats found" aria-live="polite" className={cn(cardVariants(), 'p-1.5')}>
           <h3 className="px-2 text-small font-medium text-ink-muted">
@@ -521,9 +438,6 @@ export function AskChats({
               <ul className="mt-1 space-y-0.5">{inGroup.map((chat) => row(chat, whenOf(chat)))}</ul>
             </section>
           ))}
-          {groups.length === 0 && listed.length > 0 && (
-            <p className="px-2 text-ui text-ink-muted">No chat used {moduleById(only)?.label} yet.</p>
-          )}
           {listed.length === 0 && (
             <p className="px-2 text-ui text-ink-muted">Every chat is archived. They are kept below.</p>
           )}
@@ -537,7 +451,7 @@ export function AskChats({
           defaultOpen={initialArchivedOpen}
           summaryClassName="px-2 text-small font-medium"
         >
-          <ul className="mt-1 space-y-0.5">{narrowed(archived).map((chat) => row(chat, whenOf(chat)))}</ul>
+          <ul className="mt-1 space-y-0.5">{archived.map((chat) => row(chat, whenOf(chat)))}</ul>
         </Disclosure>
       )}
 

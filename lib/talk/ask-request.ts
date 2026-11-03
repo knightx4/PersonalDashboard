@@ -194,7 +194,7 @@ export async function askDashInRequest(input: {
           const supabase = await createClient();
           const { error } = await supabase
             .from('feedback_items')
-            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/chat/dash/${conversationRef}` });
           if (error) console.error('the gap note was not filed', error.message);
         } catch (error) {
           console.error('the gap note was not filed', error);

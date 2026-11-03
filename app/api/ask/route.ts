@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         });
         // The list of past questions reads the table, so a new question or a new
         // answer has to show there the next time it is opened.
-        if (result.conversation) revalidatePath('/ask');
+        if (result.conversation) revalidatePath('/chat/dash');
         // A change Dash made in the answer shows on the pages that hold its row (plan #1440).
         for (const change of result.changes ?? []) {
           if (change.status === 'done') for (const path of changePaths(change)) revalidatePath(path);

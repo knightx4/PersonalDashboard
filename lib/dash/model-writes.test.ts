@@ -121,7 +121,7 @@ describe('the dash_model lookup', () => {
   it('returns the saved model', async () => {
     const core = fakeCore({ [ME]: { dash_model: HAIKU } });
     const result = await dashModelLookup(context(core));
-    expect(result).toMatchObject({ ok: true, rows: [{ title: 'Dash answers with Haiku', href: '/ask' }] });
+    expect(result).toMatchObject({ ok: true, rows: [{ title: 'Dash answers with Haiku', href: '/chat/dash' }] });
   });
 
   it('says it is the default when nothing was picked', async () => {

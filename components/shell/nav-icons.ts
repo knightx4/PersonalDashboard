@@ -1,5 +1,7 @@
 import {
   Timer,
+  MessagesSquare,
+  UsersRound,
   Activity,
   SendHorizontal,
   BarChart3,
@@ -214,6 +216,9 @@ export const NAV_ICONS = {
   board: Users,
   // Dash's Writing style page: how you write, read from your sent mail.
   writingStyle: Feather,
+  // Chat's two tabs (plan #2748.1): the mentors you text, and your chats with Dash.
+  chatPeople: UsersRound,
+  chatDash: MessagesSquare,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;

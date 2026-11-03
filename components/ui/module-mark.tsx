@@ -172,6 +172,25 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       </>
     ),
   },
+  bubbles: {
+    // Two speech bubbles: theirs in colour behind, with its tail to the right,
+    // and yours in glass in front, tail to the left, with the three dots of
+    // someone typing. The dots are the one detail; Dash's own mark is the
+    // visor, so the bubbles say "conversation" rather than "assistant".
+    back: (
+      <path d="M13 2.4h4.4a4 4 0 0 1 4 4v1.2a4 4 0 0 1-1.7 3.3l1.3 2.7-3.7-2H13a4 4 0 0 1-4-4V6.4a4 4 0 0 1 4-4Z" />
+    ),
+    front:
+      'M7.2 8.4h5.8a4.6 4.6 0 0 1 4.6 4.6v.8a4.6 4.6 0 0 1-4.6 4.6H8.8l-4.4 3.2v-3.8A4.6 4.6 0 0 1 2.6 13.8v-.8A4.6 4.6 0 0 1 7.2 8.4Z',
+    lines: null,
+    dots: (
+      <>
+        <circle cx={6.3} cy={13.4} r={1.15} />
+        <circle cx={10.1} cy={13.4} r={1.15} />
+        <circle cx={13.9} cy={13.4} r={1.15} />
+      </>
+    ),
+  },
   person: {
     // A bust: the head is the colour, sitting into a pair of glass shoulders,
     // and the V of a collar is what makes the pane shoulders rather than a hill.
