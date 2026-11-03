@@ -25,6 +25,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   fireFeatureRoutine,
+  PROJECTS_DISPATCHER,
   resolveRoutineId,
   type FireRoutineResult,
   type RoutineTarget,
@@ -171,12 +172,25 @@ export async function startRoutineRun(input: {
   // started or failed.
   const id = crypto.randomUUID();
   const text = [input.text?.trim(), runEndNote(id), runMarker(id)].filter(Boolean).join('\n\n');
-  const result = await fireFeatureRoutine({
-    apiKey: input.routine.token,
-    routineId: input.routine.id,
-    text,
-    fetch: input.fetch,
-  });
+  // A project's run is queued for the dispatcher rather than fired: no routine
+  // can reach the project's repository (PROJECTS_DISPATCHER says why). The
+  // brief rides on the row, and the dispatcher hands it to the session it
+  // starts on that repository.
+  const result: FireRoutineResult =
+    input.routine.id === PROJECTS_DISPATCHER
+      ? {
+          ok: true,
+          detail: 'Queued. Dash starts it in the project\'s repository within the hour.',
+          status: 202,
+          body: { queued: PROJECTS_DISPATCHER, brief: text },
+          runId: null,
+        }
+      : await fireFeatureRoutine({
+          apiKey: input.routine.token,
+          routineId: input.routine.id,
+          text,
+          fetch: input.fetch,
+        });
 
   const row = {
     id,

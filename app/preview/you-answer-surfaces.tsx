@@ -28,6 +28,8 @@ function question(
     answer: null,
     answeredAt: null,
     skippedAt: null,
+    areaId: null,
+    areaName: null,
     createdAt: '2026-10-20T09:00:00Z',
     updatedAt: '2026-10-20T09:00:00Z',
     ...fields,

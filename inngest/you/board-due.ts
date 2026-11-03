@@ -43,7 +43,7 @@ export function boardDuePorts(you: YouSupabaseClient): BoardDuePorts {
         .select('id, user_id, question, status, decided_at, reviews, tripwire, notified')
         .or('status.eq.decided,tripwire->>status.eq.watching')
         .limit(ROWS);
-      if (error) throw new Error(`Reading the board's decisions failed: ${error.message}`);
+      if (error) throw new Error(`Reading the council's decisions failed: ${error.message}`);
       return (data ?? []) as Record<string, unknown>[];
     },
     push(userId) {

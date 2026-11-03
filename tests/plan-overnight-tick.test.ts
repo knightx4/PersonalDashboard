@@ -32,6 +32,7 @@ import {
   OVERNIGHT_NO_PROGRESS,
   personAnsweredSince,
   outsideRunning,
+  stepAddedSince,
   runOvernightTick,
   sweepQuietRuns,
   tickNote,
@@ -1673,5 +1674,82 @@ describe('sweepQuietRuns', () => {
     expect(updates).toEqual([
       { values: { status: 'failed', error: 'Nothing was heard from this run for 4h.' }, id: 'r1' },
     ]);
+  });
+});
+
+describe('a feature whose steps are all done', () => {
+  // #2644 and #2667 on 1 and 2 November: every step closed, the feature left
+  // open, and the runner sent it again to a session with nothing to build.
+  const finished = () => [
+    item({ id: 'finished' }),
+    item({ id: 'finished-a', parentId: 'finished', status: 'done', commitSha: 'aaa', completedAt: HOUR_AGO }),
+    item({ id: 'finished-b', parentId: 'finished', status: 'done', commitSha: 'bbb', completedAt: SEVEN_HOURS_AGO }),
+  ];
+
+  it('is closed with its newest step\'s commit and never sent', async () => {
+    const closed: Array<{ id: string; commitSha: string | null }> = [];
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(finished()),
+      closeFinished: async (features) => {
+        closed.push(...features.map((f) => ({ id: f.id, commitSha: f.commitSha })));
+      },
+    });
+
+    await overnightTick(p);
+
+    expect(closed).toEqual([{ id: 'finished', commitSha: 'aaa' }]);
+    expect(calls.fired).toEqual([]);
+  });
+
+  it('is passed over for the ready feature beside it', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree([...finished(), ...oneReadyFeature()]),
+    });
+
+    await overnightTick(p);
+
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+
+  it('still lets the tick fire when closing it fails', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree([...finished(), ...oneReadyFeature()]),
+      closeFinished: async () => {
+        throw new Error('down');
+      },
+    });
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await overnightTick(p);
+
+    quiet.mockRestore();
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+});
+
+describe('a step added under a held feature', () => {
+  // #2644.6 to #2644.8 on 2 November: written under #2644 after its last
+  // session closed nothing, and held from the runner with it.
+  const held = (added: string) =>
+    tree([
+      item({ id: 'first', priority: 1 }),
+      item({ id: 'first-old', parentId: 'first', status: 'done', completedAt: YESTERDAY }),
+      item({ id: 'first-new', parentId: 'first', priority: 1, createdAt: added }),
+      item({ id: 'second', priority: 3 }),
+      item({ id: 'second-step', parentId: 'second', priority: 3 }),
+    ]);
+
+  it('releases the feature when the step is newer than its last fire', () => {
+    const sections = held('2026-09-17T22:30:00.000Z');
+    expect(stepAddedSince(findNode(sections, 'first')!, HOUR_AGO)).toBe(true);
+    const choice = chooseOvernightFire(sections, night(), MIDNIGHT, { first: HOUR_AGO }, { first: YESTERDAY });
+    expect(choice.act === 'fire' && choice.feature.id).toBe('first');
+  });
+
+  it('keeps holding it when every open step was there before the fire', () => {
+    const sections = held('2026-09-17T21:00:00.000Z');
+    expect(stepAddedSince(findNode(sections, 'first')!, HOUR_AGO)).toBe(false);
+    const choice = chooseOvernightFire(sections, night(), MIDNIGHT, { first: HOUR_AGO }, { first: YESTERDAY });
+    expect(choice.act === 'fire' && choice.feature.id).toBe('second');
   });
 });

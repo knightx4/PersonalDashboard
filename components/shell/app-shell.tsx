@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { PendingPage } from '@/components/shell/pending-page';
+import { keptHref } from '@/lib/shell/kept-view';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
@@ -62,6 +63,11 @@ export type NavSection = {
   exact?: boolean;
   /** Also treat these prefixes as this section. */
   alsoMatches?: readonly string[];
+  /**
+   * Link to the view the page was last showing, not its bare address, for a
+   * list that keeps its view in the address (lib/shell/kept-view.ts).
+   */
+  keepsView?: true;
   /**
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
@@ -299,6 +305,18 @@ export function AppShell({
     });
   }
 
+  // Where a `keepsView` tab goes: the view its page last showed (note
+  // 978314f8). Read after each move, since storage is not there on the server.
+  const [kept, setKept] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const section of sections) {
+      if (section.keepsView) next[section.href] = keptHref(section.href);
+    }
+    setKept(next);
+  }, [pathname, sections]);
+  const sectionHref = (section: NavSection) => kept[section.href] ?? section.href;
+
   const isActive = (section: NavSection) =>
     section.exact
       ? pathname === section.href ||
@@ -322,7 +340,7 @@ export function AppShell({
       const target = sections[Number(match[1]) - 1];
       if (!target) return;
       event.preventDefault();
-      router.push(target.href);
+      router.push(target.keepsView ? keptHref(target.href) : target.href);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -469,7 +487,7 @@ export function AppShell({
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
       {sections.map((section, index) =>
         navRow({
-          href: section.href,
+          href: sectionHref(section),
           label: section.label,
           Icon: section.icon ? NAV_ICONS[section.icon] : null,
           on: isActive(section),
@@ -555,7 +573,7 @@ export function AppShell({
     return (
       <li key={section.href}>
         <Link
-          href={section.href}
+          href={sectionHref(section)}
           aria-current={on ? 'page' : undefined}
           data-capture-nav={section.href}
           className={cn(dockItem, 'relative', on ? 'text-shell-ink' : 'text-shell-muted')}

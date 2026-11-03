@@ -118,6 +118,29 @@ describe('startRoutineRun', () => {
     );
   });
 
+  it("queues a project's run for the dispatcher with its brief, and fires nothing", async () => {
+    const { insert, supabase } = db();
+    const fetchFn = vi.fn();
+
+    const result = await startRoutineRun({
+      supabase: supabase as never,
+      userId: 'user-1',
+      job: 'step',
+      routine: { id: 'projects-dispatcher', token: 'projects-dispatcher' },
+      planItemId: 'step-3',
+      text: 'build the site step',
+      fetch: fetchFn as never,
+    });
+
+    expect(result).toMatchObject({ ok: true, status: 202 });
+    expect(fetchFn).not.toHaveBeenCalled();
+    const row = (insert.mock.calls[0] as unknown as [{ id: string; status: string; routine_id: string; response: { queued: string; brief: string } }])[0];
+    expect(row).toMatchObject({ status: 'started', routine_id: 'projects-dispatcher' });
+    expect(row.response.queued).toBe('projects-dispatcher');
+    expect(row.response.brief).toContain('build the site step');
+    expect(row.response.brief).toContain(`Dash run id: ${row.id}`);
+  });
+
   it('tells the session how to end the run it was fired as', async () => {
     const { insert, supabase } = db();
     const fetchFn = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(

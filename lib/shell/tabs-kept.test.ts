@@ -52,7 +52,7 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
-    { href: '/you/board', label: 'Board', icon: 'board' },
+    { href: '/you/council', label: 'Council', icon: 'board' },
   ],
   home: [
     { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },

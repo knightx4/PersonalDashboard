@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRefreshWhileRunning } from '@/app/you/board/refresh-while-running';
+import { useRefreshWhileRunning } from '@/app/you/council/refresh-while-running';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';

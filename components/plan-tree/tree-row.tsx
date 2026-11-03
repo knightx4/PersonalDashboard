@@ -194,7 +194,7 @@ export type TreeRowFrameParts = {
   substeps: ReactNode;
   /** The row's `activity` items: the Activity tab's runs. */
   activity: ReactNode;
-  /** The row's comment thread, for the Activity tab. */
+  /** The row's comment thread, for the Overview tab's Comments part. */
   thread: ReactNode;
   /**
    * The menu's Add a sub-step was pressed. The frame draws the composer, and
@@ -924,9 +924,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
       turns={node.thread}
       titles={titles}
       placeholder={threadPlaceholder}
-      // On a step's own page the thread is on its Activity tab, offered as
-      // the goal's is on its own (plan #2373.3).
+      // On a step's own page the thread is the Overview tab's Comments part
+      // (note 42b3d858).
       label={glyphOnly ? 'Comment on this step' : undefined}
+      // There its heading carries the count, so the fold would say it twice.
+      unfolded={glyphOnly}
     />
   );
 
@@ -1038,7 +1040,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!glyphOnly && questionsPart(false)}
                   {!glyphOnly && waits}
 
-                  {/* In a page's frame the thread is on the Activity tab (plan #2373.2). */}
+                  {/* In a page's frame the thread is on the Overview tab (note 42b3d858). */}
                   {!glyphOnly && thread}
 
                   {meta}

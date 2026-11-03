@@ -26,6 +26,7 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouCouncilLoadingPreview, YouCouncilMentorPreview, YouCouncilPreview } from './you-council-surfaces';
 import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
@@ -3384,7 +3385,7 @@ const youSections: NavSection[] = [
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
   { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
-  { href: '/you/board', label: 'Board', icon: 'board' },
+  { href: '/you/council', label: 'Council', icon: 'board' },
 ];
 
 const triageCrumbs = [
@@ -5508,9 +5509,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalStepMenuSurface />,
   },
   {
-    /* A step's page whose thread has a comment: the count on Activity (plan #2373.1). */
+    /* A step's page whose thread has a comment: Comments on its Overview (note 42b3d858). */
     id: 'goals-step-comments',
-    label: 'Goal · a step’s comments on its Activity tab',
+    label: 'Goal · a step’s comments on its Overview tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalStepCommentsSurface />,
@@ -9621,6 +9622,31 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // One area chosen in the chips row (plan #2629.5): the deck holds only
+    // the Career cards, and Earlier only the Career marks.
+    id: 'you-insights-area',
+    label: 'You · Insights, one area chosen',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ area: '00000000-0000-4000-8000-0000000000c1', earlier: true }} />
+      </div>
+    ),
+  },
+  {
+    // The chosen area has no card waiting: its one card is marked.
+    id: 'you-insights-area-empty',
+    label: 'You · Insights, the chosen area has nothing waiting',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview homeDone open={{ area: '00000000-0000-4000-8000-0000000000c3' }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-earlier',
     label: 'You · Insights, Earlier open with your marks',
     module: 'you',
@@ -9767,7 +9793,7 @@ export const SURFACES: readonly Surface[] = [
      * board's suggested questions with Ask now, Save for Sunday and Dismiss,
      * the questions asked with their state, then the meetings newest first. */
     id: 'you-board',
-    label: 'You · Board, suggestions, questions and meetings',
+    label: 'You · Council, suggestions, questions and meetings',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9781,7 +9807,7 @@ export const SURFACES: readonly Surface[] = [
      * board asks you, one asked a second time, one answered and waiting for
      * the next meeting; and the same with a failed save. */
     id: 'you-board-asks',
-    label: 'You · Board, the board asks you questions',
+    label: 'You · Council, the board asks you questions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9792,7 +9818,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-asks-error',
-    label: 'You · Board, an answer to the board that did not save',
+    label: 'You · Council, an answer to the board that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9806,7 +9832,7 @@ export const SURFACES: readonly Surface[] = [
      * how each turned out with receipts, and the three presses to answer;
      * and the same with a save that failed. */
     id: 'you-board-reviews',
-    label: 'You · Board, the board checks back on two decisions',
+    label: 'You · Council, the board checks back on two decisions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9817,7 +9843,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-reviews-error',
-    label: 'You · Board, an answer to a check-back that did not save',
+    label: 'You · Council, an answer to a check-back that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9832,7 +9858,7 @@ export const SURFACES: readonly Surface[] = [
      * it, a written one, a tripwire whose day came, and under the list each
      * advisor's track record by topic. */
     id: 'you-board-due',
-    label: 'You · Board, check-backs and a tripwire due, with track records',
+    label: 'You · Council, check-backs and a tripwire due, with track records',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9845,7 +9871,7 @@ export const SURFACES: readonly Surface[] = [
     /* A meeting that checked back on two decisions, one answered and graded,
      * with the scorecard of whose picks held up by topic (plan #2561.8). */
     id: 'you-board-meeting-reviewed',
-    label: 'You · Board, a meeting that checked back on decisions, with picks graded',
+    label: 'You · Council, a meeting that checked back on decisions, with picks graded',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9857,7 +9883,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* A verdict that names its assumptions (plan #2561.11). */
     id: 'you-board-meeting-assumed',
-    label: 'You · Board, a verdict resting on stated assumptions',
+    label: 'You · Council, a verdict resting on stated assumptions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9868,7 +9894,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-empty',
-    label: 'You · Board, nothing asked, suggested or held yet',
+    label: 'You · Council, nothing asked, suggested or held yet',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9879,7 +9905,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-running',
-    label: 'You · Board, a question convened now, its meeting being held',
+    label: 'You · Council, a question convened now, its meeting being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9889,8 +9915,88 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Council (you 0037): new notes from three mentors with what can be
+     * done with each, a decision waiting, then the five seats and eleven
+     * guests as tiles with their newest note. */
+    id: 'you-council',
+    label: 'You · Council, new notes and every mentor',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-empty',
+    label: 'You · Council, before any mentor has written',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    /* Six unread: the round holds back, and the section says so. */
+    id: 'you-council-held',
+    label: 'You · Council, held back at six unread',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview state="held" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-loading',
+    label: 'You · Council, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouCouncilLoadingPreview />,
+  },
+  {
+    /* Jerwyn the Elder: his newest note, a talk with a commitment made in
+     * it, what he holds the person to, what he knows, and how he thinks. */
+    id: 'you-council-mentor',
+    label: 'You · Council, one mentor mid-talk',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-mentor-waiting',
+    label: 'You · Council, a mentor writing back',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview state="waiting" />
+      </div>
+    ),
+  },
+  {
+    /* Opened from a note's Talk about this: the note above the box. */
+    id: 'you-council-mentor-about',
+    label: 'You · Council, talking about a note',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview state="about" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-loading',
-    label: 'You · Board, loading',
+    label: 'You · Council, loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardListLoadingPreview />,
@@ -9900,7 +10006,7 @@ export const SURFACES: readonly Surface[] = [
      * disagreements with a vote each, the dream, the question, the
      * resolutions, the predictions, the scorecard, and the memos folded. */
     id: 'you-board-meeting',
-    label: 'You · Board, one meeting with some marks made',
+    label: 'You · Council, one meeting with some marks made',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9911,7 +10017,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-memos',
-    label: 'You · Board, a meeting with the memos open',
+    label: 'You · Council, a meeting with the memos open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9925,7 +10031,7 @@ export const SURFACES: readonly Surface[] = [
      * filled as far as a real question goes, and the card with a question
      * that was saved but whose meeting could not start. */
     id: 'you-board-ask',
-    label: 'You · Board, Ask the board open',
+    label: 'You · Council, Ask the board open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9936,7 +10042,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-ask-error',
-    label: 'You · Board, a question whose meeting could not start',
+    label: 'You · Council, a question whose meeting could not start',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9947,7 +10053,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start',
-    label: 'You · Board, Start a meeting open',
+    label: 'You · Council, Start a meeting open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9958,7 +10064,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start-error',
-    label: 'You · Board, a meeting that could not be started',
+    label: 'You · Council, a meeting that could not be started',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9969,7 +10075,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start-running',
-    label: 'You · Board, Start a meeting while one is running',
+    label: 'You · Council, Start a meeting while one is running',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9980,7 +10086,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-called',
-    label: 'You · Board, a called meeting with each seat’s vote',
+    label: 'You · Council, a called meeting with each seat’s vote',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9991,7 +10097,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-running',
-    label: 'You · Board, a meeting still being held',
+    label: 'You · Council, a meeting still being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10002,7 +10108,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-failed',
-    label: 'You · Board, a meeting that failed',
+    label: 'You · Council, a meeting that failed',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10013,7 +10119,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-loading',
-    label: 'You · Board, a meeting loading',
+    label: 'You · Council, a meeting loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardMeetingLoadingPreview />,
@@ -10024,7 +10130,7 @@ export const SURFACES: readonly Surface[] = [
      * exchanges between two advisors. Drawn finished, still being held with
      * a question no advisor has reached, and with one advisor's thinking open. */
     id: 'you-board-meeting-debate',
-    label: 'You · Board, a meeting held as a debate',
+    label: 'You · Council, a meeting held as a debate',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10035,7 +10141,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-debate-running',
-    label: 'You · Board, a debate still being held, one question not reached',
+    label: 'You · Council, a debate still being held, one question not reached',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10049,7 +10155,7 @@ export const SURFACES: readonly Surface[] = [
      * questions decided, the first against the board; the form to change a
      * decision; and the form with a save that failed. */
     id: 'you-board-meeting-decided',
-    label: 'You · Board, both questions decided from their verdicts',
+    label: 'You · Council, both questions decided from their verdicts',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10060,7 +10166,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-decision-change',
-    label: 'You · Board, changing a decision',
+    label: 'You · Council, changing a decision',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10071,7 +10177,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-decision-error',
-    label: 'You · Board, a decision that did not save',
+    label: 'You · Council, a decision that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10086,7 +10192,7 @@ export const SURFACES: readonly Surface[] = [
      * the words; the steps choice with a goal picked; the same after a write
      * that failed; and the card after the action was written, listing it. */
     id: 'you-board-make',
-    label: 'You · Board, writing a decision as todos',
+    label: 'You · Council, writing a decision as todos',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10097,7 +10203,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-make-steps',
-    label: 'You · Board, writing a decision as steps under a goal',
+    label: 'You · Council, writing a decision as steps under a goal',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10109,7 +10215,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The steps choice after a write under a goal that had closed. */
     id: 'you-board-make-steps-error',
-    label: 'You · Board, a decision whose goal had closed',
+    label: 'You · Council, a decision whose goal had closed',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10120,7 +10226,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-make-made',
-    label: 'You · Board, what a decision made',
+    label: 'You · Council, what a decision made',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10133,7 +10239,7 @@ export const SURFACES: readonly Surface[] = [
     /* Advisors (plan #2561.7): the five seats and every guest with the
      * question each owns, a brain state and the switch for the chair. */
     id: 'you-board-advisors',
-    label: 'You · Board, the advisors and their switches',
+    label: 'You · Council, the advisors and their switches',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10144,7 +10250,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-add',
-    label: 'You · Board, Add advisor open',
+    label: 'You · Council, Add advisor open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10155,7 +10261,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-building',
-    label: 'You · Board, a guest’s brain being built',
+    label: 'You · Council, a guest’s brain being built',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10166,7 +10272,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-failed',
-    label: 'You · Board, a brain that failed to build, with retry',
+    label: 'You · Council, a brain that failed to build, with retry',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10177,14 +10283,14 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-loading',
-    label: 'You · Board, advisors loading',
+    label: 'You · Council, advisors loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardAdvisorsLoadingPreview />,
   },
   {
     id: 'you-board-panel',
-    label: 'You · Board, one panel of advisors',
+    label: 'You · Council, one panel of advisors',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10195,7 +10301,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-panel-empty',
-    label: 'You · Board, a panel just made with no advisors',
+    label: 'You · Council, a panel just made with no advisors',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10206,7 +10312,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-panel-delete',
-    label: 'You · Board, deleting a panel',
+    label: 'You · Council, deleting a panel',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10217,7 +10323,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-advisor',
-    label: 'You · Board, one advisor’s thinking open',
+    label: 'You · Council, one advisor’s thinking open',
     module: 'you',
     width: 'page',
     render: () => (

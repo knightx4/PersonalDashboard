@@ -15,9 +15,12 @@ import type { DashWriteContext, DashWriteResult } from './registry';
 // joins the in-memory database does not serve and calls the model; these
 // tests cover the tool around it.
 const prepareRound = vi.fn<(...args: unknown[]) => Promise<PrepareRoundResult>>();
-const recordSessionSpend = vi.fn(async () => undefined);
+const recordSpendReports = vi.fn(async () => undefined);
 vi.mock('@/lib/jobs/interview/prepare-round', () => ({ prepareRound: (...args: unknown[]) => prepareRound(...args) }));
-vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: (...args: unknown[]) => recordSessionSpend(...(args as [])) }));
+vi.mock('@/lib/core/spend/record', async (original) => ({
+  ...(await original<typeof import('@/lib/core/spend/record')>()),
+  recordSpendReports: (...args: unknown[]) => recordSpendReports(...(args as [])),
+}));
 
 /**
  * A round Dash adds to a role when asked (plan #2044.1): made the way the
@@ -93,7 +96,7 @@ const interviews = () => tables['job_search.interviews'];
 beforeEach(() => {
   seen = new Set();
   prepareRound.mockReset();
-  recordSessionSpend.mockClear();
+  recordSpendReports.mockClear();
   process.env.ANTHROPIC_API_KEY = 'test-key';
   tables = {
     'core.dash_actions': [],
@@ -311,7 +314,7 @@ describe('write_prep_note', () => {
       undo: { none: expect.any(String) },
       row: { detail: { spent_a_run: true, summary: 'A first screen with the recruiter.' } },
     });
-    expect(recordSessionSpend).toHaveBeenCalledWith(ME, { module: 'jobs', operation: 'write-interview-prep' }, expect.any(Array));
+    expect(recordSpendReports).toHaveBeenCalledWith(expect.anything(), ME, { module: 'jobs', operation: 'write-interview-prep' }, expect.any(Array));
   });
 
   it('returns an unchanged round’s stored note and says no run was spent', async () => {

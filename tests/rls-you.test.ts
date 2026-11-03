@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -966,5 +966,65 @@ describe('advisor chats, memory and forecasts', () => {
       () => turn(1, true, { A: 0.5 }, { A: { low: 0, high: 1 } }, { A: 99.5, B: 0.5 }),
     ];
     for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+});
+
+describe('council notes and runs', () => {
+  // migrations-you/0037_council.sql: notes the mentors write unasked, capped
+  // so they never pile up unread, and the runs that write them.
+  const receipts = admin.json([{ label: 'A role', link: '/jobs' }]);
+  const advisors: string[] = [];
+
+  beforeAll(async () => {
+    for (let n = 0; n < 8; n += 1) {
+      const [row] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${userA}, ${`council_${n}`}, ${`Mentor ${n}`}, 'guest', 'What now?')
+        returning id`;
+      advisors.push(row.id);
+    }
+  });
+
+  it('keeps notes and runs to their owner only', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice') returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into council_notes (user_id, advisor_id, run_id, text, receipts)
+                 values (${userA}, ${advisors[0]}, ${run.id}, 'Answer Brex today.', ${receipts})`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from council_notes`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from council_runs`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into council_notes (user_id, advisor_id, text, receipts)
+                   values (${userB}, ${advisors[1]}, 'Planted.', ${receipts})`,
+      ),
+    ).rejects.toThrow();
+    // A second advice round while one is open is refused.
+    await expect(
+      asUser(userA, (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice')`),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a note without a receipt, a second unread note from a mentor, and a fourth in a day', async () => {
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text) values (${userA}, ${advisors[1]}, 'No receipt.')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[0]}, 'Again.', ${receipts})`,
+    ).rejects.toThrow(/already has an unread note/);
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[1]}, 'Two.', ${receipts})`;
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[2]}, 'Three.', ${receipts})`;
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[3]}, 'Four.', ${receipts})`,
+    ).rejects.toThrow(/three notes today/);
   });
 });

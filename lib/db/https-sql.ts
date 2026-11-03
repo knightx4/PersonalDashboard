@@ -124,10 +124,20 @@ export function render(
   return { text, words };
 }
 
-/** `$1`, `$2` … in a raw statement replaced by its values, outside quoted text. */
+/**
+ * `$1`, `$2` … in a raw statement replaced by its values, outside quoted text.
+ *
+ * Quoted text is a '…' string or a dollar-quoted one ($$…$$, $s$…$s$). A
+ * statement given no values is sent as written: sessions write prose such as
+ * "a $150,000 floor" inside $s$…$s$, and filling `$150` there wrote "NULL,000"
+ * into the person's rows (note 646c750c).
+ */
 export function withParameters(query: string, values: readonly unknown[]): string {
-  return query.replace(/('(?:[^']|'')*')|\$(\d+)/g, (match, quoted: string | undefined, n) =>
-    quoted !== undefined ? match : valueSql(values[Number(n) - 1]),
+  if (values.length === 0) return query;
+  return query.replace(
+    /('(?:[^']|'')*')|(\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\3\$)|\$(\d+)/g,
+    (match, quoted: string | undefined, dollarQuoted: string | undefined, _tag, n) =>
+      quoted !== undefined || dollarQuoted !== undefined ? match : valueSql(values[Number(n) - 1]),
   );
 }
 

@@ -60,7 +60,7 @@ type Db = SupabaseClient<any, 'public'>;
  * Read off the top of the row's tree, because that is what files it under a
  * section on the plan page; a step's own column can disagree with its root.
  * A project's row goes to its own routine when it has one set, and to the
- * shared projects routine otherwise (plan #2553.3). One with neither is
+ * plan routine otherwise (plan #2553.3). One with neither is
  * refused rather than sent on: with no id, the routine call falls back to the
  * plan routine, which would build the step in this repository.
  */
@@ -84,7 +84,7 @@ export function builderFor(
       ok: false,
       error:
         `${project.label} has no routine to build it yet: ` +
-        'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
+        'set CLAUDE_PLAN_ROUTINE_ID and CLAUDE_PLAN_ROUTINE_TOKEN.',
     };
   }
   return { ok: true, project, routine };
@@ -126,13 +126,15 @@ export function projectPreamble(project: DevProject): string {
   return (
     `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
     'dashboard this session checked out. Follow .claude/skills/plan/reference/project-routine.md. ' +
-    `First call add_repo for ${where} with push access, clone it beside this checkout, call ` +
+    `First find ${where}: when the routine has it among its repositories it is already checked ` +
+    `out under /home/user/${project.repo.repo}, so build in that checkout. Otherwise call add_repo ` +
+    'for it with push access, clone it beside this checkout, call ' +
     'register_repo_root on the clone, and build there: the code, the commits and the checks are ' +
     `that repository's, and its ${project.skill} says how a step is built in it. ` +
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
     `both. ${check}${setUp}` +
-    'If add_repo is refused, do not build anywhere else: write a setup step for the person with ' +
-    'the remedy the tool returned, as project-routine.md says, and stop.\n\n'
+    'If it is not checked out or a push to it is refused, do not build anywhere else: ' +
+    'say exactly what was refused and stop.\n\n'
   );
 }
 
