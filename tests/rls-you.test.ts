@@ -1094,3 +1094,75 @@ describe('council notes and runs', () => {
     ).rejects.toThrow(/three notes today/);
   });
 });
+
+describe('mentor texts: caps and quiet hours', () => {
+  // migrations-you/0039_council_texts.sql (plan #2748.7): the daily round's
+  // texts hold the caps 0037 held on notes, and none is sent at night.
+  let user = '';
+  const chats: string[] = [];
+  // A zone where it is midday now, so a text dated now() is outside quiet hours.
+  const middayZone = () => {
+    const offset = 12 - new Date().getUTCHours();
+    return offset === 0 ? 'Etc/GMT' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
+  };
+  const text = (n: number, at?: string) =>
+    at
+      ? admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, created_at)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.', ${at}::timestamptz) returning id`
+      : admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.') returning id`;
+  const quiet = async (at: string) =>
+    (await admin<{ q: boolean }[]>`select you.quiet_hours(${user}, ${at}::timestamptz) as q`)[0].q;
+  const setZone = (zone: string) =>
+    admin`insert into core.account_settings (user_id, timezone) values (${user}, ${zone})
+          on conflict (user_id) do update set timezone = excluded.timezone`;
+
+  beforeAll(async () => {
+    user = await createUser('you-texts@example.com');
+    for (let n = 0; n < 8; n += 1) {
+      const [a] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${user}, ${`texter_${n}`}, ${`Texter ${n}`}, 'guest', 'What now?') returning id`;
+      const [c] = await admin<{ id: string }[]>`
+        insert into you.advisor_chats (user_id, advisor_id) values (${user}, ${a.id}) returning id`;
+      chats.push(c.id);
+    }
+  });
+
+  it("knows quiet hours in the person's zone, and refuses a text inside them", async () => {
+    await setZone('America/New_York');
+    expect(await quiet('2026-01-05T02:59:00Z')).toBe(false); // 21:59
+    expect(await quiet('2026-01-05T03:00:00Z')).toBe(true); // 22:00
+    expect(await quiet('2026-01-05T12:59:00Z')).toBe(true); // 07:59
+    expect(await quiet('2026-01-05T13:00:00Z')).toBe(false); // 08:00
+    await expect(text(7, '2026-01-05T04:00:00Z')).rejects.toThrow(/Quiet hours/);
+    await text(7, '2026-01-05T15:00:00Z');
+
+    // A zone Postgres does not know reads as UTC rather than failing.
+    await setZone('Mars/Olympus');
+    expect(await quiet('2026-01-05T23:00:00Z')).toBe(true);
+    expect(await quiet('2026-01-05T12:00:00Z')).toBe(false);
+  });
+
+  it('refuses a second unread text from a mentor until the thread is read, and a fourth in a day', async () => {
+    await setZone('America/New_York');
+    await expect(text(7, '2026-01-05T16:00:00Z')).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_chats set last_read_at = '2026-01-05T15:30:00Z' where id = ${chats[7]}`;
+    await text(7, '2026-01-05T16:00:00Z');
+
+    await setZone(middayZone());
+    await text(0);
+    await expect(text(0)).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_messages set read_at = now() where chat_id = ${chats[0]}`;
+    await text(1);
+    await text(2);
+    await expect(text(3)).rejects.toThrow(/three texts today/);
+  });
+
+  it('never caps a reply or an ack', async () => {
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'reply', 'Answering you.')`;
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'ack', 'Hm.')`;
+  });
+});

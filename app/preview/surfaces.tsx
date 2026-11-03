@@ -9915,11 +9915,11 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The Council (you 0037): new notes from three mentors with what can be
-     * done with each, a decision waiting, then the five seats and eleven
-     * guests as tiles with their newest note. */
+    /* The Council (you 0037): a decision waiting, a line to three unread
+     * texts in Chat (plan #2748.7), then the five seats and eleven guests as
+     * tiles with their newest note. */
     id: 'you-council',
-    label: 'You · Council, new notes and every mentor',
+    label: 'You · Council, unread texts and every mentor',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9940,7 +9940,7 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Six unread: the round holds back, and the section says so. */
+    /* Six unread texts: the round holds back, and the line says so. */
     id: 'you-council-held',
     label: 'You · Council, held back at six unread',
     module: 'you',

@@ -50,15 +50,14 @@ export function BoardMeetingSkeleton() {
   );
 }
 
-/** The Council while it loads: the header, a note, then mentor tiles in the grid they take. */
+/** The Council while it loads: the header, the line to Chat, then mentor tiles in the grid they take. */
 export function CouncilSkeleton() {
   return (
     <PageColumn className="space-y-6">
       <PageHeaderSkeleton />
-      <Card padding="standard" className="space-y-3">
-        <Skeleton className="h-3 w-32" />
-        <Skeleton className="h-3.5 w-full" />
-        <Skeleton className="h-3.5 w-3/4" />
+      {/* The one line to the mentors' texts in Chat (plan #2748.7). */}
+      <Card padding="standard">
+        <Skeleton className="h-3.5 w-2/3" />
       </Card>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {/* ui-ok: the Council's mentors are tiles in a grid, as the person asked, and this is their shape loading */}
