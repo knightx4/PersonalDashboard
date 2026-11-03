@@ -9,7 +9,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fireDraftRoutine, runTopicDraft } from '@/lib/learn/levels/draft-run';
 import { roleRequirementSourceFrom } from '@/lib/learn/levels/role-sources';
-import { territorySources, topicsLeft, type Territory } from '@/lib/learn/levels/territory';
+import { subjectLensFor, territorySources, topicsLeft, type Territory } from '@/lib/learn/levels/territory';
 import { embedCatalogueSegments } from '@/lib/learn/catalogue/embed-sweep';
 import {
   liveGoalPullPorts,
@@ -157,7 +157,7 @@ export async function draftTerritoryTick(
 
   const [frames, lens] = await Promise.all([
     learn.from('area_check_articles').select('id, title').eq('level', 4).in('title', [...new Set(left.map((t) => t.frame))]),
-    learn.from('lenses').select('id').eq('user_id', owner).eq('origin', 'subject').eq('name', territory.subjectLens).maybeSingle(),
+    learn.from('lenses').select('id').eq('user_id', owner).eq('origin', 'subject').eq('name', subjectLensFor(territory, area)).maybeSingle(),
   ]);
   if (frames.error) throw new Error(`Reading the frame topics failed: ${frames.error.message}`);
   const frameId = new Map(((frames.data ?? []) as { id: string; title: string }[]).map((f) => [f.title, f.id]));
