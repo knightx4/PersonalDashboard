@@ -100,6 +100,8 @@
  * the brief -- is lib/plan/tree.ts and lib/plan/brief.ts, the same code the
  * page runs, so the two cannot disagree about what is next.
  */
+// First: names the repository before lib/plan/github.ts reads it.
+import './app-repository';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
