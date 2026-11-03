@@ -45,10 +45,10 @@ describe('when the daily round runs', () => {
     expect(decideAdviceRun(quiet)).toEqual({ start: true });
   });
 
-  it('does not pile notes up while six are unread', () => {
+  it('does not pile texts up while six are unread', () => {
     expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX })).toEqual({
       start: false,
-      skipped: '6 council notes are unread',
+      skipped: '6 mentor texts are unread',
     });
     expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX - 1 })).toEqual({ start: true });
   });
@@ -57,8 +57,14 @@ describe('when the daily round runs', () => {
     expect(decideAdviceRun({ ...quiet, writtenToday: 3 }).start).toBe(false);
   });
 
-  it('waits while every mentor has an unread note', () => {
+  it('waits while every mentor has an unread text', () => {
     expect(decideAdviceRun({ ...quiet, free: 0 }).start).toBe(false);
+  });
+
+  it("never starts in the person's quiet hours, memory included (plan #2748.7)", () => {
+    expect(decideAdviceRun({ ...quiet, quiet: true })).toEqual({ start: false, skipped: 'it is quiet hours for the person' });
+    expect(decideAdviceRun({ ...quiet, quiet: true, episodesDue: 2 }).start).toBe(false);
+    expect(decideAdviceRun({ ...quiet, quiet: false })).toEqual({ start: true });
   });
 
   it('runs once a day, and never two at once', () => {
