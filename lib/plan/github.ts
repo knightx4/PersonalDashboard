@@ -97,6 +97,11 @@ const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
 export function refusalFor(status: number, path: string): string {
   // The repository the refused path is about, so a token that reads this app
   // but not a project's repository is told which one it is missing.
+  // A path with no repository in it is asked of nobody, and GitHub's 404 for
+  // it is no fault of the token's: say what is actually missing.
+  if (path.startsWith('/repos//')) {
+    return `GitHub was asked about a repository with no name (${status}). Set APP_REPOSITORY to "owner/name", or run this from a checkout whose origin is on GitHub.`;
+  }
   const named = /^\/repos\/([^/]+)\/([^/?]+)/.exec(path);
   const where = named ? `${named[1]}/${named[2]}` : REPO_KEY;
   if (status === 401) {

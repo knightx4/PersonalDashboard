@@ -61,6 +61,13 @@ session is idle (`get_session`; read its last assistant message with
   "<the question>"`.
 - needs something only the person has: `npx tsx scripts/plan.ts needs
   "<what>" --for <outline> --detail "<where to go>"`.
+- left a migration unapplied: that is not something only the person has.
+  Read the file from the project's repository, compare it with the live
+  definitions, and apply it yourself, through the Supabase connector or
+  the Management API with SUPABASE_ACCESS_TOKEN (the worker prompt says
+  how). If it cannot go in as written, send the step back to a worker with
+  what you found. Never file it as a `needs`: #2737 sat in the person's
+  inbox that way, with a guessed token check that would have failed.
 
 When the run was sent at a feature and every step under it is now done,
 close the feature too: `npx tsx scripts/plan.ts done <feature number>
@@ -86,9 +93,11 @@ Where the brief tells you to read or write plan rows with scripts/plan.ts, or to
 
 Follow the repository's own CLAUDE.md where it has one. For the "Set up" step, follow the brief: read the repository, find how it installs, tests and builds, run that, commit a short CLAUDE.md if it has none, and work out the check command.
 
+A database change is yours to apply, in the same sitting. A project whose code reads the dashboard's Supabase project (its tables, functions or storage) gets its schema there, and this session's environment has SUPABASE_ACCESS_TOKEN for it even where no Supabase connector is loaded. Follow the repository's CLAUDE.md where it says how (music-pipeline: scripts/apply_migrations.py). Otherwise go through the Management API: read what is there first with POST https://api.supabase.com/v1/projects/<ref>/database/query and body {"query": "..."} (pg_get_functiondef, information_schema.columns); never guess a column, a function body or a grant. Then apply the file with POST .../database/migrations and body {"query": <the file>, "name": "<repo>_<name>"}, and select what it made to check it landed. The project ref is SUPABASE_PROJECT_REF, or the host of the project URL, or the "ref" inside SUPABASE_SERVICE_ROLE_KEY. Nothing that drops or deletes; a step that needs that is blocked with the question. Never leave a written migration for the person to apply: a step whose code is on the default branch without its migration applied is not built.
+
 Before merging a step to the default branch, run the check command the brief names (or the one you found), and merge only when it passes. Then push.
 
-When you are done, or stopped, send one message to the session that started you (send_message, session id given at the end of this prompt) with: the step's outline, built or blocked, the commit sha on the default branch, whether it reached it, the check command and its result, a one-line note for the step, and any question or anything only the person can supply. Then stop.
+When you are done, or stopped, send one message to the session that started you (send_message, session id given at the end of this prompt) with: the step's outline, built or blocked, the commit sha on the default branch, whether it reached it, the check command and its result, each migration applied and the name it went in under, a one-line note for the step, and any question or anything only the person can supply. Then stop.
 ```
 
 Add the line `Dispatcher session: <this session's id>` after the prompt and
