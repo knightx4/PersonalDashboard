@@ -260,7 +260,7 @@ export function MeetingView({
         <Card padding="standard" className="flex items-start gap-2.5" role="status">
           <DashMark state="working" activity="reading" decorative className="mt-0.5" />
           <p className="text-body text-ink">
-            The board is meeting, started {formatDateTime(state.since, timezone, now)}. This page
+            The advisors are meeting, started {formatDateTime(state.since, timezone, now)}. This page
             fills in with the minutes when it is done.
             {meeting.runUrl && (
               <>
@@ -335,7 +335,7 @@ export function MeetingView({
         <section aria-labelledby="board-disagreements" className="space-y-3">
           <SectionHeading
             id="board-disagreements"
-            title="Where the board disagrees"
+            title="Where the advisors disagrees"
             count={minutes.disagreements.length}
           />
           {minutes.disagreements.map((disagreement, index) => (

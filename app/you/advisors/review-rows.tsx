@@ -18,7 +18,7 @@ import type { ForecastScore } from '@/lib/you/board-scoring';
 import { Evidence, Prose } from './[id]/prose';
 
 /**
- * One check-back on a decision (plan #2561.8), on the Board tab and on the
+ * One check-back on a decision (plan #2561.8), on the Advisors tab and on the
  * meeting that wrote it: the question and what was chosen, how it turned out
  * with its receipts, then the board's one line and three presses to answer
  * it. Once answered, the answer shows with Change, and under it whose pick

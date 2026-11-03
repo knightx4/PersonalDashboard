@@ -187,7 +187,7 @@ export function QuestionDebate({
           <p className="text-ui text-ink-muted">
             {running
               ? 'No advisor has spoken on this yet. Their turns appear here as the meeting goes.'
-              : 'The board left no turns on this question.'}
+              : 'The advisors left no turns on this question.'}
           </p>
         </Card>
       ) : (
@@ -390,7 +390,7 @@ const turnLabel = (turn: DebateTurn, to: DebateAdvisor | undefined): string =>
       ? 'Round 3, final vote'
       : to
         ? `Round 2, to ${to.name}`
-        : 'Round 2, to the board';
+        : 'Round 2, to the advisors';
 
 /**
  * One advisor's thinking for the meeting, over the page from the right: who
@@ -449,7 +449,7 @@ export function AdvisorDrawer({
           <div className="space-y-2">
             <p className="text-small text-ink-muted">
               {advisor.kind === 'seat'
-                ? 'One of the five seats on your board.'
+                ? 'One of the five seats on your advisors.'
                 : 'A guest: a persona Dash built from their public work, not the person.'}
             </p>
             {advisor.question && (

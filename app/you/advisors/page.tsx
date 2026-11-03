@@ -19,7 +19,7 @@ import { listDueTripwires } from '@/lib/you/board-tripwires';
 import { loadTrackRecords } from '@/lib/you/board-scoring';
 import { BoardListView } from './board-list-view';
 
-export const metadata = { title: 'Board' };
+export const metadata = { title: 'Advisors' };
 export const dynamic = 'force-dynamic';
 
 /** The time the page is read; outside the component, since reading the clock during render is unstable. */
@@ -28,7 +28,7 @@ function readAt(): number {
 }
 
 /**
- * You's Board tab (plans #2540.3 and #2561.4): Ask the board, the board's
+ * You's Advisors tab (plans #2540.3 and #2561.4): Ask the advisors, the board's
  * suggested questions, the questions asked, and the meetings newest first.
  * Each meeting opens on its own page (./[id]), where the person reads the
  * minutes and marks them. The board's check-backs on their decisions wait

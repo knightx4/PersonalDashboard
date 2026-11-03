@@ -1,20 +1,20 @@
 'use client';
 
-import type { AskStart } from '@/app/you/board/ask-board';
-import type { StartStart } from '@/app/you/board/start-meeting';
-import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
+import type { AskStart } from '@/app/you/advisors/ask-board';
+import type { StartStart } from '@/app/you/advisors/start-meeting';
+import { BoardListView, type BoardListActions } from '@/app/you/advisors/board-list-view';
 import {
   sortAdvisors,
   type BoardAdvisor,
   type BoardDecision,
   type BoardQuestion,
 } from '@/lib/you/board-questions';
-import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
+import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/advisors/board-skeleton';
 import {
   MeetingView,
   type MeetingActions,
   type MeetingOpen,
-} from '@/app/you/board/[id]/meeting-view';
+} from '@/app/you/advisors/[id]/meeting-view';
 import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import type { DecisionReview } from '@/lib/you/board-reviews';
@@ -29,7 +29,7 @@ import {
 } from '@/lib/you/board';
 
 /**
- * The Board tab in the gallery (plan #2540.3): the list of meetings, one
+ * The Advisors tab in the gallery (plan #2540.3): the list of meetings, one
  * meeting's minutes with some marks made, and each hidden part: the empty
  * tab, a meeting being held, one that failed, the memos open, and both
  * loading states. The fixtures are invented and run as long as a real
@@ -83,7 +83,7 @@ const meeting = (over: Partial<BoardMeeting> = {}): BoardMeeting => ({
 
 const minutes = parseMinutes({
   since:
-    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the board read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
+    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the advisors read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
   disagreements: [
     {
       key: 'd1',
@@ -102,7 +102,7 @@ const minutes = parseMinutes({
         },
         {
           seat: 'skeptic',
-          stance: 'arguing against the board’s shared view',
+          stance: 'arguing against the advisors’ shared view',
           text: 'Both of you assume the résumé was the problem. The two replies came from companies you had already spoken to in September, so they may be warm leads, and the rewrite may have changed nothing.',
           receipts: [{ label: 'September notes', link: '/vault/n/Jobs/September.md' }],
         },
@@ -226,7 +226,7 @@ const minutes = parseMinutes({
       memo: 'Both replies were from companies you had spoken to before. What makes you sure it was the résumé?',
       rebuttal: {
         to: null,
-        stance: 'arguing against the board’s shared view',
+        stance: 'arguing against the advisors’ shared view',
         text: 'Everyone is reading two warm replies as proof. Send three cold applications first and see.',
       },
     },
@@ -320,8 +320,8 @@ const subject = {
   ref: null,
   path: [
     { label: 'You', href: '/you' },
-    { label: 'Board', href: '/you/board' },
-    { label: 'Board meeting 1 Nov 2026', href: `/you/board/${ID}` },
+    { label: 'Advisors', href: '/you/advisors' },
+    { label: 'Board meeting 1 Nov 2026', href: `/you/advisors/${ID}` },
   ],
 };
 
@@ -372,7 +372,7 @@ export function YouBoardMeetingPreview({
                 : state === 'called'
                   ? CALLED_DECISION
                   : 'Board meeting',
-            href: `/you/board/${ID}`,
+            href: `/you/advisors/${ID}`,
           },
         ],
       }}

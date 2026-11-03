@@ -1,6 +1,6 @@
 'use client';
 
-import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
+import { MeetingView, type MeetingActions } from '@/app/you/advisors/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
 import type { DecisionReview, PickScore } from '@/lib/you/board-reviews';
@@ -592,10 +592,10 @@ export function YouBoardDebatePreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
+          { label: 'Advisors', href: '/you/advisors' },
           {
             label: running ? 'Board meeting' : 'Board meeting 1 Nov 2026',
-            href: `/you/board/${MEETING}`,
+            href: `/you/advisors/${MEETING}`,
           },
         ],
       }}

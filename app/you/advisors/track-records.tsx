@@ -3,7 +3,7 @@ import { TOPIC_LABELS } from '@/lib/you/board-reviews';
 import type { TrackRecord } from '@/lib/you/board-scoring';
 
 /**
- * Who has been right about what (plan #2581.10), as rows of the Board tab's
+ * Who has been right about what (plan #2581.10), as rows of the Advisors tab's
  * surface: a line on how to read the scores, then every advisor with a scored
  * forecast, closest first, their mean Brier score at the end, and each topic
  * under the name with how many were scored and the weight the board now gives
@@ -20,7 +20,7 @@ export function TrackRecordRows({ records }: { records: readonly TrackRecord[] }
     <>
       <li className="card-pad-x row-pad text-small text-ink-muted">
         How close each advisor’s forecasts came once you said how a decision went. 0 is perfect and 0.25 is a coin
-        toss. After five scored on a topic, the board weighs them by it.
+        toss. After five scored on a topic, the advisors weighs them by it.
       </li>
       {records.map((record) => (
         <li key={record.advisor} className="card-pad-x row-pad flex items-start gap-3">

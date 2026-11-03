@@ -40,7 +40,7 @@ import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
 
 /**
- * The Board tab's list (plans #2540.3 and #2561.4), on the list pattern
+ * The Advisors tab's list (plans #2540.3 and #2561.4), on the list pattern
  * (components/patterns/list-detail.tsx): the header's one action, Ask the
  * board, which opens the compose card under it; then one surface of rows in
  * groups. What fell due comes first (plan #2581.10): the check-backs waiting
@@ -120,11 +120,11 @@ export function BoardListView({
   const starting = useStartMeeting({ panels, roster: advisors, running, actions, start: meetingStart });
   const header = (
     <PageHeader
-      title="Board"
+      title="Advisors"
       actions={
         <>
-          <Link href="/you/board/advisors" className={buttonVariants({ variant: 'ghost' })}>
-            Advisors
+          <Link href="/you/advisors/advisors" className={buttonVariants({ variant: 'ghost' })}>
+            Roster
           </Link>
           {starting.button}
           {ask.button}
@@ -153,8 +153,8 @@ export function BoardListView({
         <EmptyState
           icon={Users}
           align="start"
-          title="Nothing before the board yet"
-          description={`The board meets every Sunday at 6:41 PM, next on ${nextDay.replace(/^\S+ /, '')}. Ask it a question to take up then, or have it meet now. Each meeting also suggests questions for you.`}
+          title="Nothing before the advisors yet"
+          description={`The advisors meets every Sunday at 6:41 PM, next on ${nextDay.replace(/^\S+ /, '')}. Ask it a question to take up then, or have it meet now. Each meeting also suggests questions for you.`}
         />
       </PageColumn>
     );
@@ -198,7 +198,7 @@ export function BoardListView({
             </Group>
           )}
           {asks.length > 0 && (
-            <Group title="The board asks you" count={asks.length}>
+            <Group title="The advisors asks you" count={asks.length}>
               {groupByQuestion(asks).map((group, index) => (
                 <AskQuestionRow
                   key={group.questionId}
@@ -211,7 +211,7 @@ export function BoardListView({
             </Group>
           )}
           {suggestions.length > 0 && (
-            <Group title="Suggested by the board" count={suggestions.length}>
+            <Group title="Suggested by the advisors" count={suggestions.length}>
               {suggestions.map((question) => (
                 <SuggestionRow key={question.id} question={question} actions={actions} />
               ))}
@@ -239,7 +239,7 @@ export function BoardListView({
               {decisions.map((decision) => (
                 <ListRow
                   key={decision.id}
-                  href={decision.meetingId ? `/you/board/${decision.meetingId}` : '/you/board'}
+                  href={decision.meetingId ? `/you/advisors/${decision.meetingId}` : '/you/advisors'}
                   title={decision.question}
                   meta={decisionMeta(decision)}
                   wrapMeta
@@ -261,7 +261,7 @@ export function BoardListView({
                 return (
                   <ListRow
                     key={meeting.id}
-                    href={`/you/board/${meeting.id}`}
+                    href={`/you/advisors/${meeting.id}`}
                     title={meetingTitle(meeting)}
                     meta={meeting.kind === 'called' ? `Called meeting · ${meta}` : meta}
                     end={
@@ -309,7 +309,7 @@ export function decisionMeta(decision: BoardDecision): string {
   );
   const option = decision.options.find((o) => o.letter === decision.chosen);
   return [
-    decision.recommended ? `Board said ${decision.recommended}` : 'Board did not settle',
+    decision.recommended ? `Advisors said ${decision.recommended}` : 'Advisors did not settle',
     option
       ? `You chose ${decision.chosen}, ${shortOption(option.text)}`
       : `You chose ${decision.chosen}`,

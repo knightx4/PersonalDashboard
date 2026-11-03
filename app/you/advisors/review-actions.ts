@@ -26,15 +26,15 @@ export async function answerBoardReview(
   outcome: Outcome,
 ): Promise<{ error: string | null }> {
   const parsed = input.safeParse({ questionId, at, outcome });
-  if (!parsed.success) return { error: 'That is not a check-back the board wrote.' };
+  if (!parsed.success) return { error: 'That is not a check-back the advisors wrote.' };
   try {
     const user = await requireUser();
     const client = await createYouClient();
     const result = await answerReview(client, user.id, questionId, at, outcome);
-    if (result === 'missing') return { error: 'That decision is no longer on your board.' };
+    if (result === 'missing') return { error: 'That decision is no longer on your advisors.' };
     if (result === 'changed') return { error: 'This decision changed while you were looking. Read the page again.' };
-    revalidatePath('/you/board');
-    revalidatePath('/you/board/[id]', 'page');
+    revalidatePath('/you/advisors');
+    revalidatePath('/you/advisors/[id]', 'page');
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
@@ -53,14 +53,14 @@ export async function answerBoardTripwire(
   tripped: boolean,
 ): Promise<{ error: string | null }> {
   const parsed = tripwireInput.safeParse({ questionId, tripped });
-  if (!parsed.success) return { error: 'That is not a tripwire the board set.' };
+  if (!parsed.success) return { error: 'That is not a tripwire the advisors set.' };
   try {
     const user = await requireUser();
     const client = await createYouClient();
     const result = await answerTripwire(client, user.id, questionId, tripped);
-    if (result === 'missing') return { error: 'That decision is no longer on your board.' };
-    if (result === 'changed') return { error: 'The board already checked this tripwire. Read the page again.' };
-    revalidatePath('/you/board');
+    if (result === 'missing') return { error: 'That decision is no longer on your advisors.' };
+    if (result === 'changed') return { error: 'The advisors already checked this tripwire. Read the page again.' };
+    revalidatePath('/you/advisors');
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };

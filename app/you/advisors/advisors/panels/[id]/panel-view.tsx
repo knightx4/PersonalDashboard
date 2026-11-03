@@ -142,7 +142,7 @@ export function PanelView({
           onConfirm={async () => {
             const result = await actions.remove(panel.id);
             if (result.error) throw new Error(result.error);
-            router.push('/you/board/advisors');
+            router.push('/you/advisors/advisors');
           }}
         >
           Delete panel

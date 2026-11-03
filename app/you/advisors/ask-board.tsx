@@ -24,7 +24,7 @@ import { panelPicked, panelSeats, type BoardPanel } from '@/lib/you/board-panels
 import { AdvisorMark } from './advisor-mark';
 
 /**
- * Ask the board (plan #2561.4): the header's one action on the Board tab, and
+ * Ask the advisors (plan #2561.4): the header's one action on the Advisors tab, and
  * the compose card that opens under the header when it is pressed. It took
  * the place of Call a meeting (plan #2540.5).
  *
@@ -68,7 +68,7 @@ export const SAMPLE_REFUSED: QuestionInput = {
   options: ['Take the contract and keep applying in the evenings', ''],
   lean: '',
 };
-export const SAMPLE_ERROR = 'Give at least two options, or leave them all blank for the board to write.';
+export const SAMPLE_ERROR = 'Give at least two options, or leave them all blank for the advisors to write.';
 
 export function useAskBoard({
   advisors,
@@ -123,7 +123,7 @@ export function useAskBoard({
       aria-expanded={open}
       aria-controls="ask-board"
     >
-      Ask the board
+      Ask the advisors
     </Button>
   );
 
@@ -216,7 +216,7 @@ export function AskBoardForm({
               </IconButton>
             </Tooltip>
           </div>
-          {/* ui-ok: the card only renders once Ask the board is pressed (useAskBoard); the list here is its own options */}
+          {/* ui-ok: the card only renders once Ask the advisors are pressed (useAskBoard); the list here is its own options */}
           <Textarea
             id="ask-question"
             value={value.question}
@@ -279,7 +279,7 @@ export function AskBoardForm({
 
         <div>
           <Label htmlFor="ask-context">Context</Label>
-          {/* ui-ok: the card only renders once Ask the board is pressed (useAskBoard); the list here is its own options */}
+          {/* ui-ok: the card only renders once Ask the advisors are pressed (useAskBoard); the list here is its own options */}
           <Textarea
             id="ask-context"
             value={value.context}
@@ -308,7 +308,7 @@ export function AskBoardForm({
                 </ToggleChip>
               ))}
             </div>
-            <FieldHint>The board tests your lean rather than agreeing with it.</FieldHint>
+            <FieldHint>The advisors tests your lean rather than agreeing with it.</FieldHint>
           </fieldset>
         ) : (
           <div>
@@ -321,7 +321,7 @@ export function AskBoardForm({
               aria-describedby="ask-lean-hint"
               onChange={(event) => set({ lean: event.target.value })}
             />
-            <FieldHint id="ask-lean-hint">The board tests your lean rather than agreeing with it.</FieldHint>
+            <FieldHint id="ask-lean-hint">The advisors tests your lean rather than agreeing with it.</FieldHint>
           </div>
         )}
 
@@ -350,7 +350,7 @@ export function AskBoardForm({
             <div className="flex items-center justify-between gap-3">
               <p className="min-w-0 text-ui text-ink">
                 <span className="text-small font-medium text-ink-muted">Advisors </span>
-                {picked.length > 0 ? `${picked.length} chosen` : 'the board chooses'}
+                {picked.length > 0 ? `${picked.length} chosen` : 'the advisors chooses'}
                 {leftOut.length > 0 && <span className="text-ink-muted">{` · without ${leftOut.join(', ')}`}</span>}
               </p>
               <Button
@@ -408,7 +408,7 @@ export function AskBoardForm({
             pending={pending === 'now'}
             disabled={blank || busy}
             routine="board"
-            what="Cost of convening the board"
+            what="Cost of convening the advisors"
             align="start"
             onClick={() => onSubmit('now')}
           >

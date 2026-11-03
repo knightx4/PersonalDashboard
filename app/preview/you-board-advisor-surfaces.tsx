@@ -4,14 +4,14 @@ import {
   AdvisorsView,
   type AddStart,
   type AdvisorActions,
-} from '@/app/you/board/advisors/advisors-view';
+} from '@/app/you/advisors/advisors/advisors-view';
 import { PREVIEW_PANELS } from './you-board-surfaces';
-import { BoardListSkeleton } from '@/app/you/board/board-skeleton';
-import { PanelView } from '@/app/you/board/advisors/panels/[id]/panel-view';
+import { BoardListSkeleton } from '@/app/you/advisors/board-skeleton';
+import { PanelView } from '@/app/you/advisors/advisors/panels/[id]/panel-view';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
 
 /**
- * The Advisors view of the Board tab in the gallery (plan #2561.7): the roster
+ * The Advisors view of the Advisors tab in the gallery (plan #2561.7): the roster
  * with every guest ready and one switched off, a brain being built, a build
  * that failed with its retry, the Add advisor card open, and the loading
  * state. The fixtures are invented and run as long as a real roster does.
@@ -184,8 +184,8 @@ export function YouBoardAdvisorsPreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
+          { label: 'Advisors', href: '/you/advisors' },
+          { label: 'Roster', href: '/you/advisors/advisors' },
         ],
       }}
     />
@@ -216,9 +216,9 @@ export function YouBoardPanelPreview({ state = 'ready' }: { state?: 'ready' | 'e
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
-          { label: panel.name, href: `/you/board/advisors/panels/${panel.id}` },
+          { label: 'Advisors', href: '/you/advisors' },
+          { label: 'Roster', href: '/you/advisors/advisors' },
+          { label: panel.name, href: `/you/advisors/advisors/panels/${panel.id}` },
         ],
       }}
     />

@@ -62,6 +62,12 @@ const nextConfig: NextConfig = {
 
   async redirects() {
     return [
+      /**
+       * The You tab Board became Advisors (plan #2581.2). Every old /you/board
+       * link, in a notification, a Dash reply or a note, lands on the same page.
+       */
+      { source: '/you/board', destination: '/you/advisors', permanent: true },
+      { source: '/you/board/:path*', destination: '/you/advisors/:path*', permanent: true },
       ...MOVED_TO_SHOPPING.map((section) => ({
         source: `/${section}/:path*`,
         destination: `/shopping/${section}/:path*`,

@@ -52,7 +52,7 @@ export type AddStart = 'closed' | 'form' | 'error';
 
 export const SAMPLE_NAME = 'Marcus Aurelius';
 export const SAMPLE_FOCUS = 'How to act well when you do not control the outcome.';
-export const SAMPLE_ADD_ERROR = 'Marcus Aurelius is already on your board.';
+export const SAMPLE_ADD_ERROR = 'Marcus Aurelius is already on your advisors.';
 
 export function AdvisorsView({
   advisors,
@@ -302,7 +302,7 @@ function AdvisorRow({
         </span>
         {guest && (
           <Tooltip
-            label={active ? 'The chair may bring them in' : 'Kept off the board'}
+            label={active ? 'The chair may bring them in' : 'Kept off the advisors'}
             align="end"
           >
             <Switch
@@ -400,13 +400,13 @@ function PanelRow({
         setError(result.error);
         return;
       }
-      router.push('/you/board');
+      router.push('/you/advisors');
     });
   };
   const why = running ? MEETING_RUNNING_MESSAGE : empty ? `${panel.name} has no advisors yet` : null;
   return (
     <li className="card-pad-x row-pad relative">
-      <RowLink href={`/you/board/advisors/panels/${panel.id}`} className="block min-h-11 hover:bg-sunken">
+      <RowLink href={`/you/advisors/advisors/panels/${panel.id}`} className="block min-h-11 hover:bg-sunken">
         {/* The press sits over the name line's empty right; the member line below takes the full width. */}
         <span className="block min-h-8 pr-48 text-ui text-ink">{panel.name}</span>
         <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">{members}</span>
@@ -450,7 +450,7 @@ function NewPanelRow({ create }: { create: AdvisorActions['createPanel'] }) {
         setError(result.error ?? 'The panel was not made. Try again.');
         return;
       }
-      router.push(`/you/board/advisors/panels/${result.panelId}`);
+      router.push(`/you/advisors/advisors/panels/${result.panelId}`);
     });
   };
   return (

@@ -96,7 +96,7 @@ export async function voteOnDisagreement(
       value,
       note: note ?? null,
     });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: null, saved };
   } catch (error) {
     return failed(error, 'Your vote was not saved. Try again.');
@@ -113,7 +113,7 @@ export async function answerBoardQuestion(id: string, answer: string): Promise<B
     if (!found.minutes.question) return { error: 'This meeting asked no question.' };
     if (!answer.trim()) {
       await clearBoardMark(found.client, found.user.id, id, 'answer', 'question');
-      revalidatePath('/you/board');
+      revalidatePath('/you/advisors');
       return { error: null, saved: null };
     }
     const saved = await saveBoardMark(found.client, found.user.id, id, {
@@ -121,7 +121,7 @@ export async function answerBoardQuestion(id: string, answer: string): Promise<B
       item: 'question',
       value: answer,
     });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: null, saved };
   } catch (error) {
     return failed(error, 'Your answer was not saved. Try again.');
@@ -146,7 +146,7 @@ export async function markResolution(
       item,
       value: done ? 'done' : 'open',
     });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: null, saved };
   } catch (error) {
     return failed(error, 'Your tick was not saved. Try again.');
@@ -175,7 +175,7 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
       found.user.id,
       {
         title: title.length > 500 ? `${title.slice(0, 499)}…` : title,
-        body: `From the board's [${meetingTitle(found.meeting)}](/you/board/${id}).`,
+        body: `From the advisors' [${meetingTitle(found.meeting)}](/you/advisors/${id}).`,
         dueOn: resolution.day,
         dueTime: null,
         pinned: false,
@@ -191,7 +191,7 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
       value: existing?.value ?? 'open',
       todoId: task.id,
     });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     revalidatePath('/todo');
     return { error: null, saved };
   } catch (error) {
@@ -200,7 +200,7 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
 }
 
 /**
- * Ask the board a question: save it queued, and with `now` convene a meeting
+ * Ask the advisors a question: save it queued, and with `now` convene a meeting
  * about it at once. A meeting that cannot start leaves the question queued
  * for Sunday and says why, with `queued` and its id so the card can close
  * and the question's row can say why.
@@ -215,7 +215,7 @@ export async function askBoard(
     const client = await createYouClient();
     const result = await putQuestionToBoard({ client, userId: user.id, question: input, when });
     if (!result.ok) return { error: result.error };
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: result.convening, queued: true, questionId: result.question.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your question was not saved. Try again.' };
@@ -225,7 +225,7 @@ export async function askBoard(
 const questionId = z.string().uuid();
 
 async function questionFor(id: string) {
-  if (!questionId.safeParse(id).success) return { error: 'That is not a question for the board.' } as const;
+  if (!questionId.safeParse(id).success) return { error: 'That is not a question for the advisors.' } as const;
   const user = await requireUser();
   const client = await createYouClient();
   const question = await loadBoardQuestion(client, user.id, id);
@@ -248,7 +248,7 @@ export async function acceptSuggestion(
     if (!moved) return { error: 'This suggestion has already been taken up or dismissed.' };
     const result =
       when === 'now' ? await convene(found.client, found.user.id, found.question) : { error: null };
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return result;
   } catch (error) {
     return {
@@ -266,7 +266,7 @@ export async function dismissSuggestion(id: string): Promise<{ error: string | n
     const moved = await moveBoardQuestion(found.client, found.user.id, id, ['suggested'], {
       status: 'dismissed',
     });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: moved ? null : 'This suggestion has already been taken up or dismissed.' };
   } catch (error) {
     return {
@@ -298,7 +298,7 @@ export async function decideQuestion(
       return { error: 'This question has not been through a meeting, so there is nothing to decide yet.' };
     const saved = await decideBoardQuestion(client, user.id, id, choice, note ?? null);
     if (!saved) return { error: 'This question changed while you were looking. Read the page again.' };
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your decision was not saved. Try again.' };
@@ -321,10 +321,10 @@ export async function conveneQuestion(id: string): Promise<{ error: string | nul
         ? await loadBoardMeeting(client, user.id, question.meetingId)
         : null;
       if (held && meetingState(held.meeting).kind !== 'failed') {
-        return { error: 'The board is already working on this question.' };
+        return { error: 'The advisors are already working on this question.' };
       }
     } else if (question.status !== 'queued' && question.status !== 'deferred') {
-      return { error: 'This question is not waiting on the board.' };
+      return { error: 'This question is not waiting on the advisors.' };
     }
     if (question.status !== 'queued') {
       const moved = await moveBoardQuestion(client, user.id, id, ['discussing', 'deferred'], {
@@ -334,7 +334,7 @@ export async function conveneQuestion(id: string): Promise<{ error: string | nul
       if (!moved) return { error: 'This question changed while you were looking. Read the page again.' };
     }
     const result = await convene(client, user.id, question);
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The meeting did not start. Try again.' };
@@ -362,8 +362,8 @@ export async function addBoardAdvisor(input: {
       focus: input.focus,
       routine: boardRoutine(),
     });
-    revalidatePath('/you/board');
-    revalidatePath('/you/board/advisors');
+    revalidatePath('/you/advisors');
+    revalidatePath('/you/advisors/advisors');
     return { error: result.error, saved: Boolean(result.advisorId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The advisor was not added. Try again.' };
@@ -378,7 +378,7 @@ export async function retryAdvisorBrain(advisorId: string): Promise<{ error: str
     const user = await requireUser();
     const client = await createYouClient();
     const result = await retryBuild({ client, userId: user.id, advisorId, routine: boardRoutine() });
-    revalidatePath('/you/board/advisors');
+    revalidatePath('/you/advisors/advisors');
     return { error: result.started ? null : result.error };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The build did not start. Try again.' };
@@ -396,8 +396,8 @@ export async function setAdvisorActive(
     const user = await requireUser();
     const client = await createYouClient();
     const result = await setActive({ client, userId: user.id, advisorId, active });
-    revalidatePath('/you/board');
-    revalidatePath('/you/board/advisors');
+    revalidatePath('/you/advisors');
+    revalidatePath('/you/advisors/advisors');
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
@@ -418,14 +418,14 @@ export async function answerBoardAsk(
   const problem = answerError(answer);
   if (problem) return { error: problem };
   if (!meetingId.safeParse(questionId).success || !askId || askId.length > 40)
-    return { error: 'That is not a question the board asked.' };
+    return { error: 'That is not a question the advisors asked.' };
   try {
     const user = await requireUser();
     const client = await createYouClient();
     const result = await answerAsk(client, user.id, questionId, askId, answer);
-    if (result === 'missing') return { error: 'That question is no longer on your board.' };
+    if (result === 'missing') return { error: 'That question is no longer on your advisors.' };
     if (result === 'changed') return { error: 'This question changed while you were looking. Read the page again.' };
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: null };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Your answer was not saved. Try again.' };
@@ -447,7 +447,7 @@ export async function startMeeting(panelId: string | null): Promise<{ error: str
     const panel = panelId === null ? null : await loadPanel(client, user.id, panelId);
     if (panelId !== null && !panel) return { error: 'That panel is not yours or no longer exists.' };
     const result = await startBoardMeeting({ client, userId: user.id, routine: boardRoutine(), panel });
-    revalidatePath('/you/board');
+    revalidatePath('/you/advisors');
     return { error: result.started ? null : result.error };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The meeting did not start. Try again.' };
@@ -472,7 +472,7 @@ export async function createBoardPanel(): Promise<PanelResult> {
     const user = await requireUser();
     const client = await createYouClient();
     const panel = await createPanel(client, user.id);
-    revalidatePath('/you/board/advisors');
+    revalidatePath('/you/advisors/advisors');
     return { error: null, panelId: panel.id };
   } catch (error) {
     return panelFailed(error, 'The panel was not made. Try again.');
@@ -490,8 +490,8 @@ export async function renameBoardPanel(id: string, name: string): Promise<PanelR
     const client = await createYouClient();
     const saved = await updatePanel(client, user.id, id, { name: clean.name });
     if (!saved) return { error: 'That panel is not yours or no longer exists.' };
-    revalidatePath('/you/board/advisors');
-    revalidatePath(`/you/board/advisors/panels/${id}`);
+    revalidatePath('/you/advisors/advisors');
+    revalidatePath(`/you/advisors/advisors/panels/${id}`);
     return { error: null };
   } catch (error) {
     return panelFailed(error, 'The name was not saved. Try again.');
@@ -513,8 +513,8 @@ export async function setBoardPanelAdvisors(id: string, advisors: string[]): Pro
     if (!clean.ok) return { error: clean.error };
     const saved = await updatePanel(client, user.id, id, { advisors: clean.advisors });
     if (!saved) return { error: 'That panel is not yours or no longer exists.' };
-    revalidatePath('/you/board/advisors');
-    revalidatePath(`/you/board/advisors/panels/${id}`);
+    revalidatePath('/you/advisors/advisors');
+    revalidatePath(`/you/advisors/advisors/panels/${id}`);
     return { error: null };
   } catch (error) {
     return panelFailed(error, 'The panel was not saved. Try again.');
@@ -529,8 +529,8 @@ export async function deleteBoardPanel(id: string): Promise<PanelResult> {
     const user = await requireUser();
     const client = await createYouClient();
     await removePanel(client, user.id, id);
-    revalidatePath('/you/board');
-    revalidatePath('/you/board/advisors');
+    revalidatePath('/you/advisors');
+    revalidatePath('/you/advisors/advisors');
     return { error: null };
   } catch (error) {
     return panelFailed(error, 'The panel was not deleted. Try again.');

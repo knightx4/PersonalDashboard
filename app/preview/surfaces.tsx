@@ -3353,7 +3353,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-  { href: '/you/board', label: 'Board', icon: 'board' },
+  { href: '/you/advisors', label: 'Advisors', icon: 'board' },
 ];
 
 const triageCrumbs = [

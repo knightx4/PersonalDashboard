@@ -6,7 +6,7 @@ import { loadPanel } from '@/lib/you/board-panels';
 import { deleteBoardPanel, renameBoardPanel, setBoardPanelAdvisors } from '../../../actions';
 import { PanelView } from './panel-view';
 
-export const metadata = { title: 'Board panel' };
+export const metadata = { title: 'Advisor panel' };
 export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,9 +32,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
-          { label: panel.name, href: `/you/board/advisors/panels/${id}` },
+          { label: 'Advisors', href: '/you/advisors' },
+          { label: 'Roster', href: '/you/advisors/advisors' },
+          { label: panel.name, href: `/you/advisors/advisors/panels/${id}` },
         ],
       }}
     />

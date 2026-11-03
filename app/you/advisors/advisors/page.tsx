@@ -6,7 +6,7 @@ import { listPanels } from '@/lib/you/board-panels';
 import { addBoardAdvisor, createBoardPanel, retryAdvisorBrain, setAdvisorActive, startMeeting } from '../actions';
 import { AdvisorsView } from './advisors-view';
 
-export const metadata = { title: 'Board advisors' };
+export const metadata = { title: 'Advisors roster' };
 export const dynamic = 'force-dynamic';
 
 /** The time the page is read; outside the component, since reading the clock during render is unstable. */
@@ -36,8 +36,8 @@ export default async function Page() {
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
+          { label: 'Advisors', href: '/you/advisors' },
+          { label: 'Roster', href: '/you/advisors/advisors' },
         ],
       }}
       actions={{

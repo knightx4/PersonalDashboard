@@ -46,13 +46,13 @@ export function VerdictCard({
   return (
     <Card padding="standard" className="space-y-3" data-board-verdict>
       <p className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
-        {recommended ? `The board recommends ${recommended}` : 'The board did not settle on one option'}
+        {recommended ? `The advisors recommends ${recommended}` : 'The advisors did not settle on one option'}
       </p>
       {verdict.conditions.length > 0 && (
         <VerdictList title="On these conditions" items={verdict.conditions} />
       )}
       {verdict.assumptions.length > 0 && (
-        <VerdictList title="Assumed, because the board did not know" items={verdict.assumptions} />
+        <VerdictList title="Assumed, because the advisors did not know" items={verdict.assumptions} />
       )}
       {verdict.dissent.length > 0 && (
         <div className="space-y-1">
@@ -158,8 +158,8 @@ export function DecisionCard({
         {decision.kind === 'option' && recommended && (
           <p className="text-ui text-ink-muted">
             {decision.option === recommended
-              ? 'The board recommended it.'
-              : `The board recommended ${optionLabel(question.options, recommended)}.`}
+              ? 'The advisors recommended it.'
+              : `The advisors recommended ${optionLabel(question.options, recommended)}.`}
           </p>
         )}
         {decision.note && <Prose markdown={decision.note} />}
