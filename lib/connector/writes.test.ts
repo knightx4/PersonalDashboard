@@ -339,7 +339,8 @@ describe('the writes shared with Ask Dash', () => {
       const closed = await runConnectorWrite(tool('close_goal_step'), context, { step_ref: STEP });
       expect(closed).toMatchObject({ ok: true, rows: [{ table: 'goals.items', ref: STEP }] });
       expect(tables['goals.items'].find((row) => row.id === STEP)).toMatchObject({ status: 'done' });
-      expect(actors).toEqual(['claude', 'claude']);
+      // The close is the person's own, so the evidence rule for Dash's runs does not apply.
+      expect(actors).toEqual(['claude', undefined]);
       expect(tables['core.dash_actions'].map((row) => row.kind)).toEqual(['add_goal_step', 'close_goal_step']);
     });
 
