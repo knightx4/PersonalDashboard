@@ -170,6 +170,7 @@ const conceptMaterial: ClaimMaterialView = {
       lengthChars: 5200,
       tStartSeconds: 724,
       tEndSeconds: 1110,
+      openUrl: 'https://www.youtube.com/watch?v=example1&t=724',
       item: {
         id: 'item1',
         title: 'Elasticity and total revenue',
@@ -190,6 +191,7 @@ const conceptMaterial: ClaimMaterialView = {
       lengthChars: 3100,
       tStartSeconds: null,
       tEndSeconds: null,
+      openUrl: 'https://openstax.org/books/principles-economics-3e/pages/5-1#Price_elasticity_of_demand',
       item: {
         id: 'item2',
         title: 'Principles of Economics, chapter 5: Elasticity',
