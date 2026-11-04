@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { threadBlocks } from '@/lib/you/chat-threads-model';
 import {
   cleanGroupTitle,
   cleanMemberKeys,
   createGroup,
   defaultGroupTitle,
   deleteGroup,
+  groupPreviewOf,
+  reactionSummary,
   memberChange,
   renameGroup,
   setGroupMembers,
@@ -183,5 +186,70 @@ describe('setGroupMembers', () => {
     const { client, calls } = fakeClient(group);
     expect(await setGroupMembers(client, USER, 'g1', ['ben'])).toMatchObject({ ok: false });
     expect(calls.some((c) => c.op !== 'select')).toBe(false);
+  });
+});
+
+describe('a group in the Messages list (plan #2879.1.3)', () => {
+  const members = [
+    { id: 'a', key: 'ada', name: 'Ada Lovelace', colour: '#4a5fd0', typingUntil: null },
+    { id: 'b', key: 'ben', name: 'Ben Franklin', colour: '#8a6d3b', typingUntil: '2026-11-03T09:00:20Z' },
+    { id: 'c', key: 'cy', name: 'Cy Twombly', colour: '#2f7d4f', typingUntil: '2026-11-03T09:00:30Z' },
+  ];
+  const row = {
+    kind: 'group' as const,
+    id: 'g1',
+    name: null,
+    title: 'Ada, Ben and Cy',
+    members,
+    last: { text: 'Take it.', role: 'advisor' as const, speaker: 'Ada Lovelace', at: '2026-11-03T08:00:00Z' },
+    unread: false,
+  };
+  const now = Date.parse('2026-11-03T09:00:00Z');
+
+  it('says who is typing, then who said the last thing', () => {
+    expect(groupPreviewOf(row, now)).toBe('Ben and Cy are typing…');
+    expect(groupPreviewOf(row, now + 25_000)).toBe('Cy is typing…');
+    expect(groupPreviewOf(row, now + 60_000)).toBe('Ada: Take it.');
+    expect(groupPreviewOf({ ...row, last: null }, now + 60_000)).toBe('Say hello to the group');
+  });
+
+  it('groups reactions by glyph with who gave each', () => {
+    expect(
+      reactionSummary(
+        [
+          { advisorId: 'a', reaction: 'laugh' },
+          { advisorId: 'b', reaction: 'heart' },
+          { advisorId: 'c', reaction: 'heart' },
+        ],
+        members,
+      ),
+    ).toEqual([
+      { reaction: 'heart', glyph: '❤️', who: ['Ben', 'Cy'] },
+      { reaction: 'laugh', glyph: '😂', who: ['Ada'] },
+    ]);
+  });
+
+  it('starts a new run in a thread when another bot speaks', () => {
+    const m = (id: string, speakerId: string | null, at: string) => ({
+      id,
+      chatId: 'g1',
+      role: speakerId ? ('advisor' as const) : ('person' as const),
+      kind: 'reply' as const,
+      text: id,
+      receipts: [],
+      createdAt: at,
+      deliveredAt: null,
+      readAt: null,
+      speakerId,
+    });
+    const blocks = threadBlocks(
+      [m('1', null, '2026-11-03T08:00:00Z'), m('2', 'a', '2026-11-03T08:00:10Z'), m('3', 'a', '2026-11-03T08:00:20Z'), m('4', 'b', '2026-11-03T08:00:30Z')],
+      { timeZone: 'UTC', now },
+    );
+    expect(blocks.flatMap((b) => (b.kind === 'group' ? [[b.speakerId, b.messages.length]] : []))).toEqual([
+      [null, 1],
+      ['a', 2],
+      ['b', 1],
+    ]);
   });
 });

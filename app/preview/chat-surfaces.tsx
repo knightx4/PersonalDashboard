@@ -6,6 +6,9 @@ import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
 import { ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
+import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
+import { GroupThreadView } from '@/app/chat/groups/[id]/group-thread-view';
+import { groupTitleOf, type GroupMember, type GroupRow, type Reacted } from '@/lib/you/group-chats-model';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -189,6 +192,100 @@ export const EVERYONE: PersonRow[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// A group (plan #2879.1.3): Benjamin Franklin, the CFO and the Mentor.
+// ---------------------------------------------------------------------------
+
+const GROUP_ID = '00000000-0000-4000-8000-0000000000a1';
+
+function member(row: PersonRow, typingUntil: string | null = null): GroupMember {
+  return { id: row.id, key: row.key, name: row.name, colour: row.colour, typingUntil };
+}
+
+const GROUP_MEMBERS: GroupMember[] = [member(CHAT_PEOPLE[0]), member(CHAT_PEOPLE[1]), member(CHAT_PEOPLE[2])];
+
+function gmsg(id: string, speaker: string | null, text: string, createdAt: string): ThreadMessage {
+  return { ...msg(id, speaker ? 'advisor' : 'person', text, createdAt), chatId: GROUP_ID, speakerId: speaker };
+}
+
+/** A morning in the group: the person asks, two answer, one pushes back on the other, and the rest tap back. */
+const GROUP_THREAD: ThreadMessage[] = [
+  gmsg('g1', null, 'Northwind offered 12% more than I make now. Should I take it, or use it to ask for a raise here?', '2026-11-03T08:40:00Z'),
+  gmsg('g2', 'm1', 'Twelve percent is about $14,000 a year before tax. That is real, but it is not life changing on its own.', '2026-11-03T08:40:20Z'),
+  gmsg('g3', 'm1', 'What would the commute cost you?', '2026-11-03T08:40:30Z'),
+  gmsg('g4', 'm3', 'Ask yourself which job you would want in three years. The money follows the work you get good at.', '2026-11-03T08:41:00Z'),
+  gmsg('g5', 'm2', 'Mentor, that is too easy. A raise here costs nothing to ask for, and you learn what they think you are worth.', '2026-11-03T08:41:30Z'),
+  gmsg('g6', null, 'The commute is the same. I think I want the work at Northwind more.', '2026-11-03T08:50:00Z'),
+];
+
+const GROUP_REACTIONS: Record<string, Reacted[]> = {
+  g4: [{ advisorId: 'm2', reaction: 'thumbs_up' }],
+  g5: [
+    { advisorId: 'm1', reaction: 'emphasis' },
+    { advisorId: 'm3', reaction: 'laugh' },
+  ],
+  g6: [{ advisorId: 'm1', reaction: 'heart' }],
+};
+
+export const GROUP_ROW: GroupRow = {
+  kind: 'group',
+  id: GROUP_ID,
+  name: 'Northwind offer',
+  title: 'Northwind offer',
+  members: GROUP_MEMBERS,
+  last: { role: 'advisor', speaker: 'The Mentor', text: 'Then that is your answer. Ask Northwind for the start date you want.', at: '2026-11-03T08:52:00Z' },
+  unread: true,
+};
+
+/** A group with no name, called by its members' first names. */
+const UNNAMED_GROUP: GroupRow = {
+  kind: 'group',
+  id: '00000000-0000-4000-8000-0000000000b2',
+  name: null,
+  title: groupTitleOf(null, [CHAT_PEOPLE[3].name, CHAT_PEOPLE[4].name]),
+  members: [member(CHAT_PEOPLE[3]), member(CHAT_PEOPLE[4])],
+  last: { role: 'person', speaker: null, text: 'Thanks, both of you.', at: '2026-10-29T10:00:00Z' },
+  unread: false,
+};
+
+export const MESSAGE_GROUPS: GroupRow[] = [GROUP_ROW, UNNAMED_GROUP];
+
+type GroupState = 'thread' | 'typing' | 'new' | 'settings' | 'settings-delete';
+
+/** A group open beside the list, in each of its states, and its settings. */
+export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
+  const typing = state === 'typing';
+  const members = typing
+    ? GROUP_MEMBERS.map((m) => (m.id === 'm1' || m.id === 'm3' ? { ...m, typingUntil: '2026-11-03T09:00:20Z' } : m))
+    : GROUP_MEMBERS;
+  // A group just started has no name of its own, so the list and the thread both call it by its members.
+  const unnamed = groupTitleOf(null, GROUP_MEMBERS.map((m) => m.name));
+  const groups = MESSAGE_GROUPS.map((g) =>
+    g.id === GROUP_ID ? { ...g, unread: false, members, ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}) } : g,
+  );
+  const messages = state === 'new' ? [] : typing ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
+  return (
+    <ChatShell path={`/chat/groups/${GROUP_ID}`}>
+      <PeopleView rows={MESSAGE_ROWS} groups={groups} current={GROUP_ID} timezone={ZONE} now={NOW} live={false}>
+        {state === 'settings' || state === 'settings-delete' ? (
+          <GroupSettings chatId={GROUP_ID} name="Northwind offer" members={GROUP_MEMBERS} everyone={EVERYONE} confirming={state === 'settings-delete'} />
+        ) : (
+          <GroupThreadView
+            chatId={GROUP_ID}
+            title={state === 'new' ? unnamed : 'Northwind offer'}
+            members={members}
+            former={[]}
+            page={{ messages, hasOlder: false, reactions: GROUP_REACTIONS }}
+            timezone={ZONE}
+            now={NOW}
+            live={false}
+          />
+        )}
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
 /** Messages with its chats, with none, not read, while loading, searched, or with New message open. */
 export function ChatPeopleSurface({
   state = 'people',
@@ -205,8 +302,9 @@ export function ChatPeopleSurface({
   if (state === 'new') {
     return (
       <ChatShell path="/chat">
-        <PeopleView rows={MESSAGE_ROWS} timezone={ZONE} now={NOW} live={false} adding>
-          <NewMessage everyone={EVERYONE} />
+        <PeopleView rows={MESSAGE_ROWS} groups={MESSAGE_GROUPS} timezone={ZONE} now={NOW} live={false} adding>
+          {/* Three picked, so the To line holds them and the group's name can be given (plan #2879.1.3). */}
+          <NewMessage everyone={EVERYONE} picked={['benjamin-franklin', 'cfo', 'mentor']} />
         </PeopleView>
       </ChatShell>
     );
@@ -214,6 +312,7 @@ export function ChatPeopleSurface({
   return (
     <ChatShell path="/chat">
       <PeopleView
+        groups={state === 'people' || state === 'search' || state === 'nothing-found' ? MESSAGE_GROUPS : []}
         rows={
           state === 'empty' || state === 'failed'
             ? []

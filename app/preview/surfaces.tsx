@@ -507,7 +507,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatArrivalMomentSurface, ChatGroupSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
@@ -8873,7 +8873,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPeopleSurface />,
   },
   {
-    /* New message open in the thread's place (plan #2879.2): a To box over everyone A to Z, one not ready to talk listed but not pickable, and Add someone new at the foot. */
+    /* New message open in the thread's place (plan #2879.2): a To box over everyone A to Z, one not ready to talk listed but not pickable; three picked for a group, with its name to give (plan #2879.1.3). */
     id: 'chat-people-new',
     label: 'Chat · Messages, New message',
     module: 'chat',
@@ -9003,6 +9003,46 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="loading" />,
+  },
+  {
+    /* A group chat open beside the list (plan #2879.1.3): each bot's run under its name and colour dot, one bot pushing back on another, and tap backs on the bubbles. */
+    id: 'chat-group',
+    label: 'Chat · A group chat open',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface />,
+  },
+  {
+    /* Two bots typing at once in a group: each one's dots under its own name, and "are typing…" in the group's row. */
+    id: 'chat-group-typing',
+    label: 'Chat · A group chat, two bots typing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="typing" />,
+  },
+  {
+    /* A group just started from New message, nothing said yet, called by its members' first names. */
+    id: 'chat-group-new',
+    label: 'Chat · A group chat never written in',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="new" />,
+  },
+  {
+    /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
+    id: 'chat-group-settings',
+    label: 'Chat · A group chat, settings',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="settings" />,
+  },
+  {
+    /* Delete group asked about once more, at the foot of the settings. */
+    id: 'chat-group-settings-delete',
+    label: 'Chat · A group chat, deleting it',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="settings-delete" />,
   },
   {
     /* The Bots tab (plan #2879.3): every bot A to Z, a long name and one not ready to talk among them, Add a bot at the head, and on a laptop the prompt to choose one. */

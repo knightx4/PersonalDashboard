@@ -9,6 +9,15 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
 import {
+  createGroup,
+  deleteGroup,
+  groupHref,
+  loadGroupThreadPage,
+  renameGroup,
+  setGroupMembers,
+  type Reacted,
+} from '@/lib/you/group-chats';
+import {
   addPerson,
   ASK_MAX,
   briefOf,
@@ -62,6 +71,92 @@ export async function startChatWith(key: string): Promise<{ href: string } | { e
   } catch (error) {
     console.error('chat not started', error);
     return { error: 'The chat could not be started. Try again.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Group chats (plan #2879.1.3).
+// ---------------------------------------------------------------------------
+
+const keysOf = (keys: unknown): string[] | null =>
+  Array.isArray(keys) && keys.length <= 20 && keys.every((k) => typeof k === 'string' && KEY.test(k)) ? (keys as string[]) : null;
+
+/** New message with two to eight picked: start the group and say where it is. */
+// latency: pending
+export async function startGroupWith(keys: string[], name: string): Promise<{ href: string } | { error: string }> {
+  const user = await requireUser();
+  const picked = keysOf(keys);
+  if (!picked) return { error: 'That group cannot be started.' };
+  try {
+    const made = await createGroup(await createYouClient(), user.id, { keys: picked, title: typeof name === 'string' ? name : null });
+    if (!made.ok) return { error: made.error };
+    revalidatePath('/chat');
+    return { href: groupHref(made.value.chatId) };
+  } catch (error) {
+    console.error('group not started', error);
+    return { error: 'The group could not be started. Try again.' };
+  }
+}
+
+/** A group's settings saved: its name and who is in it, together. */
+// latency: pending
+export async function saveGroup(chatId: string, input: { name: string; keys: string[] }): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const picked = keysOf(input?.keys);
+  if (!UUID.test(chatId) || !picked) return { error: 'That group cannot be changed.' };
+  const client = await createYouClient();
+  try {
+    const renamed = await renameGroup(client, user.id, chatId, typeof input.name === 'string' ? input.name : '');
+    if (!renamed.ok) return { error: renamed.error };
+    const changed = await setGroupMembers(client, user.id, chatId, picked);
+    if (!changed.ok) return { error: changed.error };
+    revalidatePath('/chat', 'layout');
+    return { error: null };
+  } catch (error) {
+    console.error('group not saved', error);
+    return { error: 'Your changes were not saved. Try again.' };
+  }
+}
+
+/** Delete a group with everything said in it. */
+// latency: pending
+export async function deleteGroupChat(chatId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(chatId)) return { error: 'That group is not there.' };
+  try {
+    const gone = await deleteGroup(await createYouClient(), user.id, chatId);
+    if (!gone) return { error: 'That group is not there any more.' };
+    revalidatePath('/chat', 'layout');
+    return { error: null };
+  } catch (error) {
+    console.error('group not deleted', error);
+    return { error: 'The group was not deleted. Try again.' };
+  }
+}
+
+// latency: pending
+export async function olderGroupMessages(
+  chatId: string,
+  before: string,
+): Promise<{ messages: ThreadPage['messages']; hasOlder: boolean; reactions: Record<string, Reacted[]> } | { error: string }> {
+  const user = await requireUser();
+  if (!UUID.test(chatId) || !Number.isFinite(Date.parse(before))) return { error: 'Those messages cannot be read.' };
+  try {
+    return await loadGroupThreadPage(await createYouClient(), user.id, chatId, before);
+  } catch (error) {
+    console.error('older group messages not read', error);
+    return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+// latency: instant
+export async function readGroup(chatId: string): Promise<void> {
+  const user = await requireUser();
+  if (!UUID.test(chatId)) return;
+  try {
+    await markThreadRead(await createYouClient(), user.id, chatId);
+  } catch (error) {
+    console.error('group not marked read', error);
   }
 }
 

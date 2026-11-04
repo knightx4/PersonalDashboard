@@ -22,7 +22,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -36,6 +36,8 @@ export type ThreadMessage = {
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
+  /** In a group, the bot that wrote it (plan #2879.1.3); null or absent elsewhere. */
+  speakerId?: string | null;
 };
 
 /** A page of a thread, oldest first, and whether there is more before it. */
@@ -59,6 +61,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     createdAt: str(row.created_at),
     deliveredAt: strOrNull(row.delivered_at),
     readAt: strOrNull(row.read_at),
+    speakerId: strOrNull(row.speaker_id),
   };
 }
 
@@ -285,7 +288,7 @@ export type SearchHit = {
 
 export type ThreadBlock =
   | { kind: 'day'; key: string; label: string }
-  | { kind: 'group'; key: string; from: 'you' | 'them'; messages: ThreadMessage[] };
+  | { kind: 'group'; key: string; from: 'you' | 'them'; messages: ThreadMessage[]; speakerId?: string | null };
 
 /**
  * The thread as it is drawn: a day label wherever the day changes, and
@@ -306,8 +309,10 @@ export function threadBlocks(messages: readonly ThreadMessage[], options: { time
     }
     const from = m.role === 'person' ? 'you' : 'them';
     const at = Date.parse(m.createdAt);
-    if (!group || group.from !== from || at - lastAt > GROUP_GAP_MS) {
-      group = { kind: 'group', key: `group-${m.id}`, from, messages: [] };
+    // In a group a run is one bot's: a different bot starts a new one (plan #2879.1.3).
+    const speakerId = from === 'them' ? (m.speakerId ?? null) : null;
+    if (!group || group.from !== from || (group.speakerId ?? null) !== speakerId || at - lastAt > GROUP_GAP_MS) {
+      group = { kind: 'group', key: `group-${m.id}`, from, messages: [], speakerId };
       out.push(group);
     }
     group.messages.push(m);

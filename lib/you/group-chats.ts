@@ -1,8 +1,17 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
-import { mentorColour } from '@/lib/you/chat-threads-model';
+import { mentorColour, THREAD_MESSAGE_COLUMNS, THREAD_PAGE, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
 import { canTalkOf } from '@/lib/you/people-cards-model';
-import { cleanGroupTitle, cleanMemberKeys, groupTitleOf, memberChange, type GroupMember } from '@/lib/you/group-chats-model';
+import {
+  cleanGroupTitle,
+  cleanMemberKeys,
+  groupTitleOf,
+  isReaction,
+  memberChange,
+  type GroupMember,
+  type GroupRow,
+  type Reacted,
+} from '@/lib/you/group-chats-model';
 
 export * from '@/lib/you/group-chats-model';
 
@@ -218,6 +227,109 @@ export async function loadMembersOf(
       typingUntil: strOrNull(r.typing_until),
     };
     (r.left_at ? entry.former : entry.members).push(member);
+  }
+  return out;
+}
+
+/** Every group of theirs, as the Messages list draws it, newest message first. */
+export async function loadGroupRows(client: YouSupabaseClient, userId: string): Promise<GroupRow[]> {
+  const chats = await client
+    .from('advisor_chats')
+    .select('id, title, last_read_at, last_message_at, created_at')
+    .eq('user_id', userId)
+    .eq('kind', 'group')
+    .order('last_message_at', { ascending: false, nullsFirst: false });
+  if (chats.error) throw new Error(`Reading your groups failed: ${chats.error.message}`);
+  const rows = (chats.data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => str(r.id)).filter(Boolean);
+  const members = await loadMembersOf(client, userId, ids);
+  return Promise.all(
+    rows.map(async (row): Promise<GroupRow> => {
+      const id = str(row.id);
+      const lastReadAt = strOrNull(row.last_read_at);
+      const { members: inGroup, former } = members.get(id) ?? { members: [], former: [] };
+      let unreadQuery = client
+        .from('advisor_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('chat_id', id)
+        .eq('role', 'advisor')
+        .is('read_at', null);
+      if (lastReadAt) unreadQuery = unreadQuery.gt('created_at', lastReadAt);
+      const [last, unread] = await Promise.all([
+        client
+          .from('advisor_messages')
+          .select('role, text, speaker_id, created_at')
+          .eq('user_id', userId)
+          .eq('chat_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        unreadQuery,
+      ]);
+      if (last.error) throw new Error(`Reading a group failed: ${last.error.message}`);
+      if (unread.error) throw new Error(`Reading a group failed: ${unread.error.message}`);
+      const lastRow = last.data as Record<string, unknown> | null;
+      const text = str(lastRow?.text);
+      const speaker = [...inGroup, ...former].find((m) => m.id === str(lastRow?.speaker_id))?.name ?? null;
+      const name = strOrNull(row.title);
+      return {
+        kind: 'group',
+        id,
+        name,
+        title: groupTitleOf(name, inGroup.map((m) => m.name)),
+        members: inGroup,
+        last: lastRow && text ? { text, role: lastRow.role === 'advisor' ? 'advisor' : 'person', speaker, at: str(lastRow.created_at) } : null,
+        unread: (unread.count ?? 0) > 0,
+      };
+    }),
+  );
+}
+
+/** A group thread's page with its reactions: the newest, or the page before `before`. */
+export async function loadGroupThreadPage(
+  client: YouSupabaseClient,
+  userId: string,
+  chatId: string,
+  before?: string | null,
+): Promise<{ messages: ThreadMessage[]; hasOlder: boolean; reactions: Record<string, Reacted[]> }> {
+  let query = client
+    .from('advisor_messages')
+    .select(THREAD_MESSAGE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(THREAD_PAGE + 1);
+  if (before) query = query.lt('created_at', before);
+  const found = await query;
+  if (found.error) throw new Error(`Reading the group failed: ${found.error.message}`);
+  const rows = (found.data ?? []) as Record<string, unknown>[];
+  const messages = rows
+    .slice(0, THREAD_PAGE)
+    .flatMap((row) => {
+      const m = threadMessageOf(row);
+      return m ? [m] : [];
+    })
+    .reverse();
+  return { messages, hasOlder: rows.length > THREAD_PAGE, reactions: await loadReactions(client, userId, messages.map((m) => m.id)) };
+}
+
+/** The bots' reactions on these messages, by message id. */
+export async function loadReactions(client: YouSupabaseClient, userId: string, messageIds: readonly string[]): Promise<Record<string, Reacted[]>> {
+  const out: Record<string, Reacted[]> = {};
+  if (messageIds.length === 0) return out;
+  const { data, error } = await client
+    .from('advisor_message_reactions')
+    .select('message_id, advisor_id, reaction')
+    .eq('user_id', userId)
+    .in('message_id', [...messageIds]);
+  if (error) throw new Error(`Reading the reactions failed: ${error.message}`);
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const id = str(r.message_id);
+    if (!id || !isReaction(r.reaction)) continue;
+    (out[id] ??= []).push({ advisorId: str(r.advisor_id), reaction: r.reaction });
   }
   return out;
 }

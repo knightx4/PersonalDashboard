@@ -4,6 +4,7 @@ import Link from '@/components/ui/link';
 import { PageColumn } from '@/components/shell/page-width';
 import type { PersonRow, SearchHit } from '@/lib/you/chat-threads-model';
 import { NEW_MESSAGE_HREF } from '@/lib/you/chat-threads-model';
+import type { GroupRow } from '@/lib/you/group-chats-model';
 import { PeopleList } from './people-list';
 
 /**
@@ -21,6 +22,7 @@ import { PeopleList } from './people-list';
  */
 export function PeopleView({
   rows,
+  groups = [],
   failed = false,
   query = null,
   hits = null,
@@ -33,6 +35,8 @@ export function PeopleView({
   children,
 }: {
   rows: readonly PersonRow[];
+  /** Group chats (plan #2879.1.3), listed with the direct ones. */
+  groups?: readonly GroupRow[];
   failed?: boolean;
   query?: string | null;
   hits?: readonly SearchHit[] | null;
@@ -48,7 +52,7 @@ export function PeopleView({
   /** The open thread, when one is. */
   children?: React.ReactNode;
 }) {
-  if (!failed && rows.length === 0 && !adding) {
+  if (!failed && rows.length === 0 && groups.length === 0 && !adding) {
     // Nobody to talk to: one card with the way to the Council, and no empty thread pane beside it.
     return (
       <PageColumn>
@@ -90,7 +94,7 @@ export function PeopleView({
     <Messaging
       label="Messages"
       open={Boolean(children) && !newest}
-      list={<PeopleList rows={rows} current={current} currentWide={newest} query={query} hits={hits} timezone={timezone} now={now} live={live} />}
+      list={<PeopleList rows={rows} groups={groups} current={current} currentWide={newest} query={query} hits={hits} timezone={timezone} now={now} live={live} />}
     >
       {children ?? (
         <MessagingPlaceholder>

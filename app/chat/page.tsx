@@ -11,7 +11,8 @@ import {
   type SearchHit,
   type ThreadPage,
 } from '@/lib/you/chat-threads';
-import { olderMessages, readThread, startChatWith } from './actions';
+import { loadGroupRows, type GroupRow } from '@/lib/you/group-chats';
+import { olderMessages, readThread, startChatWith, startGroupWith } from './actions';
 import { NewMessage } from './new-message';
 import { ThreadView } from './people/[key]/thread-view';
 import { PeopleView } from './people-view';
@@ -29,6 +30,8 @@ type Found = {
   everyone: PersonRow[];
   /** Those with a chat, which the list shows. */
   rows: PersonRow[];
+  /** Group chats (plan #2879.1.3), listed with them. */
+  groups: GroupRow[];
   hits: SearchHit[] | null;
   newest: { person: PersonRow; page: ThreadPage } | null;
   failed?: true;
@@ -53,19 +56,19 @@ export default async function ChatMessagesPage({
   const client = await createYouClient();
   const now = readAt();
   const [found, settings] = await Promise.all([
-    loadPeople(client, user.id).then(
-      async (everyone): Promise<Found> => {
+    Promise.all([loadPeople(client, user.id), loadGroupRows(client, user.id)]).then(
+      async ([everyone, groups]): Promise<Found> => {
         const rows = withChats(everyone);
         const first = rows.find((r) => r.chatId && r.last);
         const [hits, page] = await Promise.all([
           query ? searchThreads(client, user.id, query, rows) : null,
           first?.chatId ? loadThreadPage(client, user.id, first.chatId) : null,
         ]);
-        return { everyone, rows, hits, newest: first && page ? { person: first, page } : null };
+        return { everyone, rows, groups, hits, newest: first && page ? { person: first, page } : null };
       },
       (error: unknown): Found => {
         console.error('chat people were not read', error);
-        return { everyone: [], rows: [], hits: null, newest: null, failed: true };
+        return { everyone: [], rows: [], groups: [], hits: null, newest: null, failed: true };
       },
     ),
     loadAccountSettings(user.id),
@@ -73,14 +76,15 @@ export default async function ChatMessagesPage({
   const newest = found.newest;
   if (composing && !found.failed) {
     return (
-      <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
-        <NewMessage everyone={found.everyone} start={startChatWith} />
+      <PeopleView rows={found.rows} groups={found.groups} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
+        <NewMessage everyone={found.everyone} start={startChatWith} startGroup={startGroupWith} />
       </PeopleView>
     );
   }
   return (
     <PeopleView
       rows={found.rows}
+      groups={found.groups}
       failed={found.failed}
       query={query}
       hits={found.hits}

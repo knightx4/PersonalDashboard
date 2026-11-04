@@ -37,9 +37,19 @@ export type GroupMember = {
   typingUntil: string | null;
 };
 
-/** A name's first word, for the default title and for addressing. */
+const HONORIFICS = new Set(['dr', 'dr.', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.', 'sir', 'dame']);
+
+/**
+ * What to call someone in a group, for the default title and for addressing:
+ * a seat keeps its whole name ("The CFO"), a title is skipped ("Dr Ada
+ * Smith" is "Ada"), and anyone else goes by their first word.
+ */
 export function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? '';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  if (words[0].toLowerCase() === 'the') return words.join(' ');
+  if (words.length > 1 && HONORIFICS.has(words[0].toLowerCase())) return words[1];
+  return words[0];
 }
 
 /** What a group with no name is called: its members' first names, three at most and a count of the rest. */
@@ -73,6 +83,81 @@ export function cleanMemberKeys(keys: readonly string[]): { ok: true; keys: stri
   if (unique.length < GROUP_MIN) return { ok: false, error: 'A group needs at least two bots.' };
   if (unique.length > GROUP_MAX) return { ok: false, error: `A group holds at most ${GROUP_MAX} bots.` };
   return { ok: true, keys: unique };
+}
+
+// ---------------------------------------------------------------------------
+// Groups on the Messages tab (plan #2879.1.3).
+// ---------------------------------------------------------------------------
+
+/** A group in the Messages list. */
+export type GroupRow = {
+  kind: 'group';
+  /** The chat's id, which its address and the send name. */
+  id: string;
+  title: string;
+  /** The name the person gave it, or null for the members' first names. */
+  name: string | null;
+  members: GroupMember[];
+  last: { text: string; role: 'person' | 'advisor'; speaker: string | null; at: string } | null;
+  unread: boolean;
+};
+
+/** Where a group's thread is. */
+export function groupHref(id: string): string {
+  return `/chat/groups/${id}`;
+}
+
+/** A group's settings: rename, members, delete, in the thread's place. */
+export function groupSettingsHref(id: string): string {
+  return `/chat/groups/${id}?settings=1`;
+}
+
+/** The members typing now, by first name. */
+export function typingNames(members: readonly GroupMember[], now: number): string[] {
+  return members
+    .filter((m) => {
+      const until = m.typingUntil ? Date.parse(m.typingUntil) : NaN;
+      return Number.isFinite(until) && until > now;
+    })
+    .map((m) => firstName(m.name));
+}
+
+/** "Ada", "Ada and Ben", "Ada, Ben and Cy" */
+export function namesList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** The line under a group's name: who is typing, the last thing said and by whom, or an invitation. */
+export function groupPreviewOf(row: GroupRow, now: number): string {
+  const typing = typingNames(row.members, now);
+  if (typing.length === 1) return `${typing[0]} is typing…`;
+  if (typing.length > 1) return `${namesList(typing)} are typing…`;
+  if (!row.last) return 'Say hello to the group';
+  if (row.last.role === 'person') return `You: ${row.last.text}`;
+  return row.last.speaker ? `${firstName(row.last.speaker)}: ${row.last.text}` : row.last.text;
+}
+
+/** Who is in a group, as the quiet line under its name in the thread. */
+export function groupDetailOf(members: readonly GroupMember[]): string {
+  return namesList(members.map((m) => firstName(m.name))) || 'No one in this group yet';
+}
+
+/** One bot's reaction on a message. */
+export type Reacted = { advisorId: string; reaction: Reaction };
+
+/** Reactions on one message, one glyph each with who gave it. */
+export function reactionSummary(list: readonly Reacted[], members: readonly GroupMember[]): { reaction: Reaction; glyph: string; who: string[] }[] {
+  const nameOf = new Map(members.map((m) => [m.id, firstName(m.name)]));
+  const out = new Map<Reaction, string[]>();
+  for (const r of list) out.set(r.reaction, [...(out.get(r.reaction) ?? []), nameOf.get(r.advisorId) ?? 'Someone']);
+  return REACTIONS.filter((r) => out.has(r)).map((reaction) => ({ reaction, glyph: REACTION_GLYPH[reaction], who: out.get(reaction) ?? [] }));
+}
+
+/** Who wrote a group's message: a member, one who left, or nobody known. */
+export function speakerOf(speakerId: string | null, members: readonly GroupMember[], former: readonly GroupMember[]): GroupMember | null {
+  if (!speakerId) return null;
+  return members.find((m) => m.id === speakerId) ?? former.find((m) => m.id === speakerId) ?? null;
 }
 
 /** Which members a change of membership takes out and which it adds, by advisor id. */

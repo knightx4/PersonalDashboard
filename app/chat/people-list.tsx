@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/field';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
+import { GroupMark } from './group-parts';
+import { groupHref, groupPreviewOf, typingNames, type GroupRow } from '@/lib/you/group-chats-model';
 import {
   isTyping,
   NEW_MESSAGE_HREF,
@@ -54,6 +56,8 @@ function useLiveThreads(live: boolean) {
       .channel(`chat-people:${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_chats' }, refresh)
       .on('postgres_changes', { event: 'INSERT', schema: 'you', table: 'advisor_messages' }, refresh)
+      // A bot typing in a group (plan #2879.1.3).
+      .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chat_members' }, refresh)
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
@@ -63,23 +67,39 @@ function useLiveThreads(live: boolean) {
 }
 
 /** Now, moved on when the soonest typing ends so "typing…" goes without a reload. */
-function useTypingClock(rows: readonly PersonRow[], start: number, live: boolean): number {
+function useTypingClock(rows: readonly PersonRow[], groups: readonly GroupRow[], start: number, live: boolean): number {
   const [now, setNow] = useState(start);
   useEffect(() => {
     if (!live) return;
-    const ends = rows
-      .map((r) => (r.typingUntil ? Date.parse(r.typingUntil) : NaN))
+    const ends = [...rows.map((r) => r.typingUntil), ...groups.flatMap((g) => g.members.map((m) => m.typingUntil))]
+      .map((t) => (t ? Date.parse(t) : NaN))
       .filter((t) => Number.isFinite(t) && t > now);
     if (ends.length === 0) return;
     const wait = Math.min(...ends) - now + 50;
     const timer = setTimeout(() => setNow(Date.now()), Math.max(wait, 50));
     return () => clearTimeout(timer);
-  }, [rows, now, live]);
+  }, [rows, groups, now, live]);
   return live ? Math.max(now, start) : start;
+}
+
+type Entry = { kind: 'person'; row: PersonRow; at: string | null } | { kind: 'group'; row: GroupRow; at: string | null };
+
+/** Direct chats and groups in one run, newest message first; those with nothing said after them, as sortPeople keeps them. */
+export function entriesOf(rows: readonly PersonRow[], groups: readonly GroupRow[]): Entry[] {
+  const said: Entry[] = [
+    ...rows.filter((r) => r.last).map((row): Entry => ({ kind: 'person', row, at: row.last?.at ?? null })),
+    ...groups.filter((g) => g.last).map((row): Entry => ({ kind: 'group', row, at: row.last?.at ?? null })),
+  ].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+  const quiet: Entry[] = [
+    ...groups.filter((g) => !g.last).map((row): Entry => ({ kind: 'group', row, at: null })),
+    ...rows.filter((r) => !r.last).map((row): Entry => ({ kind: 'person', row, at: null })),
+  ];
+  return [...said, ...quiet];
 }
 
 export function PeopleList({
   rows,
+  groups = [],
   current = null,
   currentWide = false,
   query = null,
@@ -89,7 +109,9 @@ export function PeopleList({
   live = true,
 }: {
   rows: readonly PersonRow[];
-  /** The key of the open thread, lit in the list. */
+  /** The groups (plan #2879.1.3), in the same run as the direct chats. */
+  groups?: readonly GroupRow[];
+  /** The key of the open thread, or the open group's id, lit in the list. */
   current?: string | null;
   /** The open thread shows only from laptop width (the newest, on /chat), so a phone does not light its row. */
   currentWide?: boolean;
@@ -103,9 +125,10 @@ export function PeopleList({
   live?: boolean;
 }) {
   useLiveThreads(live);
-  const now = useTypingClock(rows, start, live);
+  const now = useTypingClock(rows, groups, start, live);
   const listRef = useRef<HTMLUListElement>(null);
-  useRowArrival(listRef, rows);
+  const entries = entriesOf(rows, groups);
+  useRowArrival(listRef, entries.map((e) => e.row));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
@@ -134,9 +157,13 @@ export function PeopleList({
         // One run, as the reference: the threads newest first, then those never
         // written to, whose quiet "Say hello" is never a line of theirs (sortPeople).
         <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {rows.map((row) => (
-            <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
-          ))}
+          {entries.map((entry) =>
+            entry.kind === 'person' ? (
+              <PersonItem key={entry.row.id} row={entry.row} current={entry.row.key === current} wide={currentWide} timezone={timezone} now={now} />
+            ) : (
+              <GroupItem key={entry.row.id} row={entry.row} current={entry.row.id === current} wide={currentWide} timezone={timezone} now={now} />
+            ),
+          )}
         </ul>
       )}
     </div>
@@ -185,6 +212,37 @@ function PersonItem({
           {row.last && (
             <span className="tabular text-small text-ink-muted">{threadTime(row.last.at, { timeZone: timezone, now })}</span>
           )}
+          {row.unread && <span role="img" aria-label="Unread" data-person-unread className="size-2 rounded-pill bg-accent" />}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function GroupItem({ row, current, wide, timezone, now }: { row: GroupRow; current: boolean; wide: boolean; timezone: string; now: number }) {
+  const typing = typingNames(row.members, now).length > 0;
+  return (
+    <li data-person-row={row.id} className="relative rounded-control">
+      <Link
+        href={groupHref(row.id)}
+        aria-current={current && !wide ? 'page' : undefined}
+        className={cn(
+          'grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken',
+          current && (wide ? 'min-[720px]:bg-accent-tint' : 'bg-accent-tint hover:bg-accent-tint'),
+        )}
+      >
+        <GroupMark members={row.members} />
+        <span className="min-w-0">
+          <span className={cn('block truncate text-body text-ink', row.unread ? 'font-bold' : 'font-semibold')}>{row.title}</span>
+          <span
+            data-person-preview
+            className={cn('line-clamp-2 text-small', typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted')}
+          >
+            {groupPreviewOf(row, now)}
+          </span>
+        </span>
+        <span className="flex flex-col items-end gap-1.5 pt-0.5">
+          {row.last && <span className="tabular text-small text-ink-muted">{threadTime(row.last.at, { timeZone: timezone, now })}</span>}
           {row.unread && <span role="img" aria-label="Unread" data-person-unread className="size-2 rounded-pill bg-accent" />}
         </span>
       </Link>

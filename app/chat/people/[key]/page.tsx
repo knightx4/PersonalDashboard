@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, loadThreadPage, withChats, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadGroupRows } from '@/lib/you/group-chats';
 import { editHref } from '@/lib/you/people-cards-model';
 import { olderMessages, readThread } from '../../actions';
 import { PeopleView } from '../../people-view';
@@ -37,7 +38,7 @@ export default async function ChatThreadPage({
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
-  const [everyone, settings] = await Promise.all([loadPeople(client, user.id), loadAccountSettings(user.id)]);
+  const [everyone, groups, settings] = await Promise.all([loadPeople(client, user.id), loadGroupRows(client, user.id), loadAccountSettings(user.id)]);
   // The list beside it holds only the chats there are (plan #2879.2), and this thread's row; the thread opens for anyone on the roster.
   const rows = withChats(everyone, key);
   const person = everyone.find((r) => r.key === key);
@@ -46,7 +47,7 @@ export default async function ChatThreadPage({
     ? await loadThreadPage(client, user.id, person.chatId)
     : { messages: [], hasOlder: false };
   return (
-    <PeopleView rows={rows} current={key} timezone={settings.timezone} now={now}>
+    <PeopleView rows={rows} groups={groups} current={key} timezone={settings.timezone} now={now}>
       <ThreadView
         key={person.id}
         person={person}
