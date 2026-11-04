@@ -449,7 +449,7 @@ type CoastScene = {
 function coast(scene: CoastScene, seed: number): string {
   const horizon = 620;
   const random = seeded(seed);
-  let defs =
+  const defs =
     skyGradient(scene.sky) +
     GLOW_DEF +
     lightDefs(scene.light, 'sun') +
