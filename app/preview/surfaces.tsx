@@ -11618,10 +11618,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
-    /* The runner card on /dev/plan with its four Dashes (plan #1704): a
-     * night with two sessions, a goal run and a slot asleep, then off. */
+    /* The runner card on Home with its four Dashes (plan #1704, moved off
+     * /dev/plan by #578.12): a night with two sessions, a goal run and a
+     * slot asleep, then off. */
     id: 'dev-runner-crew',
-    label: 'Dev · Plan, the runner’s four Dashes',
+    label: 'Dev · Home, the runner’s four Dashes',
     module: 'dev',
     width: 'page',
     render: () => <DevRunnerCrewSurface />,

@@ -585,13 +585,13 @@ export function dashActivityLine(
 
   if (session) {
     const noun = RUN_JOB_NOUN[session.job];
-    if (standing === 'paused') return `dash · ${noun} running · overnight run held`;
-    return night ? `dash · ${noun} running · overnight, ${night}` : `dash · ${noun} running`;
+    if (standing === 'paused') return `dash · ${noun} running · runner held`;
+    return night ? `dash · ${noun} running · runner on, ${night}` : `dash · ${noun} running`;
   }
 
-  if (standing === 'paused') return 'dash · overnight run held';
+  if (standing === 'paused') return 'dash · runner held';
   // Nothing fired at this moment, but the runner is on and the next tick will.
-  if (night) return `dash · overnight run on · ${night}`;
+  if (night) return `dash · runner on · ${night}`;
   return null;
 }
 
