@@ -970,7 +970,7 @@ describe('overnightTick', () => {
 
 describe('Dev project seats', () => {
   /** A feature with one ready step, in a workspace of this app or a Dev project. */
-  const feature = (id: string, module: string, priority = 2) => [
+  const feature = (id: string, module: string, priority: 1 | 2 | 3 = 2) => [
     item({ id, module, priority }),
     item({ id: `${id}-step`, parentId: id, module, priority }),
   ];
