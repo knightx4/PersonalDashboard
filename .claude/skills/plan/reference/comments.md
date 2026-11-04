@@ -14,6 +14,11 @@ do not close or dismiss the raise, and do not commit. The person asked what
 something means; a session that answers by settling it has taken the decision
 away from them, which is the same rule as never answering your own decision.
 
+A GitHub refusal you see from this session is read the way
+`project-routine.md` says under **A 403 from a cloud session is not the token**:
+a 403 whose body says "not enabled for this session" is the session's proxy,
+so call add_repo and check again before saying anything is wrong with a token.
+
 If the answer is that the thing being asked about is wrong, say that in the
 thread. Then it is theirs to act on — a note, a decision, or nothing.
 
