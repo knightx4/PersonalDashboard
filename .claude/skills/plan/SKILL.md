@@ -273,6 +273,13 @@ thousand tokens, and gets to the end.
    - `git push -u origin plan/<feature number>`. Every step pushed is a step
      that outlives this session, which is what decision #674 asked of the
      arrangement this one replaces.
+   - **Land at four.** Once the feature holds four built steps (`built`
+     says so when it marks the fourth), send nothing more: let the steps
+     still out report, then land what is built, below, if the app works
+     with the rest of the feature missing. Then carry on the batch from the
+     new main on the same branch. A long feature ships in pieces rather
+     than all at the end; on 4 November 2026, 12 open features held about
+     45 built steps that never reached main (plan #2815).
 
    **When the feature's steps are built:**
 
@@ -303,7 +310,16 @@ thousand tokens, and gets to the end.
    or running short): the built steps stay on the pushed feature branch, in
    progress, with their Built lines. Land what is built only if the app works
    with the rest of the feature missing, and say in the report which you did.
-   Otherwise leave the branch for the next session, which continues it. The
+   Otherwise leave the branch for the next session, which continues it.
+
+   **A land run** (a session sent with "Land plan feature #n") does only
+   this part: no step is claimed or built. The overnight runner sends one
+   at a feature with built steps and no session going, ahead of features
+   with steps ready to build. Check first that the app works with the
+   unbuilt steps missing: nothing on the branch (a page, a link, a
+   migration, a test) may need one. If something does, land nothing and
+   end with `stopped <feature> --reason "…"` naming what needs which step.
+   Otherwise do the steps above, from the fetch to `land <feature>`. The
    rule against leaving a step in progress does not apply to a built step: its
    Built line says where it is.
 
