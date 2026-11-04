@@ -348,6 +348,7 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   session_progress_state_ck: 'what a session says it is doing now, reported as it works; nothing closes by it',
+  session_threads_state_ck: 'whether a session thread is waiting, working or idle; the thread is a conversation, and nothing closes by it',
   links_status_ck: 'whether a Plaid link is working, failing or removed',
   dash_questions_status_ck: 'whether a question Dash asked is still open, answered or skipped, kept on the Answer tab',
   month_reviews_status_ck: 'whether the monthly money review was written or the run failed',
