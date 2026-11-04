@@ -22,6 +22,7 @@ import { tabsFor } from '@/lib/shell/tabs';
 import { ChatUsed } from '@/app/chat/dash/used';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import type { AskChat } from '@/lib/talk/ask-chats';
+import type { SessionThread } from '@/lib/core/session-threads-model';
 import type { SearchHit } from '@/lib/search/sources';
 import type { ModuleId } from '@/lib/modules';
 import type { AskBoxStart } from '@/components/talk/ask-box';
@@ -907,7 +908,13 @@ export function DashPageSurface({
   list,
   draft,
   modelStart,
+  sessions,
+  session,
 }: {
+  /** Threads with Claude Code sessions in the list (plan #2789.7). */
+  sessions?: SessionThread[];
+  /** A session thread open beside the list in place of a chat, with its id (plan #2789.7). */
+  session?: { id: string; view: React.ReactNode };
   /** The model chip's list open, or a pick that could not be saved (plan #2458.3). */
   modelStart?: 'open' | 'failed';
   chat?: 'open' | 'new' | 'archived';
@@ -938,7 +945,7 @@ export function DashPageSurface({
         ]
       : dashPageTurns(open.title ?? '');
   const none = list === 'empty' || list === 'failed' || list === 'loading';
-  const opened = chat !== 'new' && !none;
+  const opened = chat !== 'new' && !none && !session;
   return (
     // The shell's cost hints, as app/chat/dash/layout.tsx reads them for the box.
     <PaidCostsProvider costs={ASK_COSTS}>
@@ -953,12 +960,12 @@ export function DashPageSurface({
         counts={{ jobs: '3', todo: '8', shopping: '1' }}
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
-        pathname={opened ? `/chat/dash/${open.ref}` : '/chat/dash'}
+        pathname={session ? `/chat/dash/session/${session.id}` : opened ? `/chat/dash/${open.ref}` : '/chat/dash'}
       >
         <Conversation
           label="Chats"
           fill
-          open={opened}
+          open={opened || Boolean(session)}
           initialListOpen={listOpen}
           newChat={{ href: '/chat/dash?chat=new', label: 'New chat' }}
           list={
@@ -972,7 +979,8 @@ export function DashPageSurface({
               made={none ? [] : DASH_MADE}
               presses={DASH_PRESSES}
               edits={DASH_EDITS}
-              active={opened ? open.ref : null}
+              active={session ? session.id : opened ? open.ref : null}
+              sessions={sessions}
               initialQuery={list === 'search' ? 'Catan' : undefined}
               initialHits={list === 'search' ? SEARCH_HITS : undefined}
               initialMenu={list === 'menu' ? DASH_CHATS[1].ref : null}
@@ -982,7 +990,9 @@ export function DashPageSurface({
             )
           }
         >
-          {opened ? (
+          {session ? (
+            session.view
+          ) : opened ? (
             <ConversationChat
               title={open.title ?? 'A question'}
               back={CHATS_BACK}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { MainRail } from '@/components/patterns/main-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageWide } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
@@ -10,41 +9,48 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
-import { Stat } from '@/components/ui/stat';
+import { SectionLabel } from '@/components/ui/section-heading';
+import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import { formatDateInline } from '@/lib/jobs/applications/load';
 import {
   ANSWER_HREF,
   ANSWER_MAX,
+  groupByArea,
   type DashQuestion,
   type DashQuestionResult,
 } from '@/lib/you/dash-questions';
-import { answerQuestion, editAnswer, skipQuestion } from './actions';
+import { answerQuestion, editAnswer, skipQuestion, unskipQuestion } from './actions';
 
 /**
- * You's Answer tab (plan #2617.2): the questions Dash has asked about you,
- * the open ones on top in the order it asked them, each with Answer, which
- * opens its box (one at a time), and Skip; then what you answered, latest first, each with Edit; then the
- * skipped ones, folded, each of which can still be answered.
+ * You's Ask tab (plans #2617.2 and #2635.3): the questions Dash has asked
+ * about you. The open ones come first, under the life area each is about in
+ * the order Dash asked them, with the ones about no area under Other. Each has
+ * Answer, which opens its box (one at a time), and Skip, which a laptop shows
+ * on hover and a phone always shows. Then what you answered, latest first,
+ * each with Edit; then the skipped ones, folded, each of which can still be
+ * answered or asked again.
  *
  * The page re-reads after each press (the actions revalidate the tab), so a
  * question answered here moves from the open list to the answers by itself.
  *
  * `ask` is the slot for the press that has Dash write new questions (plan
- * #2617.3): in the header while there is anything on the tab, in the empty
- * state while there is nothing. `notice` says how a run is going, under the
- * header.
+ * #2617.3): in the header while questions wait, and in the empty line when
+ * none do, beside when Dash will next ask by itself. `notice` says how a run
+ * is going, under the header.
  */
 
 export type AnswerActions = {
   answer: (id: string, answer: string) => Promise<DashQuestionResult>;
   skip: (id: string) => Promise<DashQuestionResult>;
+  unskip: (id: string) => Promise<DashQuestionResult>;
   edit: (id: string, answer: string) => Promise<DashQuestionResult>;
 };
 
 const REAL_ACTIONS: AnswerActions = {
   answer: answerQuestion,
   skip: skipQuestion,
+  unskip: unskipQuestion,
   edit: editAnswer,
 };
 
@@ -56,14 +62,30 @@ export type AnswerOpen = {
   skipped?: boolean;
   /** The id of a skipped question drawn with its box open. */
   answering?: string;
+  /** The id of a question drawn hovered, with its hover controls showing. */
+  hover?: string;
   /** An error drawn under the question with this id, as a refused save shows it. */
   error?: { id: string; message: string; draft?: string };
 };
 
-export function AnswerView({
+/**
+ * Shown on a phone or any touch screen; on a laptop only while its row is
+ * hovered or holds the focus, or when the gallery draws the row hovered.
+ */
+function hoverOnly(held: boolean): string {
+  return cn(
+    'transition-opacity duration-quick focus-visible:opacity-100',
+    !held &&
+      'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 pointer-coarse:opacity-100',
+  );
+}
+
+export function AskView({
   open,
   past,
   timezone = 'UTC',
+  nextAsk = null,
+  weekly = true,
   ask,
   notice,
   actions = REAL_ACTIONS,
@@ -74,6 +96,10 @@ export function AnswerView({
   /** The answered and skipped ones, latest first. */
   past: readonly DashQuestion[];
   timezone?: string;
+  /** The day Dash will next ask by itself, as a date in a sentence ("5 Nov"); null when unknown. */
+  nextAsk?: string | null;
+  /** Whether Dash asks by itself each week: the weekly check runs for the owner alone. */
+  weekly?: boolean;
   /** The press that asks Dash for new questions (plan #2617.3). */
   ask?: React.ReactNode;
   /** How Dash's run for new questions is going, under the header (plan #2617.3). */
@@ -89,47 +115,80 @@ export function AnswerView({
   const [answeringId, setAnsweringId] = useState<string | null>(
     show.error && open.some((q) => q.id === show.error?.id) ? show.error.id : null,
   );
+  const groups = groupByArea(open);
+  // A lone Other heading says nothing, so one group with no area goes unheaded.
+  const headed = groups.length > 1 || (groups.length === 1 && groups[0].areaId !== null);
+  const when = !weekly
+    ? 'Ask Dash for more whenever you like.'
+    : nextAsk
+      ? `Dash asks a few more by itself on ${nextAsk}, or ask now.`
+      : 'Dash asks a few more by itself once a week, after you answer or skip one.';
 
   const main = (
     <>
       <PageHeader
-        subject={sectionSubject(ANSWER_HREF, 'Answer')}
-        title="Answer"
-        actions={nothing ? undefined : ask}
+        subject={sectionSubject(ANSWER_HREF, 'Ask')}
+        title="Ask"
+        actions={open.length > 0 ? ask : undefined}
       />
       {notice ? <div className="mb-5 empty:hidden">{notice}</div> : null}
       {nothing ? (
         <EmptyState
           size="box"
           title="No questions yet"
-          description="Dash asks a few questions about you here at a time. It reads what you answer when it answers you or works on your goals, and leaves out any you skip."
+          description={`Dash asks a few questions about you here at a time${weekly ? ', once a week after you answer' : ''}. It reads what you answer when it answers you or works on your goals, and leaves out any you skip.`}
         >
           {ask}
         </EmptyState>
       ) : (
         <div className="space-y-8">
-          {/* Left out when nothing waits (law 1): the page goes from the header,
-              with its Ask button, straight to the answers. */}
           {open.length > 0 ? (
             <SectionFold title="Waiting for you" count={open.length} remember="you.answer.open">
+              {/* One surface of rows; an area is a small heading inside it, above its questions. */}
               <Card padding="none">
-                <ol className="divide-y divide-border">
-                  {open.map((q) => (
-                    <li key={q.id} className="px-4 py-4">
-                      <OpenQuestion
-                        question={q}
-                        actions={actions}
-                        answering={answeringId === q.id}
-                        onAnswering={setAnsweringId}
-                        initialError={errorFor(q.id)}
-                        initialDraft={show.error?.id === q.id ? (show.error.draft ?? '') : ''}
-                      />
-                    </li>
-                  ))}
+                <ol>
+                  {groups.flatMap((group, g) => [
+                    ...(headed
+                      ? [
+                          <li
+                            key={`area-${group.areaId ?? 'other'}`}
+                            className={cn('px-4 pt-4', g > 0 && 'border-t border-border pt-5')}
+                            data-ask-area={group.areaId ?? 'other'}
+                          >
+                            <SectionLabel as="h3">{group.name}</SectionLabel>
+                          </li>,
+                        ]
+                      : []),
+                    ...group.questions.map((q, i) => (
+                      <li
+                        key={q.id}
+                        className={cn(
+                          'group px-4 py-4',
+                          // A hairline between questions; none under an area's heading.
+                          headed ? i > 0 && 'border-t border-border' : (g > 0 || i > 0) && 'border-t border-border',
+                          headed && i === 0 && 'pt-2',
+                        )}
+                      >
+                        <OpenQuestion
+                          question={q}
+                          actions={actions}
+                          answering={answeringId === q.id}
+                          onAnswering={setAnsweringId}
+                          hovered={show.hover === q.id}
+                          initialError={errorFor(q.id)}
+                          initialDraft={show.error?.id === q.id ? (show.error.draft ?? '') : ''}
+                        />
+                      </li>
+                    )),
+                  ])}
                 </ol>
               </Card>
             </SectionFold>
-          ) : null}
+          ) : (
+            <EmptyState size="box" title="Nothing waiting for you" description={when}>
+              {ask}
+            </EmptyState>
+          )}
 
           {answered.length > 0 ? (
             <SectionFold
@@ -165,11 +224,12 @@ export function AnswerView({
               <Card padding="none">
                 <ul className="divide-y divide-border">
                   {skipped.map((q) => (
-                    <li key={q.id} className="px-4 py-3">
+                    <li key={q.id} className="group px-4 py-3">
                       <SkippedQuestion
                         question={q}
                         timezone={timezone}
-                        onSave={actions.answer}
+                        actions={actions}
+                        hovered={show.hover === q.id}
                         initialAnswering={show.answering === q.id}
                         initialError={errorFor(q.id)}
                       />
@@ -179,35 +239,21 @@ export function AnswerView({
               </Card>
             </SectionFold>
           ) : null}
+
+          {/* The count after the rows (the list pattern), on a quiet panel of its own. */}
+          <Card padding="standard">
+            <p className="text-small text-ink-muted">
+              {answered.length > 0
+                ? `Dash reads your ${answered.length === 1 ? 'answer' : `${answered.length} answers`} when it answers you or works on your goals. It does not read a question you skip.`
+                : 'Dash reads your answers when it answers you or works on your goals. It does not read a question you skip.'}
+            </p>
+          </Card>
         </div>
       )}
     </>
   );
 
-  // Before anything is asked the empty state says all of it: a rail saying it
-  // again would be the same sentence twice, so the page is one wide column.
-  if (nothing) return <PageWide>{main}</PageWide>;
-
-  return (
-    <MainRail
-      main={main}
-      rail={
-        <Card padding="standard" className="space-y-3">
-          {/* No "0 answered" before the first answer (law 1): the sentence says it alone. */}
-          {answered.length > 0 ? (
-            <Stat
-              value={answered.length}
-              label={answered.length === 1 ? 'answer Dash reads' : 'answers Dash reads'}
-            />
-          ) : null}
-          <p className="text-small text-ink-muted">
-            Dash reads your answers when it answers you or works on your goals. It does not read a
-            question you skip.
-          </p>
-        </Card>
-      }
-    />
-  );
+  return <PageWide>{main}</PageWide>;
 }
 
 /** Why a question was asked, as Dash wrote it: one muted line under it. */
@@ -216,12 +262,13 @@ function Why({ why }: { why: string | null }) {
   return <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{why}</p>;
 }
 
-/** One open question: the question, why Dash asked, a box, Save answer and Skip. */
+/** One open question: the question, why Dash asked, Answer, which opens a box, and Skip. */
 function OpenQuestion({
   question,
   actions,
   answering,
   onAnswering,
+  hovered,
   initialError,
   initialDraft = '',
 }: {
@@ -231,6 +278,8 @@ function OpenQuestion({
   answering: boolean;
   /** Opens this question's box, closing any other, or closes it with null. */
   onAnswering: (id: string | null) => void;
+  /** Drawn hovered, for the gallery. */
+  hovered: boolean;
   initialError: string | null;
   initialDraft?: string;
 }) {
@@ -271,6 +320,7 @@ function OpenQuestion({
               size="sm"
               variant="ghost"
               pending={skipping}
+              className={hoverOnly(hovered || skipping)}
               aria-label={`Skip: ${question.question}`}
               onClick={() =>
                 startSkipping(async () => {
@@ -408,21 +458,29 @@ function PastAnswer({
   );
 }
 
-/** One skipped question: the question, when it was skipped, and Answer, which opens the box. */
+/**
+ * One skipped question: the question, when it was skipped, Answer it, which
+ * opens the box, and Ask again, which puts it back with the open ones (shown
+ * on hover on a laptop, always on a phone).
+ */
 function SkippedQuestion({
   question,
   timezone,
-  onSave,
+  actions,
+  hovered,
   initialAnswering,
   initialError,
 }: {
   question: DashQuestion;
   timezone: string;
-  onSave: AnswerActions['answer'];
+  actions: AnswerActions;
+  hovered: boolean;
   initialAnswering: boolean;
   initialError: string | null;
 }) {
   const [answering, setAnswering] = useState(initialAnswering);
+  const [error, setError] = useState<string | null>(null);
+  const [unskipping, startUnskipping] = useTransition();
   return (
     <div className="space-y-1.5">
       <p className="text-ui text-ink [overflow-wrap:anywhere]">{question.question}</p>
@@ -432,24 +490,42 @@ function SkippedQuestion({
           label={`Your answer to: ${question.question}`}
           initial=""
           saveLabel="Save answer"
-          onSave={(answer) => onSave(question.id, answer)}
+          onSave={(answer) => actions.answer(question.id, answer)}
           onCancel={() => setAnswering(false)}
           initialError={initialError}
         />
       ) : (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <p className="text-small text-ink-muted">
-            Skipped {formatDateInline(question.skippedAt, timezone)}
-          </p>
-          <Button
-            type="button"
-            variant="link"
-            aria-label={`Answer: ${question.question}`}
-            onClick={() => setAnswering(true)}
-          >
-            Answer it
-          </Button>
-        </div>
+        <>
+          <FieldError>{error}</FieldError>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-small text-ink-muted">
+              Skipped {formatDateInline(question.skippedAt, timezone)}
+            </p>
+            <Button
+              type="button"
+              variant="link"
+              aria-label={`Answer: ${question.question}`}
+              onClick={() => setAnswering(true)}
+            >
+              Answer it
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className={hoverOnly(hovered || unskipping)}
+              disabled={unskipping}
+              aria-label={`Ask again: ${question.question}`}
+              onClick={() =>
+                startUnskipping(async () => {
+                  const result = await actions.unskip(question.id);
+                  setError(result.ok ? null : result.error);
+                })
+              }
+            >
+              Ask again
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );

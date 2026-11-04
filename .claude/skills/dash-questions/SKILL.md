@@ -5,7 +5,7 @@ description: Write up to five new questions about the person into you.dash_quest
 
 # Writing Dash's questions about the person
 
-The Answer tab of You shows questions Dash has asked about the person. They
+The Ask tab of You shows questions Dash has asked about the person. They
 answer or skip each one, and the answers become part of what Dash reads when
 it answers them or works on their goals (`core.memory_sources`, the
 `you.dash_questions` source). A good question asks for something the records
@@ -41,7 +41,7 @@ one statement per call, so send each statement in a block below on its own.
 
 ## 1. Read the brief and claim the run
 
-The Ask button on the Answer tab fires the goals routine with this brief
+The Ask button on the Ask tab fires the goals routine with this brief
 (`dashQuestionsBrief` in `lib/you/dash-questions-run.ts`):
 
 ```

@@ -9,7 +9,7 @@ import { decideQuestionRun, type QuestionTickRun } from '@/lib/you/dash-question
 
 /**
  * The question stage of the daily cron (plan #2635.1). Once a day it asks
- * lib/you/dash-questions-triggers.ts whether the owner's Answer tab needs new
+ * lib/you/dash-questions-triggers.ts whether the owner's Ask tab needs new
  * questions: at most once a week, only with fewer than three open, and only
  * after they answered or skipped one since the last run. It starts the run the
  * Ask button starts (lib/you/dash-questions-run.ts), with a brief that says
