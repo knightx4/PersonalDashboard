@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { laneOf, planEntries, planOrder, shownOutside, whoseLine } from './plan-order';
+import { dailyView } from './daily';
+import {
+  NEXT_MAX,
+  NOW_MAX,
+  laneOf,
+  planEntries,
+  planOrder,
+  shownOutside,
+  showsOutside,
+  whoseLine,
+} from './plan-order';
 import type { StepNode } from './steps';
+import { todoSteps } from './todo';
+import type { Goal } from './tree';
 
 function node(id: string, extra: Partial<StepNode> = {}): StepNode {
   return {
@@ -165,5 +177,42 @@ describe('whoseLine', () => {
   it('says whose a step is and when it is due', () => {
     const [entry] = planOrder([node('a', { dueOn: '2026-12-18' })]).now;
     expect(whoseLine(entry)).toBe('Yours · by 18 Dec');
+  });
+});
+
+describe('showsOutside (plan #2778.6)', () => {
+  const today = '2026-11-04';
+  const goal = { id: 'g', title: 'Loans', status: 'open', areaId: 'a', activity: 'active' } as unknown as Goal;
+  const forty = (extra: Record<string, Partial<StepNode>> = {}) =>
+    Array.from({ length: 40 }, (_, i) => node(`s${i}`, extra[`s${i}`] ?? {}));
+
+  it('lets through only Now and Up next on a goal with forty open steps', () => {
+    const byGoal = new Map([['g', forty()]]);
+    const shows = showsOutside(byGoal, today);
+    const shown = byGoal.get('g')!.filter(shows).map((n) => n.id);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.length).toBeLessThanOrEqual(NOW_MAX + NEXT_MAX);
+    const home = dailyView([{ goal, areaName: 'Money' }], byGoal, today, shows);
+    expect(home.goals[0].next.length).toBeLessThanOrEqual(3);
+    expect(home.goals[0].next.every((item) => shown.includes(item.id))).toBe(true);
+    // The home's own cap of three leaves the fourth as "more"; the other 36 are not counted.
+    expect(home.goals[0].next.length + home.goals[0].more).toBe(shown.length);
+  });
+
+  it('keeps a step dated inside a week and one you put on Todo, and not one Dash sent', () => {
+    const steps = forty({
+      s30: { dueOn: '2026-11-09' },
+      s31: { dueOn: '2026-11-20' },
+      s32: { onTodo: true, onTodoBy: 'me' },
+      s33: { onTodo: true, onTodoBy: 'claude' },
+    });
+    const byGoal = new Map([['g', steps]]);
+    const shows = showsOutside(byGoal, today);
+    const out = steps.filter(shows).map((n) => n.id);
+    expect(out).toContain('s30');
+    expect(out).toContain('s32');
+    expect(out).not.toContain('s31');
+    expect(out).not.toContain('s33');
+    expect(todoSteps([goal], byGoal, shows).map((s) => s.id)).toEqual(['s32']);
   });
 });

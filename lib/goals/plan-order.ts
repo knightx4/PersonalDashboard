@@ -254,3 +254,36 @@ export function whoseLine(entry: Pick<PlanEntry, 'whose' | 'node'>): string {
   const who = entry.whose === 'dash' ? 'Dash’s' : entry.whose === 'question' ? 'To answer' : 'Yours';
   return entry.node.dueOn ? `${who} · by ${formatDay(entry.node.dueOn)}` : who;
 }
+
+/**
+ * Whether a step may show away from its goal's page (plan #2778.6): the one
+ * test the Goals home, the Inbox, Todo and the morning brief share.
+ */
+export type ShowsOutside = (node: StepNode) => boolean;
+
+/**
+ * Which steps show on the Goals home, the Inbox and Todo. A step does when
+ * the goal's Plan tab has it under Now or Up next; anything under Later stays
+ * on the goal. Two kinds come through whatever lane they are in: a step with
+ * a date inside seven days (due, overdue, or starting by then), and one you
+ * put on Todo yourself. A step Dash sent to Todo is not the second kind, so
+ * it follows the plan.
+ *
+ * `byGoal` is the trees as loadGoalMap builds them, with dependencies and
+ * start dates marked (loadLiveTree does both).
+ */
+export function showsOutside(
+  byGoal: ReadonlyMap<string, readonly StepNode[]>,
+  today: string,
+): ShowsOutside {
+  const shown = new Set<string>();
+  for (const steps of byGoal.values()) {
+    for (const id of shownOutside(planOrder(steps, { today }))) shown.add(id);
+  }
+  const soonBy = addDays(today, SOON_DAYS);
+  return (node) =>
+    shown.has(node.id) ||
+    (node.dueOn !== null && node.dueOn <= soonBy) ||
+    (!!node.startsOn && node.startsOn <= soonBy) ||
+    (node.onTodo && node.onTodoBy !== 'claude');
+}
