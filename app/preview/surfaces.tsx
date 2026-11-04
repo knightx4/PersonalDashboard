@@ -8952,6 +8952,8 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskThinkSurface part="cost" />,
+  },
+  {
     /* @ and the start of a workspace's name in the box (plan #2748.1):
      * Learn first in the menu, to keep the question to, then the rows. */
     id: 'ask-box-workspaces',
