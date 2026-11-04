@@ -99,7 +99,7 @@ export function ChatsListSkeleton() {
       aria-label="Reading your chats"
       className="space-y-3 rounded-card bg-surface p-2 min-[720px]:rounded-none min-[720px]:bg-transparent min-[720px]:p-0"
     >
-      <Skeleton className="h-9 w-full rounded-control" />
+      <Skeleton className="h-(--control-h) w-full rounded-control" />
       {(['Pinned', 'Today', 'This week'] as const).map((group, g) => (
         <section key={group}>
           <h3 className="px-2 text-small font-medium text-ink-muted">{group}</h3>
@@ -172,6 +172,7 @@ export function AskConversation({
       label="Ask a follow-up"
       placeholder="Ask more about this"
       dock
+      bubbles
     />
     </ConversationChat>
   );
@@ -257,6 +258,7 @@ export function NewDashChat() {
           label="Ask a question"
           placeholder="Ask about your money, jobs, todos or notes"
           dock
+          bubbles
         />
         </div>
         {!asked && (

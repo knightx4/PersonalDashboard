@@ -925,6 +925,7 @@ export function DashPageSurface({
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 dock
+                bubbles
                 initialDraft={draft}
               />
             </ConversationChat>

@@ -43,14 +43,23 @@ export function LookupList({ lines, label }: { lines: readonly LookupLine[]; lab
 }
 
 /** A finished answer's lookups, folded; nothing for an answer that made none. */
-export function LookupFold({ calls }: { calls: readonly TalkToolCall[] | undefined }) {
+export function LookupFold({
+  calls,
+  quiet = false,
+}: {
+  calls: readonly TalkToolCall[] | undefined;
+  /** Set small and muted, as a note above the answer it heads (plan #2748.12). */
+  quiet?: boolean;
+}) {
   const lines = turnLookups(calls);
   if (lines.length === 0) return null;
+  const meta = lines.length === 1 ? '1 lookup' : `${lines.length} lookups`;
   return (
     <Disclosure
-      title="What Dash looked up"
-      meta={lines.length === 1 ? '1 lookup' : `${lines.length} lookups`}
-      className="pt-1"
+      title={quiet ? <span className="font-normal text-ink-muted">What Dash looked up</span> : 'What Dash looked up'}
+      meta={meta}
+      className={quiet ? undefined : 'pt-1'}
+      summaryClassName={quiet ? 'text-small' : undefined}
     >
       <LookupList lines={lines} label="What Dash looked up" />
     </Disclosure>
