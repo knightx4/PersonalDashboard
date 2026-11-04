@@ -142,8 +142,8 @@ describe('the page the sheet will tell Dash', () => {
 
   it('shows nothing when there is no page, or on the Ask page', () => {
     expect(panel(null)).not.toContain('Looking at');
-    expect(panel('/ask')).not.toContain('Looking at');
-    expect(panel('/ask/00000000-0000-4000-8000-000000000009')).not.toContain('Looking at');
+    expect(panel('/chat/dash')).not.toContain('Looking at');
+    expect(panel('/chat/dash/00000000-0000-4000-8000-000000000009')).not.toContain('Looking at');
   });
 
   it('drops the page when its × is pressed', () => {

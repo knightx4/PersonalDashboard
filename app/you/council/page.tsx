@@ -4,7 +4,6 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { loadCouncilHome } from '@/lib/you/council';
 import { listOpenReviews } from '@/lib/you/board-reviews';
 import { listDueTripwires } from '@/lib/you/board-tripwires';
-import { makeTodoFromNote, reactToCouncilNote, readCouncilNotes } from './council-actions';
 import { CouncilView } from './council-view';
 
 export const metadata = { title: 'Council' };
@@ -16,8 +15,9 @@ function readAt(): number {
 }
 
 /**
- * You's Council tab (you 0037), the tab that was the Board: the notes the
- * mentors wrote unasked, and every mentor as a tile that opens their page.
+ * You's Council tab (you 0037), the tab that was the Board: a line to the
+ * mentors' texts in Chat (plan #2748.7), and every mentor as a tile that
+ * opens their page.
  * The board's decisions and meetings are one press away, on Decisions.
  */
 export default async function Page() {
@@ -33,11 +33,10 @@ export default async function Page() {
   return (
     <CouncilView
       mentors={home.mentors}
-      unread={home.unread}
+      unreadTexts={home.unreadTexts}
       due={reviews.length + tripwires.length}
       timezone={settings.timezone}
       now={now}
-      actions={{ read: readCouncilNotes, react: reactToCouncilNote, todo: makeTodoFromNote }}
     />
   );
 }

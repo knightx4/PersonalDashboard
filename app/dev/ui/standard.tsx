@@ -284,6 +284,7 @@ const MEANINGS = [
  * template built from the module id would compile to nothing.
  */
 const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
+  chat: 'bg-w-chat',
   shopping: 'bg-w-shopping',
   jobs: 'bg-w-jobs',
   todo: 'bg-w-todo',

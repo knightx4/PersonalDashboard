@@ -3,7 +3,7 @@ import 'server-only';
 import { createCoreClient } from '@/lib/core/auth/server';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { MODULE_IDS, isModuleId, type ModuleId } from '@/lib/modules';
+import { MODULE_IDS, isModuleId, withAlwaysOn, type ModuleId } from '@/lib/modules';
 import { parseTheme, SYSTEM_THEME, type Theme } from '@/lib/theme';
 
 /**
@@ -53,7 +53,7 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
 function toModuleIds(raw: unknown): ModuleId[] {
   if (!Array.isArray(raw)) return [...MODULE_IDS];
   const known = raw.filter((m): m is ModuleId => typeof m === 'string' && isModuleId(m));
-  return known.length > 0 ? known : [...MODULE_IDS];
+  return known.length > 0 ? withAlwaysOn(known) : [...MODULE_IDS];
 }
 
 /** The columns that have always been here, and the one that may not be yet. */

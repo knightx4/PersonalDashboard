@@ -82,6 +82,23 @@ const APARTMENT_PLAN: Reference = {
  * surface in the gallery (tests/preview-routes.test.ts).
  */
 export const REFERENCES: Readonly<Record<string, Reference>> = {
+  // The "Chat Module Mockup" plan #2748 names. Its saved copy swaps the
+  // companies and living people for made-up ones, since the repository is
+  // public; the Dash tab's state is described in a comment at its foot.
+  'chat-people': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'A messaging app: People and Dash as two tabs, each mentor a row with a round avatar, their name, the last thing said in two lines, the time, and a dot when it is unread, unread rows in bolder type.',
+    from: '2748.1',
+  },
+  'ask-page-new': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'The same mockup, for the Dash tab: one list of chats, each a name and a day, with no workspace column and no chips; a question is pointed at one workspace by typing @ in the box.',
+    from: '2748.1',
+  },
   // The "Dash Chat Workspace" mockup the person chose on 15 October 2026 ("go
   // with B"), replacing the one from decision #1899.1. Its saved copy names
   // made-up people and companies, since the repository is public.

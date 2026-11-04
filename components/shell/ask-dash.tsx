@@ -61,7 +61,7 @@ import {
   rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
-} from '@/app/ask/actions';
+} from '@/app/chat/dash/actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
@@ -94,7 +94,7 @@ import type { DashChoiceId } from '@/lib/core/models';
 export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
 
 /**
- * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
@@ -515,6 +515,7 @@ export function AskThread({
   onSend,
   onAnswered,
   boxStart,
+  bubbles = false,
   ...thread
 }: {
   id: string;
@@ -548,6 +549,11 @@ export function AskThread({
   pendingQuestion?: string;
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
+  /**
+   * Drawn as Chat's Dash tab draws it (plan #2748.12): questions in bubbles,
+   * and what Dash looked up folded under his name, above the answer.
+   */
+  bubbles?: boolean;
 }) {
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
@@ -672,15 +678,27 @@ export function AskThread({
       written={written}
       activity="searching"
       incoming={incoming}
+      bubbles={bubbles}
+      lead={bubbles ? (turn) => (turn.role === 'assistant' ? <LookupFold calls={turn.toolCalls} quiet /> : null) : undefined}
       below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
-            <LookupFold calls={turn.toolCalls} />
+            {!bubbles && <LookupFold calls={turn.toolCalls} />}
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
-                A todo or a note comes back as a change, drawn above with Undo. */}
+                A todo or a note comes back as a change, drawn above with Undo.
+                In a chat on the page they rest under every answer but the
+                latest until it is pointed at, from laptop width; a touch
+                screen, with nothing to point with, keeps them (plan #2748.12). */}
+            <div
+              className={
+                bubbles && !thread.latest
+                  ? 'min-[720px]:opacity-0 min-[720px]:transition-opacity min-[720px]:group-hover:opacity-100 min-[720px]:group-focus-within:opacity-100 pointer-coarse:opacity-100'
+                  : undefined
+              }
+            >
             <AnswerActions
               body={turn.body}
               question={thread.question}
@@ -695,6 +713,7 @@ export function AskThread({
               rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
               rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
             />
+            </div>
           </>
         );
       }}
@@ -909,7 +928,7 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip label="Open on Dash's page" align="end">
                 <Link
-                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  href={chatRef ? `/chat/dash/${chatRef}` : '/chat/dash'}
                   aria-label="Open on Dash's page"
                   className={iconButtonVariants()}
                 >
@@ -1077,7 +1096,7 @@ function Earlier({
         id="ask-dash-earlier"
         title="Earlier questions"
         action={
-          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
             All of them
           </Link>
         }

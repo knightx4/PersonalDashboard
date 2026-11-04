@@ -12,7 +12,7 @@ import type { ReadRow } from '@/lib/talk/chat-trail';
 import type { LookupLine } from '@/lib/talk/lookups';
 import type { DashChange } from '@/lib/talk/changes';
 import type { TalkFile } from '@/lib/talk/talk';
-import { WorkspaceDot } from './chats';
+import { SOURCE_NUMBER } from '@/components/talk/source-marks';
 
 /**
  * What Dash used in the open chat (plan #1899.4), in the column beside it on
@@ -57,21 +57,34 @@ function None({ children }: { children: React.ReactNode }) {
 const ROW_LINK =
   'press-area flex min-h-8 min-w-0 items-center gap-2 rounded-control text-ui text-ink hover:text-accent';
 
-function ReadRowLink({ row }: { row: ReadRow }) {
+/** A source's number beside its name and, under that, where it lives. */
+const READ_LINK =
+  'press-area flex min-w-0 items-start gap-2.5 rounded-control py-1.5 text-ui text-ink hover:text-accent';
+
+/**
+ * One row Dash read, under its number in the chat: the same number marks the
+ * answer that cites it (plan #2748.12, components/talk/source-marks.ts).
+ */
+function ReadRowLink({ row, n }: { row: ReadRow; n: number }) {
   const where = row.workspace ? moduleById(row.workspace)?.label : row.href.startsWith('/') ? null : 'Gmail';
   const inner = (
     <>
-      {row.workspace ? <WorkspaceDot id={row.workspace} className="size-2" /> : <span aria-hidden className="size-2 shrink-0" />}
-      <span className="min-w-0 flex-1 truncate">{row.title}</span>
-      {where && <span className="shrink-0 text-small text-ink-muted">{where}</span>}
+      <span className={`${SOURCE_NUMBER} mt-px shrink-0`}>
+        <span className="sr-only">Source </span>
+        {n}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-words">{row.title}</span>
+        {where && <span className="block text-small text-ink-muted">{where}</span>}
+      </span>
     </>
   );
   return row.href.startsWith('/') ? (
-    <Link href={row.href} className={ROW_LINK}>
+    <Link href={row.href} className={READ_LINK}>
       {inner}
     </Link>
   ) : (
-    <a href={row.href} target="_blank" rel="noopener noreferrer" className={ROW_LINK}>
+    <a href={row.href} target="_blank" rel="noopener noreferrer" className={READ_LINK}>
       {inner}
       <span className="sr-only"> (opens in Gmail)</span>
     </a>
@@ -123,9 +136,9 @@ export function ChatUsed({
           <None>Nothing read yet.</None>
         ) : (
           <ul>
-            {used.rows.map((row) => (
+            {used.rows.map((row, i) => (
               <li key={`${row.table}:${row.ref}`}>
-                <ReadRowLink row={row} />
+                <ReadRowLink row={row} n={i + 1} />
               </li>
             ))}
           </ul>

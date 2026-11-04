@@ -1382,6 +1382,15 @@
   --c-page-accent: var(--c-w-dev-lit);
   --c-accent-tint: var(--c-w-dev-tint);
 }
+/* Chat wears the app's own indigo rather than a hue of its own: it is where
+ * Dash lives, and the indigo is Dash's colour everywhere outside a workspace
+ * (plan #2748.1). So it reads the base accent each theme already sets and
+ * the contrast script already checks. */
+[data-workspace='chat'] {
+  --c-sheet-accent: var(--c-accent-base);
+  --c-page-accent: var(--c-accent-base-lit);
+  --c-accent-tint: var(--c-accent-tint-base);
+}
 
 :root {
   /* No workspace -- home, account, auth, legal. The app's own accent. */
@@ -1555,6 +1564,8 @@ body,
   --color-w-finances-tint: var(--c-w-finances-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
+  --color-w-chat: var(--c-accent-base);
+  --color-w-chat-tint: var(--c-accent-tint-base);
 
   --color-positive: var(--c-positive);
   --color-positive-tint: var(--c-positive-tint);

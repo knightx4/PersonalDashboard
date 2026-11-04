@@ -261,7 +261,24 @@ export const youSources: ModuleSources = {
       parent: parentBy('chat_id', 'you.advisor_chats'),
       note:
         'role is person (what they said) or advisor (written by Dash in the advisor\'s voice), so cite only role person as theirs. ' +
-        'chat_id points at you.advisor_chats (you 0029).',
+        'chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038).',
+    },
+    {
+      table: 'you.advisor_episodes',
+      module: 'You',
+      holds: 'Each conversation they had with a mentor, from its first message to three quiet hours after its last, with a summary of what was said.',
+      weight: 'record',
+      search: ['summary'],
+      title: 'summary',
+      facts: ['started_at', 'ended_at', 'message_count'],
+      newest: 'ended_at',
+      href: () => '/you/council',
+      section: BOARD,
+      page: null,
+      parent: parentBy('chat_id', 'you.advisor_chats'),
+      note:
+        'summary is written by Dash once the episode is over and is null before that; the words themselves are in you.advisor_messages ' +
+        'between first_message_id and last_message_id (you 0038).',
     },
   ],
   notSources: [

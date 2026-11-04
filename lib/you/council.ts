@@ -11,6 +11,8 @@ import {
   memoryOf,
   messageOf,
   newestByAdvisor,
+  EPISODE_QUIET_MS,
+  episodeDue,
   NO_ROUTINE_ERROR,
   NOTE_COLUMNS,
   noteOf,
@@ -26,6 +28,7 @@ import {
   type Mentor,
   type Reaction,
 } from '@/lib/you/council-model';
+import { unreadTextsOf, type TextRow, type TextThread } from '@/lib/you/council-texts';
 
 export * from '@/lib/you/council-model';
 
@@ -38,20 +41,25 @@ const strOrNull = (value: unknown): string | null => str(value) || null;
  *
  * Three things happen here.
  *
- *   - Notes. Once a day the board routine runs a round in which a few
- *     mentors each write the person a short note, unasked, resting on
- *     something of theirs (.claude/skills/board/council.md). Notes may not
- *     pile up while the person is away: a mentor with an unread note writes
- *     nothing more, nothing is written while six are unread, and at most
- *     three are written a day. The table's trigger holds the same three
- *     numbers; `decideAdviceRun` skips the round before it is fired when
- *     they would refuse every note.
+ *   - Texts. Once a day the board routine runs a round in which a few
+ *     mentors each text the person, unasked, in their thread, about
+ *     something of theirs (.claude/skills/board/council.md; plan #2748.7).
+ *     Texts may not pile up while the person is away: a mentor with an
+ *     unread text writes nothing more, nothing is written while six are
+ *     unread, at most three are written a day, and none between 22:00 and
+ *     08:00 their time. you.advisor_texts_cap (you 0039) holds the same
+ *     rules; `decideAdviceRun` skips the round before it is fired when they
+ *     would refuse every text. The notes written before #2748.7 stay in
+ *     you.council_notes and are still shown on each mentor's tile and page.
  *   - Talks. One running conversation per mentor (you.advisor_chats). The
  *     person's message is saved, the chat marked waiting, and the board
  *     routine fired to write the mentor's reply on the person's plan, so a
  *     reply takes a few minutes and costs no API spend.
  *   - Memory. What a mentor keeps between talks (you.advisor_memory), and
  *     the commitments the person made to one, which that mentor follows up.
+ *     Each daily round first summarises the conversations that ended
+ *     (you.advisor_episodes) and updates the mentors' memory from them, so
+ *     it is started whenever one is due, even with the note caps full.
  *
  * Every query names the person as well as relying on row level security, so
  * the same functions serve a service-role client. Rows written by a session
@@ -77,13 +85,15 @@ function mentorOf(advisor: RosterAdvisor, note: CouncilNote | null, chat: Counci
 export type CouncilHome = {
   mentors: Mentor[];
   unread: CouncilNote[];
+  /** Mentors' texts the person has not read (plan #2748.7). */
+  unreadTexts: number;
   /** The newest advice round, for when the next comes and whether it failed. */
   lastRound: { status: string; requestedAt: string; error: string | null } | null;
 };
 
 /** Everything the Council's home draws: every mentor on the council, their newest note and the unread ones. */
 export async function loadCouncilHome(client: YouSupabaseClient, userId: string, now: number): Promise<CouncilHome> {
-  const [roster, notes, chats, round] = await Promise.all([
+  const [roster, notes, chats, round, texts] = await Promise.all([
     listRoster(client, userId),
     client.from('council_notes').select(NOTE_COLUMNS).eq('user_id', userId).order('created_at', { ascending: false }).limit(300),
     client
@@ -99,6 +109,7 @@ export async function loadCouncilHome(client: YouSupabaseClient, userId: string,
       .order('requested_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    readUnreadTexts(client, userId),
   ]);
   for (const r of [notes, chats, round]) {
     if (r.error) throw new Error(`Reading your council failed: ${r.error.message}`);
@@ -122,6 +133,7 @@ export async function loadCouncilHome(client: YouSupabaseClient, userId: string,
   return {
     mentors,
     unread: unreadNotes(allNotes).filter((n) => onCouncil.has(n.advisorId)),
+    unreadTexts: texts.length,
     lastRound: roundRow
       ? { status: str(roundRow.status), requestedAt: str(roundRow.requested_at), error: strOrNull(roundRow.error) }
       : null,
@@ -406,6 +418,42 @@ async function queueAndFire(input: {
   return { started: true, runId };
 }
 
+/**
+ * The mentors' texts the person has not read, each with its mentor (plan
+ * #2748.7): read_at null and newer than the thread's last_read_at, as
+ * you.advisor_texts_cap counts them.
+ */
+export async function readUnreadTexts(
+  client: YouSupabaseClient,
+  userId: string,
+): Promise<{ advisorId: string; createdAt: string }[]> {
+  const [threads, texts] = await Promise.all([
+    client.from('advisor_chats').select('id, advisor_id, last_read_at').eq('user_id', userId),
+    client
+      .from('advisor_messages')
+      .select('chat_id, created_at, read_at')
+      .eq('user_id', userId)
+      .eq('kind', 'text_first')
+      .is('read_at', null)
+      .order('created_at', { ascending: false })
+      .limit(200),
+  ]);
+  for (const r of [threads, texts]) {
+    if (r.error) throw new Error(`Reading your mentors' texts failed: ${r.error.message}`);
+  }
+  const threadRows: TextThread[] = ((threads.data ?? []) as Record<string, unknown>[]).map((t) => ({
+    id: str(t.id),
+    advisorId: str(t.advisor_id),
+    lastReadAt: strOrNull(t.last_read_at),
+  }));
+  const textRows: TextRow[] = ((texts.data ?? []) as Record<string, unknown>[]).map((m) => ({
+    chatId: str(m.chat_id),
+    createdAt: str(m.created_at),
+    readAt: strOrNull(m.read_at),
+  }));
+  return unreadTextsOf(threadRows, textRows);
+}
+
 export type AdviceDecision = { start: true } | { start: false; skipped: string };
 
 /**
@@ -414,10 +462,16 @@ export type AdviceDecision = { start: true } | { start: false; skipped: string }
  *   - Never two at once: an open round not yet stale skips.
  *   - Once a day: a round asked for in the last twenty hours skips, so a
  *     round that keeps failing is tried daily, not every tick.
- *   - Nothing piles up: with six notes unread, or three written today, no
- *     note could be saved, so the round is not fired at all.
+ *   - Never at night: in the person's quiet hours (22:00 to 08:00 their
+ *     time) nothing starts, memory included; the five-minute council-texts
+ *     call starts it once their morning begins (plan #2748.7).
+ *   - Nothing piles up: with six texts unread, or three sent today, no
+ *     text could be saved, so the round is not fired at all.
  *   - Someone can speak: every mentor on the council already has an unread
- *     note, or none is on it.
+ *     text, or none is on it.
+ *   - Memory still runs: when a conversation is due a summary (plan
+ *     #2748.8), the round starts whatever the note caps say, and writes
+ *     the mentors' memory with no notes.
  */
 export function decideAdviceRun(input: {
   now: number;
@@ -426,6 +480,10 @@ export function decideAdviceRun(input: {
   writtenToday: number;
   /** Mentors on the council with no unread note. */
   free: number;
+  /** Mentor conversations over and due a summary. */
+  episodesDue?: number;
+  /** The person's quiet hours, when no mentor texts them. */
+  quiet?: boolean;
 }): AdviceDecision {
   const asked = input.latest ? Date.parse(input.latest.requestedAt) : NaN;
   if (input.latest && (input.latest.status === 'queued' || input.latest.status === 'running')) {
@@ -436,9 +494,11 @@ export function decideAdviceRun(input: {
   if (Number.isFinite(asked) && input.now - asked < ADVICE_GAP_MS) {
     return { start: false, skipped: 'a council round was asked for in the last day' };
   }
-  if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} council notes are unread` };
-  if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has written its notes for today' };
-  if (input.free <= 0) return { start: false, skipped: 'every mentor already has an unread note' };
+  if (input.quiet) return { start: false, skipped: 'it is quiet hours for the person' };
+  if ((input.episodesDue ?? 0) > 0) return { start: true };
+  if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} mentor texts are unread` };
+  if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has sent its texts for today' };
+  if (input.free <= 0) return { start: false, skipped: 'every mentor already has an unread text' };
   return { start: true };
 }
 
@@ -449,12 +509,16 @@ export async function maybeStartAdviceRun(input: {
   routine: RoutineTarget;
   now?: number;
   fetch?: typeof globalThis.fetch;
+  /** The person's quiet hours, when no mentor texts them. */
+  quiet?: boolean;
 }): Promise<{ skipped: string } | { started: true; runId: string }> {
   const { client, userId } = input;
   const now = input.now ?? Date.now();
   const dayStart = new Date(now);
   dayStart.setUTCHours(0, 0, 0, 0);
-  const [latest, unread, today, roster] = await Promise.all([
+  const quietSince = new Date(now - EPISODE_QUIET_MS).toISOString();
+  const lately = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString();
+  const [latest, unread, today, roster, episodes] = await Promise.all([
     client
       .from('council_runs')
       .select('status, requested_at')
@@ -463,18 +527,29 @@ export async function maybeStartAdviceRun(input: {
       .order('requested_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    client.from('council_notes').select('advisor_id').eq('user_id', userId).is('read_at', null),
+    readUnreadTexts(client, userId).then((data) => ({ data, error: null })),
     client
-      .from('council_notes')
+      .from('advisor_messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
+      .eq('kind', 'text_first')
       .gte('created_at', dayStart.toISOString()),
     client.from('board_advisors').select('id').eq('user_id', userId).eq('active', true),
+    // Over and unsummarised, or ended lately and perhaps grown after its
+    // summary; PostgREST cannot compare two columns, so episodeDue settles it.
+    client
+      .from('advisor_episodes')
+      .select('ended_at, summarised_at')
+      .eq('user_id', userId)
+      .lt('ended_at', quietSince)
+      .or(`summarised_at.is.null,ended_at.gt.${lately}`)
+      .order('ended_at', { ascending: false })
+      .limit(200),
   ]);
-  for (const r of [latest, unread, today, roster]) {
+  for (const r of [latest, unread, today, roster, episodes]) {
     if (r.error) throw new Error(`Reading the council failed: ${r.error.message}`);
   }
-  const unreadBy = new Set(((unread.data ?? []) as { advisor_id: string }[]).map((r) => r.advisor_id));
+  const unreadBy = new Set((unread.data ?? []).map((r) => r.advisorId));
   const free = ((roster.data ?? []) as { id: string }[]).filter((r) => !unreadBy.has(r.id)).length;
   const latestRow = latest.data as { status: string; requested_at: string } | null;
   const decision = decideAdviceRun({
@@ -483,6 +558,10 @@ export async function maybeStartAdviceRun(input: {
     unread: (unread.data ?? []).length,
     writtenToday: today.count ?? 0,
     free,
+    quiet: input.quiet,
+    episodesDue: ((episodes.data ?? []) as { ended_at: string; summarised_at: string | null }[]).filter((e) =>
+      episodeDue({ endedAt: e.ended_at, summarisedAt: e.summarised_at }, now),
+    ).length,
   });
   if (!decision.start) return { skipped: decision.skipped };
 

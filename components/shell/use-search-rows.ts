@@ -531,7 +531,7 @@ export function useSearchRows({
         hint: 'Your chats with Dash',
         module: null,
         icon: 'dash',
-        run: () => router.push('/ask'),
+        run: () => router.push('/chat/dash'),
       },
       ...visibleModules(enabledModules, module).map((entry) => ({
         id: `workspace:${entry.id}`,
