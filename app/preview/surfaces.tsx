@@ -8857,9 +8857,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPeopleSurface />,
   },
   {
-    /* People with no mentors on the council yet. */
+    /* New message open in the thread's place (plan #2879.2): a To box over everyone A to Z, one not ready to talk listed but not pickable, and Add someone new at the foot. */
+    id: 'chat-people-new',
+    label: 'Chat · Messages, New message',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="new" />,
+  },
+  {
+    /* Messages with no chat started yet (plan #2879.2): one card offering New message. */
     id: 'chat-people-empty',
-    label: 'Chat · People, no mentors yet',
+    label: 'Chat · Messages, no chats yet',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPeopleSurface state="empty" />,

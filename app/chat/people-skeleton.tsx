@@ -39,7 +39,7 @@ export function PeopleSkeleton({ thread = false }: { thread?: boolean }) {
       <MessagingThread
         name={<Skeleton className="h-4 w-32" />}
         avatar={<Skeleton className="size-8 shrink-0 rounded-full" />}
-        back={{ href: '/chat', label: 'People' }}
+        back={{ href: '/chat', label: 'Messages' }}
         box={<Skeleton className="h-(--control-h) w-full rounded-pill" />}
       >
         <div className="flex flex-col gap-2" aria-busy>

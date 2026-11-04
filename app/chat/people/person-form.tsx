@@ -151,8 +151,8 @@ export function PersonForm({
     <MessagingPanel
       title={adding ? 'Add someone' : `Edit ${card.name}`}
       avatar={<PersonMark initials={personInitials(name)} colour={colour} size="sm" />}
-      back={{ href: back, label: adding ? 'People' : card.name }}
-      crumbs={[{ label: 'People', href: '/chat' }, ...(adding ? [] : [{ label: card.name, href: back }])]}
+      back={{ href: back, label: adding ? 'Messages' : card.name }}
+      crumbs={[{ label: 'Messages', href: '/chat' }, ...(adding ? [] : [{ label: card.name, href: back }])]}
       foot={
         <div className="flex flex-wrap items-center justify-end gap-2">
           {saveError && <p className="mr-auto text-small text-danger">{saveError}</p>}
