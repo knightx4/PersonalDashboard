@@ -1,7 +1,4 @@
-import Link, { linkVariants } from '@/components/ui/link';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { DetailCard } from '@/components/patterns/tabbed-detail';
-import { cn } from '@/lib/cn';
 import { notFound } from 'next/navigation';
 import { tabFrom } from '@/lib/tabs';
 import { createClient, requireUser } from '@/lib/auth/server';
@@ -62,7 +59,6 @@ import { loadPreparation } from '@/lib/learn/prepare/store';
 import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
 import { progressLine } from '@/lib/learn/lessons/plan-view';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
-import { FileLinks } from '@/components/files/file-links';
 import { fileHref, type LinkedFile } from '@/lib/files/files';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
@@ -76,6 +72,7 @@ import {
   newestFiles,
   stepTitlesIn,
   unreadWords,
+  type GoalFileRow,
 } from '@/lib/goals/goal-files';
 import { formatDay } from '@/lib/goals/dates';
 import { dayIn } from '@/lib/todo/time';
@@ -116,18 +113,25 @@ import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
 import { GoalPlan } from './goal-plan';
-import { DashWork } from './dash-work';
+import { GoalFilesTab, type TabWork } from './goal-files-tab';
 import { DashboardTiles } from './dashboard-tiles';
 import {
   DashOnCard,
   GoalDashboard,
   GoalStripRow,
-  GoalWorkFiles,
   NoLayoutLine,
   RecentFiles,
 } from './goal-dashboard';
 import { AskDash } from '../ask-dash';
 import { dashWork, FINISHED_SHOWN_MS, questionWork } from '@/lib/goals/dash-work';
+import {
+  waitingRows,
+  workEntries,
+  type WaitingKind,
+  type WaitingRow,
+  type WorkRun,
+} from '@/lib/goals/goal-files-tab';
+import { loadGoalWork, loadWaitingKinds, type StepLike } from '@/lib/goals/goal-files-tab-store';
 import { QuestionResults } from './question-results';
 
 export const metadata = { title: 'Goal' };
@@ -271,6 +275,46 @@ async function loadQuestions(
   } catch {
     return { running: [], finished: [], results: [], suggestions: {} };
   }
+}
+
+/**
+ * What the Work & files tab reads beyond the page (plan #2778.7): the
+ * documents the goal's open steps still wait for, and every run on the goal
+ * and its steps. Outside the component because it reads the clock. A failed
+ * read leaves that part empty rather than the page.
+ */
+async function loadFilesTab(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  map: GoalMap,
+  filesOf: Record<string, LinkedFile[]>,
+  files: GoalFileRow[],
+  timeZone: string,
+): Promise<{ waiting: WaitingRow[]; work: TabWork[] }> {
+  const steps: StepLike[] = [];
+  const titles = new Map<string, string>();
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      steps.push({ id: node.id, title: node.title, status: node.status, collectionId: node.collectionId ?? null });
+      titles.set(node.id, node.title);
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  const filled = new Set(
+    Object.values(filesOf).flatMap((list) => list.flatMap((file) => (file.documentKindId ? [file.documentKindId] : []))),
+  );
+  const [kinds, runs] = await Promise.all([
+    loadWaitingKinds(client, steps).catch((): WaitingKind[] => []),
+    loadGoalWork(client, [map.goal.id, ...steps.map((step) => step.id)]).catch((): WorkRun[] => []),
+  ]);
+  const now = Date.now();
+  return {
+    waiting: waitingRows(kinds, filled),
+    work: workEntries(runs, map.goal.id, titles, files, now).map((entry) => ({
+      ...entry,
+      day: formatDay(dayIn(entry.at, timeZone)),
+    })),
+  };
 }
 
 /** Dash's work at the top of the page (note 03ce0cce). Outside the component because it reads the clock. */
@@ -700,22 +744,9 @@ export default async function GoalMapPage({
     ...file,
     meta: fileByline(file, formatDay(dayIn(file.updatedAt, account.timezone))),
   }));
-  const filesSection = files.length > 0 && (
-    <section aria-labelledby="files-heading" className="space-y-2">
-      <SectionHeading
-        id="files-heading"
-        title="Files"
-        count={unread || undefined}
-        className="px-1"
-        action={
-          <Link href="/goals/files" className={cn('press-area text-small', linkVariants())}>
-            Files for every goal
-          </Link>
-        }
-      />
-      <FileLinks files={bylined} />
-    </section>
-  );
+  // The Work & files tab's own reads (plan #2778.7), only when it is open.
+  const filesTab =
+    tab === 'files' ? await loadFilesTab(client, map, filesOf, files, account.timezone) : null;
   const dashboard = (
     <GoalDashboard
       strip={<GoalStripRow strip={strip} />}
@@ -873,12 +904,15 @@ export default async function GoalMapPage({
           />
         </GoalStepsFold>
       ) : tab === 'files' ? (
-        // Work & files (plan #2778.4): what Dash is on and every file on the
-        // goal. Plan #2778.7 gives it its own lists; here it holds what the
-        // page had.
-        <GoalWorkFiles
-          work={work.length > 0 ? <DashWork items={work} /> : null}
-          files={filesSection || null}
+        // Work & files (plan #2778.7): every file on the goal in four views,
+        // what it is still waiting for, a place to add yours, and every
+        // piece of work Dash took on for it.
+        <GoalFilesTab
+          goalId={map.goal.id}
+          files={bylined}
+          waiting={filesTab?.waiting ?? []}
+          work={filesTab?.work ?? []}
+          canAdd={owner && map.goal.status !== 'dropped'}
         />
       ) : tab === 'history' ? (
         <GoalActivity

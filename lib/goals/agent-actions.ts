@@ -134,6 +134,12 @@ export const goalsActions: ModuleActions = {
     turnDownHelpAction: none('theirs'),
     restoreHelpProposalAction: none('theirs', 'Undo: takes back their own decline.'),
   },
+  'app/goals/[goalId]/goal-file-actions.ts': {
+    addGoalFileAction: none('own', 'Keeps a file the person uploaded from their own device; an agent has no file of theirs to hand over.'),
+    pinGoalFileAction: none('setting', 'Which file sits at the top of the goal is a display preference.'),
+    renameGoalFileAction: none('own', 'What the person calls a file they keep is their own writing.'),
+    removeGoalFileAction: none('deletes', 'Takes a file off the goal, and Dash never removes what the person kept.'),
+  },
   'app/goals/files/[fileId]/read-actions.ts': {
     markFileReadAction: none('own', 'Opening the file marks it read, which means the person read it.'),
   },

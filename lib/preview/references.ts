@@ -53,6 +53,18 @@ const LOANS_PLAN: Reference = {
   from: '2778.5',
 };
 
+/** The loans mockup's Work & files view, approved on 3 November 2026 for #2778 (plan #2778.7). */
+const LOANS_FILES: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/loans-files-laptop.png',
+    'docs/references/goal-dashboard/loans-files-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+  source: 'docs/references/goal-dashboard/loans.html',
+  why: "The loans goal's Work & files tab the person approved on 3 November 2026 for #2778: a Files card with its count and unread on the heading line, an All / Dash wrote / Yours / Waiting for switch, rows of files each with a small page-shaped mark saying what it is (tinted for Dash's), the title with an unread dot, a muted line of who, when and which step, and Pinned at the right; the documents still waiting at the foot of All as dashed rows with an Add button; then a dashed drop zone at the card's foot. Beside it from laptop width, a Dash's work card with '6 pieces · 1 going', one folded row per piece of work with its day, opening to what came of it, where it started and its file. On a phone the two cards stack. The mockup has no properties column; this page keeps the tabbed detail pattern's.",
+  from: '2778.7',
+};
+
 /** The apartment mockup's Plan view, approved on 4 November 2026 for #2778 (plan #2778.5). */
 const APARTMENT_PLAN: Reference = {
   pictures: [
@@ -287,6 +299,31 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     from: '2778.4',
   },
   'goals-page-steps': LOANS_PLAN,
+  'goals-page-files': LOANS_FILES,
+  'goals-page-files-waiting': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the switch is on Waiting for, which lists only the dashed rows, each with its Add.`,
+  },
+  'goals-page-files-yours': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the switch is on Yours, after a letter you added has gone on its step and left Waiting for.`,
+  },
+  'goals-page-files-drag': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file is held over the drop zone, which the mockup draws as the dashed box tinting with the goal's colour and its border darkening.`,
+  },
+  'goals-page-files-uploading': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file is uploading, which the mockup draws as a new row at the top of the list saying 'You · just now · Dash is reading it'.`,
+  },
+  'goals-page-files-menu': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file's menu (Pin, Rename, Remove) is open; the mockup draws no menu, so it should sit at the row's right and not disturb the list.`,
+  },
+  'goals-page-files-empty': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the goal has no files, nothing waiting and no work from Dash, which the mockup draws as one row ('Nothing of yours yet. Statements, letters and screenshots you add land here.') above the drop zone.`,
+  },
   'goals-page-plan-draft': {
     ...LOANS_PLAN,
     why: `${LOANS_PLAN.why} Here Dash's how-to under the autopay step is open in place, as the mockup's folded 'Dash's how-to' opens: a quiet sunken box inside the step's card.`,

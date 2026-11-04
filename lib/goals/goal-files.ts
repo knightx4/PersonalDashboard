@@ -22,6 +22,12 @@ export type GoalFileRow = {
   updatedAt: string;
   /** The step it was written for, or null for the goal itself. */
   stepTitle: string | null;
+  /** That step's id (plan #2778.7). */
+  stepId?: string | null;
+  /** Pinned to the top of the goal's files (plan #2778.7). */
+  pinned?: boolean;
+  /** A file the person added rather than a piece of writing: its type, as "application/pdf". */
+  contentType?: string | null;
 };
 
 /** Each step in the trees by id, at any depth, for naming the step a file came from. */
@@ -92,6 +98,9 @@ export function goalFileRows(
       unread: isUnread(file),
       updatedAt: file.updatedAt,
       stepTitle,
+      stepId: stepTitle ? stepId : null,
+      pinned: Boolean(file.pinnedAt),
+      contentType: file.stored?.contentType ?? null,
     };
   });
 }

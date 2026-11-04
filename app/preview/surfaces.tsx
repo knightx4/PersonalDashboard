@@ -5981,12 +5981,61 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPageErrorSurface />,
   },
   {
-    /* A goal's Work & files tab (plan #2778.4): Dash's work, then every file. */
+    /* A goal's Work & files tab (plan #2778.7): the files on All, the drop
+     * zone, and Dash's work beside them. */
     id: 'goals-page-files',
     label: 'Goal · the Work & files tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalFilesTabSurface />,
+  },
+  {
+    /* Work & files on Waiting for: the documents the goal's steps still need. */
+    id: 'goals-page-files-waiting',
+    label: 'Goal · Work & files, Waiting for',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="waiting" />,
+  },
+  {
+    /* Work & files on Yours, once a PDF you added has gone on its step. */
+    id: 'goals-page-files-yours',
+    label: 'Goal · Work & files, Yours',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="yours" added />,
+  },
+  {
+    /* The drop zone with a file held over it. */
+    id: 'goals-page-files-drag',
+    label: 'Goal · Work & files, a file dragged over',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface dragging />,
+  },
+  {
+    /* A file uploading, before Dash has put it on its step. */
+    id: 'goals-page-files-uploading',
+    label: 'Goal · Work & files, uploading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface uploading />,
+  },
+  {
+    /* A file's menu open: Pin, Rename, Remove. */
+    id: 'goals-page-files-menu',
+    label: 'Goal · Work & files, a file’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface menu />,
+  },
+  {
+    /* A goal with no files, nothing waiting and no work from Dash. */
+    id: 'goals-page-files-empty',
+    label: 'Goal · Work & files, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface empty />,
   },
   {
     /* A passive goal's page (plan #2503.2): the switch in the header on

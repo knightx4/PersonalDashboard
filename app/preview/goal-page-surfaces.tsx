@@ -11,7 +11,6 @@ import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
 import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
-import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
@@ -47,12 +46,12 @@ import { SetTab } from './set-tab';
 import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
 import { DashboardTiles } from '@/app/goals/[goalId]/dashboard-tiles';
-import { DashWork } from '@/app/goals/[goalId]/dash-work';
+import { GoalFilesTab, type TabFile, type TabWork } from '@/app/goals/[goalId]/goal-files-tab';
+import type { FileView, WaitingRow } from '@/lib/goals/goal-files-tab';
 import {
   DashOnCard,
   GoalDashboard,
   GoalStripRow,
-  GoalWorkFiles,
   NoLayoutLine,
   RecentFiles,
 } from '@/app/goals/[goalId]/goal-dashboard';
@@ -1564,7 +1563,7 @@ const LOANS_FILES = [
 ];
 
 /** The goal page frame around the loans goal's Dashboard. */
-function LoansGoal({ children }: { children: React.ReactNode }) {
+function LoansGoal({ children, unreadFiles = 2 }: { children: React.ReactNode; unreadFiles?: number }) {
   return (
     <GoalDetail
       goal={loansGoal}
@@ -1581,7 +1580,7 @@ function LoansGoal({ children }: { children: React.ReactNode }) {
         daysSince: 1,
         slower: false,
       }}
-      unreadFiles={2}
+      unreadFiles={unreadFiles}
     >
       {children}
     </GoalDetail>
@@ -1726,35 +1725,198 @@ export function GoalDashboardPageSurface({
   );
 }
 
-/** The loans goal on Work & files (plan #2778.4): what Dash is on, then every file. */
-export function GoalFilesTabSurface() {
+/** The loans goal's files on Work & files (plan #2778.7). Invented titles of the real shape. */
+const TAB_FILES: TabFile[] = [
+  {
+    fileId: 'f-script',
+    title: 'Call script and email for the loan servicer',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Check with the servicer”',
+    byDash: true,
+    unread: true,
+    updatedAt: '2026-11-02T15:00:00Z',
+    stepTitle: 'Check with the servicer',
+  },
+  {
+    fileId: 'f-walk',
+    title: 'Walkthrough: apply for the repayment plan online',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Apply for the repayment plan”',
+    byDash: true,
+    unread: false,
+    pinned: true,
+    updatedAt: '2026-11-02T10:00:00Z',
+    stepTitle: 'Apply for the repayment plan',
+  },
+  {
+    fileId: 'f-statement',
+    title: 'Servicer statement, October',
+    summary: null,
+    meta: 'You · 28 Oct · for “Log each loan balance”',
+    byDash: false,
+    unread: false,
+    contentType: 'application/pdf',
+    updatedAt: '2026-10-28T09:00:00Z',
+    stepTitle: 'Log each loan balance',
+  },
+  {
+    fileId: 'f-compare',
+    title: 'Income-driven repayment or the standard schedule',
+    summary: null,
+    meta: 'Dash · 29 Oct · for “Which repayment plan?”',
+    byDash: true,
+    unread: true,
+    updatedAt: '2026-10-29T12:00:00Z',
+    stepTitle: 'Which repayment plan?',
+  },
+  {
+    fileId: 'f-payoff',
+    title: 'Payoff schedule, highest rate first',
+    summary: null,
+    meta: 'Dash · 25 Sep · for “Choose the payoff order”',
+    byDash: true,
+    unread: false,
+    updatedAt: '2026-09-25T12:00:00Z',
+    stepTitle: 'Choose the payoff order',
+  },
+  {
+    fileId: 'f-options',
+    title: 'Refinancing, income-driven repayment and forgiveness: every option for the four loans compared',
+    summary: null,
+    meta: 'Dash · 25 Sep',
+    byDash: true,
+    unread: false,
+    updatedAt: '2026-09-25T11:00:00Z',
+    stepTitle: null,
+  },
+];
+
+/** The uploaded letter, as Yours lists it once it is added. */
+const UPLOADED: TabFile = {
+  fileId: 'f-letter',
+  title: 'Repayment plan approval letter',
+  summary: null,
+  meta: 'You · 4 Nov · for “Save the servicer’s approval showing the new payment”',
+  byDash: false,
+  unread: false,
+  contentType: 'application/pdf',
+  updatedAt: '2026-11-04T09:00:00Z',
+  stepTitle: 'Save the servicer’s approval showing the new payment',
+};
+
+const TAB_WAITING: WaitingRow[] = [
+  {
+    kindId: 'k-letter',
+    name: 'Repayment plan approval letter',
+    recognise: '',
+    stepId: 'save-letter',
+    stepTitle: 'Save the servicer’s approval showing the new payment',
+  },
+  {
+    kindId: 'k-autopay',
+    name: 'Autopay confirmation, all four loans',
+    recognise: '',
+    stepId: 'autopay',
+    stepTitle: 'Turn on autopay',
+  },
+];
+
+const TAB_WORK: TabWork[] = [
+  {
+    runId: 'run-consolidate',
+    title: 'Should I consolidate my loans or keep them separate?',
+    state: 'running',
+    startedFrom: 'From Ask Dash',
+    result: 'reading the four loans and the repayment rules',
+    file: null,
+    at: '2026-11-04T09:00:00Z',
+    day: '4 Nov',
+  },
+  {
+    runId: 'run-walk',
+    title: 'Apply for the repayment plan',
+    state: 'done',
+    startedFrom: 'On the step “Apply for the repayment plan”',
+    result:
+      'Ten steps for the federal site: pick the income-driven plan, consent to the tax data, report zero income for a $0 payment.',
+    file: { fileId: 'f-walk', title: 'Walkthrough: apply for the repayment plan online' },
+    at: '2026-11-02T10:00:00Z',
+    day: '2 Nov',
+  },
+  {
+    runId: 'run-script',
+    title: 'Can the servicer hold the bills while the plan is processed?',
+    state: 'done',
+    startedFrom: 'From a chat',
+    result: 'Asks the servicer to confirm no bill falls due on the four loans while the plan is processed.',
+    file: { fileId: 'f-script', title: 'Call script and email for the loan servicer' },
+    at: '2026-11-02T09:00:00Z',
+    day: '2 Nov',
+  },
+  {
+    runId: 'run-compare',
+    title: 'Which repayment plan?',
+    state: 'done',
+    startedFrom: 'On the step “Which repayment plan?”',
+    result: 'Recommended the income-driven plan, in place before the 18 Dec bill.',
+    file: { fileId: 'f-compare', title: 'Income-driven repayment or the standard schedule' },
+    at: '2026-10-29T12:00:00Z',
+    day: '29 Oct',
+  },
+  {
+    runId: 'run-map',
+    title: 'Mapped the goal',
+    state: 'done',
+    startedFrom: 'On the goal',
+    result: 'Laid out five stages and wrote the payoff schedule.',
+    file: null,
+    at: '2026-09-25T12:00:00Z',
+    day: '25 Sep',
+  },
+  {
+    runId: 'run-rates',
+    title: 'Check the loan rates against the servicer',
+    state: 'failed',
+    startedFrom: 'On the step “Check the loan rates against the servicer”',
+    result: 'The servicer’s statement was not in Gmail yet.',
+    file: null,
+    at: '2026-09-24T12:00:00Z',
+    day: '24 Sep',
+  },
+];
+
+/**
+ * The loans goal on Work & files (plan #2778.7): the files in their views,
+ * what the goal is waiting for, the drop zone, and Dash's work beside them.
+ */
+export function GoalFilesTabSurface({
+  view = 'all',
+  dragging = false,
+  uploading = false,
+  menu = false,
+  empty = false,
+  added = false,
+}: {
+  view?: FileView;
+  dragging?: boolean;
+  uploading?: boolean;
+  menu?: boolean;
+  empty?: boolean;
+  added?: boolean;
+}) {
   return (
     <>
       <SetTab tab="files" />
-      <LoansGoal>
-        <GoalWorkFiles
-          work={
-            <DashWork
-              items={[
-                {
-                  stepId: 'consolidate',
-                  runId: 'run-consolidate',
-                  title: 'Should I consolidate the loans or keep them separate?',
-                  state: 'running',
-                  line: 'reading the four loans and the repayment rules',
-                },
-              ]}
-            />
-          }
-          files={
-            <section aria-labelledby="files-heading" className="space-y-2">
-              <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
-                Files
-                <span className="ml-2 font-normal text-ink-muted">2 not read</span>
-              </h2>
-              <FileLinks files={LOANS_FILES} />
-            </section>
-          }
+      <LoansGoal unreadFiles={empty ? 0 : 2}>
+        <GoalFilesTab
+          goalId={LOANS_GOAL_ID}
+          files={empty ? [] : added ? [UPLOADED, ...TAB_FILES] : TAB_FILES}
+          waiting={empty ? [] : added ? TAB_WAITING.slice(1) : TAB_WAITING}
+          work={empty ? [] : TAB_WORK}
+          defaultView={view}
+          defaultDragging={dragging}
+          defaultUploading={uploading ? { name: 'servicer-approval-letter-nov.pdf' } : null}
+          defaultMenuFor={menu ? 'f-statement' : null}
         />
       </LoansGoal>
     </>
