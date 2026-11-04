@@ -259,7 +259,7 @@ export function MessageLink({ href, children }: { href: string; children: React.
   return (
     <Link
       href={href}
-      className="press-area my-0.5 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-border px-2.5 py-0.5 text-small text-ink-muted hover:text-ink"
+      className="press-area my-0.5 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-border px-2.5 py-0.5 text-small text-ink-muted hover:text-ink" /* ui-ok: an outlined chip on one line, the reference's link under a bubble, not a box that groups anything */
     >
       <span aria-hidden>↳</span>
       <span className="truncate">{children}</span>
