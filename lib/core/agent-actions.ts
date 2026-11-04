@@ -36,7 +36,7 @@ export const coreActions: ModuleActions = {
     readFinishNotice: none('setting'),
     saveFinishNotice: none('setting'),
   },
-  'app/ask/actions.ts': {
+  'app/chat/dash/actions.ts': {
     askDashPageLabel: none('page'),
     recentAskQuestions: none('page'),
     openAskQuestion: none(

@@ -8,8 +8,8 @@ import type { Brain } from '@/lib/you/board-brain';
 import type { CouncilMemory, CouncilMessage, CouncilNote, Mentor } from '@/lib/you/council-model';
 
 /**
- * The Council in the gallery (you 0037): the home with new notes, with none,
- * and held back at six unread; and one mentor's page mid-talk, waiting on a
+ * The Council in the gallery (you 0037): the home with three unread texts in
+ * Chat (plan #2748.7), with none, and held back at six unread; and one mentor's page mid-talk, waiting on a
  * reply, and opened from a note. The fixtures are invented, sixteen mentors
  * long like the real council.
  */
@@ -118,15 +118,15 @@ export function YouCouncilPreview({ state = 'notes' }: { state?: 'notes' | 'empt
             Object.fromEntries(Object.keys(WITH_NOTES).map((k, i) => [k, { hours: 6 + i * 10 }])) as typeof WITH_NOTES,
           )
         : mentors(WITH_NOTES);
-  const unread = list.flatMap((m) => (m.note && !m.note.readAt ? [m.note] : [])).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  // Unread texts in Chat (plan #2748.7): one from each mentor with a fresh note, six when held back.
+  const unreadTexts = list.filter((m) => m.note && !m.note.readAt).length;
   return (
     <CouncilView
       mentors={list}
-      unread={unread}
+      unreadTexts={unreadTexts}
       due={state === 'notes' ? 1 : 0}
       timezone={ZONE}
       now={NOW}
-      actions={noteActions}
       subject={{ ref: null, path: [{ label: 'You', href: '/you' }, { label: 'Council', href: '/you/council' }] }}
     />
   );

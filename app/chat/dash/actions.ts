@@ -165,7 +165,7 @@ async function pressChange(
       if (outcome.change.status !== 'declined') {
         for (const path of changePaths(outcome.change)) revalidatePath(path);
       }
-      revalidatePath('/ask');
+      revalidatePath('/chat/dash');
     }
     return outcome;
   } catch (error) {
@@ -210,7 +210,7 @@ export async function saveDashAnswer(ref: string, turnId: string, to: SaveAnswer
     const outcome = await saveAskAnswer(conversation.data, turn.data, to);
     if (outcome.ok) {
       for (const path of changePaths(outcome.change)) revalidatePath(path);
-      revalidatePath('/ask');
+      revalidatePath('/chat/dash');
     }
     return outcome;
   } catch (error) {
@@ -256,7 +256,7 @@ async function editChat(ref: string, edit: AskChatEdit, failed: string): Promise
   try {
     const found = await editAskChatInRequest(parsed.data, edit);
     if (!found) return { ok: false, error: 'That chat is not there any more.' };
-    revalidatePath('/ask', 'layout');
+    revalidatePath('/chat/dash', 'layout');
     return { ok: true };
   } catch (error) {
     console.error('chat edit failed', error);
@@ -264,7 +264,7 @@ async function editChat(ref: string, edit: AskChatEdit, failed: string): Promise
   }
 }
 
-/** Pin a chat to the top of the list on /ask, or unpin it (plan #1899.6). */
+/** Pin a chat to the top of the list on Chat's Dash tab, or unpin it (plan #1899.6). */
 // latency: pending
 export async function pinDashChat(ref: string, pinned: boolean): Promise<ChatEditOutcome> {
   return editChat(

@@ -1,58 +1,54 @@
 'use client';
 
-import { useTransition } from 'react';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Banner } from '@/components/ui/banner';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { whenAgo } from '@/lib/core/when';
-import { NOTES_PER_DAY, UNREAD_MAX, type CouncilNote, type Mentor } from '@/lib/you/council-model';
+import { UNREAD_MAX, type Mentor } from '@/lib/you/council-model';
+import { CHAT_URL } from '@/lib/you/council-texts';
 import { MentorMark } from './mentor-mark';
-import { NoteCard, type NoteActions } from './note-card';
 
 /**
  * The Council (you 0037): the home of the You tab that was the Board.
  *
  * First, anything the board's decisions need from the person today (a
- * check-back or a tripwire), as one line to the Decisions page. Then the
- * notes the mentors wrote since the person last read, oldest first, each
- * with what can be done with it. Then every mentor as a tile: their mark,
- * the question they own, and their newest note, or the question alone when
- * they have written nothing yet. A tile opens the mentor's page, where the
- * person talks to them.
+ * check-back or a tripwire), as one line to the Decisions page. Then one
+ * line to Chat, where the mentors' daily notes now arrive as texts in their
+ * threads (plan #2748.7), with how many are unread. Then every mentor as a
+ * tile: their mark, the question they own, and their newest note, or the
+ * question alone when they have written nothing yet. A tile opens the
+ * mentor's page.
  *
- * The notes are capped so they do not pile up: one unread per mentor, six
- * unread at most, three written a day. When the cap holds the round back,
- * the section says so, so silence is never mistaken for a broken routine.
+ * The texts are capped so they do not pile up: one unread per mentor, six
+ * unread at most, three a day. When the cap holds the round back, the line
+ * says so, so silence is never mistaken for a broken routine.
  */
 
 export function CouncilView({
   mentors,
-  unread,
+  unreadTexts,
   due,
   timezone,
   now,
-  actions,
   subject,
 }: {
   mentors: readonly Mentor[];
-  unread: readonly CouncilNote[];
+  /** Mentors' texts in Chat the person has not read. */
+  unreadTexts: number;
   /** Check-backs and tripwires due on the board's decisions. */
   due: number;
   timezone: string;
   now: number;
-  actions: NoteActions;
   subject?: Subject;
 }) {
-  const [pending, startTransition] = useTransition();
-  const byId = new Map(mentors.map((m) => [m.id, m]));
   const seats = mentors.filter((m) => m.kind === 'seat');
   const guests = mentors.filter((m) => m.kind === 'guest');
-  const held = unread.length >= UNREAD_MAX;
+  const held = unreadTexts >= UNREAD_MAX;
 
   return (
     <PageColumn>
@@ -81,51 +77,20 @@ export function CouncilView({
       )}
 
       <div className="space-y-6">
-        <Group
-          title={unread.length > 0 ? `New from your council (${unread.length})` : 'New from your council'}
-          action={
-            unread.length > 1 ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                pending={pending}
-                onClick={() => startTransition(async () => void (await actions.read(unread.map((n) => n.id))))}
-              >
-                Mark all read
-              </Button>
-            ) : undefined
-          }
-        >
-          {unread.length === 0 ? (
-            <p className="text-ui text-ink-muted">
-              Nothing new. A few mentors write each day, about something of yours that changed. At most{' '}
-              {NOTES_PER_DAY} a day, and they hold off while {UNREAD_MAX} are waiting for you.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {held && (
-                <p className="text-small text-ink-muted">
-                  The council is holding back until you read some of these: it stops at {UNREAD_MAX} unread.
-                </p>
-              )}
-              {unread.map((note) => {
-                const mentor = byId.get(note.advisorId);
-                if (!mentor) return null;
-                return (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    author={{ key: mentor.key, name: mentor.name, kind: mentor.kind }}
-                    timezone={timezone}
-                    now={now}
-                    actions={actions}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </Group>
+        <Card padding="standard" className="text-ui text-ink-muted">
+          <Link href={CHAT_URL} className={cn(linkVariants(), 'font-medium')}>
+            {unreadTexts === 0
+              ? 'Open Chat'
+              : unreadTexts === 1
+                ? 'One unread text in Chat'
+                : `${unreadTexts} unread texts in Chat`}
+          </Link>
+          {unreadTexts === 0
+            ? '. Your mentors text you there, about something of yours that changed.'
+            : held
+              ? `. Your mentors hold off until you read some: they stop at ${UNREAD_MAX}.`
+              : ' from your mentors.'}
+        </Card>
 
         <Group title="The five seats">
           <MentorGrid mentors={seats} timezone={timezone} now={now} />

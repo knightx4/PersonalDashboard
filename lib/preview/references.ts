@@ -41,11 +41,64 @@ export type Reference = {
   from: string;
 };
 
+/** The loans mockup's Plan view, approved on 3 November 2026 for #2778 (plan #2778.5). */
+const LOANS_PLAN: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/loans-plan-laptop.png',
+    'docs/references/goal-dashboard/loans-plan-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+  source: 'docs/references/goal-dashboard/loans.html',
+  why: "The loans goal's Plan tab the person approved on 3 November 2026 for #2778: a What's next / By stage switch, then NOW in the accent with one step on a faintly ringed card (a filled numbered circle, the title, a muted line of whose and which stage, a sentence on why, and Done beside the other buttons), UP NEXT as plain numbered cards with Dash's how-to folded inside, LATER as one card of numbered rows each ending in a chip saying what it waits on (a date in blue, another step in amber), and the finished steps folded at the foot as '15 done'. The mockup's side column of Progress and Coming up is the page's own properties column here.",
+  from: '2778.5',
+};
+
+/** The loans mockup's Work & files view, approved on 3 November 2026 for #2778 (plan #2778.7). */
+const LOANS_FILES: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/loans-files-laptop.png',
+    'docs/references/goal-dashboard/loans-files-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+  source: 'docs/references/goal-dashboard/loans.html',
+  why: "The loans goal's Work & files tab the person approved on 3 November 2026 for #2778: a Files card with its count and unread on the heading line, an All / Dash wrote / Yours / Waiting for switch, rows of files each with a small page-shaped mark saying what it is (tinted for Dash's), the title with an unread dot, a muted line of who, when and which step, and Pinned at the right; the documents still waiting at the foot of All as dashed rows with an Add button; then a dashed drop zone at the card's foot. Beside it from laptop width, a Dash's work card with '6 pieces · 1 going', one folded row per piece of work with its day, opening to what came of it, where it started and its file. On a phone the two cards stack. The mockup has no properties column; this page keeps the tabbed detail pattern's.",
+  from: '2778.7',
+};
+
+/** The apartment mockup's Plan view, approved on 4 November 2026 for #2778 (plan #2778.5). */
+const APARTMENT_PLAN: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/apartment-plan-laptop.png',
+    'docs/references/goal-dashboard/apartment-plan-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+  source: 'docs/references/goal-dashboard/apartment.html',
+  why: "The apartment goal's Plan tab the person approved on 4 November 2026 for #2778: the same Now, Up next and Later as the loans goal, in rooms, with the room under each step's title, a person's name or a date as the chip on a later step, and a What's next / By room switch. Its 'Right now' focus switch, 'Tidy the list' and 'Not about the apartment' boxes belong to other steps or were turned down, so they are not to copy.",
+  from: '2778.5',
+};
+
 /**
  * The registered references, by gallery surface id. Every key must be a
  * surface in the gallery (tests/preview-routes.test.ts).
  */
 export const REFERENCES: Readonly<Record<string, Reference>> = {
+  // The "Chat Module Mockup" plan #2748 names. Its saved copy swaps the
+  // companies and living people for made-up ones, since the repository is
+  // public; the Dash tab's state is described in a comment at its foot.
+  'chat-people': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'A messaging app: People and Dash as two tabs, each mentor a row with a round avatar, their name, the last thing said in two lines, the time, and a dot when it is unread, unread rows in bolder type.',
+    from: '2748.1',
+  },
+  'ask-page-new': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'The same mockup, for the Dash tab: one list of chats, each a name and a day, with no workspace column and no chips; a question is pointed at one workspace by typing @ in the box.',
+    from: '2748.1',
+  },
   // The "Dash Chat Workspace" mockup the person chose on 15 October 2026 ("go
   // with B"), replacing the one from decision #1899.1. Its saved copy names
   // made-up people and companies, since the repository is public.
@@ -118,6 +171,200 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     link: '/preview?s=goals-page-top',
     why: 'A step\'s Overview should read as a goal\'s: the same header and properties column, then each part headed in small type on the page and on its own card, with the comments the last of them.',
     from: '2373.3',
+  },
+  // The loans and apartment goal pages the person approved for #2778
+  // (https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH and
+  // https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ). The saved copies,
+  // apartment.html beside loans.html, carry made-up names, lender and amounts,
+  // since the repository is public. Later steps of #2778 reuse them.
+  'goal-dashboard-tiles': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-add': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here the quick add is open, which the mockups draw only as the \'+ Log balances\' line, so it should open in place inside its card as quietly.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-menu': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here a tile\'s menu is open; the mockups draw no menu, so it should sit at the card\'s top right and not disturb the card.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-empty': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here every tile is empty, which the chart card in the loans mockup shows in one line (\'No balances logged yet. Each one you log draws here as a dot against the line.\').',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-broken': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here every tile names what is missing; the mockups draw no broken tile, so it should keep the card\'s shape and say it in one line.',
+    from: '2778.2',
+  },
+  // Plan #2778.3's parts, slots, tracker and grid tiles, judged against the
+  // same two approved pages; the apartment one draws the rooms.
+  'goal-dashboard-tiles-apartment': {
+    pictures: [
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+    source: 'docs/references/goal-dashboard/apartment.html',
+    why: 'The apartment goal page the person approved on 4 November 2026 for #2778: a Rooms card holding a card per room, three to a row on a laptop, two on a tablet and one on a phone, each with a 40-pixel ring of its steps done and the percent inside, the room\'s name and \'7 of 12 done · last 27 Oct\', then a hairline and a small NEXT label over its next step; a room not started sits on a faintly sunken card. The tags, photos and \'Right now\' switch of that mockup belong to other steps or were turned down, so they are not to copy.',
+    from: '2778.3',
+  },
+  'goal-dashboard-tiles-apartment-open': {
+    pictures: [
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+    source: 'docs/references/goal-dashboard/apartment.html',
+    why: 'The apartment goal page the person approved on 4 November 2026 for #2778, whose room cards say \'tap a room for its steps\'. Here one room is pressed and lists its open steps in place, with no drawer; the mockup draws no open card, so it should keep the card grid calm and read as that room\'s steps.',
+    from: '2778.3',
+  },
+  'goal-dashboard-tiles-programs': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and wide cards for a table with its numbers lined up right. The slots and the grid of programs are new kinds of tile, so they should read as members of the same family: a slots tile like a number tile with its row of slots under the figure, and the grid like the loans table with yes/no columns as marks.',
+    from: '2778.3',
+  },
+  'goal-dashboard-page': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, as a whole page: the Dashboard, Plan, Work & files and History tabs, then a row of three Now, Next and Later cards (Now faintly tinted, each with a small label, the step and a muted line with See the plan), then the tiles on the left with a column on the right holding a Dash is on card (what Dash is working on, the last thing it finished, and an Ask Dash box) and a Recent files card of three files with All files. On a phone it is one column: the strip, the tiles, Dash\'s card, the files. The mockup has no properties column; this page keeps the tabbed detail pattern\'s, so Dash\'s card and the files sit between the tiles and it.',
+    from: '2778.4',
+  },
+  'goal-dashboard-page-ask': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778, whose Dash is on card ends with an Ask Dash box (\'Ask Dash to figure something out…\' and an Ask button). Here that box is open inside the card, as quietly as the mockup draws it.',
+    from: '2778.4',
+  },
+  'goal-dashboard-page-answer': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778, whose Dash is on card holds what Dash is working on and the last thing it finished. Here a question handed from Ask Dash has finished and the page is opened at its answer, which the mockup does not draw: it should read as one more card of the same family above the tiles, with the question, the answer in a sentence or two and the suggested changes, each waiting on Add and No, as quietly as the rest of the page.',
+    from: '2778.8',
+  },
+  'goals-page-top': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778: the strip of Now, Next and Later, then the goal\'s parts on the left with Dash is on and Recent files in a column on the right. Here the goal has no tiles laid out yet, so one card says so and offers Dash lay it out where the tiles would be.',
+    from: '2778.4',
+  },
+  'goals-page-steps': LOANS_PLAN,
+  'goals-page-files': LOANS_FILES,
+  'goals-page-files-waiting': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the switch is on Waiting for, which lists only the dashed rows, each with its Add.`,
+  },
+  'goals-page-files-yours': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the switch is on Yours, after a letter you added has gone on its step and left Waiting for.`,
+  },
+  'goals-page-files-drag': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file is held over the drop zone, which the mockup draws as the dashed box tinting with the goal's colour and its border darkening.`,
+  },
+  'goals-page-files-uploading': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file is uploading, which the mockup draws as a new row at the top of the list saying 'You · just now · Dash is reading it'.`,
+  },
+  'goals-page-files-menu': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here a file's menu (Pin, Rename, Remove) is open; the mockup draws no menu, so it should sit at the row's right and not disturb the list.`,
+  },
+  'goals-page-files-empty': {
+    ...LOANS_FILES,
+    why: `${LOANS_FILES.why} Here the goal has no files, nothing waiting and no work from Dash, which the mockup draws as one row ('Nothing of yours yet. Statements, letters and screenshots you add land here.') above the drop zone.`,
+  },
+  'goals-page-plan-draft': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here Dash's how-to under the autopay step is open in place, as the mockup's folded 'Dash's how-to' opens: a quiet sunken box inside the step's card.`,
+  },
+  'goals-page-plan-done': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the finished fold at the foot ('15 done') is open: one muted line per step with the day it closed.`,
+  },
+  'goals-page-plan-stage': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the switch is on By stage, which the mockup draws as each stage with its count and steps; this page keeps the goal's own column header and rows for it, as the step asks, with every stage open on one card.`,
+  },
+  'goals-page-plan-empty': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the goal has no steps yet, which the mockup does not draw: the 'Help me plan this' button of its bar is the one thing offered, in a quiet placeholder.`,
+  },
+  'goals-page-plan-apartment': APARTMENT_PLAN,
+  'goals-page-plan-apartment-later': {
+    ...APARTMENT_PLAN,
+    why: `${APARTMENT_PLAN.why} Here every later step is listed, where the mockup ends Later with a line of how many more.`,
+  },
+  'goals-page-plan-apartment-rooms': {
+    ...APARTMENT_PLAN,
+    why: `${APARTMENT_PLAN.why} Here the switch is on By room, which the mockup draws as each room with its count; this page keeps the goal's own column header and rows for it, as the step asks, with every room open on one card.`,
   },
 };
 

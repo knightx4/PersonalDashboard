@@ -5,6 +5,8 @@ import {
   adviceBrief,
   cleanMessage,
   decideAdviceRun,
+  EPISODE_QUIET_MS,
+  episodeDue,
   newestByAdvisor,
   noteOf,
   receiptsOf,
@@ -43,10 +45,10 @@ describe('when the daily round runs', () => {
     expect(decideAdviceRun(quiet)).toEqual({ start: true });
   });
 
-  it('does not pile notes up while six are unread', () => {
+  it('does not pile texts up while six are unread', () => {
     expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX })).toEqual({
       start: false,
-      skipped: '6 council notes are unread',
+      skipped: '6 mentor texts are unread',
     });
     expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX - 1 })).toEqual({ start: true });
   });
@@ -55,8 +57,14 @@ describe('when the daily round runs', () => {
     expect(decideAdviceRun({ ...quiet, writtenToday: 3 }).start).toBe(false);
   });
 
-  it('waits while every mentor has an unread note', () => {
+  it('waits while every mentor has an unread text', () => {
     expect(decideAdviceRun({ ...quiet, free: 0 }).start).toBe(false);
+  });
+
+  it("never starts in the person's quiet hours, memory included (plan #2748.7)", () => {
+    expect(decideAdviceRun({ ...quiet, quiet: true })).toEqual({ start: false, skipped: 'it is quiet hours for the person' });
+    expect(decideAdviceRun({ ...quiet, quiet: true, episodesDue: 2 }).start).toBe(false);
+    expect(decideAdviceRun({ ...quiet, quiet: false })).toEqual({ start: true });
   });
 
   it('runs once a day, and never two at once', () => {
@@ -71,6 +79,34 @@ describe('when the daily round runs', () => {
   it('takes over from a round that stopped long ago', () => {
     const latest = { status: 'running', requestedAt: ago(Math.max(ADVICE_STALE_AFTER_MS, ADVICE_GAP_MS) + 60_000) };
     expect(decideAdviceRun({ ...quiet, latest })).toEqual({ start: true });
+  });
+});
+
+describe('the overnight memory pass', () => {
+  const quiet = { now: NOW, latest: null, unread: 0, writtenToday: 0, free: 16 };
+
+  it('runs while the note caps are full when a conversation is due a summary', () => {
+    expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX, episodesDue: 1 })).toEqual({ start: true });
+    expect(decideAdviceRun({ ...quiet, writtenToday: 3, free: 0, episodesDue: 2 })).toEqual({ start: true });
+    expect(decideAdviceRun({ ...quiet, unread: UNREAD_MAX, episodesDue: 0 }).start).toBe(false);
+  });
+
+  it('still runs once a day, and never two at once', () => {
+    const latest = { status: 'running', requestedAt: ago(60_000) };
+    expect(decideAdviceRun({ ...quiet, latest, episodesDue: 3 }).start).toBe(false);
+    const recent = { status: 'ready', requestedAt: ago(ADVICE_GAP_MS - 60_000) };
+    expect(decideAdviceRun({ ...quiet, latest: recent, episodesDue: 3 }).start).toBe(false);
+  });
+
+  it('summarises a conversation once three quiet hours have closed it', () => {
+    expect(episodeDue({ endedAt: ago(EPISODE_QUIET_MS - 60_000), summarisedAt: null }, NOW)).toBe(false);
+    expect(episodeDue({ endedAt: ago(EPISODE_QUIET_MS + 60_000), summarisedAt: null }, NOW)).toBe(true);
+  });
+
+  it('summarises again only a conversation that grew after its summary', () => {
+    const endedAt = ago(EPISODE_QUIET_MS + 60 * 60_000);
+    expect(episodeDue({ endedAt, summarisedAt: ago(60_000) }, NOW)).toBe(false);
+    expect(episodeDue({ endedAt, summarisedAt: ago(EPISODE_QUIET_MS + 2 * 60 * 60_000) }, NOW)).toBe(true);
   });
 });
 
