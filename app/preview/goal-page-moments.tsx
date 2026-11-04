@@ -18,21 +18,23 @@ import { TabbedGoal, tabbedMap } from './goal-page-surfaces';
 const progress = goalProgress(tabbedMap.steps);
 /**
  * The goal with only its finished steps, so the Plan tab's fold is on screen
- * and the page's figures agree with what it says. Before Dash's step arrives
- * the fold holds the others; `withScript` adds it.
+ * and the page's figures agree with what it says.
  */
 type Nodes = typeof tabbedMap.steps;
-function finishedOnly(nodes: Nodes, keepScript: boolean): Nodes {
+function finishedOnly(nodes: Nodes): Nodes {
   return nodes.flatMap((node) => {
-    if (node.id === 'script' && !keepScript) return [];
-    const children = finishedOnly(node.children, keepScript);
+    const children = finishedOnly(node.children);
     return node.status === 'done' || children.length > 0 ? [{ ...node, children }] : [];
   });
 }
 const TODAY = '2026-09-25';
-const planBefore = { ...tabbedMap, steps: finishedOnly(tabbedMap.steps, false) };
-const planAfter = { ...tabbedMap, steps: finishedOnly(tabbedMap.steps, true) };
-const counted = goalProgress(planAfter.steps);
+/**
+ * Both finished steps are in the fold at rest, so every count on the screen
+ * agrees before the press as after it; the press opens the tab afresh and
+ * replays Draft what to say on the call arriving (plan #2778.11).
+ */
+const finished = { ...tabbedMap, steps: finishedOnly(tabbedMap.steps) };
+const counted = goalProgress(finished.steps);
 /** Everything on the plan is finished, as the page says; the progress and tab count agree. */
 const allDone = {
   ...counted,
@@ -110,7 +112,7 @@ export function GoalPageArrivalDemo() {
       <TabbedGoal progress={allDone}>
         <GoalPlan
           key={visit}
-          map={visit > 0 ? planAfter : planBefore}
+          map={finished}
           view="next"
           byStage={null}
           canRun

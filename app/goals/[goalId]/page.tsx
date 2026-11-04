@@ -761,24 +761,19 @@ export default async function GoalMapPage({
         </GoalDoneWhen>
       }
       lead={
-        (asked.results.length > 0 || tileViews) && (
-          <>
-            {/* What a question handed from a chat worked out (plan #2778.8), first. */}
-            <QuestionResults
-              goalId={map.goal.id}
-              results={asked.results}
-              suggestions={asked.suggestions}
-              named={namedWork}
-            />
-            {tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="lead" />}
-          </>
-        )
-      }
-      main={
         <>
-          {/* No tiles yet: the offer to lay them out heads the column, and on a
-              phone follows Dash's card, so mapping the goal comes first. */}
-          {!tileViews && (
+          {/* What a question handed from a chat worked out (plan #2778.8), first. */}
+          <QuestionResults
+            goalId={map.goal.id}
+            results={asked.results}
+            suggestions={asked.suggestions}
+            named={namedWork}
+          />
+          {tileViews ? (
+            <DashboardTiles goalId={map.goal.id} views={tileViews} part="lead" />
+          ) : (
+            // No tiles yet: the offer to lay them out stands where the tiles
+            // would, straight after the strip on a phone (plan #2778.11).
             <NoLayoutLine
               ask={
                 open && (
@@ -794,6 +789,10 @@ export default async function GoalMapPage({
               }
             />
           )}
+        </>
+      }
+      main={
+        <>
           <GoalStatusCard
             line={line}
             review={review}
@@ -801,6 +800,7 @@ export default async function GoalMapPage({
             change={reviewChange}
             brief={brief}
             briefWhen={brief ? noteWhen(brief, account.timezone) : null}
+            now={strip.now}
           />
           {tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="rest" />}
           {open && <GoalLogDone goalId={map.goal.id} />}

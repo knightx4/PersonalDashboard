@@ -51,6 +51,7 @@ export function TabbedDetail({
   label,
   children,
   className,
+  titleSize = 'title',
 }: {
   /** What the page is about and the path down to it, as PageHeader takes it. */
   subject: Subject;
@@ -84,6 +85,12 @@ export function TabbedDetail({
   /** The open tab's content, and only that tab's. */
   children: React.ReactNode;
   className?: string;
+  /**
+   * How large the title is set. `headline` is the goal page's, 24px bold on a
+   * phone and 28px from laptop width, as its approved mockup has it (plan
+   * #2778.11); every other page keeps the title step.
+   */
+  titleSize?: 'title' | 'headline';
 }) {
   return (
     <DetailLayout
@@ -101,7 +108,12 @@ export function TabbedDetail({
             {lead && (
               <div className="-mx-1.5 flex shrink-0 items-center self-center">{lead}</div>
             )}
-            <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+            <h1
+              className={cn(
+                'min-w-0 flex-1 font-display tracking-tight text-ink [overflow-wrap:anywhere]',
+                titleSize === 'headline' ? 'text-headline font-bold sm:text-headline-lg' : 'text-title',
+              )}
+            >
               {title}
             </h1>
             {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
