@@ -79,9 +79,9 @@ export function AdvisorProfileSkeleton() {
       }
     >
       <div className="mb-5 flex gap-4 border-b border-border pb-2">
-        {[64, 96, 72].map((width) => (
-          <Skeleton key={width} className="h-4" style={{ width }} />
-        ))}
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-18" />
       </div>
       <Card padding="standard" className="space-y-4">
         {[92, 84, 70].map((width) => (

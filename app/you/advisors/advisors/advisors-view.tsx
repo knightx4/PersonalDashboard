@@ -286,7 +286,7 @@ function AdvisorGrid({
         </SectionLabel>
         {note}
       </h2>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {advisors.map((advisor, i) => (
           <li key={advisor.id} className="min-w-0">
             <AdvisorCard advisor={advisor} state={states[i]} record={records[advisor.key] ?? null} />
@@ -311,21 +311,20 @@ function AdvisorCard({
   return (
     <Link
       href={advisorHref(advisor.key)}
-      className={cn(cardVariants({ padding: 'standard', interactive: true }), 'flex h-full items-start gap-3')}
+      className={cn(
+        cardVariants({ padding: 'standard', interactive: true }),
+        'flex h-full flex-col items-center gap-2 text-center',
+      )}
     >
-      <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
-      <span className="min-w-0 flex-1 space-y-0.5">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui font-medium text-ink">
-          <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
-          <BrainStatus state={state} />
-        </span>
-        <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
+      <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative className="size-16" />
+      <span className="flex min-w-0 flex-col items-center gap-0.5">
+        <span className="text-ui font-medium text-ink [overflow-wrap:anywhere]">{advisor.name}</span>
+        <BrainStatus state={state} />
+        <span className="text-small text-ink-muted [overflow-wrap:anywhere]">
           {advisor.assessment ?? advisor.question}
         </span>
-        <span className="tabular block text-small text-ink-muted">
-          {recordLine(record)}
-          {off && ' · Off in meetings'}
-        </span>
+        <span className="tabular mt-1 text-small text-ink-muted">{recordLine(record)}</span>
+        {off && <span className="text-small text-ink-muted">Off in meetings</span>}
       </span>
     </Link>
   );

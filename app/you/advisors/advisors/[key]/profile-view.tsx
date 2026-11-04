@@ -122,7 +122,7 @@ export function ProfileView({
   return (
     <TabbedDetail
       subject={subject}
-      lead={
+      portrait={
         <Tooltip label={changeLabel} align="start">
           <button
             type="button"

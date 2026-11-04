@@ -174,6 +174,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/you/advisors',
   '/you/advisors/[id]',
   '/you/advisors/advisors',
+  '/you/advisors/advisors/[key]',
   '/you/advisors/advisors/panels/[id]',
   '/you/details',
   '/you/insights',

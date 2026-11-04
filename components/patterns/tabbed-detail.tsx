@@ -41,6 +41,7 @@ export function TabbedDetail({
   subject,
   title,
   lead,
+  portrait,
   description,
   actions,
   glance,
@@ -59,6 +60,11 @@ export function TabbedDetail({
    * heading names only the thing: a step's status you press (plan #2373.1).
    */
   lead?: React.ReactNode;
+  /**
+   * A large picture of the thing, such as an advisor's avatar (plan #2581.5):
+   * drawn left of the title and its one line, which sit centred beside it.
+   */
+  portrait?: React.ReactNode;
   /** One line under the title: what kind of thing this is, or its state. */
   description?: React.ReactNode;
   /** The action that belongs to the whole page, whatever tab is open. */
@@ -88,27 +94,49 @@ export function TabbedDetail({
       header={
         <header className="mb-5">
           <PathLine crumbs={subject.path} fallback={parentCrumb(subject.path)} className="mb-2" />
-          {/* The title and its one line take what is left of the row, and
+          {portrait ? (
+            /* A portrait holds the title and its one line beside it, centred on it. */
+            <div className="flex items-center gap-4">
+              <div className="shrink-0">{portrait}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-3">
+                  <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+                    {title}
+                  </h1>
+                  {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+                </div>
+                {description && (
+                  <p className="mt-1 text-body text-ink-muted [overflow-wrap:anywhere]">
+                    {description}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* The title and its one line take what is left of the row, and
               the actions keep their width on the same line (plan #1688):
               with the row free to wrap, a title wider than the space beside
               the actions pushed them onto a line of their own. */}
-          <div className="flex items-start gap-3">
-            {/* The lead's control carries its own padding, so it is pulled in by
+              <div className="flex items-start gap-3">
+                {/* The lead's control carries its own padding, so it is pulled in by
                 that much to sit as close to the title as a goal's hexagon. */}
-            {lead && (
-              <div className="-mx-1.5 flex shrink-0 items-center self-center">{lead}</div>
-            )}
-            <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
-              {title}
-            </h1>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-          </div>
-          {/* The one line runs the header's full width, under the actions as
+                {lead && (
+                  <div className="-mx-1.5 flex shrink-0 items-center self-center">{lead}</div>
+                )}
+                <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+                  {title}
+                </h1>
+                {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+              </div>
+              {/* The one line runs the header's full width, under the actions as
               well as the title, so it stays one line on a phone. */}
-          {description && (
-            <p className="mt-0.5 text-body text-ink-muted [overflow-wrap:anywhere]">
-              {description}
-            </p>
+              {description && (
+                <p className="mt-0.5 text-body text-ink-muted [overflow-wrap:anywhere]">
+                  {description}
+                </p>
+              )}
+            </>
           )}
         </header>
       }
@@ -151,9 +179,7 @@ export function DetailCard({
 export function DetailPart({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1">
-      {label && (
-        <SectionLabel as="h2">{label}</SectionLabel>
-      )}
+      {label && <SectionLabel as="h2">{label}</SectionLabel>}
       {children}
     </section>
   );
