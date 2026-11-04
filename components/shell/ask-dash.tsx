@@ -64,6 +64,7 @@ import {
 } from '@/app/chat/dash/actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
+import { ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
 import type { DashChoiceId } from '@/lib/core/models';
 
@@ -91,7 +92,13 @@ import type { DashChoiceId } from '@/lib/core/models';
  * What else goes with a question (plan #1899.5): the signal that stops it,
  * the rows added with @, and the workspace its lookups are kept to.
  */
-export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+export type AskMore = {
+  signal?: AbortSignal;
+  rows?: AskMention[];
+  scope?: ModuleId | null;
+  /** "Think it through" is on (plan #2789.10). */
+  think?: boolean;
+};
 
 /**
  * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
@@ -149,7 +156,7 @@ async function askLive(
   onText?: (piece: string) => void,
   more: AskMore = {},
 ): Promise<AskDashResult> {
-  const { signal, rows, scope } = more;
+  const { signal, rows, scope, think } = more;
   // The question as the route kept it, heard before Dash answers: what a
   // stopped answer is found again by (plan #1899.5).
   let asked: AskedWire | null = null;
@@ -158,7 +165,7 @@ async function askLive(
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
+      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope, ...(think ? { think: true } : {}) }),
       signal,
     });
   } catch {
@@ -569,6 +576,8 @@ export function AskThread({
     fixtureHits: handle?.searchHits,
     start: boxStart,
   });
+  // "Think it through" (plan #2789.10): on until pressed again.
+  const [think, setThink] = useState(boxStart?.think ?? false);
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
@@ -595,7 +604,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
-    () => ({ ...box.take(), signal: running.current?.signal }),
+    () => ({ ...box.take(), signal: running.current?.signal, think }),
   );
   const onChanged = useCallback(
     (next: DashChange) => {
@@ -660,18 +669,14 @@ export function AskThread({
         )
       }
       boxStart={
-        handle?.model && handle.chooseModel ? (
-          <>
-            {box.thread.boxStart}
-            <ModelChip
-              model={handle.model}
-              onModel={handle.chooseModel}
-              initialOpen={handle.modelOpen}
-            />
-          </>
-        ) : (
-          box.thread.boxStart
-        )
+        <>
+          {box.thread.boxStart}
+          <ThinkSwitch on={think} onChange={setThink} />
+          {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
+          {!think && handle?.model && handle.chooseModel ? (
+            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} />
+          ) : null}
+        </>
       }
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
@@ -687,6 +692,8 @@ export function AskThread({
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
             {!bubbles && <LookupFold calls={turn.toolCalls} />}
+            {/* What a thought-through answer cost (plan #2789.10). */}
+            <ThoughtLine calls={turn.toolCalls} />
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
                 A todo or a note comes back as a change, drawn above with Undo.
                 In a chat on the page they rest under every answer but the

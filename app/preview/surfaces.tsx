@@ -101,6 +101,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
+import { PageHeaderSurface } from './page-header-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
@@ -490,6 +491,7 @@ import {
   DashPageSurface,
   AskAnswerActionsSurface,
   AskBoxSurface,
+  AskThinkSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -9097,6 +9099,33 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* "Think it through" on (plan #2789.10): the switch pressed in the box's
+     * foot, standing in for the model chip, with a question typed. */
+    id: 'ask-think-on',
+    label: 'Dash · Think it through, switched on',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="on" />,
+  },
+  {
+    /* A thought-through answer with the mockup it drew, in its sandboxed
+     * frame, and the line saying it was thought through on Opus and its cost. */
+    id: 'ask-think-mockup',
+    label: 'Dash · A thought-through answer with a mockup',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="mockup" />,
+  },
+  {
+    /* A thought-through answer with no mockup: the cost line alone, the
+     * switch off again in the box. */
+    id: 'ask-think-cost',
+    label: 'Dash · What a thought-through answer cost',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="cost" />,
+  },
+  {
     /* @ and the start of a workspace's name in the box (plan #2748.1):
      * Learn first in the menu, to keep the question to, then the rows. */
     id: 'ask-box-workspaces',
@@ -11463,6 +11492,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <RefPreviewSurface />,
+  },
+
+  /* The frame every page draws (plan #2815.3): the heading in each state it
+   * has, the path with its back link, and both page widths. */
+  {
+    id: 'shell-page-header',
+    label: 'The shell · A page’s heading, path and width',
+    module: 'dev',
+    width: 'page',
+    render: () => <PageHeaderSurface />,
   },
 
   /* The per-day bar chart for the usage pages (plan #2036.1): a month of

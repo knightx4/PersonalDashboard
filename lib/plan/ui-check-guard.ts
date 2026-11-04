@@ -149,8 +149,10 @@ export function uiCheckRefusal(input: {
     `${missing.length === 1 ? 'its surface' : `${missing.length} of its surfaces`}: ${which}. ` +
     `Run the critic on ${missing.length === 1 ? 'it' : 'each'} and record the round ` +
     `(npm run ui-check -- ${input.step} ${first.surface} ${next}), then close it once it passes. ` +
-    `A surface still failing after round 3, or one reached only through a shared file, ` +
-    `is yours to settle: npm run ui-guard -- ${input.step} --settle "<why>". ` +
+    `Surfaces reached only through a shared file are compared with main by ` +
+    `npm run ui-guard -- ${input.step} --compare, which settles those that look the same. ` +
+    `A surface still failing after round 3 is yours to settle: ` +
+    `npm run ui-guard -- ${input.step} --settle "<why>". ` +
     `screen.md, beside building.md in the plan skill, has the loop.`
   );
 }

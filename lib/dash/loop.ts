@@ -192,6 +192,13 @@ export type DashVoice = {
   acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
+  /**
+   * How hard the model thinks, sent as `output_config.effort` (plan
+   * #2789.10, Ask's "Think it through"). Absent: the model's own default.
+   */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Time spent looking before it must answer; TIME_BUDGET_MS when absent. */
+  timeBudgetMs?: number;
 };
 
 /** Where the conversation is happening. */
@@ -786,6 +793,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const tools = voiceTools(voice);
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
+  const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
+  // Widened: the installed SDK's types predate output_config.
+  const effort = (voice.effort ? { output_config: { effort: voice.effort } } : {}) as Record<string, never>;
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
   // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
@@ -967,7 +977,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         ? 'lookups'
         : inputTokens >= INPUT_BUDGET
           ? 'budget'
-          : now() - started >= TIME_BUDGET_MS
+          : now() - started >= timeBudget
             ? 'time'
             : null;
     const mustAnswer = limit !== null || asked || round === MAX_LOOKUPS + 1;
@@ -979,6 +989,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         {
           model,
           max_tokens: maxTokens,
+          ...effort,
           system,
           tools,
           tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
@@ -1169,6 +1180,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
               {
                 model,
                 max_tokens: maxTokens,
+                ...effort,
                 system,
                 tools,
                 tool_choice: { type: 'none' },

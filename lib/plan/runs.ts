@@ -589,7 +589,7 @@ export async function readRunWork(
   }
 
   let planRows: WorkRow[] = [];
-  if (needs('feature', 'overhaul', 'reshape', 'unstick')) {
+  if (needs('feature', 'overhaul', 'reshape', 'unstick', 'land')) {
     type Row = {
       id: string;
       parent_id: string | null;
@@ -695,7 +695,10 @@ export async function readRunWork(
         (row) => under.has(row.planItemId) && within(row.createdAt, window),
       ).length;
       out.set(run.id, unstickWork(planRows, run.plan_item_id, window, checks));
-    } else if ((run.job === 'feature' || run.job === 'overhaul') && run.plan_item_id) {
+    } else if (
+      (run.job === 'feature' || run.job === 'overhaul' || run.job === 'land') &&
+      run.plan_item_id
+    ) {
       out.set(
         run.id,
         featureWork(planRows, run.plan_item_id, window, now, FEATURE_IDLE_AFTER_MINUTES),

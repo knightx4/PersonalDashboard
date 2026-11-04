@@ -197,6 +197,14 @@ What they asked or explained, and what Dash replied, turn by turn.
 - Name a row by `body`; link it by `id`
 - role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.
 
+### `core.session_messages` (Home)
+
+What they wrote to a Claude Code session working on one of their projects or this app, and what the session wrote back, message by message.
+
+- Search: `body`, `answer`
+- Name a row by `body`; link it by `id`
+- author 'person' is theirs and 'session' is the session's: read their messages as what they asked for, and the session's only for context. kind 'question' carries options and, once they pressed one, answer; 'mockup' carries artifact_url; 'status' is a line on what the session was doing. thread_id joins core.session_threads, whose title says what the thread is about and whose project_id names the dev_projects project (null for this app).
+
 ### `core.watches` (Home)
 
 Things they asked Dash to watch outside the app, such as a resale ticket price, with the price that should alert them and when the watch ends.

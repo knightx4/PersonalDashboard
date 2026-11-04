@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { readLastLines } from '@/lib/core/run-liveness';
+import { endsWithBuiltLine } from '@/lib/plan/built';
 import { claimExpiredNote, claimHeldByRun, expiredClaim } from '@/lib/plan/claims';
 import { listPushes } from '@/lib/plan/ci';
 import { claimIsLive, claimLiveness, lastPushSince } from '@/lib/plan/liveness';
@@ -255,6 +256,9 @@ export async function releaseStaleClaims(
     // a trigger, so a row without one was claimed this instant -- which is why
     // a condemned claim always has the start time the line is written from.
     if (!row.started_at) continue;
+    // A built step is finished work waiting on its feature to land, with its
+    // commit on a branch. Putting it back would erase that.
+    if (endsWithBuiltLine(row.comment)) continue;
     if (expiredClaim({ status: row.status, startedAt: row.started_at }, now.getTime())) {
       expired.push({ row, startedAt: row.started_at });
     }

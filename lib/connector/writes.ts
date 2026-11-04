@@ -29,6 +29,7 @@ import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/l
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
 import { insertTask } from '@/lib/todo/tasks/write';
+import { THREAD_TOOLS } from './thread-writes';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { ProgressInputError, progressRpcArgs, readProgress } from '@/lib/plan/session-progress';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
@@ -1041,6 +1042,8 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...SHOPPING_TOOLS,
   ...VAULT_TOOLS,
   ...JOBS_TOOLS,
+  // A Claude Code session's thread and its plan writes (plan #2789.5).
+  ...THREAD_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */

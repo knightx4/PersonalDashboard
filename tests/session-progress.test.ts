@@ -84,6 +84,28 @@ describe('core.report_session_progress', () => {
     ).rejects.toThrow();
   });
 
+  it('announces a wait once: a repeat report keeps notified_at, a new wait or a new question clears it (plan #2800.4)', async () => {
+    const session = 'cse_notify';
+    const stamp = async () =>
+      (await admin<{ notified_at: Date | null }[]>`
+        select notified_at from core.session_progress where user_id = ${userA} and session_id = ${session}`)[0].notified_at;
+
+    await report(userA, { session, state: 'waiting', action: 'Asked', needs: 'CSV or JSON?' });
+    expect(await stamp()).toBeNull();
+    await admin`update core.session_progress set notified_at = now() where user_id = ${userA} and session_id = ${session}`;
+
+    await report(userA, { session, state: 'waiting', action: 'Still waiting', needs: 'CSV or JSON?' });
+    expect(await stamp()).not.toBeNull();
+
+    await report(userA, { session, state: 'waiting', action: 'Asked again', needs: 'Which delimiter?' });
+    expect(await stamp()).toBeNull();
+
+    await admin`update core.session_progress set notified_at = now() where user_id = ${userA} and session_id = ${session}`;
+    await report(userA, { session, state: 'working', action: 'Carrying on' });
+    await report(userA, { session, state: 'waiting', action: 'Asked', needs: 'Which delimiter?' });
+    expect(await stamp()).toBeNull();
+  });
+
   it('allows exactly the states the code names', async () => {
     const [row] = await admin<{ def: string }[]>`
       select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'session_progress_state_ck'`;
