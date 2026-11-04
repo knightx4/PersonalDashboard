@@ -55,11 +55,9 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   ],
   jobs: [
     { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'] },
+    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox' },
     // Back to the view you left it on (note 978314f8).
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
-    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -72,14 +70,12 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
+  // One room (plan #1496.9): the Inbox's rows and the quick notes to triage
+  // sit on Now, and /vault/inbox and /vault/triage open it. Map and Maya were
+  // frozen, unopened for a month: their pages still open from a bookmark or a
+  // note, with no tab.
   vault: [
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-    { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
-    // The quick notes waiting in the Inbox folder, on a tab of their own (note
-    // aee95195). The Inbox also lists them as one row that opens this page.
-    { href: '/vault/triage', label: 'Triage', icon: 'triage' },
-    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
   // A subject, an idea, a quiz, an essay and a reading are reached through
   // their list, so they light its tab through `alsoMatches` rather than having
@@ -122,10 +118,11 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       ownerOnly: true,
     },
   ],
+  // A month of opens (plan #1496.10) folded Inbox and the Daily review into
+  // Now and tucked Saved away: its page, route and rows are kept, reached by
+  // address and from the Newsletters list.
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-    { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
     {
       href: '/news/all',
       label: 'Newsletters',
@@ -133,7 +130,6 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       exact: true,
       alsoMatches: ['/news/i/'],
     },
-    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ],
   goals: [
     { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },

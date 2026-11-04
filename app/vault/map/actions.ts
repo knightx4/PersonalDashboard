@@ -6,6 +6,7 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { undoMapMerge } from '@/lib/vault/map/merge-apply';
 import { renameThemeRow, themeNameProblem } from '@/lib/vault/map/rename-theme';
 import { undoRefusal } from '@/lib/vault/map/merge-log';
+import { SWEEP_PAUSED } from '@/lib/vault/map/sweep-read';
 
 /**
  * Starting, stopping and resuming the sweep (plan #757).
@@ -19,6 +20,9 @@ import { undoRefusal } from '@/lib/vault/map/merge-log';
 // latency: pending
 export async function startSweep(): Promise<void> {
   const user = await requireUser();
+  // The sweep's clock is off (plan #1496.9), so a sweep started now would sit
+  // marked running and never move.
+  if (SWEEP_PAUSED) throw new Error('Sweeps are paused, so a new one cannot start.');
   const supabase = await createVaultClient();
 
   // One unfinished sweep per person, enforced by map_sweeps_one_open_idx. A

@@ -1,11 +1,9 @@
 import { NewsListView } from '@/app/news/all/list-view';
-import { StoryView } from '@/app/news/i/[id]/s/[index]/story-view';
 import { NewsSettingsView } from '@/app/news/settings/settings-view';
 import { AllTasksView } from '@/app/todo/all/all-view';
 import { agendaSourceGroups, TodoSettingsView } from '@/app/todo/settings/settings-view';
 import { WaitingView } from '@/app/todo/waiting/waiting-view';
 import type { NewsIssue, NewsSender, UnreadStories } from '@/lib/news/issues/list';
-import type { NewsStory } from '@/lib/news/issues/stories';
 import type { Anchor } from '@/lib/todo/agenda/anchors';
 import type { Feed } from '@/lib/todo/feeds/load';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -96,29 +94,6 @@ export function NewsAllSurface() {
 }
 
 // ---- News: one story -------------------------------------------------------
-
-const story: NewsStory = {
-  headline: 'The council votes on Thursday on whether the Mare Street cycle lane becomes permanent',
-  summary:
-    'After an eighteen-month trial the council will decide whether to keep the lane, take it out or move it to Morning Lane. Traders want the loading bays back; the cycling campaign has a petition with four thousand names.',
-  link: 'https://example.com/hackney/mare-street-lane',
-  text: 'The trial began in April last year, when the council took out one lane of traffic between the Narrow Way and Well Street and put in a kerbed lane in each direction.\n\nCounts taken by the council show about 2,400 bicycles a day now use the street, up from 900 before the trial. Bus journey times through the stretch rose by about a minute at the evening peak.\n\nThe meeting is at 7pm at the town hall and is open to the public. Anyone who wants to speak has to register by noon on Wednesday.',
-  topic: 'Local',
-};
-
-export function NewsStorySurface() {
-  return (
-    <StoryView
-      back={{ href: '/news', label: 'News' }}
-      issue={{ id: 'i2', receivedAt: '2026-10-06T17:30:00Z', sender: senders[2] }}
-      story={story}
-      storyIndex={0}
-      timezone={ZONE}
-      saved={false}
-      sent={undefined}
-    />
-  );
-}
 
 // ---- News: settings --------------------------------------------------------
 

@@ -14,7 +14,7 @@ import {
 } from './catalogue';
 
 // Sections whose page is out of the nav but still opens.
-const TUCKED_AWAY = new Set(['/shopping/share']);
+const TUCKED_AWAY = new Set(['/shopping/share', '/vault/map', '/vault/maya', '/news/saved']);
 
 describe('the catalogue of sources', () => {
   it('names every table once, as a source or not', () => {

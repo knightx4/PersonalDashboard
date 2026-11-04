@@ -81,8 +81,8 @@ describe('reviewNav', () => {
 
 describe('labels and addresses', () => {
   it('names the latest day by the bare address', () => {
-    expect(reviewHref('2026-10-06', '2026-10-06')).toBe('/news/review');
-    expect(reviewHref('2026-10-05', '2026-10-06')).toBe('/news/review?day=2026-10-05');
+    expect(reviewHref('2026-10-06', '2026-10-06')).toBe('/news');
+    expect(reviewHref('2026-10-05', '2026-10-06')).toBe('/news?day=2026-10-05');
   });
 
   it('writes the day out, with the year only when it is not this one', () => {

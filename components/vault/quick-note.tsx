@@ -85,7 +85,7 @@ export function QuickNoteRow({
 
       {saved && !open && (
         <p role="status" className="text-ui text-ink-muted">
-          Added to Quick note triage.
+          Added to your quick notes.
         </p>
       )}
 
