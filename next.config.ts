@@ -119,6 +119,11 @@ const nextConfig: NextConfig = {
        * chat's link, New chat (?chat=new, carried across) and the Writing
        * style page keep working from notes, notifications and Dash's replies.
        */
+      /**
+       * You's Answer tab became Ask (plan #2635.3). Links already written
+       * into insights, notes and Dash's replies still open it.
+       */
+      { source: '/you/answer', destination: '/you/ask', permanent: false },
       { source: '/ask', destination: '/chat/dash', permanent: false },
       { source: '/ask/:path*', destination: '/chat/dash/:path*', permanent: false },
     ];

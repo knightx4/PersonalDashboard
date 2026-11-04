@@ -68,7 +68,7 @@ import type { ChatStats } from '@/lib/you/claude-chats';
  * span two or more areas, a row of area chips above the deck narrows the deck
  * and Earlier to one; cards with no area fall under All only. A line under
  * the deck names the person's areas no insight is about yet and links to the
- * Answer tab, where Dash asks about them.
+ * Ask tab, where Dash asks about them.
  *
  * Look again starts a run (startInsightRun), a session on the goals routine
  * that reads everything and takes a while; while one is queued or running a
@@ -260,7 +260,7 @@ export function InsightsView({
         <p className="text-ui text-ink-muted">
           No insight yet about {joinNames(uncovered.map((a) => a.name))}.{' '}
           <Link href={ANSWER_HREF} className={linkVariants()}>
-            Tell Dash more on Answer
+            Tell Dash more on Ask
           </Link>
         </p>
       </Card>

@@ -150,7 +150,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     // Dash's questions about you and your answers (plan #2617.2).
-    { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
+    { href: '/you/ask', label: 'Ask', icon: 'answer', exact: true },
     { href: '/you/council', label: 'Council', icon: 'board' },
   ],
   // Accounts first, with net worth at its top (plan #2593.6): what you hold,

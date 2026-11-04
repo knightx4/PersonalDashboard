@@ -596,6 +596,9 @@ export function AppShell({
   });
 
   if (overflow) {
+    // The counts on sections folded behind More go on More as one number, so a
+    // waiting count is seen on a phone without opening anything (plan #2635.3).
+    const folded = sections.slice(tabs.length).reduce((sum, s) => sum + (s.badge ?? 0), 0);
     dockTabs.push(
       <li key="__more">
         <button
@@ -604,10 +607,17 @@ export function AppShell({
           // Where an item lands when its section is one the dock folded away
           // (landingTarget in components/motion/settle.ts).
           data-capture-more=""
-          className={cn(dockItem, 'text-shell-muted')}
+          className={cn(dockItem, 'relative text-shell-muted')}
         >
           <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
           More
+          {folded > 0 && (
+            // ui-ok: hand-rolled-chip -- the count badge on a dock tab, placed over the icon, not a label or a choice
+            <span className="tabular absolute left-1/2 top-1.5 ml-1.5 rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold leading-none text-caution-fill-ink">
+              {folded}
+              <span className="sr-only"> waiting</span>
+            </span>
+          )}
         </button>
       </li>,
     );
