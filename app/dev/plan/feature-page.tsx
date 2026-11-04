@@ -414,7 +414,7 @@ export function FeaturePage({
               )}
               {parts.origin && (
                 <span>
-                  From {parts.origin.ref}&apos;s answer: {readable(parts.origin.gist)}
+                  From {parts.origin.ref}&apos;s {parts.origin.source}: {readable(parts.origin.gist)}
                 </span>
               )}
             </span>
