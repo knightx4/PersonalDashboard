@@ -1,10 +1,11 @@
 'use client';
 
 import { Fragment, startTransition, useActionState, useId, useRef, useState, type ComponentType } from 'react';
-import { CircleAlert, Plus } from 'lucide-react';
+import { Check, ChevronUp, CircleAlert, Plus } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { FieldError, InlineInput, Input, Label } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -16,12 +17,17 @@ import {
   formatValue,
   type ChartBody,
   type CountdownBody,
+  type GridBody,
   type NumberBody,
   type QuickAdd,
+  type RoomsBody,
+  type SlotsBody,
   type TableBody,
   type TileBody,
   type TileView,
+  type TrackerBody,
 } from '@/lib/goals/dashboard-tiles';
+import { stepHref } from '@/lib/goals/all-goals';
 import { formatDay } from '@/lib/goals/dates';
 import { VALUE_PREFIX, displayValue } from '@/lib/goals/information';
 import { axisLabel, currentLabel } from '@/lib/goals/metric-chart';
@@ -43,18 +49,18 @@ import { FieldInput } from './field-input';
  * quick add where its source takes input. The views come from
  * lib/goals/dashboard-tiles.ts, so the gallery and the page draw the same.
  *
- * A body is drawn by the component TILE_BODIES names for its type. A type
- * with no entry is not drawn; plan #2778.3 adds rooms, slots, tracker and
- * grid there.
+ * A body is drawn by the component TILE_BODIES names for its type; plan
+ * #2778.3 added the parts, slots, tracker and grid bodies.
  */
 
-/** Small tiles sit three to a row on a laptop; wide ones take the whole row. */
+/** Small tiles (number, countdown, slots) sit three to a row on a laptop; wide ones take the whole row. */
 const WIDE: ReadonlySet<TileType> = new Set(['chart', 'table', 'rooms', 'tracker', 'grid']);
 
 export type TileBodyProps<B extends TileBody = TileBody> = {
   body: B;
   view: TileView;
-  /** For the gallery: hold a bar's or a point's tooltip open. */
+  goalId: string;
+  /** For the gallery: hold a bar's tooltip open, or a part's card pressed open. */
   held?: number;
 };
 
@@ -64,11 +70,15 @@ export const TILE_BODIES: Partial<Record<TileType, ComponentType<TileBodyProps>>
   countdown: CountdownTileBody as ComponentType<TileBodyProps>,
   chart: ChartTileBody as ComponentType<TileBodyProps>,
   table: TableTileBody as ComponentType<TileBodyProps>,
+  rooms: RoomsTileBody as ComponentType<TileBodyProps>,
+  slots: SlotsTileBody as ComponentType<TileBodyProps>,
+  tracker: TrackerTileBody as ComponentType<TileBodyProps>,
+  grid: GridTileBody as ComponentType<TileBodyProps>,
 };
 
 /**
- * The tiles in their saved order. Number and countdown tiles sit side by
- * side; a chart or a table takes the whole row.
+ * The tiles in their saved order. Number, countdown and slots tiles sit side
+ * by side; the rest take the whole row.
  */
 export function DashboardTiles({
   goalId,
@@ -82,8 +92,8 @@ export function DashboardTiles({
 }) {
   const drawn = views.filter((view) => view.problem || view.empty || (view.body && TILE_BODIES[view.type]));
   return (
-    // items-start: a tile keeps its own height when its neighbour opens its add.
-    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    // Small tiles in a row share its height, as the reference's do.
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {drawn.map((view, position) => (
         <DashboardTile
           key={`${view.index}-${view.type}`}
@@ -125,13 +135,15 @@ export function DashboardTile({
   const add = view.add && !view.problem ? view.add : null;
   // A wide tile carries its add on the heading's line; a small one under its figure.
   const chip = add && !adding ? <AddChip label={add.label} onClick={() => setAdding(true)} /> : null;
+  const meta = view.problem ? null : headingMeta(view);
 
   return (
     <Card
       padding="standard"
       aria-labelledby={headingId}
       role="region"
-      className={cn('group flex min-w-0 flex-col gap-3', wide && 'sm:col-span-2 lg:col-span-3')}
+      // A small tile with its quick add open takes the whole row, so its neighbours keep their own height.
+      className={cn('group flex min-w-0 flex-col gap-3', (wide || (add && adding)) && 'sm:col-span-2 lg:col-span-3')}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <h2
@@ -145,11 +157,14 @@ export function DashboardTile({
         >
           {view.title}
         </h2>
-        <div className="-my-1 flex shrink-0 items-center gap-1">
+        {meta && <p className="tabular ml-auto min-w-0 text-right text-small text-ink-muted max-sm:hidden">{meta}</p>}
+        <div className={cn('-my-1 flex shrink-0 items-center gap-1', !meta && 'ml-auto')}>
           {wide && chip}
           <TileMenu goalId={goalId} view={view} first={first} last={last} open={menuOpen} />
         </div>
       </div>
+
+      {meta && <p className="tabular -mt-1 text-small text-ink-muted sm:hidden">{meta}</p>}
 
       {view.problem ? (
         <p role="note" className="flex items-start gap-2 text-ui text-ink-muted">
@@ -157,7 +172,7 @@ export function DashboardTile({
           <span>{view.problem}</span>
         </p>
       ) : view.body && Body ? (
-        <Body body={view.body} view={view} held={held} />
+        <Body body={view.body} view={view} goalId={goalId} held={held} />
       ) : (
         <p className="text-ui text-ink-muted">{view.empty}</p>
       )}
@@ -166,6 +181,23 @@ export function DashboardTile({
       {!wide && chip && <div className="mt-auto">{chip}</div>}
     </Card>
   );
+}
+
+/**
+ * The count a parts or tracker tile sets on its heading's line, as the
+ * apartment mockup's card heads do; on a phone it drops under the heading.
+ */
+function headingMeta(view: TileView): string | null {
+  const body = view.body;
+  if (body?.type === 'rooms') {
+    return `${formatNumber(body.done)} of ${formatNumber(body.total)} steps done · press a card for its open steps`;
+  }
+  if (body?.type === 'tracker') {
+    if (body.done === body.points.length) return `All ${formatNumber(body.points.length)} done`;
+    const now = body.points.find((p) => p.state === 'now');
+    return `${formatNumber(body.done)} of ${formatNumber(body.points.length)} done${now?.dueOn ? ` · next due ${formatDay(now.dueOn)}` : ''}`;
+  }
+  return null;
 }
 
 /** The quiet add: a small chip with a dashed edge that names what it adds, as the reference draws it. */
@@ -699,6 +731,370 @@ function ShareBar({ share }: { share: number }) {
   );
 }
 
+/** Done out of all, as a ring with the percent inside, as the apartment mockup draws a room. */
+function Ring({ done, total }: { done: number; total: number }) {
+  const share = total > 0 ? done / total : 0;
+  const r = 16;
+  const around = 2 * Math.PI * r;
+  return (
+    <span className="relative grid size-11 shrink-0 place-items-center" aria-hidden>
+      <svg viewBox="0 0 40 40" className="absolute inset-0 size-full -rotate-90">
+        <circle cx="20" cy="20" r={r} fill="none" className="stroke-border" strokeWidth={4} />
+        {share > 0 && (
+          <circle
+            cx="20"
+            cy="20"
+            r={r}
+            fill="none"
+            className="stroke-accent"
+            strokeWidth={4}
+            strokeLinecap="round"
+            strokeDasharray={`${(around * share).toFixed(1)} ${around.toFixed(1)}`}
+          />
+        )}
+      </svg>
+      {/* A finished part shows a tick, which fits the ring where "100%" would not. */}
+      {total > 0 && done === total ? (
+        <Check className="relative size-4 text-accent" strokeWidth={2.5} />
+      ) : (
+        <span className="tabular relative text-micro font-semibold tracking-tight text-ink">{Math.round(share * 100)}%</span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A card per part: its ring, its name, how many of its steps are done and
+ * when it last moved, and its next step; a finished part ends at its count.
+ * Pressing a card lists its open steps across the whole width under that
+ * card's row, so the cards keep their places and heights; the later cards
+ * close up beside it (grid-flow-dense). Pressing it again folds them.
+ */
+function RoomsTileBody({ body, goalId, held }: TileBodyProps<RoomsBody>) {
+  const [opened, setOpened] = useState<string | null>(held === undefined ? null : (body.parts[held]?.id ?? null));
+  const baseId = useId();
+  return (
+    <ul className="grid grid-flow-row-dense grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {body.parts.map((part) => {
+        const open = opened === part.id;
+        const listId = `${baseId}-${part.id}`;
+        const next = part.open[0];
+        const finished = part.total > 0 && part.done === part.total;
+        const when = part.lastOn ? `last ${formatDay(part.lastOn)}` : part.done === 0 ? 'not started' : null;
+        return (
+          <Fragment key={part.id}>
+            <li
+              className={cn(
+                'min-w-0 rounded-card transition-colors duration-quick',
+                // As the reference: a started part on the card colour with a hairline, one not started faintly sunken.
+                part.done === 0 ? 'bg-sunken/60' : 'border bg-surface' /* ui-ok: a part's card inside its tile, drawn with the reference's hairline since a surface on a surface shows no tone */,
+                part.done !== 0 && (open ? 'border-accent' : 'border-border'),
+                part.done === 0 && open && 'ring-1 ring-accent',
+              )}
+            >
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={open ? listId : undefined}
+                onClick={() => setOpened(open ? null : part.id)}
+                className="press grid h-full w-full content-start gap-2 rounded-card p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <Ring done={part.done} total={part.total} />
+                  <span className="min-w-0">
+                    <span className="block text-body font-semibold leading-tight text-ink [overflow-wrap:anywhere]">{part.title}</span>
+                    <span className="tabular block text-small text-ink-muted">
+                      {part.done} of {part.total} done{when ? ` · ${when}` : ''}
+                    </span>
+                  </span>
+                  {open && <ChevronUp aria-hidden strokeWidth={1.75} className="ml-auto size-4 shrink-0 text-ink-muted" />}
+                </span>
+                {next && !finished && (
+                  <span className="block border-t border-border pt-2 text-ui text-ink">
+                    <SectionLabel as="span" className="block">
+                      Next
+                    </SectionLabel>
+                    {next.title}
+                  </span>
+                )}
+              </button>
+            </li>
+            {open && (
+              <li id={listId} className="col-span-full min-w-0 rounded-card bg-sunken/60 px-3 pt-2 pb-3">
+                <SectionLabel count={part.open.length + part.moreOpen === 0 ? 'nothing open' : `${part.open.length + part.moreOpen} open`}>
+                  {part.title}
+                </SectionLabel>
+                {part.open.length > 0 && (
+                  <ol className="mt-1 grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {part.open.map((step) => (
+                      <li key={step.id} className="border-t border-border py-1.5">
+                        {/* The padding, taken back by the margin, makes a 44px press target without moving the line. */}
+                        <a
+                          href={stepHref(goalId, step.id)}
+                          className="-my-3 block py-3 text-ui text-ink hover:text-accent [overflow-wrap:anywhere]"
+                        >
+                          {step.title}
+                        </a>
+                        {(step.under || step.blocked || step.dueOn) && (
+                          <span className="block text-small text-ink-muted">
+                            {[step.under, step.blocked ? 'Blocked' : null, step.dueOn ? `Due ${formatDay(step.dueOn)}` : null]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {part.moreOpen > 0 && (
+                  <p className="pt-1 text-small text-ink-muted">and {formatNumber(part.moreOpen)} more on the Plan tab</p>
+                )}
+              </li>
+            )}
+          </Fragment>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** "3 of 10" with a row of slots, the filled ones in accent, and who filled them. */
+function SlotsTileBody({ body }: TileBodyProps<SlotsBody>) {
+  const filled = Math.min(body.filled.length, body.count);
+  return (
+    <div className="space-y-2">
+      <p className="font-display tabular text-figure font-semibold tracking-tight text-ink">
+        {formatNumber(filled)} <span className="text-ink-muted">of {formatNumber(body.count)}</span>
+      </p>
+      <div
+        role="img"
+        aria-label={`${filled} of ${body.count} filled`}
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${Math.min(body.count, 10)}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: body.count }, (_, index) => (
+          <span key={index} className={cn('h-2 rounded-full', index < filled ? 'bg-accent' : 'bg-sunken')} />
+        ))}
+      </div>
+      <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{body.caption}</p>
+    </div>
+  );
+}
+
+/**
+ * Checkpoints in order: done ones filled with a tick and their date, the
+ * next one ringed, the rest hollow. Side by side from a laptop up when there
+ * are few enough to read across, one under another otherwise.
+ */
+function TrackerTileBody({ body, goalId }: TileBodyProps<TrackerBody>) {
+  const across = body.points.length <= 7;
+  const last = body.points.length - 1;
+  // The date: when a checkpoint was done, or when the next and later ones are due.
+  const dateOf = (point: TrackerBody['points'][number]) =>
+    point.state === 'done'
+      ? point.closedOn
+        ? formatDay(point.closedOn)
+        : 'Done'
+      : point.dueOn
+        ? `due ${formatDay(point.dueOn)}`
+        : point.state === 'now'
+          ? 'next'
+          : '';
+  return (
+    <div>
+      <ol className={cn('grid', across ? 'lg:auto-cols-fr lg:grid-flow-col' : '')}>
+        {body.points.map((point, index) => (
+          <li key={point.id} className={cn('relative flex min-w-0 gap-3 pb-4 last:pb-0', across && 'lg:flex-col lg:gap-2 lg:pr-3 lg:pb-0')}>
+            {index < last && (
+              <>
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute top-6 bottom-1 left-[9px] w-px',
+                    point.state === 'done' ? 'bg-accent' : 'bg-border',
+                    across && 'lg:hidden',
+                  )}
+                />
+                {across && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'absolute top-[9px] right-1 left-6 hidden h-px lg:block',
+                      point.state === 'done' ? 'bg-accent' : 'bg-border',
+                    )}
+                  />
+                )}
+              </>
+            )}
+            <span
+              aria-hidden
+              className={cn(
+                'relative grid size-[19px] shrink-0 place-items-center rounded-full',
+                point.state === 'done' && 'bg-accent text-fill-ink',
+                point.state === 'now' && 'border-2 border-accent bg-surface',
+                point.state === 'later' && 'border border-border-strong bg-surface',
+              )}
+            >
+              {point.state === 'done' && <Check className="size-3" strokeWidth={2.5} />}
+            </span>
+            {/* One under another, the date ends the title's line, so the dates line up as the reference's do; read across, it sits under the title. */}
+            <span className={cn('flex min-w-0 flex-1 items-baseline justify-between gap-3', across && 'lg:block')}>
+              <a
+                href={stepHref(goalId, point.id)}
+                className={cn(
+                  // The padding, taken back by the margin, makes a 44px press target without moving the line.
+                  '-my-3 min-w-0 py-3 text-ui [overflow-wrap:anywhere] hover:text-accent',
+                  across && 'lg:block',
+                  point.state === 'now' ? 'font-semibold text-ink' : point.state === 'done' ? 'text-ink' : 'text-ink-muted',
+                )}
+              >
+                {point.title}
+              </a>
+              <span className={cn('tabular shrink-0 text-small text-ink-muted', across && 'lg:block', point.state === 'now' && 'text-ink')}>
+                {dateOf(point) || ' '}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** A yes/no value as a mark: a tick for yes, a hollow dot for no. Not a control. */
+function Mark({ yes, label }: { yes: boolean; label: string }) {
+  return yes ? (
+    <span className="inline-flex items-center text-accent">
+      <Check className="size-4" strokeWidth={2.25} aria-hidden />
+      <span className="sr-only">{label}: yes</span>
+    </span>
+  ) : (
+    <span className="inline-flex items-center">
+      <span aria-hidden className="size-3 rounded-full border border-border-strong" /* ui-ok: a hollow dot marking no, a mark that groups nothing */ />
+      <span className="sr-only">{label}: no</span>
+    </span>
+  );
+}
+
+/**
+ * A list's rows by its columns, yes/no ones drawn as marks with how many of
+ * the rows are yes under each. On a phone each row is its name and other
+ * values, then its marks with their labels.
+ */
+function GridTileBody({ body }: TileBodyProps<GridBody>) {
+  const marks = body.columns.filter((c) => c.type === 'yes_no');
+  const others = body.columns.filter((c) => c.type !== 'yes_no');
+  const shown = (column: GridBody['columns'][number], data: GridBody['rows'][number]['data']) => {
+    const value = data[column.key];
+    if (column.type === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDay(value);
+    if (typeof value === 'number' && column.type === 'money') return formatValue(column, value);
+    return displayValue(column, value);
+  };
+  return (
+    <div className="space-y-2">
+      <div className="max-md:hidden">
+        <Table flush stack={false} fit>
+          <THead>
+            <tr>
+              <TH>{body.name?.label ?? 'Row'}</TH>
+              {body.columns.map((column) => (
+                <TH key={column.key} num={NUMERIC.has(column.type)} className={cn(column.type === 'yes_no' && 'text-center')}>
+                  {column.label}
+                </TH>
+              ))}
+            </tr>
+          </THead>
+          <TBody>
+            {body.rows.map((row) => (
+              <TR key={row.id}>
+                <TD primary>{row.name}</TD>
+                {body.columns.map((column) => (
+                  <TD
+                    key={column.key}
+                    num={NUMERIC.has(column.type)}
+                    muted={column.type === 'date'}
+                    className={cn(column.type === 'yes_no' && 'text-center')}
+                  >
+                    {column.type === 'yes_no' ? (
+                      <Mark yes={row.data[column.key] === true} label={column.label} />
+                    ) : (
+                      shown(column, row.data) || <span className="text-ink-ghost">Not set</span>
+                    )}
+                  </TD>
+                ))}
+              </TR>
+            ))}
+            {marks.length > 0 && (
+              <TR>
+                <TD muted className="text-small">
+                  Done
+                </TD>
+                {body.columns.map((column) => (
+                  <TD key={column.key} muted className={cn('tabular text-small', column.type === 'yes_no' && 'text-center')}>
+                    {column.type === 'yes_no' ? `${body.totals[column.key] ?? 0} of ${body.of}` : null}
+                  </TD>
+                ))}
+              </TR>
+            )}
+          </TBody>
+        </Table>
+      </div>
+      <ul className="divide-y divide-border md:hidden">
+        {body.rows.map((row) => {
+          // A date ends the name's line as a plain date; the other values go under it.
+          const date = others.find((c) => c.type === 'date');
+          const under = others
+            .filter((c) => c !== date)
+            .map((c) => {
+              const value = shown(c, row.data);
+              return value ? `${c.label.toLowerCase()} ${value}` : null;
+            })
+            .filter(Boolean)
+            .join(' · ');
+          const on = date ? shown(date, row.data) : '';
+          return (
+            <li key={row.id} className="space-y-1 py-2 first:pt-0">
+              <p className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 text-ui font-medium text-ink [overflow-wrap:anywhere]">{row.name}</span>
+                {on && (
+                  <span className="tabular shrink-0 text-small text-ink-muted">
+                    <span className="sr-only">{date?.label} </span>
+                    {on}
+                  </span>
+                )}
+              </p>
+              {under && <p className="tabular text-small text-ink-muted">{under}</p>}
+              {marks.length > 0 && (
+                <p className="flex flex-wrap gap-x-3 gap-y-1">
+                  {marks.map((c) => {
+                    const yes = row.data[c.key] === true;
+                    return (
+                      <span key={c.key} className={cn('inline-flex items-center gap-1 text-small', yes ? 'text-ink' : 'text-ink-muted')}>
+                        <Mark yes={yes} label={c.label} />
+                        <span aria-hidden>{c.label}</span>
+                      </span>
+                    );
+                  })}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {(body.more > 0 || (marks.length > 0 && body.rows.length > 0)) && (
+        <p className="tabular flex flex-wrap gap-x-3 text-small text-ink-muted md:hidden">
+          {marks.map((c) => (
+            <span key={c.key} className="whitespace-nowrap">
+              {c.label} {body.totals[c.key] ?? 0} of {body.of}
+            </span>
+          ))}
+        </p>
+      )}
+      {body.more > 0 && <p className="text-small text-ink-muted">{formatNumber(body.more)} more on the list</p>}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Quick add
 // ---------------------------------------------------------------------------
@@ -768,6 +1164,7 @@ function RowFields({ id, add }: { id: string; add: Extract<QuickAdd, { kind: 'ro
               inputMode={field.type === 'text' || field.type === 'date' ? undefined : field.type === 'link' ? 'url' : 'decimal'}
               // A date box shows its name until it is used, then the browser's date picker.
               onFocus={field.type === 'date' ? (event) => (event.currentTarget.type = 'date') : undefined}
+              /* ui-ok: a 44px touch target on a phone, where the quick add is typed with a thumb */
               className={cn('max-sm:h-11', NUMERIC.has(field.type) && 'tabular')}
             />
           ) : (
@@ -785,7 +1182,8 @@ function RowFields({ id, add }: { id: string; add: Extract<QuickAdd, { kind: 'ro
  */
 function ReadingFields({ id, add }: { id: string; add: Extract<QuickAdd, { kind: 'reading' }> }) {
   return (
-    <ul className="divide-y divide-border">
+    // Kept to a readable width, so each name stays near its value on a wide card.
+    <ul className="max-w-xl divide-y divide-border">
       <input type="hidden" name="field" value={add.field.key} />
       {add.rows.map((row, index) => (
         <li key={row.id} className="flex items-center justify-between gap-3 py-1.5 first:pt-0">
@@ -799,6 +1197,7 @@ function ReadingFields({ id, add }: { id: string; add: Extract<QuickAdd, { kind:
             inputMode="decimal"
             autoComplete="off"
             aria-label={`${add.field.label} of ${row.name}, now ${row.value || 'not set'}`}
+            /* ui-ok: a 44px touch target on a phone, where the quick add is typed with a thumb */
             className="tabular w-32 shrink-0 text-right max-sm:h-11"
             // The form opens because the person asked for it.
             autoFocus={index === 0}

@@ -5,9 +5,10 @@
  * same code the page draws real rows through, and the sums, dates and series
  * are tested without a database. The reads are in lib/goals/dashboard-store.ts.
  *
- * This step builds the number, countdown, chart and table tiles. A type with
- * no view here yet (rooms, slots, tracker, grid; plan #2778.3) gives `body:
- * null` with no problem, and the page leaves it out.
+ * Plan #2778.2 built the number, countdown, chart and table tiles; plan
+ * #2778.3 the parts (a card per step that has steps of its own, with a ring
+ * and its next step), slots, tracker and grid tiles. Counts of steps leave
+ * out proposed and dropped ones; counts of rows leave out drafts.
  *
  * Every view is in one of three states. Ready: it has something to show.
  * Empty: its source is there but holds nothing yet, and `empty` says what the
@@ -43,11 +44,24 @@ export type TileList = {
 /** A dated value of a tracked field on one record (goals.readings). */
 export type TileReading = { recordId: string; field: string; value: number; readOn: string };
 
-/** A step a countdown can count to. */
-export type TileStep = { id: string; title: string; dueOn: string | null; status: string; closedOn: string | null };
+/**
+ * A live step under the goal: what a countdown counts to, a part's steps, a
+ * tracker's checkpoints. `parentId` is the goal's id for a top-level step.
+ */
+export type TileStep = {
+  id: string;
+  title: string;
+  dueOn: string | null;
+  status: string;
+  closedOn: string | null;
+  parentId: string | null;
+  position: number;
+};
 
 /** Everything the tiles read on one goal. */
 export type DashboardData = {
+  /** The goal's id: a parts tile with no parent reads its top-level steps. */
+  goalId: string;
   /** Today in the account's zone. */
   today: string;
   lists: readonly TileList[];
@@ -114,7 +128,59 @@ export type TableBody = {
   more: number;
 };
 
-export type TileBody = NumberBody | CountdownBody | ChartBody | TableBody;
+/** One open step of a part, and the step it sits under when that is not the part itself. */
+export type PartStep = { id: string; title: string; under: string | null; dueOn: string | null; blocked: boolean };
+
+/** A part's card: its steps done out of all, when it last moved, and its open steps in plan order. */
+export type Part = {
+  id: string;
+  title: string;
+  done: number;
+  total: number;
+  /** The day its latest step closed, or null when none has. */
+  lastOn: string | null;
+  /** Its open steps, the first being its next one; at most PART_STEPS_MAX. */
+  open: PartStep[];
+  /** Open steps beyond the ones listed. */
+  moreOpen: number;
+};
+
+export type RoomsBody = { type: 'rooms'; parts: Part[]; done: number; total: number };
+
+export type SlotsBody = {
+  type: 'slots';
+  count: number;
+  /** The rows that fill a slot, in the list's order. */
+  filled: { id: string; name: string }[];
+  caption: string;
+};
+
+export type Checkpoint = {
+  id: string;
+  title: string;
+  /** Done; the first not done, which is what is next; or one after it. */
+  state: 'done' | 'now' | 'later';
+  dueOn: string | null;
+  closedOn: string | null;
+};
+
+export type TrackerBody = { type: 'tracker'; points: Checkpoint[]; done: number };
+
+export type GridBody = {
+  type: 'grid';
+  /** The column that names each row, or null when the list has none. */
+  name: CollectionField | null;
+  columns: CollectionField[];
+  rows: { id: string; name: string; data: RecordValues }[];
+  /** Rows on the list beyond the ones shown. */
+  more: number;
+  /** For each yes/no column, how many of all the rows are yes. */
+  totals: Record<string, number>;
+  /** All the rows counted, for "3 of 8". */
+  of: number;
+};
+
+export type TileBody = NumberBody | CountdownBody | ChartBody | TableBody | RoomsBody | SlotsBody | TrackerBody | GridBody;
 
 export type TileView = {
   /** Its place in the layout, from 0: what Move and Remove name. */
@@ -429,8 +495,170 @@ function tableTile(tile: Extract<Tile, { type: 'table' }>, data: DashboardData):
   };
 }
 
-/** The types this step draws; the rest come with plan #2778.3. */
-export const VIEWED_TYPES: ReadonlySet<TileType> = new Set(['number', 'countdown', 'chart', 'table']);
+/** The open steps a part's card lists when pressed, before "N more". */
+export const PART_STEPS_MAX = 12;
+/** The most rows a grid tile shows before "N more". */
+export const GRID_ROWS_MAX = 12;
+
+/** A step that counts: proposed ones wait on the person and dropped ones will not be done. */
+const live = (step: TileStep) => step.status !== 'proposed' && step.status !== 'dropped';
+const isOpen = (step: TileStep) => step.status === 'open' || step.status === 'blocked';
+
+/** The live steps directly under `parentId`, in plan order. */
+function childrenOf(data: DashboardData, parentId: string): TileStep[] {
+  return data.steps
+    .filter((s) => s.parentId === parentId && live(s))
+    .sort((a, b) => a.position - b.position || a.title.localeCompare(b.title));
+}
+
+/** The steps under `parentId` with none of their own, depth first in plan order, each with the step it sits under. */
+function leavesUnder(data: DashboardData, parentId: string): { step: TileStep; under: TileStep | null }[] {
+  const out: { step: TileStep; under: TileStep | null }[] = [];
+  const walk = (id: string, under: TileStep | null, seen: Set<string>) => {
+    for (const child of childrenOf(data, id)) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      if (childrenOf(data, child.id).length === 0) out.push({ step: child, under });
+      else walk(child.id, child, seen);
+    }
+  };
+  walk(parentId, null, new Set([parentId]));
+  return out;
+}
+
+const stepTitle = (data: DashboardData, id: string) => data.steps.find((s) => s.id === id)?.title;
+
+function roomsTile(tile: Extract<Tile, { type: 'rooms' }>, data: DashboardData): Built {
+  const root = tile.parent ?? data.goalId;
+  const title = tile.title ?? (tile.parent ? (stepTitle(data, tile.parent) ?? 'Parts') : 'Parts');
+  // A part is a step with steps of its own; a lone step is not one.
+  const parts: Part[] = childrenOf(data, root)
+    .filter((step) => childrenOf(data, step.id).length > 0)
+    .map((step) => {
+      const leaves = leavesUnder(data, step.id);
+      const done = leaves.filter((l) => l.step.status === 'done');
+      const open = leaves.filter((l) => isOpen(l.step));
+      const lastOn = done.reduce<string | null>((latest, l) => {
+        const on = l.step.closedOn;
+        return on && (!latest || on > latest) ? on : latest;
+      }, null);
+      return {
+        id: step.id,
+        title: step.title,
+        done: done.length,
+        total: leaves.length,
+        lastOn,
+        open: open.slice(0, PART_STEPS_MAX).map(({ step: s, under }) => ({
+          id: s.id,
+          title: s.title,
+          under: under?.title ?? null,
+          dueOn: s.dueOn,
+          blocked: s.status === 'blocked',
+        })),
+        moreOpen: Math.max(0, open.length - PART_STEPS_MAX),
+      };
+    });
+  if (parts.length === 0) {
+    const where = tile.parent ? `Nothing under ${title}` : 'No step on this goal';
+    return {
+      title,
+      empty: `${where} has steps of its own yet. Each one that does shows here as a card with its progress and next step.`,
+      body: null,
+      add: null,
+    };
+  }
+  const done = parts.reduce((sum, p) => sum + p.done, 0);
+  const total = parts.reduce((sum, p) => sum + p.total, 0);
+  return { title, empty: null, body: { type: 'rooms', parts, done, total }, add: null };
+}
+
+/** "Ana, Ben, Cy and 2 more": the first names, then how many after. */
+function namesLine(names: string[], shown = 3): string {
+  if (names.length <= shown) {
+    return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  }
+  return `${names.slice(0, shown).join(', ')} and ${names.length - shown} more`;
+}
+
+function slotsTile(tile: Extract<Tile, { type: 'slots' }>, data: DashboardData): Built {
+  const list = data.lists.find((l) => l.id === tile.list)!;
+  const field = tile.field ? liveFields(list.fields).find((f) => f.key === tile.field)! : null;
+  const title = tile.title ?? list.name;
+  const add = addRow(list, field ? [field.key] : []);
+  const filled = counted(list)
+    .map((record, position) => ({ id: record.id, name: rowName(list.fields, record.data, position), yes: record.data[field?.key ?? ''] }))
+    .filter((r) => !field || r.yes === true)
+    .map(({ id, name }) => ({ id, name }));
+  if (filled.length === 0) {
+    const fills = field ? `Each row in ${list.name} marked ${field.label.toLowerCase()}` : `Each one you add to ${list.name}`;
+    return { title, empty: `None of ${formatNumber(tile.count)} yet. ${fills} fills a slot.`, body: null, add };
+  }
+  const over = filled.length - tile.count;
+  const names = namesLine(filled.map((f) => f.name));
+  // When the list holds other than the slots, say so, so "2 of 8" does not read against a list of 7.
+  const rows = counted(list).length;
+  const aim = rows === tile.count ? '' : ` · ${formatNumber(tile.count)} aimed for, ${formatNumber(rows)} in ${list.name}`;
+  const caption = over > 0 ? `${names} · ${formatNumber(over)} past the ${formatNumber(tile.count)} aimed for` : `${names}${aim}`;
+  return { title, empty: null, body: { type: 'slots', count: tile.count, filled, caption }, add };
+}
+
+function trackerTile(tile: Extract<Tile, { type: 'tracker' }>, data: DashboardData): Built {
+  const title = tile.title ?? (tile.parent ? (stepTitle(data, tile.parent) ?? 'Checkpoints') : 'Checkpoints');
+  const steps = tile.steps
+    ? tile.steps.map((id) => data.steps.find((s) => s.id === id)).filter((s): s is TileStep => s !== undefined && live(s))
+    : childrenOf(data, tile.parent!);
+  if (steps.length === 0) {
+    return { title, empty: `No steps under ${title} yet. Each one added shows here as a checkpoint, in order.`, body: null, add: null };
+  }
+  let now = false;
+  const points: Checkpoint[] = steps.map((s) => {
+    let state: Checkpoint['state'] = 'done';
+    if (s.status !== 'done') {
+      state = now ? 'later' : 'now';
+      now = true;
+    }
+    return { id: s.id, title: s.title, state, dueOn: s.dueOn, closedOn: s.closedOn };
+  });
+  const done = points.filter((p) => p.state === 'done').length;
+  return { title, empty: null, body: { type: 'tracker', points, done }, add: null };
+}
+
+function gridTile(tile: Extract<Tile, { type: 'grid' }>, data: DashboardData): Built {
+  const list = data.lists.find((l) => l.id === tile.list)!;
+  const live = liveFields(list.fields);
+  const name = nameFieldOf(list.fields);
+  const columns = tile.fields
+    .filter((key) => key !== name?.key)
+    .map((key) => live.find((f) => f.key === key)!)
+    .filter(Boolean);
+  const rows = counted(list);
+  const title = tile.title ?? list.name;
+  const add = addRow(list, tile.fields);
+  if (rows.length === 0) {
+    return { title, empty: `Nothing in ${list.name} yet. Each row you add shows here with its marks.`, body: null, add };
+  }
+  const totals: Record<string, number> = {};
+  for (const column of columns) {
+    if (column.type === 'yes_no') totals[column.key] = rows.filter((r) => r.data[column.key] === true).length;
+  }
+  return {
+    title,
+    empty: null,
+    body: {
+      type: 'grid',
+      name,
+      columns,
+      rows: rows.slice(0, GRID_ROWS_MAX).map((r, position) => ({ id: r.id, name: rowName(list.fields, r.data, position), data: r.data })),
+      more: Math.max(0, rows.length - GRID_ROWS_MAX),
+      totals,
+      of: rows.length,
+    },
+    add,
+  };
+}
+
+/** The types with a view. Every type has one since plan #2778.3. */
+export const VIEWED_TYPES: ReadonlySet<TileType> = new Set(['number', 'countdown', 'chart', 'table', 'rooms', 'slots', 'tracker', 'grid']);
 
 /**
  * One tile as the page draws it. `problem` is tileProblem's answer for the
@@ -452,8 +680,14 @@ export function tileView(tile: Tile, index: number, problem: string | null, data
       return { ...base, ...chartTile(tile, data) };
     case 'table':
       return { ...base, ...tableTile(tile, data) };
-    default:
-      return { ...base, title: fallback, empty: null, body: null, add: null };
+    case 'rooms':
+      return { ...base, ...roomsTile(tile, data) };
+    case 'slots':
+      return { ...base, ...slotsTile(tile, data) };
+    case 'tracker':
+      return { ...base, ...trackerTile(tile, data) };
+    case 'grid':
+      return { ...base, ...gridTile(tile, data) };
   }
 }
 

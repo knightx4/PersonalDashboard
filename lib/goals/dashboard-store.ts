@@ -132,12 +132,21 @@ export async function saveGoalDashboard(
 type ListRow = { id: string; name: string; fields: CollectionField[] };
 type RecordRow = { id: string; collection_id: string; data: RecordValues; draft: boolean };
 type ReadingRow = { record_id: string; field: string; value: number | string; read_on: string };
-type StepRow = { id: string; title: string; due_on: string | null; status: string; closed_at: string | null };
+type StepRow = {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  due_on: string | null;
+  status: string;
+  closed_at: string | null;
+  position: number | null;
+};
 
 /**
  * Everything a set of tiles reads on one goal (plan #2778.2): the lists the
  * tiles and the goal's metrics name, with their live records; each metric's
- * counts; the steps a countdown names; and the readings of every tracked
+ * counts; the steps a countdown names, or every step under the goal when a
+ * parts or tracker tile reads the tree (plan #2778.3); and the readings of every tracked
  * field a tile adds up or draws. Only what some tile reads is fetched.
  */
 export async function loadDashboardData(
@@ -155,7 +164,11 @@ export async function loadDashboardData(
   const listIds = new Set<string>();
   for (const tile of shown) if ('list' in tile && tile.list) listIds.add(tile.list);
   for (const metric of metrics) if (metric.collectionId) listIds.add(metric.collectionId);
+  // Parts and trackers read the goal's steps as a tree, so every live step is
+  // fetched and walked from the goal; a countdown alone fetches its one step.
+  const wantsTree = shown.some((t) => t.type === 'rooms' || t.type === 'tracker');
   const stepIds = shown.flatMap((t) => (t.type === 'countdown' && t.step ? [t.step] : []));
+  const stepColumns = 'id, parent_id, level, title, due_on, status, closed_at, position';
 
   const [lists, records, steps] = await Promise.all([
     listIds.size === 0
@@ -171,9 +184,11 @@ export async function loadDashboardData(
           .is('archived_at', null)
           .order('position')
           .order('created_at'),
-    stepIds.length === 0
-      ? Promise.resolve({ data: [] as StepRow[], error: null })
-      : client.from('items').select('id, title, due_on, status, closed_at').eq('user_id', userId).in('id', stepIds),
+    wantsTree
+      ? client.from('items').select(stepColumns).eq('user_id', userId).eq('level', 'step').is('archived_at', null)
+      : stepIds.length === 0
+        ? Promise.resolve({ data: [] as StepRow[], error: null })
+        : client.from('items').select(stepColumns).eq('user_id', userId).in('id', stepIds),
   ]);
   if (lists.error) throw new Error(`Could not read the dashboard's lists: ${lists.error.message}`);
   if (records.error) throw new Error(`Could not read the dashboard's rows: ${records.error.message}`);
@@ -216,12 +231,15 @@ export async function loadDashboardData(
   }
 
   const zone = safeTimeZone(timeZone);
-  const tileSteps: TileStep[] = ((steps.data ?? []) as StepRow[]).map((s) => ({
+  const stepRows = (steps.data ?? []) as StepRow[];
+  const tileSteps: TileStep[] = (wantsTree ? underGoal(stepRows, goal.id) : stepRows).map((s) => ({
     id: s.id,
     title: s.title,
     dueOn: s.due_on,
     status: s.status,
     closedOn: s.closed_at ? dayIn(s.closed_at, zone) : null,
+    parentId: s.parent_id,
+    position: s.position ?? 0,
   }));
 
   // A broken tile whose list has left the goal is named by what the list was called.
@@ -234,7 +252,34 @@ export async function loadDashboardData(
     for (const row of (gone ?? []) as { id: string; name: string }[]) goneLists[row.id] = row.name;
   }
 
-  return { today: todayIn(zone, now), lists: tileLists, metrics, steps: tileSteps, readings, goneLists };
+  return { goalId: goal.id, today: todayIn(zone, now), lists: tileLists, metrics, steps: tileSteps, readings, goneLists };
+}
+
+/** The steps at any depth under the goal, walked down from it. */
+function underGoal(rows: readonly StepRow[], goalId: string): StepRow[] {
+  const children = new Map<string, StepRow[]>();
+  for (const row of rows) {
+    if (!row.parent_id) continue;
+    const list = children.get(row.parent_id) ?? [];
+    list.push(row);
+    children.set(row.parent_id, list);
+  }
+  const out: StepRow[] = [];
+  const seen = new Set<string>([goalId]);
+  let frontier = [goalId];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const row of children.get(id) ?? []) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        out.push(row);
+        next.push(row.id);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 /**

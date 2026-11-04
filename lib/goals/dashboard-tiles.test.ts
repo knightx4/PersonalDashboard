@@ -15,6 +15,7 @@ import type { Metric } from '@/lib/goals/metrics';
 const LIST = '11111111-1111-4111-8111-111111111111';
 const METRIC = '22222222-2222-4222-8222-222222222222';
 const STEP = '33333333-3333-4333-8333-333333333333';
+const GOAL = '55555555-5555-4555-8555-555555555555';
 
 const FIELDS: CollectionField[] = [
   { key: 'name', label: 'Loan', type: 'text' },
@@ -46,6 +47,7 @@ const metric: Metric = {
 
 function data(over: Partial<DashboardData> = {}): DashboardData {
   return {
+    goalId: GOAL,
     today: '2026-11-03',
     lists: [LOANS],
     metrics: [
@@ -57,7 +59,7 @@ function data(over: Partial<DashboardData> = {}): DashboardData {
         ],
       },
     ],
-    steps: [{ id: STEP, title: 'Send the form', dueOn: '2026-11-10', status: 'open', closedOn: null }],
+    steps: [{ id: STEP, title: 'Send the form', dueOn: '2026-11-10', status: 'open', closedOn: null, parentId: GOAL, position: 0 }],
     readings: [],
     ...over,
   };
@@ -123,7 +125,7 @@ describe('countdown tiles', () => {
   it('is empty when no date is ahead, and when a step has none', () => {
     const past = data({ today: '2027-01-01' });
     expect(view({ type: 'countdown', list: LIST, field: 'due' }, past).empty).toBe('No due ahead in Loans. Add one and this counts down to it.');
-    const bare = data({ steps: [{ id: STEP, title: 'Send the form', dueOn: null, status: 'open', closedOn: null }] });
+    const bare = data({ steps: [{ id: STEP, title: 'Send the form', dueOn: null, status: 'open', closedOn: null, parentId: GOAL, position: 0 }] });
     expect(view({ type: 'countdown', step: STEP }, bare).empty).toBe('It has no date yet. Give it one and this counts down to it.');
   });
 
@@ -190,5 +192,131 @@ describe('broken tiles', () => {
     // A list archived since is named.
     const named = view({ type: 'number', list: id }, data({ goneLists: { [id]: 'Savings' } }));
     expect(named.problem).toBe('The list Savings is no longer on this goal.');
+  });
+});
+
+/** A step under the goal unless a parent is named. */
+const s = (id: string, over: Partial<DashboardData['steps'][number]> = {}) => ({
+  id,
+  title: id,
+  dueOn: null,
+  status: 'open',
+  closedOn: null,
+  parentId: GOAL,
+  position: 0,
+  ...over,
+});
+
+const uuid = (n: number) => `66666666-6666-4666-8666-${String(n).padStart(12, '0')}`;
+
+describe('parts tiles', () => {
+  const steps = [
+    s(uuid(1), { title: 'Kitchen', position: 0 }),
+    s(uuid(2), { title: 'Counters', parentId: uuid(1), position: 1 }),
+    s(uuid(3), { title: 'Wipe', parentId: uuid(2), position: 0, status: 'done', closedOn: '2026-10-27' }),
+    s(uuid(4), { title: 'Clear', parentId: uuid(2), position: 1 }),
+    s(uuid(5), { title: 'Sink', parentId: uuid(1), position: 0, status: 'done', closedOn: '2026-10-20' }),
+    s(uuid(6), { title: 'Idea', parentId: uuid(1), position: 2, status: 'proposed' }),
+    s(uuid(7), { title: 'Gone', parentId: uuid(1), position: 3, status: 'dropped' }),
+    s(uuid(8), { title: 'Hall', position: 1 }),
+    s(uuid(9), { title: 'Boxes', parentId: uuid(8), status: 'blocked' }),
+    // A lone step at the top is not a part.
+    s(uuid(10), { title: 'Shortlist', position: 2, status: 'done' }),
+  ];
+
+  it('makes a card per step with steps of its own, counting the steps with none', () => {
+    const v = view({ type: 'rooms', title: 'Rooms' }, data({ steps }));
+    expect(v.body).toMatchObject({ type: 'rooms', done: 2, total: 4 });
+    const [kitchen, hall] = v.body && v.body.type === 'rooms' ? v.body.parts : [];
+    expect(kitchen).toMatchObject({ title: 'Kitchen', done: 2, total: 3, lastOn: '2026-10-27', moreOpen: 0 });
+    // Plan order, depth first, and the next step names the sub-part it sits in.
+    expect(kitchen.open).toEqual([{ id: uuid(4), title: 'Clear', under: 'Counters', dueOn: null, blocked: false }]);
+    expect(hall).toMatchObject({ title: 'Hall', done: 0, total: 1, lastOn: null, open: [{ title: 'Boxes', blocked: true }] });
+  });
+
+  it('reads under a parent, and is empty when nothing there has steps of its own', () => {
+    const v = view({ type: 'rooms', parent: uuid(1) }, data({ steps }));
+    expect(v.title).toBe('Kitchen');
+    expect(v.body && v.body.type === 'rooms' && v.body.parts.map((p) => p.title)).toEqual(['Counters']);
+    const bare = view({ type: 'rooms' }, data({ steps: [s(uuid(10))] }));
+    expect(bare.empty).toMatch(/^No step on this goal has steps of its own yet/);
+  });
+});
+
+describe('slots tiles', () => {
+  const fields: CollectionField[] = [
+    { key: 'name', label: 'Person', type: 'text' },
+    { key: 'met', label: 'Met', type: 'yes_no' },
+  ];
+  const people = (n: number, met: (i: number) => boolean): TileList => ({
+    id: LIST,
+    name: 'People',
+    fields,
+    records: Array.from({ length: n }, (_, i) => row(`p${i}`, { name: `P${i}`, met: met(i) })),
+  });
+
+  it('fills a slot for each confirmed row where the field is yes', () => {
+    const base = people(4, (i) => i !== 1);
+    const d = data({ lists: [{ ...base, records: [...base.records, row('dr', { name: 'Draft', met: true }, true)] }] });
+    const v = view({ type: 'slots', list: LIST, count: 10, field: 'met' }, d);
+    expect(v.body).toMatchObject({ type: 'slots', count: 10, caption: 'P0, P2 and P3 · 10 aimed for, 4 in People' });
+    expect(v.add).toMatchObject({ kind: 'row', fields: [{ key: 'name' }, { key: 'met' }] });
+  });
+
+  it('says how far past the aim it is, and is empty with none', () => {
+    const over = view({ type: 'slots', list: LIST, count: 2 }, data({ lists: [people(5, () => false)] }));
+    expect(over.body).toMatchObject({ caption: 'P0, P1, P2 and 2 more · 3 past the 2 aimed for' });
+    const none = view({ type: 'slots', list: LIST, count: 10, field: 'met' }, data({ lists: [people(2, () => false)] }));
+    expect(none.empty).toBe('None of 10 yet. Each row in People marked met fills a slot.');
+  });
+});
+
+describe('tracker tiles', () => {
+  it('marks the checkpoints done, the first open one next, and the rest after', () => {
+    const steps = [
+      s(uuid(1), { title: 'A', status: 'done', closedOn: '2026-11-01' }),
+      s(uuid(2), { title: 'B', dueOn: '2026-11-20' }),
+      s(uuid(3), { title: 'C', status: 'dropped' }),
+      s(uuid(4), { title: 'D' }),
+    ];
+    const v = view({ type: 'tracker', steps: [uuid(1), uuid(2), uuid(3), uuid(4)] }, data({ steps }));
+    expect(v.title).toBe('Checkpoints');
+    expect(v.body).toMatchObject({
+      type: 'tracker',
+      done: 1,
+      points: [
+        { title: 'A', state: 'done', closedOn: '2026-11-01' },
+        { title: 'B', state: 'now', dueOn: '2026-11-20' },
+        { title: 'D', state: 'later' },
+      ],
+    });
+  });
+
+  it("reads a parent's steps in plan order, and is empty with none", () => {
+    const steps = [
+      s(uuid(1), { title: 'Apply' }),
+      s(uuid(2), { title: 'Second', parentId: uuid(1), position: 2 }),
+      s(uuid(3), { title: 'First', parentId: uuid(1), position: 1 }),
+    ];
+    const v = view({ type: 'tracker', parent: uuid(1) }, data({ steps }));
+    expect(v.title).toBe('Apply');
+    expect(v.body && v.body.type === 'tracker' && v.body.points.map((p) => p.title)).toEqual(['First', 'Second']);
+    expect(view({ type: 'tracker', parent: uuid(3) }, data({ steps })).empty).toBe(
+      'No steps under First yet. Each one added shows here as a checkpoint, in order.',
+    );
+  });
+});
+
+describe('grid tiles', () => {
+  it('shows the rows by the named columns, counting the yeses over every confirmed row', () => {
+    const fields: CollectionField[] = [...FIELDS, { key: 'signed', label: 'Signed', type: 'yes_no' }];
+    const records = [row('r1', { name: 'A', signed: true }), row('r2', { name: 'B', signed: false }), row('r3', { name: 'C', signed: true }, true)];
+    const v = view({ type: 'grid', list: LIST, fields: ['name', 'due', 'signed'] }, data({ lists: [{ ...LOANS, fields, records }] }));
+    expect(v.body).toMatchObject({ type: 'grid', name: { key: 'name' }, totals: { signed: 1 }, of: 2, more: 0 });
+    // The name column names each row, so it is not drawn twice.
+    expect(v.body && v.body.type === 'grid' && v.body.columns.map((c) => c.key)).toEqual(['due', 'signed']);
+    expect(view({ type: 'grid', list: LIST, fields: ['due'] }, data({ lists: [list([])] })).empty).toBe(
+      'Nothing in Loans yet. Each row you add shows here with its marks.',
+    );
   });
 });

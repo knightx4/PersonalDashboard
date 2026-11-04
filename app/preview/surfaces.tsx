@@ -12,9 +12,12 @@ import {
 } from './goal-metrics-surfaces';
 import {
   GoalDashboardTilesAddSurface,
+  GoalDashboardTilesApartmentOpenSurface,
+  GoalDashboardTilesApartmentSurface,
   GoalDashboardTilesBrokenSurface,
   GoalDashboardTilesEmptySurface,
   GoalDashboardTilesMenuSurface,
+  GoalDashboardTilesProgramsSurface,
   GoalDashboardTilesSurface,
 } from './goal-dashboard-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
@@ -5408,6 +5411,31 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalDashboardTilesBrokenSurface />,
+  },
+  {
+    /* The parts tile (plan #2778.3): an apartment goal's rooms, a card each
+     * with its ring and next step. Its hidden part, a card pressed open to
+     * list its open steps, follows. */
+    id: 'goal-dashboard-tiles-apartment',
+    label: 'Goals · Dashboard tiles, rooms of an apartment',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-apartment-open',
+    label: 'Goals · Dashboard tiles, a room pressed open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentOpenSurface />,
+  },
+  {
+    /* The slots and grid tiles (plan #2778.3) on a graduate programs goal. */
+    id: 'goal-dashboard-tiles-programs',
+    label: 'Goals · Dashboard tiles, slots and a checklist grid',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesProgramsSurface />,
   },
   {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with

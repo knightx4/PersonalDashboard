@@ -86,6 +86,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goal-dashboard-tiles-menu': ['/goals/[goalId]'],
   'goal-dashboard-tiles-empty': ['/goals/[goalId]'],
   'goal-dashboard-tiles-broken': ['/goals/[goalId]'],
+  'goal-dashboard-tiles-apartment': ['/goals/[goalId]'],
+  'goal-dashboard-tiles-apartment-open': ['/goals/[goalId]'],
+  'goal-dashboard-tiles-programs': ['/goals/[goalId]'],
   'dev-plan-feature': ['/dev/plan/[number]'],
   'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
@@ -1038,6 +1041,10 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'goal-dashboard-tiles-menu': ['app/goals/[goalId]/dashboard-tiles.tsx'],
   'goal-dashboard-tiles-empty': ['app/goals/[goalId]/dashboard-tiles.tsx'],
   'goal-dashboard-tiles-broken': ['app/goals/[goalId]/dashboard-tiles.tsx'],
+  // The parts, slots, tracker and grid tiles (plan #2778.3).
+  'goal-dashboard-tiles-apartment': ['app/goals/[goalId]/dashboard-tiles.tsx'],
+  'goal-dashboard-tiles-apartment-open': ['app/goals/[goalId]/dashboard-tiles.tsx'],
+  'goal-dashboard-tiles-programs': ['app/goals/[goalId]/dashboard-tiles.tsx'],
   'goals-hours': ['app/goals/hours/hours-view.tsx'],
   'goals-hours-log': ['app/goals/hours/log-hours.tsx'],
   // Every state of the mark, bare and in each hat, at every size.

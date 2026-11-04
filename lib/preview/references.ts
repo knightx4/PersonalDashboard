@@ -184,6 +184,42 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here every tile names what is missing; the mockups draw no broken tile, so it should keep the card\'s shape and say it in one line.',
     from: '2778.2',
   },
+  // Plan #2778.3's parts, slots, tracker and grid tiles, judged against the
+  // same two approved pages; the apartment one draws the rooms.
+  'goal-dashboard-tiles-apartment': {
+    pictures: [
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+    source: 'docs/references/goal-dashboard/apartment.html',
+    why: 'The apartment goal page the person approved on 4 November 2026 for #2778: a Rooms card holding a card per room, three to a row on a laptop, two on a tablet and one on a phone, each with a 40-pixel ring of its steps done and the percent inside, the room\'s name and \'7 of 12 done · last 27 Oct\', then a hairline and a small NEXT label over its next step; a room not started sits on a faintly sunken card. The tags, photos and \'Right now\' switch of that mockup belong to other steps or were turned down, so they are not to copy.',
+    from: '2778.3',
+  },
+  'goal-dashboard-tiles-apartment-open': {
+    pictures: [
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+    source: 'docs/references/goal-dashboard/apartment.html',
+    why: 'The apartment goal page the person approved on 4 November 2026 for #2778, whose room cards say \'tap a room for its steps\'. Here one room is pressed and lists its open steps in place, with no drawer; the mockup draws no open card, so it should keep the card grid calm and read as that room\'s steps.',
+    from: '2778.3',
+  },
+  'goal-dashboard-tiles-programs': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and wide cards for a table with its numbers lined up right. The slots and the grid of programs are new kinds of tile, so they should read as members of the same family: a slots tile like a number tile with its row of slots under the figure, and the grid like the loans table with yes/no columns as marks.',
+    from: '2778.3',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */
