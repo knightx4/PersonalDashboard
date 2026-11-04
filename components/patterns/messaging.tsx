@@ -244,7 +244,7 @@ export function MessageBubble({
     <p
       className={cn(
         arriving && 'message-in',
-        'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body',
+        'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body', /* ui-ok: the text inside is rendered through LinkedText below */
         from === 'you' ? 'bg-accent text-fill-ink' : 'bg-them text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
       )}

@@ -43,7 +43,7 @@ export function Reactions({ list, members, from }: { list: readonly Reacted[]; m
           role="img"
           aria-label={`${r.who.join(', ')} reacted ${r.reaction.replace('_', ' ')}`}
           title={r.who.join(', ')}
-          className="inline-flex items-center gap-0.5 rounded-pill bg-surface px-1.5 py-0.5 text-small text-ink-muted shadow-sm ring-1 ring-border" /* ui-ok: a reaction pill sitting on a bubble's edge, as a texting app draws a tap back */
+          className="inline-flex items-center gap-0.5 rounded-pill bg-surface px-1.5 py-0.5 text-small text-ink-muted ring-1 ring-border" /* ui-ok: a reaction pill sitting on a bubble's edge, as a texting app draws a tap back */
         >
           <span aria-hidden>{r.glyph}</span>
           {r.who.length > 1 && <span className="tabular">{r.who.length}</span>}
