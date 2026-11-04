@@ -239,7 +239,7 @@ export function MessageBubble({
       className={cn(
         arriving && 'message-in',
         'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body',
-        from === 'you' ? 'bg-accent text-fill-ink' : 'bg-sunken text-ink',
+        from === 'you' ? 'bg-accent text-fill-ink' : 'bg-them text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
         !last && (from === 'you' ? 'rounded-br-control' : 'rounded-bl-control'),
       )}
@@ -273,7 +273,7 @@ export function MessageNote({ tone = 'quiet', children }: { tone?: 'quiet' | 'da
 export function TypingBubble({ name }: { name: string }) {
   return (
     <div className="typing-in mb-2 self-start" role="status" aria-label={`${name} is typing`}>
-      <span className="flex items-center gap-1 rounded-pane bg-sunken px-3.5 py-3.5">
+      <span className="flex items-center gap-1 rounded-pane bg-them px-3.5 py-3.5">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
