@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { chipVariants } from '@/components/ui/chip';
+import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { DASH_CHOICES, type DashChoiceId } from '@/lib/core/models';
 
@@ -33,9 +34,12 @@ export function ModelChip({
   model,
   onModel,
   initialOpen = false,
+  quiet = false,
 }: {
   model: DashChoiceId;
   onModel: (model: DashChoiceId) => void;
+  /** Plain grey words under the box rather than a chip in its foot (plan #2863). */
+  quiet?: boolean;
   /** For the gallery: the list drawn open. */
   initialOpen?: boolean;
 }) {
@@ -52,15 +56,24 @@ export function ModelChip({
   // Where the list sits: hung from the chip, but kept inside the question
   // box it belongs to, so it never runs past the box's edges or the
   // screen's, wherever the chip lands in the foot.
-  const [place, setPlace] = useState<{ left: number; width: number } | null>(null);
+  // Quiet under the box (plan #2863), the list rises past the box too, so
+  // Send and the words stay in view while a model is picked.
+  const [place, setPlace] = useState<{ left: number; width: number; lift: number } | null>(null);
   useLayoutEffect(() => {
     if (!open || !root.current) return;
     const chip = root.current.getBoundingClientRect();
-    const box = (root.current.closest('form') ?? document.body).getBoundingClientRect();
+    const form = root.current.closest('form') ?? document.body;
+    const outer = form.getBoundingClientRect();
+    // Inside the form's own padding: on a phone the box held over the tab
+    // bar is a form the screen's width, padded in to the page's margin.
+    const style = window.getComputedStyle(form);
+    const inLeft = outer.left + (parseFloat(style.paddingLeft) || 0);
+    const inRight = outer.right - (parseFloat(style.paddingRight) || 0);
+    const box = { top: outer.top, left: inLeft, right: inRight, width: inRight - inLeft };
     const width = Math.min(LIST_WIDTH, box.width);
     const left = Math.min(Math.max(chip.left, box.left), box.right - width);
-    setPlace({ left: left - chip.left, width });
-  }, [open]);
+    setPlace({ left: left - chip.left, width, lift: quiet ? Math.max(0, chip.top - box.top) : 0 });
+  }, [open, quiet]);
   const label = modelLabel(model);
   return (
     <div ref={root} className="relative shrink-0">
@@ -76,7 +89,7 @@ export function ModelChip({
             setOpen(false);
           }
         }}
-        className={cn(chipVariants({ tone: 'neutral' }), 'press-area shrink-0 hover:text-ink')}
+        className={quiet ? QUIET_PICKER : cn(chipVariants({ tone: 'neutral' }), 'press-area shrink-0 hover:text-ink')}
       >
         <span>{label}</span>
         {/* On a phone too, where Add a file gives up its words to make room (plan #2458.5). */}
@@ -87,7 +100,11 @@ export function ModelChip({
           role="listbox"
           aria-label="Dash answers with"
           className={cn(popoverSurface, 'absolute bottom-full left-0 z-overlay mb-1.5 w-72 p-1')}
-          style={place ? { left: place.left, width: place.width } : undefined}
+          style={
+            place
+              ? { left: place.left, width: place.width, bottom: place.lift ? `calc(100% + ${place.lift}px)` : undefined }
+              : undefined
+          }
         >
           <p className="px-2.5 pb-0.5 pt-1 text-small text-ink-muted">Dash answers with</p>
           {DASH_CHOICES.map((choice) => {

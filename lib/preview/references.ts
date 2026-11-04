@@ -113,12 +113,14 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The same mockup, for the People list when a text arrives: each mentor a row with a round avatar, their name, the last thing said, the time and a dot when it is unread.',
     from: '2748.10',
   },
+  // Claude's own new chat, from the screenshot the person shared on 4
+  // November 2026. Cropped to the chat, since the sidebar beside it showed
+  // their own projects and chats and the repository is public.
   'ask-page-new': {
-    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
-    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
-    source: 'docs/references/chat-people/chat.html',
-    why: 'The same mockup, for the Dash tab: one list of chats, each a name and a day, with no workspace column and no chips; a question is pointed at one workspace by typing @ in the box.',
-    from: '2748.1',
+    pictures: ['docs/references/ask-page-new/claude-new-chat.png'],
+    link: null,
+    why: 'Calmer and cleaner: one greeting by the time of day and the name, in large type with a small mark beside it, and nothing else above the box; a tall, quiet box holding only a + on the left and Send on the right; the pickers in quiet text under the box. The sidebar beside it (not in the picture) is flat and full height, with New at the top, search, then plain close-set rows of titles under section labels and no times.',
+    from: '2863',
   },
   // The "Dash Chat Workspace" mockup the person chose on 15 October 2026 ("go
   // with B"), replacing the one from decision #1899.1. Its saved copy names

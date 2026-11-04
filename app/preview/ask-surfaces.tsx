@@ -1031,7 +1031,7 @@ export function DashPageSurface({
               />
             </ConversationChat>
           ) : (
-            <NewDashChat />
+            <NewDashChat greeting="Good afternoon, Chris" />
           )}
         </Conversation>
       </AppShell>
