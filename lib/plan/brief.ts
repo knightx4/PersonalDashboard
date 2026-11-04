@@ -616,7 +616,7 @@ export function planBrief(
   // that produced it is the first thing worth knowing about it.
   const origin = reshapeOrigin(node.comment, outlines);
   if (origin) {
-    out.push(`From ${origin.ref}'s answer: ${readable(origin.gist)}`);
+    out.push(`From ${origin.ref}'s ${origin.source}: ${readable(origin.gist)}`);
   }
 
   // What the workspace is for, above where the feature is going: the layer a
