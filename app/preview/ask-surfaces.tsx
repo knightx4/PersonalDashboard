@@ -498,15 +498,13 @@ const THINK_MOCKUP_HTML = `<style>
 
 const THINK_QUESTION = 'Should the model chip move into the box foot, or stay in settings?';
 
-const THINK_ANSWER = `## What the code does now
-The chip sits in the box's foot beside the scope chip (components/talk/model-chip.tsx), and the pick is saved on your account, so it already follows you from the popup to the Dash page.
+const THINK_ANSWER = `**What the code does now.** The chip sits in the box's foot beside the scope chip (components/talk/model-chip.tsx), and the pick is saved on your account, so it already follows you from the popup to the Dash page.
 
-## The two ways
+**The two ways.**
 - **Keep it in the foot.** One press to change it per question, which is when the choice matters. It costs a chip's width on a phone.
 - **Move it to settings.** A cleaner foot, but a question that needs Opus means leaving the chat.
 
-## What I would do
-Keep it in the foot, and let "Think it through" stand in for it when that is on, as in the mockup. The choice is made per question, so it belongs where the question is written.`;
+**What I would do.** Keep it in the foot, and let "Think it through" stand in for it when that is on, as in the mockup. The choice is made per question, so it belongs where the question is written.`;
 
 /**
  * "Think it through" on Dash's box (plan #2789.10), on the chat's card at
@@ -537,7 +535,7 @@ export function AskThinkSurface({ part }: { part: 'on' | 'mockup' | 'cost' }) {
                     {
                       name: 'show_mockup',
                       input: {},
-                      result: { ok: true, mockup: { title: 'The box foot, before and after', html: THINK_MOCKUP_HTML } },
+                      result: { ok: true, mockup: { title: 'The box foot, before and after', html: THINK_MOCKUP_HTML, height: 236 } },
                     },
                   ]
                 : []),

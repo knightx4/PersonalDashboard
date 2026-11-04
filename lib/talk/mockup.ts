@@ -24,7 +24,10 @@ export const MAX_MOCKUP_TITLE = 100;
 /** The most mockups one answer draws. */
 export const MAX_MOCKUPS = 2;
 
-export type DashMockup = { title: string; html: string };
+/** How tall the frame is drawn, in pixels: a sandboxed page cannot say, so the mockup does. */
+export const MOCKUP_HEIGHT = { least: 120, most: 720, usual: 360 } as const;
+
+export type DashMockup = { title: string; html: string; height: number };
 
 /** What the model is told once a mockup is kept. */
 export const MOCKUP_DRAWN = 'The mockup is drawn under your answer. Say in a sentence what it shows; do not repeat the HTML.';
@@ -51,7 +54,9 @@ export function parseMockup(input: unknown): { ok: true; mockup: DashMockup } | 
   if (/<script\b/i.test(html)) {
     return { ok: false, error: 'A mockup runs no scripts. Draw it with HTML and CSS alone.' };
   }
-  return { ok: true, mockup: { title, html } };
+  const asked = typeof raw.height === 'number' && Number.isFinite(raw.height) ? Math.round(raw.height) : MOCKUP_HEIGHT.usual;
+  const height = Math.min(MOCKUP_HEIGHT.most, Math.max(MOCKUP_HEIGHT.least, asked));
+  return { ok: true, mockup: { title, html, height } };
 }
 
 /** The mockups an answer drew, from its kept tool calls, in the order drawn. */
@@ -92,7 +97,7 @@ export function mockupDocument(mockup: DashMockup): string {
 
 export const MOCKUP_TOOL_DEFINITION = {
   name: MOCKUP_TOOL,
-  description: `Draw a quick mockup under your answer: a small page of HTML with inline CSS that shows what you mean, such as a layout for a screen or a component in two states. It is drawn in a sandboxed frame about 360 pixels tall that runs no scripts and loads nothing from elsewhere, so put every style inline or in a <style> block and draw pictures as plain shapes. Keep it to the part that matters, at phone width first. Use it only when a picture says it better than words; at most ${MAX_MOCKUPS} for an answer.`,
+  description: `Draw a quick mockup under your answer: a small page of HTML with inline CSS that shows what you mean, such as a layout for a screen or a component in two states. It is drawn in a sandboxed frame as tall as height says that runs no scripts and loads nothing from elsewhere, so put every style inline or in a <style> block and draw pictures as plain shapes. Keep it to the part that matters, at phone width first. Use it only when a picture says it better than words; at most ${MAX_MOCKUPS} for an answer.`,
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -100,6 +105,10 @@ export const MOCKUP_TOOL_DEFINITION = {
       html: {
         type: 'string',
         description: `The body's HTML, with its CSS inline or in a <style> block. No <script>. At most ${MAX_MOCKUP_HTML} characters.`,
+      },
+      height: {
+        type: 'number',
+        description: `How tall the drawn page is at 360 pixels wide, so the frame ends where it does: ${MOCKUP_HEIGHT.least} to ${MOCKUP_HEIGHT.most}, ${MOCKUP_HEIGHT.usual} when left out.`,
       },
     },
     required: ['title', 'html'],

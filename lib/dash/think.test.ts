@@ -155,7 +155,7 @@ describe('answerQuestion with Think it through', () => {
     expect(file).toContain('export function ModelChip');
     // The mockup is kept with the answer's calls, and the file's text is not.
     expect(answer.ok && turnMockups(answer.toolCalls)).toEqual([
-      { title: 'The box foot', html: '<div style="padding:8px">Think it through</div>' },
+      { title: 'The box foot', html: '<div style="padding:8px">Think it through</div>', height: 360 },
     ]);
     expect(JSON.stringify(answer.ok && answer.toolCalls)).not.toContain('export function ModelChip');
   });
@@ -316,14 +316,20 @@ describe('the code lookups', () => {
 
 describe('mockups', () => {
   it('takes a title and HTML, and refuses scripts and anything too long', () => {
-    expect(parseMockup({ title: ' A  box ', html: '<p>x</p>' })).toEqual({ ok: true, mockup: { title: 'A box', html: '<p>x</p>' } });
+    expect(parseMockup({ title: ' A  box ', html: '<p>x</p>' })).toEqual({
+      ok: true,
+      mockup: { title: 'A box', html: '<p>x</p>', height: 360 },
+    });
+    expect(parseMockup({ title: 'A', html: '<p>x</p>', height: 5000 }).ok && parseMockup({ title: 'A', html: '<p>x</p>', height: 5000 })).toMatchObject({
+      mockup: { height: 720 },
+    });
     expect(parseMockup({ title: 'A', html: '<script>alert(1)</script>' }).ok).toBe(false);
     expect(parseMockup({ title: 'A', html: 'x'.repeat(MAX_MOCKUP_HTML + 1) }).ok).toBe(false);
     expect(parseMockup({ html: '<p>x</p>' }).ok).toBe(false);
   });
 
   it('draws in a document that refuses every fetch', () => {
-    const doc = mockupDocument({ title: 'A', html: '<p>x</p>' });
+    const doc = mockupDocument({ title: 'A', html: '<p>x</p>', height: 200 });
     expect(doc.indexOf("default-src 'none'")).toBeLessThan(doc.indexOf('<p>x</p>'));
   });
 

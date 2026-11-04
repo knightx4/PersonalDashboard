@@ -5,8 +5,9 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  * The mockups Dash drew in a thought-through answer (plan #2789.10), read
  * from the turn's kept tool calls (lib/talk/mockup.ts), each in a frame that
  * runs no scripts and loads nothing: `sandbox` with no permissions, and the
- * document's own content security policy. The frame is a fixed height and
- * scrolls inside, since a sandboxed page cannot say how tall it is.
+ * document's own content security policy. A sandboxed page cannot say how
+ * tall it is, so the frame is drawn at the height the mockup gave, and
+ * scrolls inside past it.
  */
 export function ReplyMockups({ calls }: { calls: readonly TalkToolCall[] | undefined }) {
   const mockups = turnMockups(calls);
@@ -26,7 +27,8 @@ export function ReplyMockups({ calls }: { calls: readonly TalkToolCall[] | undef
             sandbox=""
             referrerPolicy="no-referrer"
             srcDoc={mockupDocument(mockup)}
-            className="block h-90 w-full"
+            className="block w-full"
+            style={{ height: mockup.height }}
           />
         </figure>
       ))}

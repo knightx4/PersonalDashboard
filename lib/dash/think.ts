@@ -79,8 +79,10 @@ life, what an article or a product means for what they are building.
   for is still made with its tool.
 - When a picture says it better than words, such as a layout or a screen in
   two states, draw it with show_mockup and say in a sentence what it shows.
-- Write the answer as prose with short headings or a list where it helps.
-  It can be longer than a usual answer, but every paragraph earns its place.`;
+- Write the answer as prose, with a list where it helps. The thread draws no
+  headings, so open each part with its name in bold ("**The two ways.**")
+  instead. It can be longer than a usual answer, but every paragraph earns
+  its place.`;
 
 /** What the thought-through answer cost, from the spend its calls reported; null when any call is unpriced. */
 export function thoughtCost(reports: readonly SpendReport[]): number | null {

@@ -10,9 +10,10 @@ import type { TalkToolCall } from '@/lib/talk/talk';
 /**
  * "Think it through" on Dash's box (plan #2789.10): pressed, the next
  * questions are answered on Opus at high effort, with web search, the specs,
- * the code and a mockup (lib/dash/think.ts). It sits in the box's foot where
- * the model chip was, since the model is then Opus whatever was picked, and
- * stays on until it is pressed again.
+ * the code and a mockup (lib/dash/think.ts). Off, it is the bulb alone, since
+ * the foot already holds the file, scope and model chips; on, it says its name
+ * in the model chip's place, since the model is then Opus whatever was
+ * picked. It stays on until it is pressed again.
  */
 export function ThinkSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
@@ -24,9 +25,14 @@ export function ThinkSwitch({ on, onChange }: { on: boolean; onChange: (on: bool
       }
       className="shrink-0"
     >
-      <ToggleChip on={on} onClick={() => onChange(!on)} className="h-5.5 px-2">
+      <ToggleChip
+        on={on}
+        aria-label="Think it through"
+        onClick={() => onChange(!on)}
+        className={on ? 'h-5.5 px-2' : 'h-5.5 w-7 justify-center px-0'}
+      >
         <Lightbulb strokeWidth={1.75} aria-hidden />
-        <span>Think it through</span>
+        {on && <span>Think it through</span>}
       </ToggleChip>
     </Tooltip>
   );
