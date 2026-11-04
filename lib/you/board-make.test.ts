@@ -102,8 +102,8 @@ describe('the rest', () => {
   it('links back to the question in its meeting', () => {
     const q = { id: 'q1', question: 'Take it?', options };
     expect(backLink(q, 'm1', 'A')).toBe(
-      "From the advisors' decision on [Take it?](/you/advisors/m1#board-q-q1) (option A).",
+      "From the board's decision on [Take it?](/you/board/m1#board-q-q1) (option A).",
     );
-    expect(backLink(q, null, null)).toContain('(/you/advisors)');
+    expect(backLink(q, null, null)).toContain('(/you/board)');
   });
 });

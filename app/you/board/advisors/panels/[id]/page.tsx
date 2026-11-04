@@ -35,9 +35,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           ref: null,
           path: [
             { label: 'You', href: '/you' },
-            { label: 'Advisors', href: '/you/advisors' },
-            { label: 'Roster', href: '/you/advisors/advisors' },
-            { label: panel.name, href: `/you/advisors/advisors/panels/${id}` },
+            { label: 'Advisors', href: '/you/board' },
+            { label: 'Roster', href: '/you/board/advisors' },
+            { label: panel.name, href: `/you/board/advisors/panels/${id}` },
           ],
         }}
       />

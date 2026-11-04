@@ -72,8 +72,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           ref: null,
           path: [
             { label: 'You', href: '/you' },
-            { label: 'Advisors', href: '/you/advisors' },
-            { label: meetingTitle(found.meeting), href: `/you/advisors/${id}` },
+            { label: 'Advisors', href: '/you/board' },
+            { label: meetingTitle(found.meeting), href: `/you/board/${id}` },
           ],
         }}
       />

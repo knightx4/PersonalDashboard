@@ -74,7 +74,7 @@ export function duePayload(notices: readonly DueNotice[], day: string): PushPayl
   return {
     title: clip(title, TITLE_MAX),
     body: clip(body, BODY_MAX),
-    url: '/you/advisors',
+    url: '/you/board',
     tag: `board-due-${day}`,
   };
 }

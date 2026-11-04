@@ -69,7 +69,7 @@ export function cleanPanelMembers(
   roster: readonly string[],
 ): { ok: true; advisors: string[] } | { ok: false; error: string } {
   const advisors = [...new Set(keys)];
-  if (advisors.some((key) => !roster.includes(key))) return { ok: false, error: 'One of those advisors is not on your advisors.' };
+  if (advisors.some((key) => !roster.includes(key))) return { ok: false, error: 'One of those advisors is not on your board.' };
   if (advisors.length > PANEL_SIZE_MAX) return { ok: false, error: `A panel holds at most ${PANEL_SIZE_MAX} advisors.` };
   return { ok: true, advisors };
 }

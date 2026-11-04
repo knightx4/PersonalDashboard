@@ -901,7 +901,7 @@ const talkToAdvisor: ConnectorWriteTool = {
           table: 'you.advisor_chats',
           ref: chatRef(sent.chatId ?? ''),
           title: `${sent.advisorName ?? 'Advisor'}, in a talk`,
-          href: sent.href ?? '/you/advisors',
+          href: sent.href ?? '/you/board',
           detail: { chat_id: sent.chatId ?? null, advisor: sent.advisorName ?? null, reply: reply.body },
         },
       ],

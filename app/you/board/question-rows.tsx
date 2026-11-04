@@ -15,7 +15,7 @@ import type { AskWhen } from './ask-board';
 import { AdvisorAvatar } from './advisor-avatar';
 
 /**
- * The Advisors tab's question rows (plan #2561.4): the board's suggestions, each
+ * The Board tab's question rows (plan #2561.4): the board's suggestions, each
  * with Ask now and Save for Sunday under it and Dismiss as a cross at its
  * right, and the person's asked
  * questions with the state each is in. A question in a meeting opens that
@@ -110,7 +110,7 @@ export function SuggestionRow({
           size="sm"
           variant="secondary"
           routine="board"
-          what="Cost of asking the advisors now"
+          what="Cost of asking the board now"
           align="start"
           pending={pending === 'now'}
           disabled={busy}
@@ -208,7 +208,7 @@ export function AskedRow({
     return (
       <li>
         <RowLink
-          href={`/you/advisors/${question.meetingId}`}
+          href={`/you/board/${question.meetingId}`}
           className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
         >
           {body}
@@ -230,7 +230,7 @@ export function AskedRow({
             size="sm"
             variant="secondary"
             routine="board"
-            what="Cost of asking the advisors now"
+            what="Cost of asking the board now"
             align="end"
             wrapperClassName="shrink-0"
             pending={pending}

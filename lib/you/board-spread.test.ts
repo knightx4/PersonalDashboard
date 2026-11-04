@@ -206,6 +206,6 @@ describe('stackDots', () => {
 it('writes a range and the profile link', () => {
   expect(rangeText({ low: 5200, high: 6800, unit: 'a month' })).toBe('5,200 to 6,800 a month');
   expect(advisorDecisionHref('cfo', 'q1')).toBe(
-    '/you/advisors/advisors/cfo?tab=record#decision-q1',
+    '/you/board/advisors/cfo?tab=record#decision-q1',
   );
 });

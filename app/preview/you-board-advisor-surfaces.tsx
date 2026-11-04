@@ -4,22 +4,22 @@ import {
   AdvisorsView,
   type AddStart,
   type AdvisorActions,
-} from '@/app/you/advisors/advisors/advisors-view';
+} from '@/app/you/board/advisors/advisors-view';
 import { PREVIEW_PANELS } from './you-board-surfaces';
-import { BoardListSkeleton } from '@/app/you/advisors/board-skeleton';
-import { PanelView } from '@/app/you/advisors/advisors/panels/[id]/panel-view';
+import { BoardListSkeleton } from '@/app/you/board/board-skeleton';
+import { PanelView } from '@/app/you/board/advisors/panels/[id]/panel-view';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
 import { avatarFor } from '@/lib/you/advisor-avatar';
-import type { Drawn } from '@/app/you/advisors/avatar-editor';
-import { ProfileView, type ProfileActions } from '@/app/you/advisors/advisors/[key]/profile-view';
-import { TalkTab, type TalkActions, type TalkData } from '@/app/you/advisors/advisors/[key]/talk-view';
-import { AdvisorTalkSkeleton } from '@/app/you/advisors/advisors/[key]/talk-skeleton';
+import type { Drawn } from '@/app/you/board/avatar-editor';
+import { ProfileView, type ProfileActions } from '@/app/you/board/advisors/[key]/profile-view';
+import { TalkTab, type TalkActions, type TalkData } from '@/app/you/board/advisors/[key]/talk-view';
+import { AdvisorTalkSkeleton } from '@/app/you/board/advisors/[key]/talk-skeleton';
 import type { Brain } from '@/lib/you/board-brain';
 import { advisorHref, type AdvisorDecision, type AdvisorTab } from '@/lib/you/board-profile';
 import { trackRecords, type TrackRecord } from '@/lib/you/board-scoring';
 
 /**
- * The Advisors view of the Advisors tab in the gallery (plan #2561.7): the roster
+ * The Advisors view of the Board tab in the gallery (plan #2561.7): the roster
  * with every guest ready and one switched off, a brain being built, a build
  * that failed with its retry, the Add advisor card open, and the loading
  * state. The fixtures are invented and run as long as a real roster does.
@@ -230,8 +230,8 @@ export function YouBoardAdvisorsPreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/advisors' },
-          { label: 'Roster', href: '/you/advisors/advisors' },
+          { label: 'Board', href: '/you/board' },
+          { label: 'Advisors', href: '/you/board/advisors' },
         ],
       }}
     />
@@ -262,9 +262,9 @@ export function YouBoardPanelPreview({ state = 'ready' }: { state?: 'ready' | 'e
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/advisors' },
-          { label: 'Roster', href: '/you/advisors/advisors' },
-          { label: panel.name, href: `/you/advisors/advisors/panels/${panel.id}` },
+          { label: 'Board', href: '/you/board' },
+          { label: 'Advisors', href: '/you/board/advisors' },
+          { label: panel.name, href: `/you/board/advisors/panels/${panel.id}` },
         ],
       }}
     />
@@ -441,8 +441,8 @@ export function YouBoardAdvisorProfilePreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/advisors' },
-          { label: 'Roster', href: '/you/advisors/advisors' },
+          { label: 'Advisors', href: '/you/board' },
+          { label: 'Roster', href: '/you/board/advisors' },
           { label: advisor.name, href: advisorHref(advisor.key) },
         ],
       }}

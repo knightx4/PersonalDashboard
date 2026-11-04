@@ -46,7 +46,7 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *   ask_board     a question put to the board with its options, context and
  *                 the person's lean (plan #2561.10): queued for the Sunday
  *                 meeting, or a meeting convened about it now when they said
- *                 so. Through the Ask the advisors button's own function.
+ *                 so. Through the Ask the board button's own function.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -353,11 +353,11 @@ async function saveAboutMe(env: YouWriteEnv, args: Args): Promise<YouMade> {
   };
 }
 
-const BOARD_PATHS = ['/you/advisors', '/home'];
+const BOARD_PATHS = ['/you/board', '/home'];
 
 /** Why a question put to the board has no Undo: Dash never deletes, and a meeting may already hold it. */
 const BOARD_NO_UNDO =
-  'A question put to the advisors are on its agenda, and Dash does not delete rows. Open it on the Advisors tab.';
+  'A question put to the board is on its agenda, and Dash does not delete rows. Open it on the Board tab.';
 
 async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const question = textArg(args, 'question') ?? '';
@@ -391,19 +391,19 @@ async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
       : ', queued for the Sunday meeting';
   return {
     kind: 'ask_board',
-    input: { verb: 'Asked the advisors', what: short, rest, href: '/you/advisors', where: 'Open Advisors', paths: BOARD_PATHS },
+    input: { verb: 'Asked the board', what: short, rest, href: '/you/board', where: 'Open the Board', paths: BOARD_PATHS },
     subjectRef: toRef('you.board_questions', row.id),
     op: 'insert',
     before: null,
     after: { ...row } as unknown as Row,
-    summary: `Dash asked the advisors "${short}"${rest}.`,
+    summary: `Dash asked the board "${short}"${rest}.`,
     row: {
       table: 'you.board_questions',
       ref: row.id,
       title: short,
-      href: '/you/advisors',
+      href: '/you/board',
       detail: {
-        options: row.options.map((o) => `${o.letter}: ${o.text}`).join(' | ') || 'the advisors will write them',
+        options: row.options.map((o) => `${o.letter}: ${o.text}`).join(' | ') || 'the board will write them',
         lean: row.lean,
         meeting: convened ? 'called now' : 'next Sunday',
       },
@@ -516,8 +516,8 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'ask_board',
-    runs: sameAs(['app/you/advisors/actions.ts#askBoard', 'lib/you/board-ask.ts#putQuestionToBoard']),
-    description: `Put a question to the person's advisors (hiring manager, mentor, skeptic, CFO, dreamer, and any guests) on the Advisors tab, when they say "ask the advisors whether ...", "put this to the advisors" or the like. It is queued for the advisors' next Sunday meeting, and a meeting is called about it right now only when they say so ("ask the advisors now", "convene the advisors on this"): pass when 'now' then, never otherwise, since a meeting costs them a long run. Write question as one line from what they said, take options from the conversation (two to ${OPTIONS_MAX}, one line each; leave them out and the advisors write them), put the numbers, limits and what success would look like in context, and pass their lean in lean when they gave one (an option's letter, or a line). Do not invent options, numbers or a lean they did not give. Then answer with the question and the link to it on the Advisors tab. Not for a decision they have already made, or a todo.`,
+    runs: sameAs(['app/you/board/actions.ts#askBoard', 'lib/you/board-ask.ts#putQuestionToBoard']),
+    description: `Put a question to the person's board of advisors (hiring manager, mentor, skeptic, CFO, dreamer, and any guests) on the Board tab, when they say "ask the board whether ...", "put this to the board" or the like. It is queued for the board's next Sunday meeting, and a meeting is called about it right now only when they say so ("ask the board now", "convene the board on this"): pass when 'now' then, never otherwise, since a meeting costs them a long run. Write question as one line from what they said, take options from the conversation (two to ${OPTIONS_MAX}, one line each; leave them out and the board writes them), put the numbers, limits and what success would look like in context, and pass their lean in lean when they gave one (an option's letter, or a line). Do not invent options, numbers or a lean they did not give. Then answer with the question and the link to it on the Board tab. Not for a decision they have already made, or a todo.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -529,7 +529,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
         },
         context: {
           type: 'string',
-          description: `What the advisors needs to know from the conversation: numbers, limits, deadline, what a good outcome is. At most ${CONTEXT_MAX} characters.`,
+          description: `What the board needs to know from the conversation: numbers, limits, deadline, what a good outcome is. At most ${CONTEXT_MAX} characters.`,
         },
         lean: {
           type: 'string',

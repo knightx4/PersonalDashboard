@@ -6,7 +6,7 @@ import { FieldError, Textarea } from '@/components/ui/field';
 import { ASK_TIMES_MAX, type PersonAsk } from '@/lib/you/board-asks';
 
 /**
- * The Advisors tab's "The board asks you" rows (plan #2561.11): the facts the
+ * The Board tab's "The board asks you" rows (plan #2561.11): the facts the
  * board lacked on one of your questions. One row per question, with its
  * asks under it, each a line of text and an Answer press that opens the
  * box. The answer saves when you press Save and the next meeting reads it
@@ -25,7 +25,7 @@ export function askedLine(ask: Pick<PersonAsk, 'askedIn' | 'answer'>): string | 
   const times = ask.askedIn.length;
   if (ask.answer || times < 2) return null;
   return times >= ASK_TIMES_MAX
-    ? 'Asked in three meetings. The advisors will not ask again.'
+    ? 'Asked in three meetings. The board will not ask again.'
     : `Asked in ${times} meetings`;
 }
 

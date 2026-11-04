@@ -45,7 +45,7 @@ export async function makeDecisionHappen(
   target: MakeTarget,
 ): Promise<MakeResult> {
   try {
-    if (!questionId.safeParse(id).success) return { error: 'That is not a question for the advisors.' };
+    if (!questionId.safeParse(id).success) return { error: 'That is not a question for the board.' };
     const user = await requireUser();
     const client = await createYouClient();
     const source = await loadMakeSource(client, user.id, id);
@@ -85,7 +85,7 @@ export async function makeDecisionHappen(
           kind: 'make_board_decision_todo',
           subjectRef: toRef('todo.tasks', task.id),
           op: 'insert',
-          summary: `Dash made the todo "${title}" from your advisors decision.`,
+          summary: `Dash made the todo "${title}" from your board decision.`,
         });
         added.push(ref);
         items.push({
@@ -116,7 +116,7 @@ export async function makeDecisionHappen(
           kind: 'make_board_decision_step',
           subjectRef: toRef('goals.items', stepId),
           op: 'insert',
-          summary: `Dash made the step "${title}"${goalTitle ? ` under "${goalTitle}"` : ''} from your advisors decision.`,
+          summary: `Dash made the step "${title}"${goalTitle ? ` under "${goalTitle}"` : ''} from your board decision.`,
         });
         added.push(ref);
         items.push({
@@ -132,7 +132,7 @@ export async function makeDecisionHappen(
 
     if (added.length > 0) {
       await appendMade(client, user.id, id, added);
-      revalidatePath('/you/advisors');
+      revalidatePath('/you/board');
       revalidatePath(target.kind === 'todo' ? '/todo' : '/goals');
       revalidatePath('/home');
     }

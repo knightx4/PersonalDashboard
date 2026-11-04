@@ -123,7 +123,7 @@ export function BoardListView({
       title="Advisors"
       actions={
         <>
-          <Link href="/you/advisors/advisors" className={buttonVariants({ variant: 'ghost' })}>
+          <Link href="/you/board/advisors" className={buttonVariants({ variant: 'ghost' })}>
             Roster
           </Link>
           {starting.button}
@@ -239,7 +239,7 @@ export function BoardListView({
               {decisions.map((decision) => (
                 <ListRow
                   key={decision.id}
-                  href={decision.meetingId ? `/you/advisors/${decision.meetingId}` : '/you/advisors'}
+                  href={decision.meetingId ? `/you/board/${decision.meetingId}` : '/you/board'}
                   title={decision.question}
                   meta={decisionMeta(decision)}
                   wrapMeta
@@ -261,7 +261,7 @@ export function BoardListView({
                 return (
                   <ListRow
                     key={meeting.id}
-                    href={`/you/advisors/${meeting.id}`}
+                    href={`/you/board/${meeting.id}`}
                     title={meetingTitle(meeting)}
                     meta={meeting.kind === 'called' ? `Called meeting · ${meta}` : meta}
                     end={

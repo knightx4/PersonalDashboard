@@ -8,7 +8,7 @@ import { optionLabel } from '@/lib/you/board-questions';
 import type { DueTripwire } from '@/lib/you/board-tripwires';
 
 /**
- * A tripwire that fell due (plan #2581.10), on the Advisors tab: the decision,
+ * A tripwire that fell due (plan #2581.10), on the Board tab: the decision,
  * what was chosen, and the condition the board set to reopen it. The person
  * says whether it happened. It happened puts the decision back on the next
  * meeting's agenda; it did not clears the wire. Left alone, the Sunday

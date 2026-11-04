@@ -3,7 +3,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skeleton';
 
-/** The Advisors tab's list while it loads: the header with Ask the advisors, then rows in the shape a question's and a meeting's take. */
+/** The Board tab's list while it loads: the header with Ask the board, then rows in the shape a question's and a meeting's take. */
 export function BoardListSkeleton() {
   return (
     <PageColumn>

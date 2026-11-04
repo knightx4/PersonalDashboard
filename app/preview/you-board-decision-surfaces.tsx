@@ -1,6 +1,6 @@
 'use client';
 
-import { MeetingView, type MeetingActions } from '@/app/you/advisors/[id]/meeting-view';
+import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
 
@@ -466,8 +466,8 @@ export function YouBoardDecisionPreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/advisors' },
-          { label: title, href: `/you/advisors/${MEETING}` },
+          { label: 'Advisors', href: '/you/board' },
+          { label: title, href: `/you/board/${MEETING}` },
         ],
       }}
       timezone="Europe/London"

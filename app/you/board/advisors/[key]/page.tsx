@@ -55,8 +55,8 @@ export default async function Page({
           ref: null,
           path: [
             { label: 'You', href: '/you' },
-            { label: 'Advisors', href: '/you/advisors' },
-            { label: 'Roster', href: '/you/advisors/advisors' },
+            { label: 'Advisors', href: '/you/board' },
+            { label: 'Roster', href: '/you/board/advisors' },
             { label: advisor.name, href: advisorHref(advisor.key) },
           ],
         }}

@@ -1020,7 +1020,7 @@ where user_id = '<user_id>' and status = 'open' and body like 'Board spread chec
 insert into public.feedback_items (user_id, kind, body, page_path)
 values ('<user_id>', 'bug',
   $n$Board spread check: the advisors' blind forecasts were within 0.15 of each other on every one-way decision for three meetings running (<the three dates>). Their slices or brains may be too alike; look at .claude/skills/board/SKILL.md step 3 and the brains in you.board_advisors.$n$,
-  '/you/advisors')
+  '/you/board')
 returning id;
 select core.record_dash_action('<user_id>', 'public.feedback_items:<id>', 'insert',
   'board_spread_note', $s$Dash filed a Dev note: the board's advisors have agreed too closely for three meetings.$s$);

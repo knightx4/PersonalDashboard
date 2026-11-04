@@ -125,7 +125,7 @@ export function TalkTab({
             placeholder={`Ask ${advisor.name} anything`}
             waiting={`${advisor.name} is writing…`}
             cost={{
-              action: 'app/you/advisors/advisors/[key]/talk-actions.ts#sendToAdvisor',
+              action: 'app/you/board/advisors/[key]/talk-actions.ts#sendToAdvisor',
               what: `Cost of each reply from ${advisor.name}`,
             }}
             ask={opener ?? undefined}

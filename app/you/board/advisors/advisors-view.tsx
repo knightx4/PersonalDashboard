@@ -390,13 +390,13 @@ function PanelRow({
         setError(result.error);
         return;
       }
-      router.push('/you/advisors');
+      router.push('/you/board');
     });
   };
   const why = running ? MEETING_RUNNING_MESSAGE : empty ? `${panel.name} has no advisors yet` : null;
   return (
     <li className="card-pad-x row-pad relative">
-      <RowLink href={`/you/advisors/advisors/panels/${panel.id}`} className="block min-h-11 hover:bg-sunken">
+      <RowLink href={`/you/board/advisors/panels/${panel.id}`} className="block min-h-11 hover:bg-sunken">
         {/* The press sits over the name line's empty right; the member line below takes the full width. */}
         <span className="block min-h-8 pr-48 text-ui text-ink">{panel.name}</span>
         <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">{members}</span>
@@ -440,7 +440,7 @@ function NewPanelRow({ create }: { create: AdvisorActions['createPanel'] }) {
         setError(result.error ?? 'The panel was not made. Try again.');
         return;
       }
-      router.push(`/you/advisors/advisors/panels/${result.panelId}`);
+      router.push(`/you/board/advisors/panels/${result.panelId}`);
     });
   };
   return (

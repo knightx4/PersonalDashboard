@@ -24,7 +24,7 @@ import {
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
 import { YouBoardDecisionPreview } from './you-board-decision-surfaces';
-import { AdvisorAvatars } from '@/app/you/advisors/advisor-avatar';
+import { AdvisorAvatars } from '@/app/you/board/advisor-avatar';
 import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
 import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
 import {
@@ -34,7 +34,7 @@ import {
   YouBoardPanelPreview,
   YouBoardAdvisorTalkPreview,
 } from './you-board-advisor-surfaces';
-import { AdvisorProfileSkeleton } from '@/app/you/advisors/board-skeleton';
+import { AdvisorProfileSkeleton } from '@/app/you/board/board-skeleton';
 import { SetTab } from './set-tab';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
@@ -3365,7 +3365,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-  { href: '/you/advisors', label: 'Advisors', icon: 'board' },
+  { href: '/you/board', label: 'Board', icon: 'board' },
 ];
 
 const triageCrumbs = [

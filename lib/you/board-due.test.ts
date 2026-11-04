@@ -45,7 +45,7 @@ describe('what the daily board notification announces (plan #2581.10)', () => {
       [{ questionId: 'q1', question: 'Take the contract?', kind: 'review', key: 'review:30' }],
       '2026-10-01',
     );
-    expect(one).toMatchObject({ title: 'How did your decision go?', url: '/you/advisors', tag: 'board-due-2026-10-01' });
+    expect(one).toMatchObject({ title: 'How did your decision go?', url: '/you/board', tag: 'board-due-2026-10-01' });
     const two = duePayload(
       [
         { questionId: 'q1', question: 'Take the contract?', kind: 'review', key: 'review:30' },

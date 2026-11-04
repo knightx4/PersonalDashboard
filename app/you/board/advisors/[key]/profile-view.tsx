@@ -444,7 +444,7 @@ function RecordTab({ record, decisions }: { record: TrackRecord | null; decision
               {decisions.map((d) => (
                 <li key={d.questionId} className="card-pad-x row-pad space-y-0.5">
                   {d.meetingId ? (
-                    <Link href={`/you/advisors/${d.meetingId}`} className="text-ui text-ink hover:text-accent">
+                    <Link href={`/you/board/${d.meetingId}`} className="text-ui text-ink hover:text-accent">
                       <span className="[overflow-wrap:anywhere]">{d.question}</span>
                     </Link>
                   ) : (

@@ -13,7 +13,7 @@ import { panelNames, type BoardPanel } from '@/lib/you/board-panels';
 import { cn } from '@/lib/cn';
 
 /**
- * Start a meeting (plan #2576.3): the Advisors tab header's second action, and the
+ * Start a meeting (plan #2576.3): the Board tab header's second action, and the
  * short card that opens under it. The person picks No panel (the usual board)
  * or one of their panels, each shown with its topic and members, and presses
  * Start. startMeeting (./actions) queues a weekly-kind meeting with the panel
@@ -27,7 +27,7 @@ export type StartActions = { start: (panelId: string | null) => Promise<{ error:
 export type StartStart = 'closed' | 'form' | 'error' | 'running';
 
 export const SAMPLE_START_ERROR =
-  'Dash could not start the meeting. The advisors routine did not answer. Try again in a minute.';
+  'Dash could not start the meeting. The board routine did not answer. Try again in a minute.';
 
 export function useStartMeeting({
   panels,
@@ -144,7 +144,7 @@ export function StartMeetingForm({
               checked={panelId === null}
               onPick={() => onPick(null)}
               title="No panel"
-              detail="The usual five advisors: the five seats, on whatever the chair takes up."
+              detail="The usual board: the five seats, on whatever the chair takes up."
               disabled={pending}
             />
             {panels.map((panel) => (

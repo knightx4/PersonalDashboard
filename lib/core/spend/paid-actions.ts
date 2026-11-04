@@ -248,7 +248,7 @@ export const PAID_ACTIONS = {
 
   // You: talking to one advisor alone, from the Talk tab of their profile
   // (plan #2581.6): their reply, then what they remember of it
-  'app/you/advisors/advisors/[key]/talk-actions.ts#sendToAdvisor': ['talk-to-advisor', 'remember-advisor-talk'],
+  'app/you/board/advisors/[key]/talk-actions.ts#sendToAdvisor': ['talk-to-advisor', 'remember-advisor-talk'],
 
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],
