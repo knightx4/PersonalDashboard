@@ -88,6 +88,7 @@ describe('runConnectorWrite', () => {
       'change_goals_inbox',
       'change_goal_list',
       'change_goal_dashboard',
+      'log_hours',
       'change_item',
       'item_lists',
       'add_items',
