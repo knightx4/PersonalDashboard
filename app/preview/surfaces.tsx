@@ -164,6 +164,12 @@ import type { Deck } from '@/lib/preview/deck';
 import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
 import {
+  QuestionMockupFailedSurface,
+  QuestionMockupLoadingSurface,
+  QuestionMockupViewerSurface,
+  QuestionMockupsSurface,
+} from './question-mockup-surfaces';
+import {
   GoalArchiveConfirmSurface,
   GoalPutAwayMenuSurface,
   GoalsAllPutAwayMenuSurface,
@@ -10841,6 +10847,41 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <LaterMenuRows />,
+  },
+  {
+    /* A question about a screen with its mockups under the options (plan
+     * #2810.2): pictures on two options, none on the third, one picture of a
+     * whole question, and a plain question unchanged. */
+    id: 'dev-question-mockups',
+    label: 'Questions · mockups under the options',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupsSurface />,
+  },
+  {
+    /* The same, with the pictures still loading. */
+    id: 'dev-question-mockups-loading',
+    label: 'Questions · mockups loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupLoadingSurface />,
+  },
+  {
+    /* The same, with pictures that will not load: the options still read. */
+    id: 'dev-question-mockups-failed',
+    label: 'Questions · mockups that will not load',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupFailedSurface />,
+  },
+  {
+    /* A picture opened full screen: phone and laptop side by side, with Open
+     * the mockup. */
+    id: 'dev-question-mockups-viewer',
+    label: 'Questions · a mockup opened full screen',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupViewerSurface />,
   },
   {
     /* The four words that close a row (plan #1957.3): Done, Drop, Later and

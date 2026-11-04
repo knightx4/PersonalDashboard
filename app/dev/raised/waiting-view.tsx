@@ -387,7 +387,7 @@ function AnswerQuestion({
 
   return (
     <div className="space-y-2">
-      <TheOptions detail={row.detail} onChoose={choose} />
+      <TheOptions detail={row.detail} onChoose={choose} itemId={row.id} />
 
       {row.resolution && <TheAnswered resolution={row.resolution} />}
 
