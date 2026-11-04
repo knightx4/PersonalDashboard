@@ -6,9 +6,10 @@ import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
  * type are the person's own results, which no agent enters for them.
  */
 export const youActions: ModuleActions = {
-  'app/you/answer/actions.ts': {
+  'app/you/ask/actions.ts': {
     answerQuestion: none('own', "An answer to a question Dash asked is the person's own words; Dash does not answer for them."),
     skipQuestion: none('own', "Skipping a question Dash asked is the person's own choice."),
+    unskipQuestion: none('own', "Asking for a skipped question again is the person's own choice."),
     editAnswer: none('own', "An answer is the person's own words; Dash does not rewrite it."),
     askDash: none('spends', 'Starts a Dash run that writes new questions, a model cost the person chooses to start with the button.'),
   },

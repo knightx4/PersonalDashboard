@@ -12,7 +12,7 @@ import type { QuestionRunState } from '@/lib/you/dash-questions-run';
 import { askDash } from './actions';
 
 /**
- * The press that has Dash write new questions on the Answer tab (plan
+ * The press that has Dash write new questions on the Ask tab (plan
  * #2617.3), and the line that says how the run is going.
  *
  * AskDash is the button, drawn in the page header while there are questions

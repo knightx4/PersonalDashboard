@@ -1,21 +1,23 @@
 'use client';
 
-import { AnswerSkeleton } from '@/app/you/answer/answer-skeleton';
-import { AnswerView, type AnswerActions, type AnswerOpen } from '@/app/you/answer/answer-view';
-import { AskDash, AskDashStatus } from '@/app/you/answer/ask-dash';
+import { AskDash, AskDashStatus } from '@/app/you/ask/ask-dash';
+import { AskSkeleton } from '@/app/you/ask/ask-skeleton';
+import { AskView, type AnswerActions, type AnswerOpen } from '@/app/you/ask/ask-view';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { DashQuestion } from '@/lib/you/dash-questions';
 import type { DashQuestionRun, QuestionRunState } from '@/lib/you/dash-questions-run';
 
 /**
- * The Answer tab in the gallery (plan #2617.2): three questions waiting,
- * four answered, two skipped, and each hidden part drawn open. The fixtures
+ * The Ask tab in the gallery (plans #2617.2 and #2635.3): three questions
+ * waiting, two under their areas and one under Other, four answered, two
+ * skipped, and each hidden part drawn open. The fixtures
  * run as long as Dash's questions and a considered answer get.
  */
 
 const actions: AnswerActions = {
   answer: async () => ({ ok: true }),
   skip: async () => ({ ok: true }),
+  unskip: async () => ({ ok: true }),
   edit: async () => ({ ok: true }),
 };
 
@@ -41,12 +43,16 @@ const open: DashQuestion[] = [
     status: 'open',
     question: 'When a week goes well, what usually happened on the Monday?',
     why: 'Your daily notes rate some weeks far higher than others, and the good ones seem to start differently.',
+    areaId: '00000000-0000-4000-8000-000000002681',
+    areaName: 'Health and energy',
   }),
   question(2, {
     status: 'open',
     question:
       'You have applied to three companies that build tools for teachers. Is education the field you want to stay in, or is it the kind of product you like making?',
     why: 'Your goals say "find a product role" without a field, and the roles you save point both ways.',
+    areaId: '00000000-0000-4000-8000-000000002682',
+    areaName: 'Career and the job search',
   }),
   question(3, {
     status: 'open',
@@ -110,11 +116,12 @@ const past = [...answered, ...skipped];
  * Which hidden part to draw, by name: the gallery's list is a server module,
  * and an id exported from this client one would reach it as a reference.
  */
-export type AnswerPart = 'edit' | 'skipped' | 'error';
+export type AnswerPart = 'edit' | 'skipped' | 'error' | 'hover';
 
 function partOpen(part: AnswerPart | undefined): AnswerOpen {
   if (part === 'edit') return { editing: answered[0].id };
-  if (part === 'skipped') return { skipped: true, answering: skipped[0].id };
+  if (part === 'skipped') return { skipped: true, answering: skipped[0].id, hover: skipped[1].id };
+  if (part === 'hover') return { hover: open[1].id };
   if (part === 'error') {
     return {
       error: {
@@ -152,7 +159,7 @@ function runState(ask: AskPart): QuestionRunState {
   return { kind: 'ready', run: { ...fixtureRun, status: 'ready', runUrl: null } };
 }
 
-export function YouAnswerPreview({
+export function YouAskPreview({
   part,
   empty = false,
   noneOpen = false,
@@ -168,10 +175,11 @@ export function YouAnswerPreview({
 }) {
   const run = runState(ask);
   return (
-    <AnswerView
+    <AskView
       open={empty || noneOpen ? [] : open}
       past={empty ? [] : past}
       timezone="Europe/Dublin"
+      nextAsk={empty || noneOpen ? '5 Nov' : null}
       actions={actions}
       show={partOpen(part)}
       ask={<AskDash run={run} available onAsk={async () => ({ error: null })} />}
@@ -186,6 +194,6 @@ export function YouAnswerPreview({
   );
 }
 
-export function YouAnswerLoadingPreview() {
-  return <AnswerSkeleton />;
+export function YouAskLoadingPreview() {
+  return <AskSkeleton />;
 }
