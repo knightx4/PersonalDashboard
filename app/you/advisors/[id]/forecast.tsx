@@ -378,7 +378,7 @@ function SpreadCard({
             <ul className="flex flex-wrap items-center gap-2" aria-label="Still answering">
               {waiting.map((a) => (
                 <li key={a.id} className="flex items-center gap-1.5 text-small text-ink-muted">
-                  <span className="rounded-full border border-dashed border-border-strong p-0.5 opacity-60">
+                  <span /* ui-ok: a hollow mark for an advisor still answering, not a grouping box */ className="rounded-full border border-dashed border-border-strong p-0.5 opacity-60">
                     <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
                   </span>
                   {a.name}
@@ -409,7 +409,7 @@ function SpreadCard({
                 <p className="flex flex-wrap items-baseline gap-x-2 text-ui">
                   <Link
                     href={advisorDecisionHref(f.advisor.key, question.id)}
-                    className="font-medium text-ink transition-colors duration-quick hover:text-accent"
+                    className="press-area rounded-control font-medium text-ink transition-colors duration-quick hover:text-accent"
                   >
                     {f.advisor.name}
                   </Link>
