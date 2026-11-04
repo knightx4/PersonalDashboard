@@ -136,7 +136,7 @@ export function MessageGroup({
     <div
       data-from={from}
       className={cn(
-        'mb-2 flex max-w-xs flex-col gap-0.5 sm:max-w-md',
+        'mb-2 flex max-w-[80%] flex-col gap-0.5 sm:max-w-md',
         from === 'you' ? 'items-end self-end' : 'items-start self-start',
       )}
     >

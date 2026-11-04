@@ -481,6 +481,9 @@ export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' | 
             startWriting
             initialDraft={draft}
             boxStart={start}
+            // The workspaces menu is the Chat page's box, which draws your
+            // questions as bubbles (plan #2748.12).
+            bubbles={open === 'workspaces'}
           />
         </Card>
       </PageColumn>

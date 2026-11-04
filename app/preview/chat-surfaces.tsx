@@ -77,7 +77,7 @@ export const CHAT_MENTORS: Mentor[] = [
   mentor({
     id: 'm5',
     key: 'richard-feynman-and-the-art-of-explaining-things-simply',
-    name: 'Richard Feynman, on explaining things simply to anyone',
+    name: 'Richard Feynman',
     kind: 'guest',
     question: 'Can you explain it to a twelve-year-old?',
     canTalk: false,
