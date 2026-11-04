@@ -245,7 +245,9 @@ export const youSources: ModuleSources = {
       href: () => '/you/council',
       section: BOARD,
       page: null,
-      note: 'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).',
+      note:
+        'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029). ' +
+        'kind is direct or group; a group has a null advisor_id and its bots in you.advisor_chat_members, and title is the name they gave it or null (you 0042).',
     },
     {
       table: 'you.advisor_messages',
@@ -261,7 +263,8 @@ export const youSources: ModuleSources = {
       parent: parentBy('chat_id', 'you.advisor_chats'),
       note:
         'role is person (what they said) or advisor (written by Dash in the advisor\'s voice), so cite only role person as theirs. ' +
-        'chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038).',
+        'chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038). ' +
+        'speaker_id is the bot that wrote an advisor message in a group chat (you 0042).',
     },
     {
       table: 'you.advisor_episodes',
@@ -282,6 +285,14 @@ export const youSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'you.advisor_chat_members',
+      reason: 'Join rows naming which bots are in a group chat and whether each is typing; what was said is in you.advisor_messages.',
+    },
+    {
+      table: 'you.advisor_message_reactions',
+      reason: "A bot's tap back on a message in a group, written by Dash in the bot's voice; nothing the person wrote or did.",
+    },
     {
       table: 'you.course_overviews',
       reason:

@@ -284,6 +284,13 @@ export const SPEND_OPERATIONS = {
     // The mentor's one-line first text when the reply has not started after
     // about three seconds (plan #2748.4). One Haiku call, background.
     'mentor-ack',
+    // Who speaks next in a group chat, or wait for the person (plan
+    // #2879.1.2). One Haiku call when the person writes and one after each
+    // round of bots, at most three a burst.
+    'group-director',
+    // One bot's text in a group chat (plan #2879.1.2): the model chosen for
+    // Dash, no lookups, at most six a message from the person.
+    'group-speaker',
     // A persona card drafted from the People form, or redrafted from a
     // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
     'draft-persona',

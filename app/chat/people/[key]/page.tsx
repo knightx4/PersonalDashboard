@@ -1,28 +1,19 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { todayInTimezone } from '@/lib/money';
 import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import { createYouClient } from '@/lib/you/auth/server';
-import { loadPeople, loadThreadPage, type ThreadPage } from '@/lib/you/chat-threads';
-import { loadPersonCard } from '@/lib/you/people-cards';
-import {
-  correctPersonMemory,
-  draftPersonCard,
-  olderMessages,
-  readThread,
-  removePersonMemory,
-  retryReply,
-  savePersonCard,
-  threadChanges,
-} from '../../actions';
+import { loadPeople, loadThreadPage, withChats, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadGroupRows } from '@/lib/you/group-chats';
+import { editHref } from '@/lib/you/people-cards-model';
+import { olderMessages, readThread, retryReply, threadChanges } from '../../actions';
 import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '../../dash/actions';
 import { PeopleView } from '../../people-view';
-import { PersonForm } from '../person-form';
 import { ThreadView } from './thread-view';
 
-export const metadata = { title: 'People' };
+export const metadata = { title: 'Messages' };
 export const dynamic = 'force-dynamic';
 
 const KEY = /^[a-z0-9_-]{1,80}$/;
@@ -33,10 +24,10 @@ function readAt(): number {
 }
 
 /**
- * One thread on Chat's People tab (plan #2748.6): the list beside it on a
+ * One thread on Chat's Messages tab (plan #2748.6): the list beside it on a
  * laptop, the thread alone on a phone. It opens on the newest fifty messages;
- * the view pages back from there. `?edit=1` opens the form for editing them
- * in the thread's place (plan #2748.11).
+ * the view pages back from there. Their form is on the Bots tab now (plan
+ * #2879.3), so the old `?edit=1` goes there.
  */
 export default async function ChatThreadPage({
   params,
@@ -47,27 +38,15 @@ export default async function ChatThreadPage({
 }) {
   const [{ key }, { edit }] = await Promise.all([params, searchParams]);
   if (!KEY.test(key)) notFound();
+  if (edit === '1') redirect(editHref(key));
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
-  const [rows, settings] = await Promise.all([loadPeople(client, user.id), loadAccountSettings(user.id)]);
-  const person = rows.find((r) => r.key === key);
+  const [everyone, groups, settings] = await Promise.all([loadPeople(client, user.id), loadGroupRows(client, user.id), loadAccountSettings(user.id)]);
+  // The list beside it holds only the chats there are (plan #2879.2), and this thread's row; the thread opens for anyone on the roster.
+  const rows = withChats(everyone, key);
+  const person = everyone.find((r) => r.key === key);
   if (!person) notFound();
-  if (edit === '1') {
-    const card = await loadPersonCard(client, user.id, key);
-    if (!card) notFound();
-    return (
-      <PeopleView rows={rows} current={key} timezone={settings.timezone} now={now}>
-        <PersonForm
-          key={`${card.id}-${card.persona.length}`}
-          card={card}
-          timezone={settings.timezone}
-          now={now}
-          actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory }}
-        />
-      </PeopleView>
-    );
-  }
   // What they did in the thread is drawn as cards with its presses (plan #2854.2.1).
   const chatId = person.chatId;
   const [page, changes]: [ThreadPage, DashChange[]] = chatId
@@ -83,7 +62,7 @@ export default async function ChatThreadPage({
       ])
     : [{ messages: [], hasOlder: false }, []];
   return (
-    <PeopleView rows={rows} current={key} timezone={settings.timezone} now={now}>
+    <PeopleView rows={rows} groups={groups} current={key} timezone={settings.timezone} now={now}>
       <ThreadView
         key={person.id}
         person={person}

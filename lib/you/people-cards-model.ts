@@ -250,11 +250,14 @@ export function newPersonCard(taken: readonly string[]): PersonCard {
   };
 }
 
-/** Where the form is. */
+/** Chat's Bots tab (plan #2879.3): every bot A to Z, with the form beside the list. */
+export const BOTS_HREF = '/chat/bots';
+
+/** Where a bot's form is: its row on the Bots tab. */
 export function editHref(key: string): string {
-  return `/chat/people/${key}?edit=1`;
+  return `${BOTS_HREF}/${key}`;
 }
-export const ADD_HREF = '/chat?add=1';
+export const ADD_HREF = `${BOTS_HREF}?add=1`;
 
 /**
  * Whether a mentor can text: a seat always, a guest once Dash has built their

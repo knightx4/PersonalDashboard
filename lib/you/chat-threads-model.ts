@@ -22,7 +22,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -36,6 +36,8 @@ export type ThreadMessage = {
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
+  /** In a group, the bot that wrote it (plan #2879.1.3); null or absent elsewhere. */
+  speakerId?: string | null;
 };
 
 /** A page of a thread, oldest first, and whether there is more before it. */
@@ -59,6 +61,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     createdAt: str(row.created_at),
     deliveredAt: strOrNull(row.delivered_at),
     readAt: strOrNull(row.read_at),
+    speakerId: strOrNull(row.speaker_id),
   };
 }
 
@@ -178,6 +181,41 @@ export function previewOf(row: PersonRow, now: number): string {
   return row.canTalk ? 'Say hello' : 'Not ready to talk yet';
 }
 
+/**
+ * The Messages list (plan #2879.2): only the people and bots you have a chat
+ * with. Everyone else is reached through New message, which starts one.
+ */
+export function withChats(rows: readonly PersonRow[], open: string | null = null): PersonRow[] {
+  // The open thread keeps a row, lit, even before it has a chat, so the list
+  // always says whose thread is beside it.
+  return rows.filter((r) => r.chatId !== null || r.key === open);
+}
+
+/** Who New message offers, A to Z: everyone, those ready to talk first. */
+export function recipientsOf(rows: readonly PersonRow[]): PersonRow[] {
+  return [...rows].sort((a, b) => Number(b.canTalk) - Number(a.canTalk) || a.name.localeCompare(b.name));
+}
+
+/** The Bots tab's list (plan #2879.3): every bot on the roster, A to Z by name, chat or none. */
+export function botsOf(rows: readonly PersonRow[]): PersonRow[] {
+  return [...rows].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+}
+
+/** The quiet line under a bot's name on the Bots tab: what it is for, or that it cannot talk yet. */
+export function botLineOf(row: Pick<PersonRow, 'about' | 'canTalk'>): string {
+  if (row.canTalk) return row.about;
+  return row.about ? `${row.about} · not ready to talk yet` : 'Not ready to talk yet';
+}
+
+/** Who New message shows for what is typed in its To box: a name holding those letters. */
+export function filterRecipients(rows: readonly PersonRow[], typed: string): PersonRow[] {
+  const q = typed.trim().toLowerCase();
+  return q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : [...rows];
+}
+
+/** Where New message opens: the picker of who to message, in the thread's place. */
+export const NEW_MESSAGE_HREF = '/chat?new=1';
+
 /** Where a person's thread is. */
 export function threadHref(key: string): string {
   return `/chat/people/${key}`;
@@ -265,7 +303,7 @@ export type SearchHit = {
 
 export type ThreadBlock =
   | { kind: 'day'; key: string; label: string }
-  | { kind: 'group'; key: string; from: 'you' | 'them'; messages: ThreadMessage[] };
+  | { kind: 'group'; key: string; from: 'you' | 'them'; messages: ThreadMessage[]; speakerId?: string | null };
 
 /**
  * The thread as it is drawn: a day label wherever the day changes, and
@@ -286,8 +324,10 @@ export function threadBlocks(messages: readonly ThreadMessage[], options: { time
     }
     const from = m.role === 'person' ? 'you' : 'them';
     const at = Date.parse(m.createdAt);
-    if (!group || group.from !== from || at - lastAt > GROUP_GAP_MS) {
-      group = { kind: 'group', key: `group-${m.id}`, from, messages: [] };
+    // In a group a run is one bot's: a different bot starts a new one (plan #2879.1.3).
+    const speakerId = from === 'them' ? (m.speakerId ?? null) : null;
+    if (!group || group.from !== from || (group.speakerId ?? null) !== speakerId || at - lastAt > GROUP_GAP_MS) {
+      group = { kind: 'group', key: `group-${m.id}`, from, messages: [], speakerId };
       out.push(group);
     }
     group.messages.push(m);
