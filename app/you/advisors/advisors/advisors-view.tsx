@@ -33,7 +33,7 @@ import { useRefreshWhileRunning } from '../refresh-while-running';
  * The Advisors view of the Board tab (plan #2561.7), on the list pattern: the
  * header with its one action, Add advisor, then one surface in two groups.
  * The five seats come first and always sit. Under them every guest: a persona
- * Dash builds from a person's public work, marked as an AI impression, with
+ * Dash builds from a person's public work, marked as AI impressions, with
  * the question they own, the state of their brain and a switch for whether
  * the chair may bring them in. A guest whose brain is being built shows it;
  * one that failed says why and offers a retry.
@@ -225,7 +225,11 @@ export function AdvisorsView({
               />
             ))}
           </Group>
-          <Group title="Guests" count={guests.length}>
+          <Group
+            title="Guests"
+            count={guests.length}
+            note={<Chip size="sm">AI impressions</Chip>}
+          >
             {guests.map((advisor) => (
               <AdvisorRow
                 key={advisor.id}
@@ -246,10 +250,13 @@ export function AdvisorsView({
 function Group({
   title,
   count,
+  note,
   children,
 }: {
   title: string;
   count: number;
+  /** A word beside the heading on everything in the group, as the guests are AI impressions. */
+  note?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -258,9 +265,12 @@ function Group({
         defaultOpen
         remember={`you.board.advisors.fold.${title}`}
         title={
-          <SectionLabel as="span" count={count}>
-            {title}
-          </SectionLabel>
+          <span className="inline-flex items-center gap-2">
+            <SectionLabel as="span" count={count}>
+              {title}
+            </SectionLabel>
+            {note}
+          </span>
         }
         summaryClassName="card-pad-x rounded-none pb-1 pt-3"
         bodyClassName=""
@@ -348,13 +358,6 @@ function AdvisorRow({
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui text-ink">
             <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
-            {guest && (
-              <Tooltip label="A persona Dash built from their public work, not the person">
-                <Chip size="sm" tabIndex={0}>
-                  AI impression
-                </Chip>
-              </Tooltip>
-            )}
             <BrainStatus state={state} />
           </span>
           <span className="mt-0.5 block text-small text-ink-muted [overflow-wrap:anywhere]">
