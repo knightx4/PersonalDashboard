@@ -144,7 +144,22 @@ export type PersonRow = {
   unread: boolean;
   typingUntil: string | null;
   lastReadAt: string | null;
+  /**
+   * Why the reply to the person's last message could not be written (plan
+   * #2854.4), from you.advisor_chats.reply_status 'failed'; null or absent
+   * when nothing failed. The thread says so with Try again.
+   */
+  replyFailed?: string | null;
 };
+
+/** Said when a failed reply kept no reason. */
+export const MENTOR_REPLY_FAILED = 'The reply could not be written.';
+
+/** The failure a thread shows, from the chat's reply columns; null unless the reply failed. */
+export function replyFailedOf(row: { reply_status?: unknown; reply_error?: unknown }): string | null {
+  if (row.reply_status !== 'failed') return null;
+  return (typeof row.reply_error === 'string' && row.reply_error.trim()) || MENTOR_REPLY_FAILED;
+}
 
 /** Newest thread first; people with nothing said yet after them, by name. */
 export function sortPeople(rows: readonly PersonRow[]): PersonRow[] {

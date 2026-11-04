@@ -910,7 +910,14 @@ export function DashPageSurface({
   modelStart,
   sessions,
   session,
+  reply,
 }: {
+  /**
+   * The last question's reply as the server holds it when the chat is opened
+   * (plan #2854.4): still being written after the page that asked was left,
+   * or failed, with Try again.
+   */
+  reply?: 'answering' | 'failed';
   /** Threads with Claude Code sessions in the list (plan #2789.7). */
   sessions?: SessionThread[];
   /** A session thread open beside the list in place of a chat, with its id (plan #2789.7). */
@@ -943,7 +950,10 @@ export function DashPageSurface({
             createdAt: open.lastAt,
           },
         ]
-      : dashPageTurns(open.title ?? '');
+      : reply
+        ? // The second question's answer is not in yet, or did not come.
+          dashPageTurns(open.title ?? '').filter((turn) => turn.id !== 'a2')
+        : dashPageTurns(open.title ?? '');
   const none = list === 'empty' || list === 'failed' || list === 'loading';
   const opened = chat !== 'new' && !none && !session;
   return (
@@ -1022,7 +1032,14 @@ export function DashPageSurface({
                 id="dash-page-preview"
                 conversationRef={open.ref}
                 turns={turns}
-                changes={DASH_CHAT_CHANGES}
+                changes={reply ? [] : DASH_CHAT_CHANGES}
+                reply={
+                  reply === 'answering'
+                    ? { state: 'answering', startedAt: chatAt(CHAT_TODAY, 10) }
+                    : reply === 'failed'
+                      ? { state: 'failed', error: 'Dash stopped before the answer was written.' }
+                      : null
+                }
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 dock

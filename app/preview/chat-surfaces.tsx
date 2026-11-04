@@ -198,7 +198,10 @@ export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'em
   );
 }
 
-type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'new' | 'not-ready' | 'loading';
+type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'reply-failed' | 'new' | 'not-ready' | 'loading';
+
+/** Their reply that could not be written (plan #2854.4), as the thread says it. */
+const REPLY_FAILED_WHY = 'Benjamin Franklin could not reply: the answer was cut off. Nothing was lost.';
 
 /** One thread open beside the list, in each of its states. */
 export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState }) {
@@ -209,7 +212,14 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
       </ChatShell>
     );
   }
-  const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
+  const who =
+    state === 'new'
+      ? CHAT_PEOPLE[4]
+      : state === 'not-ready'
+        ? CHAT_PEOPLE[5]
+        : state === 'reply-failed'
+          ? { ...FRANKLIN, replyFailed: REPLY_FAILED_WHY }
+          : FRANKLIN;
   const rows = CHAT_PEOPLE.map((r) =>
     state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
   );

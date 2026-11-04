@@ -4,6 +4,7 @@ import { AskThread, useAskDash } from '@/components/shell/ask-dash';
 import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
 import type { ChangePresses } from '@/components/talk/dash-changes';
 import type { DashChange, MadeChange } from '@/lib/talk/changes';
+import type { ReplyState } from '@/lib/talk/reply-state';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
@@ -140,6 +141,7 @@ export function AskConversation({
   turns,
   changes,
   openHandoffs,
+  reply = null,
   used,
   archived = false,
   crumbs,
@@ -153,6 +155,8 @@ export function AskConversation({
   turns: TalkTurn[];
   changes: DashChange[];
   openHandoffs?: number;
+  /** The reply to the last question, still being written or failed (plan #2854.4). */
+  reply?: ReplyState;
   used: ChatUsedData;
 }) {
   const router = useRouter();
@@ -175,6 +179,7 @@ export function AskConversation({
       turns={turns}
       changes={changes}
       openHandoffs={openHandoffs}
+      reply={reply}
       onAnswered={() => router.refresh()}
       label="Ask a follow-up"
       placeholder="Ask more about this"

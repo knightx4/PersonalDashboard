@@ -26,6 +26,7 @@ import {
   mergeMessages,
   personInitials,
   receiptOf,
+  replyFailedOf,
   threadBlocks,
   threadDetail,
   threadMessageOf,
@@ -46,6 +47,9 @@ import { editHref } from '@/lib/you/people-cards-model';
  * - The mentor's messages and the receipts on yours (Delivered, then Read)
  *   arrive over Realtime on you.advisor_messages, and their typing on
  *   you.advisor_chats.typing_until, so nothing waits for a reload.
+ * - The reply is written on the server, so leaving does not stop it; one
+ *   that failed (advisor_chats.reply_status) says so under your message,
+ *   with Try again (plan #2854.4).
  */
 
 export type ThreadActions = {
@@ -53,12 +57,15 @@ export type ThreadActions = {
   older: (chatId: string, before: string) => Promise<ThreadPage | { error: string }>;
   /** Reading the thread, as having it open does. */
   read: (chatId: string, advisorId: string) => Promise<void>;
+  /** Try again on a reply that failed (plan #2854.4): the mentor answers your last message once more. */
+  retryReply?: (chatId: string, advisorId: string) => Promise<{ error: string | null }>;
 };
 
-/** What the gallery reads with: nothing further back, and reading changes nothing. */
+/** What the gallery reads with: nothing further back, and reading and trying again change nothing. */
 const NO_ACTIONS: ThreadActions = {
   older: async () => ({ messages: [], hasOlder: false }),
   read: async () => {},
+  retryReply: async () => ({ error: null }),
 };
 
 type Pending = { id: string; text: string; at: string; failed: string | null };
@@ -120,6 +127,10 @@ export function ThreadView({
   const [heardTyping, setTypingUntil] = useState<string | null | undefined>(undefined);
   const typingUntil = heardTyping === undefined ? initialTyping : heardTyping;
   const [pending, setPending] = useState<Pending[]>(initialPending);
+  // Why the reply failed, as Realtime last said or as the server drew it (plan #2854.4).
+  const [heardFailed, setReplyFailed] = useState<string | null | undefined>(undefined);
+  const replyFailed = heardFailed === undefined ? (person.replyFailed ?? null) : heardFailed;
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [now, setNow] = useState(start);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -151,6 +162,7 @@ export function ThreadView({
       .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chats', filter: `id=eq.${chatId}` }, (event) => {
         const next = (event.new ?? {}) as Record<string, unknown>;
         setTypingUntil(typeof next.typing_until === 'string' ? next.typing_until : null);
+        if ('reply_status' in next) setReplyFailed(replyFailedOf(next));
       })
       .subscribe();
     return () => {
@@ -273,10 +285,27 @@ export function ThreadView({
     void send(again);
   };
 
+  const retryReply = async () => {
+    const tryAgain = act.current.retryReply;
+    if (!chatId || !tryAgain) return;
+    setReplyFailed(null);
+    setRetryError(null);
+    atFoot.current = true;
+    setTypingUntil(new Date(Date.now() + 15_000).toISOString());
+    const outcome = await tryAgain(chatId, person.id).catch(() => ({ error: 'Not sent. Check your connection.' }));
+    if (outcome.error) {
+      setTypingUntil(null);
+      setRetryError(outcome.error);
+    }
+  };
+
   const typing = isTyping(typingUntil, now);
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
   const empty = messages.length === 0 && pending.length === 0;
+  // A failed reply is said under your last message, while nothing newer is on its way.
+  const failedNote =
+    !typing && pending.length === 0 && messages.at(-1)?.role === 'person' ? (retryError ?? replyFailed) : null;
 
   return (
     <MessagingThread
@@ -374,6 +403,21 @@ export function ThreadView({
             </div>
           ))}
         </MessageGroup>
+      )}
+      {failedNote && (
+        <div role="alert" className="flex flex-col items-start">
+          <MessageNote tone="danger">
+            {failedNote}
+            {actions.retryReply && chatId && (
+              <>
+                {' '}
+                <button type="button" onClick={() => void retryReply()} className="font-medium text-accent hover:underline">
+                  Try again
+                </button>
+              </>
+            )}
+          </MessageNote>
+        </div>
       )}
       {typing && <TypingBubble name={person.name} />}
     </MessagingThread>
