@@ -497,6 +497,7 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
+import { SessionThreadSurface } from './chat-session-surfaces';
 import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
 import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
@@ -8858,6 +8859,54 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'page',
     render: () => <DashPageSurface list="loading" />,
+  },
+  {
+    /* A conversation with a Claude Code session (plan #2789.7): the project first, opening it, then where the thread stands with Open in Claude, the turns with a file, a mockup card and an answered question, and the box closed until pressed. The list shows session threads above the chats. */
+    id: 'chat-session',
+    label: 'Dash · A session thread open beside the list',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="open" />,
+  },
+  {
+    /* The working line (plan #2789.7): your message sent, and under it what the session last reported while the reply is to come. */
+    id: 'chat-session-working',
+    label: 'Dash · A session thread, a reply on its way',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="working" />,
+  },
+  {
+    /* A question from the session (plan #2789.7) with its options as buttons; one press answers it. */
+    id: 'chat-session-question',
+    label: 'Dash · A session thread, a question to answer',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="question" />,
+  },
+  {
+    /* The attach sheet (plan #2789.7): the box open with the paperclip pressed, a file chosen, and what kinds of file it takes. */
+    id: 'chat-session-attach',
+    label: 'Dash · A session thread, the attach sheet',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="attach" />,
+  },
+  {
+    /* A new thread (plan #2789.7), as Talk about this project opens it: the project picked, and the prompt to say what to work on. */
+    id: 'chat-session-empty',
+    label: 'Dash · A new session thread',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="empty" />,
+  },
+  {
+    /* A message that could not be sent (plan #2789.7): kept in the thread, marked, with Try again. */
+    id: 'chat-session-failed',
+    label: 'Dash · A session thread, a send that failed',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="failed" />,
   },
   {
     /* Chat's People tab (plan #2748.1), where Chat opens: each mentor as a

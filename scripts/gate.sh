@@ -41,6 +41,10 @@ export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
 # check (next.config.ts), as CI's does.
 export SKIP_BUILD_TYPECHECK=1
 
+# CI gives the typecheck an 8 GB heap (.github/workflows/ci.yml); without it
+# tsc runs out of memory on this repository before it finishes.
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
+
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
 

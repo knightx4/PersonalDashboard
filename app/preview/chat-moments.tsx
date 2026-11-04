@@ -5,6 +5,7 @@ import { PeopleView } from '@/app/chat/people-view';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
 import { prefersReducedMotion } from '@/components/motion/reduced';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import type { PersonRow, ThreadMessage } from '@/lib/you/chat-threads-model';
 
 /**
@@ -115,16 +116,29 @@ function GalleryButton({
   over?: boolean;
   children: React.ReactNode;
 }) {
+  // Down is drawn from the pointer's own event, so the frame the finger lands in already shows the press.
+  const [down, setDown] = useState(false);
   return (
     // Over the bar it sits clear of Edit: on a phone on the way-back row above the name, on a laptop to Edit's left.
+    // Quiet grey text with no outline there, so nothing in the bar is heavier than the person's name.
     <div
       className={
         over
-          ? 'fixed top-[calc(env(safe-area-inset-top)+5rem)] right-8 z-status min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
+          ? 'fixed top-[calc(env(safe-area-inset-top)+5.25rem)] right-8 z-status min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
           : 'mb-3'
       }
     >
-      <Button variant="secondary" size="sm" className="active:bg-sunken" data-motion-demo={demo} onClick={onClick}>
+      <Button
+        variant={over ? 'ghost' : 'secondary'}
+        size="sm"
+        className={cn('active:bg-sunken', down && 'bg-sunken text-ink')}
+        data-motion-demo={demo}
+        onPointerDown={() => setDown(true)}
+        onPointerUp={() => setDown(false)}
+        onPointerLeave={() => setDown(false)}
+        onPointerCancel={() => setDown(false)}
+        onClick={onClick}
+      >
         {children}
       </Button>
     </div>

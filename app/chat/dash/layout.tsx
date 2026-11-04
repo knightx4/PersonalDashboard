@@ -5,6 +5,10 @@ import { todayInTimezone } from '@/lib/money';
 import { listAskChatsInRequest, loadAskMadeChanges } from '@/lib/talk/ask-request';
 import type { AskChat } from '@/lib/talk/ask-chats';
 import type { MadeChange } from '@/lib/talk/changes';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { listSessionThreads } from '@/lib/core/session-threads';
+import type { SessionThread } from '@/lib/core/session-threads-model';
+import { loadProjectsForRequest } from '@/lib/plan/request-plan';
 import { ChatsListSkeleton, DashChatsFrame, DashChatsList } from './view';
 
 /**
@@ -33,7 +37,7 @@ export default function DashChatsLayout({ children }: { children: React.ReactNod
 async function ReadChats() {
   const user = await requireUser();
   const settings = await loadAccountSettings(user.id);
-  const [chats, made] = await Promise.all([
+  const [chats, made, sessions] = await Promise.all([
     listAskChatsInRequest(settings.timezone).then(
       (found): { chats: AskChat[]; failed?: true } => ({ chats: found }),
       (error: unknown) => {
@@ -48,6 +52,14 @@ async function ReadChats() {
         return { changes: [], failed: true as const };
       },
     ),
+    // The conversations with Claude Code sessions (plan #2789.7).
+    (async () => listSessionThreads(await createCoreClient(), user.id, await loadProjectsForRequest(user.id)))().then(
+      (threads): { threads: SessionThread[]; failed?: true } => ({ threads }),
+      (error: unknown) => {
+        console.error('session threads were not read', error);
+        return { threads: [], failed: true as const };
+      },
+    ),
   ]);
   return (
     <DashChatsList
@@ -56,6 +68,8 @@ async function ReadChats() {
       today={todayInTimezone(settings.timezone)}
       made={made.changes}
       madeFailed={made.failed}
+      sessions={sessions.threads}
+      sessionsFailed={sessions.failed}
     />
   );
 }

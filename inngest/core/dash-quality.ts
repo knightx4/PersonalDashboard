@@ -13,6 +13,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { answerQuestion } from '@/lib/dash/ask';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
 import { searchMail } from '@/lib/inbox/search-mail';
@@ -28,7 +29,8 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  *
  * Each case is asked as Ask asks it (answerQuestion with the person's chosen
  * model and every workspace they have on), with three differences: no write,
- * proposal, paid press or hand-off is offered, so the run changes nothing;
+ * proposal or hand-off is offered, and a paid press is checked but never kept
+ * (lib/dash/quality/rehearse-paid.ts), so the run changes and spends nothing;
  * nothing is kept in their chats; and the lookups read through service-role
  * clients, since there is no session. Every lookup filters by the user id it
  * is given (AskContext), and the only id given is the owner's.
@@ -117,6 +119,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         turns: [{ role: 'user', body: question }],
         today,
         execute: (name, args) => executeAskTool(name, args, ctx),
+        queue: rehearsePaid(ctx),
         anthropicApiKey: apiKey,
         model,
         onSpend: (report) => spent.push(report),

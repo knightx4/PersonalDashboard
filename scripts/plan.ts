@@ -138,7 +138,7 @@ import {
   storedScopeOf,
   type DevProject,
 } from '../lib/plan/projects';
-import { endsWithBuiltLine } from '../lib/plan/built';
+import { builtBeneathExpiries, endsWithBuiltLine } from '../lib/plan/built';
 import { landNowLine } from '../lib/plan/land';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
@@ -1987,11 +1987,11 @@ async function main(): Promise<void> {
         )
         select id, number, comment, commit_sha from plan_items
         where id in (select id from tree) and user_id = ${userId}
-          and status = 'in_progress' and commit_sha is not null
+          and status in ('in_progress', 'not_started') and commit_sha is not null
         order by position, created_at`;
-      const built = rows.filter((row) => {
-        return endsWithBuiltLine(row.comment as string | null);
-      });
+      // A step the sweep took back before #2815.1 is not started, with a
+      // claim-expired line under its Built one; it lands like any other.
+      const built = rows.filter((row) => builtBeneathExpiries(row.comment as string | null));
       if (built.length === 0) fail(`Nothing under ${ref(item.number)} is marked built.`);
 
       const stamp = new Date().toISOString().slice(0, 10);
