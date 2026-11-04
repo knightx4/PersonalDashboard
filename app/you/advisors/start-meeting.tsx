@@ -67,10 +67,11 @@ export function useStartMeeting({
     });
   };
 
+  // Quiet, like Roster beside it, so Ask the advisors is the header's one button (plan #2581.3's critic).
   const button = (
     <Button
       type="button"
-      variant="secondary"
+      variant="ghost"
       onClick={() => {
         setError(null);
         setOpen((current) => !current);
