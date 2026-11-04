@@ -303,6 +303,7 @@ describe('a write call', () => {
     expect(calls.runConnectorWrite.mock.calls[0][1]).toEqual({
       ...writeCtx,
       account: { enabledModules: session.ctx.enabledModules, today: session.ctx.today, timezone: session.ctx.timezone },
+      lookups: session.ctx,
     });
     expect(calls.executeAskTool).not.toHaveBeenCalled();
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);

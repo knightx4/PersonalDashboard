@@ -48,6 +48,12 @@ export function VerdictCard({
       <p className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
         {recommended ? `The council recommends ${recommended}` : 'The council did not settle on one option'}
       </p>
+      {verdict.recommended && typeof verdict.probability?.[verdict.recommended] === 'number' && (
+        <p className="tabular text-ui text-ink-muted">
+          {Math.round(verdict.probability[verdict.recommended] * 100)}% likely to meet your measure,
+          weighted by each advisor’s track record.
+        </p>
+      )}
       {verdict.conditions.length > 0 && (
         <VerdictList title="On these conditions" items={verdict.conditions} />
       )}
@@ -60,7 +66,11 @@ export function VerdictCard({
           <ul className="space-y-1.5">
             {verdict.dissent.map((d) => (
               <li key={d.advisor} className="text-body text-ink [overflow-wrap:anywhere]">
-                <span className="font-medium">{nameOf(d.advisor)}</span>: {d.text}
+                <span className="font-medium">
+                  {nameOf(d.advisor)}
+                  {d.option ? `, for ${d.option}` : ''}
+                </span>
+                : {d.text}
               </li>
             ))}
           </ul>
