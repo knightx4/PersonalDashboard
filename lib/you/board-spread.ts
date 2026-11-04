@@ -274,7 +274,7 @@ export function rangeText(range: ForecastRange, short = false, unit = true): str
   const n = (v: number) =>
     short && Math.abs(v) >= 1000
       ? new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v)
-      : v.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+      : new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(v);
   const span =
     range.low === range.high
       ? n(range.low)

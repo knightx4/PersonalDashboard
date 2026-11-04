@@ -509,7 +509,7 @@ function DotPopover({
         </div>
         <Tooltip label="Close" align="end">
           <IconButton label="Close" size="sm" onClick={onClose}>
-            <X aria-hidden />
+            <X aria-hidden strokeWidth={1.75} />
           </IconButton>
         </Tooltip>
       </div>
