@@ -11,7 +11,7 @@ import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
-import { SONNET } from '@/lib/core/models';
+import { OPUS, SONNET } from '@/lib/core/models';
 import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
@@ -491,6 +491,94 @@ export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' | 
   );
 }
 
+
+/** The mockup a thought-through answer drew in the gallery: the box's foot, before and after. */
+const THINK_MOCKUP_HTML = `<style>
+.w{padding:16px;display:grid;gap:12px;font:14px/1.4 system-ui,sans-serif;color:#1c1c1c} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.box{border:1px solid #d9d6d0;border-radius:12px;padding:10px 12px;background:#fff} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.q{color:#8a867f;margin-bottom:10px} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.c{border:1px solid #d9d6d0;border-radius:999px;padding:2px 10px;font-size:12px;color:#5c5852} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.on{background:#e8eefc;border-color:#e8eefc;color:#2f55c8} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.k{font-size:12px;color:#8a867f} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+</style>
+<div class="w">
+<div class="k">Today</div>
+<div class="box"><div class="q">Ask Dash</div><div class="foot"><span class="c">Everything</span><span class="c">Sonnet</span></div></div>
+<div class="k">With the switch on</div>
+<div class="box"><div class="q">Ask Dash</div><div class="foot"><span class="c">Everything</span><span class="c on">Think it through</span></div></div>
+</div>`;
+
+const THINK_QUESTION = 'Should the model chip move into the box foot, or stay in settings?';
+
+const THINK_ANSWER = `**What the code does now.** The chip sits in the box's foot beside the scope chip (components/talk/model-chip.tsx), and the pick is saved on your account, so it already follows you from the popup to the Dash page.
+
+**The two ways.**
+- **Keep it in the foot.** One press to change it per question, which is when the choice matters. It costs a chip's width on a phone.
+- **Move it to settings.** A cleaner foot, but a question that needs Opus means leaving the chat.
+
+**What I would do.** Keep it in the foot, and let "Think it through" stand in for it when that is on, as in the mockup. The choice is made per question, so it belongs where the question is written.`;
+
+/**
+ * "Think it through" on Dash's box (plan #2789.10), on the chat's card at
+ * reading width: the switch on with a question typed, or a thought-through
+ * answer under it with the mockup it drew and the line saying what it cost,
+ * or one with no mockup and the cost line alone.
+ */
+export function AskThinkSurface({ part }: { part: 'on' | 'mockup' | 'cost' }) {
+  const at = '2026-11-04T09:00:00Z';
+  const turns: TalkTurn[] =
+    part === 'on'
+      ? [
+          { id: 'k-q', role: 'user', body: 'Which model is answering me now?', createdAt: at },
+          { id: 'k-a', role: 'assistant', body: 'Sonnet, the one picked on the chip in the box.', createdAt: at },
+        ]
+      : [
+          { id: 'k-q', role: 'user', body: THINK_QUESTION, createdAt: at },
+          {
+            id: 'k-a',
+            role: 'assistant',
+            body: THINK_ANSWER,
+            createdAt: at,
+            toolCalls: [
+              { name: 'read_spec', input: { spec: 'one-interface' }, result: { ok: true, rows: [] } },
+              { name: 'read_code', input: { path: 'components/talk/model-chip.tsx' }, result: { ok: true, rows: [] } },
+              ...(part === 'mockup'
+                ? [
+                    {
+                      name: 'show_mockup',
+                      input: {},
+                      result: { ok: true, mockup: { title: 'The box foot, before and after', html: THINK_MOCKUP_HTML, height: 236 } },
+                    },
+                  ]
+                : []),
+              {
+                name: 'think_it_through',
+                input: { model: OPUS, effort: 'high' },
+                result: { ok: true, costMicros: part === 'mockup' ? 418_000 : 236_000 },
+              },
+            ],
+          },
+        ];
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id={`ask-think-${part}`}
+            conversationRef="00000000-0000-4000-8000-000000000032"
+            turns={turns}
+            label="Ask a follow-up"
+            placeholder="Ask Dash. @ adds a row, / a command"
+            startWriting={part === 'on'}
+            initialDraft={part === 'on' ? 'Is it worth moving the model chip into settings?' : undefined}
+            boxStart={{ think: part !== 'cost' }}
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
 
 /**
  * A reopened question whose answers proposed changes (plan #1190), each card
