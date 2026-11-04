@@ -8,6 +8,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import {
   addPerson,
   ASK_MAX,
@@ -43,6 +44,24 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+/**
+ * The changes someone on People made or proposed in one thread (plan
+ * #2854.2.1), read again when their reply comes in, so its cards show
+ * without a reload. Null when they could not be read; the thread keeps what
+ * it has.
+ */
+// latency: instant
+export async function threadChanges(chatId: string): Promise<DashChange[] | null> {
+  await requireUser();
+  if (!UUID.test(chatId)) return null;
+  try {
+    return await loadPeopleChanges(await createCoreClient(), chatId);
+  } catch (error) {
+    console.error('thread changes not read', error);
+    return null;
   }
 }
 
