@@ -1,112 +1,101 @@
-import { ListPage } from '@/components/patterns/list-detail';
-import { RowLink } from '@/components/shell/back-link';
-import { PageHeader } from '@/components/shell/page-header';
+import { Messaging, MessagingPlaceholder } from '@/components/patterns/messaging';
+import { buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
 import { PageColumn } from '@/components/shell/page-width';
-import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/cn';
-import { whenAgo } from '@/lib/core/when';
-import type { Mentor } from '@/lib/you/council-model';
-import { MentorMark } from '@/app/you/council/mentor-mark';
-
-/** Where a mentor's thread is until the People tab has threads of its own. */
-export function mentorHref(mentor: Pick<Mentor, 'key'>): string {
-  return `/you/council/mentors/${mentor.key}`;
-}
-
-/** The line under a mentor's name: them writing, their newest note, or the question they own. */
-export function mentorPreview(mentor: Mentor): string {
-  if (mentor.waiting) return 'Writing back to you…';
-  if (mentor.note) return mentor.note.text;
-  return mentor.canTalk ? mentor.question : 'Not ready to talk yet.';
-}
+import type { PersonRow, SearchHit } from '@/lib/you/chat-threads-model';
+import { ADD_HREF } from '@/lib/you/people-cards-model';
+import { PeopleList } from './people-list';
 
 /**
- * Chat's People tab (plan #2748.1): every mentor on the council, newest note
- * first, as a messaging app lists its threads. A row opens the mentor's page
- * on the Council, which is where their thread is until the People tab step
- * (#2748.6) draws threads here.
+ * Chat's People tab (plan #2748.6), the messaging pattern: everyone you talk
+ * to on the left and the open thread on the right. On a phone the list is
+ * the page and a thread is a page of its own (app/chat/people/[key]); `/chat`
+ * on a laptop opens the newest thread beside the list, as a texting app
+ * does, and passes it as `newest` so a phone leaves it hidden.
+ *
+ * With no one to talk to, one card says so and links to the Council; with the
+ * threads not read, the list's pane says so where its rows would be, and
+ * the thread's pane says in one quiet line that threads open there once they
+ * can be read, so a laptop is not left with a blank pane.
  */
 export function PeopleView({
-  mentors,
+  rows,
   failed = false,
+  query = null,
+  hits = null,
+  current = null,
   timezone,
   now,
+  live = true,
+  newest = false,
+  adding = false,
+  children,
 }: {
-  mentors: readonly Mentor[];
+  rows: readonly PersonRow[];
   failed?: boolean;
+  query?: string | null;
+  hits?: readonly SearchHit[] | null;
+  /** The key of the open thread. */
+  current?: string | null;
   timezone: string;
   now: number;
+  live?: boolean;
+  /** The thread is the newest, opened beside the list on a laptop only. */
+  newest?: boolean;
+  /** The form for adding someone is open in the thread's place, even with nobody here yet. */
+  adding?: boolean;
+  /** The open thread, when one is. */
+  children?: React.ReactNode;
 }) {
-  const header = <PageHeader title="People" />;
+  if (!failed && rows.length === 0 && !adding) {
+    // Nobody to talk to: one card with the way to the Council, and no empty thread pane beside it.
+    return (
+      <PageColumn>
+        <section className="sheet rounded-card bg-surface px-4 py-4">
+          <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+          <p className="mt-4 text-body font-semibold text-ink">No one to talk to yet</p>
+          <p className="mt-1 text-ui text-ink-muted">Add someone of your own, or put mentors on your council, and each one gets a thread here.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={ADD_HREF} className={buttonVariants({ variant: 'primary' })}>
+              Add someone
+            </Link>
+            <Link href="/you/council" className={buttonVariants({ variant: 'secondary' })}>
+              Open the Council
+            </Link>
+          </div>
+        </section>
+      </PageColumn>
+    );
+  }
   if (failed) {
     return (
-      <PageColumn>
-        {header}
-        <p className="text-ui text-danger">Your mentors could not be read. Reload to try again.</p>
-      </PageColumn>
+      <Messaging
+        label="People"
+        open={false}
+        list={
+          <div className="flex flex-col px-4 pt-4 pb-4">
+            <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+            <p className="mt-3 text-ui text-danger">Your threads could not be read. Reload to try again.</p>
+          </div>
+        }
+      >
+        <MessagingPlaceholder>
+          <p className="text-ui text-ink-muted">Your threads open here once they can be read.</p>
+        </MessagingPlaceholder>
+      </Messaging>
     );
   }
-  if (mentors.length === 0) {
-    return (
-      <PageColumn>
-        {header}
-        <EmptyState
-          title="No mentors yet"
-          description="Put mentors on your council and each one gets a thread here."
-          action={{ label: 'Open the Council', href: '/you/council' }}
-        />
-      </PageColumn>
-    );
-  }
-  const sorted = [...mentors].sort((a, b) => (b.note?.createdAt ?? '').localeCompare(a.note?.createdAt ?? ''));
-  const unread = mentors.filter((m) => m.note && !m.note.readAt).length;
   return (
-    <ListPage
-      // The line between threads starts at the text, as a messaging app
-      // draws it, so the avatars stand in one column with nothing under them.
-      className="[&_ul]:divide-y-0"
-      header={header}
-      foot={`${mentors.length} ${mentors.length === 1 ? 'mentor' : 'mentors'}${unread > 0 ? `, ${unread} unread` : ''}`}
+    <Messaging
+      label="People"
+      open={Boolean(children) && !newest}
+      list={<PeopleList rows={rows} current={current} currentWide={newest} query={query} hits={hits} timezone={timezone} now={now} live={live} />}
     >
-      {sorted.map((mentor) => {
-        const isUnread = Boolean(mentor.note && !mentor.note.readAt);
-        return (
-          <li
-            key={mentor.id}
-            className="relative [&+li]:before:absolute [&+li]:before:inset-x-0 [&+li]:before:top-0 [&+li]:before:ml-[calc(var(--card-p)+3.75rem)] [&+li]:before:border-t [&+li]:before:border-border [&+li]:before:content-['']"
-          >
-            <RowLink
-              href={mentorHref(mentor)}
-              className="card-pad-x row-pad flex min-h-11 items-center gap-3 hover:bg-sunken"
-            >
-              <MentorMark mentorKey={mentor.key} name={mentor.name} kind={mentor.kind} size="lg" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline gap-2">
-                  <span className={cn('min-w-0 flex-1 truncate text-ui text-ink', isUnread ? 'font-semibold' : 'font-medium')}>
-                    {mentor.name}
-                  </span>
-                  {mentor.note && (
-                    <span className="tabular shrink-0 text-small text-ink-muted">
-                      {whenAgo(mentor.note.createdAt, { timeZone: timezone, now })}
-                    </span>
-                  )}
-                </span>
-                <span className="flex items-start gap-2">
-                  <span
-                    className={cn(
-                      'line-clamp-2 min-w-0 flex-1 text-small',
-                      mentor.waiting ? 'text-accent' : isUnread ? 'text-ink' : 'text-ink-muted',
-                    )}
-                  >
-                    {mentorPreview(mentor)}
-                  </span>
-                  {isUnread && <span className="mt-1.5 size-2 shrink-0 rounded-pill bg-accent" aria-label="Unread" role="img" />}
-                </span>
-              </span>
-            </RowLink>
-          </li>
-        );
-      })}
-    </ListPage>
+      {children ?? (
+        <MessagingPlaceholder>
+          <p className="text-body font-medium text-ink">Choose someone to open your thread with them.</p>
+        </MessagingPlaceholder>
+      )}
+    </Messaging>
   );
 }

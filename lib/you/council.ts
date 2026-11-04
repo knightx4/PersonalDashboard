@@ -29,6 +29,7 @@ import {
   type Reaction,
 } from '@/lib/you/council-model';
 import { unreadTextsOf, type TextRow, type TextThread } from '@/lib/you/council-texts';
+import { canTalkOf } from '@/lib/you/people-cards-model';
 
 export * from '@/lib/you/council-model';
 
@@ -75,7 +76,7 @@ function mentorOf(advisor: RosterAdvisor, note: CouncilNote | null, chat: Counci
     question: advisor.question,
     focus: advisor.focus,
     active: advisor.active,
-    canTalk: advisor.kind === 'seat' || advisor.brainStatus === 'ready',
+    canTalk: canTalkOf(advisor),
     note,
     waiting: replyState(chat, now).kind === 'waiting',
   };

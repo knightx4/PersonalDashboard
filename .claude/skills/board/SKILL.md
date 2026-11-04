@@ -111,9 +111,13 @@ parts from the other advisors and what it would never say. When a seat's
 A seat with no ready brain still sits, on its paragraph alone.
 
 **Guests join where they fit, four at most per meeting.** A guest is usable
-only when `active` is true and `brain_status` is `ready`; one whose brain is
-`none`, `building` or `failed` does not sit, even when the person named it,
-and the minutes say so in `chair_note`. For each question, the guests are:
+only when `active` and `joins_meetings` are true and `brain_status` is
+`ready`; one whose brain is `none`, `building` or `failed` does not sit, even
+when the person named it, and the minutes say so in `chair_note`. A person
+the owner made up in Chat (`made_by_you` true, plan #2748.11) has no brain:
+they are usable when `active` and `joins_meetings` are true and they have a
+`persona`, and are briefed with their persona card in place of a brain. With
+`joins_meetings` false a seat or guest is in Chat only and never sits. For each question, the guests are:
 
 - every usable guest the person named in the question's `advisors`, and
 - the usable guests whose `question` and `focus` bear most on it, chosen by
@@ -718,9 +722,9 @@ meaning, and say in `chair_note` which option you reworded and how.
 Read the roster:
 
 ```sql
-select id, key, name, kind, question, focus, brain, brain_status, active, believability
+select id, key, name, kind, question, focus, brain, brain_status, active, believability, persona, made_by_you
 from you.board_advisors
-where user_id = '<user_id>' and active
+where user_id = '<user_id>' and active and joins_meetings
 order by kind desc, created_at;
 ```
 

@@ -143,6 +143,17 @@ const WIDTHS = (() => {
 const HIDE_DEV_BADGE =
   "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
 
+/**
+ * Puts every CSS animation and transition at rest before a capture (plan
+ * #2815.4). Two shoots of one build differed by 0.01 to 0.02% of their pixels
+ * on ask-dash-at-work, ui-kit and dev-runner-crew, which have looping
+ * animations (a pulse, a spinner), so the compare listed them as changed when
+ * a step had not touched them. A finite animation is finished, which is where
+ * the page settles anyway; a looping one is paused at its first frame.
+ */
+const FREEZE_ANIMATIONS = `document.getAnimations().forEach(function(a){
+  try{a.finish();}catch(e){a.pause();a.currentTime=0;}});`;
+
 /** True when something visible is fixed to the bottom half of the screen, such as Quick read's Next row. */
 const HAS_PINNED_ROW = `[...document.querySelectorAll('body *')].some(function(e){
   var s=getComputedStyle(e);if(s.position!=='fixed'&&s.position!=='sticky')return false;
@@ -443,6 +454,8 @@ async function main() {
           console.log(`  (${surfaceId} is cut to its top ${clipHeight}px)`);
         }
 
+        await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
+        await wait(100);
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
           captureBeyondViewport: !windowOnly,
@@ -477,6 +490,7 @@ async function main() {
               expression: 'window.scrollTo(0, document.documentElement.scrollHeight)',
             });
             await wait(400);
+            await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
             const end = await send('Page.captureScreenshot', { format: 'png' });
             const endName = `${surfaceId}--${size.name}-${slug(theme)}-end.png`;
             writeFileSync(join(OUT, endName), Buffer.from(end.data, 'base64'));

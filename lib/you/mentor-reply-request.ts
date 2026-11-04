@@ -11,6 +11,7 @@ import { listRoster } from '@/lib/you/board-advisors';
 import { loadNote } from '@/lib/you/council';
 import { replyToMentor } from '@/lib/you/mentor-reply';
 import { sendMentorText, type MentorSent } from '@/lib/you/mentor-send';
+import { canTalkOf } from '@/lib/you/people-cards-model';
 
 /**
  * Texting a mentor from a request (plan #2748.4): the Council's send and
@@ -36,7 +37,7 @@ export async function sendMentorMessageInRequest(
   const sent: MentorSent = await sendMentorText({
     client,
     userId,
-    mentor: { id: mentor.id, name: mentor.name, canTalk: mentor.kind === 'seat' || mentor.brainStatus === 'ready' },
+    mentor: { id: mentor.id, name: mentor.name, canTalk: canTalkOf(mentor) },
     text: input.text,
     noteId: input.noteId ?? null,
   });

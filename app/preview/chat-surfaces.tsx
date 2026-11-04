@@ -1,87 +1,146 @@
 import { AppShell } from '@/components/shell/app-shell';
 import { tabsFor } from '@/lib/shell/tabs';
-import type { CouncilNote, Mentor } from '@/lib/you/council-model';
+import { MENTOR_PALETTE, type PersonRow, type SearchHit, type ThreadMessage } from '@/lib/you/chat-threads-model';
 import { PeopleView } from '@/app/chat/people-view';
+import { PeopleSkeleton } from '@/app/chat/people-skeleton';
+import { ThreadView } from '@/app/chat/people/[key]/thread-view';
+import { ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 
 /**
- * The Chat workspace in the gallery (plan #2748.1): People, its first tab,
- * with the mentors as threads, and with none at all. The Dash
- * tab is drawn by DashPageSurface in ask-surfaces.tsx.
+ * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
+ * first tab, as a messaging app: the list of everyone you talk to and an open
+ * thread, in each of its states. The Dash tab is drawn by DashPageSurface in
+ * ask-surfaces.tsx.
  */
 
 /** Fixed, so the server's render and the browser's agree. */
 const NOW = Date.parse('2026-11-03T09:00:00Z');
+const ZONE = 'Europe/London';
 
-function note(advisorId: string, text: string, createdAt: string, read: boolean): CouncilNote {
+function person(fields: Partial<PersonRow> & Pick<PersonRow, 'id' | 'key' | 'name' | 'colour'>): PersonRow {
   return {
-    id: `n-${advisorId}`,
-    advisorId,
-    text,
-    receipts: [],
-    createdAt,
-    readAt: read ? createdAt : null,
-    reaction: null,
-    reactionNote: null,
-    taskId: null,
+    about: '',
+    canTalk: true,
+    chatId: `chat-${fields.id}`,
+    last: null,
+    unread: false,
+    typingUntil: null,
+    lastReadAt: null,
+    ...fields,
   };
 }
 
-function mentor(fields: Partial<Mentor> & Pick<Mentor, 'id' | 'key' | 'name' | 'kind' | 'question'>): Mentor {
-  return { focus: null, active: true, canTalk: true, note: null, waiting: false, ...fields };
-}
-
-/** Five mentors: two unread, one writing back, one with nothing yet, and a guest whose brain is not built. */
-export const CHAT_MENTORS: Mentor[] = [
-  mentor({
-    id: 'm1',
-    key: 'cfo',
-    name: 'The CFO',
-    kind: 'seat',
-    question: 'Can you afford it, and what does it cost you later?',
-    note: note(
-      'm1',
-      'Your gym membership renewed at $260 this morning. You have checked in twice since August, so it is costing you $130 a visit.',
-      '2026-11-03T07:12:00Z',
-      false,
-    ),
-  }),
-  mentor({
+/** Six people: two unread, one typing, one never written to, a long name, and a guest not ready to talk. */
+export const CHAT_PEOPLE: PersonRow[] = [
+  person({
     id: 'm2',
     key: 'benjamin-franklin',
     name: 'Benjamin Franklin',
-    kind: 'guest',
-    question: 'What would a careful, curious man of business do here?',
-    note: note(
-      'm2',
-      'You put the Northwind application off again yesterday. That is the third time this week. What is actually in the way?',
-      '2026-11-02T18:40:00Z',
-      false,
-    ),
+    colour: MENTOR_PALETTE[1],
+    about: 'Money and habits',
+    unread: true,
+    last: { role: 'advisor', text: 'What is actually in the way?', at: '2026-11-03T07:12:00Z' },
   }),
-  mentor({
+  person({
+    id: 'm1',
+    key: 'cfo',
+    name: 'The CFO',
+    colour: MENTOR_PALETTE[7],
+    about: 'Can you afford it, and what does it cost you later?',
+    unread: true,
+    last: {
+      role: 'advisor',
+      text: 'Your gym membership renewed at $260 this morning. You have checked in twice since August, so it is costing you $130 a visit.',
+      at: '2026-11-02T18:40:00Z',
+    },
+  }),
+  person({
     id: 'm3',
     key: 'mentor',
     name: 'The Mentor',
-    kind: 'seat',
-    question: 'What would someone who has done this before tell you?',
-    waiting: true,
-    note: note('m3', 'Then let us not fix anything tonight. Tell me the one part you keep replaying.', '2026-11-01T21:05:00Z', true),
+    colour: MENTOR_PALETTE[2],
+    about: 'What would someone who has done this before tell you?',
+    last: { role: 'person', text: 'I keep replaying the review with Dana.', at: '2026-11-01T21:05:00Z' },
   }),
-  mentor({
-    id: 'm4',
-    key: 'skeptic',
-    name: 'The Skeptic',
-    kind: 'seat',
-    question: 'What would have to be true for this to be a mistake?',
+  person({
+    id: 'm6',
+    key: 'alexandrina',
+    name: 'Dr Alexandrina Featherstonehaugh-Wetherby',
+    colour: MENTOR_PALETTE[4],
+    about: 'Health and sleep',
+    last: { role: 'advisor', text: 'Then explain to me what you did get. Sloppy is fine.', at: '2026-10-30T12:00:00Z' },
   }),
-  mentor({
+  person({ id: 'm4', key: 'skeptic', name: 'The Skeptic', colour: MENTOR_PALETTE[5], about: 'What would have to be true for this to be a mistake?', chatId: null }),
+  person({
     id: 'm5',
-    key: 'richard-feynman-and-the-art-of-explaining-things-simply',
+    key: 'richard-feynman',
     name: 'Richard Feynman',
-    kind: 'guest',
-    question: 'Can you explain it to a twelve-year-old?',
+    colour: MENTOR_PALETTE[3],
+    about: 'Can you explain it to a twelve-year-old?',
     canTalk: false,
+    chatId: null,
   }),
+];
+
+const FRANKLIN = CHAT_PEOPLE[0];
+
+function msg(id: string, role: 'person' | 'advisor', text: string, createdAt: string, extra: Partial<ThreadMessage> = {}): ThreadMessage {
+  return {
+    id,
+    chatId: 'chat-m2',
+    role,
+    kind: 'reply',
+    text,
+    receipts: [],
+    createdAt,
+    deliveredAt: createdAt,
+    readAt: createdAt,
+    ...extra,
+  };
+}
+
+/** A thread over three days: grouped replies, a text first with a receipt, and your last message read. */
+const THREAD: ThreadMessage[] = [
+  msg('t1', 'person', 'I keep going back and forth on whether to take the Northwind call', '2026-10-28T19:02:00Z'),
+  msg('t2', 'advisor', 'Then take it. A call costs you an hour and commits you to nothing.', '2026-10-28T19:02:20Z', { kind: 'ack' }),
+  msg(
+    't3',
+    'advisor',
+    "Most men regret the doors they didn't knock on, not the ones that opened onto a dull room.",
+    '2026-10-28T19:02:40Z',
+  ),
+  msg('t4', 'person', 'Fair. Booked it for Thursday.', '2026-10-28T19:10:00Z'),
+  msg('t5', 'advisor', 'Good. Write down the one question you most want answered before you go in.', '2026-10-28T19:10:30Z'),
+  msg(
+    't6',
+    'advisor',
+    "Morning. You put the Northwind application off again yesterday. That's the third time this week.",
+    '2026-11-03T07:11:00Z',
+    { kind: 'text_first', receipts: [{ label: 'To do · Finish Northwind application', link: '/todo' }] },
+  ),
+  msg('t7', 'advisor', 'What is actually in the way?', '2026-11-03T07:12:00Z', { kind: 'text_first' }),
+  msg('t8', 'person', 'Honestly, the cover letter. I do not know what to say about the gap last year.', '2026-11-03T08:58:00Z'),
+];
+
+const SEARCH: SearchHit[] = [
+  {
+    id: 's1',
+    key: 'benjamin-franklin',
+    name: 'Benjamin Franklin',
+    colour: MENTOR_PALETTE[1],
+    role: 'advisor',
+    text: "Morning. You put the Northwind application off again yesterday. That's the third time this week.",
+    at: '2026-11-03T07:11:00Z',
+  },
+  {
+    id: 's2',
+    key: 'benjamin-franklin',
+    name: 'Benjamin Franklin',
+    colour: MENTOR_PALETTE[1],
+    role: 'person',
+    text: 'I keep going back and forth on whether to take the Northwind call',
+    at: '2026-10-28T19:02:00Z',
+  },
 ];
 
 function ChatShell({ path, children }: { path: string; children: React.ReactNode }) {
@@ -103,16 +162,133 @@ function ChatShell({ path, children }: { path: string; children: React.ReactNode
   );
 }
 
-/** People with its mentors, with none, or not read. */
-export function ChatPeopleSurface({ state = 'mentors' }: { state?: 'mentors' | 'empty' | 'failed' }) {
+/** People with its threads, with no one, not read, while loading, or searched. */
+export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'empty' | 'failed' | 'loading' | 'search' | 'nothing-found' }) {
+  if (state === 'loading') {
+    return (
+      <ChatShell path="/chat">
+        <PeopleSkeleton />
+      </ChatShell>
+    );
+  }
   return (
     <ChatShell path="/chat">
       <PeopleView
-        mentors={state === 'mentors' ? CHAT_MENTORS : []}
+        rows={
+          state === 'empty' || state === 'failed'
+            ? []
+            : state === 'people'
+              ? // The Mentor writing back, so the list draws "typing…" in a row (a hidden part of plan #2748.6).
+                CHAT_PEOPLE.map((r) => (r.key === 'mentor' ? { ...r, typingUntil: '2026-11-03T09:00:20Z' } : r))
+              : CHAT_PEOPLE
+        }
         failed={state === 'failed'}
-        timezone="Europe/London"
+        query={state === 'search' ? 'Northwind' : state === 'nothing-found' ? 'sabbatical' : null}
+        hits={state === 'search' ? SEARCH : state === 'nothing-found' ? [] : null}
+        current={FRANKLIN.key}
+        newest
+        timezone={ZONE}
+        now={NOW}
+        live={false}
+      >
+        {/* On a laptop the newest thread opens beside the list; a phone shows the list alone. */}
+        <ThreadView person={FRANKLIN} chatId={FRANKLIN.chatId} page={{ messages: THREAD, hasOlder: false }} typingUntil={null} timezone={ZONE} now={NOW} live={false} />
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
+type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'new' | 'not-ready' | 'loading';
+
+/** One thread open beside the list, in each of its states. */
+export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState }) {
+  if (state === 'loading') {
+    return (
+      <ChatShell path="/chat/people/benjamin-franklin">
+        <PeopleSkeleton thread />
+      </ChatShell>
+    );
+  }
+  const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
+  const rows = CHAT_PEOPLE.map((r) =>
+    state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
+  );
+  const messages =
+    state === 'new' || state === 'not-ready'
+      ? []
+      : state === 'typing'
+        ? THREAD.map((m) => (m.id === 't8' ? { ...m, readAt: null } : m))
+        : state === 'failed'
+          ? THREAD.slice(0, 7)
+          : state === 'older'
+            ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
+              THREAD.map((m) => ({ ...m, receipts: [] }))
+            : THREAD;
+  return (
+    <ChatShell path={`/chat/people/${who.key}`}>
+      <PeopleView rows={rows} current={who.key} timezone={ZONE} now={NOW} live={false}>
+        <ThreadView
+          person={who}
+          chatId={who.chatId}
+          page={{ messages, hasOlder: state === 'older' }}
+          typingUntil={state === 'typing' ? '2026-11-03T09:00:20Z' : null}
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+          loadingOlder={state === 'older'}
+          pending={
+            state === 'failed'
+              ? [
+                  {
+                    id: 'p1',
+                    text: 'Honestly, the cover letter. I do not know what to say about the gap last year.',
+                    at: '2026-11-03T08:58:00Z',
+                    failed: 'Not sent. Check your connection.',
+                  },
+                ]
+              : []
+          }
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
+/**
+ * Their typing, played (plan #2748.10): the dots rise in, give way to their
+ * text, and rise in again while another is coming.
+ */
+export function ChatTypingMomentSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <ChatTypingDemo
+        rows={rows}
+        person={FRANKLIN}
+        base={THREAD}
+        reply={msg('t9', 'advisor', 'Then write the bad version first. Nobody reads it but you.', '2026-11-03T09:00:10Z')}
+        typingUntil="2026-11-03T09:00:40Z"
+        timezone={ZONE}
         now={NOW}
       />
+    </ChatShell>
+  );
+}
+
+/** A text that arrives first, played (plan #2748.10): a mentor lower in the list writes and their row rises to the top. */
+export function ChatArrivalMomentSurface() {
+  const mentor = CHAT_PEOPLE[2];
+  const after = [
+    {
+      ...mentor,
+      unread: true,
+      last: { role: 'advisor' as const, text: 'You said you would call Dana by Friday. Have you picked a time?', at: '2026-11-03T08:59:00Z' },
+    },
+    ...CHAT_PEOPLE.filter((r) => r.id !== mentor.id),
+  ];
+  return (
+    <ChatShell path="/chat">
+      <ChatArrivalDemo before={CHAT_PEOPLE} after={after} timezone={ZONE} now={NOW} />
     </ChatShell>
   );
 }

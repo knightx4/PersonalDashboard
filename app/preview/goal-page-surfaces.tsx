@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { GoalsInboxView } from '@/app/goals/inbox/inbox-view';
 import { goalInboxGroups } from '@/lib/goals/inbox';
+import type { SessionQuestion } from '@/lib/core/session-questions';
 import { PageHeader } from '@/components/shell/page-header';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
@@ -518,6 +519,37 @@ const FINISHED_NOTICES: TodayItem[] = [
   },
 ];
 
+/** Sessions that stopped to ask (plan #2800.4): one with choices, one in words, one with no way back. */
+const SESSION_QUESTIONS: SessionQuestion[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000a1',
+    about: 'Music pipeline: split the long tracks before import',
+    href: '/ask?thread=00000000-0000-4000-8000-0000000000b1',
+    body: 'The import found 14 tracks over 20 minutes. Split them at silence, or import them whole?',
+    options: ['Split at silence', 'Import whole'],
+    askedAt: '2026-11-04T11:42:00Z',
+    route: 'thread',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a2',
+    about: '#2800.4 Send what waits on you to the Inbox and your phone',
+    href: '/dev/plan/2800.4',
+    body: 'Which push title do you want when several sessions are waiting at once?',
+    options: null,
+    askedAt: '2026-11-04T10:15:00Z',
+    route: 'plan_run',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a3',
+    about: 'Project interactive-islm',
+    href: '/dev/projects/interactive-islm',
+    body: 'The deploy token for the staging site has expired. Add a new one in the project settings.',
+    options: null,
+    askedAt: '2026-11-03T18:00:00Z',
+    route: 'none',
+  },
+];
+
 /**
  * The Inbox tab in Goals: the same rows as the home, grouped by what finishes
  * each, with the steps Dash finished at the foot of Your actions. `hover`
@@ -535,9 +567,12 @@ export function GoalsInboxSurface({
         groups={
           empty
             ? goalInboxGroups([], [])
-            : goalInboxGroups([...home.onYou, ...FINISHED_NOTICES], home.dash ?? [], [
-                GOAL_RUN_QUESTION,
-              ])
+            : goalInboxGroups(
+                [...home.onYou, ...FINISHED_NOTICES],
+                home.dash ?? [],
+                [GOAL_RUN_QUESTION],
+                SESSION_QUESTIONS,
+              )
         }
         laterOn={empty ? [] : (home.laterOn ?? [])}
         preparable={home.preparable ?? []}
