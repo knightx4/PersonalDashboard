@@ -5,6 +5,10 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { holdActingSteps, type HoldSurface } from '@/lib/goals/hold-acts-store';
 import type { RunJob } from '@/lib/goals/runs';
 import { areaRunText, goalRunText, type GoalRun } from '@/lib/goals/shaping';
+import { takeOnRunText, type TakeOnOrigin } from '@/lib/goals/take-on';
+
+/** A question handed to a goal (plan #2778.8), kept on its run row. */
+export type RunQuestion = { text: string; origin: TakeOnOrigin; originRef: string | null };
 
 /**
  * Reads and writes for Claude shaping a goal (plan #932): the latest run on a
@@ -79,9 +83,15 @@ export async function startGoalRun(input: {
   routine: RoutineTarget;
   /** Where the run was started, for the record of each step it holds (plan #1573). */
   surface: HoldSurface;
+  /**
+   * A question to figure out for the goal (plan #2778.8): the run answers it
+   * on the goal and suggests rather than maps, and the app reports back when
+   * it ends.
+   */
+  question?: RunQuestion;
   fetch?: typeof globalThis.fetch;
 }): Promise<{ ok: true; detail: string; runId: string } | { ok: false; error: string }> {
-  const { goal, userId } = input;
+  const { goal, userId, question } = input;
   // Before the run reads the tree, a Claude step that acts outside the plan
   // becomes a proposal it will not work (plan #1183).
   await holdActingSteps({ client: input.client, userId, surface: input.surface });
@@ -90,7 +100,16 @@ export async function startGoalRun(input: {
     job: 'goal',
     itemId: goal.id,
     text: (runId) =>
-      goalRunText({
+      question
+        ? takeOnRunText({
+            goalId: goal.id,
+            goalTitle: goal.title,
+            userId,
+            runId,
+            question: question.text,
+            origin: question.origin,
+          })
+        : goalRunText({
         goalId: goal.id,
         goalTitle: goal.title,
         userId,
@@ -132,6 +151,44 @@ export async function loadAreaRuns(client: GoalsSupabaseClient): Promise<Record<
     };
   }
   return latest;
+}
+
+/** A question run on a goal (plan #2778.8): the run, and what was asked. */
+export type QuestionRun = GoalRun & { question: string };
+
+/**
+ * The question runs on one goal that are going, or ended since `since`, and
+ * the one `named` (the link from a notification) however long ago it ended.
+ * Newest first.
+ */
+export async function loadQuestionRuns(
+  client: GoalsSupabaseClient,
+  goalId: string,
+  since: string,
+  named?: string | null,
+): Promise<QuestionRun[]> {
+  const { data, error } = await client
+    .from('runs')
+    .select('id, status, created_at, ended_at, summary, error, last_seen_at, now_on, question')
+    .eq('job', 'goal')
+    .eq('item_id', goalId)
+    .not('question', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw new Error(`Could not read the goal's questions: ${error.message}`);
+  return ((data ?? []) as (RunRow & { question: string })[])
+    .filter((row) => row.id === named || row.ended_at === null || row.ended_at >= since)
+    .map((row) => ({
+      id: row.id,
+      status: row.status,
+      createdAt: row.created_at,
+      endedAt: row.ended_at,
+      summary: row.summary,
+      error: row.error,
+      lastSeenAt: row.last_seen_at,
+      nowOn: row.now_on,
+      question: row.question,
+    }));
 }
 
 /** The jobs a run on one step has: sent, sent as a phase, or asked to prepare it. */
@@ -214,6 +271,8 @@ export async function recordAndFire(input: {
   areaId?: string | null;
   routine: RoutineTarget;
   text: (runId: string) => string;
+  /** The question a goal run is to figure out, kept on the row (goals 0092). */
+  question?: RunQuestion;
   fetch?: typeof globalThis.fetch;
 }): Promise<
   { ok: true; detail: string; runId: string } | { ok: false; error: string; runId: string | null }
@@ -228,6 +287,13 @@ export async function recordAndFire(input: {
       area_id: input.areaId ?? null,
       status: 'started',
       routine_id: resolveRoutineId(routine.id),
+      ...(input.question
+        ? {
+            question: input.question.text,
+            origin: input.question.origin,
+            origin_ref: input.question.originRef,
+          }
+        : {}),
     })
     .select('id')
     .single();

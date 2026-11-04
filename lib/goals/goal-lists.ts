@@ -519,13 +519,14 @@ export function listTabId(key: string): string {
 type TabLike = { id: string; label: string; count?: number };
 
 /**
- * The goal page's tabs with a tab for each list after Steps, once the goal
+ * The goal page's tabs with a tab for each list after Plan (Steps before
+ * plan #2778.4), once the goal
  * has LIST_TABS_FROM lists or more. With fewer, the tabs are as they were and
  * the chips alone open the lists.
  */
 export function tabsWithLists<T extends TabLike>(tabs: readonly T[], lists: readonly ListView[]): TabLike[] {
   if (lists.length < LIST_TABS_FROM) return [...tabs];
-  const at = tabs.findIndex((t) => t.id === 'steps');
+  const at = tabs.findIndex((t) => t.id === 'plan' || t.id === 'steps');
   const listTabs = lists.map((list) => ({ id: listTabId(list.key), label: list.name, count: list.rows.length }));
   return [...tabs.slice(0, at + 1), ...listTabs, ...tabs.slice(at + 1)];
 }

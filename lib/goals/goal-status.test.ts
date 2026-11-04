@@ -50,10 +50,10 @@ describe('goalStatus', () => {
       step('proposed', { status: 'proposed', title: 'Email the recruiter' }),
     ]);
     expect(view.yourMove.map((row) => [row.kind, row.title, row.href])).toEqual([
-      ['question', 'Which lane first?', '?tab=steps#step-question'],
-      ['approve', '1 proposed step', '?tab=steps#step-proposed'],
-      ['read', 'Split by role family', '?tab=steps#step-result'],
-      ['do', 'Update the resume', '?tab=steps#step-mine-1'],
+      ['question', 'Which lane first?', '?tab=plan#step-question'],
+      ['approve', '1 proposed step', '?tab=plan#step-proposed'],
+      ['read', 'Split by role family', '?tab=plan#step-result'],
+      ['do', 'Update the resume', '?tab=plan#step-mine-1'],
     ]);
   });
 

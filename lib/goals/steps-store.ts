@@ -39,6 +39,7 @@ import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
+import { showsOutside } from '@/lib/goals/plan-order';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, toGoalActivity, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -758,7 +759,7 @@ export async function loadDailyView(
     syncRhythms(client, userId, live, today),
     loadLatestReviews(client),
   ]);
-  const view = dailyView(goals, byGoal, today);
+  const view = dailyView(goals, byGoal, today, showsOutside(byGoal, today));
   return {
     ...view,
     goals: view.goals.map((daily) => ({
@@ -785,7 +786,7 @@ export async function loadTodoGoals(
   // userId narrows the read for a service-role client (the morning brief);
   // under RLS it changes nothing.
   const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  return { steps: todoSteps(goals.map((g) => g.goal), byGoal) };
+  return { steps: todoSteps(goals.map((g) => g.goal), byGoal, showsOutside(byGoal, today)) };
 }
 
 /**

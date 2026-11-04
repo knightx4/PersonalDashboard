@@ -29,6 +29,7 @@ import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/l
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
 import { insertTask } from '@/lib/todo/tasks/write';
+import { goalsRoutine } from '@/lib/feedback/routine';
 import { ProgressInputError, progressRpcArgs, readProgress } from '@/lib/plan/session-progress';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 
@@ -583,6 +584,8 @@ const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => (
         op: made.op,
         summary: made.summary,
         beforeValues: made.before,
+        // A dashboard change keeps its one column, so its Undo outlasts edits to the goal's others.
+        ...(made.kind === 'change_goal_dashboard' ? { afterValues: made.after } : {}),
         undo: made.undo,
       },
     );
@@ -733,7 +736,8 @@ type SharedWrite =
   | 'write_prep_note'
   | 'rewrite_post'
   | 'suggest_post'
-  | 'add_project';
+  | 'add_project'
+  | 'take_on_for_goal';
 
 /**
  * The shared writes that name a goal or a step by its ref. Ask holds a ref to
@@ -741,7 +745,23 @@ type SharedWrite =
  * conversation, so it takes any ref, and every read in these tools names the
  * verified person, so a ref that is not theirs is refused as not found.
  */
-const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'close_goal_step', 'set_goal_done_when']);
+const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set([
+  'add_goal_step',
+  'close_goal_step',
+  'set_goal_done_when',
+  'take_on_for_goal',
+]);
+
+/**
+ * Whether the verified person may start the goals routine, and the routine:
+ * the owner's account only, as in the app (plan #2778.8). The service-role
+ * core client reads the owner from core.app_settings.
+ */
+async function connectorGoalRoutine(ctx: ConnectorWriteContext) {
+  const { data } = await ctx.core.from('app_settings').select('owner_user_id').maybeSingle();
+  const owner = (data as { owner_user_id: string | null } | null)?.owner_user_id ?? null;
+  return { canRun: owner !== null && owner === ctx.userId, routine: goalsRoutine() };
+}
 
 /**
  * The shared writes that take any ref the same way: every read in them names
@@ -803,6 +823,11 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         createTask: async (owner, task, timezone) =>
           insertTask((await db('todo')) as unknown as TodoSupabaseClient, owner, task, timezone),
         quickNotePorts: ctx.quickNotePorts,
+        // Only take_on_for_goal starts a run from here; a Claude chat cannot
+        // be written back to, so the notification is its reply (plan #2778.8).
+        ...(name === 'take_on_for_goal'
+          ? { goalRoutine: () => connectorGoalRoutine(ctx), origin: { kind: 'chat' as const, ref: null } }
+          : {}),
       } satisfies DashWriteContext;
       const result = await dash.apply(write, input);
       if (!result.ok) return { ok: false, error: result.error };
@@ -919,6 +944,11 @@ const suggestPost = sharedWrite(
   'Save a new X post draft to the Posts tab in Dash\'s Dev workspace, when they ask for a post about the app, how they build it, or something near it. Write about what the app does, never what they keep in it. Send angle as the one idea the post is about, and posts as the text, one string per post in the thread. No links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture post_pictures returned, where one fits. The draft waits on the Posts tab: nothing is posted. It is listed on Home with an Undo.',
 );
 
+const takeOnForGoal = sharedWrite(
+  'take_on_for_goal',
+  'Hand one of the person\'s goals in Dash a question to figure out, when they ask you to work something out for a goal and leave it with Dash ("have Dash figure out whether I should consolidate my loans"). Dash works it in a run of its own on the goal, several minutes or more, and the person gets a notification that opens the goal at the answer; you are not written back to, so tell them that. Pass the question in their words. Name the goal by the goals.items ref goal_status or search (kinds ["goal"]) returned; without one, the goal is picked from the question, and when that is unclear the call names the likeliest goals: ask them which and call again. Steps and tiles it suggests wait on the goal for their Add. Only the account that owns the app can start it.',
+);
+
 const addProject = sharedWrite(
   'add_project',
   'Add one of the person\'s GitHub repositories as a project in Dash\'s Dev workspace, when they ask ("add my recipes repo as a project"). It gets its own section on the plan. Name it by owner/name, or by its name alone and it is looked up among their repositories on GitHub; a name that matches none or several is refused with the matches, so ask which. One already added is refused, and one they archived is put back. It is listed on Home with an Undo.',
@@ -1001,6 +1031,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   rewritePost,
   suggestPost,
   addProject,
+  takeOnForGoal,
   reportProgress,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,

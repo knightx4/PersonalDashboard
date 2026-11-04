@@ -268,13 +268,15 @@ for it before your first write:
 
 | Job | Read |
 |---|---|
-| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`. An errand also needs `working-steps.md`. |
+| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`, `dashboards.md`. An errand also needs `working-steps.md`. |
+| `goal` with a `question` on its run row (a question handed from a chat) | `question.md`, `pulling-in.md`, `deciding.md`, `files.md`, `working-steps.md` ("Files") |
 | `goal` with a comment in the brief | `requests.md` ("Replying to a comment"), then whatever the comment asks for: `working-steps.md` for work you do, `records.md` for facts to file |
 | `area` | `pulling-in.md`, `area.md`, `deciding.md` |
 | `reshape` | `reshape.md`, `deciding.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps", and "Moving a step that has sat for a week" for a drop on the person's answer), `step-states.md` |
 | `step`, `phase` | `requests.md`, `working-steps.md`, `deciding.md` |
 | `prepare` | `prep.md`, `working-steps.md` (for files and for Jobs) |
-| `daily` | `morning.md`, `tending.md`, `prep.md`, `working-steps.md`, `records.md`, `deciding.md`, `step-states.md` |
+| `daily` | `morning.md`, `tending.md`, `prep.md`, `working-steps.md`, `records.md`, `deciding.md`, `step-states.md`, and `dashboards.md` when the brief lists goals with no dashboard |
+| `goal` whose brief asks for the dashboard | `dashboards.md` |
 | `weekly` | `weekly.md`, `working-steps.md` ("Files") |
 | `raise` | nothing more: "Flagging something on a goal" is below, with "What you may change" |
 
@@ -284,7 +286,7 @@ not in this file, find it here and read it:
 | Section | File |
 |---|---|
 | Pulling in from the other modules (Where to look, How to search, Search by meaning from a row you found, What is already on the goal, Writing what you found, Using it, Something the catalogue does not list) | `reference/pulling-in.md` |
-| Mapping a goal (Blind spots, Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
+| Mapping a goal (Blind spots, Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, The dashboard, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
 | Filing a document you were given, Pre-filling from Gmail, Answers on an information step | `reference/records.md` |
 | Decide first, ask last; Questions; Provisional steps | `reference/deciding.md` |
 | Planning an area (Reading the area, What to propose, Afterwards) | `reference/area.md` |
@@ -297,6 +299,8 @@ not in this file, find it here and read it:
 | A step of yours to prepare, A Dash step before yours | `reference/prep.md` |
 | The weekly run, Researching the help each goal asks for, Suggesting steps, The week's notes | `reference/weekly.md` |
 | What goes in a file | `reference/files.md` |
+| A question handed to a goal | `reference/question.md` |
+| Laying out a goal's dashboard (The rule, The tiles, Templates by kind of goal) | `reference/dashboards.md` |
 | The catalogue of sources | `reference/sources.md` |
 
 Read a whole file when you need one section of it: the sections in a file

@@ -10,7 +10,8 @@ import type { LearnChangeInput } from './learn-changes';
  * goal's measure or links, or an information step's form, changed (plan
  * #1894.7.3), and a step set aside or brought back, a Goals Inbox row snoozed
  * or brought back, or going to an event recorded (plan #1894.7.4), and a
- * goal's own lists and their rows changed (plan #2330.2).
+ * goal's own lists and their rows changed (plan #2330.2), and the tiles on
+ * a goal's dashboard (plan #2778.9).
  *
  * They take the shape Learn's six set out (lib/ask/learn-changes.ts): the
  * tool that made the change wrote the sentence and the link when it made it
@@ -28,16 +29,17 @@ export const GOALS_CHANGE_KINDS = [
   'change_goal_form',
   'change_goals_inbox',
   'change_goal_list',
+  'change_goal_dashboard',
 ] as const;
 
 export type GoalsChangeKind = (typeof GOALS_CHANGE_KINDS)[number];
 
 /**
- * The two that start the goals routine from Ask (lib/dash/goal-run-writes.ts):
- * the goal page's Ask Dash and a step row's. In the app only, so not among
- * the writes the connector shares.
+ * The ones that start the goals routine from Ask (lib/dash/goal-run-writes.ts):
+ * the goal page's Ask Dash and a step row's, in the app only; and a question
+ * handed to a goal (plan #2778.8), which the connector shares.
  */
-export const GOAL_RUN_CHANGE_KINDS = ['start_goal_run', 'work_goal_step'] as const;
+export const GOAL_RUN_CHANGE_KINDS = ['start_goal_run', 'work_goal_step', 'take_on_for_goal'] as const;
 
 export type GoalRunChangeKind = (typeof GOAL_RUN_CHANGE_KINDS)[number];
 
