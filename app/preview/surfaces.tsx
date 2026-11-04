@@ -29,7 +29,7 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
-import { YouAnswerLoadingPreview, YouAnswerPreview } from './you-answer-surfaces';
+import { YouAskLoadingPreview, YouAskPreview } from './you-ask-surfaces';
 import {
   YouBoardListLoadingPreview,
   YouBoardListPreview,
@@ -394,6 +394,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { withBadges } from '@/lib/shell/tabs';
 import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
@@ -3351,7 +3352,7 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-  { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
+  { href: '/you/ask', label: 'Ask', icon: 'answer', exact: true },
   { href: '/you/council', label: 'Council', icon: 'board' },
 ];
 
@@ -10165,99 +10166,137 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouInsightsLoadingPreview />,
   },
   {
-    /* Answer (plan #2617.2): Dash's questions about you, three waiting with
-     * a box and Skip each, four answers below with Edit, two skipped folded. */
-    id: 'you-answer',
-    label: 'You · Answer, three waiting and four answered',
+    /* Ask (plans #2617.2 and #2635.3): Dash's questions about you, three
+     * waiting under the area each is about (none under Other), four answers
+     * below with Edit, two skipped folded. */
+    id: 'you-ask',
+    label: 'You · Ask, three waiting by area and four answered',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview />
+        <YouAskPreview />
       </div>
     ),
   },
   {
-    id: 'you-answer-empty',
-    label: 'You · Answer, before Dash has asked anything',
+    /* The tab in its shell, with the count of open questions on it. */
+    id: 'you-ask-tab',
+    label: 'You · Ask, in the workspace with the open count on its tab',
     module: 'you',
     width: 'page',
-    render: () => <YouAnswerPreview empty />,
+    render: () => (
+      <AppShell
+        account="preview"
+        module="you"
+        pathname="/you/ask"
+        sections={withBadges(youSections, { '/you/ask': 3 })}
+        displayName="Chris"
+        email="chris@example.com"
+        isOwner
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <YouAskPreview />
+      </AppShell>
+    ),
   },
   {
-    id: 'you-answer-answered',
-    label: 'You · Answer, nothing waiting',
+    /* An open question hovered on a laptop: its Skip shows. A phone always shows it. */
+    id: 'you-ask-hover',
+    label: 'You · Ask, an open question hovered with Skip showing',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview noneOpen />
+        <YouAskPreview part="hover" />
       </div>
     ),
   },
   {
-    id: 'you-answer-edit',
-    label: 'You · Answer, an answer being changed',
+    id: 'you-ask-empty',
+    label: 'You · Ask, before Dash has asked anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAskPreview empty />,
+  },
+  {
+    /* Nothing waiting: the line says when Dash next asks, beside Ask now. */
+    id: 'you-ask-answered',
+    label: 'You · Ask, nothing waiting',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview part="edit" />
+        <YouAskPreview noneOpen />
       </div>
     ),
   },
   {
-    id: 'you-answer-skipped',
-    label: 'You · Answer, skipped open with one being answered',
+    id: 'you-ask-edit',
+    label: 'You · Ask, an answer being changed',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview noneOpen part="skipped" />
+        <YouAskPreview part="edit" />
       </div>
     ),
   },
   {
-    id: 'you-answer-error',
-    label: 'You · Answer, an answer that did not save',
+    /* The skipped fold open: one being answered, the other hovered with Ask again showing. */
+    id: 'you-ask-skipped',
+    label: 'You · Ask, skipped open with one being answered',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview part="error" />
+        <YouAskPreview noneOpen part="skipped" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-ask-error',
+    label: 'You · Ask, an answer that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAskPreview part="error" />
       </div>
     ),
   },
   {
     /* The Ask button's run going (plan #2617.3): Dash at work on the button
      * and a line under the header with when it started. */
-    id: 'you-answer-running',
-    label: 'You · Answer, Dash writing new questions',
+    id: 'you-ask-running',
+    label: 'You · Ask, Dash writing new questions',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview ask="running" />
+        <YouAskPreview ask="running" />
       </div>
     ),
   },
   {
-    id: 'you-answer-ask-failed',
-    label: 'You · Answer, the last run for new questions failed',
+    id: 'you-ask-ask-failed',
+    label: 'You · Ask, the last run for new questions failed',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview ask="failed" />
+        <YouAskPreview ask="failed" />
       </div>
     ),
   },
   {
-    id: 'you-answer-loading',
-    label: 'You · Answer, loading',
+    id: 'you-ask-loading',
+    label: 'You · Ask, loading',
     module: 'you',
     width: 'page',
-    render: () => <YouAnswerLoadingPreview />,
+    render: () => <YouAskLoadingPreview />,
   },
   {
     /* Board (plans #2540.3 and #2561.4): one surface in three groups, the

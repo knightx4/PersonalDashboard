@@ -11,7 +11,7 @@ const PLACES: Section = { href: '/you/places', label: 'Places' };
 const WORK: Section = { href: '/you/work', label: 'Work & school' };
 const INSIGHTS: Section = { href: '/you/insights', label: 'Insights' };
 const BOARD: Section = { href: '/you/council', label: 'Council' };
-const ANSWER: Section = { href: ANSWER_HREF, label: 'Answer' };
+const ANSWER: Section = { href: ANSWER_HREF, label: 'Ask' };
 
 /**
  * You's tables (lib/sources/types.ts): what is true about the person. Each is
@@ -200,7 +200,7 @@ export const youSources: ModuleSources = {
     {
       table: 'you.dash_questions',
       module: 'You',
-      holds: 'Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.',
+      holds: 'Their answers to the questions Dash asked them about themselves on the Ask tab, in their own words.',
       weight: 'record',
       search: ['question', 'answer'],
       title: 'question',
@@ -297,7 +297,7 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
-    { table: 'you.dash_question_runs', reason: 'Bookkeeping for the runs that write Dash\'s questions on the Answer tab.' },
+    { table: 'you.dash_question_runs', reason: 'Bookkeeping for the runs that write Dash\'s questions on the Ask tab.' },
     { table: 'you.board_meetings', reason: 'Minutes Dash wrote for the board meetings; Goals reading them would cite Dash to itself.' },
     { table: 'you.board_marks', reason: 'Their votes, answers and ticks on the board\'s minutes, read by the next board meeting, not by Goals.' },
     { table: 'you.board_advisors', reason: 'The board\'s roster and the brains Dash built for its guests from their public work.' },
