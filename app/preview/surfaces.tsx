@@ -91,6 +91,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
+import { PageHeaderSurface } from './page-header-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
@@ -10983,6 +10984,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <RefPreviewSurface />,
+  },
+
+  /* The frame every page draws (plan #2815.3): the heading in each state it
+   * has, the path with its back link, and both page widths. */
+  {
+    id: 'shell-page-header',
+    label: 'The shell · A page’s heading, path and width',
+    module: 'dev',
+    width: 'page',
+    render: () => <PageHeaderSurface />,
   },
 
   /* The per-day bar chart for the usage pages (plan #2036.1): a month of

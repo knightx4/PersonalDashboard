@@ -99,6 +99,22 @@ const items: PlanItem[] = [
     acceptance: 'The dev plan renders through the shared components.',
     status: 'in_progress',
     size: 'l',
+    // Two comments, so the row draws its comment count: this surface is where
+    // a change to components/dev/comment-count.tsx is looked at (plan #2815.3).
+    thread: [
+      {
+        id: 'shared-t1',
+        author: 'me',
+        body: 'Keep the goal page’s rows the same height as the plan’s.',
+        createdAt: '2026-10-07T10:00:00Z',
+      },
+      {
+        id: 'shared-t2',
+        author: 'claude',
+        body: 'They share the row now, so they cannot drift.',
+        createdAt: '2026-10-07T10:05:00Z',
+      },
+    ],
   }),
   item({
     id: 'gallery',
