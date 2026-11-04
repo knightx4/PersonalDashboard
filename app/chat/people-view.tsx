@@ -14,8 +14,9 @@ import { PeopleList } from './people-list';
  * does, and passes it as `newest` so a phone leaves it hidden.
  *
  * With no one to talk to, one card says so and links to the Council; with the
- * threads not read, the list's pane says so
- * where its rows would be, and the thread's pane stays empty beside it.
+ * threads not read, the list's pane says so where its rows would be, and
+ * the thread's pane says in one quiet line that threads open there once they
+ * can be read, so a laptop is not left with a blank pane.
  */
 export function PeopleView({
   rows,
@@ -78,7 +79,9 @@ export function PeopleView({
           </div>
         }
       >
-        <MessagingPlaceholder>{null}</MessagingPlaceholder>
+        <MessagingPlaceholder>
+          <p className="text-ui text-ink-muted">Your threads open here once they can be read.</p>
+        </MessagingPlaceholder>
       </Messaging>
     );
   }
