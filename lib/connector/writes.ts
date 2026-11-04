@@ -29,6 +29,7 @@ import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/l
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
 import { insertTask } from '@/lib/todo/tasks/write';
+import { ProgressInputError, progressRpcArgs, readProgress } from '@/lib/plan/session-progress';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 
 /**
@@ -923,6 +924,59 @@ const addProject = sharedWrite(
   'Add one of the person\'s GitHub repositories as a project in Dash\'s Dev workspace, when they ask ("add my recipes repo as a project"). It gets its own section on the plan. Name it by owner/name, or by its name alone and it is looked up among their repositories on GitHub; a name that matches none or several is refused with the matches, so ask which. One already added is refused, and one they archived is put back. It is listed on Home with an Undo.',
 );
 
+/**
+ * A session's report of what it is doing (plan #2800.1), for the project
+ * pages and Dev to show while it works. Bookkeeping rather than a change to
+ * the person's own rows, so it is not recorded on Home and has no Undo.
+ */
+const reportProgress: ConnectorWriteTool = {
+  definition: {
+    name: 'report_progress',
+    description:
+      'Say what this Claude Code session is doing, for the person to see on the project page and in Dev while you work. Call it when you start, after each step you build or commit, when you stop to wait on the person (state waiting, with what you need in needs), and when you finish (done) or end without finishing (stopped). Each call rewrites this session\'s row for its step, so send the whole current picture each time. Pass session_id (your session\'s id, from CLAUDE_CODE_REMOTE_SESSION_ID), and run_id when your brief names the plan run you were sent as, thread_id when you answer in a session thread, and project when you work on one of their Dev projects rather than the dashboard itself.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string', description: 'This session\'s id, such as cse_015….' },
+        state: { type: 'string', enum: ['working', 'waiting', 'done', 'stopped'], description: 'working while you work, waiting when you need the person, done when finished, stopped when ending without finishing.' },
+        action: { type: 'string', description: 'What you did last or are doing now, in one line the person can read ("Committed the export page").' },
+        needs: { type: 'string', description: 'While waiting: what you need from them, as a question or a job they can act on. Ignored in any other state.' },
+        run_id: { type: 'string', description: 'The plan run this session was sent as (the id under "Ending this run" in the brief). The step is taken from it.' },
+        plan_item_id: { type: 'string', description: 'The plan step\'s id, when you know it and are on a different step from the run\'s.' },
+        thread_id: { type: 'string', description: 'The session thread you answer in, when you were started from one.' },
+        project: { type: 'string', description: 'The Dev project\'s id (such as music-pipeline) when you work on one of their projects.' },
+      },
+      required: ['session_id', 'state', 'action'],
+      additionalProperties: false,
+    },
+  },
+  async run(ctx, input) {
+    let report;
+    try {
+      report = readProgress(input);
+    } catch (error) {
+      if (error instanceof ProgressInputError) throw new AskInputError(error.message);
+      throw error;
+    }
+    const { data, error } = await ctx.core.rpc('report_session_progress', progressRpcArgs(ctx.userId, report));
+    if (error) throw new AskInputError(error.message);
+    const row = data as { id: string; state: string; plan_item_id: string | null; updated_at: string };
+    return {
+      ok: true,
+      rows: [
+        {
+          table: 'core.session_progress',
+          ref: row.id,
+          title: report.action,
+          href: report.project ? `/dev/projects/${report.project}` : '/dev/plan',
+          detail: { state: row.state, needs: report.needs, updated_at: row.updated_at },
+        },
+      ],
+      note: report.state === 'waiting' ? 'Reported as waiting on the person.' : `Reported as ${report.state}.`,
+    };
+  },
+};
+
 /** Every write the connector offers, in the order clients are sent them. */
 export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addToReadingList,
@@ -947,6 +1001,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   rewritePost,
   suggestPost,
   addProject,
+  reportProgress,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,

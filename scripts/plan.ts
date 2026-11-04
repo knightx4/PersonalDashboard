@@ -72,6 +72,10 @@
  *                                [--option "…" ...]   # one line on the run fired at <n> (or
  *                                # the feature above it), shown live on the run's page; a
  *                                # question takes 1-10 options and parks the run on you
+ *   npx tsx scripts/plan.ts progress <n> --state working|waiting|done|stopped --action "…"
+ *                                [--needs "…"] [--project <id>] [--thread <id>] [--session <id>]
+ *                                # what this session is doing on <n> now, for the project
+ *                                # pages and Dev; --needs says what it waits on you for
  *   npx tsx scripts/plan.ts response <n>   # your answer to the run's last question, or
  *                                # "No answer yet"; what a session that asked reads back
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
@@ -132,6 +136,7 @@ import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
+import { ProgressInputError, currentSessionId, progressRpcArgs, readProgress } from '../lib/plan/session-progress';
 import { branchesContaining } from '../lib/plan/branches';
 import {
   needsLines,
@@ -1593,6 +1598,63 @@ async function main(): Promise<void> {
         await sql`update plan_runs set status = ${next} where id = ${run.id} and user_id = ${userId}`;
       }
       console.log(`#${item.number} run line (${line.kind}): ${line.body}`);
+      return;
+    }
+
+    // What this session is doing now (plan #2800.1): its row in
+    // core.session_progress for this step, rewritten on each call, which the
+    // project pages and Dev show while it works. The same write as the Dash
+    // connector's report_progress, for a builder with no connector loaded.
+    // The run is the newest one fired at the step or above it, when there is one.
+    if (command === 'progress') {
+      let report;
+      try {
+        report = readProgress({
+          session_id: arg('--session') ?? currentSessionId(process.env),
+          state: arg('--state'),
+          action: arg('--action'),
+          needs: arg('--needs'),
+          project: arg('--project'),
+          thread_id: arg('--thread'),
+          plan_item_id: item.id,
+        });
+      } catch (error) {
+        if (error instanceof ProgressInputError) fail(error.message);
+        throw error;
+      }
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date }[]
+      >`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      const a = progressRpcArgs(userId, { ...report, planRunId: run?.id ?? null });
+      await sql`
+        select id from core.report_session_progress(
+          ${a.p_user_id}::uuid, ${a.p_session_id}, ${a.p_state}, ${a.p_action}, ${a.p_needs},
+          ${a.p_plan_run_id}::uuid, ${a.p_plan_item_id}::uuid, ${a.p_thread_id}::uuid, ${a.p_project})`;
+      console.log(
+        `${ref(item.number)} progress (${report.state}): ${report.action}` +
+          (report.needs ? `\nNeeds: ${report.needs}` : ''),
+      );
       return;
     }
 
