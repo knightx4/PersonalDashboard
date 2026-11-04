@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { PeopleView } from '@/app/chat/people-view';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
+import { prefersReducedMotion } from '@/components/motion/reduced';
 import { Button } from '@/components/ui/button';
 import type { PersonRow, ThreadMessage } from '@/lib/you/chat-threads-model';
 
@@ -17,7 +18,7 @@ import type { PersonRow, ThreadMessage } from '@/lib/you/chat-threads-model';
 
 /** Waits `ms` on the document's own clock, which a recording slows with the animations. */
 function wait(ms: number): Promise<void> {
-  if (typeof document.documentElement.animate !== 'function') return new Promise((done) => setTimeout(done, ms));
+  if (prefersReducedMotion() || typeof document.documentElement.animate !== 'function') return new Promise((done) => setTimeout(done, ms));
   return document.documentElement.animate([{ opacity: 1 }, { opacity: 1 }], { duration: ms }).finished.then(() => undefined);
 }
 
