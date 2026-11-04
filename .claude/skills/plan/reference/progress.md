@@ -20,6 +20,12 @@ the last, so send the whole current picture each time.
 4. **When you finish**: `done`, with what you shipped. A session that ends
    without finishing reports `stopped`, with why.
 
+A `waiting` report reaches the person within a minute as a row in the Goals
+Inbox and a push to their phone (plan #2800.4), and only that state does. Their
+answer comes back through the way your report names: `thread_id` (read it with
+`read_thread`) or the plan run (`plan.ts response <n>`). A report with neither
+is listed but cannot be answered from the Inbox, so give one.
+
 One line each, in the writing guide's plain words. An action is cut at 300
 characters.
 

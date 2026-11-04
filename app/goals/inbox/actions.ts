@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { answerFrom } from '@/lib/core/run-questions';
+import { answerSessionQuestion } from '@/lib/core/session-questions-store';
+import type { AnswerRunState } from '@/components/runs/run-answer';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { snoozeRow, unsnoozeRow } from '@/lib/core/inbox-snooze-store';
 import { dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
@@ -121,4 +124,28 @@ export async function restoreStepNoticeAction(form: FormData): Promise<SnoozeSta
   } catch {
     return { error: 'Could not bring that notice back. Try again.' };
   }
+}
+
+/**
+ * Your answer to a session that stopped to ask you something (plan #2800.4).
+ * The form names the session's report in `runId`, the field the shared answer
+ * box posts; the rules, and the way back to the session, are in
+ * lib/core/session-questions-store.ts.
+ */
+// latency: pending
+export async function answerSessionQuestionAction(_prev: AnswerRunState, form: FormData): Promise<AnswerRunState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('runId'));
+  if (!id.success) return { error: 'Could not tell which question that was.' };
+  const parsed = answerFrom(form.get('answer'));
+  if ('refusal' in parsed) return { error: parsed.refusal };
+  const outcome = await answerSessionQuestion({
+    supabase: await createClient(),
+    userId: user.id,
+    progressId: id.data,
+    answer: parsed.answer,
+  });
+  if (!outcome.ok) return { error: outcome.error };
+  revalidatePath('/goals', 'layout');
+  return { answered: parsed.answer, continued: outcome.continued };
 }
