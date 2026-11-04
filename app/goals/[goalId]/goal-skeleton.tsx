@@ -1,3 +1,4 @@
+import { PageWide } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
 
@@ -11,7 +12,7 @@ import { PageHeaderSkeleton, Skeleton } from '@/components/ui/skeleton';
  */
 export function GoalPageSkeleton() {
   return (
-    <div className="grid w-full grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+    <PageWide className="grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
       <div className="lg:col-start-1 lg:row-start-1">
         <Skeleton className="mb-3 h-3 w-32" />
         <PageHeaderSkeleton />
@@ -107,6 +108,6 @@ export function GoalPageSkeleton() {
           </div>
         </div>
       </div>
-    </div>
+    </PageWide>
   );
 }
