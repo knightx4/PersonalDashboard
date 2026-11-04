@@ -49,6 +49,8 @@ import { useRefreshWhileRunning } from '../refresh-while-running';
 import { AdvisorAvatar } from '../advisor-avatar';
 import { SeatLabel } from '../seat-label';
 import { QuestionDebate } from './debate';
+import { ForecastDecision } from './forecast';
+import { isForecast } from '@/lib/you/board-spread';
 import type { MakeProps } from './make';
 import type { DecideAction } from './decision';
 import { Evidence, Prose } from './prose';
@@ -98,9 +100,12 @@ export type MeetingOpen = {
   decide?: 'open' | 'error';
   /** The Make it happen card with a failed write's error showing (plan #2561.9). */
   make?: 'error';
+  /** One advisor's dot on a decision's strip open, by key (plan #2581.9). */
+  dot?: string;
 };
 
-const DECIDE_ERROR = 'Your decision was not saved. Try again.';const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
+const DECIDE_ERROR = 'Your decision was not saved. Try again.';
+const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -185,21 +190,43 @@ export function MeetingView({
   const state = meetingState(meeting, now);
   useRefreshWhileRunning(state.kind === 'running');
   const isDebate = debate.questions.length > 0;
-  const questions = debate.questions.map((question, index) => (
-    <QuestionDebate
-      key={question.id}
-      question={question}
-      number={index + 1}
-      of={debate.questions.length}
-      advisors={debate.advisors}
-      running={state.kind === 'running'}
-      decide={decide}
-      decideOpen={open.decide !== undefined}
-      decideError={open.decide === 'error' ? DECIDE_ERROR : null}
-      make={make}
-      makeFailed={open.make === 'error' ? MAKE_ERROR : null}
-    />
-  ));
+  // A decision worked with probabilities (plan #2581.9) leads with its
+  // headline and spread; one scored out of 10 keeps the debate view.
+  const forecastMeeting = debate.questions.some(isForecast);
+  const title = meetingTitle(meeting);
+  const questions = debate.questions.map((question, index) =>
+    isForecast(question) ? (
+      <ForecastDecision
+        key={question.id}
+        question={question}
+        number={index + 1}
+        of={debate.questions.length}
+        advisors={debate.advisors}
+        running={state.kind === 'running'}
+        showQuestion={question.question !== title}
+        decide={decide}
+        decideOpen={open.decide !== undefined}
+        decideError={open.decide === 'error' ? DECIDE_ERROR : null}
+        make={make}
+        makeFailed={open.make === 'error' ? MAKE_ERROR : null}
+        openDot={open.dot ?? null}
+      />
+    ) : (
+      <QuestionDebate
+        key={question.id}
+        question={question}
+        number={index + 1}
+        of={debate.questions.length}
+        advisors={debate.advisors}
+        running={state.kind === 'running'}
+        decide={decide}
+        decideOpen={open.decide !== undefined}
+        decideError={open.decide === 'error' ? DECIDE_ERROR : null}
+        make={make}
+        makeFailed={open.make === 'error' ? MAKE_ERROR : null}
+      />
+    ),
+  );
 
   const keep = (kind: MarkKind, item: string, saved: BoardMark | null | undefined) =>
     setMarks((current) => {
@@ -211,15 +238,25 @@ export function MeetingView({
   const markOf = (kind: MarkKind, item: string | null) =>
     item ? marks.get(markKey(kind, item)) : undefined;
 
-  const title = meetingTitle(meeting);
   const counts = progress(minutes, [...marks.values()]);
   const ready = state.kind === 'ready';
 
+  const decideBy = debate.questions.find((q) => q.decideBy)?.decideBy ?? null;
   const details = (
     <DetailFacts>
       <Property label="Held" value={meeting.heldOn ? heldOnLabel(meeting.heldOn) : 'Not yet'} />
       <Property label="Kind" value={meeting.kind === 'called' ? 'Called' : 'Weekly'} />
-      {ready && isDebate ? (
+      {forecastMeeting ? (
+        <>
+          {decideBy && <Property label="Decide by" value={heldOnLabel(decideBy)} />}
+          {debate.questions.length > 1 && (
+            <Property label="Questions" value={String(debate.questions.length)} />
+          )}
+          {debate.advisors.length > 0 && (
+            <Property label="Advisors" value={String(debate.advisors.length)} />
+          )}
+        </>
+      ) : ready && isDebate ? (
         <>
           <Property label="Questions" value={String(debate.questions.length)} />
           <Property label="Advisors" value={String(debate.advisors.length)} />
@@ -253,8 +290,8 @@ export function MeetingView({
         <Card padding="standard" className="flex items-start gap-2.5" role="status">
           <DashMark state="working" activity="reading" decorative className="mt-0.5" />
           <p className="text-body text-ink">
-            The advisors are meeting, started {formatDateTime(state.since, timezone, now)}. This page
-            fills in with the minutes when it is done.
+            The advisors are meeting, started {formatDateTime(state.since, timezone, now)}. This
+            page fills in with the minutes when it is done.
             {meeting.runUrl && (
               <>
                 {' '}
@@ -290,7 +327,7 @@ export function MeetingView({
       header={<PageHeader title={title} subject={subject} />}
       details={details}
       text={
-        minutes.since ? (
+        minutes.since && !forecastMeeting ? (
           <section aria-labelledby="board-since" className="space-y-2">
             <SectionHeading
               id="board-since"
@@ -304,6 +341,17 @@ export function MeetingView({
       }
     >
       {questions}
+
+      {forecastMeeting && minutes.since && (
+        <SectionFold
+          title={meeting.kind === 'called' ? 'Background' : 'Since last week'}
+          defaultOpen={false}
+        >
+          <Card padding="standard" className="space-y-2">
+            <Prose markdown={minutes.since} />
+          </Card>
+        </SectionFold>
+      )}
 
       {reviews.length > 0 && (
         <section aria-labelledby="board-reviews" className="space-y-3">
@@ -478,11 +526,18 @@ export function MeetingView({
         </section>
       )}
 
-      <section aria-labelledby="board-scorecard" className="space-y-3">
-        <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
-        <Scorecard scores={scorecard} bare={isDebate} />
-        {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
-      </section>
+      {/* A decision's page leaves out a scorecard with nothing graded yet (plan #2581.9). */}
+      {!(
+        forecastMeeting &&
+        picks.length === 0 &&
+        scorecard.every((s) => s.hits + s.misses === 0)
+      ) && (
+        <section aria-labelledby="board-scorecard" className="space-y-3">
+          <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
+          <Scorecard scores={scorecard} bare={isDebate} />
+          {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
+        </section>
+      )}
 
       {minutes.memos.length > 0 && (
         <SectionFold
@@ -606,7 +661,10 @@ function DisagreementCard({
           <li key={index} className="space-y-1">
             {called && position.stance ? (
               <p className="text-body font-semibold text-ink">
-                <SeatLabel seat={position.seat} text={`${SEAT_LABELS[position.seat]} · ${position.stance}`} />
+                <SeatLabel
+                  seat={position.seat}
+                  text={`${SEAT_LABELS[position.seat]} · ${position.stance}`}
+                />
               </p>
             ) : (
               <p className="text-small font-medium text-ink-muted">
@@ -962,8 +1020,14 @@ function PickScorecard({
             <tr key={score.advisor} className="align-top">
               <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
                 <span className="flex items-center gap-1.5">
-                  <AdvisorAvatar advisorKey={score.advisor} name={advisorName(score.advisor, names)} decorative />
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{advisorName(score.advisor, names)}</span>
+                  <AdvisorAvatar
+                    advisorKey={score.advisor}
+                    name={advisorName(score.advisor, names)}
+                    decorative
+                  />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {advisorName(score.advisor, names)}
+                  </span>
                 </span>
                 <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
                   {topicsLine(score)}

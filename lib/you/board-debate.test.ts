@@ -77,12 +77,39 @@ describe('verdictOf', () => {
         scores: [{ advisor: 'skeptic', scores: { A: 8, B: 2 } }, { advisor: 'mentor', scores: {} }],
       }),
     ).toEqual({
+      method: null,
+      probability: null,
+      spread: null,
+      forecasts: [],
+      steelman: null,
       recommended: 'A',
       conditions: ['One evening in writing'],
-      dissent: [{ advisor: 'mentor', text: 'Three days.' }],
+      dissent: [{ advisor: 'mentor', text: 'Three days.', option: null }],
       wouldChange: ['A full-time offer'],
       assumptions: [],
       scores: [{ advisor: 'skeptic', scores: { A: 8, B: 2 } }],
+    });
+  });
+});
+
+describe('verdictOf, since plan #2581.8', () => {
+  it('reads the weighted probabilities, the spread, the forecasts and the steelman', () => {
+    const got = verdictOf({
+      method: 'full',
+      recommended: 'B',
+      probability: { A: 0.41, B: 0.58, C: 2 },
+      spread: { A: 0.3 },
+      forecasts: [{ advisor: 'mentor', probabilities: { A: 0.3, B: 0.7 }, budget: { A: 25, B: 75 }, weight: 1 }, { advisor: 'x' }],
+      dissent: [{ advisor: 'cfo', option: 'A', text: 'Money first.' }],
+      steelman: { advisor: 'dreamer', option: 'C' },
+    });
+    expect(got).toMatchObject({
+      method: 'full',
+      probability: { A: 0.41, B: 0.58 },
+      spread: { A: 0.3 },
+      forecasts: [{ advisor: 'mentor', probabilities: { A: 0.3, B: 0.7 }, budget: { A: 25, B: 75 }, weight: 1 }],
+      dissent: [{ advisor: 'cfo', option: 'A', text: 'Money first.' }],
+      steelman: { advisor: 'dreamer', option: 'C' },
     });
   });
 });
