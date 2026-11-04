@@ -334,8 +334,8 @@ function Composer({
     >
       {hidden}
       {over}
-      {/* Roomy, the outline is the faint line and a soft shadow sets the box off, as Claude's is. */}
-      <ComposeBox className={roomy ? 'rounded-card border-border px-3 pb-2 pt-3 shadow-sm' : undefined}>
+      {/* Roomy, the faint outline sets the box off, as Claude's does. */}
+      <ComposeBox className={roomy ? 'rounded-card border-border px-3 pb-2 pt-3' : undefined}>
         {attached}
         <div className="flex items-start gap-2">
           {lead}
