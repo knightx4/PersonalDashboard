@@ -23,6 +23,11 @@ export type StripCard = {
   href: string;
   /** A step of yours that Done can close from the card (Now only). */
   canClose?: boolean;
+  /**
+   * What the Now card's button says when the step is done somewhere else,
+   * such as Answer for a question; the button opens it (plan #2778.11).
+   */
+  action?: string;
 };
 
 export type GoalStrip = {
@@ -53,11 +58,12 @@ export function goalStrip(
   const fallback = first ? undefined : yourMove.find((row) => row.kind !== 'do');
   const now: StripCard | null = first
     ? {
-        ...card(first, first.whose === 'question' ? 'Answer' : nowLine(first)),
+        ...card(first, first.whose === 'question' ? null : nowLine(first)),
         canClose: first.whose === 'you',
+        ...(first.whose === 'question' ? { action: 'Answer' } : {}),
       }
     : fallback
-      ? { id: fallback.id, title: fallback.title, line: fallback.label, href: fallback.href, canClose: false }
+      ? { id: fallback.id, title: fallback.title, line: null, href: fallback.href, canClose: false, action: fallback.label }
       : null;
   const nextEntry = [...rest, ...order.next][0] ?? null;
   const laterEntry = order.later[0] ?? null;
@@ -65,7 +71,7 @@ export function goalStrip(
     now,
     next: nextEntry ? card(nextEntry, whoseLine(nextEntry)) : null,
     later: laterEntry
-      ? card(laterEntry, laterEntry.waits?.label ?? whoseLine(laterEntry))
+      ? card(laterEntry, laterEntry.waits?.detail ?? laterEntry.waits?.label ?? whoseLine(laterEntry))
       : null,
     laterMore: Math.max(0, order.later.length - 1),
   };

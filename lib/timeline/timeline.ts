@@ -111,7 +111,7 @@ export function timelineHref(event: Pick<TimelineEvent, 'source_table' | 'source
     case 'public.orders':
       return `/shopping/orders/${event.source_id}`;
     case 'public.returns':
-      return '/shopping/returns';
+      return '/shopping/inventory/returns';
     case 'job_search.application_events':
     case 'job_search.interviews':
       return ref ? (sourceHref('job_search.roles', ref) ?? '/jobs/pipeline') : '/jobs/pipeline';

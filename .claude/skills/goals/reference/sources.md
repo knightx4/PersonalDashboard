@@ -255,7 +255,7 @@ Interviews, with their prep and what was asked.
 
 - Search: `notes`, `prep_notes`, `questions_asked`
 - Name a row by `notes`; link it by `id`
-- Opens at `/jobs/interviews`
+- Opens at `/jobs/pipeline?stage=in_process`
 - Name one by its application’s role (application_id → applications.role_id → roles.title).
 
 ### `job_search.companies` (Job search)

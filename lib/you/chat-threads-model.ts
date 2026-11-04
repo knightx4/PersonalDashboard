@@ -135,7 +135,7 @@ export type PersonRow = {
   id: string;
   key: string;
   name: string;
-  /** One quiet line about them, under their name in the thread. */
+  /** Their area in a word or two ("Money"), under their name in the thread; empty when there is none. */
   about: string;
   colour: string;
   canTalk: boolean;
@@ -156,11 +156,11 @@ export function sortPeople(rows: readonly PersonRow[]): PersonRow[] {
   });
 }
 
-/** The line under a name: their typing, the last thing said, or why there is nothing yet. */
+/** The line under a name: their typing, the last thing said, or an invitation to start. */
 export function previewOf(row: PersonRow, now: number): string {
   if (isTyping(row.typingUntil, now)) return 'typing…';
   if (row.last) return row.last.role === 'person' ? `You: ${row.last.text}` : row.last.text;
-  return row.canTalk ? 'No messages yet' : 'Not ready to talk yet';
+  return row.canTalk ? 'Say hello' : 'Not ready to talk yet';
 }
 
 /** Where a person's thread is. */
@@ -168,10 +168,63 @@ export function threadHref(key: string): string {
   return `/chat/people/${key}`;
 }
 
-/** A thread's time in the list: the clock today, the day this week, the date before that. */
+const SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Whole days from zone day `b` to zone day `a`, each written YYYY-MM-DD. */
+function dayDiff(a: string, b: string): number {
+  return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * A thread's time in the list, as a texting app writes it (the reference):
+ * the clock today ("7:12 AM"), "Yesterday", the short weekday within the week
+ * ("Sun"), and the month and day before that ("Oct 29"), with the year when
+ * it is not this one.
+ */
 export function threadTime(at: string, options: { timeZone: string; now: number }): string {
-  if (zoneDay(at, options.timeZone) === zoneDay(options.now, options.timeZone)) return whenTime(at, options);
-  return whenDay(at, options);
+  const day = zoneDay(at, options.timeZone);
+  const today = zoneDay(options.now, options.timeZone);
+  const diff = dayDiff(today, day);
+  // Today's clock keeps its AM or PM, as every time in the app does.
+  if (diff <= 0) return whenTime(at, options);
+  if (diff === 1) return 'Yesterday';
+  const [y, m, d] = day.split('-').map(Number);
+  if (diff <= 6) return SHORT_WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const text = `${SHORT_MONTHS[m - 1]} ${d}`;
+  return y === Number(today.slice(0, 4)) ? text : `${text}, ${y}`;
+}
+
+/** The quiet line under a thread's name: what they are on the council for, then how soon they answer. */
+export function threadDetail(row: Pick<PersonRow, 'about' | 'canTalk'>): string {
+  const pace = row.canTalk ? 'usually replies right away' : 'not ready to talk yet';
+  return row.about ? `${row.about} · ${pace}` : pace[0].toUpperCase() + pace.slice(1);
+}
+
+/** What each seat is on the council for, in a word or two, as the reference's "Money". */
+const SEAT_AREAS: Record<string, string> = {
+  cfo: 'Money',
+  hiring_manager: 'Job search',
+  mentor: 'Career',
+  skeptic: 'Pushes back',
+  dreamer: 'Ambitions',
+};
+
+/** The longest area kept whole, so "<area> · usually replies right away" fits one line on a phone. */
+const AREA_MAX = 12;
+
+/**
+ * A mentor's area in a word, as the reference's "Money": a seat's from the
+ * list above, anyone else's the first phrase of their focus, cut to its
+ * last word when that phrase is long ("Practical habits, thrift, …" is
+ * "Habits"), or nothing when even that is long.
+ */
+export function seatAreaOf(advisor: { key: string; kind: 'seat' | 'guest'; focus: string | null }): string {
+  if (advisor.kind === 'seat' && SEAT_AREAS[advisor.key]) return SEAT_AREAS[advisor.key];
+  const first = (advisor.focus ?? '').split(/[,.:;]/)[0]?.trim() ?? '';
+  const area = first.length > AREA_MAX ? (first.split(/\s+/).at(-1) ?? '') : first;
+  if (!area || area.length > AREA_MAX) return '';
+  return area[0].toUpperCase() + area.slice(1);
 }
 
 /** The search as kept: trimmed and cut to the box's length, or null for nothing to look for. */

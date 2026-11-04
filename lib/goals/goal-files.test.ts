@@ -90,7 +90,7 @@ describe('the files on a goal page (plan #1860)', () => {
       ['read', false],
       ['mine', false],
     ]);
-    expect(unreadWords(rows)).toBe('1 not read');
+    expect(unreadWords(rows)).toBe('1 unread');
     expect(unreadWords(rows.filter((row) => !row.unread))).toBeNull();
   });
 });

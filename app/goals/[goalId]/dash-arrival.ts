@@ -52,15 +52,25 @@ export function rememberArrived(id: string): void {
  * gentle bob (dash-mark-bob in app/globals.css) cannot be seen on a phone:
  * this one swells to nearly twice its size and takes the accent at the peak.
  */
-const FLASH_KEYFRAMES: Keyframe[] = [
-  { opacity: 0.4, transform: 'scale(0.7)' },
-  { opacity: 1, transform: 'scale(1.8)', color: 'var(--c-accent)', offset: 0.5 },
-  { opacity: 1, transform: 'scale(1)' },
-];
+function flashKeyframes(accent: string): Keyframe[] {
+  return [
+    { opacity: 0.4, transform: 'scale(0.7)' },
+    { opacity: 1, transform: 'scale(1.8)', color: accent, offset: 0.4 },
+    { opacity: 1, transform: 'scale(1.6)', color: accent, offset: 0.65 },
+    { opacity: 1, transform: 'scale(1)' },
+  ];
+}
 
+/**
+ * The accent is read off the mark itself and written out as a colour: a
+ * keyframe holding `var(--c-accent)` left the mark grey in every frame (plan
+ * #2778.11), and the colour is held across the top of the swell so a frame
+ * catches it.
+ */
 function flashMark(mark: HTMLElement): void {
   if (prefersReducedMotion() || typeof mark.animate !== 'function') return;
-  mark.animate(FLASH_KEYFRAMES, { duration: MOTION_MS.move, easing: EASE.outSoft });
+  const accent = window.getComputedStyle(mark).getPropertyValue('--c-accent').trim() || 'currentColor';
+  mark.animate(flashKeyframes(accent), { duration: MOTION_MS.move * 1.5, easing: EASE.outSoft });
 }
 
 /**

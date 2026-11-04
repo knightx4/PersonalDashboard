@@ -40,7 +40,17 @@ export type PlanWhose = 'you' | 'question' | 'dash';
  * `date` is a start date ahead, `step` another step still open, `person` a
  * block someone has to clear, and `rhythm` a step kept up rather than done.
  */
-export type PlanWait = { kind: 'date' | 'step' | 'person' | 'rhythm'; label: string };
+export type PlanWait = {
+  kind: 'date' | 'step' | 'person' | 'rhythm';
+  /** The chip's few words: "Starts 18 Dec", "After step 4", "After a step", "Blocked". */
+  label: string;
+  /**
+   * What a block asks for as written, or the step it waits on by title. The
+   * chip stays short so the row keeps its width (plan #2778.11); this is
+   * said on the row's own line.
+   */
+  detail?: string;
+};
 
 export type PlanEntry = {
   id: string;
@@ -97,7 +107,7 @@ function blockOf(
   if (!held) return null;
   const ask = held.blockAsk?.trim();
   // The ask as written: it often opens with a name, which lowering would spoil.
-  return { kind: 'person', label: ask || 'Blocked' };
+  return ask ? { kind: 'person', label: 'Blocked', detail: ask } : { kind: 'person', label: 'Blocked' };
 }
 
 function waitOf(node: StepNode, ancestors: readonly StepNode[]): PlanWait | null {
@@ -106,7 +116,9 @@ function waitOf(node: StepNode, ancestors: readonly StepNode[]): PlanWait | null
   }
   if (node.waitsUntil) return { kind: 'date', label: `Starts ${formatDay(node.waitsUntil)}` };
   const first = node.waitingOn?.[0];
-  if (first) return { kind: 'step', label: `After “${first.title}”` };
+  // The step it waits on is named on the row's line; the chip stays short
+  // (plan #2778.11). One the plan numbers is named by number further on.
+  if (first) return { kind: 'step', label: 'After a step', detail: `After “${first.title}”` };
   return blockOf(node, ancestors);
 }
 

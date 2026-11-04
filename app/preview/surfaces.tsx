@@ -109,7 +109,7 @@ import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModu
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
-import { UiStandard } from '@/app/dev/ui/standard';
+import { UiStandard, WorkspaceMoments } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
@@ -147,7 +147,6 @@ import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
-import { FollowUpsView } from '@/app/jobs/(app)/follow-ups/view';
 import type { FollowUp, OutreachPerson } from '@/lib/jobs/followup/load';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -163,7 +162,6 @@ import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { CompaniesPage } from '@/components/jobs/companies/companies-page';
 import type { CompanyRow } from '@/lib/jobs/companies-view';
-import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { buildFunnel } from '@/lib/jobs/home/funnel';
@@ -416,7 +414,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import type { DashChange } from '@/lib/talk/changes';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
@@ -627,10 +625,8 @@ import {
   TermsSurface,
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
-import { JobsInsightsSurface } from './jobs-insights-surface';
 import {
   JobsActivitySurface,
-  JobsAnalyticsSurface,
   JobsAnswersSurface,
   JobsCasePageSurface,
   JobsOnboardingSurface,
@@ -2041,62 +2037,6 @@ const todayPageSince: SinceView = {
   error: null,
 };
 
-/** Two upcoming rounds and three past ones, one of them still owing a debrief. */
-const interviewRounds: RoundView[] = [
-  {
-    key: 'ir1',
-    leadId: 'ti1',
-    roleId: 'role-p1',
-    companyName: 'Larkspur Vane',
-    roleTitle: 'Quantitative Developer, Systematic Strategies',
-    scheduledAt: '2026-09-11T13:30:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-09-11T14:30:00.000Z'),
-    round: 'Round 2 · Technical',
-    kind: 'Technical',
-    notes: null,
-  },
-  {
-    key: 'ir2',
-    leadId: 'ti2',
-    roleId: 'role-p2',
-    companyName: 'The Halloran-Achterberg group',
-    roleTitle: 'Software Developer',
-    scheduledAt: '2026-09-16T08:00:00.000Z',
-    timeKnown: false,
-    endsAt: Date.parse('2026-09-17T00:00:00.000Z'),
-    round: 'Round 3 · Final',
-    kind: '4 interviews',
-    notes: null,
-  },
-  {
-    key: 'ir3',
-    leadId: 'ti4',
-    roleId: 'role-p1',
-    companyName: 'Larkspur Vane',
-    roleTitle: 'Quantitative Developer, Systematic Strategies',
-    scheduledAt: '2026-08-27T09:00:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-08-27T09:45:00.000Z'),
-    round: 'Round 1',
-    kind: 'Phone screen',
-    notes: 'Went well. She asked mostly about the reconciliation rewrite.',
-  },
-  {
-    key: 'ir4',
-    leadId: 'ti5',
-    roleId: 'role-p10',
-    companyName: 'Pennyroyal',
-    roleTitle: 'Engineering Manager, Core Banking',
-    scheduledAt: '2026-08-25T15:00:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-08-25T15:30:00.000Z'),
-    round: null,
-    kind: 'Recruiter screen',
-    notes: null,
-  },
-];
-
 /**
  * A month with an ordinary amount in it: a week carrying three things, one
  * square over the dot limit, a couple of finished tasks and a long run of
@@ -2133,7 +2073,7 @@ const calendarEntries: Record<string, CalendarEntry[]> = {
       eventId: null,
       feedEventId: null,
       title: 'Return window closes — Sony WH-1000XM5',
-      href: '/shopping/returns',
+      href: '/shopping/inventory/returns',
       done: false,
     },
   ],
@@ -6397,6 +6337,20 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Chat's two moments as the catalogue on /dev/ui lists them (plan
+     * #2748.10), alone, since the whole page photographs taller than a
+     * browser shot reaches and the catalogue is near its foot. */
+    id: 'dev-ui-moments',
+    label: 'UI · the Chat moments in the catalogue',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <Card padding="standard">
+        <WorkspaceMoments workspace="chat" label="Chat" />
+      </Card>
+    ),
+  },
+  {
     /* The sent-back count on /dev/ui alone (plan #2215.5), with the empty and
      * unread states beneath, since the whole page is too tall to read a chart. */
     id: 'dev-ui-sent-back',
@@ -6601,35 +6555,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <MaterialView {...material} part="voice" />,
-  },
-  {
-    /* Follow-ups: who to tell about each application, and the note to them. */
-    id: 'jobs-follow-ups',
-    width: 'page',
-    label: 'Follow-ups',
-    module: 'jobs',
-    render: () => (
-      <FollowUpsView
-        followUps={followUpRows}
-        contactsByCompany={{
-          'co-1': [
-            { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
-            { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
-            { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
-          ],
-          'co-3': [{ id: 'c-8', name: 'Lee Park', title: 'Recruiter' }],
-        }}
-        timezone="Europe/London"
-      />
-    ),
-  },
-  {
-    /* The page before anything has been saved or applied for. */
-    id: 'jobs-follow-ups-empty',
-    width: 'page',
-    label: 'Follow-ups · Empty',
-    module: 'jobs',
-    render: () => <FollowUpsView followUps={[]} timezone="Europe/London" />,
   },
   {
     /* The page as it opens, in Pipeline's order: leads to reach out to,
@@ -6865,14 +6790,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <JobsTodaySurface board={{ ...todayBoard, interviews: [] }} />,
-  },
-  {
-    /* Analytics: how far each channel's applications got (plan #1595). */
-    id: 'jobs-insights',
-    label: 'Analytics · By channel',
-    module: 'jobs',
-    width: 'wide',
-    render: () => <JobsInsightsSurface />,
   },
   {
     /* The month grid, which is the todo module's densest surface and the one
@@ -8414,18 +8331,6 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <ConceptList concepts={subjectConcepts} nextId="k1" subjectId="s1" timezone="Europe/London" />
-    ),
-  },
-  {
-    id: 'jobs-interviews',
-    label: 'Interviews · Upcoming and past',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <>
-        <RoundsTable title="Upcoming" rows={interviewRounds.slice(0, 2)} timezone="Europe/London" />
-        <RoundsTable title="Past" rows={interviewRounds.slice(2)} timezone="Europe/London" />
-      </>
     ),
   },
 
@@ -12355,13 +12260,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <JobsActivitySurface />,
-  },
-  {
-    id: 'jobs-analytics',
-    label: 'Jobs · Analytics',
-    module: 'jobs',
-    width: 'page',
-    render: () => <JobsAnalyticsSurface />,
   },
   {
     id: 'jobs-answers',

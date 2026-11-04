@@ -32,7 +32,7 @@ export const SHOPPING: InboxRow[] = [
     href: '/shopping/orders/o1',
     move: onYou,
     later,
-    verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/returns' }],
+    verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/inventory/returns' }],
     decline,
   },
   {

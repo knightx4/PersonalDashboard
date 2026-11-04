@@ -27,7 +27,7 @@ const QUEUES: Record<
     many: '{n} guesses from your mail to check',
     line: 'Orders and emails the mail sync was not sure of',
     verb: 'Review',
-    href: '/shopping/review',
+    href: '/shopping/orders/review',
     section: 'review',
   },
   'jobs-review': {

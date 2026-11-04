@@ -97,6 +97,16 @@ const nextConfig: NextConfig = {
       { source: '/shopping/dashboard/:path*', destination: '/finances/spending/:path*', permanent: false },
       { source: '/shopping/recurring/:path*', destination: '/finances/recurring/:path*', permanent: false },
       /**
+       * A month of opens folded two Shopping pages into the tabs they sit
+       * under (plan #1496.8): Returns into Inventory and the review queue
+       * into Now, the orders list. Links already written into briefs,
+       * todos, notifications and Dash's replies still open them, with
+       * their ?view=, ?merchant= and ?group= carried across. The bare
+       * /returns and /review of the oldest links reach these from above.
+       */
+      { source: '/shopping/returns', destination: '/shopping/inventory/returns', permanent: false },
+      { source: '/shopping/review', destination: '/shopping/orders/review', permanent: false },
+      /**
        * The Board tab became the Council. Its list of questions and meetings
        * is now /you/council/decisions; a meeting, the roster and a panel
        * keep their paths under /you/council. Links already written into

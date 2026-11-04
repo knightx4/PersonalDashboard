@@ -8,8 +8,10 @@ import {
   previewOf,
   receiptOf,
   searchTextOf,
+  seatAreaOf,
   sortPeople,
   threadBlocks,
+  threadDetail,
   threadMessageOf,
   threadTime,
   type PersonRow,
@@ -99,13 +101,25 @@ describe('the People tab model', () => {
   it('previews typing, then the last line, then why there is nothing', () => {
     expect(previewOf(row({ typingUntil: '2026-11-03T09:00:05Z', last: { text: 'x', role: 'advisor', at: '' } }), NOW)).toBe('typing…');
     expect(previewOf(row({ last: { text: 'hi', role: 'person', at: '' } }), NOW)).toBe('You: hi');
-    expect(previewOf(row({}), NOW)).toBe('No messages yet');
+    expect(previewOf(row({}), NOW)).toBe('Say hello');
     expect(previewOf(row({ canTalk: false }), NOW)).toBe('Not ready to talk yet');
   });
 
-  it('times a thread by the clock today and by the day before', () => {
-    expect(threadTime('2026-11-03T07:12:00Z', { timeZone: ZONE, now: NOW })).toMatch(/7:12/);
+  it('times a thread as a texting app does: the clock, Yesterday, the weekday, the date', () => {
+    expect(threadTime('2026-11-03T07:12:00Z', { timeZone: ZONE, now: NOW })).toMatch(/^7:12\sAM$/u);
+    expect(threadTime('2026-11-03T00:05:00Z', { timeZone: ZONE, now: NOW })).toMatch(/^12:05\sAM$/u);
     expect(threadTime('2026-11-02T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Yesterday');
+    expect(threadTime('2026-11-01T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Sun');
+    expect(threadTime('2026-10-27T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Oct 27');
+    expect(threadTime('2025-10-29T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Oct 29, 2025');
+  });
+
+  it('names a mentor’s area in a word or two and says how soon they answer', () => {
+    expect(seatAreaOf({ key: 'cfo', kind: 'seat', focus: 'Six to twelve months: spending' })).toBe('Money');
+    expect(seatAreaOf({ key: 'franklin', kind: 'guest', focus: 'Practical habits, thrift, hard work.' })).toBe('Habits');
+    expect(seatAreaOf({ key: 'x', kind: 'guest', focus: null })).toBe('');
+    expect(threadDetail({ about: 'Money', canTalk: true })).toBe('Money · usually replies right away');
+    expect(threadDetail({ about: '', canTalk: false })).toBe('Not ready to talk yet');
   });
 
   it('cuts a search to the box', () => {

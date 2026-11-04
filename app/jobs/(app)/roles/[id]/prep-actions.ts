@@ -62,7 +62,7 @@ export async function writeRoundPrepNote(
 
   if (result.spent) {
     revalidatePath(`/jobs/roles/${result.roleId}`);
-    revalidatePath('/jobs/interviews');
+    revalidatePath('/jobs/pipeline');
     revalidatePath('/jobs');
   }
   return { note: result.note, error: null };

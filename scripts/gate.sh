@@ -42,8 +42,12 @@ export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
 export SKIP_BUILD_TYPECHECK=1
 
 # CI gives the typecheck an 8 GB heap (.github/workflows/ci.yml); without it
-# tsc runs out of memory on this repository before it finishes.
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
+# tsc runs out of memory on this repository before it finishes. Added to
+# whatever NODE_OPTIONS already holds (cloud sessions set --use-openssl-ca).
+case " ${NODE_OPTIONS:-} " in
+  *" --max-old-space-size="*) ;;
+  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=8192" ;;
+esac
 
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT

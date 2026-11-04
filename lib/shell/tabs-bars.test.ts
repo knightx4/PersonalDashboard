@@ -48,13 +48,11 @@ const BEFORE: Record<
       },
       // Returns to the view it was left on (note 978314f8).
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
-      { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
       { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
       { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
       { href: '/jobs/material', label: 'Material', icon: 'answers' },
-      { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
     ],
   },
   shopping: {
@@ -63,18 +61,9 @@ const BEFORE: Record<
     badge: '/shopping/inbox',
     bar: [
       { href: '/shopping/orders', label: 'Now', icon: 'orders' },
-      {
-        href: '/shopping/inbox',
-        label: 'Inbox',
-        icon: 'inbox',
-        alsoMatches: ['/shopping/review'],
-        badge: 7,
-      },
+      { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', badge: 7 },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-      { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-      { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-      { href: '/shopping/share', label: 'Share', icon: 'share' },
     ],
   },
 };
