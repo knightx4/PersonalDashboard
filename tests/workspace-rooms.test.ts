@@ -35,7 +35,7 @@ const LAYOUTS: Partial<Record<TabWorkspace, string>> = {
  * Workspaces that have no Inbox page yet. You (plan #1991) arrived after the
  * Inboxes were built (plan #1937.5); take it off this list when it has one.
  * Finances (plan #2593) is the same: nothing in it lands in an inbox yet.
- * Chat (plan #2748) opens on its two tabs, People and Dash, and the threads
+ * Chat (plan #2748) opens on its tabs, Messages and Dash, and the threads
  * themselves are where something new shows.
  */
 const NO_INBOX_YET = new Set(['you', 'finances', 'chat']);
