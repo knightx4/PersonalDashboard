@@ -1,5 +1,6 @@
 import { AskInputError, type AskDb, type AskRow } from '@/lib/ask/db';
 import { recordDashAction } from '@/lib/core/dash-actions';
+import { sessionThreadPath } from '@/lib/core/session-threads-model';
 import { refHref, toRef } from '@/lib/core/refs';
 import { isModuleId } from '@/lib/modules';
 import { insertPlanItem } from '@/lib/plan/insert-item';
@@ -39,9 +40,9 @@ import type { ConnectorWriteContext, ConnectorWriteTool } from './writes';
  * only children written after the record).
  */
 
-/** Where a thread opens. The thread screen is #2789.7's, in Chat. */
+/** Where a thread opens: its screen on Chat's Dash tab (#2789.7). */
 export function sessionThreadHref(threadId: string): string {
-  return `/ask?thread=${encodeURIComponent(threadId)}`;
+  return sessionThreadPath(threadId);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
