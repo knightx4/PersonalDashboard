@@ -81,6 +81,16 @@ const nextConfig: NextConfig = {
       },
       { source: '/news/quick', destination: '/news', permanent: false },
       /**
+       * A month of opens folded three News pages into the ones that hold
+       * them (plan #1496.10): Inbox and the Daily review show on Now, and a
+       * story's slide is the story as the newsletter's page lists it. Old
+       * links in briefs, notifications and Dash's replies still open them;
+       * a review's ?day= rides across to Now.
+       */
+      { source: '/news/inbox', destination: '/news', permanent: false },
+      { source: '/news/review', destination: '/news', permanent: false },
+      { source: '/news/i/:id/s/:index', destination: '/news/i/:id', permanent: false },
+      /**
        * Education moved from the Vault to You's Work & school tab (plan
        * #1991.3). A course or transcript link keeps its #anchor, which the
        * browser carries across the redirect, and a transcript's file link

@@ -340,6 +340,7 @@ export function InboxPage({
   alsoWaiting = 0,
   laterOpen = false,
   groups,
+  inFold = false,
   children,
 }: {
   /** Everything on you, in the order each section lists it. */
@@ -361,6 +362,12 @@ export function InboxPage({
    * whose `group` names none of them is not drawn.
    */
   groups?: readonly InboxGroup[];
+  /**
+   * Drawn inside a fold that already names the page and counts the rows
+   * (News's Now, plan #1496.10): the rows list straight under it, with no
+   * fold of their own per section and no total line after them.
+   */
+  inFold?: boolean;
   /** Anything the workspace keeps under the sections, before Later. */
   children?: ReactNode;
 }) {
@@ -398,7 +405,17 @@ export function InboxPage({
     <div className="space-y-6">
       {total + alsoWaiting === 0 && <EmptyState icon={InboxIcon} title={empty.title} description={empty.description} align={empty.align} />}
 
-      {sections.map((section) => (
+      {inFold && (
+        <ul className="divide-y divide-border">
+          {sections
+            .flatMap((section) => section.rows)
+            .map((row) =>
+              row.card ? <Fragment key={row.ref}>{row.card}</Fragment> : <ShapeRow key={row.ref} row={row} />,
+            )}
+        </ul>
+      )}
+
+      {!inFold && sections.map((section) => (
         <div key={section.key} id={inboxAnchor(section.key)} className="scroll-mt-bar">
           <Group
             fold
@@ -427,7 +444,7 @@ export function InboxPage({
         </div>
       ))}
 
-      {total > 0 && (
+      {total > 0 && !inFold && (
         <p className="tabular text-small text-ink-muted">
           {total === 1 ? '1 thing waiting on you' : `${total} things waiting on you`}
         </p>

@@ -432,7 +432,7 @@ import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
-import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
+import { NewsReviewFold, type NewsReviewFoldProps } from '@/app/news/now-fold-views';
 import { NeedsConfirming } from '@/app/news/all/needs-confirming';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
@@ -604,7 +604,7 @@ import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
   JobsInboxSurface,
   LearnInboxSurface,
-  NewsInboxSurface,
+  NewsInboxFoldSurface,
   ShoppingInboxSurface,
   TodoInboxSurface,
   VaultInboxSurface,
@@ -665,7 +665,6 @@ import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
-  NewsStorySurface,
   TodoAllSurface,
   TodoAllTaggedSurface,
   TodoSettingsSurface,
@@ -3137,7 +3136,7 @@ const reviewLines: [string, number][] = [
   ['NASA set a new date in March for the next crewed Moon flyby.', 1],
 ];
 
-const reviewFull: ReviewViewProps = {
+const reviewFull: NewsReviewFoldProps = {
   review: {
     dayLabel: 'Tuesday 6 October',
     writtenAt: '8:04\u00a0PM',
@@ -3147,21 +3146,21 @@ const reviewFull: ReviewViewProps = {
       ...reviewLines.map(([line, sources], i) => ({
         issueId: `issue-${i + 1}`,
         storyIndex: i % 3,
-        href: `/news/i/issue-${i + 1}/s/${i % 3}?from=review`,
+        href: `/news/i/issue-${i + 1}`,
         line,
         sources,
       })),
       {
         issueId: 'issue-local',
         storyIndex: 2,
-        href: '/news/i/issue-local/s/2?from=review',
+        href: '/news/i/issue-local',
         line: 'The council approved protected cycle lanes on Mill Road, with work starting in January.',
         sources: 1,
         local: true,
       },
     ],
   },
-  earlier: { href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' },
+  earlier: { href: '/news?day=2026-10-05', label: 'Mon 5 Oct' },
   later: null,
   todayAt: null,
 };
@@ -5771,13 +5770,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnInboxSurface />,
-  },
-  {
-    id: 'news-inbox',
-    label: 'News · Inbox, empty',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
@@ -11112,10 +11104,7 @@ export const SURFACES: readonly Surface[] = [
           module="news"
           sections={[
             { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-            { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
-            { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
           ]}
           settingsHref="/news/settings"
           settingsLabel="News settings"
@@ -11150,6 +11139,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <QuickReadView {...quickPageView} />
+      </div>
+    ),
+  },
+  {
+    /* Inbox and the Daily review as folds under the Quick read (plan #1496.10). */
+    id: 'news-now-folds',
+    label: 'News · Now with the Inbox and Daily review folds',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <>
+              <div className="mt-6">
+                <NewsInboxFoldSurface />
+              </div>
+              <div className="mt-6">
+                <NewsReviewFold {...reviewFull} />
+              </div>
+            </>
+          }
+        />
+      </div>
+    ),
+  },
+  {
+    /* Tonight's review could not be written and is tried again; an earlier day sits behind the arrow. */
+    id: 'news-now-folds-failed',
+    label: 'News · Now when the Daily review could not be written',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <div className="mt-6">
+              <NewsReviewFold
+                review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00 PM', overview: null, lines: [], retrying: true }}
+                earlier={{ href: '/news?day=2026-10-05', label: 'Mon 5 Oct' }}
+                later={null}
+                todayAt={null}
+              />
+            </div>
+          }
+        />
       </div>
     ),
   },
@@ -11227,36 +11264,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView {...savedStories} />,
-  },
-  {
-    id: 'news-review',
-    label: 'News · Daily review',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView {...reviewFull} />,
-  },
-  {
-    id: 'news-review-empty',
-    label: 'News · Daily review before the first one',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView review={null} earlier={null} later={null} todayAt={'8:00\u00a0PM'} />,
-  },
-  {
-    /* Tonight's run failed and is tried again on the hour until midnight;
-     * earlier days are still there behind the back arrow. */
-    id: 'news-review-failed',
-    label: 'News · Daily review that could not be written',
-    module: 'news',
-    width: 'page',
-    render: () => (
-      <ReviewView
-        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
-        earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
-        later={null}
-        todayAt={null}
-      />
-    ),
   },
   {
     id: 'news-saved-empty',
@@ -13274,13 +13281,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <NewsAllSurface />,
-  },
-  {
-    id: 'news-story',
-    label: 'News · One story on its own page',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsStorySurface />,
   },
   {
     id: 'news-settings',
