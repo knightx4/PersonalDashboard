@@ -12,7 +12,7 @@ function draw(body: string, marks: SourceMark[]): string {
 
 /** The answer's words with each mark written as [n]. */
 function marked(html: string): string {
-  return html.replace(/<a[^>]*>(\d+)<\/a>/g, '[$1]').replace(/<[^>]+>/g, '');
+  return html.replace(/<a[^>]*>(?:<span[^>]*>)?(\d+)(?:<\/span>)?<\/a>/g, '[$1]').replace(/<[^>]+>/g, '');
 }
 
 describe('namesFor and namedAt', () => {

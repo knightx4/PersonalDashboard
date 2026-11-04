@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The app's own pages that core rows open under. They belong to no
  * workspace, so a path to one starts at Home (refPath in lib/core/refs.ts).
  */
-const ASK: Section = { href: '/chat/dash', label: 'Questions to Dash' };
+const ASK: Section = { href: '/chat/dash', label: 'Dash' };
 const TIMELINE: Section = { href: '/timeline', label: 'Timeline' };
 const HOME: Section = { href: '/home', label: 'Home' };
 

@@ -136,8 +136,10 @@ export function MessageGroup({
     <div
       data-from={from}
       className={cn(
-        'mb-2 flex max-w-[80%] flex-col gap-0.5 sm:max-w-md',
-        from === 'you' ? 'items-end self-end' : 'items-start self-start',
+        'mb-2 flex max-w-xs flex-col gap-0.5 sm:max-w-md',
+        // The margin keeps a group to about four fifths of a phone's pane, so
+        // yours and theirs read as two sides; max-w-md caps it on a laptop.
+        from === 'you' ? 'ml-16 items-end self-end' : 'mr-16 items-start self-start',
       )}
     >
       {children}
