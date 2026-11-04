@@ -176,10 +176,22 @@ export function MessageGroup({
  * One message. Bubbles are round; within a group every bubble but the last
  * tucks its corner on the sender's side, so the run reads as one turn.
  */
-export function MessageBubble({ from, last = true, children }: { from: 'you' | 'them'; last?: boolean; children: string }) {
+export function MessageBubble({
+  from,
+  last = true,
+  arriving = false,
+  children,
+}: {
+  from: 'you' | 'them';
+  last?: boolean;
+  /** It came in while the thread was open, so it rises into place. */
+  arriving?: boolean;
+  children: string;
+}) {
   return (
     <p
       className={cn(
+        arriving && 'message-in',
         'whitespace-pre-wrap break-words rounded-[1.125rem] px-3 py-2 text-body', /* ui-ok: a chat bubble's round, from the reference; no card or control radius is a bubble */
         from === 'you' ? 'bg-accent text-fill-ink' : 'bg-sunken text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
@@ -214,14 +226,14 @@ export function MessageNote({ tone = 'quiet', children }: { tone?: 'quiet' | 'da
 /** Their typing: three dots in a bubble of theirs, at the foot of the thread. */
 export function TypingBubble({ name }: { name: string }) {
   return (
-    <div className="mb-2 self-start" role="status" aria-label={`${name} is typing`}>
+    <div className="typing-in mb-2 self-start" role="status" aria-label={`${name} is typing`}>
       <span className="flex items-center gap-1 rounded-[1.125rem] bg-sunken px-3.5 py-3.5">{/* ui-ok: a bubble's round, as MessageBubble */}
         {[0, 1, 2].map((i) => (
           <span
             key={i}
             aria-hidden
             className="typing-dot size-1.5 rounded-pill bg-ink-muted"
-            style={{ animationDelay: `${i * 160}ms` }}
+            style={{ animationDelay: `calc(var(--motion-quick) * ${i})` }}
           />
         ))}
       </span>

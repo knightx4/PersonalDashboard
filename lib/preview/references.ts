@@ -99,6 +99,20 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The same mockup, for an open thread: the person\'s initials in their colour on a bar above the messages, quiet day labels, your bubbles filled on the right and theirs on the left with the corners tucked inside a run, and the box fixed at the foot.',
     from: '2748.6',
   },
+  'chat-people-thread-typing-moment': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'The same mockup, for an open thread while their reply comes in: their bubbles on the left, with the three dots of their typing in a bubble of theirs at the foot.',
+    from: '2748.10',
+  },
+  'chat-people-arrives': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'The same mockup, for the People list when a text arrives: each mentor a row with a round avatar, their name, the last thing said, the time and a dot when it is unread.',
+    from: '2748.10',
+  },
   'ask-page-new': {
     pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
     link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',

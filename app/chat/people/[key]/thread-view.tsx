@@ -12,11 +12,13 @@ import {
   PersonMark,
   TypingBubble,
 } from '@/components/patterns/messaging';
+import { prefersReducedMotion } from '@/components/motion/reduced';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
+import { EASE, MOTION_MS } from '@/lib/motion';
 import { MESSAGE_MAX } from '@/lib/you/council-model';
 import {
   isTyping,
@@ -103,6 +105,10 @@ export function ThreadView({
   // a change) brings a fresher page, and the two are merged by id.
   const [heard, setMessages] = useState<ThreadMessage[]>([]);
   const messages = mergeMessages(page.messages, heard);
+  // What was on screen when the thread opened, and what older pages added, never rises in; a text of theirs after that does.
+  const [openingIds] = useState(() => new Set(page.messages.map((m) => m.id)));
+  const [olderIds, setOlderIds] = useState<ReadonlySet<string>>(new Set());
+  const arrives = (m: ThreadMessage) => m.role === 'advisor' && !openingIds.has(m.id) && !olderIds.has(m.id);
   const [olderState, setHasOlder] = useState<boolean | null>(null);
   const hasOlder = olderState ?? page.hasOlder;
   const [loadingOlder, setLoadingOlder] = useState(initialLoadingOlder);
@@ -162,15 +168,30 @@ export function ThreadView({
   }, [live, typingUntil]);
 
   // Start at the foot; after older messages arrive, stay where you were.
+  // When the foot moves because dots or a text came in, what is already there
+  // slides up to its place rather than jumping (the moment "A mentor typing").
+  const footSeen = useRef<{ height: number; kids: WeakSet<Element> } | null>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
+    const seen = footSeen.current;
     if (keepFrom.current !== null) {
       el.scrollTop = el.scrollHeight - keepFrom.current;
       keepFrom.current = null;
     } else if (atFoot.current) {
       el.scrollTop = el.scrollHeight;
+      const moved = seen ? el.scrollHeight - seen.height : 0;
+      if (seen && moved !== 0 && !prefersReducedMotion() && typeof el.animate === 'function') {
+        for (const kid of Array.from(el.children)) {
+          if (!seen.kids.has(kid)) continue;
+          kid.animate([{ transform: `translateY(${moved}px)` }, { transform: 'none' }], {
+            duration: MOTION_MS.move,
+            easing: EASE.outSoft,
+          });
+        }
+      }
     }
+    footSeen.current = { height: el.scrollHeight, kids: new WeakSet(Array.from(el.children)) };
   }, [messages, pending, typingUntil]);
 
   const loadOlder = useCallback(async () => {
@@ -184,6 +205,7 @@ export function ThreadView({
       setOlderError(result.error);
     } else {
       keepFrom.current = el ? el.scrollHeight - el.scrollTop : null;
+      setOlderIds((ids) => new Set([...ids, ...result.messages.map((m) => m.id)]));
       setMessages((list) => mergeMessages(result.messages, list));
       setHasOlder(result.hasOlder);
     }
@@ -310,7 +332,7 @@ export function ThreadView({
           <MessageGroup key={block.key} from={block.from}>
             {block.messages.map((m, i) => (
               <Fragment key={m.id}>
-                <MessageBubble from={block.from} last={i === block.messages.length - 1}>
+                <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={arrives(m)}>
                   {m.text}
                 </MessageBubble>
                 {m.receipts.map((r) => (

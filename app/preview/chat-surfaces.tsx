@@ -4,6 +4,7 @@ import { MENTOR_PALETTE, type PersonRow, type SearchHit, type ThreadMessage } fr
 import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
+import { ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -242,6 +243,45 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           }
         />
       </PeopleView>
+    </ChatShell>
+  );
+}
+
+/**
+ * Their typing, played (plan #2748.10): the dots rise in, give way to their
+ * text, and rise in again while another is coming.
+ */
+export function ChatTypingMomentSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <ChatTypingDemo
+        rows={rows}
+        person={FRANKLIN}
+        base={THREAD}
+        reply={msg('t9', 'advisor', 'Then write the bad version first. Nobody reads it but you.', '2026-11-03T09:00:10Z')}
+        typingUntil="2026-11-03T09:00:40Z"
+        timezone={ZONE}
+        now={NOW}
+      />
+    </ChatShell>
+  );
+}
+
+/** A text that arrives first, played (plan #2748.10): a mentor lower in the list writes and their row rises to the top. */
+export function ChatArrivalMomentSurface() {
+  const mentor = CHAT_PEOPLE[2];
+  const after = [
+    {
+      ...mentor,
+      unread: true,
+      last: { role: 'advisor' as const, text: 'You said you would call Dana by Friday. Have you picked a time?', at: '2026-11-03T08:59:00Z' },
+    },
+    ...CHAT_PEOPLE.filter((r) => r.id !== mentor.id),
+  ];
+  return (
+    <ChatShell path="/chat">
+      <ChatArrivalDemo before={CHAT_PEOPLE} after={after} timezone={ZONE} now={NOW} />
     </ChatShell>
   );
 }

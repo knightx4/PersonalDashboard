@@ -494,7 +494,7 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
-import { ChatPeopleSurface, ChatThreadSurface } from './chat-surfaces';
+import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8920,6 +8920,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="typing" />,
+  },
+  {
+    /* The moment "A mentor typing" played (plan #2748.10): the dots rise in, give way to their text, and rise in again while another is coming. */
+    id: 'chat-people-thread-typing-moment',
+    label: 'Chat · A thread, them typing then replying',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-typing"]',
+      shows:
+        'Their three dots rise in at the foot of the thread, then give way to their first bubble rising from the same place, and the dots rise in again below it while another text is coming.',
+    },
+    render: () => <ChatTypingMomentSurface />,
+  },
+  {
+    /* The moment "A text that arrives first" played (plan #2748.10): their row rises to the top of the list with the new preview and an unread dot. */
+    id: 'chat-people-arrives',
+    label: 'Chat · People, a text arriving first',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-arrival"]',
+      shows:
+        'The Mentor’s row rises from the third place to the top as the rows it passes move down one place each, its preview line changes to the new text and its unread dot lands.',
+    },
+    render: () => <ChatArrivalMomentSurface />,
   },
   {
     /* Scrolled to the top of a long thread: earlier messages loading above the oldest shown. */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
@@ -8,6 +8,7 @@ import { PersonMark } from '@/components/patterns/messaging';
 import { Input } from '@/components/ui/field';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
+import { useRowArrival } from './use-row-arrival';
 import {
   isTyping,
   personInitials,
@@ -100,6 +101,8 @@ export function PeopleList({
 }) {
   useLiveThreads(live);
   const now = useTypingClock(rows, start, live);
+  const listRef = useRef<HTMLUListElement>(null);
+  useRowArrival(listRef, rows);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
@@ -119,7 +122,7 @@ export function PeopleList({
       {hits ? (
         <SearchResults hits={hits} query={query ?? ''} timezone={timezone} now={now} />
       ) : (
-        <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
           {rows.map((row) => (
             <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
           ))}
@@ -144,7 +147,7 @@ function PersonItem({
 }) {
   const typing = isTyping(row.typingUntil, now);
   return (
-    <li>
+    <li data-person-row={row.id} className="relative rounded-control">
       <Link
         href={threadHref(row.key)}
         aria-current={current && !wide ? 'page' : undefined}
@@ -159,6 +162,7 @@ function PersonItem({
             {row.name}
           </span>
           <span
+            data-person-preview
             className={cn(
               'line-clamp-2 text-small',
               typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted',
@@ -171,7 +175,7 @@ function PersonItem({
           {row.last && (
             <span className="tabular text-small text-ink-muted">{threadTime(row.last.at, { timeZone: timezone, now })}</span>
           )}
-          {row.unread && <span role="img" aria-label="Unread" className="size-2 rounded-pill bg-accent" />}
+          {row.unread && <span role="img" aria-label="Unread" data-person-unread className="size-2 rounded-pill bg-accent" />}
         </span>
       </Link>
     </li>
