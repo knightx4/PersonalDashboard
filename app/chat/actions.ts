@@ -104,6 +104,8 @@ export type PersonSaveInput = {
   brief: PersonBrief;
   persona: string;
   joinsMeetings: boolean;
+  /** What they text first about, for someone with a rule (plan #2854.1). */
+  textWhen?: string[];
   /** Who wrote the card as it is saved. */
   author: CardAuthor;
 };

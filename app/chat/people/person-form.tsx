@@ -16,6 +16,7 @@ import { cn } from '@/lib/cn';
 import { whenDate } from '@/lib/core/when';
 import { MENTOR_PALETTE, personInitials, threadHref } from '@/lib/you/chat-threads-model';
 import type { CouncilMemory } from '@/lib/you/council-model';
+import { ruleFor } from '@/lib/you/first-texts';
 import {
   ASK_MAX,
   BUBBLE_LABELS,
@@ -55,6 +56,7 @@ export type PersonFormActions = {
     brief: PersonBrief;
     persona: string;
     joinsMeetings: boolean;
+    textWhen?: string[];
     author: { by: 'you' | 'dash'; ask: string | null };
   }) => Promise<{ key: string } | { error: string }>;
   draft: (input: { name: string; brief: PersonBrief; current?: string | null; ask?: string | null }) => Promise<{ card: string } | { error: string }>;
@@ -96,7 +98,7 @@ export function PersonForm({
   /** For the gallery: the memory line being corrected. */
   editing?: string | null;
   /** For the gallery: open scrolled to a part further down. */
-  scrollTo?: 'card' | 'versions' | 'memory' | null;
+  scrollTo?: 'card' | 'versions' | 'memory' | 'texts' | null;
 }) {
   const router = useRouter();
   const adding = !card.id;
@@ -105,6 +107,7 @@ export function PersonForm({
   const [brief, setBrief] = useState<PersonBrief>(card.brief);
   const [persona, setPersona] = useState(card.persona);
   const [joins, setJoins] = useState(card.joinsMeetings);
+  const [textWhen, setTextWhen] = useState<string[]>(() => (card.texts ?? []).filter((t) => t.on).map((t) => t.kind));
   const [ask, setAsk] = useState('');
   const [drafted, setDrafted] = useState<Drafted | null>(null);
   const [drafting, setDrafting] = useState(initialDrafting);
@@ -133,7 +136,16 @@ export function PersonForm({
     setSaveError(null);
     startSave(async () => {
       const author = drafted && drafted.card === persona.trim() ? { by: 'dash' as const, ask: drafted.ask } : { by: 'you' as const, ask: null };
-      const result = await actions.save({ advisorId: card.id, name, colour, brief, persona, joinsMeetings: joins, author });
+      const result = await actions.save({
+        advisorId: card.id,
+        name,
+        colour,
+        brief,
+        persona,
+        joinsMeetings: joins,
+        ...(card.texts ? { textWhen } : {}),
+        author,
+      });
       if ('error' in result) {
         setSaveError(result.error);
         return;
@@ -312,7 +324,35 @@ export function PersonForm({
           <Memory key={card.id} lines={card.memory} name={card.name} actions={actions} removing={removing} editing={editing} />
         )}
 
-        <section>
+        {card.texts && card.texts.length > 0 && (
+          <section id="person-texts" className="flex scroll-mt-4 flex-col gap-3">
+            <div>
+              <SectionLabel as="h2">When {card.name} texts first</SectionLabel>
+              <p className="mt-1 text-small text-ink-muted">
+                One text for everything since the last, at most {ruleFor(card.key)?.dailyLimit ?? 4} a day, and never from 10 PM to 8 AM.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-3">
+              {card.texts.map((t) => (
+                <li key={t.kind}>
+                  <label className="flex cursor-pointer items-start justify-between gap-4">
+                    <span className="min-w-0">
+                      <span className="block text-ui text-ink">{t.label}</span>
+                      <span className="mt-0.5 block text-small text-ink-muted">{t.hint}</span>
+                    </span>
+                    <Switch
+                      checked={textWhen.includes(t.kind)}
+                      onChange={(e) => setTextWhen((on) => (e.target.checked ? [...on.filter((k) => k !== t.kind), t.kind] : on.filter((k) => k !== t.kind)))}
+                      aria-label={t.label}
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className={cn(card.texts && card.texts.length > 0 && 'border-t border-border pt-6')}>
           <label className="flex cursor-pointer items-start justify-between gap-4">
             <span className="min-w-0">
               <span className="block text-ui text-ink">Join board meetings</span>
