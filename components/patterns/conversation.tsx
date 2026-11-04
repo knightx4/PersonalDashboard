@@ -120,8 +120,9 @@ export function Conversation({
         aria-label={label}
         className={cn(
           'min-w-0 min-[720px]:sticky min-[720px]:top-16 min-[720px]:max-h-[calc(100dvh-6rem)] min-[720px]:self-start min-[720px]:overflow-y-auto',
-          // A pane of its own, the height of the chat beside it.
-          fill && listOpen && cn('min-[720px]:sheet min-[720px]:rounded-card min-[720px]:bg-surface min-[720px]:p-3', PANE_H),
+          // A flat column the height of the chat beside it, on the page with
+          // no card around it, as Claude's sidebar is (plan #2863).
+          fill && listOpen && cn('min-[720px]:pr-1', PANE_H),
           open && 'max-[719px]:hidden',
         )}
       >
@@ -144,7 +145,27 @@ export function Conversation({
         </div>
 
         <div className={cn(!listOpen && 'min-[720px]:hidden')}>
-          <div className="flex items-center justify-between gap-2">
+          {fill && (
+            // The page's list from laptop width (plan #2863): no heading over
+            // it, New chat as the first row and the way to hide the list beside it.
+            <div className="hidden items-center gap-1 min-[720px]:flex">
+              <h2 className="sr-only">{label}</h2>
+              <Link
+                href={newChat.href}
+                className="press flex min-h-8 min-w-0 flex-1 items-center gap-2.5 rounded-control px-2 text-ui font-medium text-ink transition-colors duration-quick hover:bg-sunken"
+              >
+                <SquarePen className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                {newChat.label}
+              </Link>
+              <Tooltip label={`Hide ${label.toLowerCase()}`} align="end">
+                <IconButton label={`Hide ${label.toLowerCase()}`} onClick={() => toggle(false)}>
+                  <PanelLeftClose strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
+            </div>
+          )}
+          {/* On a phone the list is the page, under its heading. */}
+          <div className={cn('flex items-center justify-between gap-2', fill && 'min-[720px]:hidden')}>
             <h2 className="font-display text-title font-semibold tracking-tight text-ink">{label}</h2>
             <span className="flex items-center gap-1">
               {/* New chat sits by the heading, as a compact button, as chat apps put it. */}
@@ -179,6 +200,20 @@ export function Conversation({
 }
 
 /**
+ * The open chat's box: a card at reading width, or, filling the window, a
+ * plain filled pane with no outline, so the answers have a ground and the
+ * flat list beside it reads as the sidebar (plan #2863).
+ */
+function ChatPane({ fill, className, children }: { fill: boolean; className: string; children: React.ReactNode }) {
+  if (fill) return <div className={cn('rounded-card bg-surface', className)}>{children}</div>;
+  return (
+    <Card padding="standard" className={className}>
+      {children}
+    </Card>
+  );
+}
+
+/**
  * The open chat in the conversation pattern (plans #1899.2, #1899.4): its
  * title, then the thread, on one card at reading width, and the glance
  * column beside it when there is one. On a phone the way back to the list
@@ -200,10 +235,16 @@ export function ConversationChat({
   initialGlanceOpen,
   initialSheetOpen = false,
   fill = false,
+  quietTitle = false,
   children,
 }: {
   /** The chat's title. */
   title: string;
+  /**
+   * From 720 pixels wide the title line is left out and the title is read by
+   * screen readers only: a new chat, whose greeting says what it is (plan #2863).
+   */
+  quietTitle?: boolean;
   /** On a phone, the way back to the list the chat is drawn over. */
   back: { href: string; label: string };
   /**
@@ -302,26 +343,34 @@ export function ConversationChat({
         beside && (fill ? '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_17rem]' : '@min-[48rem]/chat:grid-cols-[minmax(0,1fr)_15rem]'),
       )}
     >
-      {/* The chat on one card, so neither side of it sits bare on the page. */}
-      <Card
-        padding={fill ? 'none' : 'standard'}
+      {/* The chat on one card, so neither side of it sits bare on the page.
+          Filling the window it is a filled pane with no outline and no rule
+          under its title (plan #2863). */}
+      <ChatPane
+        fill={fill}
         className={cn(
           'mx-auto w-full min-w-0',
           fill ? cn('flex flex-col min-[720px]:sticky min-[720px]:top-16', PANE_H) : 'max-w-prose',
         )}
       >
-        <div className={cn(fill ? 'shrink-0 border-b border-border px-(--card-p) py-3 max-[719px]:pt-(--card-p)' : 'mb-4')}>
-          <div className="mb-1 flex items-center justify-between gap-2 min-[720px]:hidden">
-            <BackLink crumbs={crumbs ?? []} fallback={back} />
-            {glanceButtons}
-          </div>
+        <div
+          className={cn(
+            fill ? 'shrink-0 px-(--card-p) py-3 max-[719px]:pt-(--card-p)' : 'mb-4',
+            quietTitle && 'min-[720px]:sr-only',
+          )}
+        >
           {crumbs && crumbs.length > 0 && <Breadcrumb crumbs={crumbs} className="mb-1 hidden min-[720px]:flex" />}
-          <div className="flex items-start gap-2">
+          {/* One row at every width (plan #2863): on a phone the way back
+              leads it, then the title cut to one line, then the column's button. */}
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 min-[720px]:hidden">
+              <BackLink crumbs={crumbs ?? []} fallback={back} />
+            </span>
             {/* One quiet line, since the question's own bubble sits right under it (plan #2748.12). */}
             <h1 className="line-clamp-1 min-w-0 flex-1 break-words text-body font-semibold text-ink">
               {title}
             </h1>
-            <span className="hidden shrink-0 min-[720px]:flex">{glanceButtons}</span>
+            {glanceButtons}
           </div>
         </div>
         {fill ? (
@@ -332,7 +381,7 @@ export function ConversationChat({
         ) : (
           children
         )}
-      </Card>
+      </ChatPane>
 
       {beside && (
         <aside

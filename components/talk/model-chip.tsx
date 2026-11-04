@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { chipVariants } from '@/components/ui/chip';
+import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { DASH_CHOICES, type DashChoiceId } from '@/lib/core/models';
 
@@ -33,9 +34,12 @@ export function ModelChip({
   model,
   onModel,
   initialOpen = false,
+  quiet = false,
 }: {
   model: DashChoiceId;
   onModel: (model: DashChoiceId) => void;
+  /** Plain grey words under the box rather than a chip in its foot (plan #2863). */
+  quiet?: boolean;
   /** For the gallery: the list drawn open. */
   initialOpen?: boolean;
 }) {
@@ -76,7 +80,7 @@ export function ModelChip({
             setOpen(false);
           }
         }}
-        className={cn(chipVariants({ tone: 'neutral' }), 'press-area shrink-0 hover:text-ink')}
+        className={quiet ? QUIET_PICKER : cn(chipVariants({ tone: 'neutral' }), 'press-area shrink-0 hover:text-ink')}
       >
         <span>{label}</span>
         {/* On a phone too, where Add a file gives up its words to make room (plan #2458.5). */}
