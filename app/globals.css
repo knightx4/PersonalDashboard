@@ -1610,6 +1610,12 @@ body,
   --text-body--line-height: 1.55;
   --text-title: 20px;
   --text-title--line-height: 1.25;
+  /* A goal's own name at the head of its page, as the approved goal mockup
+   * sets it (plan #2778.11): 24px on a phone, 28px from laptop width. */
+  --text-headline: 24px;
+  --text-headline--line-height: 1.15;
+  --text-headline-lg: 28px;
+  --text-headline-lg--line-height: 1.1;
   --text-figure: 32px;
   --text-figure--line-height: 1.05;
   --text-figure-lg: 48px;

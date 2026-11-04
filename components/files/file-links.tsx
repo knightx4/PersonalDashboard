@@ -3,6 +3,7 @@ import { ChevronRight, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { fileHref, isUnread, type FileAuthor } from '@/lib/files/files';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { FileSheet } from './file-sheet';
 
 type FileLinkItem = {
   fileId: string;
@@ -16,6 +17,11 @@ type FileLinkItem = {
   /** Or who wrote it and when it was read, from which `unread` is worked out. */
   madeBy?: FileAuthor;
   readAt?: string | null;
+  /**
+   * The file's kind (Note, PDF, Img), drawn on a small page in place of the
+   * plain file icon, as a goal's Recent files card has it (plan #2778.11).
+   */
+  sheet?: string;
 };
 
 /**
@@ -34,7 +40,11 @@ export function FileLinks({ files, bare = false }: { files: FileLinkItem[]; bare
             href={fileHref(file.fileId)}
             className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-quick hover:bg-sunken"
           >
-            <FileText className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+            {file.sheet ? (
+              <FileSheet label={file.sheet} tone={file.byDash ? 'dash' : 'yours'} />
+            ) : (
+              <FileText className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+            )}
             <span className="min-w-0 flex-1">
               <span className="block text-ui font-medium text-ink">
                 {(file.unread ?? isUnread(file)) && (

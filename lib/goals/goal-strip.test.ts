@@ -51,9 +51,10 @@ describe('goalStrip', () => {
     expect(strip.now).toEqual({
       id: 'q',
       title: 'Which card first?',
-      line: 'Answer',
+      line: null,
       href: '?tab=plan#step-q',
       canClose: false,
+      action: 'Answer',
     });
     expect(strip.next).toEqual({
       id: 'next',

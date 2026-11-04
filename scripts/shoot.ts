@@ -81,7 +81,9 @@ function findChrome(): string {
 
 const CHROME = findChrome();
 const PORT = process.env.PREVIEW_PORT ?? '3400';
-const OUT = process.env.SHOOT_OUT?.trim() || join(process.cwd(), '.preview-shots');
+const OUT =
+  process.env.SHOOT_OUT?.trim() ||
+  join(process.cwd(), process.env.SHOOT_REDUCED_MOTION === '1' ? '.preview-shots/reduced' : '.preview-shots');
 const PROBE = process.env.SHOOT_PROBE_PORT ? Number(process.env.SHOOT_PROBE_PORT) : 9500;
 
 /**
@@ -511,6 +513,14 @@ const PLAYBACK = 0.25;
 const STRIPS = join(OUT, 'strips');
 
 /**
+ * `SHOOT_REDUCED_MOTION=1 npm run record -- <id>` films the interaction with
+ * the browser asking for reduced motion, for a moment whose reduced version
+ * has to be judged too (plan #2778.11). Its strips go to
+ * .preview-shots/reduced/strips/ unless SHOOT_OUT names a folder.
+ */
+const REDUCED_MOTION = process.env.SHOOT_REDUCED_MOTION === '1';
+
+/**
  * Stops every form sending while recording. A gallery fixture has nothing
  * behind it, so Quick read's Next form would reach for a server action that
  * fails and paint an error over the last frames of a swipe. The motion up to
@@ -632,6 +642,9 @@ async function recordOne(
     mobile: true,
   });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await send('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: REDUCED_MOTION ? 'reduce' : 'no-preference' }],
+  });
   await send('Page.navigate', { url: `http://localhost:${PORT}/preview?s=${surfaceId}` });
   await wait(2200);
   await send('Runtime.evaluate', {
