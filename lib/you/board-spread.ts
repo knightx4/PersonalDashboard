@@ -134,7 +134,10 @@ export type Agreement = {
 };
 
 /** How far the advisors' probabilities on one option are apart. */
-export function agreementOn(forecasts: readonly AdvisorForecast[], letter: string): Agreement | null {
+export function agreementOn(
+  forecasts: readonly AdvisorForecast[],
+  letter: string,
+): Agreement | null {
   const values = forecasts.flatMap((f) =>
     typeof f.probabilities[letter] === 'number' ? [f.probabilities[letter]] : [],
   );
@@ -174,7 +177,12 @@ export function headline(
   const agreement = agreementOn(forecasts, letter);
   const n = forecasts.length;
   if (running) {
-    const who = seated > n ? `${n} of ${seated} advisors have` : n === 1 ? 'One advisor has' : `${n} advisors have`;
+    const who =
+      seated > n
+        ? `${n} of ${seated} advisors have`
+        : n === 1
+          ? 'One advisor has'
+          : `${n} advisors have`;
     return `${who} answered so far, and ${letter} leads at ${pct(mean)}.`;
   }
   if (n === 1) return `${forecasts[0].advisor.name} gives ${letter} the best chance, ${pct(mean)}.`;
@@ -216,19 +224,26 @@ export function theExchange(question: DebateQuestion): DebateTurn[] {
 }
 
 /** The steelman on a unanimous decision: the brief for the option nobody backed, and the answer to it. */
-export function steelmanOf(question: DebateQuestion): { brief: DebateTurn; answer: DebateTurn | null } | null {
+export function steelmanOf(
+  question: DebateQuestion,
+): { brief: DebateTurn; answer: DebateTurn | null } | null {
   const brief = question.turns.find((t) => BRIEF_OPENING.test(t.text));
   if (!brief) return null;
   const answer =
     question.turns.find(
-      (t) => t.position > brief.position && t.addressedTo === brief.advisorId && t.advisorId !== brief.advisorId,
+      (t) =>
+        t.position > brief.position &&
+        t.addressedTo === brief.advisorId &&
+        t.advisorId !== brief.advisorId,
     ) ?? null;
   return { brief, answer };
 }
 
 /** What each advisor said once they heard the person's lean, in the order spoken. */
 export function leanReplies(question: DebateQuestion): DebateTurn[] {
-  return question.turns.filter((t) => t.round === 2 && t.addressedTo === null && !BRIEF_OPENING.test(t.text));
+  return question.turns.filter(
+    (t) => t.round === 2 && t.addressedTo === null && !BRIEF_OPENING.test(t.text),
+  );
 }
 
 /**
@@ -236,7 +251,10 @@ export function leanReplies(question: DebateQuestion): DebateTurn[] {
  * gets the first row where it is at least `gap` from every dot already
  * there, in order of value.
  */
-export function stackDots<T extends { p: number }>(dots: readonly T[], gap = 0.13): (T & { row: number })[] {
+export function stackDots<T extends { p: number }>(
+  dots: readonly T[],
+  gap = 0.13,
+): (T & { row: number })[] {
   const rows: number[][] = [];
   return [...dots]
     .sort((a, b) => a.p - b.p)
@@ -258,7 +276,9 @@ export function rangeText(range: ForecastRange, short = false, unit = true): str
       ? new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v)
       : v.toLocaleString('en-GB', { maximumFractionDigits: 2 });
   const span =
-    range.low === range.high ? n(range.low) : `${n(range.low)}${short ? '–' : ' to '}${n(range.high)}`;
+    range.low === range.high
+      ? n(range.low)
+      : `${n(range.low)}${short ? '–' : ' to '}${n(range.high)}`;
   return range.unit && unit ? `${span} ${range.unit}` : span;
 }
 

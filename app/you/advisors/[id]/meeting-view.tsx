@@ -104,7 +104,8 @@ export type MeetingOpen = {
   dot?: string;
 };
 
-const DECIDE_ERROR = 'Your decision was not saved. Try again.';const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
+const DECIDE_ERROR = 'Your decision was not saved. Try again.';
+const MAKE_ERROR = 'That goal is no longer open, so nothing was written under it.';
 
 const GRADE_LABELS: Record<Grade, string> = {
   hit: 'Hit',
@@ -211,19 +212,19 @@ export function MeetingView({
         openDot={open.dot ?? null}
       />
     ) : (
-    <QuestionDebate
-      key={question.id}
-      question={question}
-      number={index + 1}
-      of={debate.questions.length}
-      advisors={debate.advisors}
-      running={state.kind === 'running'}
-      decide={decide}
-      decideOpen={open.decide !== undefined}
-      decideError={open.decide === 'error' ? DECIDE_ERROR : null}
-      make={make}
-      makeFailed={open.make === 'error' ? MAKE_ERROR : null}
-    />
+      <QuestionDebate
+        key={question.id}
+        question={question}
+        number={index + 1}
+        of={debate.questions.length}
+        advisors={debate.advisors}
+        running={state.kind === 'running'}
+        decide={decide}
+        decideOpen={open.decide !== undefined}
+        decideError={open.decide === 'error' ? DECIDE_ERROR : null}
+        make={make}
+        makeFailed={open.make === 'error' ? MAKE_ERROR : null}
+      />
     ),
   );
 
@@ -289,8 +290,8 @@ export function MeetingView({
         <Card padding="standard" className="flex items-start gap-2.5" role="status">
           <DashMark state="working" activity="reading" decorative className="mt-0.5" />
           <p className="text-body text-ink">
-            The advisors are meeting, started {formatDateTime(state.since, timezone, now)}. This page
-            fills in with the minutes when it is done.
+            The advisors are meeting, started {formatDateTime(state.since, timezone, now)}. This
+            page fills in with the minutes when it is done.
             {meeting.runUrl && (
               <>
                 {' '}
@@ -342,7 +343,10 @@ export function MeetingView({
       {questions}
 
       {forecastMeeting && minutes.since && (
-        <SectionFold title={meeting.kind === 'called' ? 'Background' : 'Since last week'} defaultOpen={false}>
+        <SectionFold
+          title={meeting.kind === 'called' ? 'Background' : 'Since last week'}
+          defaultOpen={false}
+        >
           <Card padding="standard" className="space-y-2">
             <Prose markdown={minutes.since} />
           </Card>
@@ -522,11 +526,18 @@ export function MeetingView({
         </section>
       )}
 
-      <section aria-labelledby="board-scorecard" className="space-y-3">
-        <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
-        <Scorecard scores={scorecard} bare={isDebate} />
-        {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
-      </section>
+      {/* A decision's page leaves out a scorecard with nothing graded yet (plan #2581.9). */}
+      {!(
+        forecastMeeting &&
+        picks.length === 0 &&
+        scorecard.every((s) => s.hits + s.misses === 0)
+      ) && (
+        <section aria-labelledby="board-scorecard" className="space-y-3">
+          <SectionHeading id="board-scorecard" title="Scorecard" count="every meeting" />
+          <Scorecard scores={scorecard} bare={isDebate} />
+          {isDebate && picks.length > 0 && <PickScorecard picks={picks} names={names} />}
+        </section>
+      )}
 
       {minutes.memos.length > 0 && (
         <SectionFold
@@ -650,7 +661,10 @@ function DisagreementCard({
           <li key={index} className="space-y-1">
             {called && position.stance ? (
               <p className="text-body font-semibold text-ink">
-                <SeatLabel seat={position.seat} text={`${SEAT_LABELS[position.seat]} · ${position.stance}`} />
+                <SeatLabel
+                  seat={position.seat}
+                  text={`${SEAT_LABELS[position.seat]} · ${position.stance}`}
+                />
               </p>
             ) : (
               <p className="text-small font-medium text-ink-muted">
@@ -1006,8 +1020,14 @@ function PickScorecard({
             <tr key={score.advisor} className="align-top">
               <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
                 <span className="flex items-center gap-1.5">
-                  <AdvisorAvatar advisorKey={score.advisor} name={advisorName(score.advisor, names)} decorative />
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{advisorName(score.advisor, names)}</span>
+                  <AdvisorAvatar
+                    advisorKey={score.advisor}
+                    name={advisorName(score.advisor, names)}
+                    decorative
+                  />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {advisorName(score.advisor, names)}
+                  </span>
                 </span>
                 <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
                   {topicsLine(score)}

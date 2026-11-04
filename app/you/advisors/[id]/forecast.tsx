@@ -99,7 +99,12 @@ export function ForecastDecision({
   const undecided = finished && question.verdict !== null && question.decision === null;
 
   return (
-    <section aria-labelledby={headingId} className="space-y-6" data-board-question-debate data-board-forecast>
+    <section
+      aria-labelledby={headingId}
+      className="space-y-6"
+      data-board-question-debate
+      data-board-forecast
+    >
       <div className="space-y-3">
         <div className="space-y-1">
           {of > 1 && (
@@ -108,7 +113,10 @@ export function ForecastDecision({
             </p>
           )}
           {showQuestion || of > 1 ? (
-            <h2 id={headingId} className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
+            <h2
+              id={headingId}
+              className="text-body font-semibold text-ink [overflow-wrap:anywhere]"
+            >
               {question.question}
             </h2>
           ) : (
@@ -117,7 +125,10 @@ export function ForecastDecision({
             </h2>
           )}
         </div>
-        <p className="text-title font-semibold text-ink [overflow-wrap:anywhere]" data-board-headline>
+        <p
+          className="text-title font-semibold text-ink [overflow-wrap:anywhere]"
+          data-board-headline
+        >
           {headline(question, forecasts, running, question.seated.length)}
         </p>
         <SpreadCard
@@ -188,7 +199,8 @@ export function ForecastDecision({
           data-board-decide-bar
         >
           <span className="min-w-0 text-ui text-ink">
-            The advisors recommend <span className="font-semibold">{question.verdict.recommended}</span>
+            The advisors recommend{' '}
+            <span className="font-semibold">{question.verdict.recommended}</span>
           </span>
           <a href={`#decide-${question.id}`} className={buttonVariants({ size: 'sm' })}>
             Decide
@@ -211,7 +223,11 @@ export function ForecastDecision({
       )}
 
       {opened.length > 0 && (
-        <SectionFold title="Every answer in full" count={opened.length + lean.length} defaultOpen={false}>
+        <SectionFold
+          title="Every answer in full"
+          count={opened.length + lean.length}
+          defaultOpen={false}
+        >
           <AnswersInFull opened={opened} lean={lean} byId={byId} question={question} />
         </SectionFold>
       )}
@@ -222,7 +238,11 @@ export function ForecastDecision({
 /** "Success: … · Hard to undo", at the head of the spread. */
 function MeasureLine({ question }: { question: DebateQuestion }) {
   const parts = [
-    question.door === 'one_way' ? 'hard to undo' : question.door === 'two_way' ? 'easy to undo' : null,
+    question.door === 'one_way'
+      ? 'hard to undo'
+      : question.door === 'two_way'
+        ? 'easy to undo'
+        : null,
   ].filter(Boolean);
   if (!question.successMeasure && !parts.length) return null;
   return (
@@ -263,7 +283,9 @@ function SpreadCard({
   const placed = letter
     ? stackDots(
         forecasts.flatMap((f) =>
-          typeof f.probabilities[letter] === 'number' ? [{ forecast: f, p: f.probabilities[letter] }] : [],
+          typeof f.probabilities[letter] === 'number'
+            ? [{ forecast: f, p: f.probabilities[letter] }]
+            : [],
         ),
       )
     : [];
@@ -307,13 +329,19 @@ function SpreadCard({
                     forecast={forecast}
                     letter={letter!}
                     open={open === forecast.advisor.key}
-                    onToggle={() => setOpen((k) => (k === forecast.advisor.key ? null : forecast.advisor.key))}
+                    onToggle={() =>
+                      setOpen((k) => (k === forecast.advisor.key ? null : forecast.advisor.key))
+                    }
                   />
                 </li>
               ))}
             </ul>
           </div>
-          <div aria-hidden className="tabular mt-1.5 flex justify-between text-small text-ink-muted" style={{ marginInline: -DOT / 2 }}>
+          <div
+            aria-hidden
+            className="tabular mt-1.5 flex justify-between text-small text-ink-muted"
+            style={{ marginInline: -DOT / 2 }}
+          >
             <span>0%</span>
             <span>50%</span>
             <span>100%</span>
@@ -329,9 +357,12 @@ function SpreadCard({
         </div>
         {placed.length > 1 && mean !== null && agreement && (
           <p className="text-small text-ink-muted">
-            <span aria-hidden className="mr-1.5 inline-block h-3 w-0.5 translate-y-0.5 rounded-full bg-accent" />
-            {question.verdict?.probability ? 'Weighted by track record' : 'Mean so far'}, {pct(mean)}. From{' '}
-            {pct(agreement.low)} to {pct(agreement.high)}.
+            <span
+              aria-hidden
+              className="mr-1.5 inline-block h-3 w-0.5 translate-y-0.5 rounded-full bg-accent"
+            />
+            {question.verdict?.probability ? 'Weighted by track record' : 'Mean so far'},{' '}
+            {pct(mean)}. From {pct(agreement.low)} to {pct(agreement.high)}.
           </p>
         )}
         {placed.length === 0 && (
@@ -367,7 +398,12 @@ function SpreadCard({
                 aria-label={`${f.advisor.name}’s profile`}
                 className="press-area shrink-0 rounded-full"
               >
-                <AdvisorAvatar advisorKey={f.advisor.key} name={f.advisor.name} size="md" decorative />
+                <AdvisorAvatar
+                  advisorKey={f.advisor.key}
+                  name={f.advisor.name}
+                  size="md"
+                  decorative
+                />
               </Link>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="flex flex-wrap items-baseline gap-x-2 text-ui">
@@ -417,7 +453,12 @@ function DotButton({
         open ? 'ring-2 ring-accent' : 'hover:ring-2 hover:ring-border-strong',
       )}
     >
-      <AdvisorAvatar advisorKey={forecast.advisor.key} name={forecast.advisor.name} size="md" decorative />
+      <AdvisorAvatar
+        advisorKey={forecast.advisor.key}
+        name={forecast.advisor.name}
+        size="md"
+        decorative
+      />
     </button>
   );
 }
@@ -452,7 +493,12 @@ function DotPopover({
       data-board-dot-popover
     >
       <div className="flex items-start gap-2.5">
-        <AdvisorAvatar advisorKey={forecast.advisor.key} name={forecast.advisor.name} size="md" decorative />
+        <AdvisorAvatar
+          advisorKey={forecast.advisor.key}
+          name={forecast.advisor.name}
+          size="md"
+          decorative
+        />
         <div className="min-w-0 flex-1">
           <p className="text-ui font-semibold text-ink">{forecast.advisor.name}</p>
           <p className="tabular text-small text-ink-muted">
@@ -474,9 +520,13 @@ function DotPopover({
         </p>
       )}
       {forecast.assessment && (
-        <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">Answering: {forecast.assessment}</p>
+        <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">
+          Answering: {forecast.assessment}
+        </p>
       )}
-      {forecast.opening && <Prose markdown={withoutCitations(forecast.opening.text)} className="text-ui" />}
+      {forecast.opening && (
+        <Prose markdown={withoutCitations(forecast.opening.text)} className="text-ui" />
+      )}
       {forecast.changeMind && (
         <p className="text-ui text-ink [overflow-wrap:anywhere]">
           <span className="text-ink-muted">What would change their mind: </span>
@@ -491,7 +541,13 @@ function DotPopover({
 }
 
 /** Each option with every advisor's chance, 90% range and points. */
-function OptionsCard({ question, forecasts }: { question: DebateQuestion; forecasts: readonly AdvisorForecast[] }) {
+function OptionsCard({
+  question,
+  forecasts,
+}: {
+  question: DebateQuestion;
+  forecasts: readonly AdvisorForecast[];
+}) {
   const topOf = (f: AdvisorForecast) => {
     const budget = f.budget;
     if (!budget) return null;
@@ -512,7 +568,9 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
               <span className="tabular inline-flex size-5 shrink-0 translate-y-0.5 items-center justify-center rounded-control bg-sunken text-small font-semibold text-ink">
                 {option.letter}
               </span>
-              <span className="min-w-0 flex-1 text-body text-ink [overflow-wrap:anywhere]">{option.text}</span>
+              <span className="min-w-0 flex-1 text-body text-ink [overflow-wrap:anywhere]">
+                {option.text}
+              </span>
               <span className="tabular shrink-0 text-body font-semibold text-ink">
                 {mean !== null ? pct(mean) : '–'}
               </span>
@@ -531,7 +589,9 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
               </p>
               <dl
                 className="grid gap-x-3"
-                style={{ gridTemplateColumns: `repeat(${question.options.length}, minmax(0, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(${question.options.length}, minmax(0, 1fr))`,
+                }}
               >
                 {question.options.map((option) => {
                   const p = f.probabilities[option.letter];
@@ -547,7 +607,12 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
                           {typeof p === 'number' ? pct(p) : '–'}
                         </span>
                         {typeof points === 'number' && (
-                          <span className={cn('block text-small', backs ? 'text-ink' : 'text-ink-muted')}>
+                          <span
+                            className={cn(
+                              'block text-small',
+                              backs ? 'text-ink' : 'text-ink-muted',
+                            )}
+                          >
                             {points} pts
                           </span>
                         )}
@@ -566,9 +631,9 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
         })}
       </ul>
       <p className="card-pad-x border-t border-border py-2 text-small text-ink-muted">
-        For each advisor and option: their chance that it meets your measure, the points of 100 they bet
-        on it, and their 90% range{oneUnit ? `, ${oneUnit}` : ''}. In bold, the option each bet most on. Beside each option above, the
-        weighted chance.
+        For each advisor and option: their chance that it meets your measure, the points of 100 they
+        bet on it, and their 90% range{oneUnit ? `, ${oneUnit}` : ''}. In bold, the option each bet
+        most on. Beside each option above, the weighted chance.
       </p>
     </Card>
   );
@@ -617,13 +682,22 @@ function Conversation({
                 <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
               </Link>
             )}
-            <Card padding="standard" className={cn('min-w-0 flex-1 space-y-1.5', right ? 'sm:ml-12' : 'sm:mr-12')}>
+            <Card
+              padding="standard"
+              className={cn('min-w-0 flex-1 space-y-1.5', right ? 'sm:ml-12' : 'sm:mr-12')}
+            >
               <p className="text-small font-medium text-ink-muted">
                 {advisor?.name ?? 'An advisor'}
-                {brief && <span className="font-normal">{` · a brief for ${brief[1]}, which nobody backed, not their own view`}</span>}
+                {brief && (
+                  <span className="font-normal">{` · a brief for ${brief[1]}, which nobody backed, not their own view`}</span>
+                )}
                 {moved && <span className="tabular font-normal"> · moves to {moved}</span>}
               </p>
-              <Prose markdown={withoutCitations(turn.text.replace(/^Arguing for [A-Z], which nobody backed:\s*/, ''))} />
+              <Prose
+                markdown={withoutCitations(
+                  turn.text.replace(/^Arguing for [A-Z], which nobody backed:\s*/, ''),
+                )}
+              />
               <Evidence receipts={turn.receipts} written={[turn.text]} />
             </Card>
           </li>
@@ -634,7 +708,13 @@ function Conversation({
 }
 
 /** Each advisor's failure story, and the tripwire set from them. */
-function PremortemCard({ question, advisors }: { question: DebateQuestion; advisors: readonly DebateAdvisor[] }) {
+function PremortemCard({
+  question,
+  advisors,
+}: {
+  question: DebateQuestion;
+  advisors: readonly DebateAdvisor[];
+}) {
   const byKey = new Map(advisors.map((a) => [a.key, a]));
   const wire = question.tripwire;
   return (
@@ -646,7 +726,11 @@ function PremortemCard({ question, advisors }: { question: DebateQuestion; advis
             return (
               <li key={story.advisor} className="card-pad-x space-y-1 py-3">
                 <p className="flex items-center gap-1.5 text-ui font-medium text-ink">
-                  <AdvisorAvatar advisorKey={story.advisor} name={advisor?.name ?? story.advisor} decorative />
+                  <AdvisorAvatar
+                    advisorKey={story.advisor}
+                    name={advisor?.name ?? story.advisor}
+                    decorative
+                  />
                   {advisor?.name ?? story.advisor}
                 </p>
                 <p className="text-body text-ink [overflow-wrap:anywhere]">{story.text}</p>
@@ -662,18 +746,29 @@ function PremortemCard({ question, advisors }: { question: DebateQuestion; advis
       )}
       {wire && (
         <div
-          className={cn('card-pad-x space-y-1 bg-sunken py-3', question.premortem.length > 0 && 'border-t border-border')}
+          className={cn(
+            'card-pad-x space-y-1 bg-sunken py-3',
+            question.premortem.length > 0 && 'border-t border-border',
+          )}
           data-board-tripwire
         >
           <p className="text-small font-medium text-ink-muted">
             The tripwire
-            {wire.status === 'watching' && wire.checkOn && `, checked on ${heldOnLabel(wire.checkOn)}`}
+            {wire.status === 'watching' &&
+              wire.checkOn &&
+              `, checked on ${heldOnLabel(wire.checkOn)}`}
             {wire.status === 'tripped' && ', tripped'}
             {wire.status === 'cleared' && ', cleared'}
           </p>
-          <p className="text-body text-ink [overflow-wrap:anywhere]">{plainCondition(wire.condition)}</p>
-          {wire.fact && <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">{wire.fact}</p>}
-          <p className="text-ui text-ink-muted">If it trips, the decision goes back to the advisors.</p>
+          <p className="text-body text-ink [overflow-wrap:anywhere]">
+            {plainCondition(wire.condition)}
+          </p>
+          {wire.fact && (
+            <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">{wire.fact}</p>
+          )}
+          <p className="text-ui text-ink-muted">
+            If it trips, the decision goes back to the advisors.
+          </p>
         </div>
       )}
     </Card>
@@ -696,7 +791,8 @@ function AnswersInFull({
     <div className="space-y-3">
       <Card padding="none">
         <p className="card-pad-x border-b border-border bg-sunken py-2 text-small text-ink-muted">
-          Each advisor answered blind, from their own evidence, before seeing the others or your lean.
+          Each advisor answered blind, from their own evidence, before seeing the others or your
+          lean.
         </p>
         <ul className="divide-y divide-border">
           {opened.map((turn) => {
@@ -713,7 +809,9 @@ function AnswersInFull({
                       {advisor.name}
                     </Link>
                   )}
-                  {turn.assessment && <span className="text-small text-ink-muted">on {turn.assessment}</span>}
+                  {turn.assessment && (
+                    <span className="text-small text-ink-muted">on {turn.assessment}</span>
+                  )}
                 </p>
                 <Prose markdown={turn.text} />
                 {turn.changeMind && (

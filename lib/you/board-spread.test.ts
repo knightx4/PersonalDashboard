@@ -46,11 +46,41 @@ const turn = (over: Record<string, unknown>) => ({
 });
 
 const turns = [
-  turn({ advisor_id: 'a1', probabilities: { A: 0.4, B: 0.5 }, budget: { A: 40, B: 60 }, blind: true, ranges: { A: { low: 1, high: 3, unit: 'offers' } } }),
-  turn({ advisor_id: 'a2', probabilities: { A: 0.2, B: 0.6 }, budget: { A: 20, B: 80 }, blind: true, text: 'Say no [c41d0a2e]. The hours say so.' }),
-  turn({ advisor_id: 'a3', probabilities: { A: 0.8, B: 0.2 }, budget: { A: 90, B: 10 }, blind: true }),
-  turn({ advisor_id: 'a2', round: 2, kind: 'reply', addressed_to: 'a3', text: 'CFO, you count the money only.', probabilities: { A: 0.3, B: 0.5 } }),
-  turn({ advisor_id: 'a3', round: 2, kind: 'reply', addressed_to: 'a2', text: 'Skeptic, money is the constraint.' }),
+  turn({
+    advisor_id: 'a1',
+    probabilities: { A: 0.4, B: 0.5 },
+    budget: { A: 40, B: 60 },
+    blind: true,
+    ranges: { A: { low: 1, high: 3, unit: 'offers' } },
+  }),
+  turn({
+    advisor_id: 'a2',
+    probabilities: { A: 0.2, B: 0.6 },
+    budget: { A: 20, B: 80 },
+    blind: true,
+    text: 'Say no [c41d0a2e]. The hours say so.',
+  }),
+  turn({
+    advisor_id: 'a3',
+    probabilities: { A: 0.8, B: 0.2 },
+    budget: { A: 90, B: 10 },
+    blind: true,
+  }),
+  turn({
+    advisor_id: 'a2',
+    round: 2,
+    kind: 'reply',
+    addressed_to: 'a3',
+    text: 'CFO, you count the money only.',
+    probabilities: { A: 0.3, B: 0.5 },
+  }),
+  turn({
+    advisor_id: 'a3',
+    round: 2,
+    kind: 'reply',
+    addressed_to: 'a2',
+    text: 'Skeptic, money is the constraint.',
+  }),
   turn({ advisor_id: 'a1', round: 2, kind: 'reply', text: 'On your lean: no move.' }),
 ];
 
@@ -61,7 +91,11 @@ describe('a decision worked with probabilities', () => {
 
   it('reads the new columns and tells it from an older decision', () => {
     expect(isForecast(q)).toBe(true);
-    const old = debateFrom([question({ door: null })], [turn({ advisor_id: 'a1', scores: { A: 7 } })], advisors);
+    const old = debateFrom(
+      [question({ door: null })],
+      [turn({ advisor_id: 'a1', scores: { A: 7 } })],
+      advisors,
+    );
     expect(isForecast(old.questions[0])).toBe(false);
   });
 
@@ -75,7 +109,9 @@ describe('a decision worked with probabilities', () => {
   it('leads with the highest mean and says how far apart they are', () => {
     expect(leadingOption(q, forecasts)).toBe('A');
     expect(agreementOn(forecasts, 'A')).toMatchObject({ low: 0.3, high: 0.8, kind: 'split' });
-    expect(headline(q, forecasts, false)).toBe('The advisors give A the best chance, 50%, but range from 30% to 80%.');
+    expect(headline(q, forecasts, false)).toBe(
+      'The advisors give A the best chance, 50%, but range from 30% to 80%.',
+    );
   });
 
   it('prefers the verdict’s weighted numbers', () => {
@@ -118,8 +154,20 @@ it('gives a unanimous decision its steelman and no exchange', () => {
     [question()],
     [
       turn({ advisor_id: 'a1', probabilities: { A: 0.7, B: 0.3 }, blind: true }),
-      turn({ advisor_id: 'a2', round: 2, kind: 'reply', addressed_to: 'a1', text: 'Arguing for B, which nobody backed: the wall.' }),
-      turn({ advisor_id: 'a1', round: 2, kind: 'reply', addressed_to: 'a2', text: 'Skeptic, it does not hold.' }),
+      turn({
+        advisor_id: 'a2',
+        round: 2,
+        kind: 'reply',
+        addressed_to: 'a1',
+        text: 'Arguing for B, which nobody backed: the wall.',
+      }),
+      turn({
+        advisor_id: 'a1',
+        round: 2,
+        kind: 'reply',
+        addressed_to: 'a2',
+        text: 'Skeptic, it does not hold.',
+      }),
     ],
     advisors,
   );
@@ -137,7 +185,9 @@ it('names who is still answering, and cleans what the page quotes', () => {
   const q = debate.questions[0];
   const forecasts = forecastsOf(q, debate.advisors);
   expect(waitingOf(q, debate.advisors, forecasts).map((a) => a.key)).toEqual(['skeptic', 'cfo']);
-  expect(headline(q, forecasts, true, q.seated.length)).toBe('1 of 3 advisors have answered so far, and A leads at 70%.');
+  expect(headline(q, forecasts, true, q.seated.length)).toBe(
+    '1 of 3 advisors have answered so far, and A leads at 70%.',
+  );
   expect(withoutCitations('forty-two on side projects [c41d0a2e]. And [a note](/x).')).toBe(
     'forty-two on side projects. And [a note](/x).',
   );
@@ -155,5 +205,7 @@ describe('stackDots', () => {
 
 it('writes a range and the profile link', () => {
   expect(rangeText({ low: 5200, high: 6800, unit: 'a month' })).toBe('5,200 to 6,800 a month');
-  expect(advisorDecisionHref('cfo', 'q1')).toBe('/you/advisors/advisors/cfo?tab=record#decision-q1');
+  expect(advisorDecisionHref('cfo', 'q1')).toBe(
+    '/you/advisors/advisors/cfo?tab=record#decision-q1',
+  );
 });

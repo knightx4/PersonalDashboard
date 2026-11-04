@@ -1,7 +1,12 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { SEATS, type BoardReceipt } from '@/lib/you/board';
 import type { MadeItem } from '@/lib/you/board-make';
-import { optionsOf, type BoardOption, type QuestionStatus, QUESTION_STATUSES } from '@/lib/you/board-questions';
+import {
+  optionsOf,
+  type BoardOption,
+  type QuestionStatus,
+  QUESTION_STATUSES,
+} from '@/lib/you/board-questions';
 import { tripwireOf, type Tripwire } from '@/lib/you/board-tripwires';
 
 /**
@@ -103,7 +108,12 @@ export function decisionFromRow(row: Record<string, unknown>): QuestionDecision 
   if (row.status === 'decided') {
     const option = text(row.decided_option);
     return option
-      ? { kind: 'option', option, note, decidedAt: typeof row.decided_at === 'string' ? row.decided_at : null }
+      ? {
+          kind: 'option',
+          option,
+          note,
+          decidedAt: typeof row.decided_at === 'string' ? row.decided_at : null,
+        }
       : null;
   }
   if (row.status === 'deferred') return { kind: 'defer', option: null, note, decidedAt: null };
@@ -245,7 +255,9 @@ export function verdictOf(value: unknown): BoardVerdict | null {
       const advisor = text(d?.advisor);
       const said = text(d?.text);
       const option = text(d?.option);
-      return advisor && said ? [{ advisor, text: said, option: /^[A-Z]$/.test(option) ? option : null }] : [];
+      return advisor && said
+        ? [{ advisor, text: said, option: /^[A-Z]$/.test(option) ? option : null }]
+        : [];
     }),
     wouldChange: texts(row.would_change),
     assumptions: texts(row.assumptions),
@@ -328,7 +340,9 @@ export function debateFrom(
         status,
         door: row.door === 'one_way' || row.door === 'two_way' ? row.door : null,
         successMeasure: text(row.success_measure) || null,
-        decideBy: /^\d{4}-\d{2}-\d{2}/.test(text(row.decide_by)) ? text(row.decide_by).slice(0, 10) : null,
+        decideBy: /^\d{4}-\d{2}-\d{2}/.test(text(row.decide_by))
+          ? text(row.decide_by).slice(0, 10)
+          : null,
         lean: /^[A-Z]$/.test(text(row.lean)) ? text(row.lean) : null,
         premortem: premortemOf(row.premortem),
         tripwire: tripwireOf(row.tripwire),
@@ -349,7 +363,9 @@ export function debateFrom(
     (a, b) =>
       rank(a.id) - rank(b.id) || (created.get(a.id) ?? '').localeCompare(created.get(b.id) ?? ''),
   );
-  const spoke = new Set(turns.flatMap((t) => (t.addressedTo ? [t.advisorId, t.addressedTo] : [t.advisorId])));
+  const spoke = new Set(
+    turns.flatMap((t) => (t.addressedTo ? [t.advisorId, t.addressedTo] : [t.advisorId])),
+  );
   const verdictKeys = new Set(
     questions.flatMap((q) => [
       ...(q.verdict?.scores.map((s) => s.advisor) ?? []),
@@ -378,7 +394,11 @@ export function sortByBoard<T extends { kind: AdvisorKind; key: string; name: st
 // ---------------------------------------------------------------------------
 
 export type ScoreCell = { final: number | null; first: number | null };
-export type ScoreRow = { advisor: DebateAdvisor; cells: Record<string, ScoreCell>; backs: string | null };
+export type ScoreRow = {
+  advisor: DebateAdvisor;
+  cells: Record<string, ScoreCell>;
+  backs: string | null;
+};
 
 /**
  * The grid of who scored what: one row per advisor who scored the question,
@@ -386,7 +406,10 @@ export type ScoreRow = { advisor: DebateAdvisor; cells: Record<string, ScoreCell
  * when no turn carries one) beside the round 1 score. `backs` is the option
  * they scored highest at the end, or null on a tie at the top.
  */
-export function scoreGrid(question: DebateQuestion, advisors: readonly DebateAdvisor[]): ScoreRow[] {
+export function scoreGrid(
+  question: DebateQuestion,
+  advisors: readonly DebateAdvisor[],
+): ScoreRow[] {
   const rows: ScoreRow[] = [];
   for (const advisor of advisors) {
     const theirs = question.turns.filter((t) => t.advisorId === advisor.id && t.scores);
@@ -425,11 +448,12 @@ export function turnsInRound(question: DebateQuestion, round: Round): DebateTurn
 export function exchanges(question: DebateQuestion): { between: string[]; turns: DebateTurn[] }[] {
   const groups = new Map<string, { between: string[]; turns: DebateTurn[] }>();
   for (const turn of turnsInRound(question, 2)) {
-    const between = turn.addressedTo
-      ? [turn.advisorId, turn.addressedTo].sort()
-      : [turn.advisorId];
+    const between = turn.addressedTo ? [turn.advisorId, turn.addressedTo].sort() : [turn.advisorId];
     const key = between.join(':');
-    const group = groups.get(key) ?? { between: [turn.advisorId, ...(turn.addressedTo ? [turn.addressedTo] : [])], turns: [] };
+    const group = groups.get(key) ?? {
+      between: [turn.advisorId, ...(turn.addressedTo ? [turn.addressedTo] : [])],
+      turns: [],
+    };
     group.turns.push(turn);
     groups.set(key, group);
   }
@@ -500,9 +524,11 @@ export async function loadMeetingDebate(
       .select('id, key, name, kind, question, focus, sources:brain->sources')
       .eq('user_id', userId),
   ]);
-  if (questions.error) throw new Error(`Reading the meeting's questions failed: ${questions.error.message}`);
+  if (questions.error)
+    throw new Error(`Reading the meeting's questions failed: ${questions.error.message}`);
   if (turns.error) throw new Error(`Reading the meeting's debate failed: ${turns.error.message}`);
-  if (advisors.error) throw new Error(`Reading the board's advisors failed: ${advisors.error.message}`);
+  if (advisors.error)
+    throw new Error(`Reading the board's advisors failed: ${advisors.error.message}`);
   return debateFrom(
     (questions.data ?? []) as Record<string, unknown>[],
     (turns.data ?? []) as Record<string, unknown>[],
