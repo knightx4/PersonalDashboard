@@ -8,14 +8,13 @@ import { Input } from '@/components/ui/field';
 import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { filterRecipients, personInitials, recipientsOf, type PersonRow } from '@/lib/you/chat-threads-model';
-import { ADD_HREF } from '@/lib/you/people-cards-model';
 
 /**
  * New message on the Messages tab (plan #2879.2), in the thread's place: a
  * To box over everyone you can message, A to Z, and picking one starts the
  * chat with them (or opens the one there is) and goes to it. Someone not
- * ready to talk is listed but cannot be picked. Adding someone new is at the
- * foot until the Bots tab takes it over.
+ * ready to talk is listed but cannot be picked. Adding a bot is on the Bots
+ * tab (plan #2879.3), so the foot holds only Cancel.
  */
 export function NewMessage({
   everyone,
@@ -59,10 +58,7 @@ export function NewMessage({
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }]}
       foot={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Link href={ADD_HREF} className={buttonVariants({ variant: 'ghost' })}>
-            Add someone new
-          </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link href="/chat" className={buttonVariants({ variant: 'ghost' })}>
             Cancel
           </Link>
@@ -84,7 +80,7 @@ export function NewMessage({
         </label>
         {error && <p className="text-small text-danger">{error}</p>}
         {everyone.length === 0 ? (
-          <p className="text-ui text-ink-muted">No one to message yet. Add someone new, or put mentors on your council.</p>
+          <p className="text-ui text-ink-muted">No one to message yet. Add a bot on the Bots tab, or put mentors on your council.</p>
         ) : shown.length === 0 ? (
           <p className="text-ui text-ink-muted">No one called “{typed.trim()}”.</p>
         ) : (

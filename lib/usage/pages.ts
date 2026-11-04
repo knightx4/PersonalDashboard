@@ -7,6 +7,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/account/spend',
   '/auth/auth-code-error',
   '/chat',
+  '/chat/bots',
+  '/chat/bots/[key]',
   '/chat/dash',
   '/chat/dash/[ref]',
   '/chat/dash/session/[id]',

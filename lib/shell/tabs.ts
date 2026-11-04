@@ -31,10 +31,12 @@ export type WorkspaceTab = Omit<NavSection, 'badge'> & {
 };
 
 export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab[]>> = {
-  // Messages first, your chats with people and bots (plan #2879.2); Dash is Ask Dash's list of chats,
-  // which moved here from /ask (plan #2748.1).
+  // Messages first, your chats with people and bots (plan #2879.2); Bots, every bot A to Z
+  // with its edit panel (plan #2879.3); Dash is Ask Dash's list of chats, which moved here
+  // from /ask (plan #2748.1).
   chat: [
     { href: '/chat', label: 'Messages', icon: 'chatMessages', exact: true, alsoMatches: ['/chat/people/'] },
+    { href: '/chat/bots', label: 'Bots', icon: 'chatBots' },
     { href: '/chat/dash', label: 'Dash', icon: 'chatDash' },
   ],
   home: [

@@ -172,7 +172,7 @@ const STARTED = CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'c
 export const MESSAGE_ROWS = withChats(STARTED);
 
 /** Everyone New message offers: the people above, and one more with no chat yet. */
-const EVERYONE: PersonRow[] = [
+export const EVERYONE: PersonRow[] = [
   ...CHAT_PEOPLE,
   {
     id: 'm7',

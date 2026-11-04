@@ -178,6 +178,17 @@ export function recipientsOf(rows: readonly PersonRow[]): PersonRow[] {
   return [...rows].sort((a, b) => Number(b.canTalk) - Number(a.canTalk) || a.name.localeCompare(b.name));
 }
 
+/** The Bots tab's list (plan #2879.3): every bot on the roster, A to Z by name, chat or none. */
+export function botsOf(rows: readonly PersonRow[]): PersonRow[] {
+  return [...rows].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+}
+
+/** The quiet line under a bot's name on the Bots tab: what it is for, or that it cannot talk yet. */
+export function botLineOf(row: Pick<PersonRow, 'about' | 'canTalk'>): string {
+  if (row.canTalk) return row.about;
+  return row.about ? `${row.about} · not ready to talk yet` : 'Not ready to talk yet';
+}
+
 /** Who New message shows for what is typed in its To box: a name holding those letters. */
 export function filterRecipients(rows: readonly PersonRow[], typed: string): PersonRow[] {
   const q = typed.trim().toLowerCase();

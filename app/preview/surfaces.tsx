@@ -508,7 +508,7 @@ import {
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
 import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
-import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
+import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8989,9 +8989,33 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface state="loading" />,
   },
   {
-    /* The form for someone new in place of the thread (plan #2748.11): name, colour, who they are, how they talk, what they care about and never say, and Draft the card. */
+    /* The Bots tab (plan #2879.3): every bot A to Z, a long name and one not ready to talk among them, Add a bot at the head, and on a laptop the prompt to choose one. */
+    id: 'chat-bots',
+    label: 'Chat · Bots',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatBotsSurface />,
+  },
+  {
+    /* No bots at all: one card saying so, with Add a bot. */
+    id: 'chat-bots-empty',
+    label: 'Chat · Bots, none yet',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatBotsSurface state="empty" />,
+  },
+  {
+    /* The bots not read: the list's pane says so, and the form's pane says where a form opens. */
+    id: 'chat-bots-failed',
+    label: 'Chat · Bots not read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatBotsSurface state="failed" />,
+  },
+  {
+    /* The form for a new bot beside the list on the Bots tab (plan #2748.11, #2879.3): name, colour, who they are, how they talk, what they care about and never say, and Draft the card. */
     id: 'chat-person-add',
-    label: 'Chat · Adding someone',
+    label: 'Chat · Adding a bot',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonAddSurface />,
@@ -8999,7 +9023,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The form filled in, scrolled to the card, while Dash writes it. */
     id: 'chat-person-add-drafting',
-    label: 'Chat · Adding someone, Dash drafting the card',
+    label: 'Chat · Adding a bot, Dash drafting the card',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonAddSurface state="drafting" />,
@@ -9007,15 +9031,15 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The form filled in, scrolled to the card, with why the draft failed and Try again. */
     id: 'chat-person-add-failed',
-    label: 'Chat · Adding someone, the draft failed',
+    label: 'Chat · Adding a bot, the draft failed',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonAddSurface state="failed" />,
   },
   {
-    /* The same form for a mentor already there, opened from Edit on their thread, on what was filled in last time. */
+    /* The same form for a bot already there, its row lit on the Bots tab (or opened from Edit on its thread), on what was filled in last time. */
     id: 'chat-person-edit',
-    label: 'Chat · Editing someone',
+    label: 'Chat · Editing a bot',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface />,
@@ -9023,7 +9047,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
     id: 'chat-person-edit-versions',
-    label: 'Chat · Editing someone, their card and earlier cards',
+    label: 'Chat · Editing a bot, their card and earlier cards',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="card" />,
@@ -9031,7 +9055,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The card while Dash redrafts it from a sentence. */
     id: 'chat-person-edit-drafting',
-    label: 'Chat · Editing someone, Dash redrafting the card',
+    label: 'Chat · Editing a bot, Dash redrafting the card',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="redrafting" />,
@@ -9039,10 +9063,26 @@ export const SURFACES: readonly Surface[] = [
   {
     /* Scrolled to what they remember: one line being corrected, and the confirm before another is removed. */
     id: 'chat-person-edit-memory',
-    label: 'Chat · Editing someone, what they remember',
+    label: 'Chat · Editing a bot, what they remember',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="memory" />,
+  },
+  {
+    /* Scrolled to the foot (plan #2879.3): the confirm before the bot is deleted, saying its chat and memory go too. */
+    id: 'chat-person-edit-delete',
+    label: 'Chat · Editing a bot, the confirm before deleting it',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="delete" />,
+  },
+  {
+    /* A seat on the board, scrolled to the foot: one line on why it cannot be deleted, in place of Delete. */
+    id: 'chat-person-edit-seat',
+    label: 'Chat · Editing a seat, which cannot be deleted',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="seat" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),

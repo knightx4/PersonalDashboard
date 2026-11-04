@@ -11,11 +11,9 @@ import {
   type SearchHit,
   type ThreadPage,
 } from '@/lib/you/chat-threads';
-import { newPersonCard } from '@/lib/you/people-cards-model';
-import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard, startChatWith } from './actions';
+import { olderMessages, readThread, startChatWith } from './actions';
 import { NewMessage } from './new-message';
 import { ThreadView } from './people/[key]/thread-view';
-import { PersonForm } from './people/person-form';
 import { PeopleView } from './people-view';
 
 export const metadata = { title: 'Messages' };
@@ -27,7 +25,7 @@ function readAt(): number {
 }
 
 type Found = {
-  /** Everyone on the roster, for New message and the add form's colours. */
+  /** Everyone on the roster, for New message. */
   everyone: PersonRow[];
   /** Those with a chat, which the list shows. */
   rows: PersonRow[];
@@ -40,16 +38,15 @@ type Found = {
  * Chat's Messages tab (plan #2748.6, #2879.2), the page Chat opens on: the
  * people and bots you have a chat with, newest first, and on a laptop the
  * newest thread open beside them. `?q=` searches every thread's words,
- * `?new=1` opens New message in the thread's place, and `?add=1` the form
- * for adding someone (plan #2748.11).
+ * and `?new=1` opens New message in the thread's place. Adding a bot is on
+ * the Bots tab (plan #2879.3).
  */
 export default async function ChatMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; add?: string; new?: string }>;
+  searchParams: Promise<{ q?: string; new?: string }>;
 }) {
   const params = await searchParams;
-  const adding = params.add === '1';
   const composing = params.new === '1';
   const query = searchTextOf(params.q);
   const user = await requireUser();
@@ -78,18 +75,6 @@ export default async function ChatMessagesPage({
     return (
       <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
         <NewMessage everyone={found.everyone} start={startChatWith} />
-      </PeopleView>
-    );
-  }
-  if (adding && !found.failed) {
-    return (
-      <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
-        <PersonForm
-          card={newPersonCard(found.everyone.map((r) => r.colour))}
-          timezone={settings.timezone}
-          now={now}
-          actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory }}
-        />
       </PeopleView>
     );
   }

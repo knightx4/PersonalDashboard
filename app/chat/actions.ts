@@ -14,6 +14,7 @@ import {
   briefOf,
   cleanPersonForm,
   correctMemory,
+  deletePerson,
   draftPersona,
   draftReady,
   MEMORY_LINE_MAX,
@@ -29,7 +30,8 @@ import {
  * The People tab's presses that are not a send (plan #2748.6): reading the
  * page of a thread before the oldest one shown, and reading a thread, which
  * having it open does. A send goes through POST /api/chat/messages. Then
- * adding and editing a person and what they remember (plan #2748.11).
+ * adding and editing a person and what they remember (plan #2748.11), and
+ * deleting one from the Bots tab (plan #2879.3).
  */
 
 const KEY = /^[a-z0-9_-]{1,80}$/;
@@ -139,6 +141,22 @@ export async function draftPersonCard(input: {
   );
   await recordSpendReports(await createCoreClient(), user.id, { module: 'you', operation: 'draft-persona' }, reports);
   return drafted.ok ? { card: drafted.card } : { error: drafted.error };
+}
+
+/** Delete from the Bots tab (plan #2879.3): the bot, its chats and what it remembers. */
+// latency: pending
+export async function deletePersonCard(advisorId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  try {
+    const gone = await deletePerson(await createYouClient(), user.id, advisorId);
+    if (!gone) return { error: 'Only a bot you or Dash added can be deleted.' };
+    revalidatePath('/chat', 'layout');
+    return { error: null };
+  } catch (error) {
+    console.error('person not deleted', error);
+    return { error: 'They were not deleted. Try again.' };
+  }
 }
 
 // latency: instant

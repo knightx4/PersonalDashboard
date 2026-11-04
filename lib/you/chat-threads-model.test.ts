@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  botLineOf,
+  botsOf,
   filterRecipients,
   isTyping,
   MENTOR_PALETTE,
@@ -186,5 +188,23 @@ describe('the Messages list and New message (plan #2879.2)', () => {
     expect(filterRecipients(rows, '  a ').map((r) => r.name)).toEqual(['Ada', 'Bea', 'Cal']);
     expect(filterRecipients(rows, 'ZE').map((r) => r.name)).toEqual(['Zed']);
     expect(filterRecipients(rows, '')).toHaveLength(4);
+  });
+});
+
+describe('the Bots tab (plan #2879.3)', () => {
+  const rows = [
+    row({ id: '1', name: 'zed', chatId: 'c1' }),
+    row({ id: '2', name: 'Ada', chatId: null, canTalk: false }),
+    row({ id: '3', name: 'Bea', chatId: null }),
+  ];
+
+  it('lists every bot A to Z, with a chat or not and ignoring case', () => {
+    expect(botsOf(rows).map((r) => r.name)).toEqual(['Ada', 'Bea', 'zed']);
+  });
+
+  it('says what a bot is for, and when it cannot talk yet', () => {
+    expect(botLineOf({ about: 'Money', canTalk: true })).toBe('Money');
+    expect(botLineOf({ about: 'Money', canTalk: false })).toBe('Money · not ready to talk yet');
+    expect(botLineOf({ about: '', canTalk: false })).toBe('Not ready to talk yet');
   });
 });
