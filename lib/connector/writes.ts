@@ -583,6 +583,8 @@ const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => (
         op: made.op,
         summary: made.summary,
         beforeValues: made.before,
+        // A dashboard change keeps its one column, so its Undo outlasts edits to the goal's others.
+        ...(made.kind === 'change_goal_dashboard' ? { afterValues: made.after } : {}),
         undo: made.undo,
       },
     );

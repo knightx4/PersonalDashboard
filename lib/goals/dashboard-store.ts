@@ -19,7 +19,8 @@ import {
   type TileView,
 } from '@/lib/goals/dashboard-tiles';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { loadGoalSteps, loadMetricCounts, loadMetrics } from '@/lib/goals/metrics-store';
+import { loadMetricCounts } from '@/lib/goals/metrics-store';
+import { targetsContext, type DashboardTargets } from '@/lib/goals/dashboard-names';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { dayIn } from '@/lib/todo/time';
@@ -39,12 +40,16 @@ import { dayIn } from '@/lib/todo/time';
 /** One tile as the page draws it: the tile, and what is missing when it can no longer be drawn. */
 export type DashboardTile = { tile: Tile; problem: string | null };
 
-/** What a tile may read on the goal now: its live lists, metrics and steps. */
-export async function loadDashboardContext(
+/**
+ * What a tile may read on the goal now, with the names a person would use:
+ * its live lists, metrics and every live step under it. Every query names the
+ * person, since the connector and the goals routine read on the service role.
+ */
+export async function loadDashboardTargets(
   client: GoalsSupabaseClient,
   userId: string,
   goalId: string,
-): Promise<DashboardContext> {
+): Promise<DashboardTargets> {
   const [lists, metrics, steps] = await Promise.all([
     client
       .from('collections')
@@ -53,15 +58,39 @@ export async function loadDashboardContext(
       .eq('goal_id', goalId)
       .is('archived_at', null)
       .order('position'),
-    loadMetrics(client, goalId),
-    loadGoalSteps(client, goalId),
+    client
+      .from('metrics')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('goal_id', goalId)
+      .is('archived_at', null)
+      .order('position'),
+    client
+      .from('items')
+      .select('id, parent_id, title, status, due_on, position')
+      .eq('user_id', userId)
+      .eq('level', 'step')
+      .is('archived_at', null)
+      .order('position'),
   ]);
   if (lists.error) throw new Error(`Could not read the goal's lists: ${lists.error.message}`);
+  if (metrics.error) throw new Error(`Could not read the goal's metrics: ${metrics.error.message}`);
+  if (steps.error) throw new Error(`Could not read the goal's steps: ${steps.error.message}`);
+  const rows = (steps.data ?? []) as { id: string; parent_id: string | null; title: string; status: string; due_on: string | null }[];
   return {
     lists: (lists.data ?? []) as { id: string; name: string; fields: CollectionField[] }[],
-    metrics: metrics.map((m) => ({ id: m.id, name: m.name })),
-    stepIds: new Set(steps.map((s) => s.id)),
+    metrics: (metrics.data ?? []) as { id: string; name: string }[],
+    steps: walkDown(rows, goalId).map((s) => ({ id: s.id, title: s.title, parentId: s.parent_id, status: s.status, dueOn: s.due_on })),
   };
+}
+
+/** What a tile may read on the goal now: its live lists, metrics and steps. */
+export async function loadDashboardContext(
+  client: GoalsSupabaseClient,
+  userId: string,
+  goalId: string,
+): Promise<DashboardContext> {
+  return targetsContext(await loadDashboardTargets(client, userId, goalId));
 }
 
 /**
@@ -250,7 +279,7 @@ export async function loadDashboardData(
 
   const zone = safeTimeZone(timeZone);
   const stepRows = (steps.data ?? []) as StepRow[];
-  const tileSteps: TileStep[] = (wantsTree ? underGoal(stepRows, goal.id) : stepRows).map((s) => ({
+  const tileSteps: TileStep[] = (wantsTree ? walkDown(stepRows, goal.id) : stepRows).map((s) => ({
     id: s.id,
     title: s.title,
     dueOn: s.due_on,
@@ -273,18 +302,18 @@ export async function loadDashboardData(
   return { goalId: goal.id, today: todayIn(zone, now), lists: tileLists, metrics, steps: tileSteps, readings, goneLists };
 }
 
-/** The steps at any depth under the goal, walked down from it. */
-function underGoal(rows: readonly StepRow[], goalId: string): StepRow[] {
-  const children = new Map<string, StepRow[]>();
+/** The rows at any depth under `rootId` (a goal's steps, walked down from it), parents before children. */
+function walkDown<T extends { id: string; parent_id: string | null }>(rows: readonly T[], rootId: string): T[] {
+  const children = new Map<string, T[]>();
   for (const row of rows) {
     if (!row.parent_id) continue;
     const list = children.get(row.parent_id) ?? [];
     list.push(row);
     children.set(row.parent_id, list);
   }
-  const out: StepRow[] = [];
-  const seen = new Set<string>([goalId]);
-  let frontier = [goalId];
+  const out: T[] = [];
+  const seen = new Set<string>([rootId]);
+  let frontier = [rootId];
   while (frontier.length > 0) {
     const next: string[] = [];
     for (const id of frontier) {
@@ -321,7 +350,11 @@ export async function loadGoalDashboardViews(
 }
 
 /** Moving a tile one place, or taking it off. */
-export type TileMove = { kind: 'move'; index: number; by: -1 | 1 } | { kind: 'remove'; index: number };
+export type TileMove =
+  | { kind: 'move'; index: number; by: -1 | 1 }
+  /** To place `to` from 0, the tiles between shifting along (Ask Dash's move_tile). */
+  | { kind: 'place'; index: number; to: number }
+  | { kind: 'remove'; index: number };
 
 /**
  * Move a tile one place earlier or later, or remove it, from its menu.
@@ -350,6 +383,10 @@ export async function rearrangeGoalDashboard(
   if (move.index < 0 || move.index >= tiles.length) return false;
   if (move.kind === 'remove') {
     tiles.splice(move.index, 1);
+  } else if (move.kind === 'place') {
+    if (move.to < 0 || move.to >= tiles.length) return false;
+    const [tile] = tiles.splice(move.index, 1);
+    tiles.splice(move.to, 0, tile);
   } else {
     const to = move.index + move.by;
     if (to < 0 || to >= tiles.length) return false;

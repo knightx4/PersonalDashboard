@@ -10,7 +10,8 @@ import type { LearnChangeInput } from './learn-changes';
  * goal's measure or links, or an information step's form, changed (plan
  * #1894.7.3), and a step set aside or brought back, a Goals Inbox row snoozed
  * or brought back, or going to an event recorded (plan #1894.7.4), and a
- * goal's own lists and their rows changed (plan #2330.2).
+ * goal's own lists and their rows changed (plan #2330.2), and the tiles on
+ * a goal's dashboard (plan #2778.9).
  *
  * They take the shape Learn's six set out (lib/ask/learn-changes.ts): the
  * tool that made the change wrote the sentence and the link when it made it
@@ -28,6 +29,7 @@ export const GOALS_CHANGE_KINDS = [
   'change_goal_form',
   'change_goals_inbox',
   'change_goal_list',
+  'change_goal_dashboard',
 ] as const;
 
 export type GoalsChangeKind = (typeof GOALS_CHANGE_KINDS)[number];

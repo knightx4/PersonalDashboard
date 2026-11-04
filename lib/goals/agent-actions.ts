@@ -42,8 +42,8 @@ export const goalsActions: ModuleActions = {
   'app/goals/[goalId]/dashboard-actions.ts': {
     addTileRowAction: none('theirs'),
     logTileReadingAction: none('theirs'),
-    moveTileAction: none('theirs'),
-    removeTileAction: none('theirs'),
+    moveTileAction: tool('change_goal_dashboard'),
+    removeTileAction: tool('change_goal_dashboard'),
   },
   'app/goals/suggestion-actions.ts': {
     reactToSuggestionAction: none('theirs'),
