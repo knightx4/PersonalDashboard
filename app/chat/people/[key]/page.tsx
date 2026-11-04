@@ -38,8 +38,8 @@ export default async function ChatThreadPage({
   const client = await createYouClient();
   const now = readAt();
   const [everyone, settings] = await Promise.all([loadPeople(client, user.id), loadAccountSettings(user.id)]);
-  // The list beside it holds only the chats there are (plan #2879.2); the thread opens for anyone on the roster.
-  const rows = withChats(everyone);
+  // The list beside it holds only the chats there are (plan #2879.2), and this thread's row; the thread opens for anyone on the roster.
+  const rows = withChats(everyone, key);
   const person = everyone.find((r) => r.key === key);
   if (!person) notFound();
   if (edit === '1') {

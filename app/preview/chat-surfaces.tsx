@@ -168,7 +168,8 @@ function ChatShell({ path, children }: { path: string; children: React.ReactNode
  * Skeptic's is one just started from New message, nothing said yet, and
  * Richard Feynman, with no chat, is reached only through New message.
  */
-export const MESSAGE_ROWS = withChats(CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'chat-m4' } : r)));
+const STARTED = CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'chat-m4' } : r));
+export const MESSAGE_ROWS = withChats(STARTED);
 
 /** Everyone New message offers: the people above, and one more with no chat yet. */
 const EVERYONE: PersonRow[] = [
@@ -249,7 +250,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
     );
   }
   const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
-  const rows = MESSAGE_ROWS.map((r) =>
+  // The open thread keeps its row, as the page draws it, even for someone with no chat yet.
+  const rows = withChats(STARTED, who.key).map((r) =>
     state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
   );
   const messages =

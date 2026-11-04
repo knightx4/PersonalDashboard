@@ -173,6 +173,11 @@ describe('the Messages list and New message (plan #2879.2)', () => {
     expect(withChats(rows).map((r) => r.name)).toEqual(['Zed', 'Cal']);
   });
 
+  it('keeps the open thread in the list even before it has a chat', () => {
+    const keyed = rows.map((r, i) => ({ ...r, key: `k${i}` }));
+    expect(withChats(keyed, 'k2').map((r) => r.name)).toEqual(['Zed', 'Bea', 'Cal']);
+  });
+
   it('offers everyone A to Z, those not ready to talk last', () => {
     expect(recipientsOf(rows).map((r) => r.name)).toEqual(['Ada', 'Cal', 'Zed', 'Bea']);
   });

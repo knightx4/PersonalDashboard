@@ -167,8 +167,10 @@ export function previewOf(row: PersonRow, now: number): string {
  * The Messages list (plan #2879.2): only the people and bots you have a chat
  * with. Everyone else is reached through New message, which starts one.
  */
-export function withChats(rows: readonly PersonRow[]): PersonRow[] {
-  return rows.filter((r) => r.chatId !== null);
+export function withChats(rows: readonly PersonRow[], open: string | null = null): PersonRow[] {
+  // The open thread keeps a row, lit, even before it has a chat, so the list
+  // always says whose thread is beside it.
+  return rows.filter((r) => r.chatId !== null || r.key === open);
 }
 
 /** Who New message offers, A to Z: everyone, those ready to talk first. */
