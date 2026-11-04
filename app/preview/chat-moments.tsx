@@ -115,7 +115,14 @@ function GalleryButton({
   children: React.ReactNode;
 }) {
   return (
-    <div className={over ? 'fixed top-[calc(env(safe-area-inset-top)+6.25rem)] right-8 z-30' : 'mb-3'}>
+    // Over the bar it sits clear of Edit: on a phone on the way-back row above the name, on a laptop to Edit's left.
+    <div
+      className={
+        over
+          ? 'fixed top-[calc(env(safe-area-inset-top)+5rem)] right-8 z-30 min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
+          : 'mb-3'
+      }
+    >
       <Button variant="secondary" size="sm" className="active:bg-sunken" data-motion-demo={demo} onClick={onClick}>
         {children}
       </Button>

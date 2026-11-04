@@ -1,5 +1,6 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
+import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   mentorColour,
   SEARCH_MAX,
@@ -76,7 +77,7 @@ async function personRow(
     name: advisor.name,
     about: aboutOf(advisor),
     colour: mentorColour(advisor.key, colour),
-    canTalk: advisor.kind === 'seat' || advisor.brainStatus === 'ready',
+    canTalk: canTalkOf(advisor),
     chatId: chat?.id ?? null,
     last: null,
     unread: false,

@@ -13,7 +13,8 @@ import {
   TypingBubble,
 } from '@/components/patterns/messaging';
 import { prefersReducedMotion } from '@/components/motion/reduced';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
 import { Input } from '@/components/ui/field';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
@@ -31,6 +32,7 @@ import {
   type ThreadMessage,
   type ThreadPage,
 } from '@/lib/you/chat-threads-model';
+import { editHref } from '@/lib/you/people-cards-model';
 
 /**
  * One thread on the People tab (plan #2748.6): every message with one person,
@@ -281,6 +283,12 @@ export function ThreadView({
       detail={person.about}
       avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
       back={{ href: '/chat', label: 'People' }}
+      crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
+      actions={
+        <Link href={editHref(person.key)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+          Edit
+        </Link>
+      }
       scrollRef={scroller}
       onScroll={onScroll}
       box={

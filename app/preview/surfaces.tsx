@@ -495,6 +495,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8988,6 +8989,62 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="loading" />,
+  },
+  {
+    /* The form for someone new in place of the thread (plan #2748.11): name, colour, who they are, how they talk, what they care about and never say, and Draft the card. */
+    id: 'chat-person-add',
+    label: 'Chat · Adding someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface />,
+  },
+  {
+    /* The form filled in, scrolled to the card, while Dash writes it. */
+    id: 'chat-person-add-drafting',
+    label: 'Chat · Adding someone, Dash drafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="drafting" />,
+  },
+  {
+    /* The form filled in, scrolled to the card, with why the draft failed and Try again. */
+    id: 'chat-person-add-failed',
+    label: 'Chat · Adding someone, the draft failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="failed" />,
+  },
+  {
+    /* The same form for a mentor already there, opened from Edit on their thread, on what was filled in last time. */
+    id: 'chat-person-edit',
+    label: 'Chat · Editing someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface />,
+  },
+  {
+    /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
+    id: 'chat-person-edit-versions',
+    label: 'Chat · Editing someone, their card and earlier cards',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="card" />,
+  },
+  {
+    /* The card while Dash redrafts it from a sentence. */
+    id: 'chat-person-edit-drafting',
+    label: 'Chat · Editing someone, Dash redrafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="redrafting" />,
+  },
+  {
+    /* Scrolled to what they remember: one line being corrected, and the confirm before another is removed. */
+    id: 'chat-person-edit-memory',
+    label: 'Chat · Editing someone, what they remember',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="memory" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),

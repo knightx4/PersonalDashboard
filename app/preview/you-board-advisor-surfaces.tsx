@@ -38,6 +38,8 @@ function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'nam
     active: true,
     addedBy: 'person',
     updatedAt: '2026-10-30T09:00:00Z',
+    madeByYou: false,
+    hasPersona: true,
     ...over,
   };
 }

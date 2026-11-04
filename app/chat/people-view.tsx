@@ -2,8 +2,8 @@ import { Messaging, MessagingPlaceholder } from '@/components/patterns/messaging
 import { buttonVariants } from '@/components/ui/button';
 import Link from '@/components/ui/link';
 import { PageColumn } from '@/components/shell/page-width';
-import { cn } from '@/lib/cn';
 import type { PersonRow, SearchHit } from '@/lib/you/chat-threads-model';
+import { ADD_HREF } from '@/lib/you/people-cards-model';
 import { PeopleList } from './people-list';
 
 /**
@@ -27,6 +27,7 @@ export function PeopleView({
   now,
   live = true,
   newest = false,
+  adding = false,
   children,
 }: {
   rows: readonly PersonRow[];
@@ -40,20 +41,27 @@ export function PeopleView({
   live?: boolean;
   /** The thread is the newest, opened beside the list on a laptop only. */
   newest?: boolean;
+  /** The form for adding someone is open in the thread's place, even with nobody here yet. */
+  adding?: boolean;
   /** The open thread, when one is. */
   children?: React.ReactNode;
 }) {
-  if (!failed && rows.length === 0) {
+  if (!failed && rows.length === 0 && !adding) {
     // Nobody to talk to: one card with the way to the Council, and no empty thread pane beside it.
     return (
       <PageColumn>
         <section className="sheet rounded-card bg-surface px-4 py-4">
           <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
           <p className="mt-4 text-body font-semibold text-ink">No one to talk to yet</p>
-          <p className="mt-1 text-ui text-ink-muted">Put mentors on your council and each one gets a thread here.</p>
-          <Link href="/you/council" className={cn(buttonVariants({ variant: 'secondary' }), 'mt-3')}>
-            Open the Council
-          </Link>
+          <p className="mt-1 text-ui text-ink-muted">Add someone of your own, or put mentors on your council, and each one gets a thread here.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={ADD_HREF} className={buttonVariants({ variant: 'primary' })}>
+              Add someone
+            </Link>
+            <Link href="/you/council" className={buttonVariants({ variant: 'secondary' })}>
+              Open the Council
+            </Link>
+          </div>
         </section>
       </PageColumn>
     );

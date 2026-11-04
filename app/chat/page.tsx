@@ -10,8 +10,10 @@ import {
   type SearchHit,
   type ThreadPage,
 } from '@/lib/you/chat-threads';
-import { olderMessages, readThread } from './actions';
+import { newPersonCard } from '@/lib/you/people-cards-model';
+import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard } from './actions';
 import { ThreadView } from './people/[key]/thread-view';
+import { PersonForm } from './people/person-form';
 import { PeopleView } from './people-view';
 
 export const metadata = { title: 'People' };
@@ -32,10 +34,12 @@ type Found = {
 /**
  * Chat's People tab (plan #2748.6), the page Chat opens on: everyone you
  * talk to, newest thread first, and on a laptop the newest thread open
- * beside them. `?q=` searches every thread's words.
+ * beside them. `?q=` searches every thread's words, and `?add=1` opens the
+ * form for adding someone in the thread's place (plan #2748.11).
  */
-export default async function ChatPeoplePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
+export default async function ChatPeoplePage({ searchParams }: { searchParams: Promise<{ q?: string; add?: string }> }) {
+  const { q, add } = await searchParams;
+  const adding = add === '1';
   const query = searchTextOf(q);
   const user = await requireUser();
   const client = await createYouClient();
@@ -58,6 +62,18 @@ export default async function ChatPeoplePage({ searchParams }: { searchParams: P
     loadAccountSettings(user.id),
   ]);
   const newest = found.newest;
+  if (adding && !found.failed) {
+    return (
+      <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
+        <PersonForm
+          card={newPersonCard(found.rows.map((r) => r.colour))}
+          timezone={settings.timezone}
+          now={now}
+          actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory }}
+        />
+      </PeopleView>
+    );
+  }
   return (
     <PeopleView
       rows={found.rows}

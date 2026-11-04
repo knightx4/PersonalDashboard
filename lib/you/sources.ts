@@ -305,6 +305,7 @@ export const youSources: ModuleSources = {
     { table: 'you.board_turns', reason: 'What each advisor said in a board debate, written by Dash; Goals reading them would cite Dash to itself.' },
     { table: 'you.council_notes', reason: 'Advice the Council\'s mentors wrote unasked, by Dash in each mentor\'s voice, with the person\'s reaction; Goals reading it would cite Dash to itself.' },
     { table: 'you.council_runs', reason: 'Bookkeeping for the board-routine sessions that write Council notes and mentors\' replies.' },
+    { table: 'you.advisor_persona_versions', reason: 'The persona cards a mentor had before their current one, kept so an earlier card can be brought back; a setting of the mentor, not something they wrote, wanted or did.' },
     { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.personality_profiles', reason: 'Dash\'s analysis across their personality tests; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },

@@ -135,6 +135,8 @@ export const MODELS = {
    * slow to start (plan #2748.4). The reply itself is the model chosen for Dash.
    */
   mentorAck: HAIKU,
+  /** lib/you/people-cards.ts, a persona card drafted or redrafted on the People form (plan #2748.11) */
+  personaDraft: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */

@@ -1,4 +1,5 @@
 import { BackLink } from '@/components/shell/back-link';
+import type { Crumb } from '@/components/shell/breadcrumb';
 import { PageWide } from '@/components/shell/page-width';
 import { chipVariants } from '@/components/ui/chip';
 import Link from '@/components/ui/link';
@@ -86,6 +87,8 @@ export function MessagingThread({
   detail,
   avatar,
   back,
+  crumbs = [],
+  actions,
   box,
   scrollRef,
   onScroll,
@@ -98,6 +101,10 @@ export function MessagingThread({
   avatar?: React.ReactNode;
   /** On a phone, the way back to the list of people. */
   back: { href: string; label: string };
+  /** The path to this thread, which the way back keeps the list's place by. */
+  crumbs?: readonly Crumb[];
+  /** Presses on the person, such as Edit, at the right of the bar. */
+  actions?: React.ReactNode;
   /** The box, fixed at the foot of the pane. */
   box: React.ReactNode;
   /** The scrolling part, for a thread that keeps its place or reads further back. */
@@ -116,14 +123,15 @@ export function MessagingThread({
     >
       <header className="shrink-0 border-b border-border px-4 py-2.5">
         <div className="mb-1 min-[720px]:hidden">
-          <BackLink crumbs={[]} fallback={back} />
+          <BackLink crumbs={crumbs} fallback={back} />
         </div>
         <div className="flex items-center gap-2.5">
           {avatar}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             {typeof name === 'string' ? <h1 className="truncate text-body font-semibold text-ink">{name}</h1> : name}
             {detail && <p className="truncate text-small text-ink-muted">{detail}</p>}
           </div>
+          {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
       </header>
       {/* The only part that scrolls; the box below it stays where it is. */}
@@ -135,6 +143,44 @@ export function MessagingThread({
         {children}
       </div>
       <div className="shrink-0 px-3 pt-2 pb-3">{box}</div>
+    </div>
+  );
+}
+
+/**
+ * A pane in the thread's place that is not a thread, such as the form for
+ * adding or editing a person: their name on the bar, the content scrolling
+ * under it, and the presses that finish it fixed at the foot.
+ */
+export function MessagingPanel({
+  title,
+  avatar,
+  back,
+  crumbs = [],
+  foot,
+  children,
+}: {
+  title: string;
+  avatar?: React.ReactNode;
+  back: { href: string; label: string };
+  crumbs?: readonly Crumb[];
+  /** Fixed at the foot of the pane: Save and Cancel. */
+  foot: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn('flex min-w-0 flex-col overflow-hidden bg-surface', PHONE_PANE, PANE_H)}>
+      <header className="shrink-0 border-b border-border px-4 py-2.5">
+        <div className="mb-1 min-[720px]:hidden">
+          <BackLink crumbs={crumbs} fallback={back} />
+        </div>
+        <div className="flex items-center gap-2.5">
+          {avatar}
+          <h1 className="min-w-0 truncate text-body font-semibold text-ink">{title}</h1>
+        </div>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 [scrollbar-gutter:stable]">{children}</div>
+      <div className="shrink-0 border-t border-border px-4 py-3">{foot}</div>
     </div>
   );
 }
@@ -192,10 +238,10 @@ export function MessageBubble({
     <p
       className={cn(
         arriving && 'message-in',
-        'whitespace-pre-wrap break-words rounded-[1.125rem] px-3 py-2 text-body', /* ui-ok: a chat bubble's round, from the reference; no card or control radius is a bubble */
+        'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body',
         from === 'you' ? 'bg-accent text-fill-ink' : 'bg-sunken text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
-        !last && (from === 'you' ? 'rounded-br-md' : 'rounded-bl-md'), /* ui-ok: the reference's tucked corner inside a run of bubbles */
+        !last && (from === 'you' ? 'rounded-br-control' : 'rounded-bl-control'),
       )}
     >
       <LinkedText text={children} />
@@ -227,7 +273,7 @@ export function MessageNote({ tone = 'quiet', children }: { tone?: 'quiet' | 'da
 export function TypingBubble({ name }: { name: string }) {
   return (
     <div className="typing-in mb-2 self-start" role="status" aria-label={`${name} is typing`}>
-      <span className="flex items-center gap-1 rounded-[1.125rem] bg-sunken px-3.5 py-3.5">{/* ui-ok: a bubble's round, as MessageBubble */}
+      <span className="flex items-center gap-1 rounded-pane bg-sunken px-3.5 py-3.5">
         {[0, 1, 2].map((i) => (
           <span
             key={i}

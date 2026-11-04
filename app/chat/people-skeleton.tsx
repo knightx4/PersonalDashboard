@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 
 /** A bubble's round, as MessageBubble draws it. */
-const BUBBLE = 'rounded-[1.125rem]'; /* ui-ok: a chat bubble's round, as MessageBubble */
+const BUBBLE = 'rounded-pane';
 
 export function PeopleSkeleton({ thread = false }: { thread?: boolean }) {
   return (

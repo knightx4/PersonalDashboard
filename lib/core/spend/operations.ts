@@ -284,6 +284,9 @@ export const SPEND_OPERATIONS = {
     // The mentor's one-line first text when the reply has not started after
     // about three seconds (plan #2748.4). One Haiku call, background.
     'mentor-ack',
+    // A persona card drafted from the People form, or redrafted from a
+    // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
+    'draft-persona',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.

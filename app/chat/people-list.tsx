@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
+import { ADD_HREF } from '@/lib/you/people-cards-model';
 import { PersonMark } from '@/components/patterns/messaging';
 import { Input } from '@/components/ui/field';
 import { createClient } from '@/lib/auth/client';
@@ -106,7 +108,13 @@ export function PeopleList({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
-        <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+          <Link href={ADD_HREF} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-mr-2')}>
+            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+            Add
+          </Link>
+        </div>
         <form action="/chat" role="search" className="relative mt-3">
           <Search aria-hidden strokeWidth={1.75} className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" />
           <Input
