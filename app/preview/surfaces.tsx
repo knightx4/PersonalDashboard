@@ -243,6 +243,7 @@ import {
 import {
   LearnConceptSurface,
   LearnConceptEvidenceSurface,
+  LearnConceptAllConsumedSurface,
   LearnListsSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
@@ -12035,6 +12036,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnConceptEvidenceSurface />,
+  },
+  {
+    /* Everything found for the idea has been read or given up on (plan
+     * #2741.1), so no list is offered and the line under the button says so. */
+    id: 'learn-concept-all-consumed',
+    label: 'Idea · Everything found for it already read',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptAllConsumedSurface />,
   },
   {
     id: 'learn-lists',

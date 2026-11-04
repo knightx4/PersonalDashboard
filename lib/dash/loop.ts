@@ -34,7 +34,7 @@ import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
  * naming a row can only name a row a lookup returned, as citations do.
  *
  * Three limits stop the looking, and when one is reached the next call is
- * made to answer with what it has: eight lookups, an input token budget, and
+ * made to answer with what it has: MAX_LOOKUPS lookups, an input token budget, and
  * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
  *

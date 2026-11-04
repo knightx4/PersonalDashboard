@@ -28,6 +28,7 @@ import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
 import { NewFeatureButton } from './feature-compose';
+import { buttonVariants } from '@/components/ui/button';
 import {
   applyView,
   buildPlanTree,
@@ -51,6 +52,9 @@ import { threadRef } from '@/lib/thread/subjects';
 import { repoKey } from '@/lib/plan/github';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { ProjectMainLine } from './project-main-line';
+
+/** The project whose page offers "Open studio" (lib/studio/handoff.ts). */
+const STUDIO_PROJECT = 'music-pipeline';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -299,7 +303,19 @@ export async function renderPlanPage({
             : sectionSubject('/dev/plan', 'Plan')
         }
         title={project ? project.label : 'Plan'}
-        actions={<NewFeatureButton module={project?.id ?? null} />}
+        actions={
+          project?.id === STUDIO_PROJECT ? (
+            <div className="flex items-center gap-2">
+              {/* A route, not a page: it makes this computer's studio token and leaves Dash. */}
+              <a href="/dev/studio" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Open studio
+              </a>
+              <NewFeatureButton module={project.id} />
+            </div>
+          ) : (
+            <NewFeatureButton module={project?.id ?? null} />
+          )
+        }
         description={
           project
             ? // One line naming where it is built (plan #1688): the paragraph

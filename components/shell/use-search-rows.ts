@@ -28,14 +28,12 @@ import {
   modeOf,
   THEME_ROOMS,
   SKIES,
-  PALETTES,
   auroraFor,
-  paletteOf,
-  posterFor,
   skyOf,
   type Theme,
 } from '@/lib/theme';
 import { applyTheme } from '@/lib/theme/apply';
+import { DEFAULT_LANDSCAPE, DEFAULT_SKY, isLandscape } from '@/lib/theme/sky';
 import type { NavSection } from '@/components/shell/app-shell';
 
 /**
@@ -190,36 +188,18 @@ function themeCommands(theme: Theme): SearchCommand[] {
   const mode = modeOf(theme);
   const hue = hueOf(theme);
   const way = colourwayOf(theme) ?? undefined;
-  // Dawn is Aurora's light side, and Lightbox's sheets are light, so both
-  // light rooms land on Dawn. modeOf already reads Aurora as dark and Dawn as
-  // light.
+  // Dawn is Aurora's light side. modeOf already reads Aurora as dark and Dawn
+  // as light; a stored glass room goes by its sheets.
   const polarity = mode === 'light' || mode === 'lightbox' ? 'light' : 'dark';
 
-
   return [
-    ...THEME_ROOMS.map((option) => ({
+    // Light and dark only: the two glass rooms are no longer offered.
+    ...THEME_ROOMS.filter((option) => option.id === 'light' || option.id === 'dark').map((option) => ({
       id: `theme:${option.id}`,
-      label: option.id === 'darkroom' ? 'Theme: Lightbox, dark' : `Theme: ${option.label}`,
-      hint:
-        option.id === 'lightbox' || option.id === 'darkroom'
-          ? 'The poster, in its last palette'
-          : 'Keeps the colour you are in',
+      label: `Theme: ${option.label}`,
+      hint: 'Keeps the colour you are in',
       icon: 'theme' as const,
-      // Lightbox is the poster now, in light and in dark, a written theme with palettes.
-      run: applying(
-        option.id === 'lightbox'
-          ? posterFor(paletteOf(theme), 'light')
-          : option.id === 'darkroom'
-            ? posterFor(paletteOf(theme), 'dark')
-            : { kind: 'generated', mode: option.id, hue, way },
-      ),
-    })),
-    ...PALETTES.map((palette) => ({
-      id: `theme:poster:${palette.id}`,
-      label: `Lightbox: ${palette.label}`,
-      hint: palette.mood,
-      icon: 'theme' as const,
-      run: applying(posterFor(palette.id, polarity)),
+      run: applying({ kind: 'generated', mode: option.id, hue, way }),
     })),
     ...COLOURWAYS.map((colour) => ({
       id: `theme:${colour.id}`,
@@ -228,18 +208,26 @@ function themeCommands(theme: Theme): SearchCommand[] {
       icon: 'theme' as const,
       run: applying({ kind: 'generated', mode, hue: colour.hue, way: colour.id }),
     })),
-    // Aurora takes a sky rather than a colour. "Theme: Aurora" keeps the sky
-    // and the polarity you are in; a sky moves you into Aurora if you are not.
+    // Aurora and Landscapes take a sky rather than a colour. Each keeps the
+    // sky and the polarity you are in when the sky belongs to it; a sky moves
+    // you into whichever of the two it belongs to.
     {
       id: 'theme:aurora',
       label: 'Theme: Aurora',
       hint: 'Glass under a moving sky',
       icon: 'theme' as const,
-      run: applying(auroraFor(polarity, skyOf(theme))),
+      run: applying(auroraFor(polarity, isLandscape(skyOf(theme)) ? DEFAULT_SKY : skyOf(theme))),
+    },
+    {
+      id: 'theme:landscape',
+      label: 'Theme: Landscapes',
+      hint: 'Glass over a painted scene',
+      icon: 'theme' as const,
+      run: applying(auroraFor(polarity, isLandscape(skyOf(theme)) ? skyOf(theme) : DEFAULT_LANDSCAPE)),
     },
     ...SKIES.filter((sky) => sky[polarity === 'light' ? 'dawn' : 'night']).map((sky) => ({
       id: `theme:sky:${sky.id}`,
-      label: `Sky: ${sky.label}`,
+      label: `${isLandscape(sky.id) ? 'Landscape' : 'Sky'}: ${sky.label}`,
       hint: sky.mood,
       icon: 'theme' as const,
       run: applying(auroraFor(polarity, sky.id)),
@@ -247,9 +235,9 @@ function themeCommands(theme: Theme): SearchCommand[] {
     {
       id: 'theme:none',
       label: 'Theme: no colour',
-      hint: mode === 'light' ? 'Paper' : mode === 'dark' ? 'Ink' : 'Lightbox',
+      hint: polarity === 'light' ? 'Paper' : 'Ink',
       icon: 'theme' as const,
-      run: applying({ kind: 'generated', mode, hue: null }),
+      run: applying({ kind: 'generated', mode: polarity, hue: null }),
     },
     {
       id: 'theme:system',

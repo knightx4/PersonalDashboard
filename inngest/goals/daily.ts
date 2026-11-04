@@ -32,10 +32,8 @@ import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { goalProposals } from '@/lib/goals/goal-proposals';
 import {
-  OPEN_QUESTION_CAP,
   RESTING_AFTER_DEFAULT_DAYS,
   STALE_STEP_LIMIT,
-  openQuestionCount,
   restingAfterDefault,
   staleSteps,
 } from '@/lib/goals/stale-steps';
@@ -346,8 +344,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     new Set(Object.keys(progress)),
     resting,
   ).slice(0, STALE_STEP_LIMIT);
-  // The questions the run may still add before the Inbox is at its cap.
-  const asksLeft = Math.max(0, OPEN_QUESTION_CAP - openQuestionCount(byGoal));
   // A step of the person's not judged yet for a Dash prep step, ten a morning,
   // newest first (plan #1217). One listed above as stale gets only that move,
   // since preparing it is one of those moves.
@@ -403,7 +399,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         answers,
         review,
         stale: sitting,
-        asksLeft,
         underWay,
         unjudged,
         evidence: evidence?.lines ?? null,

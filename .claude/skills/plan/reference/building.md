@@ -202,6 +202,18 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    Nothing else: no
    reordering, no dropping somebody else's step, no rewriting a done-when you
    disagree with, and never an approve.
+
+   That does not mean keeping quiet about them. If what you built shows that
+   a later step is now wrong, unneeded, or missing something, say so in your
+   report under **What this means for the steps still to come**. The session
+   that sent you sees every builder's report and is the one that revises the
+   plan. If nobody sent you, you are that session, so make those changes
+   yourself before closing: `revise <step> --from <yours> --because "…"` with
+   the new `--detail`, `--done-when` or `--title` for a step not yet started;
+   `add "…" --parent <the feature> --from <yours> --because "…"` for work no
+   step covers; `drop <step> --note "…"` only for a step you are sure is
+   dead. A change to where the feature ends up is a decision for the person,
+   not a revise.
 9. **Hand the close over.** `done` refuses a commit that is not on main, and
    yours is on a branch nobody has merged yet, so the session that sent you
    marks the step built and closes it when the feature lands on main. Write the note it should close with —
@@ -239,6 +251,15 @@ session building the next step:
   out to have, a test that has to be updated whenever this changes, a rule in
   the code that was not obvious. This is the part that stops the next step
   re-deriving what you just learned.
+- **What this means for the steps still to come.** Read the open steps under
+  the feature (`show <the feature>`) against what you found. For each one
+  your work has made wrong, name it by outline and say what is wrong and what
+  it should say instead: a done-when that asks for something that already
+  exists, a step that is no longer needed, a piece of work the feature now
+  needs that no step covers. Give the finding in one sentence the person
+  could read on the row; it becomes the `--because`. Write "Nothing" when
+  nothing changes, which is the usual answer. Do not edit those steps
+  yourself.
 - **The critic rounds**, for a step that changed a screen: each surface, how
   many rounds it took, and the last verdict. After a third failed round, the
   last verdict's fixes in full and where the shots are.

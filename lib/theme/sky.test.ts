@@ -181,7 +181,8 @@ describe('choosing a sky', () => {
 
   it('keeps a night-only sky out of Dawn', () => {
     expect(parseTheme('dawn:northern')).toEqual({ kind: 'written', id: 'dawn' });
-    expect(formatTheme(auroraFor('light', 'starfield'))).toBe('dawn');
+    // A night-only landscape lands on the first landscape by day, so the surface stays Landscapes.
+    expect(formatTheme(auroraFor('light', 'starfield'))).toBe('dawn:dunes');
     expect(formatTheme(auroraFor('dark', 'starfield'))).toBe('aurora:starfield');
   });
 
