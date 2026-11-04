@@ -122,6 +122,11 @@ describe('runConnectorWrite', () => {
       'change_interview',
       'change_interviewer',
       'change_interview_round',
+      'reply_in_thread',
+      'read_thread',
+      'propose_feature',
+      'add_plan_step',
+      'write_decision',
     ]);
   });
 

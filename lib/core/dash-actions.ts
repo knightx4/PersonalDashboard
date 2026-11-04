@@ -380,7 +380,10 @@ const ROLE_DEPENDENTS: Dependent[] = [
 
 const DEPENDENTS: Record<string, Dependent[]> = {
   'public.plan_items': [
-    { schema: 'public', table: 'plan_items', column: 'parent_id' },
+    // Steps written after the record. A feature proposed with its steps in
+    // one write (the connector's propose_feature, plan #2789.5) is recorded
+    // after them, so they go with it: parent_id cascades.
+    { schema: 'public', table: 'plan_items', column: 'parent_id', since: true },
     { schema: 'public', table: 'plan_dependencies', column: 'item_id' },
     { schema: 'public', table: 'plan_dependencies', column: 'depends_on_id' },
     { schema: 'public', table: 'plan_runs', column: 'plan_item_id' },
