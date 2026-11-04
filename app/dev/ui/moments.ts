@@ -152,12 +152,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'goals',
     name: 'A goal closing',
     trigger: 'Closing a goal on its page, or a step on its own page.',
-    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line when the Steps tab is open; on Overview the ring plays alone and the steps are folded when you open the tab. On a step’s page its finished sub-steps are already folded.',
+    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line when the Plan tab is open; on the Dashboard, Work & files and History tabs the ring plays alone and the steps are folded when you open the Plan tab. On a step’s page its finished sub-steps are already folded.',
     reducedMotion: 'The solid hexagon and the folded line appear at once.',
     state: {
       built: 'yes',
       where:
-        'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
+        'GoalGlyph in the title and GoalStepsFold round the Plan tab, both in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
     },
     demo: 'motion-goal-close',
   },
@@ -165,12 +165,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'goals',
     name: 'A step Dash finished',
     trigger: 'A goal step closed by a Dash run appearing on the page.',
-    sees: 'The step settles in, and Dash’s mark beside it flashes once.',
+    sees: 'The step settles in, and Dash’s mark beside it flashes once. On a goal’s page that is the step’s row in the Plan tab’s finished fold and the Last finished line in Dash’s card on the Dashboard.',
     reducedMotion: 'The step and the mark are simply there.',
     state: {
       built: 'yes',
       where:
-        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, on the goal page’s Steps tab and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
+        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row in the Plan tab (DoneRow in goal-plan.tsx, and the by-stage tree), on the Last finished line of DashOnCard (last-finished.tsx) on the Dashboard, and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
     },
   },
   {
@@ -219,7 +219,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on the Dash page, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on Chat’s Dash tab, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
     },
   },
   {

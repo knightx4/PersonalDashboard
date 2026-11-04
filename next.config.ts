@@ -50,8 +50,8 @@ const nextConfig: NextConfig = {
     // The memory sweep copies the specs into search by meaning (plan #1321),
     // and Ask Dash reads them in the app and over MCP (read_spec, find_dev_text).
     '/api/cron/memory-sweep': ['./docs/**/*.md'],
-    '/ask': ['./docs/**/*.md', './public/posts/*.png'],
-    '/ask/*': ['./docs/**/*.md', './public/posts/*.png'],
+    '/chat/dash': ['./docs/**/*.md', './public/posts/*.png'],
+    '/chat/dash/*': ['./docs/**/*.md', './public/posts/*.png'],
     '/api/mcp': ['./docs/**/*.md', './public/posts/*.png'],
     // The sheet asks through this route, which streams the lookups (plan #1438).
     '/api/ask': ['./docs/**/*.md', './public/posts/*.png'],
@@ -104,6 +104,13 @@ const nextConfig: NextConfig = {
        */
       { source: '/you/board', destination: '/you/council', permanent: false },
       { source: '/you/board/:path*', destination: '/you/council/:path*', permanent: false },
+      /**
+       * Ask Dash moved into the Chat workspace's Dash tab (plan #2748.1). A
+       * chat's link, New chat (?chat=new, carried across) and the Writing
+       * style page keep working from notes, notifications and Dash's replies.
+       */
+      { source: '/ask', destination: '/chat/dash', permanent: false },
+      { source: '/ask/:path*', destination: '/chat/dash/:path*', permanent: false },
     ];
   },
 };

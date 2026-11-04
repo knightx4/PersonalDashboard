@@ -181,7 +181,7 @@ reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
 links or an information step's form, call change_goal_number, change_goal_link
-or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list. In Shopping, to
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list; to add a tile to a goal's dashboard when they ask for one in their own words ('add a chart of my balance'), move one, take one off or lay the whole dashboard out, call change_goal_dashboard. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
@@ -215,6 +215,10 @@ When they ask for a goal to be mapped, planned, broken down or researched,
 call start_goal_run on it, straight after add_goal for a new one, and pass
 what they asked for beyond the map as its instruction; never hand_off it.
 When they ask Dash to do or get ready one step, call work_goal_step.
+When they ask Dash to figure something out for a goal they have ("should I
+consolidate my loans", "work out which program fits me"), call
+take_on_for_goal with the question in their words: it works on that goal and
+tells them when it is done, so do not answer it yourself first.
 When you cannot tell which row they mean, ask rather than guess. Say in your
 answer what you did, and cite the row the tool returned so they can open it.
 Never change something they only asked about.
@@ -428,6 +432,8 @@ export type AskWriteRunner = (
   tool: DashWriteTool,
   input: unknown,
   seen: DashSeen,
+  /** The conversation's id, which a question handed to a goal reports back into (plan #2778.8). */
+  conversationId: string,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
 /**
@@ -579,7 +585,7 @@ export async function askDash(
   const write: DashWriter | undefined =
     apply && saveChange
       ? async (tool, args, seen) => {
-          const result = await apply(tool, args, seen);
+          const result = await apply(tool, args, seen, subject.ref);
           if (!result.ok) return { ok: false, error: result.error };
           // A thread's own tool, which Ask never offers.
           if ('recorded' in result) return { ok: false, error: 'That cannot be done from Ask. Answer in words.' };

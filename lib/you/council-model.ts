@@ -19,6 +19,20 @@ export const ADVICE_STALE_AFTER_MS = 3 * 60 * 60 * 1000;
 export const REPLY_STALE_AFTER_MS = 90 * 60 * 1000;
 /** The daily round is not started again within this long of the last one. */
 export const ADVICE_GAP_MS = 20 * 60 * 60 * 1000;
+/** A conversation in a mentor thread is over after this long without a message (you 0038). */
+export const EPISODE_QUIET_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * Whether the overnight memory pass should summarise an episode (plan
+ * #2748.8): it is over, and it has no summary or grew after its summary.
+ */
+export function episodeDue(episode: { endedAt: string; summarisedAt: string | null }, now: number): boolean {
+  const ended = Date.parse(episode.endedAt);
+  if (!Number.isFinite(ended) || now - ended < EPISODE_QUIET_MS) return false;
+  if (!episode.summarisedAt) return true;
+  const summarised = Date.parse(episode.summarisedAt);
+  return !Number.isFinite(summarised) || summarised < ended;
+}
 
 export const STALE_REPLY_ERROR = 'The reply stopped before it was written. Send again to ask once more.';
 export const NO_ROUTINE_ERROR =

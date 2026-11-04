@@ -50,11 +50,11 @@ export function rememberArrived(id: string): void {
 /**
  * The mark's one flash. The mark is 12 pixels across, so the done mark's
  * gentle bob (dash-mark-bob in app/globals.css) cannot be seen on a phone:
- * this one swells to half again its size and takes the accent at the peak.
+ * this one swells to nearly twice its size and takes the accent at the peak.
  */
 const FLASH_KEYFRAMES: Keyframe[] = [
   { opacity: 0.4, transform: 'scale(0.7)' },
-  { opacity: 1, transform: 'scale(1.5)', color: 'var(--color-accent)', offset: 0.5 },
+  { opacity: 1, transform: 'scale(1.8)', color: 'var(--c-accent)', offset: 0.5 },
   { opacity: 1, transform: 'scale(1)' },
 ];
 
@@ -73,8 +73,9 @@ export function useDashArrival(stepId: string, arrived: boolean) {
     if (!arrived) return;
     const mark = markRef.current;
     // The row the mark is on, or on a step's own page, where the mark sits
-    // beside the title, the page's header (plan #2373.1).
-    const row = mark?.closest('li, header');
+    // beside the title, the page's header (plan #2373.1), or the line in Dash's card
+    // on the goal's Dashboard (plan #2778.10).
+    const row = mark?.closest('li, header, [data-arrival-row]');
     if (!mark || !row) return;
     const seen = readArrived();
     if (seen === null || seen.includes(stepId)) return;

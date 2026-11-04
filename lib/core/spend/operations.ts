@@ -277,6 +277,13 @@ export const SPEND_OPERATIONS = {
     // from its file summaries on a press (plan #2401.7). One Haiku call
     // reading the stored summaries and key points, not the files.
     'collect-course-overview',
+    // A mentor's reply to the person's text (plan #2748.4): the model chosen
+    // for Dash, with Dash's lookups, one call or a few when it looks things
+    // up, after the message is saved. The persona and tools are cached.
+    'mentor-reply',
+    // The mentor's one-line first text when the reply has not started after
+    // about three seconds (plan #2748.4). One Haiku call, background.
+    'mentor-ack',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.

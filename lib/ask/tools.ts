@@ -732,6 +732,7 @@ export function isAskToolName(name: string): name is AskToolName {
 }
 
 const MODULE_LABELS: Record<ModuleId, string> = {
+  chat: 'Chat',
   shopping: 'Shopping',
   jobs: 'Job search',
   vault: 'Vault',

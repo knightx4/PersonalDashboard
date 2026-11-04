@@ -26,7 +26,7 @@ export function DashWork({ items }: { items: DashWorkItem[] }) {
             <span className={item.state === 'running' ? 'text-accent' : 'text-positive'}>
               {item.state === 'running' ? 'Dash is on ' : 'Dash finished '}
             </span>
-            <a href={stepAnchor(item.stepId)} className="font-medium text-ink hover:text-accent">
+            <a href={item.href ?? stepAnchor(item.stepId)} className="font-medium text-ink hover:text-accent">
               {item.title}
             </a>
             {item.line && <span className="text-ink-muted"> · {item.line}</span>}

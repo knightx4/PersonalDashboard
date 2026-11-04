@@ -1057,7 +1057,7 @@ const key = (table: string, ref: string) => `${table}\u0000${ref}`;
  */
 function threadHref(ref: string): string | null {
   if (ref.includes(':')) return refHref(ref);
-  return isUuid(ref) ? `/ask/${ref}` : null;
+  return isUuid(ref) ? `/chat/dash/${ref}` : null;
 }
 
 /**

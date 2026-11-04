@@ -6,7 +6,7 @@ import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
  * A question to Dash as it arrives from a browser, checked before anything is
- * read: the server action in app/ask/actions.ts and the streaming route in
+ * read: the server action in app/chat/dash/actions.ts and the streaming route in
  * app/api/ask/route.ts take the same things and check them the same way.
  */
 

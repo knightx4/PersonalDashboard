@@ -517,6 +517,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-syllabus-weeks': run(HAIKU, 12_000, 700),
   // Up to twenty files' summaries and points in, a paragraph and eight ideas out (plan #2401.7).
   'collect-course-overview': run(HAIKU, 6_000, 900),
+  // Dash's lookups (about 16,000 tokens) and the persona (about 3,000) read
+  // from the cache, the memory, the day and the recent thread (about 4,000)
+  // fresh, two or three short bubbles out (plan #2748.4).
+  'mentor-reply': run(SONNET, 23_000, 250),
+  // The persona and the last few messages in, one line out (plan #2748.4).
+  'mentor-ack': background(run(HAIKU, 3_500, 30)),
   // The digest, note extracts, signals, earlier insights and five or six
   // notes in; thinking at high effort, then three to five cards and a new
   // digest out (plan #2413.9).

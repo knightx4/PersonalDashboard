@@ -16,9 +16,10 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
-import { AskChats, type ChatEdits } from '@/app/ask/chats';
-import { ArchivedNote, CHATS_BACK, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/ask/view';
-import { ChatUsed } from '@/app/ask/used';
+import { AskChats, type ChatEdits } from '@/app/chat/dash/chats';
+import { ArchivedNote, CHATS_BACK, ChatsListSkeleton, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/chat/dash/view';
+import { tabsFor } from '@/lib/shell/tabs';
+import { ChatUsed } from '@/app/chat/dash/used';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import type { AskChat } from '@/lib/talk/ask-chats';
 import type { SearchHit } from '@/lib/search/sources';
@@ -259,7 +260,7 @@ async function writeOut(
 }
 
 /** The workspaces the box's chip offers in the gallery (plan #1899.5). */
-const BOX_WORKSPACES: readonly ModuleId[] = ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'];
+const BOX_WORKSPACES: readonly ModuleId[] = ['chat', 'shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'];
 
 /** The rows @ finds in the gallery, as the top bar's search would list them. */
 const BOX_HITS: readonly SearchHit[] = [
@@ -429,10 +430,19 @@ export function AskDashSurface({
  * Dash's box with what plan #1899.5 adds, on the chat's card at reading
  * width: a question that carried two rows added with @, an answer stopped
  * part way and kept as far as it got, and the box open on `draft` with the
- * menu its @ or / opens, or the scope chip's menu open.
+ * menu its @ or / opens, or the scope chip's menu open. `workspaces` is @
+ * and the start of a workspace's name (plan #2748.1): the workspace it names
+ * first in the menu, to keep the question to, then the rows.
  */
-export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' }) {
-  const draft = open === 'rows' ? 'How much did the @Cat' : open === 'commands' ? '/' : '';
+export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' | 'workspaces' }) {
+  const draft =
+    open === 'rows'
+      ? 'How much did the @Cat'
+      : open === 'commands'
+        ? '/'
+        : open === 'workspaces'
+          ? 'What should I read next? @Le'
+          : '';
   const start: AskBoxStart | undefined =
     open === 'rows'
       ? { rows: [BOX_ROWS[0]], scope: 'shopping' }
@@ -471,6 +481,9 @@ export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' })
             startWriting
             initialDraft={draft}
             boxStart={start}
+            // The workspaces menu is the Chat page's box, which draws your
+            // questions as bubbles (plan #2748.12).
+            bubbles={open === 'workspaces'}
           />
         </Card>
       </PageColumn>
@@ -900,8 +913,11 @@ export function DashPageSurface({
   chat?: 'open' | 'new' | 'archived';
   /** Words in the open chat's box, unsent, for a strip that presses Send (plan #1899.8). */
   draft?: string;
-  /** The list's hidden parts (plan #1899.6): a search, a menu, a rename or Archived open. */
-  list?: 'search' | 'menu' | 'rename' | 'archived';
+  /**
+   * The list's hidden parts (plan #1899.6): a search, a menu, a rename or
+   * Archived open; and no chats yet, or chats that could not be read (#2748.1).
+   */
+  list?: 'search' | 'menu' | 'rename' | 'archived' | 'empty' | 'failed' | 'loading';
   listOpen?: boolean;
   /** The column of what Dash used, shown or folded. */
   usedOpen?: boolean;
@@ -921,34 +937,39 @@ export function DashPageSurface({
           },
         ]
       : dashPageTurns(open.title ?? '');
-  const opened = chat !== 'new';
+  const none = list === 'empty' || list === 'failed' || list === 'loading';
+  const opened = chat !== 'new' && !none;
   return (
-    // The shell's cost hints, as app/ask/layout.tsx reads them for the box.
+    // The shell's cost hints, as app/chat/dash/layout.tsx reads them for the box.
     <PaidCostsProvider costs={ASK_COSTS}>
     <AskDashProvider source={FIXTURES} modelStart={modelStart}>
       <AppShell
         account="preview"
-        module={null}
-        sections={[]}
+        module="chat"
+        sections={tabsFor('chat', true)}
         displayName="Chris"
         email="chris@example.com"
         isOwner
         counts={{ jobs: '3', todo: '8', shopping: '1' }}
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
-        pathname={opened ? `/ask/${open.ref}` : '/ask'}
+        pathname={opened ? `/chat/dash/${open.ref}` : '/chat/dash'}
       >
         <Conversation
           label="Chats"
           fill
           open={opened}
           initialListOpen={listOpen}
-          newChat={{ href: '/ask?chat=new', label: 'New chat' }}
+          newChat={{ href: '/chat/dash?chat=new', label: 'New chat' }}
           list={
+            list === 'loading' ? (
+              <ChatsListSkeleton />
+            ) : (
             <AskChats
-              chats={DASH_CHATS}
+              chats={none ? [] : DASH_CHATS}
+              failed={list === 'failed'}
               today={CHAT_TODAY}
-              made={DASH_MADE}
+              made={none ? [] : DASH_MADE}
               presses={DASH_PRESSES}
               edits={DASH_EDITS}
               active={opened ? open.ref : null}
@@ -958,6 +979,7 @@ export function DashPageSurface({
               initialRenaming={list === 'rename' ? DASH_CHATS[1].ref : null}
               initialArchivedOpen={list === 'archived' || chat === 'archived'}
             />
+            )
           }
         >
           {opened ? (
@@ -994,6 +1016,7 @@ export function DashPageSurface({
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 dock
+                bubbles
                 initialDraft={draft}
               />
             </ConversationChat>

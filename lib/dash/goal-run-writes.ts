@@ -1,4 +1,4 @@
-import { sameAs } from './runs';
+import { noButton, sameAs } from './runs';
 import { isUuid } from '@/lib/ask/db';
 import { GOAL_RUN_CHANGE_KINDS, type GoalRunChangeKind } from '@/lib/ask/goals-changes';
 import { toRef } from '@/lib/core/refs';
@@ -6,6 +6,7 @@ import { stepHref } from '@/lib/goals/all-goals';
 import { sendGoalStep } from '@/lib/goals/handover-store';
 import { runInFlight } from '@/lib/goals/shaping';
 import { loadShaping, startGoalRun } from '@/lib/goals/shaping-store';
+import { pickGoal, QUESTION_MAX, takeOnHref } from '@/lib/goals/take-on';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -28,7 +29,11 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * back, so each is recorded as not undoable, with the reason in place of an
  * Undo, as the thread's start_errand_run is.
  *
- * In the app only: the connector has no goalRoutine port.
+ * In the app only: the connector has no goalRoutine port. The third,
+ * take_on_for_goal (plan #2778.8), hands a goal a question from Ask Dash or
+ * a Claude chat; the connector gives it a goalRoutine port of its own
+ * (lib/connector/writes.ts), and the run is reported back by
+ * lib/goals/take-on-report.ts.
  */
 
 type Args = Record<string, unknown>;
@@ -196,7 +201,87 @@ async function workStep(ctx: DashWriteContext, args: Args): Promise<DashWriteRes
   return made('work_goal_step', step, { verb, what: title, rest, href, where: 'Open the step', goalId, summary });
 }
 
-function guarded(run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
+/** Their open goals, for picking the one a question is about. */
+async function openGoals(ctx: DashWriteContext) {
+  const goals = await ctx.db('goals');
+  const { data, error } = await goals
+    .from('items')
+    .select('id, title, acceptance')
+    .eq('user_id', ctx.userId)
+    .eq('level', 'goal')
+    .eq('status', 'open')
+    .is('archived_at', null)
+    .limit(200);
+  if (error) throw new Error(`Reading goals.items failed: ${error.message}`);
+  return (data ?? []) as { id: string; title: string; acceptance: string | null }[];
+}
+
+/**
+ * A question handed to a goal (plan #2778.8): a run of its own on the goal,
+ * with the question and where it came from on the run row, so the goal's
+ * Dashboard shows it while it runs and the app reports back when it ends.
+ */
+async function takeOn(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  const question = text(args, 'question');
+  if (!question) throw new Refused('question is missing: pass what they asked, in their words.');
+  if (question.length > QUESTION_MAX) throw new Refused(`Keep question under ${QUESTION_MAX} characters.`);
+  const routine = await routineFor(ctx);
+
+  let goal: Row;
+  const ref = text(args, 'goal_ref');
+  if (ref) {
+    goal = await ownItem(ctx, ref, 'goal_ref');
+    if (goal.level !== 'goal') throw new Refused('That is a step, not a goal. Name the goal it sits under.');
+  } else {
+    const picked = pickGoal(question, await openGoals(ctx));
+    if (picked.kind === 'ask') {
+      if (picked.candidates.length === 0) {
+        throw new Refused('They have no open goal to hand this to. Offer to add one with add_goal first.');
+      }
+      const names = picked.candidates.map((g) => `"${g.title}" (${g.id})`).join(', ');
+      throw new Refused(
+        `Nothing was started: it is not clear which goal this is for. Ask them which of these, then call again with its goal_ref: ${names}.`,
+      );
+    }
+    goal = await ownItem(ctx, picked.goal.id, 'goal_ref');
+  }
+  if (goal.status !== 'open') throw new Refused('That goal is not open. Reopen it with change_goal first.');
+
+  const id = goal.id as string;
+  const title = named(goal.title, 'the goal');
+  const client = await ctx.goals({});
+  const { lastRun } = await loadShaping(client, id);
+  if (runInFlight(lastRun, ctx.now ?? Date.now())) {
+    throw new Refused(`Nothing was started: Dash is already working on "${title}". Ask again once that finishes.`);
+  }
+  const origin = ctx.origin ?? { kind: 'ask_dash' as const, ref: null };
+  const started = await startGoalRun({
+    client,
+    userId: ctx.userId,
+    goal: { id, title },
+    routine,
+    surface: 'thread',
+    question: {
+      text: question,
+      origin: origin.kind,
+      originRef: origin.kind === 'ask_dash' ? origin.ref : null,
+    },
+  });
+  if (!started.ok) throw new Refused(`Nothing was started: ${started.error}`);
+
+  const href = takeOnHref(id, started.runId);
+  return made('take_on_for_goal', goal, {
+    verb: 'Handed',
+    what: title,
+    rest: ' a question to work out',
+    href,
+    where: 'Open the goal',
+    goalId: id,
+    summary: `Dash started working out "${question.length > 120 ? `${question.slice(0, 119)}…` : question}" on the goal "${title}".`,
+  });
+}
+
+function guarded(run:(ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
   return async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
     const args = input && typeof input === 'object' ? (input as Args) : {};
     try {
@@ -267,6 +352,38 @@ export const GOAL_RUN_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       },
     },
     apply: guarded(workStep),
+  },
+  {
+    name: 'take_on_for_goal',
+    kind: 'write',
+    runs: noButton(
+      'A question handed to a goal comes from a chat; the goal page’s own Ask Dash leaves a comment on the goal instead.',
+    ),
+    definition: {
+      name: 'take_on_for_goal',
+      description:
+        'Hand one of their goals a question to figure out, when they ask Dash to work something out for a goal they have ("should I consolidate my loans", "work out which of these programs fits me"). ' +
+        'Dash works it in a run of its own on the goal, several minutes or more: it reads their records, researches, writes the answer as a file on the goal and suggests steps or dashboard tiles that wait there on Add and No. The work shows on the goal while it runs, and when it ends they get a notification and a reply in this conversation, both opening the goal at the answer. ' +
+        'Pass the question in their words. Name the goal by its goals.items ref when you know it; without one the goal is picked from the question, and when that is unclear the call names the likeliest goals: ask them which and call again. ' +
+        'The request is the go-ahead: call it without asking them to confirm, and do not answer the question yourself first. Refused while another run on the goal is going, on a goal that is not open, and for anyone but the account that owns the app. ' +
+        STARTED,
+      input_schema: {
+        type: 'object',
+        properties: {
+          question: {
+            type: 'string',
+            description: 'What they want figured out, in their words, with what you know of why.',
+          },
+          goal_ref: {
+            type: 'string',
+            description: 'The goals.items ref of the goal, from a lookup. Leave it out to pick the goal from the question.',
+          },
+        },
+        required: ['question'],
+        additionalProperties: false,
+      },
+    },
+    apply: guarded(takeOn),
   },
 ];
 

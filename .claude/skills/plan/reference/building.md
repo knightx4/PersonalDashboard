@@ -36,6 +36,9 @@ npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # nor blocked: say why, in one line
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
                                                # one line on your run, shown live on its page
+npx tsx scripts/plan.ts progress <n> --state working|waiting|done|stopped --action "…" [--needs "…"]
+                                               # what you are doing now, for the project page
+                                               # and Dev; --needs only while waiting
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -69,6 +72,15 @@ what stopped it); `--kind thought` before a long stretch of work; `--kind
 error` when something fails. A question that needs the person takes `--kind
 question` with one to ten `--option`s and parks the run as waiting on them.
 With no run fired at the step the command says so and writes nothing; carry on.
+
+**Report your progress at the same moments (plan #2800.1).** Run lines are
+the run's history; the progress report is the one line the project page and
+Dev show for what you are doing now, and it is written even with no run.
+`progress <n> --state working --action "…"` when you claim the step and
+after each commit, `--state waiting --needs "…"` when you ask the person
+something or block, and `--state done` (or `stopped`, with why) as your last
+call. A session with the Dash connector loaded may call `report_progress`
+instead. `progress.md` in this directory has the details.
 
 **Asking mid-run and waiting (plan #1824).** The question shows on the run's
 lines and in the person's inbox, with each option as a press. Ask only what
@@ -202,6 +214,18 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    Nothing else: no
    reordering, no dropping somebody else's step, no rewriting a done-when you
    disagree with, and never an approve.
+
+   That does not mean keeping quiet about them. If what you built shows that
+   a later step is now wrong, unneeded, or missing something, say so in your
+   report under **What this means for the steps still to come**. The session
+   that sent you sees every builder's report and is the one that revises the
+   plan. If nobody sent you, you are that session, so make those changes
+   yourself before closing: `revise <step> --from <yours> --because "…"` with
+   the new `--detail`, `--done-when` or `--title` for a step not yet started;
+   `add "…" --parent <the feature> --from <yours> --because "…"` for work no
+   step covers; `drop <step> --note "…"` only for a step you are sure is
+   dead. A change to where the feature ends up is a decision for the person,
+   not a revise.
 9. **Hand the close over.** `done` refuses a commit that is not on main, and
    yours is on a branch nobody has merged yet, so the session that sent you
    marks the step built and closes it when the feature lands on main. Write the note it should close with —
@@ -239,6 +263,15 @@ session building the next step:
   out to have, a test that has to be updated whenever this changes, a rule in
   the code that was not obvious. This is the part that stops the next step
   re-deriving what you just learned.
+- **What this means for the steps still to come.** Read the open steps under
+  the feature (`show <the feature>`) against what you found. For each one
+  your work has made wrong, name it by outline and say what is wrong and what
+  it should say instead: a done-when that asks for something that already
+  exists, a step that is no longer needed, a piece of work the feature now
+  needs that no step covers. Give the finding in one sentence the person
+  could read on the row; it becomes the `--because`. Write "Nothing" when
+  nothing changes, which is the usual answer. Do not edit those steps
+  yourself.
 - **The critic rounds**, for a step that changed a screen: each surface, how
   many rounds it took, and the last verdict. After a third failed round, the
   last verdict's fixes in full and where the shots are.
@@ -364,6 +397,13 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
+**A decision about a screen carries a mockup.** Draw each option in one HTML
+file, mark each with `data-option="A"`, `data-option="B"`, and add
+`--mockup <file> [--link <published page>]` to the `add`. The pictures at 390
+and 1280 wide show beside each option in the Inbox and on the plan page. `add`
+refuses a screen question without one; if it is not about how something looks,
+pass `--no-mockup "<why>"`. See `shaping.md`.
+
 A block always waits on a step, so a step that waits on data that does not
 exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
 --at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as
@@ -445,6 +485,16 @@ the ask. Report both numbers.
 do.** The page shows the title in a list and the detail in a box labelled
 "What to set up", so instructions written as the title leave that box saying
 nothing the heading did not.
+
+**Never write a setup step to have the person check finished work.** Listening
+to output and giving a verdict, trying a build in another app, or confirming
+something works on their machine are not setup. If nothing you are building is
+stopped, there is no setup step to write. The person said on 4 November 2026
+that they do not want these asks and will raise anything they notice
+themselves (#2738 and #2739 were the examples). Write what you could not verify
+in the closing note of the step you finished, as one plain line, and close it.
+If a later step cannot be built without the person's judgment, that is a
+decision, not a setup step.
 
 A setup step is never yours. It closes when the person says they have done it,
 on `/dev/plan` or in the Dash tab's "Waiting on you", and it carries no commit.

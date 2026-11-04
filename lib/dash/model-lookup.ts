@@ -4,7 +4,7 @@ import { DASH_MODELS } from './models';
 import { dashModelFor } from './model-choice';
 
 /** The page the picker is on. */
-export const DASH_MODEL_HREF = '/ask';
+export const DASH_MODEL_HREF = '/chat/dash';
 
 /** The Dash page's name for a model id: "Haiku", "Sonnet" or "Opus". */
 export function dashModelLabel(id: string): string {

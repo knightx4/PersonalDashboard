@@ -5,8 +5,7 @@ import { cn } from '@/lib/cn';
  * A static label: a status, a kind, a count. Never pressable; a chip you
  * press to pick it is a ToggleChip, below.
  *
- * One shape, the pill radius, which is round everywhere and square only in
- * Poster, where everything is. Two sizes: `md` at small text for a chip
+ * One shape, the pill radius, which is round in every theme. Two sizes: `md` at small text for a chip
  * beside a title, `sm` at micro text inside a dense row. Never uppercase.
  *
  * A tone only when the colour says something (law 4): caution for "needs

@@ -105,12 +105,6 @@ export function dailyRunText(input: {
   review?: ReviewGoal[];
   stale?: StaleStep[];
   /**
-   * How many questions the run may still add before the Inbox holds
-   * OPEN_QUESTION_CAP; the database refuses one past it. Absent reads as no
-   * limit given, for briefs written before the cap.
-   */
-  asksLeft?: number;
-  /**
    * The person's steps under way that have stalled, and those whose tally
    * reached its total (plan #1281; progressNudges in
    * lib/goals/progress-nudges.ts).
@@ -141,6 +135,11 @@ export function dailyRunText(input: {
    * marked optional, and nothing else is done about it.
    */
   mentions?: PassiveMention[];
+  /**
+   * The open goals with steps and no dashboard yet (plan #2778.9), each laid
+   * out from its template through scripts/goal-dashboard.ts.
+   */
+  unlaid?: { id: string; title: string }[];
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
@@ -149,6 +148,7 @@ export function dailyRunText(input: {
   const stalled = input.underWay?.stalled ?? [];
   const finished = input.underWay?.finished ?? [];
   const mentions = input.mentions ?? [];
+  const unlaid = input.unlaid ?? [];
   const lines = input.steps.map(
     (step) =>
       `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
@@ -182,19 +182,11 @@ export function dailyRunText(input: {
           ...(sitting.length > 0
             ? [
                 'Then give each of these steps of the person\'s a move. Nothing has touched them in a',
-                'week or more. Split it into smaller sub-steps, prepare it for them, or set it to start',
-                'later. Ask whether they still want it only when you cannot tell, and then only within',
-                'the questions you have left below. Leave one you just closed from evidence or merged.',
+                'week or more. Prepare it for them, or set it to start later. Never split it into',
+                'sub-steps and never ask whether they still want it: the person drops a step they do',
+                'not want. Leave one you just closed from evidence or merged.',
                 'Follow .claude/skills/goals/SKILL.md, "Moving a step that has sat for a week".',
                 '',
-                ...(input.asksLeft === undefined
-                  ? []
-                  : [
-                      input.asksLeft === 0
-                        ? 'Questions left: none. The Inbox already holds the most it takes, so decide every move yourself.'
-                        : `Questions left: ${input.asksLeft}, across this whole run. Decide the rest yourself.`,
-                      '',
-                    ]),
                 ...sitting.map(staleLine),
                 '',
               ]
@@ -277,6 +269,17 @@ export function dailyRunText(input: {
           'goal", on passive goals.',
           '',
           ...mentions.map(mentionLine),
+          '',
+        ]
+      : []),
+    ...(unlaid.length > 0
+      ? [
+          'These goals have no dashboard yet. Lay out each one from the template for its kind of',
+          'goal, and save it with `npm run goals:dashboard -- save <goal id> <file> --run ' + input.runId + '`,',
+          'which checks it and lists it on the Goals home with an Undo. Follow',
+          '.claude/skills/goals/reference/dashboards.md.',
+          '',
+          ...unlaid.map((g) => `- "${g.title}" (goals.items id ${g.id})`),
           '',
         ]
       : []),

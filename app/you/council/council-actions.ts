@@ -4,10 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { boardRoutine } from '@/lib/feedback/routine';
 import { createTask } from '@/lib/todo/tasks/write';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
+import { sendMentorMessageInRequest } from '@/lib/you/mentor-reply-request';
 import {
   forgetMemory,
   loadNote,
@@ -16,7 +16,6 @@ import {
   REACTION_NOTE_MAX,
   REACTIONS,
   reactToNote,
-  sendToMentor,
   setCommitmentDone,
   setNoteTask,
   todoTitleFromNote,
@@ -128,7 +127,11 @@ export async function makeTodoFromNote(noteId: string): Promise<CouncilResult> {
   }
 }
 
-/** Send a mentor a message, about one of their notes when `noteId` is given. */
+/**
+ * Send a mentor a message, about one of their notes when `noteId` is given.
+ * The mentor replies live (plan #2748.4): typing at once, the reply in a few
+ * seconds, written after this returns.
+ */
 // latency: pending
 export async function sendMentorMessage(
   advisorId: string,
@@ -139,23 +142,9 @@ export async function sendMentorMessage(
   if (noteId && !id.safeParse(noteId).success) return { error: 'That is not a council note.', saved: false };
   try {
     const user = await requireUser();
-    const client = await createYouClient();
-    const mentor = (await listRoster(client, user.id)).find((a) => a.id === advisorId);
-    if (!mentor) return { error: 'That mentor is not on your council.', saved: false };
-    if (noteId) {
-      const note = await loadNote(client, user.id, noteId);
-      if (!note || note.advisorId !== advisorId) return { error: 'That note is not from this mentor.', saved: false };
-    }
-    const result = await sendToMentor({
-      client,
-      userId: user.id,
-      mentor: { id: mentor.id, name: mentor.name, canTalk: mentor.kind === 'seat' || mentor.brainStatus === 'ready' },
-      text,
-      noteId: noteId ?? null,
-      routine: boardRoutine(),
-    });
-    refresh(mentor.key);
-    return result;
+    const result = await sendMentorMessageInRequest(user.id, { advisorId, text, noteId: noteId ?? null });
+    if (result.saved) refresh(result.mentorKey);
+    return { error: result.error, saved: result.saved };
   } catch (error) {
     return { ...failed(error, 'Your message was not sent. Try again.'), saved: false };
   }

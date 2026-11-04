@@ -12,6 +12,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { COURSE_FILES_BUCKET, TRANSCRIPTS_BUCKET } from '@/lib/you/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
+import { PLAN_MOCKUPS_BUCKET } from '@/lib/plan/mockups';
 import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
 import { IMPORTS_BUCKET } from '@/lib/jobs/linkedin-import';
@@ -173,6 +174,13 @@ export async function POST(request: NextRequest) {
   //    account, written only by the service role.
   try {
     await removeAttachmentFolder(admin, user.id, UI_SHOTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the pictures kept with questions about a screen (plan #2810).
+  try {
+    await removeAttachmentFolder(admin, user.id, PLAN_MOCKUPS_BUCKET);
   } catch {
     // As above.
   }

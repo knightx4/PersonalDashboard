@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/cn';
-import type { Tab } from '@/lib/tabs';
+import type { Tab, TabAddress } from '@/lib/tabs';
 
 /**
  * The tabbed detail pattern (docs/UI-QUALITY-SPEC.md, Part 4): one thing's
@@ -47,6 +47,7 @@ export function TabbedDetail({
   detailCount,
   properties,
   tabs,
+  address,
   label,
   children,
   className,
@@ -76,6 +77,8 @@ export function TabbedDetail({
   /** The facts, as `PropertyList` holding `Property`s; the rest of them when `glance` is given. */
   properties: React.ReactNode;
   tabs: readonly Tab[];
+  /** How the page keeps its tab in the address, such as the ids its tabs used to go by. */
+  address?: TabAddress;
   /** Names the row of tabs for a screen reader, such as "Feature". */
   label: string;
   /** The open tab's content, and only that tab's. */
@@ -122,7 +125,7 @@ export function TabbedDetail({
         )
       }
     >
-      <Tabs tabs={tabs} label={label} className="mb-5" />
+      <Tabs tabs={tabs} address={address} label={label} className="mb-5" />
       {children}
     </DetailLayout>
   );

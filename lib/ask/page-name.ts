@@ -19,10 +19,14 @@ export function pathOf(address: string): string {
   return path.length > 1 ? path.replace(/\/+$/, '') : path;
 }
 
-/** The Ask page carries on earlier questions, so being on it tells Dash nothing. */
+/**
+ * The Ask page carries on earlier questions, so being on it tells Dash
+ * nothing. It is Chat's Dash tab now; /ask, where it was until plan #2748.1,
+ * still counts, since rows written then carry it.
+ */
 export function isAskPath(address: string): boolean {
   const path = pathOf(address);
-  return path === '/ask' || path.startsWith('/ask/');
+  return ['/chat/dash', '/ask'].some((base) => path === base || path.startsWith(`${base}/`));
 }
 
 /**
