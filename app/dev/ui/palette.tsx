@@ -9,7 +9,6 @@ import {
   THEME_CHOICE_ATTRIBUTE,
   COLOURWAYS,
   SKIES,
-  PALETTES,
   THEME_ROOMS,
   type Theme,
 } from '@/lib/theme';
@@ -35,10 +34,6 @@ function describe(theme: Theme): string {
   if (theme.kind === 'system') return 'Following the system';
   if (theme.kind === 'written') {
     const name = `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
-    if (theme.id === 'poster' || theme.id === 'poster-dark') {
-      const palette = PALETTES.find((option) => option.id === theme.palette) ?? PALETTES[0]!;
-      return `Lightbox${theme.id === 'poster-dark' ? ' in dark' : ''}, ${palette.label.toLowerCase()}`;
-    }
     const sky = SKIES.find((option) => option.id === theme.sky);
     return sky ? `${name}, ${sky.label.toLowerCase()} sky` : name;
   }

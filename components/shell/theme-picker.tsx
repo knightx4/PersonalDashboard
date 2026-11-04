@@ -16,15 +16,12 @@ import {
   THEME_POLARITIES,
   THEME_SURFACES,
   SKIES,
-  PALETTES,
   auroraFor,
   isAurora,
-  isPoster,
-  paletteOf,
-  posterFor,
   modeFor,
   partsOf,
   skyOf,
+  surfaceOfSky,
   type Polarity,
   type Surface,
   type ColourwayId,
@@ -33,8 +30,7 @@ import {
   type ThemeMode,
 } from '@/lib/theme';
 import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
-import type { Sky } from '@/lib/theme/sky';
-import { sideOf, type PaletteSide as PosterPalette } from '@/lib/theme/poster';
+import { DEFAULT_LANDSCAPE, DEFAULT_SKY, isLandscape, type Sky, type SkyId } from '@/lib/theme/sky';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -63,13 +59,11 @@ function getDensityServerSnapshot(): Density {
 /**
  * Choosing the room, and a colour for it.
  *
- * Two choices instead of four named themes. The switch says which room --
- * light, dark, or Lightbox -- and the swatches say which colour, and every
- * combination of the two is a theme, generated from the palettes that were
- * written by hand. Lightbox is a room rather than a preset because its page
- * and its cards are opposite polarities, so it is reachable from neither of
- * the other two; it takes a colour like them, on its bench rather than on its
- * sheets.
+ * Three choices instead of a list of named themes. The switch says light or
+ * dark, the surface says Solid, Aurora or Landscapes, and the swatches say
+ * which colour (in Solid) or which sky or scene (in the other two). Every
+ * combination is a theme: Solid is generated from the palettes written by
+ * hand, and the other two are the Aurora and Dawn blocks wearing a sky.
  *
  * Nothing happens until you click. Hovering a swatch used to repaint the whole
  * app, so that you saw a theme before you moved into it; note c0cfc6ae asked
@@ -224,39 +218,33 @@ export function ThemePicker({ value }: { value: Theme }) {
    * one of them has to keep the other, which is what `partsOf` is for: read
    * the current room apart, replace one half, put it back together.
    */
-  // Aurora is the third surface, and it is a written theme rather than a mode,
-  // so it is read apart here instead of through `partsOf`.
+  // Aurora and Landscapes are written themes rather than modes, so they are
+  // read apart here instead of through `partsOf`. Which of the two a theme is
+  // depends on its sky: a painted scene is a landscape.
   const aurora = isAurora(showing);
-  // Lightbox in light is the poster, a written theme like Aurora; in dark it
-  // is still the generated glass room.
-  const poster = isPoster(showing);
-  const here: { polarity: Polarity; surface: Surface } = aurora
-    ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: 'aurora' }
-    : poster
-      ? { polarity: showing.kind === 'written' && showing.id === 'poster-dark' ? 'dark' : 'light', surface: 'lightbox' }
-      : partsOf(mode);
   const sky = skyOf(showing);
-  const palette = paletteOf(showing);
+  const here: { polarity: Polarity; surface: Surface } = aurora
+    ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: surfaceOfSky(sky) }
+    : partsOf(mode);
   // The colour survives a change of room, which means carrying the colourway
   // and not just its hue: dropping it here would turn Ember into "330 degrees"
   // the first time somebody switched to dark, and the pools would go back to
   // the turned sweep without anything having been said about colour.
   const way = colourwayOf(showing) ?? undefined;
-  // In Aurora the switch moves between Aurora and Dawn and keeps the sky.
+  // In Aurora and Landscapes the switch moves between night and dawn and keeps the sky.
   const inPolarity = (next: Polarity): Theme =>
-    here.surface === 'aurora'
-      ? auroraFor(next, sky)
-      : here.surface === 'lightbox'
-        ? posterFor(palette, next)
-        : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
-  // Into Aurora keeps the polarity and starts from the default sky, since a
-  // colourway is not a sky. Out of it keeps the polarity and drops the sky.
+    here.surface === 'solid'
+      ? { kind: 'generated', mode: modeFor(next), hue, way }
+      : auroraFor(next, sky);
+  // Into Aurora or Landscapes keeps the polarity and the sky if it belongs
+  // there, and otherwise starts from that surface's first sky, since a
+  // colourway is not a sky. Back to Solid keeps the polarity and drops the sky.
+  const skyFor = (next: Exclude<Surface, 'solid'>): SkyId =>
+    aurora && surfaceOfSky(sky) === next ? sky : next === 'landscape' ? DEFAULT_LANDSCAPE : DEFAULT_SKY;
   const inSurface = (next: Surface): Theme =>
-    next === 'aurora'
-      ? auroraFor(here.polarity, sky)
-      : next === 'lightbox'
-        ? posterFor(palette, here.polarity)
-        : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
+    next === 'solid'
+      ? { kind: 'generated', mode: modeFor(here.polarity), hue, way }
+      : auroraFor(here.polarity, skyFor(next));
   /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
   const inWay = (next: Colourway): GeneratedTheme => ({
@@ -322,24 +310,13 @@ export function ThemePicker({ value }: { value: Theme }) {
 
           <SectionLabel className="pb-1.5 pt-3">Colour</SectionLabel>
 
-          {poster ? (
+          {aurora ? (
             <div className="flex flex-wrap gap-1.5 pb-2">
-              {PALETTES.map((option) => {
-                const next = posterFor(option.id, here.polarity);
-                return (
-                  <PaletteSwatch
-                    key={option.id}
-                    palette={sideOf(option, here.polarity === 'dark' ? 'night' : 'day')}
-                    label={`${option.label} - ${option.mood}`}
-                    chosen={same(showing, next)}
-                    onChoose={() => save(next)}
-                  />
-                );
-              })}
-            </div>
-          ) : aurora ? (
-            <div className="flex flex-wrap gap-1.5 pb-2">
-              {SKIES.filter((option) => option[here.polarity === 'light' ? 'dawn' : 'night']).map((option) => {
+              {SKIES.filter(
+                (option) =>
+                  option[here.polarity === 'light' ? 'dawn' : 'night'] &&
+                  isLandscape(option.id) === (here.surface === 'landscape'),
+              ).map((option) => {
                 const next = auroraFor(here.polarity, option.id);
                 return (
                   <SkySwatch
@@ -508,44 +485,6 @@ function Swatch({
         // ui-ok: raw-hex -- this is the generated colour itself, which is the
         // one thing on the screen that cannot be a token.
         style={style}
-      >
-        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
-        <span className="sr-only">{label}</span>
-      </button>
-    </Tooltip>
-  );
-}
-
-/**
- * A poster palette, drawn as its three bands stacked on its paper, outlined in
- * its ink.
- */
-function PaletteSwatch({
-  palette,
-  label,
-  chosen,
-  onChoose,
-}: {
-  palette: PosterPalette;
-  label: string;
-  chosen: boolean;
-  onChoose: () => void;
-}) {
-  const [b1, b2, b3] = palette.bands;
-  return (
-    <Tooltip label={label}>
-      <button
-        type="button"
-        onClick={onChoose}
-        aria-pressed={chosen}
-        className="press flex size-8 items-center justify-center transition-transform hover:scale-105"
-        // ui-ok: raw-hex -- the palette itself, which is the one thing on the
-        // screen that cannot be a token.
-        style={{
-          background: `linear-gradient(to bottom, ${b1.fill} 0 33%, ${b2.fill} 33% 66%, ${b3.fill} 66%)`,
-          border: `2px solid ${palette.ink}`,
-          boxShadow: `2px 2px 0 ${palette.ink}`,
-        }}
       >
         {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
         <span className="sr-only">{label}</span>
