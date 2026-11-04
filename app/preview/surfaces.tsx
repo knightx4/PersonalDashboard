@@ -1,5 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { GuessedAlready } from './lesson-predict-seed';
+import { NowSurface } from './now-surfaces';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import { LearnGoSurface } from './learn-go-surfaces';
@@ -162,6 +163,12 @@ import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
 import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  QuestionMockupFailedSurface,
+  QuestionMockupLoadingSurface,
+  QuestionMockupViewerSurface,
+  QuestionMockupsSurface,
+} from './question-mockup-surfaces';
 import {
   GoalArchiveConfirmSurface,
   GoalPutAwayMenuSurface,
@@ -10899,6 +10906,41 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LaterMenuRows />,
   },
   {
+    /* A question about a screen with its mockups under the options (plan
+     * #2810.2): pictures on two options, none on the third, one picture of a
+     * whole question, and a plain question unchanged. */
+    id: 'dev-question-mockups',
+    label: 'Questions · mockups under the options',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupsSurface />,
+  },
+  {
+    /* The same, with the pictures still loading. */
+    id: 'dev-question-mockups-loading',
+    label: 'Questions · mockups loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupLoadingSurface />,
+  },
+  {
+    /* The same, with pictures that will not load: the options still read. */
+    id: 'dev-question-mockups-failed',
+    label: 'Questions · mockups that will not load',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupFailedSurface />,
+  },
+  {
+    /* A picture opened full screen: phone and laptop side by side, with Open
+     * the mockup. */
+    id: 'dev-question-mockups-viewer',
+    label: 'Questions · a mockup opened full screen',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupViewerSurface />,
+  },
+  {
     /* The four words that close a row (plan #1957.3): Done, Drop, Later and
      * Decline with their glyphs, as buttons, as icons and as menu entries,
      * and the toast each leaves with Undo. */
@@ -11558,6 +11600,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ProjectPlanSurface refused />,
   },
   {
+    /* What is running now, at the top of a project's page and Dev's plan
+     * (plan #2800.3): a session that reports and one read from its pushes. */
+    id: 'dev-now',
+    label: 'Dev · Now, sessions working',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="working" />,
+  },
+  {
+    /* Hidden part: a session waiting on you, with its question's choices to
+     * answer there, and one whose need has no choices. */
+    id: 'dev-now-waiting',
+    label: 'Dev · Now, waiting on you',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="waiting" />,
+  },
+  {
+    /* Hidden part: the stale mark, no report for twenty minutes. */
+    id: 'dev-now-stale',
+    label: 'Dev · Now, a session gone quiet',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="stale" />,
+  },
+  {
+    /* Hidden part: nothing running, with the last finished session. */
+    id: 'dev-now-empty',
+    label: 'Dev · Now, nothing running',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="empty" />,
+  },
+  {
     id: 'dev-raised',
     label: 'Dev · Home',
     module: 'dev',
@@ -11599,10 +11675,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
-    /* The runner card on /dev/plan with its four Dashes (plan #1704): a
-     * night with two sessions, a goal run and a slot asleep, then off. */
+    /* The runner card on Home with its four Dashes (plan #1704, moved off
+     * /dev/plan by #578.12): a night with two sessions, a goal run and a
+     * slot asleep, then off. */
     id: 'dev-runner-crew',
-    label: 'Dev · Plan, the runner’s four Dashes',
+    label: 'Dev · Home, the runner’s four Dashes',
     module: 'dev',
     width: 'page',
     render: () => <DevRunnerCrewSurface />,

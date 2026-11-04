@@ -347,6 +347,7 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  * LIFECYCLE_SOURCES, so a new one is decided when it is added.
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
+  session_progress_state_ck: 'what a session says it is doing now, reported as it works; nothing closes by it',
   links_status_ck: 'whether a Plaid link is working, failing or removed',
   dash_questions_status_ck: 'whether a question Dash asked is still open, answered or skipped, kept on the Answer tab',
   month_reviews_status_ck: 'whether the monthly money review was written or the run failed',

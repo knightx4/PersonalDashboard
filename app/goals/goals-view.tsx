@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton } from '@/components/ui/icon-button';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { ChevronDown, ChevronRight, Flag, ListFilter, ListTree, Moon, Repeat, Zap } from 'lucide-react';
 import { toggleChipClass } from '@/components/ui/chip';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
@@ -34,7 +34,13 @@ import {
 import { VIEW_LABEL } from '@/lib/core/move';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
-import { AREA_NAME_MAX, AREA_NOTE_MAX, type AreaWithGoals, type Goal } from '@/lib/goals/tree';
+import {
+  AREA_NAME_MAX,
+  AREA_NOTE_MAX,
+  type AreaWithGoals,
+  type Goal,
+  type GoalActivity,
+} from '@/lib/goals/tree';
 import { cn } from '@/lib/cn';
 import { reopenedGoal } from '@/lib/goals/optimistic';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
@@ -695,8 +701,15 @@ function GoalRow({
           {/* `contents`, so its parts wrap in this line beside Full tree rather than
               as a block of their own: at 390 a goal's meta then takes two lines. */}
           {/* A proposed goal says Dash's suggestion below instead. */}
-          {labelPassive && goal.activity === 'passive' && goal.status !== 'proposed' && (
-            <span className="text-small text-ink-muted">Passive</span>
+          {/* Active or passive, as an icon that switches it (note d759591a). A
+              proposed goal says Dash's suggestion below instead. */}
+          {!archived && goal.status !== 'proposed' && (
+            <GoalActivityToggle
+              goalId={goal.id}
+              title={goal.title}
+              activity={goal.activity ?? 'active'}
+              showWord={labelPassive}
+            />
           )}
           {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
@@ -734,6 +747,72 @@ function GoalRow({
       </div>
       <ActionMenu label={`${goal.title} actions`} items={items} />
     </li>
+  );
+}
+
+/**
+ * Whether the goal is active or passive, as an icon on its row, and the
+ * switch for it (note d759591a): a press makes it the other one, the same
+ * write as the switch on the goal's page. The icon changes at once and is
+ * put back, with the reason in a toast, if the save is refused. With both
+ * kinds showing, a passive goal also says "Passive" beside it.
+ */
+function GoalActivityToggle({
+  goalId,
+  title,
+  activity,
+  showWord,
+}: {
+  goalId: string;
+  title: string;
+  activity: GoalActivity;
+  showWord: boolean;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [value, setValue] = useState<GoalActivity>(activity);
+  const [saving, setSaving] = useState(false);
+  const next: GoalActivity = value === 'active' ? 'passive' : 'active';
+
+  async function flip() {
+    if (saving) return;
+    const before = value;
+    setValue(next);
+    setSaving(true);
+    const form = new FormData();
+    form.set('id', goalId);
+    form.set('activity', next);
+    const result = await editGoal({}, form);
+    setSaving(false);
+    if (result.error) {
+      setValue(before);
+      toast({
+        text: result.error.startsWith('The change could not be saved')
+          ? `Could not make ${title} ${next}. Try again.`
+          : result.error,
+      });
+      return;
+    }
+    router.refresh();
+  }
+
+  const label =
+    value === 'active'
+      ? `${title} is active. Make it passive`
+      : `${title} is passive. Make it active`;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <IconButton size="sm" label={label} pending={saving} onClick={flip}>
+        {value === 'active' ? (
+          <Zap strokeWidth={1.75} aria-hidden />
+        ) : (
+          <Moon strokeWidth={1.75} aria-hidden />
+        )}
+      </IconButton>
+      {showWord && value === 'passive' && (
+        <span className="text-small text-ink-muted">Passive</span>
+      )}
+    </span>
   );
 }
 
