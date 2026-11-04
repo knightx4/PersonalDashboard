@@ -1022,7 +1022,7 @@ const RECALL_LANDING: Record<string, string> = {
   'learn.feed_cards': '/learn/now',
   'public.order_items': '/shopping/orders',
   'public.plan_items': '/dev/plan',
-  'you.dash_questions': '/you/answer',
+  'you.dash_questions': '/you/ask',
 };
 
 /** What kind of thing each source is, for the model reading the result. */

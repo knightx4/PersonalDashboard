@@ -107,7 +107,23 @@ function blockOf(
   if (!held) return null;
   const ask = held.blockAsk?.trim();
   // The ask as written: it often opens with a name, which lowering would spoil.
-  return ask ? { kind: 'person', label: 'Blocked', detail: ask } : { kind: 'person', label: 'Blocked' };
+  if (!ask) return { kind: 'person', label: 'Blocked' };
+  return { kind: 'person', label: holderOf(ask, node.title) ?? 'Blocked', detail: ask };
+}
+
+/**
+ * The person a block waits on, when the ask opens with their name and the
+ * step names them too: "Alex free for an evening" on "Walk through the room
+ * map with Alex" is held by Alex, and the chip says so as the approved
+ * mockup does (plan #2778.12). Anything less certain is left as Blocked.
+ */
+export function holderOf(ask: string, title: string): string | null {
+  const first = /^\p{Lu}[\p{L}'’-]*/u.exec(ask)?.[0]?.replace(/['’]s$/u, '');
+  if (!first || first.length < 2) return null;
+  const named = new RegExp(`(^|[^\\p{L}])${first}(['’]s)?($|[^\\p{L}])`, 'u');
+  // The title's own first word is a verb or an article as often as a name.
+  const rest = title.replace(/^\S+\s*/u, '');
+  return named.test(rest) ? first : null;
 }
 
 function waitOf(node: StepNode, ancestors: readonly StepNode[]): PlanWait | null {
