@@ -36,6 +36,9 @@ npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # nor blocked: say why, in one line
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
                                                # one line on your run, shown live on its page
+npx tsx scripts/plan.ts progress <n> --state working|waiting|done|stopped --action "…" [--needs "…"]
+                                               # what you are doing now, for the project page
+                                               # and Dev; --needs only while waiting
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -69,6 +72,15 @@ what stopped it); `--kind thought` before a long stretch of work; `--kind
 error` when something fails. A question that needs the person takes `--kind
 question` with one to ten `--option`s and parks the run as waiting on them.
 With no run fired at the step the command says so and writes nothing; carry on.
+
+**Report your progress at the same moments (plan #2800.1).** Run lines are
+the run's history; the progress report is the one line the project page and
+Dev show for what you are doing now, and it is written even with no run.
+`progress <n> --state working --action "…"` when you claim the step and
+after each commit, `--state waiting --needs "…"` when you ask the person
+something or block, and `--state done` (or `stopped`, with why) as your last
+call. A session with the Dash connector loaded may call `report_progress`
+instead. `progress.md` in this directory has the details.
 
 **Asking mid-run and waiting (plan #1824).** The question shows on the run's
 lines and in the person's inbox, with each option as a press. Ask only what

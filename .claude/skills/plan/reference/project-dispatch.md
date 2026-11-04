@@ -95,10 +95,13 @@ Follow the repository's own CLAUDE.md where it has one. For the "Set up" step, f
 
 A database change is yours to apply, in the same sitting. A project whose code reads the dashboard's Supabase project (its tables, functions or storage) gets its schema there, and this session's environment has SUPABASE_ACCESS_TOKEN for it even where no Supabase connector is loaded. Follow the repository's CLAUDE.md where it says how (music-pipeline: scripts/apply_migrations.py). Otherwise go through the Management API: read what is there first with POST https://api.supabase.com/v1/projects/<ref>/database/query and body {"query": "..."} (pg_get_functiondef, information_schema.columns); never guess a column, a function body or a grant. Then apply the file with POST .../database/migrations and body {"query": <the file>, "name": "<repo>_<name>"}, and select what it made to check it landed. The project ref is SUPABASE_PROJECT_REF, or the host of the project URL, or the "ref" inside SUPABASE_SERVICE_ROLE_KEY. Nothing that drops or deletes; a step that needs that is blocked with the question. Never leave a written migration for the person to apply: a step whose code is on the default branch without its migration applied is not built.
 
+Report your progress as you work, so the person sees it on the project's page: when the Dash connector is loaded, call its report_progress tool with session_id set to $CLAUDE_CODE_REMOTE_SESSION_ID, run_id set to the "Dash run id" in the brief, and project set to the "Project" line given at the end of this prompt. Call it with state "working" when you start and after each commit, "waiting" with needs set to the question whenever you need the person, and "done" (or "stopped", with why) just before your report to the dispatcher. One plain line in action each time. Without the connector, carry on: the dispatcher reads your report.
+
 Before merging a step to the default branch, run the check command the brief names (or the one you found), and merge only when it passes. Then push.
 
 When you are done, or stopped, send one message to the session that started you (send_message, session id given at the end of this prompt) with: the step's outline, built or blocked, the commit sha on the default branch, whether it reached it, the check command and its result, each migration applied and the name it went in under, a one-line note for the step, and any question or anything only the person can supply. Then stop.
 ```
 
-Add the line `Dispatcher session: <this session's id>` after the prompt and
-before the brief.
+Add the lines `Dispatcher session: <this session's id>` and `Project: <the
+project id, the row's module>` after the prompt and before the brief. The
+worker reports its progress against that project (plan #2800.1).
