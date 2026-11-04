@@ -225,18 +225,9 @@ export function DashChangeRow({
               size="sm"
               pending={pressing === 'confirm'}
               disabled={pressing !== null}
-              onClick={() => {
-                if (change.kind === 'delete_rows') {
-                  setError(null);
-                  setConfirming(true);
-                } else press('confirm');
-              }}
+              onClick={() => press('confirm')}
             >
-              {pressing === 'confirm' && !confirming
-                ? change.kind === 'start_build'
-                  ? 'Starting…'
-                  : 'Writing…'
-                : 'Confirm'}
+              {pressing === 'confirm' ? 'Starting…' : 'Confirm'}
             </DashAction>
           ) : (
             <Button
@@ -251,11 +242,7 @@ export function DashChangeRow({
                 } else press('confirm');
               }}
             >
-              {pressing === 'confirm' && !confirming
-                ? change.kind === 'start_build'
-                  ? 'Starting…'
-                  : 'Writing…'
-                : 'Confirm'}
+              {pressing === 'confirm' && !confirming ? 'Writing…' : 'Confirm'}
             </Button>
           )}
           <CloseButton
