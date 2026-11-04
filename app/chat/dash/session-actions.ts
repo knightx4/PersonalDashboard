@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
 import { activeProjects } from '@/lib/plan/projects';
@@ -9,6 +9,8 @@ import { loadProjectsForRequest } from '@/lib/plan/request-plan';
 import {
   SessionThreadError,
   answerThreadQuestion,
+  commentOnMockup,
+  pickMockup,
   sendSessionMessage,
   startSessionThread,
 } from '@/lib/core/session-threads';
@@ -99,5 +101,40 @@ export async function answerSessionMessageAction(input: {
     return { ok: true };
   } catch (error) {
     return failed(error, 'Your answer could not be saved. Try again.');
+  }
+}
+
+/** Pick one of the session's mockups; the step the thread is about keeps its link. */
+// latency: optimistic
+export async function pickSessionMockupAction(input: {
+  messageId: string;
+}): Promise<SessionOutcome<{ step: string | null }>> {
+  const user = await requireUser();
+  if (!isThreadId(String(input.messageId))) return { ok: false, error: 'That mockup could not be found.' };
+  try {
+    const { step } = await pickMockup(await createCoreClient(), await createClient(), user.id, {
+      messageId: input.messageId,
+    });
+    revalidatePath('/chat/dash', 'layout');
+    return { ok: true, step };
+  } catch (error) {
+    return failed(error, 'Your pick could not be saved. Try again.');
+  }
+}
+
+/** A note on one of the session's mockups, sent to the session. */
+// latency: optimistic
+export async function commentOnSessionMockupAction(input: {
+  messageId: string;
+  text: string;
+}): Promise<SessionOutcome<object>> {
+  const user = await requireUser();
+  if (!isThreadId(String(input.messageId))) return { ok: false, error: 'That mockup could not be found.' };
+  try {
+    await commentOnMockup(await createCoreClient(), user.id, { messageId: input.messageId, text: String(input.text ?? '') });
+    revalidatePath('/chat/dash', 'layout');
+    return { ok: true };
+  } catch (error) {
+    return failed(error, 'Your note could not be sent. Try again.');
   }
 }

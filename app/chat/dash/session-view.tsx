@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUp, Check, ExternalLink, LayoutTemplate, LoaderCircle, Paperclip, SquareTerminal, X } from 'lucide-react';
+import { ArrowUp, Check, ExternalLink, LayoutTemplate, LoaderCircle, MessageSquare, Paperclip, SquareTerminal, X } from 'lucide-react';
 import { ConversationChat } from '@/components/patterns/conversation';
 import { ThreadTurn } from '@/components/thread/thread';
 import { CommentBody } from '@/components/dev/comment-body';
@@ -21,10 +21,14 @@ import { cn } from '@/lib/cn';
 import { keepCurrent } from '@/lib/share/keep-current';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
+  MOCKUP_COMMENT_MAX,
   SESSION_MESSAGE_MAX,
   THIS_APP_LABEL,
   awaitingReply,
   claudeSessionUrl,
+  isPick,
+  pickedLinks,
+  shownBody,
   sessionThreadPath,
   stateLabel,
   threadTurns,
@@ -46,7 +50,10 @@ import { CHATS_BACK } from './view';
  * - While a reply is to come, a line under the turns says what the session
  *   last reported.
  * - A question shows its options as buttons; one press answers it.
- * - A mockup is a card that opens it.
+ * - A mockup is a card that opens it, with Pick and Comment under it (plan
+ *   #2789.9). Pick tells the session and, on a thread about a plan step, puts
+ *   the link on that step; the card then shows Picked. Comment opens a box
+ *   whose note goes to the session as a reply on that mockup.
  * - The page re-reads itself while it is open, as a shared page does: every
  *   fifteen seconds while a reply is to come, every minute otherwise.
  */
@@ -63,6 +70,8 @@ export type SessionActions = {
     file?: UploadedAttachment | null;
   }) => Promise<{ ok: true; message: SessionMessage } | { ok: false; error: string }>;
   answer: (input: { messageId: string; answer: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  pick: (input: { messageId: string }) => Promise<{ ok: true; step: string | null } | { ok: false; error: string }>;
+  comment: (input: { messageId: string; text: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
 /** What the gallery presses with: nothing reaches a server. */
@@ -70,6 +79,8 @@ const NO_ACTIONS: SessionActions = {
   start: async () => ({ ok: false, error: 'Not sent in the gallery.' }),
   send: async () => ({ ok: false, error: 'Not sent in the gallery.' }),
   answer: async () => ({ ok: true }),
+  pick: async () => ({ ok: true, step: null }),
+  comment: async () => ({ ok: true }),
 };
 
 export type PendingSend = { id: string; text: string; file: UploadedAttachment | null; failed: string | null };
@@ -96,6 +107,7 @@ export function SessionThreadView({
   initialAttachOpen = false,
   initialPending = [],
   initialFile = null,
+  initialCommentOn = null,
   now: start,
 }: {
   /** Null for a new thread, made by its first message. */
@@ -115,6 +127,8 @@ export function SessionThreadView({
   initialAttachOpen?: boolean;
   initialPending?: PendingSend[];
   initialFile?: UploadedAttachment | null;
+  /** For the gallery: the mockup whose comment box is open. */
+  initialCommentOn?: string | null;
   /** The time the page was drawn, until the clock is read. */
   now: number;
 }) {
@@ -131,6 +145,10 @@ export function SessionThreadView({
   const [uploading, setUploading] = useState(false);
   const [answered, setAnswered] = useState<Record<string, string>>({});
   const [answerError, setAnswerError] = useState<{ id: string; error: string } | null>(null);
+  const [pickedNow, setPickedNow] = useState<Record<string, string | null>>({});
+  const [commentOn, setCommentOn] = useState<string | null>(initialCommentOn);
+  const [mockupError, setMockupError] = useState<{ id: string; error: string } | null>(null);
+  const [commentSent, setCommentSent] = useState<string[]>([]);
   const [, startTransition] = useTransition();
   const boxId = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -241,6 +259,42 @@ export function SessionThreadView({
     });
   };
 
+  const picked = pickedLinks(messages);
+  const titleOf = (url: string | null) => messages.find((m) => m.kind === 'mockup' && m.artifactUrl === url)?.body.trim() || 'the mockup';
+
+  const pick = (message: SessionMessage) => {
+    setPickedNow((map) => ({ ...map, [message.id]: null }));
+    setMockupError(null);
+    startTransition(async () => {
+      const outcome = await actions.pick({ messageId: message.id });
+      if (!outcome.ok) {
+        setPickedNow((map) => {
+          const next = { ...map };
+          delete next[message.id];
+          return next;
+        });
+        setMockupError({ id: message.id, error: outcome.error });
+        return;
+      }
+      setPickedNow((map) => ({ ...map, [message.id]: outcome.step }));
+      router.refresh();
+    });
+  };
+
+  const comment = (message: SessionMessage, text: string) => {
+    setMockupError(null);
+    startTransition(async () => {
+      const outcome = await actions.comment({ messageId: message.id, text });
+      if (!outcome.ok) {
+        setMockupError({ id: message.id, error: outcome.error });
+        return;
+      }
+      setCommentSent((list) => [...list, message.id]);
+      setCommentOn(null);
+      router.refresh();
+    });
+  };
+
   const showPending = pending.filter((p) => !shownIds.has(p.id));
   const empty = turns.length === 0 && showPending.length === 0;
 
@@ -302,6 +356,17 @@ export function SessionThreadView({
                       canAnswer={!ended}
                       error={answerError?.id === m.id ? answerError.error : null}
                       onAnswer={(option) => answer(m, option)}
+                      mockup={{
+                        picked: !!m.artifactUrl && (picked.has(m.artifactUrl) || m.id in pickedNow),
+                        savedOn: pickedNow[m.id] ?? null,
+                        commentOpen: commentOn === m.id,
+                        commentSent: commentSent.includes(m.id),
+                        error: mockupError?.id === m.id ? mockupError.error : null,
+                        aboutTitle: m.author === 'person' && m.artifactUrl ? titleOf(m.artifactUrl) : null,
+                        onPick: () => pick(m),
+                        onToggleComment: () => setCommentOn((open) => (open === m.id ? null : m.id)),
+                        onComment: (text) => comment(m, text),
+                      }}
                     />
                   ))}
                 </div>
@@ -532,38 +597,26 @@ function Turn({
   canAnswer,
   error,
   onAnswer,
+  mockup,
 }: {
   message: SessionMessage;
   chosen: string | null;
   canAnswer: boolean;
   error: string | null;
   onAnswer: (option: string) => void;
+  mockup: MockupState;
 }) {
   const mine = m.author === 'person';
   return (
     <div className="space-y-1">
       {m.kind === 'mockup' && m.artifactUrl ? (
-        <a
-          href={m.artifactUrl}
-          target="_blank"
-          rel="noreferrer"
-          className={cn(cardVariants({ interactive: true }), 'group/mock flex items-center gap-3 px-3 py-2.5')}
-        >
-          <LayoutTemplate className="size-5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block text-ui font-medium break-words text-ink group-hover/mock:text-accent">
-              {m.body.trim() || 'A mockup'}
-            </span>
-            <span className="block text-small text-ink-muted">Mockup · opens in a new tab</span>
-          </span>
-          <ExternalLink className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-        </a>
+        <MockupCard message={m} state={mockup} canAct={canAnswer} />
       ) : (
         m.body.trim() && (
           <div className="text-body break-words">
             {mine ? (
               <p className="whitespace-pre-wrap text-ink">
-                <LinkedText text={m.body} refs={false} />
+                <LinkedText text={shownBody(m)} refs={false} />
               </p>
             ) : (
               <CommentBody body={m.body} refs="outlines" />
@@ -572,6 +625,12 @@ function Turn({
         )
       )}
       {m.attachment && <FileChip name={m.attachment.name} href={m.attachment.href} />}
+      {mine && m.artifactUrl && !isPick(m) && (
+        <p className="flex items-center gap-1.5 text-small text-ink-muted">
+          <LayoutTemplate className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+          <span className="min-w-0 break-words">{mockup.aboutTitle ? `On \u201c${mockup.aboutTitle}\u201d` : 'On a mockup'}</span>
+        </p>
+      )}
       {m.kind === 'question' && m.options && (
         <div className="pt-1">
           {chosen ? (
@@ -593,6 +652,135 @@ function Turn({
           {error && <FieldError>{error}</FieldError>}
         </div>
       )}
+    </div>
+  );
+}
+
+/** What a mockup card needs besides the message: whether it is picked, its comment box, and the presses. */
+type MockupState = {
+  picked: boolean;
+  /** The outline of the plan step the pick was just saved on, when it was. */
+  savedOn: string | null;
+  commentOpen: boolean;
+  commentSent: boolean;
+  error: string | null;
+  /** On your own pick or note about a mockup, that mockup's title. */
+  aboutTitle: string | null;
+  onPick: () => void;
+  onToggleComment: () => void;
+  onComment: (text: string) => void;
+};
+
+/**
+ * A mockup the session drew: the card that opens it, then Pick and Comment.
+ * Once picked, a mark takes Pick's place. The comment box stays closed until
+ * Comment is pressed.
+ */
+function MockupCard({ message: m, state, canAct }: { message: SessionMessage; state: MockupState; canAct: boolean }) {
+  const [text, setText] = useState('');
+  const boxId = useId();
+  const send = (event: React.FormEvent) => {
+    event.preventDefault();
+    const note = text.trim();
+    if (!note) return;
+    state.onComment(note);
+    setText('');
+  };
+  return (
+    <div className="space-y-2">
+      <a
+        href={m.artifactUrl ?? undefined}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(
+          cardVariants({ interactive: true }),
+          'group/mock flex items-center gap-3 px-3 py-2.5',
+          state.picked && 'border-accent',
+        )}
+      >
+        <LayoutTemplate className="size-5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-ui font-medium break-words text-ink group-hover/mock:text-accent">
+            {m.body.trim() || 'A mockup'}
+          </span>
+          <span className="block text-small text-ink-muted">Mockup · opens in a new tab</span>
+        </span>
+        <ExternalLink className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      </a>
+      {(canAct || state.picked) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {state.picked ? (
+            <span className={cn(chipVariants({ tone: 'accent' }), 'max-sm:min-h-11 max-sm:px-3')}>
+              <Check strokeWidth={1.75} aria-hidden />
+              Picked
+            </span>
+          ) : (
+            canAct && (
+              <Button type="button" variant="secondary" size="sm" onClick={state.onPick} className="max-sm:min-h-11">
+                Pick
+              </Button>
+            )
+          )}
+          {canAct && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              pressed={state.commentOpen}
+              onClick={state.onToggleComment}
+              className="max-sm:min-h-11"
+            >
+              <MessageSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Comment
+            </Button>
+          )}
+          {state.savedOn && <span className="text-small text-ink-muted">Saved on #{state.savedOn} as its design</span>}
+          {state.commentSent && !state.commentOpen && <span className="text-small text-ink-muted">Note sent</span>}
+        </div>
+      )}
+      {state.commentOpen && canAct && (
+        <form onSubmit={send}>
+          <ComposeBox>
+            <label htmlFor={boxId} className="sr-only">
+              Your note on this mockup
+            </label>
+            <ComposeBody
+              id={boxId}
+              rows={2}
+              autoFocus={false}
+              maxLength={MOCKUP_COMMENT_MAX}
+              placeholder="What would you change about it?"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && !text.trim()) {
+                  event.preventDefault();
+                  state.onToggleComment();
+                  return;
+                }
+                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }}
+              className="min-h-11 sm:min-h-0"
+            />
+            <div className="mt-1 flex items-center justify-end">
+              <Tooltip label="Send the note">
+                <Button
+                  type="submit"
+                  size="sm"
+                  aria-label="Send the note"
+                  className="size-7 shrink-0 px-0 active:brightness-90"
+                  disabled={!text.trim()}
+                >
+                  <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
+                </Button>
+              </Tooltip>
+            </div>
+          </ComposeBox>
+        </form>
+      )}
+      {state.error && <FieldError>{state.error}</FieldError>}
     </div>
   );
 }
