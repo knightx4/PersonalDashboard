@@ -10,7 +10,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { isOwner, type OwnerCheck } from '@/lib/dev/owner';
 import { moveNoteToIdea, routesToPlan } from '@/lib/feedback/move';
 import { triageRow } from '@/lib/feedback/triage-run';
-import { scoreIdeaRow } from '@/lib/ideas/score-run';
+import { sendIdeaToPlan } from '@/lib/ideas/send-to-plan';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /**
@@ -32,7 +32,8 @@ const PagePath = z.string().max(300).nullable();
  *
  * Triage runs once the note is saved, so saving never waits on Jev. A note
  * triage is sure needs planning moves to the ideas page (plan #1675), the
- * owner's notes only, and that idea is then scored.
+ * owner's notes only, and that idea is then scored and sent to be shaped into
+ * a proposed feature on the plan (note 677a1cdd).
  */
 export async function writeDevNote(
   supabase: Supabase,
@@ -68,9 +69,15 @@ export async function writeDevNote(
       if (!routesToPlan(triage) || !(await isOwner({ user, supabase }))) return;
       const moved = await moveNoteToIdea(supabase, { userId: user.id, noteId: id });
       if (!moved.ok) return;
-      const scoreSpend: SpendReport[] = [];
-      await scoreIdeaRow(supabase, { userId: user.id, id: moved.ideaId, triage, spend: scoreSpend });
-      await recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, scoreSpend);
+      // Scored, then straight on to be shaped (note 677a1cdd): the same path a
+      // project app's notes take (lib/ideas/send-to-plan.ts).
+      await sendIdeaToPlan(supabase, {
+        userId: user.id,
+        ideaId: moved.ideaId,
+        triage,
+        score: true,
+        record: (spend) => recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, spend),
+      });
     } catch (problem) {
       console.warn('[capture] triaging a note failed', problem);
     }

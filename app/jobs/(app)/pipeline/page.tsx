@@ -4,6 +4,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadWorkingRefs } from '@/lib/talk/handoffs';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
+import { KeepView } from '@/components/shell/keep-view';
 import { loadPipeline } from '@/lib/jobs/applications/load';
 import type { PipelineParams } from '@/lib/jobs/pipeline-view';
 import { rolesDisplay } from '@/lib/jobs/roles-display';
@@ -41,14 +42,18 @@ export default async function Page({ searchParams }: { searchParams: Promise<Pip
   // Fit and chance on each row (plan #1206).
   const rows = await withApplicationNotes(supabase, user.id, pipeline);
 
+  // The Pipeline tab returns to this view (note 978314f8).
   return (
-    <PipelinePage
-      rows={rows}
-      params={params}
-      savedViews={savedViews}
-      working={working}
-      hasInbox={(inboxCount ?? 0) > 0}
-      timezone={(profile?.timezone as string | null) ?? 'UTC'}
-    />
+    <>
+      <KeepView />
+      <PipelinePage
+        rows={rows}
+        params={params}
+        savedViews={savedViews}
+        working={working}
+        hasInbox={(inboxCount ?? 0) > 0}
+        timezone={(profile?.timezone as string | null) ?? 'UTC'}
+      />
+    </>
   );
 }

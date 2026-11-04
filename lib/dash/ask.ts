@@ -26,6 +26,20 @@ import { lookupInScope } from '@/lib/ask/tools';
 import { moduleById, type ModuleId } from '@/lib/modules';
 import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 import type { PaidQueued } from './paid';
+import {
+  THINK_EFFORT,
+  THINK_MAX_TOKENS,
+  THINK_MODEL,
+  THINK_RULES,
+  THINK_TIME_BUDGET_MS,
+  THINK_TOOLS,
+  THINK_WEB_SEARCH,
+  isThinkTool,
+  runThinkTool,
+  thoughtCall,
+  thoughtCost,
+  type ThinkDeps,
+} from './think';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -167,7 +181,7 @@ reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
 links or an information step's form, call change_goal_number, change_goal_link
-or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list. In Shopping, to
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list; to add a tile to a goal's dashboard when they ask for one in their own words ('add a chart of my balance'), move one, take one off or lay the whole dashboard out, call change_goal_dashboard. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
@@ -179,7 +193,7 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to put a question to their board ("ask the board whether ..."), call ask_board with the question, the options they gave, the numbers and limits from the conversation as context, and their lean if they said one; it queues the question for the Sunday meeting, and pass when 'now' only if they asked for a meeting now. Answer with the question and the link to the Board tab. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
+or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to put a question to their council or board ("ask the council whether ..."), call ask_board with the question, the options they gave, the numbers and limits from the conversation as context, and their lean if they said one; it queues the question for the Sunday meeting, and pass when 'now' only if they asked for a meeting now. Answer with the question and the link to the Council tab. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
 drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
 with the whole new text. When they ask for a post about the app or how
 they build it, read what it rests on, call post_pictures for a picture of that screen,
@@ -201,6 +215,10 @@ When they ask for a goal to be mapped, planned, broken down or researched,
 call start_goal_run on it, straight after add_goal for a new one, and pass
 what they asked for beyond the map as its instruction; never hand_off it.
 When they ask Dash to do or get ready one step, call work_goal_step.
+When they ask Dash to figure something out for a goal they have ("should I
+consolidate my loans", "work out which program fits me"), call
+take_on_for_goal with the question in their words: it works on that goal and
+tells them when it is done, so do not answer it yourself first.
 When you cannot tell which row they mean, ask rather than guess. Say in your
 answer what you did, and cite the row the tool returned so they can open it.
 Never change something they only asked about.
@@ -268,6 +286,25 @@ export function scopedVoice(scope: ModuleId | null | undefined, model: string = 
   return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
 }
 
+/**
+ * Ask's voice with "Think it through" on (plan #2789.10; lib/dash/think.ts):
+ * Opus at high effort, Ask's rules with the thinking rules after them, web
+ * search, and the code lookups and the mockup on top of Ask's tools. The
+ * model the person chose for ordinary questions does not apply.
+ */
+export function thinkVoice(scope: ModuleId | null | undefined): DashVoice {
+  const ask = scopedVoice(scope, THINK_MODEL);
+  return {
+    ...ask,
+    system: `${SYSTEM}\n\n${THINK_RULES}`,
+    tools: [...ask.tools, ...THINK_TOOLS],
+    serverTools: [THINK_WEB_SEARCH],
+    effort: THINK_EFFORT,
+    maxTokens: THINK_MAX_TOKENS,
+    timeBudgetMs: THINK_TIME_BUDGET_MS,
+  };
+}
+
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
 export type AskLookupEvent = DashLookupEvent;
@@ -314,11 +351,17 @@ export async function answerQuestion(input: {
   scope?: ModuleId | null;
   /** The model the person chose to be answered with (plan #2458.2); absent, Sonnet. */
   model?: DashChoiceId;
+  /**
+   * "Think it through" (plan #2789.10): answered with thinkVoice, and the
+   * think lookups run with these. Absent: an ordinary answer.
+   */
+  think?: ThinkDeps | null;
 }): Promise<AskAnswer> {
-  const { page, scope, model, ...rest } = input;
+  const { page, scope, model, think, execute, ...rest } = input;
   return runDash({
     ...rest,
-    voice: scopedVoice(scope, model),
+    execute: think ? (name, args) => (isThinkTool(name) ? runThinkTool(name, args, think) : execute(name, args)) : execute,
+    voice: think ? thinkVoice(scope) : scopedVoice(scope, model),
     context: {
       surface: 'ask',
       subject: null,
@@ -389,6 +432,8 @@ export type AskWriteRunner = (
   tool: DashWriteTool,
   input: unknown,
   seen: DashSeen,
+  /** The conversation's id, which a question handed to a goal reports back into (plan #2778.8). */
+  conversationId: string,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
 /**
@@ -475,6 +520,12 @@ export async function askDash(
      * Sonnet. The spend is recorded under the model that answered.
      */
     model?: DashChoiceId;
+    /**
+     * "Think it through" was on (plan #2789.10): answered on Opus at high
+     * effort with web search, the code and the mockup, and the answer keeps
+     * what it cost. Absent: an ordinary answer.
+     */
+    think?: ThinkDeps | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -534,7 +585,7 @@ export async function askDash(
   const write: DashWriter | undefined =
     apply && saveChange
       ? async (tool, args, seen) => {
-          const result = await apply(tool, args, seen);
+          const result = await apply(tool, args, seen, subject.ref);
           if (!result.ok) return { ok: false, error: result.error };
           // A thread's own tool, which Ask never offers.
           if ('recorded' in result) return { ok: false, error: 'That cannot be done from Ask. Answer in words.' };
@@ -639,6 +690,7 @@ export async function askDash(
     signal: input.signal,
     scope: input.scope,
     model: input.model,
+    think: input.think,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);
@@ -653,8 +705,12 @@ export async function askDash(
 
   let answered: TalkTurn[];
   try {
+    // A thought-through answer keeps its mark and its cost, read by the line under it.
+    const toolCalls = input.think
+      ? [...answer.toolCalls, thoughtCall({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spent) })]
+      : answer.toolCalls;
     answered = await stores.append(subject, [
-      { role: 'assistant', body: answer.body, toolCalls: answer.toolCalls, citations: answer.citations },
+      { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
     ]);
   } catch {
     await discard();

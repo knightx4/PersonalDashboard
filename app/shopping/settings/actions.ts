@@ -263,7 +263,7 @@ export async function reparseInboxOrders(accountId: string): Promise<{
     revalidatePath('/shopping/orders');
     revalidatePath('/shopping/inventory');
     revalidatePath('/finances/spending');
-    revalidatePath('/shopping/review');
+    revalidatePath('/shopping/orders/review');
 
     return { ok: true, ...counters };
   } catch (err) {

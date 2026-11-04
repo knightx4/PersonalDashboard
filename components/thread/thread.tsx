@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useOptimistic, useRef, useState, us
 import { ArrowUp, AtSign, Check, CircleUser, CornerDownRight, Square, X } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
+import { ModuleMark } from '@/components/ui/module-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
 import { addRoleComment, deleteRoleComment } from '@/app/jobs/(app)/roles/[id]/comment-actions';
@@ -19,10 +20,11 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { ReplyMockups } from '@/components/talk/reply-mockup';
 import { PaidCard } from '@/components/talk/paid-card';
 import { paidCardHosts } from '@/lib/dash/paid-card';
 import type { ChangePresses } from '@/components/talk/dash-changes';
-import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/ask/actions';
+import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/chat/dash/actions';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
@@ -39,6 +41,8 @@ import { cn } from '@/lib/cn';
 import { Tooltip } from '@/components/ui/tooltip';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { boxTrigger, replaceTrigger, type BoxTrigger } from '@/lib/talk/box-commands';
+import { chatReadRows } from '@/lib/talk/chat-trail';
+import { sourceMarks, type SourceMark } from '@/components/talk/source-marks';
 
 /**
  * Every conversation in the app, and the box for adding to it
@@ -156,11 +160,71 @@ export function ThreadTurn({
 }
 
 /** Words written as markdown: every assistant turn, and a row comment of yours. */
-function Words({ body, titles, refs }: { body: string; titles?: PlanRefTitles; refs?: 'outlines' }) {
+function Words({
+  body,
+  titles,
+  refs,
+  marks,
+}: {
+  body: string;
+  titles?: PlanRefTitles;
+  refs?: 'outlines';
+  /** The rows the answer cites, by their number in the chat (plan #2748.12). */
+  marks?: readonly SourceMark[];
+}) {
+  const plugins = useMemo(() => (marks && marks.length > 0 ? [sourceMarks(marks)] : undefined), [marks]);
   return (
     <div className="text-body">
-      <CommentBody body={body} titles={titles} refs={refs} />
+      <CommentBody body={body} titles={titles} refs={refs} remarkPlugins={plugins} />
     </div>
+  );
+}
+
+/**
+ * One turn on the Dash tab of Chat (plan #2748.12), drawn as a messaging app
+ * draws it: your question a filled bubble on the right with no name or date,
+ * and Dash's answer flush left under his 24px mark and name.
+ */
+function ChatTurn({
+  mine,
+  head,
+  mark,
+  muted = false,
+  role,
+  children,
+  'aria-live': live,
+  'aria-busy': busy,
+}: {
+  mine: boolean;
+  /** Dash's mark and name, at the head of a run of his turns. */
+  head?: boolean;
+  mark?: React.ReactNode;
+  muted?: boolean;
+  role?: React.AriaRole;
+  children: React.ReactNode;
+  'aria-live'?: 'polite';
+  'aria-busy'?: boolean;
+}) {
+  if (mine) {
+    return (
+      <li className="flex flex-col items-end">
+        <span className="sr-only">You:</span>
+        <div className="ml-12 max-w-lg rounded-card bg-accent-tint px-4 py-2.5 text-ink">
+          {children}
+        </div>
+      </li>
+    );
+  }
+  return (
+    <li role={role} aria-live={live} aria-busy={busy} className="group space-y-2">
+      {head && (
+        <div className="flex items-center gap-2">
+          {mark}
+          <span className={cn('text-ui font-semibold', muted ? 'text-ink-muted' : 'text-ink')}>Dash</span>
+        </div>
+      )}
+      {children}
+    </li>
   );
 }
 
@@ -203,7 +267,19 @@ function Composer({
   onKey,
   holdSend = false,
   send,
+  autoFocus = true,
+  roomy = false,
+  beneath,
 }: {
+  /** Take the caret when drawn; a chat's docked box waits to be pressed. */
+  autoFocus?: boolean;
+  /**
+   * A larger, rounder box with room for a few lines before it grows, as
+   * Claude's is: the Dash tab of Chat (plan #2863).
+   */
+  roomy?: boolean;
+  /** Under the box, outside it, in quiet text: the pickers on the Dash tab of Chat (plan #2863). */
+  beneath?: React.ReactNode;
   formRef: React.RefObject<HTMLFormElement | null>;
   boxRef?: React.RefObject<HTMLTextAreaElement | null>;
   action?: (formData: FormData) => void;
@@ -258,7 +334,8 @@ function Composer({
     >
       {hidden}
       {over}
-      <ComposeBox>
+      {/* Roomy, the faint outline sets the box off, as Claude's does. */}
+      <ComposeBox className={roomy ? 'rounded-card border-border px-3 pb-2 pt-3' : undefined}>
         {attached}
         <div className="flex items-start gap-2">
           {lead}
@@ -273,8 +350,8 @@ function Composer({
             id={boxId}
             name={name}
             rows={1}
-            className="min-h-11 sm:min-h-0"
-            autoFocus
+            className={roomy ? 'min-h-11 min-[720px]:min-h-14' : 'min-h-11 sm:min-h-0'}
+            autoFocus={autoFocus}
             maxLength={maxLength}
             placeholder={placeholder}
             value={draft}
@@ -326,6 +403,7 @@ function Composer({
           </div>
         </div>
       </ComposeBox>
+      {beneath && <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-end gap-0.5 px-1">{beneath}</div>}
       {error}
     </form>
   );
@@ -594,6 +672,12 @@ type RowThreadProps = {
    * them. Only a goal's flag needs it: a raise whose answer starts a goals run.
    */
   store?: CommentStore;
+  /**
+   * Draw the comments without the fold whose line counts them, where the
+   * caller already heads the thread with its count: a step page's Comments
+   * (note 42b3d858).
+   */
+  unfolded?: boolean;
 };
 
 /**
@@ -613,6 +697,7 @@ function RowThread({
   composerOpen = false,
   titles,
   store,
+  unfolded = false,
 }: RowThreadProps) {
   const parsed = threadSubject(subject);
   if (!parsed) throw new Error(`Thread: ${subject} is not a row that has a thread`);
@@ -809,7 +894,7 @@ function RowThread({
 
   // A row with no comments on it is the button that starts one: a "0
   // comments" heading over it would announce that it has nothing to say.
-  if (shown.length === 0) return <div className="space-y-2">{messages}</div>;
+  if (shown.length === 0 || unfolded) return <div className="space-y-2">{messages}</div>;
 
   // A thread reads as a thread: a fold whose closed line carries the count and
   // the last turn (law 10), open by default. It sits on the ground of the card
@@ -868,6 +953,8 @@ export type TurnControls = {
   resend: (body: string) => void;
   /** Open the box with `body` in it, to change and send. */
   edit: (body: string) => void;
+  /** The last turn in the thread, whose presses stay in view when earlier ones rest (plan #2748.12). */
+  latest?: boolean;
 };
 
 /**
@@ -1047,6 +1134,15 @@ type TalkThreadProps = {
   below?: (turn: TalkTurn, thread: TurnControls) => React.ReactNode;
   /** Who answers: Dash when left out. */
   assistant?: TalkAssistant;
+  /**
+   * Drawn as a messaging app is, for the Dash tab of Chat (plan #2748.12):
+   * questions in bubbles on the right, each answer under Dash's 24px mark with
+   * the rows it cites numbered as Used in this chat numbers them, and on a
+   * phone the docked box held right above the tab bar.
+   */
+  bubbles?: boolean;
+  /** Under an answer's name and above its words: what Dash looked up, folded. Drawn when `bubbles`. */
+  lead?: (turn: TalkTurn) => React.ReactNode;
   /** What kind of work the mark shows while a reply is coming. */
   activity?: DashActivity;
   /** Turns written elsewhere since the thread was drawn (plan #1402). */
@@ -1131,6 +1227,8 @@ function TalkThread({
   boxStart,
   questionCitations,
   dock = false,
+  bubbles = false,
+  lead,
 }: TalkThreadProps) {
   const [own, setTurns] = useState<TalkTurn[]>(() =>
     pendingQuestion ? [...initial, { id: PENDING, role: 'user', body: pendingQuestion, createdAt: '' }] : [...initial],
@@ -1152,8 +1250,11 @@ function TalkThread({
   // the words that follow, with room under it for the dock (plan #1899.8).
   // Watching the thread's size catches each line as it lands; nothing moves
   // when the box is already in view.
+  // Held over a phone's tab bar the box is always in view, so the end of the
+  // thread is what is kept there instead (plan #2748.12).
+  const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const box = form.current;
+    const box = end.current?.offsetParent ? end.current : form.current;
     if (!sending || !box) return;
     const keep = () => box.scrollIntoView({ block: 'nearest' });
     keep();
@@ -1168,7 +1269,8 @@ function TalkThread({
   }, [sending]);
   // A docked thread opens on its latest turn, the way a chat app does.
   useEffect(() => {
-    if (dock) form.current?.scrollIntoView({ block: 'end' });
+    if (!dock) return;
+    (end.current?.offsetParent ? end.current : form.current)?.scrollIntoView({ block: 'end' });
   }, [dock]);
   const adder = useRef<AddFileHandle>(null);
   // What the words at the caret ask the menu for (plan #1899.5), and which
@@ -1320,13 +1422,108 @@ function TalkThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sent once, on arrival
   }, []);
 
-  const mark = (state?: DashState, kind?: DashActivity) => (
-    <AssistantMark assistant={assistant} state={state} activity={kind} />
+  // On the Dash tab Dash rests on his 24px charcoal plate, as the top bar
+  // shows him, and comes off it in his capsule while he works or fails.
+  const mark = (state?: DashState, kind?: DashActivity) =>
+    bubbles && (state === undefined || state === 'idle' || state === 'done') ? (
+      <ModuleMark module="dash" size="sm" />
+    ) : bubbles ? (
+      <DashMark
+        size="sm"
+        state={state ?? 'idle'}
+        activity={kind}
+        tone="brand"
+        decorative
+        className={state === 'failed' ? 'text-danger' : undefined}
+      />
+    ) : (
+      <AssistantMark assistant={assistant} state={state} activity={kind} />
+    );
+
+  // Every row read in the chat, numbered once as Used in this chat numbers them.
+  const numbers = useMemo(() => {
+    const map = new Map<string, number>();
+    if (bubbles) chatReadRows(turns).forEach((row, i) => map.set(`${row.table}\u0000${row.ref}`, i + 1));
+    return map;
+  }, [bubbles, turns]);
+  const marksFor = (turn: TalkTurn): SourceMark[] =>
+    (turn.citations ?? []).flatMap((citation) => {
+      const n = numbers.get(`${citation.table}\u0000${citation.ref}`);
+      return n ? [{ n, title: citation.title, href: citation.href }] : [];
+    });
+
+  // A new chat keeps its box in the middle of the pane until the first question is out.
+  const held = bubbles && dock && (turns.length > 0 || sending || Boolean(failed));
+
+  const chatTurns = bubbles && (
+    <ul className="space-y-6">
+      {turns.map((turn, index) => {
+        const mine = turn.role === 'user';
+        const grouped = index > 0 && turns[index - 1].role === turn.role;
+        return (
+          <ChatTurn
+            key={turn.id === PENDING ? `${PENDING}-${index}` : turn.id}
+            mine={mine}
+            head={!grouped}
+            mark={mine ? undefined : mark(turn.id === landed ? 'done' : undefined)}
+          >
+            {mine ? (
+              <p className="text-body whitespace-pre-wrap">
+                <LinkedText text={turn.body} />
+              </p>
+            ) : (
+              <>
+                {lead?.(turn)}
+                <Words body={turn.body} refs="outlines" marks={marksFor(turn)} />
+              </>
+            )}
+            {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+            {!mine && <ReplyCharts calls={turn.toolCalls} />}
+            {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
+            {turn.id === PENDING
+              ? undefined
+              : below?.(turn, {
+                  question: questionBefore(index),
+                  busy: sending,
+                  resend,
+                  edit,
+                  latest: index === turns.length - 1 && !sending,
+                })}
+          </ChatTurn>
+        );
+      })}
+      {sending && (
+        <ChatTurn
+          mine={false}
+          head
+          muted={!fresh}
+          aria-live="polite"
+          aria-busy={fresh ? true : undefined}
+          mark={mark('working', fresh ? 'writing' : activity)}
+        >
+          {!fresh && <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>}
+          {working}
+          {fresh && <Words body={fresh} refs="outlines" />}
+        </ChatTurn>
+      )}
+      {!sending && failed && (
+        <ChatTurn mine={false} head role="alert" mark={mark('failed')}>
+          <p className="text-body text-danger">{failed}</p>
+        </ChatTurn>
+      )}
+    </ul>
   );
 
   return (
     <div className={dock ? 'flex flex-1 flex-col gap-2' : 'space-y-2'}>
-      {(turns.length > 0 || failed || opening) && (
+      {bubbles && (turns.length > 0 || failed || sending) && chatTurns}
+      {/* Room under the last turn for the box held over the phone's tab bar. */}
+      {held && <div
+          ref={end}
+          aria-hidden
+          className="h-40 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
+        />}
+      {!bubbles && (turns.length > 0 || failed || opening) && (
         <ul className="space-y-2.5">
           {opening && (
             <ThreadTurn voice="dash" name={assistant.name} now={now} mark={mark()}>
@@ -1357,6 +1554,8 @@ function TalkThread({
                 {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
+                {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
+                {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}
                 {turn.id === PENDING
                   ? undefined
@@ -1407,6 +1606,7 @@ function TalkThread({
       ) : (
         <Composer
           formRef={form}
+          autoFocus={!bubbles}
           className={cn(
             'relative scroll-mb-28',
             // Held at the foot of the pane, after the turns however few:
@@ -1415,6 +1615,14 @@ function TalkThread({
             // A phone keeps its own dock at the foot of the screen, so there
             // the box stays in the flow and is scrolled to as before.
             dock && 'mt-auto pb-1 pt-3 min-[720px]:sticky min-[720px]:bottom-0 min-[720px]:z-over-link',
+            // Room under the pickers beneath the box (plan #2863).
+            // The pane's own colour keeps the turns from showing round the
+            // box and the pickers under it as they scroll beneath.
+            dock && bubbles && 'pb-3 min-[720px]:bg-surface',
+            // The Dash tab of Chat holds it right above the phone's tab bar
+            // as well, so the box never scrolls away with the thread (plan #2748.12).
+            held &&
+              'max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] max-[719px]:z-over-link max-[719px]:bg-page max-[719px]:px-8 max-[719px]:pb-2 max-[719px]:pt-2',
           )}
           onSubmit={(event) => {
             event.preventDefault();
@@ -1526,8 +1734,13 @@ function TalkThread({
           onPaste={(event) => {
             if (adder.current?.paste(event.clipboardData)) event.preventDefault();
           }}
+          roomy={bubbles}
+          // The Dash tab of Chat keeps the box to the words, a + and Send,
+          // with what the answer reaches and who writes it in quiet text
+          // under the box, as Claude's is (plan #2863).
+          beneath={bubbles ? boxStart : undefined}
           footer={
-            withFiles || boxStart ? (
+            withFiles || (boxStart && !bubbles) ? (
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 {withFiles && (
                   <AddFile
@@ -1537,9 +1750,10 @@ function TalkThread({
                     disabled={sending}
                     onUploadingChange={setUploading}
                     iconOnPhone={Boolean(boxStart)}
+                    plus={bubbles}
                   />
                 )}
-                {boxStart}
+                {!bubbles && boxStart}
               </div>
             ) : undefined
           }

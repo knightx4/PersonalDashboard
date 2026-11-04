@@ -13,6 +13,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { answerQuestion } from '@/lib/dash/ask';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
 import { searchMail } from '@/lib/inbox/search-mail';
@@ -20,6 +21,10 @@ import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import type { TalkToolCall } from '@/lib/talk/talk';
+import { answerAsAdvisor } from '@/lib/you/advisor-talk-run';
+import { loadTalkContext } from '@/lib/you/advisor-talk-store';
+import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 
 /**
  * The Dash check's ports (lib/dash/quality/run.ts), called by
@@ -28,10 +33,14 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  *
  * Each case is asked as Ask asks it (answerQuestion with the person's chosen
  * model and every workspace they have on), with three differences: no write,
- * proposal, paid press or hand-off is offered, so the run changes nothing;
+ * proposal or hand-off is offered, and a paid press is checked but never kept
+ * (lib/dash/quality/rehearse-paid.ts), so the run changes and spends nothing;
  * nothing is kept in their chats; and the lookups read through service-role
  * clients, since there is no session. Every lookup filters by the user id it
- * is given (AskContext), and the only id given is the owner's.
+ * is given (AskContext), and the only id given is the owner's. A case that
+ * names an advisor (core.dash_eval_cases.advisor, plan #2581.6) is put to
+ * them as the first message of a talk, with the same lookups, and nothing of
+ * the talk is kept.
  */
 
 const OPERATION: CoreOperation = 'check-dash-quality';
@@ -88,14 +97,14 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
     },
 
     async cases(userId, only) {
-      let query = core.from('dash_eval_cases').select('id, question, expect').eq('user_id', userId);
+      let query = core.from('dash_eval_cases').select('id, question, expect, advisor').eq('user_id', userId);
       query = only ? query.eq('id', only) : query.eq('active', true);
       const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw new Error(`Reading the cases failed: ${error.message}`);
-      return (data ?? []) as { id: string; question: string; expect: unknown }[];
+      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null }[];
     },
 
-    async ask(userId, question) {
+    async ask(userId, question, advisor) {
       if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
       const settings = await loadAccountSettings(userId, core);
       const today = todayInTimezone(settings.timezone);
@@ -112,15 +121,38 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       };
       const model = await dashModelFor(core, userId);
       const spent: SpendReport[] = [];
+      const execute = (name: string, args: unknown) => executeAskTool(name, args, ctx);
+      // A case put to an advisor (plan #2581.6) is their reply to a first
+      // message, from their brain and memory; nothing is kept.
+      let talk: Awaited<ReturnType<typeof loadTalkContext>> = null;
+      if (advisor) {
+        talk = await loadTalkContext(
+          createServiceSchemaSupabase('you') as unknown as YouSupabaseClient,
+          createServiceSchemaSupabase('goals') as unknown as GoalsSupabaseClient,
+          userId,
+          advisor,
+        );
+        if (!talk) throw new Error(`There is no advisor ${advisor} on the board.`);
+      }
       const started = Date.now();
-      const answer = await answerQuestion({
-        turns: [{ role: 'user', body: question }],
-        today,
-        execute: (name, args) => executeAskTool(name, args, ctx),
-        anthropicApiKey: apiKey,
-        model,
-        onSpend: (report) => spent.push(report),
-      });
+      const answer = talk
+        ? await answerAsAdvisor({
+            context: talk.context,
+            turns: [{ role: 'user', body: question }],
+            today,
+            execute,
+            anthropicApiKey: apiKey,
+            onSpend: (report) => spent.push(report),
+          })
+        : await answerQuestion({
+            turns: [{ role: 'user', body: question }],
+            today,
+            execute,
+            queue: rehearsePaid(ctx),
+            anthropicApiKey: apiKey,
+            model,
+            onSpend: (report) => spent.push(report),
+          });
       const seconds = (Date.now() - started) / 1000;
       let costMicros = 0;
       for (const report of spent) {

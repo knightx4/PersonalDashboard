@@ -243,10 +243,11 @@ export function QuickReadView({
 
       <QueueCleared key={topic ?? ''} cleared={false}>
         {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
-        {/* The bottom padding is the room the Next row takes over the foot
-            of the card while it is held above the tab bar, and the row reads
-            its width from this box as a container. */}
-        <div className={cn('@container pb-16 lg:pb-0', grid && 'md:hidden')}>
+        {/* The row reads its width from this box as a container. The room
+            the Next row takes over the foot of the page while it is held above
+            the tab bar is left at the end of the page, after whatever folds
+            follow the deck (plan #1496.10). */}
+        <div className={cn('@container', grid && 'md:hidden')}>
           <QuickDeck
             key={`${card.issueId}:${card.storyIndex}`}
             current={
@@ -307,6 +308,7 @@ export function QuickReadView({
       </QueueCleared>
       <GotThrough done={false} summary={gotThrough} />
       {dashToday}
+      <div aria-hidden className="h-16 lg:hidden" />
     </PageColumn>
   );
 }
@@ -422,7 +424,7 @@ function PhoneCard({
               <StoryText
                 text={story.text}
                 summary={summary}
-                href={storyHref(card.issueId, card.storyIndex)}
+                href={storyHref(card.issueId)}
               />
             )}
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
@@ -527,7 +529,7 @@ function gridStory(
         <StoryText
           text={story.text}
           summary={story.summary}
-          href={storyHref(card.issueId, card.storyIndex)}
+          href={storyHref(card.issueId)}
         />
         <RelatedNotes notes={related} className="mt-3" />
       </>

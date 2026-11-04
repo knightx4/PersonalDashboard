@@ -55,6 +55,13 @@ export type Territory = {
   name: string;
   /** Name of the subject lens the topics join; the goal lens takes them in through learn 0137. */
   subjectLens: string;
+  /**
+   * A subject lens per area, by area name, for a pack whose areas belong to
+   * different subjects, such as the business pack's banking area under
+   * Financial services industry landscape (plan #2489). An area not listed
+   * joins `subjectLens`.
+   */
+  areaLenses?: Readonly<Record<string, string>>;
   performances: string[];
   /**
    * Optional areas the topics are grouped into, such as `accounting`, so a
@@ -81,6 +88,12 @@ export type Territory = {
   /** The goal's kind, which decides the providers a first draft pulls from; none pulls nothing. */
   kind?: GoalKind | null;
 };
+
+/** The subject lens an area's topics join: its own when the territory names one, else the territory's. */
+export function subjectLensFor(territory: Territory, area?: string): string {
+  const own = area === undefined ? undefined : territory.areaLenses?.[area];
+  return own ?? territory.subjectLens;
+}
 
 /** The texts an area's topics are drafted from: those naming that area, and those naming none. */
 export function textsFor(territory: Territory, area?: string): TerritoryText[] {

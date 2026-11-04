@@ -39,6 +39,7 @@ import {
 import { gather, type JobsClient, type ThreadReader } from './gather';
 import { overLimit, type AnswerLimit } from './limits';
 import { renderMaterial } from './render';
+import { APPLICATION_GUIDE } from './application-guide';
 import { PLAIN_VOICE } from './plain-voice';
 import { loadDrafts, saveDrafts, saveReplies, type ApplicationDrafts, type StoredAsk } from './store';
 import type { GatheredMaterial } from './types';
@@ -89,8 +90,8 @@ What a good answer does:
 - Fits its limit. Stay under the limit given, aiming for about nine tenths of
   it. A word limit counts words. A character limit counts every character,
   spaces and punctuation included, so 280 characters is two or three short
-  sentences. With no limit, write what the question needs, usually under 250
-  words.
+  sentences. With no limit, write what the question needs: about 230 to 300
+  words for a fit question, usually less for others.
 
 Before you write each answer, work out how to approach that question, and
 write the answer from that. These considerations are shown to the person
@@ -103,6 +104,8 @@ to four per answer:
 - Anything the question asks for that the material and their replies do not
   hold (a headcount, a date, a reason only they know): say what to add, and
   leave it out of the answer rather than guess it.
+
+${APPLICATION_GUIDE}
 
 ${PLAIN_VOICE}
 

@@ -42,6 +42,8 @@ export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
+  /** lib/dash/think.ts, Ask Dash with "Think it through" on (plan #2789.10) */
+  dashThink: OPUS,
   /** lib/ask/reply-check-model.ts, the weekly check of Ask Dash replies that went badly */
   askReplyCheck: HAIKU,
   /** inngest/dev/suggest.ts */
@@ -130,6 +132,13 @@ export const MODELS = {
   youPersonalityRead: SONNET,
   /** lib/you/personality/profile-run.ts, Dash's analysis across all the tests; Sonnet like the read of one */
   youPersonalityProfile: SONNET,
+  /**
+   * lib/you/mentor-reply.ts, a mentor's one-line first text when the reply is
+   * slow to start (plan #2748.4). The reply itself is the model chosen for Dash.
+   */
+  mentorAck: HAIKU,
+  /** lib/you/people-cards.ts, a persona card drafted or redrafted on the People form (plan #2748.11) */
+  personaDraft: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
@@ -252,6 +261,10 @@ export const MODELS = {
   vaultConnections: HAIKU,
   /** lib/vault/notes/voice.ts: whose words each note is (plan #2413.3) */
   vaultNoteVoice: HAIKU,
+  /** lib/you/advisor-talk-run.ts: an advisor's reply when the person talks to one alone (plan #2581.6) */
+  youAdvisorTalk: SONNET,
+  /** lib/you/advisor-talk-run.ts: what an advisor remembers after each exchange (plan #2581.6) */
+  youAdvisorMemory: HAIKU,
   /** lib/you/note-extracts.ts: their own words from private notes (plan #2413.8) */
   youNoteExtracts: HAIKU,
   /** lib/you/transcript-model.ts */

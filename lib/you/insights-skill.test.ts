@@ -56,12 +56,45 @@ describe('the insights skill', () => {
     const steps = checklist();
     expect(steps).toHaveLength(7);
     const expected: Array<[string, string[]]> = [
-      ['Read what came before', ['where they are now', 'answer', 'verdict', 'knew it', 'prediction', 'already knows']],
+      [
+        'Read what came before',
+        [
+          'where they are now',
+          'answer',
+          'Ask tab',
+          'verdict',
+          'knew it',
+          'Goals area',
+          'tagging',
+          'prediction',
+          'already knows',
+        ],
+      ],
       [
         'Read the core in full',
-        ['journal_folders', 'journal', 'daily notes', 'link to', 'Inbox', 'vault map', 'clipped and secret'],
+        [
+          'journal_folders',
+          'journal',
+          'daily notes',
+          'link to',
+          'Inbox',
+          'vault map',
+          'clipped and secret',
+        ],
       ],
-      ['Read what they did', ['four subagents', 'chats with Claude', 'owner-scoped selects', '10 to 20 findings']],
+      [
+        'Read what they did',
+        [
+          'four subagents',
+          'grouped by area',
+          'home, places, the city and music',
+          'chats with Claude',
+          'Ask tab answers',
+          'owner-scoped selects',
+          '10 to 20 findings',
+          'area each is about',
+        ],
+      ],
       [
         'Find candidates',
         [
@@ -75,7 +108,10 @@ describe('the insights skill', () => {
           'what is missing',
         ],
       ],
-      ['Go down three layers, then one more', ['saw', 'deeper', 'further', 'outside search', 'self-description']],
+      [
+        'Go down three layers, then one more',
+        ['saw', 'deeper', 'further', 'outside search', 'self-description'],
+      ],
       [
         'Filter hard',
         [
@@ -87,12 +123,26 @@ describe('the insights skill', () => {
           'surprise check',
           'hunches',
           'correct earlier cards',
-          'relationships, health and family',
+          'read relationships, health and family as evidence',
+          'at least three areas',
+          'at most two in one area',
+          'most earlier cards',
         ],
       ],
       [
         'Write three to five cards',
-        ['layers', 'receipts', 'confidence', 'live', 'question', 'hidden predictions', 'two-sentence summary'],
+        [
+          'area',
+          'layers',
+          'receipts',
+          'confidence',
+          'live',
+          'question',
+          'hidden predictions',
+          'two-sentence summary',
+          'touches health',
+          'area left out',
+        ],
       ],
     ];
     expected.forEach(([title, words], index) => {
@@ -127,6 +177,51 @@ describe('the insights skill', () => {
     const writes = skill.match(/^(update|insert into) [^\n]+(\n(?!```)[^\n]*)*/gm) ?? [];
     expect(writes.length).toBeGreaterThanOrEqual(4);
     for (const statement of writes) expect(statement).toContain("'<user_id>'");
+  });
+
+  it('reads every Goals area and every answer on the Ask tab', () => {
+    expect(skill).toContain('from goals.areas a');
+    expect(skill).toContain('a.archived_at is null');
+    expect(skill).toMatch(/count\(i\.id\)[^\n]*as earlier_cards/);
+    expect(skill).toContain('from you.dash_questions q');
+    expect(skill).toContain("q.status = 'answered'");
+    expect(skill).toContain('every answer\nfrom the Ask tab');
+    expect(skill).not.toContain('Leave out relationships, health and family');
+    expect(skill).not.toMatch(/Leave out\s+relationships/);
+  });
+
+  it('spreads a run across at least three areas, at most two in one', () => {
+    const filter = skill.split('\n## 6. Filter hard\n')[1]?.split('\n## ')[0] ?? '';
+    expect(filter).toContain('**at least three areas**');
+    expect(filter).toContain('**no more than two cards are about one area**');
+    expect(filter).toContain('the area with the most earlier cards');
+    expect(filter).toContain('**at\n  most one**');
+    expect(filter).toContain('count together as one more area');
+    expect(filter).toContain('never pad');
+  });
+
+  it('saves each card and prediction with its area, and tags earlier cards', () => {
+    const inserts = skill.match(/^insert into you\.insights [^\n]+\nvalues [^\n]+/gm) ?? [];
+    expect(inserts).toHaveLength(2);
+    for (const insert of inserts) {
+      expect(insert).toContain('(user_id, run_id, area_id,');
+      expect(insert).toContain("('<user_id>', '<run id>', '<area id>',");
+    }
+    expect(skill).toMatch(
+      /update you\.insights set area_id = '<area id>'\nwhere id = '<insight id>' and user_id = '<user_id>' and area_id is null;/,
+    );
+    expect(skill).toContain('Touches health:');
+    expect(skill).toContain('No card on');
+  });
+
+  it('gives every level a headline and holds each card to the tests the verdicts set', () => {
+    expect(skill).toContain('## What counts as an insight');
+    expect(skill).toContain('**Every layer has a headline.**');
+    expect(skill).toContain('{"depth": "saw", "headline": ..., "text": ...}');
+    expect(skill).toContain("l ->> 'headline' as headline");
+    const filter = skill.split('\n## 6. Filter hard\n')[1]?.split('\n## ')[0] ?? '';
+    for (const test of ['bookkeeping test', 'gap audit', 'imperative', 'the reason they would give'])
+      expect(filter).toContain(test);
   });
 
   it('never repeats an insight already marked', () => {

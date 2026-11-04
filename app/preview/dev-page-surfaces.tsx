@@ -947,6 +947,20 @@ export function DevRaisedSurface() {
         />
         <AskBox />
       </div>
+      {/* The runner's card, moved here from /dev/plan (plan #578.12): resting,
+          with work ready and the features the next ticks would fire. */}
+      <OvernightControl
+        run={null}
+        canSend
+        night={null}
+        push={null}
+        ready={3}
+        readySteps={7}
+        next={[
+          { ref: '#1700', title: 'Four Dashes on the runner card, one for each thing it can run at once' },
+          { ref: '#1688', title: 'Returns list on Shopping' },
+        ]}
+      />
       <CheckBacksPanel
         now={NOW}
         rows={[
@@ -1148,7 +1162,7 @@ function minutesAgo(minutes: number): string {
 }
 
 /**
- * The runner card on /dev/plan in the two states the person asked to see: a
+ * The runner card on Home in the two states the person asked to see: a
  * night running with two feature sessions, a goal run and one slot asleep
  * with the tick's reason, and the runner off with all four Dashes idle. The
  * longest titles the plan has had, so the lines are seen cut.

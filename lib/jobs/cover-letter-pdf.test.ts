@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { coverLetterPdf, letterBlocks, letterDate, letterFileName } from './cover-letter-pdf';
 
@@ -84,5 +85,30 @@ describe('the download', () => {
       },
     });
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+  });
+
+  describe('a letter too long for one page', () => {
+    const para =
+      'I led the operations team through a reorganisation that cut our close from ten days to four and kept every report on time.';
+    const pages = async (paragraphs: number) => {
+      const bytes = await coverLetterPdf({
+        letter: `Dear team,\n\n${Array(paragraphs).fill(para).join('\n\n')}`,
+        company: 'Northwind',
+        timeZone: 'UTC',
+        letterhead: { signer: 'Alex Rivera', contact: 'alex@example.com' },
+      });
+      return (await PDFDocument.load(bytes)).getPageCount();
+    };
+
+    // Fourteen of these paragraphs run to a second page at 11pt, and sixteen
+    // are too many even at 10pt.
+    it('is set in smaller type to keep it on one page', async () => {
+      expect(await pages(14)).toBe(1);
+      expect(await pages(15)).toBe(1);
+    });
+
+    it('runs on to a second page when 10pt does not fit it either', async () => {
+      expect(await pages(16)).toBe(2);
+    });
   });
 });

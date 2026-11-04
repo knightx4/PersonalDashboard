@@ -136,8 +136,8 @@ describe('the note', () => {
       [
         'Ask Dash replies that went badly, week of 12 October 2026',
         '',
-        `- Tue 13 Oct, you marked it down: "Missed the dentist". /ask/${ASK_A}`,
-        `- Thu 15 Oct, you repeated yourself: "I said Friday". /ask/${ASK_B}`,
+        `- Tue 13 Oct, you marked it down: "Missed the dentist". /chat/dash/${ASK_A}`,
+        `- Thu 15 Oct, you repeated yourself: "I said Friday". /chat/dash/${ASK_B}`,
       ].join('\n'),
     );
   });
@@ -219,7 +219,7 @@ describe('a run', () => {
     const first = await runReplyCheckFor(ports, user, now);
     expect(first).toMatchObject({ status: 'noted', week: '2026-10-12', flagged: 1, noteId: 'note-1' });
     expect(store.notes).toHaveLength(1);
-    expect(store.notes[0]).toContain(`/ask/${ASK_A}`);
+    expect(store.notes[0]).toContain(`/chat/dash/${ASK_A}`);
     expect(store.rows.get(`${user}:2026-10-12`)).toMatchObject({ model: 'haiku', note_id: 'note-1' });
     expect(store.spend).toBe(1);
 

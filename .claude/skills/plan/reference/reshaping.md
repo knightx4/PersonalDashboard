@@ -85,6 +85,13 @@ feature and every feature is theirs to approve.
    proposals), what you dropped and why, and anything you noticed and
    deliberately left alone, all **by outline and title**.
 
+A re-shape reads answers. The other thing that makes a plan go stale is what
+building turns up, and that is handled while the batch runs, not here: the
+session sending builders revises the steps not yet started from each report
+(**When building shows the plan was wrong** in `SKILL.md`), with rows
+stamped `From #<step>'s build: …`. When a re-shape finds such a stamp, the
+row was changed on purpose; leave it unless an answer since says otherwise.
+
 The contract this rests on: the person approves a feature once, and the plan
 beneath it adapts without asking again. What makes that safe is that every
 row a re-shape adds says where it came from. `--from` names the answer, the

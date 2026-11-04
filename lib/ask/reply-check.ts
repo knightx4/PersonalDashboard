@@ -266,7 +266,7 @@ export function noteLine(flag: DatedFlag, timezone: string = REPLY_CHECK_ZONE): 
       : flag.quote
         ? `you ${KIND_WORDS[flag.kind]}: "${flag.quote}"`
         : `you ${KIND_WORDS[flag.kind]}`;
-  return `- ${whenDate(flag.at, { timeZone: timezone, weekday: 'short', year: 'never' })}, ${why}. /ask/${flag.conversation_id}`;
+  return `- ${whenDate(flag.at, { timeZone: timezone, weekday: 'short', year: 'never' })}, ${why}. /chat/dash/${flag.conversation_id}`;
 }
 
 /**

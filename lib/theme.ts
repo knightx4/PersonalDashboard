@@ -22,7 +22,7 @@ export const THEMES = [
     /** For the picker's swatch, before the theme is applied. Paper's canvas
      * rather than its sheet, because the sheet is a near-white that reads as
      * no swatch at all against the picker's own ground. */
-    swatch: '#f7f4ed',
+    swatch: '#f5f1e8',
     ink: '#1a1a18',
   },
   {
@@ -30,8 +30,8 @@ export const THEMES = [
     label: 'Ink',
     mood: 'Near-black, low chroma',
     scheme: 'dark',
-    swatch: '#0f1011',
-    ink: '#f7f8f8',
+    swatch: '#161a23',
+    ink: '#f4f6fa',
   },
   {
     id: 'lightbox',
@@ -59,7 +59,7 @@ export const THEMES = [
     label: 'Dusk',
     mood: 'Plum-cast, soft edges',
     scheme: 'dark',
-    swatch: '#191426',
+    swatch: '#1e1831',
     ink: '#f2eefa',
   },
   {
@@ -79,25 +79,6 @@ export const THEMES = [
     scheme: 'light',
     swatch: '#e6eaf6',
     ink: '#121733',
-  },
-  {
-    // What the picker calls Lightbox. Its own id, because `lightbox` names the
-    // glass room the generator still turns for Darkroom's side of the switch.
-    id: 'poster',
-    label: 'Lightbox',
-    mood: 'A printed poster: outlines, hard shadows, bands of colour',
-    scheme: 'light',
-    swatch: '#f3efe6',
-    ink: '#111111',
-  },
-  {
-    // Lightbox in dark: the same poster printed in light ink on dark stock.
-    id: 'poster-dark',
-    label: 'Lightbox',
-    mood: 'The poster on dark stock',
-    scheme: 'dark',
-    swatch: '#151412',
-    ink: '#f3efe6',
   },
 ] as const;
 
@@ -121,11 +102,10 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
  */
 import type { ThemeMode } from '@/lib/theme/reference';
 import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
-import { DEFAULT_SKY, hasSide, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
-import { DEFAULT_PALETTE, isPaletteId, PALETTES, type PaletteId } from '@/lib/theme/poster';
+import { DEFAULT_LANDSCAPE, DEFAULT_SKY, hasSide, isLandscape, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
 
-export type { ThemeMode, ColourwayId, SkyId, PaletteId };
-export { COLOURWAYS, SKIES, PALETTES };
+export type { ThemeMode, ColourwayId, SkyId };
+export { COLOURWAYS, SKIES };
 
 /**
  * What somebody chose, read out of the one string that holds it.
@@ -152,7 +132,7 @@ export { COLOURWAYS, SKIES, PALETTES };
  */
 export type Theme =
   | { kind: 'system' }
-  | { kind: 'written'; id: ThemeId; sky?: SkyId; palette?: PaletteId }
+  | { kind: 'written'; id: ThemeId; sky?: SkyId }
   | { kind: 'generated'; mode: ThemeMode; hue: number | null; way?: ColourwayId };
 
 /** The shape the picker works in: a polarity, and a colour or none. */
@@ -171,17 +151,11 @@ export function parseTheme(value: string | null | undefined): Theme {
   const text = value.trim().toLowerCase();
   const [mode, colour] = text.split(':');
 
-  // Lightbox is the poster now. Every stored Lightbox -- the written one, and
-  // one with a colour or a colourway -- reads as the poster in its first
-  // palette, so nobody who chose Lightbox lands somewhere they did not.
-  if (mode === 'lightbox') return { kind: 'written', id: 'poster' };
-
-  // The poster takes a palette by name, the default stored as the bare id.
-  // The dark poster takes the same names.
-  if (mode === 'poster' || mode === 'poster-dark') {
-    if (!colour || !isPaletteId(colour) || colour === DEFAULT_PALETTE) return { kind: 'written', id: mode };
-    return { kind: 'written', id: mode, palette: colour };
-  }
+  // Lightbox, and the poster it last was, have gone from the picker. A stored
+  // one reads as Solid in the same polarity, with no colour: the poster was
+  // flat paper or flat dark stock, which is what Solid is.
+  if (mode === 'lightbox' || mode === 'poster') return { kind: 'generated', mode: 'light', hue: null };
+  if (mode === 'poster-dark') return { kind: 'generated', mode: 'dark', hue: null };
 
   if (isThemeId(text)) return { kind: 'written', id: text };
 
@@ -196,7 +170,7 @@ export function parseTheme(value: string | null | undefined): Theme {
     return { kind: 'written', id: mode, sky: colour };
   }
 
-  if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox' && mode !== 'darkroom')
+  if (mode !== 'light' && mode !== 'dark' && mode !== 'darkroom')
     return SYSTEM_THEME;
   if (colour === undefined) return { kind: 'generated', mode, hue: null };
 
@@ -215,7 +189,6 @@ export function parseTheme(value: string | null | undefined): Theme {
 export function formatTheme(theme: Theme): string | null {
   if (theme.kind === 'system') return null;
   if (theme.kind === 'written') {
-    if (theme.palette && theme.palette !== DEFAULT_PALETTE) return `${theme.id}:${theme.palette}`;
     return theme.sky && theme.sky !== DEFAULT_SKY ? `${theme.id}:${theme.sky}` : theme.id;
   }
   // The colourway's name, not its hue: the hue is one of the things the name
@@ -259,27 +232,13 @@ export function skyOf(theme: Theme): SkyId {
   return theme.kind === 'written' && theme.sky ? theme.sky : DEFAULT_SKY;
 }
 
-/** Whether a theme is Lightbox's poster, light or dark, and so takes a palette rather than a colour. */
-export function isPoster(theme: Theme): boolean {
-  return theme.kind === 'written' && (theme.id === 'poster' || theme.id === 'poster-dark');
-}
-
-/** The palette a poster is printed in; the default for anything else. */
-export function paletteOf(theme: Theme): PaletteId {
-  return theme.kind === 'written' && theme.palette ? theme.palette : DEFAULT_PALETTE;
-}
-
-/** Lightbox in a palette, light unless asked for dark. */
-export function posterFor(palette: PaletteId, polarity: Polarity = 'light'): Theme {
-  const id = polarity === 'dark' ? 'poster-dark' : 'poster';
-  return palette === DEFAULT_PALETTE ? { kind: 'written', id } : { kind: 'written', id, palette };
-}
-
 /** Aurora in a polarity, keeping its sky. Night is Aurora; first light is Dawn. */
 export function auroraFor(polarity: Polarity, sky: SkyId): Theme {
   const id = polarity === 'light' ? 'dawn' : 'aurora';
-  // A sky that only exists at night falls back to the default by day.
-  const shown = hasSide(sky, polarity === 'light' ? 'dawn' : 'night') ? sky : DEFAULT_SKY;
+  // A sky that only exists at night falls back by day: a landscape to the
+  // first landscape, so the surface stays Landscapes, and a sky to the default.
+  const fallback = isLandscape(sky) ? DEFAULT_LANDSCAPE : DEFAULT_SKY;
+  const shown = hasSide(sky, polarity === 'light' ? 'dawn' : 'night') ? sky : fallback;
   return shown === DEFAULT_SKY ? { kind: 'written', id } : { kind: 'written', id, sky: shown };
 }
 
@@ -291,42 +250,43 @@ export function hueOf(theme: Theme): number | null {
 /**
  * A room, as the picker asks for it: two questions, not one.
  *
- * Light or dark is the polarity. Solid or lightbox is the surface -- whether
- * the app is a flat page or a set of sheets floating on a lit bench. They are
- * independent, so all four combinations exist and each one takes a colour.
+ * Light or dark is the polarity. The surface is what the app is laid on: a
+ * flat page (Solid), glass over a moving sky of light (Aurora), or glass over
+ * a painted scene (Landscapes). The two are independent, so every surface
+ * comes in both polarities.
  *
- * It used to be one list of three: light, dark, and lightbox as a third thing
- * that was "both at once". That was true of the theme and false of the
- * question -- it made lightbox a polarity you could not be light or dark
- * inside of, and there was no way to ask for the dark one at all.
- *
- * In solid the polarity decides everything. In lightbox the bench is dark
- * either way and the polarity decides only what a SHEET is made of: lit paper,
- * or smoked glass.
+ * Aurora and Landscapes are the same written theme underneath -- Aurora and
+ * Dawn, wearing a sky -- and differ only in which skies they offer: a sky with
+ * a painted scene is a landscape, and one without is an aurora. So a stored
+ * `aurora:dunes` is a landscape with nothing new to store.
  */
 export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: string }[] = [
   { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
-  { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
+  { id: 'dark', label: 'Dark', mood: 'Slate, with a little blue' },
 ];
 
 export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
   { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
-  { id: 'lightbox', label: 'Lightbox', mood: 'A printed poster: outlines, hard shadows, bands of colour' },
   { id: 'aurora', label: 'Aurora', mood: 'Glass under a moving sky' },
+  { id: 'landscape', label: 'Landscapes', mood: 'Glass over a painted scene' },
 ];
 
 export type Polarity = 'light' | 'dark';
 /**
- * Aurora is the third answer. It is not a mode: it has no generated palettes
- * and takes a named sky rather than a hue, so it is said as a written theme
- * (see `auroraFor`) and the two answers below stay the four rooms they were.
+ * Aurora and Landscapes are not modes: they have no generated palettes and
+ * take a named sky rather than a hue, so they are said as a written theme
+ * (see `auroraFor`).
  */
-export type Surface = 'solid' | 'lightbox' | 'aurora';
+export type Surface = 'solid' | 'aurora' | 'landscape';
 
-/** The two answers, as the one mode everything downstream keys off. */
-export function modeFor(polarity: Polarity, surface: Exclude<Surface, 'aurora'>): ThemeMode {
-  if (surface === 'solid') return polarity;
-  return polarity === 'light' ? 'lightbox' : 'darkroom';
+/** Solid's polarity as the mode everything downstream keys off. */
+export function modeFor(polarity: Polarity): ThemeMode {
+  return polarity;
+}
+
+/** The surface an Aurora-family sky belongs to. */
+export function surfaceOfSky(sky: SkyId): Exclude<Surface, 'solid'> {
+  return isLandscape(sky) ? 'landscape' : 'aurora';
 }
 
 /**
@@ -342,10 +302,15 @@ export const THEME_ROOMS: readonly { id: ThemeMode; label: string; mood: string 
   { id: 'darkroom', label: 'Darkroom', mood: 'Smoked glass on the same bench' },
 ];
 
-/** And back again, for putting the switch where the current theme is. */
+/**
+ * And back again, for putting the switch where the current theme is.
+ *
+ * The two glass rooms are no longer offered; one still stored reads as Solid
+ * in its sheets' polarity, which is where choosing again starts from.
+ */
 export function partsOf(mode: ThemeMode): { polarity: Polarity; surface: Surface } {
-  if (mode === 'lightbox') return { polarity: 'light', surface: 'lightbox' };
-  if (mode === 'darkroom') return { polarity: 'dark', surface: 'lightbox' };
+  if (mode === 'lightbox') return { polarity: 'light', surface: 'solid' };
+  if (mode === 'darkroom') return { polarity: 'dark', surface: 'solid' };
   return { polarity: mode, surface: 'solid' };
 }
 

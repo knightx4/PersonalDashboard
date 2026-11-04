@@ -112,6 +112,9 @@ export function Tabs({
     >
       {tabs.map((tab) => {
         const on = tab.id === active;
+        // One tab's count saying what it counts puts every count in the row
+        // in the same pill, so the row writes them one way (plan #2778.11).
+        const pills = tabs.some((other) => other.countWord);
         const href = `${pathname}${tabSearch(search, tab.id, tabs, kept)}`;
         const Icon = tab.icon;
         return (
@@ -137,9 +140,16 @@ export function Tabs({
           >
             {Icon && <Icon className={cn('size-4', compact && 'max-sm:hidden')} strokeWidth={1.75} aria-hidden />}
             {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span className="tabular font-normal text-ink-muted">{tab.count}</span>
-            )}
+            {tab.count !== undefined && tab.count > 0 &&
+              (pills ? (
+                // The word drops on a phone so all the tabs stay in view at 390.
+                <span className="tabular rounded-full bg-border px-1.5 text-micro font-normal whitespace-nowrap text-ink-muted">
+                  {tab.count}
+                  {tab.countWord && <span className="max-sm:hidden"> {tab.countWord}</span>}
+                </span>
+              ) : (
+                <span className="tabular font-normal text-ink-muted">{tab.count}</span>
+              ))}
           </Link>
         );
       })}

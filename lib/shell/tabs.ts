@@ -31,35 +31,37 @@ export type WorkspaceTab = Omit<NavSection, 'badge'> & {
 };
 
 export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab[]>> = {
+  // People first, the mentors' threads; Dash is Ask Dash's list of chats,
+  // which moved here from /ask (plan #2748.1).
+  chat: [
+    { href: '/chat', label: 'People', icon: 'chatPeople', exact: true, alsoMatches: ['/chat/people/'] },
+    { href: '/chat/dash', label: 'Dash', icon: 'chatDash' },
+  ],
   home: [
     { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },
     { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
   ],
   // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
-  // the orders list is the page Shopping lands on now.
+  // the orders list is the page Shopping lands on now. A month of opens
+  // (plan #1496.8) folded Review into Now (/shopping/orders/review) and
+  // Returns into Inventory (/shopping/inventory/returns), each lit by the tab
+  // it sits under, and took Sell and Share out of the bar: their pages and
+  // rows are kept, reached from Inventory's rail and by address.
   shopping: [
     { href: '/shopping/orders', label: 'Now', icon: 'orders' },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
+    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-    { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-    { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-    { href: '/shopping/share', label: 'Share', icon: 'share' },
   ],
   jobs: [
     { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'] },
-    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-    // Who to tell about each application, and the note to them.
-    { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
-    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
+    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox' },
+    // Back to the view you left it on (note 978314f8).
+    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
     { href: '/jobs/material', label: 'Material', icon: 'answers' },
-    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   ],
   todo: [
     { href: '/todo', label: 'Now', icon: 'agenda', exact: true },
@@ -68,14 +70,12 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
+  // One room (plan #1496.9): the Inbox's rows and the quick notes to triage
+  // sit on Now, and /vault/inbox and /vault/triage open it. Map and Maya were
+  // frozen, unopened for a month: their pages still open from a bookmark or a
+  // note, with no tab.
   vault: [
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-    { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
-    // The quick notes waiting in the Inbox folder, on a tab of their own (note
-    // aee95195). The Inbox also lists them as one row that opens this page.
-    { href: '/vault/triage', label: 'Triage', icon: 'triage' },
-    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
   // A subject, an idea, a quiz, an essay and a reading are reached through
   // their list, so they light its tab through `alsoMatches` rather than having
@@ -118,10 +118,11 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       ownerOnly: true,
     },
   ],
+  // A month of opens (plan #1496.10) folded Inbox and the Daily review into
+  // Now and tucked Saved away: its page, route and rows are kept, reached by
+  // address and from the Newsletters list.
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-    { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
     {
       href: '/news/all',
       label: 'Newsletters',
@@ -129,7 +130,6 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       exact: true,
       alsoMatches: ['/news/i/'],
     },
-    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ],
   goals: [
     { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },
@@ -146,8 +146,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
     // Dash's questions about you and your answers (plan #2617.2).
-    { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
-    { href: '/you/board', label: 'Board', icon: 'board' },
+    { href: '/you/ask', label: 'Ask', icon: 'answer', exact: true },
+    { href: '/you/council', label: 'Council', icon: 'board' },
   ],
   // Accounts first, with net worth at its top (plan #2593.6): what you hold,
   // then where the money went, then what keeps charging.

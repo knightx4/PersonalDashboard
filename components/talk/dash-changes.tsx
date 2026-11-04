@@ -29,7 +29,7 @@ import { PaidCard, type PaidChange } from './paid-card';
  * written, with Confirm and Decline, and nothing is written until Confirm.
  *
  * The presses are handed in, so the sheet, the /ask page and the surface
- * gallery each bring their own: the server actions in app/ask/actions.ts, or
+ * gallery each bring their own: the server actions in app/chat/dash/actions.ts, or
  * fixtures. `onChanged` hears every change as the server now has it, so the
  * thread that owns the list keeps the latest state when the sheet re-renders.
  */

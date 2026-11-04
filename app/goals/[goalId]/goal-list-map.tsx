@@ -170,7 +170,7 @@ export function ListMap({
  * so the map does not glare out of the panel. Written here because Leaflet
  * draws the pins and its controls as its own elements, outside React's classes.
  */
-const DARK = ['ink', 'dusk', 'darkroom', 'aurora', 'poster-dark']
+const DARK = ['ink', 'dusk', 'darkroom', 'aurora']
   .map((t) => `[data-theme='${t}'] .list-map .leaflet-tile-pane`)
   .join(',');
 

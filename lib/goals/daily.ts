@@ -19,6 +19,7 @@
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
 import type { GoalReview } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
+import type { ShowsOutside } from '@/lib/goals/plan-order';
 import type { StepKind, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -185,11 +186,16 @@ export function withWaiting(
  * time away"): a due date before `today` is ranked as though it were today
  * and not shown, so a step missed a fortnight ago sits among what is due now
  * rather than leading the page with a debt.
+ *
+ * With `showsOutside` (plan #2778.6), a next step is listed only when the
+ * goal's Plan tab has it under Now or Up next, or it is dated within a week
+ * or one you put on Todo; the rest of the plan stays on the goal.
  */
 export function dailyView(
   goals: GoalWithArea[],
   stepsByGoal: Map<string, StepNode[]>,
   today: string,
+  showsOutside?: ShowsOutside,
 ): DailyView {
   const daily: DailyGoal[] = [];
   const waiting: WaitingItem[] = [];
@@ -274,16 +280,18 @@ export function dailyView(
           // Claude's own: it goes on Dash's list, not yours.
           ready.push(place({ id: node.id, title: node.title, goalId: goal.id, goalTitle: goal.title }));
         } else if (node.kind === 'mine' && waitsOnNothing(node)) {
-          if (node.dueOn !== null && node.dueOn < today) overdue.add(node.id);
-          candidates.push(
-            place({
-              id: node.id,
-              title: node.title,
-              kind: node.kind,
-              dueOn: node.dueOn !== null && node.dueOn < today ? today : node.dueOn,
-              under,
-            }),
-          );
+          if (!showsOutside || showsOutside(node)) {
+            if (node.dueOn !== null && node.dueOn < today) overdue.add(node.id);
+            candidates.push(
+              place({
+                id: node.id,
+                title: node.title,
+                kind: node.kind,
+                dueOn: node.dueOn !== null && node.dueOn < today ? today : node.dueOn,
+                under,
+              }),
+            );
+          }
         }
         walk(node.children, node.title);
       }

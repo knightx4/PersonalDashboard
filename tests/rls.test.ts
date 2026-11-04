@@ -256,6 +256,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_item_pictures = planPicture.id;
 
+  const [planMockup] = await admin<{ id: string }[]>`
+    insert into plan_item_mockups (user_id, item_id, option_letter, width, storage_path)
+    values (${userId}, ${planItem.id}, 'A', 390, ${`${userId}/1/${tag}.png`})
+    returning id`;
+  ids.plan_item_mockups = planMockup.id;
+
   const [planRun] = await admin<{ id: string }[]>`
     insert into plan_runs (user_id, plan_item_id, job, routine_id, external_id, http_status, response)
     values (

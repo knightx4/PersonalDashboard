@@ -210,3 +210,10 @@ Response, and Errors headings for lookup."
 **Revision move:** start with the answer or decision. Delete generic setup and
 repeated recaps. Use the lightest structure that helps the reader act or find
 information.
+
+## Rules
+
+**R1.** A document in `docs/` has at most one em dash. The guide's dash rule
+covers every document written here, and on 2 November 2026 eighteen of
+thirty-seven files broke it.
+Checked by: audit.
