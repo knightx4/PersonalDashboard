@@ -54,7 +54,7 @@ export function rememberArrived(id: string): void {
  */
 const FLASH_KEYFRAMES: Keyframe[] = [
   { opacity: 0.4, transform: 'scale(0.7)' },
-  { opacity: 1, transform: 'scale(1.8)', color: 'var(--color-accent)', offset: 0.5 },
+  { opacity: 1, transform: 'scale(1.8)', color: 'var(--c-accent)', offset: 0.5 },
   { opacity: 1, transform: 'scale(1)' },
 ];
 

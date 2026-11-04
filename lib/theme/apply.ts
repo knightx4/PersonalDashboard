@@ -3,7 +3,6 @@ import { formatTheme, parseTheme, THEME_CHOICE_ATTRIBUTE, type Theme, type Theme
 import { TOKEN_NAMES } from '@/lib/theme/reference';
 import { colourwayById, paintsWash, WASH_LIFT } from '@/lib/theme/colourway';
 import { SCENE_TOKENS, skyTokens } from '@/lib/theme/sky';
-import { POSTER_TOKENS, posterTokens } from '@/lib/theme/poster';
 
 /**
  * Putting a chosen theme onto the document.
@@ -48,11 +47,6 @@ export function themeStyle(theme: Theme): Record<string, string> | undefined {
   // Aurora and Dawn are written blocks that take a sky. The default sky is the
   // block itself; any other writes its bench, pools and accent over it.
   if (theme.kind === 'written') {
-    // The poster's palettes write their colours the same way.
-    if (theme.palette) {
-      const tokens = posterTokens(theme.palette, theme.id === 'poster-dark' ? 'night' : 'day');
-      return Object.keys(tokens).length > 0 ? tokens : undefined;
-    }
     if (!theme.sky) return undefined;
     const tokens = skyTokens(theme.id === 'dawn' ? 'dawn' : 'night', theme.sky);
     return Object.keys(tokens).length > 0 ? tokens : undefined;
@@ -91,7 +85,7 @@ export function applyTheme(root: HTMLElement, theme: Theme): void {
   else root.removeAttribute(THEME_CHOICE_ATTRIBUTE);
 
   const style = themeStyle(theme);
-  for (const token of [...TOKEN_NAMES, ...POSTER_TOKENS, ...SCENE_TOKENS, WASH_LIFT]) {
+  for (const token of [...TOKEN_NAMES, ...SCENE_TOKENS, WASH_LIFT]) {
     const value = style?.[token];
     if (value) root.style.setProperty(token, value);
     else root.style.removeProperty(token);

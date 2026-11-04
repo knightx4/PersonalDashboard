@@ -12,8 +12,7 @@ import { cn } from '@/lib/cn';
  * bare icon and cannot get the pairing wrong. Fifty copies of this were
  * written by hand at five sizes and four radii before it existed.
  *
- * The radius is the control's, so it follows the theme (rounder in Aurora,
- * square in Poster). Hover is quiet, a sunken ground and full ink; `active`
+ * The radius is the control's, so it follows the theme (rounder in Aurora). Hover is quiet, a sunken ground and full ink; `active`
  * (a menu that is open, a toggle that is on) is the only state that uses the
  * accent. The press area is 44px on a phone at either size.
  *

@@ -49,6 +49,13 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                # --proposed: a new feature, or a step
                                                # that acts outside the repository.
                                                # --from: whose answer made this
+                                               # or a built step under the same
+                                               # feature, with --because "what it found"
+npx tsx scripts/plan.ts revise <n> --from <built step> --because "what it found" \
+              [--title "…"] [--detail "…"] [--done-when "…"]
+              # rewrite a step nobody has started, from what building an
+              # earlier step under the same feature found. Not a feature's own
+              # done-when; the old wording stays in the step's comment
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
@@ -259,6 +266,10 @@ thousand tokens, and gets to the end.
    - `built <n> --note "…"`, with the note the subagent wrote. The step stays
      in progress and records the commit and the branch; `done` would refuse it,
      because the commit is not on main yet.
+   - **Fix the plan ahead of the builders.** Read the report's **What this
+     means for the steps still to come** against the steps not yet sent, and
+     bring the plan in line with it before the next round goes out (below,
+     **When building shows the plan was wrong**).
    - `git push -u origin plan/<feature number>`. Every step pushed is a step
      that outlives this session, which is what decision #674 asked of the
      arrangement this one replaces.
@@ -305,6 +316,40 @@ thousand tokens, and gets to the end.
    The ask never names the branch: `block` refuses one that does. Stop the
    batch there. Decisions #685 and #695 are why.
 
+   **When building shows the plan was wrong.** Shaping wrote every step
+   before anything was built, and building the first steps often shows that
+   a later one was written against a guess: the data has another shape, a
+   helper already exists, a step is no longer needed, or a piece nobody
+   planned turns out to be required. Passing that along in the carry-forward
+   is not enough. The next builder would still be handed a done-when the
+   batch knows is wrong, and the page would go on showing a plan that is no
+   longer the one being built. You are the one who sees every report, so you
+   change the plan, and the builders do not:
+
+   - **A step not yet started whose detail or done-when is now wrong:**
+     `revise <it> --from <the built step> --because "<what it found>"` with
+     the new `--detail`, `--done-when` or `--title`. The step keeps its
+     place, number and dependencies; its old wording goes into its comment
+     under a line naming the step that caused the change.
+   - **Work nobody planned that the feature now needs:** `add "…" --parent
+     <the feature> --done-when "…" --size s|m|l --from <the built step>
+     --because "…"`, and `depends` it where it belongs.
+   - **A step the build made pointless:** `drop <it> --note "<the built step>
+     showed …"`. Drop only when you are sure; when you are not, leave it and
+     say so in the report.
+   - **Anything that changes where the feature ends up** (its own done-when,
+     what you get when it is finished, or a choice between real options) is
+     the person's. Write it as a decision under the feature and block the
+     steps it affects on it. `revise` refuses a feature for this reason.
+   - **A step that acts outside the repository** stays a proposal, as
+     always.
+
+   Change only what a report gives a reason for. Most reports change nothing
+   ahead, and a step rewritten without a finding behind it is worse than one
+   left alone. Never revise a step that is in progress, blocked or closed.
+   Name every revise, add and drop in the feature's update (step 7) and in the
+   report (step 8), by outline, so the person can see the plan moved and why.
+
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
    list is the whole memory of the batch, and it is the reason the steps do not
@@ -330,10 +375,12 @@ thousand tokens, and gets to the end.
    critic stop, a failing merge, a step that keeps growing), `blocked` when it
    cannot move until the person answers or sets something up. The body is
    for the person: what closed, what is next, and what is waiting on them,
-   by outline and title, in the writing guide's terms. One update per feature
-   per batch, not one per step.
+   by outline and title, in the writing guide's terms, including any step
+   the batch revised, added or dropped because of what it built. One update
+   per feature per batch, not one per step.
 8. **Report when the batch ends**: every step closed **by outline and title**,
-   what became ready, what is blocked and on what, and anything raised on
+   what became ready, what is blocked and on what, every step revised, added
+   or dropped along the way and which build caused it, and anything raised on
    `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say whether the feature reached main. A closed step is
    on main already; a built step, or one blocked on a failed merge, is on the

@@ -51,6 +51,7 @@ describe('runConnectorWrite', () => {
       'suggest_post',
       'add_project',
       'take_on_for_goal',
+      'report_progress',
       'change_reading',
       'add_learn_track',
       'add_track_reading',
@@ -369,5 +370,64 @@ describe('the writes shared with Ask Dash', () => {
       ok: false,
       error: 'That change cannot be made through this connection.',
     });
+  });
+});
+
+describe('report_progress (plan #2800.1)', () => {
+  function withRpc(result: { data?: unknown; error?: { message: string } | null }) {
+    const rpc = vi.fn(async () => ({ data: result.data ?? null, error: result.error ?? null }));
+    return { rpc, context: { ...ctx(), userId: 'owner-1', core: { rpc } as never } };
+  }
+
+  it("writes the session's row as the account the token names", async () => {
+    const { rpc, context } = withRpc({
+      data: { id: 'row-1', state: 'waiting', plan_item_id: null, updated_at: '2026-11-04T10:00:00Z' },
+    });
+    const result = await runConnectorWrite(tool('report_progress'), context, {
+      session_id: 'cse_015abc',
+      state: 'waiting',
+      action: 'Drew the export page',
+      needs: 'CSV or JSON?',
+      project: 'music-pipeline',
+      // Who it is for comes from the token, never the input.
+      user_id: 'someone-else',
+    });
+    expect(rpc).toHaveBeenCalledWith('report_session_progress', {
+      p_user_id: 'owner-1',
+      p_session_id: 'cse_015abc',
+      p_state: 'waiting',
+      p_action: 'Drew the export page',
+      p_needs: 'CSV or JSON?',
+      p_plan_run_id: null,
+      p_plan_item_id: null,
+      p_thread_id: null,
+      p_project: 'music-pipeline',
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      rows: [{ table: 'core.session_progress', ref: 'row-1', href: '/dev/projects/music-pipeline' }],
+      note: 'Reported as waiting on the person.',
+    });
+  });
+
+  it('refuses bad input before reaching the database', async () => {
+    const { rpc, context } = withRpc({});
+    expect(
+      await runConnectorWrite(tool('report_progress'), context, { session_id: 'cse_1', state: 'waiting', action: 'Asked' }),
+    ).toEqual({ ok: false, error: 'needs is required while waiting: what the session needs from the person.' });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('passes on what the database refused', async () => {
+    const refusal = 'There is no plan run 7b7f8be3-b391-4fa8-a359-f9194b897f40 in this account.';
+    const { context } = withRpc({ error: { message: refusal } });
+    expect(
+      await runConnectorWrite(tool('report_progress'), context, {
+        session_id: 'cse_1',
+        state: 'working',
+        action: 'Started',
+        run_id: '7b7f8be3-b391-4fa8-a359-f9194b897f40',
+      }),
+    ).toEqual({ ok: false, error: refusal });
   });
 });

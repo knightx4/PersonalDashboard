@@ -15,11 +15,21 @@ export interface StudioSettings {
   url: string;
   key: string;
   token: string;
+  /**
+   * Where the studio's note button sends notes (lib/project-notes,
+   * docs/PROJECT-NOTES.md). Optional: an older studio ignores it.
+   */
+  notes?: string;
 }
 
 /** The studio's address with the settings in its fragment, as the studio's `parseHandoff` reads it. */
 export function studioHandoffUrl(base: string, settings: StudioSettings): string {
-  const json = JSON.stringify({ url: settings.url.replace(/\/+$/, ''), key: settings.key, token: settings.token });
+  const json = JSON.stringify({
+    url: settings.url.replace(/\/+$/, ''),
+    key: settings.key,
+    token: settings.token,
+    ...(settings.notes ? { notes: settings.notes } : {}),
+  });
   const packed = Buffer.from(json, 'utf8').toString('base64url');
   return `${base.split('#')[0]}#studio=${packed}`;
 }

@@ -72,7 +72,8 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
    (name it and where it goes), or the GitHub App not installed on the
    repository. One setup step each, with the detail saying exactly where to
    go. When one of these stops the CLAUDE.md commit, the step waits on it
-   instead of closing.
+   instead of closing. Never write one asking the person to try, listen to
+   or check what a step built: put what is unverified in the closing note.
 6. **Close the step** with `done <n> --commit <sha>` naming the CLAUDE.md
    commit, or the head of the branch you read when it already had one, and a
    note saying what the check command is and what could not be settled.

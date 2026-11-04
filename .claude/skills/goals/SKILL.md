@@ -314,7 +314,7 @@ may not change the person's own steps, or turn a proposal into a live step.
 Approving is the person's move, on the goal's page; it opens everything you
 proposed under the goal at once.
 
-**After it is approved:** add steps as `open`, split one into sub-steps, move a step under another step of the
+**After it is approved:** add steps as `open`, split one into sub-steps when the person asks you to break it down (never on your own), move a step under another step of the
 same goal, reorder by `position`, point a step at a collection, make a step
 wait on another, block a step on the person (see "Blocked and waiting
 steps"), merge two steps that ask for the same thing (see "Merging

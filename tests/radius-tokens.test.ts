@@ -33,11 +33,9 @@ describe('the radius tokens', () => {
     }
   });
 
-  it('draw a pill fully round, and square in Poster', async () => {
+  it('draw a pill fully round', async () => {
     const out = await built(['rounded-pill']);
     expect(out).toMatch(/--radius-pill:\s*9999px;/);
-    const poster = css.match(/\[data-theme='poster-dark'\]\)\s*\{[^}]*--radius-pill:\s*([^;]+);/);
-    expect(poster?.[1]).toBe('0');
   }, 30_000);
 });
 
