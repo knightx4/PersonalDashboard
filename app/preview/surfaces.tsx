@@ -5358,6 +5358,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalHoursSurface logOpen />,
   },
   {
+    /* A day tapped in Day by day: its entries in the drawer (plan #2907.2). */
+    id: 'goals-hours-day',
+    label: 'Goals · Hours, a day opened',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="entries" />,
+  },
+  {
+    /* A day with nothing logged: the drawer's empty state, Log hours on that day. */
+    id: 'goals-hours-day-empty',
+    label: 'Goals · Hours, a day with nothing logged',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="empty" />,
+  },
+  {
+    /* The drawer while the day's entries are read. */
+    id: 'goals-hours-day-loading',
+    label: 'Goals · Hours, a day loading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="loading" />,
+  },
+  {
+    /* The drawer when the day's entries could not be read. */
+    id: 'goals-hours-day-error',
+    label: 'Goals · Hours, a day that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="error" />,
+  },
+  {
     id: 'goals-metrics-tooltip',
     label: 'Goals · Metrics, a bar hovered',
     module: 'goals',

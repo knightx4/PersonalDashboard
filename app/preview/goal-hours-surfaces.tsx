@@ -1,7 +1,8 @@
+import type { OpenDay } from '@/app/goals/hours/day-by-day';
 import { HoursView } from '@/app/goals/hours/hours-view';
 import { LogHours } from '@/app/goals/hours/log-hours';
 import { earliestProgressDay } from '@/lib/goals/capture';
-import { hoursPage, type HoursMetric } from '@/lib/goals/hours';
+import { hoursPage, type HoursEntry, type HoursMetric } from '@/lib/goals/hours';
 import { addDays } from '@/lib/todo/tasks/model';
 
 /**
@@ -62,11 +63,71 @@ const METRICS: HoursMetric[] = [
   },
 ];
 
-export function GoalHoursSurface({ logOpen = false }: { logOpen?: boolean }) {
+/** Monday 26 October's entries, as the day's drawer lists them (plan #2907.2). */
+const DAY_ENTRIES: HoursEntry[] = [
+  {
+    id: 'e-1',
+    goalId: 'g-role',
+    goalTitle: 'Land your next role',
+    stepTitle: 'Apply to five platform engineering roles a week',
+    hours: 1.5,
+    note: 'applied to the senior platform role at Monzo and rewrote the cover letter for it',
+  },
+  {
+    id: 'e-2',
+    goalId: 'g-role',
+    goalTitle: 'Land your next role',
+    stepTitle: null,
+    hours: 0.5,
+    note: 'applied 30 min',
+  },
+  {
+    id: 'e-3',
+    goalId: 'g-home',
+    goalTitle: 'Make the apartment clean and livable',
+    stepTitle: 'Clear the hallway',
+    hours: 3,
+    note: 'cleaned 3h',
+  },
+  {
+    id: 'e-4',
+    goalId: 'g-ai',
+    goalTitle: 'Earn steadily from AI training work',
+    stepTitle: null,
+    hours: 4,
+    note: 'AI training 4h',
+  },
+];
+
+/** The days each drawn state of the drawer opens on. */
+const OPEN_DAYS = {
+  entries: { day: '2026-10-26', state: { status: 'ready', entries: DAY_ENTRIES } },
+  empty: { day: '2026-10-25', state: { status: 'ready', entries: [] }, logOpen: true },
+  loading: { day: '2026-10-26', state: { status: 'loading' } },
+  error: {
+    day: '2026-10-26',
+    state: { status: 'error', message: 'The hours for this day could not be read.' },
+  },
+} satisfies Record<string, OpenDay>;
+
+export function GoalHoursSurface({
+  logOpen = false,
+  day,
+}: {
+  logOpen?: boolean;
+  /** A day's drawer drawn open, in one of its states. */
+  day?: keyof typeof OPEN_DAYS;
+}) {
   return (
-    <div className="space-y-4">
+    // With a drawer open the page is held to a phone's height and the sheet
+    // drawn inside it, so the full-page shot shows what the window shows.
+    <div className={day ? 'relative h-[52rem] space-y-4 overflow-hidden' : 'space-y-4'}>
       <LogHours today={TODAY} earliest={earliestProgressDay(TODAY)} initialOpen={logOpen} />
-      <HoursView page={hoursPage(METRICS, TODAY)} />
+      <HoursView
+        page={hoursPage(METRICS, TODAY)}
+        earliest={earliestProgressDay(TODAY)}
+        openDay={day ? { ...OPEN_DAYS[day], contained: true } : undefined}
+      />
     </div>
   );
 }

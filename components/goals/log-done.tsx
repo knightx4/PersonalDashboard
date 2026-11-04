@@ -6,9 +6,10 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { toggleChipClass } from '@/components/ui/chip';
-import { ChipInput, FieldError, Input } from '@/components/ui/field';
+import { FieldError, Input } from '@/components/ui/field';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
+import { formatWeekday } from '@/lib/goals/dates';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
   ESTIMATE_CHIPS,
@@ -72,14 +73,16 @@ export function LogDone({
   initialMessage,
   initialOpen = false,
   days,
+  narrow = false,
   className,
 }: {
   /**
    * Lets the box log for an earlier day (note 2653989d): a date chip beside
    * the field, set to today and going back to `earliest`. Left out, the box
-   * logs for whatever day the sentence names, today by default.
+   * logs for whatever day the sentence names, today by default. `initial`
+   * starts the chip on another day, as the Hours page's day drawer does.
    */
-  days?: { today: string; earliest: string };
+  days?: { today: string; earliest: string; initial?: string };
   /** The line the box is until it is pressed. */
   label?: string;
   /** Drawn open, for the gallery. */
@@ -90,11 +93,16 @@ export function LogDone({
   /** Lines already filed, for the gallery. */
   initial?: Filed[];
   initialMessage?: string;
+  /**
+   * Put the field on a line of its own at every width, as a phone does, for
+   * a box in a narrow column such as the Hours page's day drawer.
+   */
+  narrow?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const [text, setText] = useState('');
-  const [day, setDay] = useState(days?.today ?? '');
+  const [day, setDay] = useState(days?.initial ?? days?.today ?? '');
   const [filed, setFiled] = useState<Filed[]>(initial);
   const [message, setMessage] = useState<string | undefined>(initialMessage);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +163,7 @@ export function LogDone({
         <form
           // With the date chip a phone puts the field on a line of its own, so
           // the chip does not squeeze what is being typed.
-          className={cn('flex items-center gap-2', days && 'max-sm:flex-wrap')}
+          className={cn('flex items-center gap-2', days && (narrow ? 'flex-wrap' : 'max-sm:flex-wrap'))}
           onSubmit={(event) => {
             event.preventDefault();
             submit();
@@ -178,20 +186,15 @@ export function LogDone({
             placeholder={placeholder}
             aria-label="What did you do?"
             aria-invalid={error ? true : undefined}
-            className={cn('min-w-0 flex-1 max-sm:min-h-11', days && 'max-sm:basis-full')}
+            className={cn('min-w-0 flex-1 max-sm:min-h-11', days && (narrow ? 'basis-full' : 'max-sm:basis-full'))}
           />
           {days && (
-            <ChipInput
-              type="date"
-              aria-label="Day it happened"
-              icon={<CalendarDays className="size-4" strokeWidth={1.75} />}
-              value={day}
-              min={days.earliest}
-              max={days.today}
-              required
-              onChange={(event) => setDay(event.target.value)}
-              className="shrink-0 max-sm:mr-auto"
-              inputClassName="max-sm:min-h-11"
+            <DayChip
+              day={day}
+              today={days.today}
+              earliest={days.earliest}
+              onChange={setDay}
+              className={cn('shrink-0', narrow ? 'mr-auto' : 'max-sm:mr-auto')}
             />
           )}
           <PaidCostsProvider costs={costs ?? {}}>
@@ -316,5 +319,66 @@ function LoggedLines({
       </ul>
       {error && <FieldError>{error}</FieldError>}
     </div>
+  );
+}
+
+/**
+ * The day the box logs for, as a chip that reads the way the app writes a
+ * day ("Today", "Sun 25 Oct") with one calendar glyph. The browser's own date
+ * input lies over it, unseen, so a press opens its picker and the keyboard
+ * reaches it as a date field; drawn as itself it printed "25/10/2026" beside
+ * a second calendar of its own (plan #2907.2's critic, round 1).
+ */
+function DayChip({
+  day,
+  today,
+  earliest,
+  onChange,
+  className,
+}: {
+  day: string;
+  today: string;
+  earliest: string;
+  onChange: (day: string) => void;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'group/chip press relative inline-flex items-center gap-1.5 rounded-control max-sm:min-h-11',
+        'border border-transparent px-1.5 py-0.5 text-ui text-ink',
+        'hover:bg-sunken',
+        'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
+        className,
+      )}
+    >
+      <CalendarDays
+        aria-hidden
+        className="size-4 shrink-0 text-ink-ghost group-hover/chip:text-ink-muted"
+        strokeWidth={1.75}
+      />
+      <span aria-hidden className="whitespace-nowrap">
+        {day === today ? 'Today' : formatWeekday(day)}
+      </span>
+      <input
+        type="date"
+        aria-label="Day it happened"
+        value={day}
+        min={earliest}
+        max={today}
+        required
+        onChange={(event) => {
+          if (event.target.value) onChange(event.target.value);
+        }}
+        onClick={(event) => {
+          try {
+            event.currentTarget.showPicker();
+          } catch {
+            // A browser without showPicker opens its picker on the press itself.
+          }
+        }}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      />
+    </span>
   );
 }
