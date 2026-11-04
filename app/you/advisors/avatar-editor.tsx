@@ -95,7 +95,7 @@ export function AvatarEditor({
   };
 
   return (
-    <div className="mt-2 space-y-3 rounded-card bg-sunken p-3 sm:ml-12 sm:w-fit sm:pr-6" aria-busy={drawing || undefined}>
+    <div className="space-y-3 rounded-card bg-sunken p-3 sm:w-fit sm:pr-6" aria-busy={drawing || undefined}>
       <div className="flex items-center gap-3">
         <AvatarPicture
           advisorKey={advisor.key}

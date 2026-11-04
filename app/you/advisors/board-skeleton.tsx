@@ -1,3 +1,4 @@
+import { DetailLayout } from '@/components/shell/detail-layout';
 import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { PageHeaderSkeleton, RowsSkeleton, Skeleton } from '@/components/ui/skeleton';
@@ -47,5 +48,50 @@ export function BoardMeetingSkeleton() {
         </div>
       </Card>
     </PageColumn>
+  );
+}
+
+/** One advisor's profile while it loads: the large avatar and name, the tabs, then the About card. */
+export function AdvisorProfileSkeleton() {
+  return (
+    <DetailLayout
+      header={
+        <div className="mb-5 space-y-2">
+          <Skeleton className="h-3 w-40" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-24 shrink-0 rounded-pill" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-3.5 w-64 max-w-full" />
+            </div>
+          </div>
+        </div>
+      }
+      properties={
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-1">
+          {[0, 1].map((fact) => (
+            <div key={fact} className="space-y-1.5">
+              <Skeleton className="h-2.5 w-16" />
+              <Skeleton className="h-3.5 w-20" />
+            </div>
+          ))}
+        </div>
+      }
+    >
+      <div className="mb-5 flex gap-4 border-b border-border pb-2">
+        {[64, 96, 72].map((width) => (
+          <Skeleton key={width} className="h-4" style={{ width }} />
+        ))}
+      </div>
+      <Card padding="standard" className="space-y-4">
+        {[92, 84, 70].map((width) => (
+          <div key={width} className="space-y-1.5">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-3.5" style={{ width: `${width}%` }} />
+            <Skeleton className="h-3.5" style={{ width: `${width - 20}%` }} />
+          </div>
+        ))}
+      </Card>
+    </DetailLayout>
   );
 }

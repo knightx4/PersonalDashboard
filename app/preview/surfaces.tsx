@@ -26,7 +26,14 @@ import { YouBoardDebatePreview } from './you-board-debate-surfaces';
 import { AdvisorAvatars } from '@/app/you/advisors/advisor-avatar';
 import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
 import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
-import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
+import {
+  YouBoardAdvisorProfilePreview,
+  YouBoardAdvisorsLoadingPreview,
+  YouBoardAdvisorsPreview,
+  YouBoardPanelPreview,
+} from './you-board-advisor-surfaces';
+import { AdvisorProfileSkeleton } from '@/app/you/advisors/board-skeleton';
+import { SetTab } from './set-tab';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -9939,22 +9946,97 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* An advisor's look open to change (plan #2581.3): the avatar large,
-     * Shuffle, and a stepper for hair, glasses and beard. */
-    id: 'you-board-advisors-avatar',
+    /* One advisor's profile (plan #2581.5): the avatar large, the name,
+     * the assessment they own, then About, Track record and Sources. */
+    id: 'you-board-advisor',
+    label: 'You · Advisors, one advisor’s profile, About',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record',
+    label: 'You · Advisors, an advisor’s track record',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record-empty',
+    label: 'You · Advisors, an advisor with no track record yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-sources',
+    label: 'You · Advisors, the sources an advisor was built from',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="sources" />
+        <YouBoardAdvisorProfilePreview tab="sources" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-building',
+    label: 'You · Advisors, a guest’s profile while the brain is built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-failed',
+    label: 'You · Advisors, a guest whose brain failed to build, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    /* An advisor's look open to change (plan #2581.3), on their profile since
+     * plan #2581.5: the avatar large, Shuffle, and a stepper for each trait. */
+    id: 'you-board-advisor-avatar',
     label: 'You · Advisors, changing how an advisor looks',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouBoardAdvisorsPreview
-          editing={{
-            key: 'buffett',
-            drawn: { svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) },
-          }}
+        <YouBoardAdvisorProfilePreview
+          editing={{ svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) }}
         />
       </div>
     ),
+  },
+  {
+    id: 'you-board-advisor-loading',
+    label: 'You · Advisors, a profile loading',
+    module: 'you',
+    width: 'page',
+    render: () => <AdvisorProfileSkeleton />,
   },
   {
     id: 'you-board-advisors-loading',
@@ -9993,17 +10075,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardPanelPreview state="delete" />
-      </div>
-    ),
-  },
-  {
-    id: 'you-board-meeting-advisor',
-    label: 'You · Board, one advisor’s thinking open',
-    module: 'you',
-    width: 'page',
-    render: () => (
-      <div className={SHELL_FOOT}>
-        <YouBoardDebatePreview advisor="buffett" />
       </div>
     ),
   },

@@ -1,4 +1,6 @@
 import { Fragment } from 'react';
+import Link from '@/components/ui/link';
+import { advisorHref } from '@/lib/you/board-profile';
 import { TOPIC_LABELS } from '@/lib/you/board-reviews';
 import type { TrackRecord } from '@/lib/you/board-scoring';
 import { AdvisorAvatar } from './advisor-avatar';
@@ -26,10 +28,13 @@ export function TrackRecordRows({ records }: { records: readonly TrackRecord[] }
       {records.map((record) => (
         <li key={record.advisor} className="card-pad-x row-pad flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="flex min-w-0 items-center gap-1.5 text-ui text-ink">
+            <Link
+              href={advisorHref(record.advisor, 'record')}
+              className="press-area flex w-fit min-w-0 items-center gap-1.5 rounded-control text-ui text-ink transition-colors duration-quick hover:text-accent"
+            >
               <AdvisorAvatar advisorKey={record.advisor} name={record.name} decorative />
               <span className="min-w-0 [overflow-wrap:anywhere]">{record.name}</span>
-            </p>
+            </Link>
             <p className="text-small text-ink-muted">
               {record.topics.map((t, i) => (
                 <Fragment key={t.topic}>

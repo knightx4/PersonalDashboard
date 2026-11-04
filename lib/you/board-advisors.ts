@@ -39,6 +39,8 @@ export type RosterAdvisor = {
   updatedAt: string;
   /** How they are drawn: what is stored, or the default for their key (plan #2581.3). */
   avatar: AdvisorAvatar;
+  /** The one assessment their brain says they own, by name (plan #2581.5); null before it is built. */
+  assessment: string | null;
 };
 
 /** What a guest's row says about its brain right now. */
@@ -87,6 +89,10 @@ export function rosterOf(row: Record<string, unknown>): RosterAdvisor | null {
     addedBy: row.added_by === 'dash' ? 'dash' : 'person',
     updatedAt: str(row.updated_at),
     avatar: avatarFor(key, row.avatar),
+    assessment:
+      brain?.assessment && typeof brain.assessment === 'object' && !Array.isArray(brain.assessment)
+        ? str((brain.assessment as Record<string, unknown>).name) || null
+        : null,
   };
 }
 
@@ -115,8 +121,12 @@ export async function listRoster(client: YouSupabaseClient, userId: string): Pro
   return sortAdvisors(rows);
 }
 
+/** Keys a profile address cannot take, since the roster's own pages sit beside them (plan #2581.5). */
+const RESERVED_KEYS = ['panels'];
+
 /** "Warren Buffett" as `warren_buffett`; a key already taken gets a number after. */
-export function advisorKey(name: string, taken: readonly string[]): string {
+export function advisorKey(name: string, takenKeys: readonly string[]): string {
+  const taken = [...takenKeys, ...RESERVED_KEYS];
   const base =
     name
       .normalize('NFD')

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
@@ -48,7 +48,7 @@ import {
 import { useRefreshWhileRunning } from '../refresh-while-running';
 import { AdvisorAvatar } from '../advisor-avatar';
 import { SeatLabel } from '../seat-label';
-import { AdvisorDrawer, QuestionDebate } from './debate';
+import { QuestionDebate } from './debate';
 import type { MakeProps } from './make';
 import type { DecideAction } from './decision';
 import { Evidence, Prose } from './prose';
@@ -91,10 +91,9 @@ const REAL_ACTIONS: MeetingActions = {
   makeTodo: makeResolutionTodo,
 };
 
-/** For the gallery: draw a hidden part open, the memos or one advisor's thinking by id. */
+/** For the gallery: draw a hidden part open, such as the memos. */
 export type MeetingOpen = {
   memos?: boolean;
-  advisor?: string;
   /** The decision form open under each verdict, or open with a failed save's error. */
   decide?: 'open' | 'error';
   /** The Make it happen card with a failed write's error showing (plan #2561.9). */
@@ -185,9 +184,6 @@ export function MeetingView({
   );
   const state = meetingState(meeting, now);
   useRefreshWhileRunning(state.kind === 'running');
-  const [advisorId, setAdvisorId] = useState<string | null>(open.advisor ?? null);
-  const closeAdvisor = useCallback(() => setAdvisorId(null), []);
-  const shownAdvisor = advisorId ? debate.advisors.find((a) => a.id === advisorId) : undefined;
   const isDebate = debate.questions.length > 0;
   const questions = debate.questions.map((question, index) => (
     <QuestionDebate
@@ -197,7 +193,6 @@ export function MeetingView({
       of={debate.questions.length}
       advisors={debate.advisors}
       running={state.kind === 'running'}
-      onOpen={setAdvisorId}
       decide={decide}
       decideOpen={open.decide !== undefined}
       decideError={open.decide === 'error' ? DECIDE_ERROR : null}
@@ -205,9 +200,6 @@ export function MeetingView({
       makeFailed={open.make === 'error' ? MAKE_ERROR : null}
     />
   ));
-  const drawer = shownAdvisor && (
-    <AdvisorDrawer advisor={shownAdvisor} debate={debate} onClose={closeAdvisor} />
-  );
 
   const keep = (kind: MarkKind, item: string, saved: BoardMark | null | undefined) =>
     setMarks((current) => {
@@ -279,7 +271,6 @@ export function MeetingView({
           </p>
         </Card>
         {questions}
-        {drawer}
       </DetailPage>
     );
   }
@@ -551,7 +542,6 @@ export function MeetingView({
           </Card>
         </SectionFold>
       )}
-      {drawer}
     </DetailPage>
   );
 }

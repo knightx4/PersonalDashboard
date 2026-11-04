@@ -380,7 +380,7 @@ export async function retryAdvisorBrain(advisorId: string): Promise<{ error: str
     const user = await requireUser();
     const client = await createYouClient();
     const result = await retryBuild({ client, userId: user.id, advisorId, routine: boardRoutine() });
-    revalidatePath('/you/advisors/advisors');
+    revalidatePath('/you/advisors/advisors', 'layout');
     return { error: result.started ? null : result.error };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The build did not start. Try again.' };
@@ -398,8 +398,7 @@ export async function setAdvisorActive(
     const user = await requireUser();
     const client = await createYouClient();
     const result = await setActive({ client, userId: user.id, advisorId, active });
-    revalidatePath('/you/advisors');
-    revalidatePath('/you/advisors/advisors');
+    revalidatePath('/you/advisors', 'layout');
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };

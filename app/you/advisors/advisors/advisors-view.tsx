@@ -2,15 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { AlertTriangle, Check, Plus, RotateCcw, X } from 'lucide-react';
+import { AlertTriangle, Plus, X } from 'lucide-react';
 import { RowLink } from '@/components/shell/back-link';
 import { PageHeader, type Subject } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
 import { Disclosure } from '@/components/ui/disclosure';
-import { FieldError, FieldHint, Input, Label, Switch } from '@/components/ui/field';
+import { FieldError, FieldHint, Input, Label } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import { LiveDot } from '@/components/ui/live-dot';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -25,8 +25,11 @@ import {
 import { MEETING_RUNNING_MESSAGE } from '@/lib/you/board';
 import { panelNames, type BoardPanel } from '@/lib/you/board-panels';
 import { Chip } from '@/components/ui/chip';
+import Link from '@/components/ui/link';
+import { cn } from '@/lib/cn';
+import { advisorHref, recordLine } from '@/lib/you/board-profile';
+import type { TrackRecord } from '@/lib/you/board-scoring';
 import { AdvisorAvatar } from '../advisor-avatar';
-import { AvatarEditor, type DrawAvatar, type Drawn, type SaveAvatar } from '../avatar-editor';
 import { useRefreshWhileRunning } from '../refresh-while-running';
 
 /**
@@ -38,21 +41,18 @@ import { useRefreshWhileRunning } from '../refresh-while-running';
  * the chair may bring them in. A guest whose brain is being built shows it;
  * one that failed says why and offers a retry.
  *
- * Every advisor leads their row with their avatar (plan #2581.3); pressing it
- * opens the editor under the row, to shuffle the look or pick its traits.
+ * Since plan #2581.5 the seats and guests are grids of cards, each with the
+ * advisor's avatar, the assessment they own and their track record, and a
+ * card opens the advisor's profile, where their look is changed, a guest is
+ * switched on or off and a failed build is tried again.
  */
 
 export type AdvisorActions = {
   add: (input: { name: string; focus: string }) => Promise<{ error: string | null; saved?: boolean }>;
-  retry: (id: string) => Promise<{ error: string | null }>;
-  setActive: (id: string, active: boolean) => Promise<{ error: string | null }>;
   /** Make an empty panel; the view opens it to be named. */
   createPanel: () => Promise<{ error: string | null; panelId?: string }>;
   /** Start a board meeting for a panel (plan #2576.3). */
   startMeeting: (panelId: string) => Promise<{ error: string | null }>;
-  /** Draw a look being tried on, and keep one (plan #2581.3). */
-  drawAvatar: DrawAvatar;
-  saveAvatar: SaveAvatar;
 };
 
 /** How the press starts: closed, with the card open and filled, or refusing a name (the gallery draws each). */
@@ -67,10 +67,10 @@ export function AdvisorsView({
   panels = [],
   meetingRunning = false,
   now,
+  records = {},
   actions,
   subject,
   start = 'closed',
-  editing,
 }: {
   advisors: readonly RosterAdvisor[];
   /** Their panels, each opening on its own page. */
@@ -82,8 +82,8 @@ export function AdvisorsView({
   actions: AdvisorActions;
   subject?: Subject;
   start?: AddStart;
-  /** An advisor whose look is open to change, with its drawing, as the gallery draws it. */
-  editing?: { key: string; drawn: Drawn };
+  /** Each advisor's track record by key; one with none scored is missing. */
+  records?: Readonly<Record<string, TrackRecord>>;
 }) {
   const [open, setOpen] = useState(start !== 'closed');
   const [name, setName] = useState(start === 'closed' ? '' : SAMPLE_NAME);
@@ -214,34 +214,16 @@ export function AdvisorsView({
             ))}
             <NewPanelRow create={actions.createPanel} />
           </Group>
-          <Group title="Seats" count={seats.length}>
-            {seats.map((advisor) => (
-              <AdvisorRow
-                key={advisor.id}
-                advisor={advisor}
-                state={stateOf(advisor)}
-                actions={actions}
-                editing={editing?.key === advisor.key ? editing.drawn : null}
-              />
-            ))}
-          </Group>
-          <Group
-            title="Guests"
-            count={guests.length}
-            note={<Chip size="sm">AI impressions</Chip>}
-          >
-            {guests.map((advisor) => (
-              <AdvisorRow
-                key={advisor.id}
-                advisor={advisor}
-                state={stateOf(advisor)}
-                actions={actions}
-                editing={editing?.key === advisor.key ? editing.drawn : null}
-              />
-            ))}
-          </Group>
         </ul>
       </Card>
+      <AdvisorGrid title="Seats" advisors={seats} states={seats.map(stateOf)} records={records} />
+      <AdvisorGrid
+        title="Guests"
+        note={<Chip size="sm">AI impressions</Chip>}
+        advisors={guests}
+        states={guests.map(stateOf)}
+        records={records}
+      />
     </PageColumn>
   );
 }
@@ -281,158 +263,78 @@ function Group({
   );
 }
 
-function AdvisorRow({
+/** One group of advisors as a grid of cards under its heading. */
+function AdvisorGrid({
+  title,
+  note,
+  advisors,
+  states,
+  records,
+}: {
+  title: string;
+  note?: React.ReactNode;
+  advisors: readonly RosterAdvisor[];
+  states: readonly BrainState[];
+  records: Readonly<Record<string, TrackRecord>>;
+}) {
+  if (advisors.length === 0) return null;
+  return (
+    <section className="mt-6 space-y-2">
+      <h2 className="flex items-center gap-2">
+        <SectionLabel as="span" count={advisors.length}>
+          {title}
+        </SectionLabel>
+        {note}
+      </h2>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {advisors.map((advisor, i) => (
+          <li key={advisor.id} className="min-w-0">
+            <AdvisorCard advisor={advisor} state={states[i]} record={records[advisor.key] ?? null} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** One advisor's card: avatar, name, the assessment they own and their track record. The whole card opens the profile. */
+function AdvisorCard({
   advisor,
   state,
-  actions,
-  editing = null,
+  record,
 }: {
   advisor: RosterAdvisor;
   state: BrainState;
-  actions: AdvisorActions;
-  editing?: Drawn | null;
+  record: TrackRecord | null;
 }) {
-  const [active, setActive] = useState(advisor.active);
-  const [look, setLook] = useState<Drawn | null>(editing);
-  const [opening, setOpening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
-  const [, startTransition] = useTransition();
-  const guest = advisor.kind === 'guest';
-
-  const toggle = (next: boolean) => {
-    setActive(next);
-    setError(null);
-    startTransition(async () => {
-      const result = await actions.setActive(advisor.id, next);
-      if (result.error) {
-        setActive(!next);
-        setError(result.error);
-      }
-    });
-  };
-  const retry = () => {
-    setRetrying(true);
-    setError(null);
-    startTransition(async () => {
-      const result = await actions.retry(advisor.id);
-      setRetrying(false);
-      if (result.error) setError(result.error);
-    });
-  };
-
-  const openEditor = () => {
-    if (look) {
-      setLook(null);
-      return;
-    }
-    setOpening(true);
-    setError(null);
-    startTransition(async () => {
-      const result = await actions.drawAvatar(advisor.avatar);
-      setOpening(false);
-      if (result.error || !result.svg || !result.look) {
-        setError(result.error ?? 'Their look could not be drawn. Try again.');
-        return;
-      }
-      setLook({ svg: result.svg, look: result.look });
-    });
-  };
-  const changeLabel = `Change how ${advisor.name} looks`;
-
+  const off = advisor.kind === 'guest' && !advisor.active;
   return (
-    <li className="card-pad-x row-pad">
-      <div className="flex min-h-11 items-start gap-3">
-        <Tooltip label={changeLabel} align="start">
-          <button
-            type="button"
-            aria-label={changeLabel}
-            aria-expanded={look !== null}
-            aria-busy={opening || undefined}
-            onClick={openEditor}
-            className="press-area shrink-0 rounded-pill transition-opacity duration-quick hover:opacity-80"
-          >
-            <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
-          </button>
-        </Tooltip>
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui text-ink">
-            <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
-            <BrainStatus state={state} />
-          </span>
-          <span className="mt-0.5 block text-small text-ink-muted [overflow-wrap:anywhere]">
-            {advisor.question}
-          </span>
-          {advisor.focus && (
-            <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">{advisor.focus}</span>
-          )}
+    <Link
+      href={advisorHref(advisor.key)}
+      className={cn(cardVariants({ padding: 'standard', interactive: true }), 'flex h-full items-start gap-3')}
+    >
+      <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui font-medium text-ink">
+          <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
+          <BrainStatus state={state} />
         </span>
-        {guest && (
-          <Tooltip
-            label={active ? 'The chair may bring them in' : 'Kept off the advisors'}
-            align="end"
-          >
-            <Switch
-              aria-label={`${advisor.name}: the chair may bring them in`}
-              checked={active}
-              onChange={(event) => toggle(event.target.checked)}
-              className="mt-1"
-            />
-          </Tooltip>
-        )}
-      </div>
-      {guest && state.kind === 'building' && (
-        <p className="mt-1 pl-12 text-small text-ink-muted">
-          Dash is reading their public work. This takes a while, and the guest sits once it is done.
-        </p>
-      )}
-      {guest && state.kind === 'failed' && (
-        <div className="mt-1.5 space-y-2 pl-12">
-          <p className="text-small text-danger [overflow-wrap:anywhere]">{state.why}</p>
-          <DashAction
-            type="button"
-            variant="secondary"
-            size="sm"
-            pending={retrying}
-            routine="board"
-            what="Cost of building an advisor"
-            onClick={retry}
-          >
-            <RotateCcw aria-hidden strokeWidth={1.75} className="size-3.5" />
-            {retrying ? 'Retrying…' : 'Try again'}
-          </DashAction>
-        </div>
-      )}
-      {look && (
-        <AvatarEditor
-          advisor={advisor}
-          start={look}
-          draw={actions.drawAvatar}
-          save={actions.saveAvatar}
-          onDone={() => setLook(null)}
-        />
-      )}
-      {error && (
-        <div className="pl-12">
-          <FieldError>{error}</FieldError>
-        </div>
-      )}
-    </li>
+        <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
+          {advisor.assessment ?? advisor.question}
+        </span>
+        <span className="tabular block text-small text-ink-muted">
+          {recordLine(record)}
+          {off && ' · Off in meetings'}
+        </span>
+      </span>
+    </Link>
   );
 }
 
 /** A guest's brain in a shape and words, grey when all is well and coloured only where it needs the person. */
 function BrainStatus({ state }: { state: BrainState }) {
-  if (state.kind === 'seat') return null;
-  const base = 'inline-flex items-center gap-1 whitespace-nowrap text-small';
-  if (state.kind === 'ready') {
-    return (
-      <span className={`${base} tabular text-ink-muted`}>
-        <Check aria-hidden strokeWidth={1.75} className="size-3.5" />
-        {`Ready · ${state.sources} sources`}
-      </span>
-    );
-  }
+  if (state.kind === 'seat' || state.kind === 'ready') return null;
+  const base = 'inline-flex items-center gap-1 whitespace-nowrap text-small font-normal';
   if (state.kind === 'building') {
     return (
       <span className={`${base} text-ink-muted`}>
