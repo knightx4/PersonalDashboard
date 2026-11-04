@@ -139,7 +139,6 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
 import { linkedInPlanFixture, linkedInRunsFixture } from './linkedin-import-fixtures';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
@@ -1443,9 +1442,9 @@ const allRoles: SearchableRole[] = pipelineRows.map((row) => ({
 }));
 
 /**
- * The Jobs Inbox's review items (plan #2502.2): the queue above with one more
- * message, its subject as long as recruiters write them, and nine waiting in
- * all, so the first five show and "Open all 9 in Review" follows them.
+ * The Jobs Inbox's review items (plan #2502.2): the queue above with three
+ * more, one message's subject as long as recruiters write them, seven in all
+ * and every one listed with the kinds to narrow them by (plan #1496.7.3).
  */
 const inboxReview = {
   rows: [
@@ -1479,8 +1478,44 @@ const inboxReview = {
       ],
       sortAt: '2026-09-07T10:12:00.000Z',
     },
+    {
+      kind: 'application' as const,
+      id: 'r6',
+      applicationId: 'p6',
+      roleId: 'role-p6',
+      companyName: 'Halloran-Achterberg',
+      companyDomains: ['halloran-achterberg.example'],
+      roleTitle: 'Staff Software Engineer, Real-Time Risk & Settlement Infrastructure',
+      status: 'submitted',
+      submittedAt: '2026-09-02T08:20:00.000Z',
+      reason: 'Created from a confirmation email. Nobody has confirmed the details.',
+      gmailHref: 'https://mail.google.com/mail/#all/18f2a9c4d1e0b7b9',
+      sortAt: '2026-09-02T08:20:00.000Z',
+    },
+    {
+      kind: 'message' as const,
+      id: 'r7',
+      subject: 'Your application to Tallow',
+      fromAddress: 'no-reply@ashbyhq.example',
+      threadId: 'thread-tallow',
+      replyToAddress: null,
+      roleHint: null,
+      receivedAt: '2026-09-01T17:45:00.000Z',
+      classification: 'rejection',
+      reason: 'Tallow has two pursuits on file and the email names neither.',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/13',
+      candidates: [
+        {
+          applicationId: 'p3',
+          label: 'Tallow · Backend Engineer, Payments',
+          reason: 'Same company',
+          confidence: 0.41,
+        },
+      ],
+      sortAt: '2026-09-01T17:45:00.000Z',
+    },
   ] satisfies ReviewRow[],
-  counts: { all: 9, messages: 5, applications: 2, events: 2 },
+  counts: { all: 7, messages: 4, applications: 2, events: 1 },
   companyNames: [...new Set(pipelineRows.map((row) => row.companyName))].sort(),
   allRoles,
 };
@@ -1854,10 +1889,6 @@ const referrerFixtures: ReferrerOption[] = [
   { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
   { id: 'contact-3', name: 'Sam Okafor', company: null },
 ];
-
-const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({
-  name,
-}));
 
 /**
  * A week with something in every section: two rounds coming up, one of them a
@@ -3243,7 +3274,7 @@ const savedStories: SavedViewProps = {
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
@@ -6495,27 +6526,6 @@ export const SURFACES: readonly Surface[] = [
       >
         <CompanyPanels {...companyPanels} opensOn="people" addingPerson />
       </PaidCostsProvider>
-    ),
-  },
-  {
-    id: 'jobs-review',
-    label: 'Review queue',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <ReviewQueue
-        rows={reviewRows}
-        counts={{
-          all: reviewRows.length,
-          messages: reviewRows.filter((row) => row.kind === 'message').length,
-          applications: reviewRows.filter((row) => row.kind === 'application').length,
-          events: reviewRows.filter((row) => row.kind === 'event').length,
-        }}
-        view="all"
-        timezone="Europe/London"
-        companyNames={knownCompanies.map((company) => company.name)}
-        allRoles={allRoles}
-      />
     ),
   },
   {

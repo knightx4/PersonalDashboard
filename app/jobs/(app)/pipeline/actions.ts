@@ -191,7 +191,7 @@ export async function dismissPursuit(
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
   revalidatePath('/jobs/companies');
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
 
   return { error: null, removed: `${role.companies.name} · ${role.title}` };
 }

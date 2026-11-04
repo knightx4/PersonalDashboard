@@ -38,7 +38,7 @@ const BRIEFS: [ModuleId, Brief][] = [
     'jobs',
     {
       text: 'Northwind Health replied about the staff engineer role',
-      href: '/jobs/review',
+      href: '/jobs/inbox',
       tone: 'caution',
     },
   ],

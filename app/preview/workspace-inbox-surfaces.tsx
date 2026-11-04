@@ -4,7 +4,7 @@ import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
 import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
-import { reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
+import { ReviewViewChips, reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
 import type { MessageOpen } from '@/components/jobs/review/rows';
 
 /**
@@ -186,7 +186,7 @@ export function ShoppingInboxSurface() {
 }
 
 /**
- * The Jobs Inbox with its review items listed (plan #2502.2): the gallery
+ * The Jobs Inbox with every review item listed (plans #2502.2, #1496.7.3): the gallery
  * passes the review queue's fixtures, and which message has its picker or
  * form open, or a failed press, for the hidden parts.
  */
@@ -202,7 +202,8 @@ export function JobsInboxSurface({
   return (
     <WorkspaceInbox
       workspace="jobs"
-      rows={[...reviewInboxRows(review, 'Europe/London', { open, failed }), ...JOBS_ON_YOU]}
+      rows={[...reviewInboxRows(review, 'Europe/London', 'all', { open, failed }), ...JOBS_ON_YOU]}
+      sectionTools={{ review: <ReviewViewChips counts={review.counts} view="all" /> }}
     />
   );
 }

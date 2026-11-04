@@ -35,7 +35,7 @@ const QUEUES: Record<
     many: '{n} imports from your mail to check',
     line: 'Applications, messages and interviews the mail sync was not sure of',
     verb: 'Review',
-    href: '/jobs/review',
+    href: '/jobs/inbox',
     section: 'review',
   },
   'vault-triage': {

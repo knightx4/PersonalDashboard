@@ -55,8 +55,7 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   ],
   jobs: [
     { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'] },
+    { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox' },
     // Back to the view you left it on (note 978314f8).
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
