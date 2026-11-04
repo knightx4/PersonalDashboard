@@ -16,9 +16,7 @@
  *
  * Every project's steps go to one shared routine (`projectsRoutine` in
  * lib/feedback/routine.ts, plan #2553.3), which adds the project's
- * repository to its session. A row may still name the environment variables
- * holding a routine of its own (`routineEnv`), preferred while its id is set.
- * Neither falls back to the plan routine's: that routine builds in this
+ * repository to its session. It does not fall back to the plan routine's: that routine builds in this
  * repository, and a website step built there would land in the wrong repo.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -45,14 +43,12 @@ export type DevProject = {
   setUpAt: string | null;
   /** When it was put away. An archived project draws no section. */
   archivedAt: string | null;
-  /** Environment variables holding a routine of the project's own, when it has one. */
-  routineEnv: { id: string; token: string } | null;
 };
 
 /** The columns `projectFromRow` reads. */
 export const PROJECT_COLUMNS =
   'id, label, description, owner, repo, branch, url, skill, check_command, set_up_at, archived_at, ' +
-  'routine_id_env, routine_token_env, created_at';
+  'created_at';
 
 /** What a project id looks like: the check on `dev_projects.id`. */
 const SLUG = /^[a-z][a-z0-9-]{0,39}$/;
@@ -70,8 +66,6 @@ export function projectFromRow(row: Record<string, unknown>): DevProject | null 
   // A direct connection hands back Dates where PostgREST hands back strings.
   const stamp = (value: unknown): string | null =>
     value instanceof Date ? value.toISOString() : value == null ? null : String(value);
-  const routineId = text(row.routine_id_env);
-  const routineToken = text(row.routine_token_env);
   return {
     id,
     label: text(row.label) ?? id,
@@ -86,7 +80,6 @@ export function projectFromRow(row: Record<string, unknown>): DevProject | null 
     checkCommand: text(row.check_command),
     setUpAt: stamp(row.set_up_at),
     archivedAt: stamp(row.archived_at),
-    routineEnv: routineId && routineToken ? { id: routineId, token: routineToken } : null,
   };
 }
 
