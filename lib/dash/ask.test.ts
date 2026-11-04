@@ -389,6 +389,41 @@ describe('askDash', () => {
     expect(result.conversation?.ref).toBe('conv-old');
   });
 
+  it('answers the last question again on Try again, adding no question of its own (plan #2854.4)', async () => {
+    const earlier: TalkTurn[] = [
+      { id: 'a', role: 'user', body: 'What did I buy on eBay?', createdAt: '2026-09-26T10:00:00Z' },
+    ];
+    const { client, sent } = stubClient([reply([use('a', 'answer', { answer: 'eBay order 12.', cited: [] })])]);
+    const { stores, written } = memoryStores(earlier);
+
+    const result = await askDash(
+      { question: 'ignored', conversationRef: 'conv-old', retry: true, today: '2026-09-27', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+
+    expect(sent[0].messages.map((m) => m.role)).toEqual(['user']);
+    expect(sent[0].messages[0].content).toBe('What did I buy on eBay?');
+    // Only the answer is written: the question was kept the first time.
+    expect(written).toHaveLength(1);
+    expect(written[0].turns.map((t) => t.role)).toEqual(['assistant']);
+    expect(result.turns.map((t) => t.role)).toEqual(['user', 'assistant']);
+    expect(result.turns[0].id).toBe('a');
+  });
+
+  it('refuses Try again on a question that already has its answer', async () => {
+    const earlier: TalkTurn[] = [
+      { id: 'a', role: 'user', body: 'Hi', createdAt: '2026-09-26T10:00:00Z' },
+      { id: 'b', role: 'assistant', body: 'Hello.', createdAt: '2026-09-26T10:00:05Z' },
+    ];
+    const { stores, written } = memoryStores(earlier);
+    const result = await askDash(
+      { question: 'Hi', conversationRef: 'conv-old', retry: true, today: '2026-09-27', execute: stubExecute().execute, anthropicApiKey: 'k' },
+      stores,
+    );
+    expect(result.error).toBe('That question already has its answer.');
+    expect(written).toEqual([]);
+  });
+
   it('refuses a conversation that is not there', async () => {
     const { stores, written } = memoryStores();
     const result = await askDash(

@@ -507,7 +507,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadChangesSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
 import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
@@ -8745,6 +8745,26 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashPageSurface />,
   },
   {
+    /* A reply still being written after the page that asked was left (plan
+     * #2854.4): the chat opened again shows Dash at work under the question,
+     * and the answer lands in place when it is in. */
+    id: 'ask-page-reply-answering',
+    label: 'Dash · A chat whose reply is still being written',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface reply="answering" />,
+  },
+  {
+    /* A reply that failed while nobody was looking (plan #2854.4): the
+     * question stays, Dash's mark shows failed with why, and Try again
+     * answers the same question without sending it twice. */
+    id: 'ask-page-reply-failed',
+    label: 'Dash · A chat whose reply failed',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface reply="failed" />,
+  },
+  {
     /* Dash at work on the full page (plan #1899.8): Send pressed in an open
      * chat, each lookup appearing under Dash's name, the answer written out
      * after them and the mark coming to rest. */
@@ -8921,6 +8941,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface />,
   },
   {
+    /* What they did when asked (plan #2854.2.1): a todo they added, as a card with Undo after their reply, and a build and a delete they proposed, each with Confirm and nothing written until it is pressed. */
+    id: 'chat-people-thread-changes',
+    label: 'Chat · A thread, what they did when asked',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadChangesSurface />,
+  },
+  {
     /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
     id: 'chat-people-thread-typing',
     label: 'Chat · A thread, them typing',
@@ -8971,6 +8999,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="failed" />,
+  },
+  {
+    /* A reply that could not be written (plan #2854.4): the reply runs on the server, so leaving does not stop it, and one that failed says why under your last message, with Try again. */
+    id: 'chat-people-thread-reply-failed',
+    label: 'Chat · A thread, their reply failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="reply-failed" />,
   },
   {
     /* A mentor you have never written to: their mark and name, and a line saying to write below. */

@@ -4,7 +4,8 @@ import { MENTOR_PALETTE, type PersonRow, type SearchHit, type ThreadMessage } fr
 import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
-import { ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
+import type { DashChange } from '@/lib/talk/changes';
+import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -198,7 +199,93 @@ export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'em
   );
 }
 
-type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'new' | 'not-ready' | 'loading';
+type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'reply-failed' | 'new' | 'not-ready' | 'loading';
+
+/** Their reply that could not be written (plan #2854.4), as the thread says it. */
+const REPLY_FAILED_WHY = 'Benjamin Franklin could not reply: the answer was cut off. Nothing was lost.';
+/** A change someone on People made or proposed in Franklin's thread, under the text that asked. */
+function threadChange(fields: Pick<DashChange, 'id' | 'kind' | 'input' | 'status' | 'advisorMessageId'> & Partial<DashChange>): DashChange {
+  return {
+    conversationId: '',
+    turnId: null,
+    subjectRef: null,
+    writtenTable: null,
+    writtenRef: null,
+    undo: null,
+    createdAt: '2026-11-03T08:58:30Z',
+    doneAt: null,
+    declinedAt: null,
+    undoneAt: null,
+    advisorId: FRANKLIN.id,
+    advisorChatId: 'chat-m2',
+    ...fields,
+  } as DashChange;
+}
+
+/** You ask Franklin for a todo, then for a build and a clean-up: one made with Undo, two waiting on Confirm. */
+const ACTED: ThreadMessage[] = [
+  ...THREAD.slice(0, 5),
+  msg('c1', 'person', 'Add a todo to finish the Northwind cover letter by Friday', '2026-11-03T08:40:00Z'),
+  msg('c2', 'advisor', 'Done. Friday it is, and no polishing past the second draft.', '2026-11-03T08:40:20Z'),
+  msg('c3', 'person', 'Also start the build of the live card step, and clear out the old duplicate answers on Jobs', '2026-11-03T08:52:00Z'),
+  msg('c4', 'advisor', 'Both are below. Nothing happens to either until you press Confirm.', '2026-11-03T08:52:30Z'),
+];
+
+const ACTED_CHANGES: DashChange[] = [
+  threadChange({
+    id: 'x-todo',
+    kind: 'add_todo',
+    input: { title: 'Finish the Northwind cover letter', body: null, dueOn: '2026-11-06', dueTime: null, pinned: false },
+    status: 'done',
+    subjectRef: 'todo.tasks:x-todo-row',
+    writtenTable: 'todo.tasks',
+    writtenRef: 'x-todo-row',
+    doneAt: '2026-11-03T08:40:10Z',
+    advisorMessageId: 'c1',
+  }),
+  threadChange({
+    id: 'x-build',
+    kind: 'start_build',
+    input: { stepId: 'x-step', number: 2860, outline: '2854.3', title: 'Show a small live card while a person works', quiet: false },
+    status: 'proposed',
+    advisorMessageId: 'c3',
+  }),
+  threadChange({
+    id: 'x-delete',
+    kind: 'delete_rows',
+    input: {
+      table: 'job_search.application_answers',
+      count: 2,
+      titles: ['Why do you want to work here? (copy)', 'Tell us about a hard problem (copy)'],
+      href: '/jobs/answers',
+      rows: [],
+    },
+    status: 'proposed',
+    advisorMessageId: 'c3',
+  }),
+];
+
+/** A thread where they acted when asked (plan #2854.2.1): a todo made with Undo, a build and a delete waiting on Confirm. */
+export function ChatThreadChangesSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <PeopleView rows={rows} current={FRANKLIN.key} timezone={ZONE} now={NOW} live={false}>
+        <ChangeThreadDemo
+          person={FRANKLIN}
+          chatId={FRANKLIN.chatId}
+          page={{ messages: ACTED, hasOlder: false }}
+          typingUntil={null}
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+          changes={ACTED_CHANGES}
+          today="2026-11-03"
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}
 
 /** One thread open beside the list, in each of its states. */
 export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState }) {
@@ -209,7 +296,14 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
       </ChatShell>
     );
   }
-  const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
+  const who =
+    state === 'new'
+      ? CHAT_PEOPLE[4]
+      : state === 'not-ready'
+        ? CHAT_PEOPLE[5]
+        : state === 'reply-failed'
+          ? { ...FRANKLIN, replyFailed: REPLY_FAILED_WHY }
+          : FRANKLIN;
   const rows = CHAT_PEOPLE.map((r) =>
     state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
   );

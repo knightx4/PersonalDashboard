@@ -11,7 +11,7 @@ import {
   type ThreadPage,
 } from '@/lib/you/chat-threads';
 import { newPersonCard } from '@/lib/you/people-cards-model';
-import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard } from './actions';
+import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, retryReply, savePersonCard } from './actions';
 import { ThreadView } from './people/[key]/thread-view';
 import { PersonForm } from './people/person-form';
 import { PeopleView } from './people-view';
@@ -94,7 +94,7 @@ export default async function ChatPeoplePage({ searchParams }: { searchParams: P
           typingUntil={newest.person.typingUntil}
           timezone={settings.timezone}
           now={now}
-          actions={{ older: olderMessages, read: readThread }}
+          actions={{ older: olderMessages, read: readThread, retryReply }}
         />
       )}
     </PeopleView>

@@ -432,6 +432,20 @@ describe('what can be pressed when', () => {
     expect(off.tables['todo.tasks']).toHaveLength(0);
   });
 
+  it('confirms and undoes what someone on People proposed, by the text it hangs from (plan #2854.2)', async () => {
+    const made = setup({ turnId: null });
+    Object.assign(made.change, { surface: 'thread', conversation_id: null, advisor_id: id(700), advisor_chat_id: id(701), advisor_message_id: id(702) });
+    const confirmed = await confirmChange(made.deps, made.change.id as string);
+    expect(confirmed).toMatchObject({ ok: true, change: { status: 'done', advisorId: id(700), advisorMessageId: id(702) } });
+    expect(made.tables['todo.tasks']).toHaveLength(1);
+    expect(await undoChange(made.deps, made.change.id as string)).toMatchObject({ ok: true, change: { status: 'undone' } });
+
+    // A thread record that hangs from nothing on People is still not pressable.
+    const bare = setup({ turnId: null });
+    Object.assign(bare.change, { surface: 'thread', conversation_id: null });
+    expect(await confirmChange(bare.deps, bare.change.id as string)).toMatchObject({ ok: false, change: null });
+  });
+
   it('answers for a change that is not there', async () => {
     const { deps } = setup();
     expect(await confirmChange(deps, id(999))).toEqual({ ok: false, error: 'That change is not there any more.', change: null });
