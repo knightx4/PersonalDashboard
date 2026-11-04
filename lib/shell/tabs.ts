@@ -70,12 +70,13 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
-  // One room (plan #1496.9): the Inbox's rows and the quick notes to triage
-  // sit on Now, and /vault/inbox and /vault/triage open it. Map and Maya were
-  // frozen, unopened for a month: their pages still open from a bookmark or a
-  // note, with no tab.
+  // The Inbox's rows and the quick notes to triage sit on Now, and
+  // /vault/inbox and /vault/triage open it (plan #1496.9). Maya is frozen,
+  // unopened for a month: its page still opens from a bookmark or a note, with
+  // no tab. Map was frozen with it and brought back at the person's ask.
   vault: [
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
+    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
   ],
   // A subject, an idea, a quiz, an essay and a reading are reached through
   // their list, so they light its tab through `alsoMatches` rather than having
