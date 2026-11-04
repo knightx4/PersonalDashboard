@@ -29,7 +29,7 @@ import {
   type Theme,
   type ThemeMode,
 } from '@/lib/theme';
-import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
+import { POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
 import { DEFAULT_LANDSCAPE, DEFAULT_SKY, isLandscape, type Sky, type SkyId } from '@/lib/theme/sky';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
@@ -343,7 +343,7 @@ export function ThemePicker({ value }: { value: Theme }) {
               <Swatch
                 key={colour.id}
                 theme={inWay(colour)}
-                label={`${colour.label} - ${colour.mood}`}
+                label={colour.label}
                 chosen={same(showing, inWay(colour))}
                 onChoose={save}
               />
@@ -400,30 +400,14 @@ export function ThemePicker({ value }: { value: Theme }) {
 }
 
 /**
- * One colour, shown as what it actually paints.
+ * One Solid colour, shown flat, as what it actually paints.
  *
- * A colourway draws its own wash: the four pool tokens and the lift go onto
- * the chip as inline custom properties, and `.wash-chip` draws
- * `--page-wash-image` from them. So a swatch for Ember is the Ember bench,
- * shrunk -- magenta into purple with the orange along the bottom -- and a
- * swatch for Midnight is one blue, because that is what Midnight is. It used
- * to be a single square of `--c-accent-base-lit`, which told you the link
- * colour and nothing about the room, and made the four multi-coloured
- * colourways indistinguishable from each other.
- *
- * A hue with no colourway keeps the old fill: the strip's presets are a
- * position on a circle rather than a set of pools, and the accent is the
- * clearest single colour to stand for one. "No colour" shows the page ground,
- * because that is what it is.
+ * Solid has no wash: a colour there turns the ground, the borders and the
+ * accent to its hue and nothing else. So the chip is that, flat -- the card
+ * ground of the room being edited, with a disc of the accent on it -- rather
+ * than the glass rooms' multi-colour wash, which promised gradients Solid
+ * never draws. "No colour" is the same picture in Paper or Ink.
  */
-/**
- * How loud a chip is, against the percentages in `--page-wash`.
- *
- * The largest of those is 34%, so 2.6 lands just under the 100% at which a
- * pool stops being a wash and becomes a flat fill.
- */
-const CHIP_LIFT = 2.6;
-
 function Swatch({
   theme,
   label,
@@ -435,40 +419,14 @@ function Swatch({
   chosen: boolean;
   onChoose: (theme: Theme) => void;
 }) {
-  const way = colourwayById(theme.way);
-  const style = useMemo(() => {
+  const { ground, accent, fill } = useMemo(() => {
     const palette = generatePalette(theme.mode, theme.hue, theme.way);
-    if (!way) {
-      return { background: palette[theme.hue === null ? '--c-page' : '--c-accent-base-lit'] };
-    }
-    // Always on a glass bench, whichever room is being edited. A colourway is
-    // a wash, and in Solid there is no wash to show: drawing it over Paper's
-    // near-white ground turned all seven chips into pale squares a few
-    // thousandths apart, which is the problem the chips were meant to fix.
-    // Lightbox and Darkroom share a bench, so either one stands for both.
     return {
-      backgroundColor: generatePalette('darkroom', theme.hue, theme.way)['--c-page'],
-      // Turned up, and only here. A pool reaches the bench at about a third of
-      // itself, which is right across a whole viewport and invisible across
-      // 32 pixels: at the room's own strength every chip came out a flat dark
-      // square and the multi-coloured ones were indistinguishable. The field's
-      // shape and geometry are the real ones; only how much of each pool shows
-      // through is raised, which is the one thing a thumbnail cannot afford to
-      // be faithful about.
-      //
-      // Flat rather than a multiple of the room's own strength. Multiplying
-      // took Ember to 4.7, which puts the first pool's mix over 100%: it goes
-      // opaque, covers the other three, and the chip for a four-colour
-      // colourway comes back a single flat magenta.
-      [WASH_LIFT]: String(CHIP_LIFT),
-      ...Object.fromEntries(
-        Object.entries(POOL_TOKENS).map(([slot, token]) => [
-          token,
-          way.pools[slot as keyof typeof way.pools],
-        ]),
-      ),
-    } as React.CSSProperties;
-  }, [theme.mode, theme.hue, theme.way, way]);
+      ground: palette['--c-surface'],
+      accent: palette['--c-accent-base-lit'],
+      fill: palette['--c-fill-ink'],
+    };
+  }, [theme.mode, theme.hue, theme.way]);
 
   return (
     <Tooltip label={label}>
@@ -479,14 +437,19 @@ function Swatch({
         className={cn(
           // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
           'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
-          way && 'wash-chip',
           chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
         )}
         // ui-ok: raw-hex -- this is the generated colour itself, which is the
         // one thing on the screen that cannot be a token.
-        style={style}
+        style={{ backgroundColor: ground }}
       >
-        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
+        <span
+          className="flex size-4 items-center justify-center rounded-full"
+          // ui-ok: raw-hex -- the generated accent, as above.
+          style={{ backgroundColor: accent, color: fill }}
+        >
+          {chosen && <Check className="size-3" strokeWidth={2.25} aria-hidden />}
+        </span>
         <span className="sr-only">{label}</span>
       </button>
     </Tooltip>
@@ -494,9 +457,18 @@ function Swatch({
 }
 
 /**
- * A sky, drawn as the sky it paints: its own bench with its four pools on it.
+ * How loud a sky chip is, against the percentages in `--page-wash`.
  *
- * The same `.wash-chip` the colourways use, with the side for the polarity
+ * The largest of those is 34%, so 2.6 lands just under the 100% at which a
+ * pool stops being a wash and becomes a flat fill.
+ */
+const CHIP_LIFT = 2.6;
+
+/**
+ * A sky, drawn as the sky it paints: its own bench with its four pools on it,
+ * or its painted scene shrunk.
+ *
+ * `.wash-chip` draws the pools, with the side for the polarity
  * the person is in, so a Dawn swatch is the pale version they will get.
  */
 function SkySwatch({
