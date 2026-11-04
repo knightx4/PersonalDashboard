@@ -141,8 +141,11 @@ For each cause:
    ```
 
    `expect` takes `mentions_all`, `mentions_any`, `mentions_none`,
-   `cites_any`, `max_lookups`, `max_seconds`, `allow_failed_lookups`. Every
-   case is also held to the floor in `grade.ts`: answered, no fallback, no
+   `cites_any`, `max_lookups`, `max_seconds`, `allow_failed_lookups`, and
+   `calls_all`, the tools the answer must have called without a refusal. A
+   paid tool in a case is checked as in Ask and told to the model as queued,
+   but never kept, so a case can test that Dash presses the right button
+   (lib/dash/quality/rehearse-paid.ts). Every case is also held to the floor in `grade.ts`: answered, no fallback, no
    limit, no failed lookup, never "Claude". Prefer facts that will not change
    next week, such as a company that exists or a past order, over counts
    that grow.
