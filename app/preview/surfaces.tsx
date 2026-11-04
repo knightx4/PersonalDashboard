@@ -507,8 +507,15 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadChangesSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
-import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
+import {
+  ChatArrivalMomentSurface,
+  ChatBuilderTextSurface,
+  ChatPeopleSurface,
+  ChatThreadChangesSurface,
+  ChatThreadSurface,
+  ChatTypingMomentSurface,
+} from './chat-surfaces';
+import { ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8851,6 +8858,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SessionThreadSurface part="attach" />,
   },
   {
+    /* Hidden part (plan #2789.9): Comment pressed on the session's mockup, its note box open under the card. */
+    id: 'chat-session-comment',
+    label: 'Dash · A session thread, a note on a mockup',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="comment" />,
+  },
+  {
+    /* Hidden part (plan #2789.9): the mockup picked, its card marked Picked, with your pick and a note on it as turns. */
+    id: 'chat-session-picked',
+    label: 'Dash · A session thread, a mockup picked',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="picked" />,
+  },
+  {
     /* A new thread (plan #2789.7), as Talk about this project opens it: the project picked, and the prompt to say what to work on. */
     id: 'chat-session-empty',
     label: 'Dash · A new session thread',
@@ -9071,6 +9094,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="memory" />,
+  },
+  {
+    /* The builder's form scrolled to when it texts first (plan #2854.1): a switch for each kind of thing worth a text, one switched off. */
+    id: 'chat-person-edit-texts',
+    label: 'Chat · Editing someone, when they text first',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonTextsSurface />,
+  },
+  {
+    /* The builder's first text of the morning (plan #2854.1): what happened overnight as one batch of three short bubbles, unread. */
+    id: 'chat-people-thread-text-first',
+    label: 'Chat · A thread, the builder texting first',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatBuilderTextSurface />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),

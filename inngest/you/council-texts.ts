@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { createServiceSchemaSupabase } from '@/inngest/supabase-admin';
+import { createServiceSchemaSupabase, createServiceSupabase } from '@/inngest/supabase-admin';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { pushPorts } from '@/inngest/core/day-brief';
 import { runCouncilTick } from '@/inngest/you/council-tick';
+import { firstTextPorts, runFirstTextsWith, type FirstTextsSummary } from '@/inngest/you/first-texts';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { sendToPerson, type PushPayload, type PushPorts, type PushResult } from '@/lib/push/send';
 import { isQuietHours, textPayload } from '@/lib/you/council-texts';
@@ -20,6 +21,10 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
  * 08:00. A text with no phone to go to is recorded as pushed; one the push
  * service failed on is tried on the next pass. No model is called. The
  * service clients bypass RLS, so every read and write names the person.
+ *
+ * Before the announcing, the pass lets everyone on People who texts first by
+ * a rule write their batch (plan #2854.1, inngest/you/first-texts.ts), so a
+ * batch worth a notification is announced in the same call.
  *
  * The same call then runs the council tick, so the daily round starts at the
  * first pass after the person's morning begins rather than only at the daily
@@ -138,15 +143,25 @@ export async function runCouncilTextsWith(ports: CouncilTextPorts, now: Date): P
 }
 
 export async function runCouncilTexts(now: Date = new Date()): Promise<
-  CouncilTextsSummary & { round: { skipped: string } | { started: true; runId: string } | { error: string } }
+  CouncilTextsSummary & {
+    firstTexts: FirstTextsSummary | { error: string };
+    round: { skipped: string } | { started: true; runId: string } | { error: string };
+  }
 > {
   const you = createServiceSchemaSupabase('you') as unknown as YouSupabaseClient;
-  const summary = await runCouncilTextsWith(councilTextPorts(you, createCoreServiceSupabase()), now);
+  const core = createCoreServiceSupabase();
+  let firstTexts: FirstTextsSummary | { error: string };
+  try {
+    firstTexts = await runFirstTextsWith(firstTextPorts(you, core, createServiceSupabase()), now);
+  } catch (err) {
+    firstTexts = { error: err instanceof Error ? err.message : String(err) };
+  }
+  const summary = await runCouncilTextsWith(councilTextPorts(you, core), now);
   let round: { skipped: string } | { started: true; runId: string } | { error: string };
   try {
     round = await runCouncilTick({ now: now.getTime() });
   } catch (err) {
     round = { error: err instanceof Error ? err.message : String(err) };
   }
-  return { ...summary, round };
+  return { ...summary, firstTexts, round };
 }

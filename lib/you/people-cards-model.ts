@@ -1,6 +1,7 @@
 import { relativeLuminance } from '@/lib/theme/oklch';
 import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import type { CouncilMemory } from '@/lib/you/council-model';
+import type { TextSwitch } from '@/lib/you/first-texts';
 
 /**
  * Adding and editing the people you chat with (plan #2748.11), kept pure so
@@ -97,7 +98,11 @@ export type PersonForm = {
   joinsMeetings: boolean;
 };
 
-export type CleanPerson = PersonForm & { persona: string };
+export type CleanPerson = PersonForm & {
+  persona: string;
+  /** What they text first about, as the form's switches left it; undefined when the form has none (plan #2854.1). */
+  textWhen?: string[];
+};
 
 /** The form as it is saved, or the first thing wrong with it, in words for the person. */
 export function cleanPersonForm(input: {
@@ -106,6 +111,7 @@ export function cleanPersonForm(input: {
   brief?: Partial<Record<keyof PersonBrief, unknown>>;
   persona?: unknown;
   joinsMeetings?: unknown;
+  textWhen?: unknown;
 }): { ok: true; value: CleanPerson } | { ok: false; error: string } {
   const name = oneLine(input.name);
   const colour = str(input.colour).toLowerCase();
@@ -122,7 +128,9 @@ export function cleanPersonForm(input: {
   if (brief.never.length > NEVER_MAX) return { ok: false, error: `Keep what they never say to ${NEVER_MAX} characters.` };
   if (!persona) return { ok: false, error: 'Write their card, or have Dash draft it.' };
   if (persona.length > PERSONA_MAX) return { ok: false, error: `Keep the card to ${PERSONA_MAX} characters.` };
-  return { ok: true, value: { name, colour, brief, persona, joinsMeetings: input.joinsMeetings === true } };
+  const value: CleanPerson = { name, colour, brief, persona, joinsMeetings: input.joinsMeetings === true };
+  if (Array.isArray(input.textWhen)) value.textWhen = input.textWhen.filter((k): k is string => typeof k === 'string').slice(0, 20);
+  return { ok: true, value };
 }
 
 /** What a new person's draft needs before Dash can write one. */
@@ -216,6 +224,11 @@ export type PersonCard = {
   joinsMeetings: boolean;
   versions: PersonaVersion[];
   memory: CouncilMemory[];
+  /**
+   * What they text first about, for someone with a rule in
+   * lib/you/first-texts.ts (plan #2854.1); null for everyone else.
+   */
+  texts: TextSwitch[] | null;
 };
 
 /** A new person's form before anything is typed: the first palette colour nobody uses yet. */
@@ -233,6 +246,7 @@ export function newPersonCard(taken: readonly string[]): PersonCard {
     joinsMeetings: false,
     versions: [],
     memory: [],
+    texts: null,
   };
 }
 

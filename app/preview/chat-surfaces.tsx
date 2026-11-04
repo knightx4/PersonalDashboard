@@ -397,3 +397,57 @@ export function ChatArrivalMomentSurface() {
     </ChatShell>
   );
 }
+
+/** The builder on People (plan #2854.1): the person who texts first about the plan. */
+export const BUILDER_ROW: PersonRow = person({
+  id: 'm7',
+  key: 'builder',
+  name: 'Builder',
+  colour: MENTOR_PALETTE[6],
+  about: 'Dev',
+  chatId: 'chat-m7',
+});
+
+const builderMsg = (id: string, role: 'person' | 'advisor', text: string, at: string, extra: Partial<ThreadMessage> = {}) =>
+  msg(id, role, text, at, { chatId: 'chat-m7', ...extra });
+
+/** Yesterday's exchange, then the morning's first text: one batch of three short bubbles, not yet read. */
+const BUILDER_THREAD: ThreadMessage[] = [
+  builderMsg('b1', 'person', 'Anything I need to look at before tomorrow?', '2026-11-02T17:40:00Z'),
+  builderMsg('b2', 'advisor', 'No. Two builds are running and neither needs you yet.', '2026-11-02T17:40:20Z'),
+  builderMsg('b3', 'advisor', '#2854.6 is a question for you: Which card should a long build show in the thread?', '2026-11-03T08:05:00.000Z', {
+    kind: 'text_first',
+    readAt: null,
+  }),
+  builderMsg(
+    'b4',
+    'advisor',
+    'Shipped 3: #2854.2 (Give every person on People the same…), #2854.2.1 (Show each change a person on People…) and #2854.4 (Replies keep going when I leave the page).',
+    '2026-11-03T08:05:00.001Z',
+    { kind: 'text_first', readAt: null },
+  ),
+  builderMsg('b5', 'advisor', 'The build of #2815.4 stalled.', '2026-11-03T08:05:00.002Z', { kind: 'text_first', readAt: null }),
+];
+
+/** The builder's thread open on the morning's first text, its row at the top of the list. */
+export function ChatBuilderTextSurface() {
+  const rows: PersonRow[] = [
+    { ...BUILDER_ROW, last: { role: 'advisor', text: 'The build of #2815.4 stalled.', at: '2026-11-03T08:05:00Z' } },
+    ...CHAT_PEOPLE,
+  ];
+  return (
+    <ChatShell path={`/chat/people/${BUILDER_ROW.key}`}>
+      <PeopleView rows={rows} current={BUILDER_ROW.key} timezone={ZONE} now={NOW} live={false}>
+        <ThreadView
+          person={BUILDER_ROW}
+          chatId={BUILDER_ROW.chatId}
+          page={{ messages: BUILDER_THREAD, hasOlder: false }}
+          typingUntil={null}
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}

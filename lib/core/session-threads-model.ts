@@ -148,6 +148,75 @@ export function workingLine(
   return 'Working on it';
 }
 
+/**
+ * Choosing among a session's mockups (plan #2789.9). Both presses are your
+ * messages in the thread that carry the mockup's link as artifact_url, so the
+ * session reads them with read_thread and no column was added for them.
+ * "Picked the mockup" opens a pick; a comment opens "About the mockup".
+ */
+export const PICK_OPENING = 'Picked the mockup';
+export const COMMENT_OPENING = 'About the mockup';
+/** Longest note on a mockup. */
+export const MOCKUP_COMMENT_MAX = 4_000;
+
+function quoted(title: string): string {
+  const flat = title.replace(/\s+/g, ' ').trim();
+  return flat ? ` \u201c${flat.length > 120 ? `${flat.slice(0, 119).trimEnd()}\u2026` : flat}\u201d` : '';
+}
+
+/** What a pick writes in the thread. */
+export function pickBody(mockupTitle: string): string {
+  return `${PICK_OPENING}${quoted(mockupTitle)}`;
+}
+
+/** What a note on a mockup writes in the thread. */
+export function commentBody(mockupTitle: string, note: string): string {
+  return `${COMMENT_OPENING}${quoted(mockupTitle)}: ${note.trim()}`;
+}
+
+/**
+ * What the thread shows of your pick or note: the words without the mockup's
+ * title, which the session needs and the card above already shows. Any other
+ * message comes back as it is.
+ */
+export function shownBody(m: SessionMessage): string {
+  if (m.author !== 'person' || !m.artifactUrl) return m.body;
+  const match = m.body.match(/^(Picked the mockup|About the mockup)(?: \u201c[^\u201d]*\u201d)?(?:: )?([\s\S]*)$/);
+  if (!match) return m.body;
+  return match[1] === PICK_OPENING ? PICK_OPENING : match[2].trim() || m.body;
+}
+
+/** True for your message that picks a mockup. */
+export function isPick(m: SessionMessage): boolean {
+  return m.author === 'person' && m.kind === 'text' && !!m.artifactUrl && m.body.startsWith(PICK_OPENING);
+}
+
+/** The mockup links you have picked in this thread. */
+export function pickedLinks(messages: readonly SessionMessage[]): Set<string> {
+  return new Set(messages.filter(isPick).map((m) => m.artifactUrl as string));
+}
+
+/** The Reference line a pick leaves on a plan step, which the step's brief reads. */
+export function referenceLine(link: string): string {
+  return `Reference: ${link}`;
+}
+
+/**
+ * A step's detail with the picked link on a Reference line. Links this thread
+ * picked before are taken off first, so the brief carries the one design now
+ * picked and not each one tried.
+ */
+export function detailWithReference(detail: string | null, link: string, earlier: readonly string[]): string {
+  const old = new Set(earlier.filter((l) => l !== link).map(referenceLine));
+  const kept = (detail ?? '')
+    .split('\n')
+    .filter((line) => !old.has(line.trim()))
+    .join('\n')
+    .trimEnd();
+  if (kept.split('\n').some((line) => line.trim() === referenceLine(link))) return kept;
+  return kept ? `${kept}\n\n${referenceLine(link)}` : referenceLine(link);
+}
+
 function text(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }

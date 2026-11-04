@@ -14,7 +14,7 @@ import {
   TypingBubble,
 } from '@/components/patterns/messaging';
 import { prefersReducedMotion } from '@/components/motion/reduced';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import Link from '@/components/ui/link';
 import { Input } from '@/components/ui/field';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -98,6 +98,12 @@ const NEAR_FOOT_PX = 120;
 /** Within this many pixels of the top, the page before is read. */
 const NEAR_TOP_PX = 80;
 
+/**
+ * No changes, as one array: a fresh `[]` default on every draw made the
+ * redraw check below see new changes each time and draw again without end.
+ */
+const NO_CHANGES: DashChange[] = [];
+
 export function ThreadView({
   person,
   chatId: initialChatId,
@@ -109,7 +115,7 @@ export function ThreadView({
   live = true,
   pending: initialPending = [],
   loadingOlder: initialLoadingOlder = false,
-  changes: initialChanges = [],
+  changes: initialChanges = NO_CHANGES,
   presses = NO_PRESSES,
   today,
 }: {
@@ -348,16 +354,22 @@ export function ThreadView({
 
   return (
     <MessagingThread
-      name={person.name}
+      // Their name is the way into their settings, as a messaging app's is (plan #2854.1).
+      name={
+        <h1 className="truncate text-body font-semibold text-ink">
+          <Link href={editHref(person.key)} title={`Edit ${person.name}`} className="rounded-control hover:underline">
+            {person.name}
+          </Link>
+        </h1>
+      }
       detail={threadDetail(person)}
-      avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
-      back={{ href: '/chat', label: 'People' }}
-      crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
-      actions={
-        <Link href={editHref(person.key)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          Edit
+      avatar={
+        <Link href={editHref(person.key)} aria-label={`Edit ${person.name}`} title={`Edit ${person.name}`} className="press shrink-0 rounded-full">
+          <PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />
         </Link>
       }
+      back={{ href: '/chat', label: 'People' }}
+      crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
       scrollRef={scroller}
       onScroll={onScroll}
       box={

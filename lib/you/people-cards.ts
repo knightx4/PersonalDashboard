@@ -6,6 +6,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
 import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
+import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
 import {
   ASK_MAX,
   briefOf,
@@ -37,7 +38,7 @@ export * from '@/lib/you/people-cards-model';
 const MODEL = MODELS.personaDraft;
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings';
+const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when';
 
 /** One person's form, their earlier cards and what they remember, or null when they are not on the council. */
 export async function loadPersonCard(client: YouSupabaseClient, userId: string, key: string): Promise<PersonCard | null> {
@@ -76,7 +77,15 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
     joinsMeetings: row.joins_meetings !== false,
     versions: (versions.data ?? []).flatMap((v) => versionOf(v as Record<string, unknown>) ?? []),
     memory: (memory.data ?? []).flatMap((m) => memoryOf(m as Record<string, unknown>) ?? []) as CouncilMemory[],
+    texts: textsOf(str(row.key), row.text_when),
   };
+}
+
+/** The switches for what someone texts first about; null when no rule is theirs (plan #2854.1). */
+function textsOf(key: string, stored: unknown): TextSwitch[] | null {
+  const rule = ruleFor(key);
+  if (!rule) return null;
+  return textSwitches(rule, Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : null);
 }
 
 /** Who wrote the card being saved: Dash when it is Dash's draft as drafted, with the sentence asked. */
@@ -156,11 +165,19 @@ export async function savePerson(
       persona: person.persona,
       persona_brief: storedBrief(person.brief, keepAuthor),
       joins_meetings: person.joinsMeetings,
+      ...textWhenPatch(str(row.key), person.textWhen),
     })
     .eq('user_id', userId)
     .eq('id', advisorId);
   if (error) throw new Error(`Saving ${person.name} failed: ${error.message}`);
   return str(row.key);
+}
+
+/** text_when as a save writes it: only for someone with a rule, and only when the form sent the list. */
+function textWhenPatch(key: string, on: readonly string[] | undefined): { text_when?: string[] | null } {
+  const rule = ruleFor(key);
+  if (!rule || !on) return {};
+  return { text_when: storedTextWhen(rule, on) };
 }
 
 function authorOf(brief: unknown): CardAuthor {

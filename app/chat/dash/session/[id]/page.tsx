@@ -5,7 +5,13 @@ import { loadSessionThread } from '@/lib/core/session-threads';
 import { isThreadId } from '@/lib/core/session-threads-model';
 import { activeProjects } from '@/lib/plan/projects';
 import { loadProjectsForRequest } from '@/lib/plan/request-plan';
-import { answerSessionMessageAction, sendSessionMessageAction, startSessionThreadAction } from '../../session-actions';
+import {
+  answerSessionMessageAction,
+  commentOnSessionMockupAction,
+  pickSessionMockupAction,
+  sendSessionMessageAction,
+  startSessionThreadAction,
+} from '../../session-actions';
 import { SessionThreadView } from '../../session-view';
 
 export const metadata = { title: 'Session' };
@@ -15,6 +21,8 @@ const ACTIONS = {
   start: startSessionThreadAction,
   send: sendSessionMessageAction,
   answer: answerSessionMessageAction,
+  pick: pickSessionMockupAction,
+  comment: commentOnSessionMockupAction,
 };
 
 /** The time the page is read; outside the component, since reading the clock during render is unstable. */

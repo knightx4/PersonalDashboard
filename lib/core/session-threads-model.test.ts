@@ -3,6 +3,12 @@ import {
   attachmentName,
   awaitingReply,
   claudeSessionUrl,
+  commentBody,
+  detailWithReference,
+  isPick,
+  pickBody,
+  pickedLinks,
+  shownBody,
   newSessionThreadHref,
   openSessionRef,
   sessionMessageOf,
@@ -97,5 +103,41 @@ describe('sessionMessageOf', () => {
 
   it('refuses a row that is not a message', () => {
     expect(sessionMessageOf({ id: 'x', author: 'bot', kind: 'text', created_at: 'now' })).toBeNull();
+  });
+});
+
+describe('choosing among mockups', () => {
+  const link = 'https://claude.ai/artifact/AAA';
+  const other = 'https://claude.ai/artifact/BBB';
+
+  it('writes a pick and a note that name the mockup and carry its link', () => {
+    expect(pickBody('Season page')).toBe('Picked the mockup \u201cSeason page\u201d');
+    expect(commentBody('Season page', ' Move it lower ')).toBe(
+      'About the mockup \u201cSeason page\u201d: Move it lower',
+    );
+  });
+
+  it('knows a pick from a note, and which links are picked', () => {
+    const pick = msg({ id: 'p', author: 'person', createdAt: 't', body: pickBody('A'), artifactUrl: link });
+    const note = msg({ id: 'n', author: 'person', createdAt: 't', body: commentBody('A', 'x'), artifactUrl: other });
+    expect(isPick(pick)).toBe(true);
+    expect(isPick(note)).toBe(false);
+    expect([...pickedLinks([pick, note])]).toEqual([link]);
+  });
+
+  it('shows your pick and note without repeating the mockup title', () => {
+    const pick = msg({ id: 'p', author: 'person', createdAt: 't', body: pickBody('A b'), artifactUrl: link });
+    const note = msg({ id: 'n', author: 'person', createdAt: 't', body: commentBody('A b', 'Move it'), artifactUrl: link });
+    expect(shownBody(pick)).toBe('Picked the mockup');
+    expect(shownBody(note)).toBe('Move it');
+    expect(shownBody(msg({ id: 'x', author: 'person', createdAt: 't', body: 'hi' }))).toBe('hi');
+  });
+
+  it('puts the link on the step as a Reference line, once, replacing an earlier pick', () => {
+    expect(detailWithReference(null, link, [])).toBe(`Reference: ${link}`);
+    expect(detailWithReference('Do the thing.', link, [])).toBe(`Do the thing.\n\nReference: ${link}`);
+    const once = detailWithReference('Do the thing.', link, []);
+    expect(detailWithReference(once, link, [])).toBe(once);
+    expect(detailWithReference(once, other, [link])).toBe(`Do the thing.\n\nReference: ${other}`);
   });
 });
