@@ -477,7 +477,7 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
-import { ChatPeopleSurface } from './chat-surfaces';
+import { ChatPeopleSurface, ChatThreadSurface } from './chat-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8599,13 +8599,12 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* Chat's People tab (plan #2748.1), where Chat opens: each mentor as a
-     * thread, newest note first, unread ones bold with a dot, one writing
-     * back, one with nothing yet and a guest not ready to talk. A row opens
-     * the mentor's page on the Council until #2748.6. */
+     * thread, newest first, unread ones bold with a dot, one never written
+     * to, a long name and a guest not ready to talk (plan #2748.6). */
     id: 'chat-people',
     label: 'Chat · People',
     module: 'chat',
-    width: 'page',
+    width: 'screen',
     render: () => <ChatPeopleSurface />,
   },
   {
@@ -8613,8 +8612,96 @@ export const SURFACES: readonly Surface[] = [
     id: 'chat-people-empty',
     label: 'Chat · People, no mentors yet',
     module: 'chat',
-    width: 'page',
+    width: 'screen',
     render: () => <ChatPeopleSurface state="empty" />,
+  },
+  {
+    /* The threads could not be read (plan #2748.6): one line saying so under the heading. */
+    id: 'chat-people-failed',
+    label: 'Chat · People, the threads not read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="failed" />,
+  },
+  {
+    /* The People tab while it is read: the list's pane with round marks and two lines, and on a laptop the thread's pane with bubbles. */
+    id: 'chat-people-loading',
+    label: 'Chat · People loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="loading" />,
+  },
+  {
+    /* A search across every thread (plan #2748.6): the messages with the words, each under whose thread it is in. */
+    id: 'chat-people-search',
+    label: 'Chat · People, a search',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="search" />,
+  },
+  {
+    /* A search nothing matches: the line saying so and the way back to the list. */
+    id: 'chat-people-search-none',
+    label: 'Chat · People, a search that finds nothing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="nothing-found" />,
+  },
+  {
+    /* A thread open beside the list (plan #2748.6): day labels, bubbles grouped by sender, a text first with its to do, and Read under your last message. On a phone the thread alone, with the way back above the name. */
+    id: 'chat-people-thread',
+    label: 'Chat · A thread open',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface />,
+  },
+  {
+    /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
+    id: 'chat-people-thread-typing',
+    label: 'Chat · A thread, them typing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="typing" />,
+  },
+  {
+    /* Scrolled to the top of a long thread: earlier messages loading above the oldest shown. */
+    id: 'chat-people-thread-older',
+    label: 'Chat · A thread, loading earlier messages',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="older" />,
+  },
+  {
+    /* A message that was not sent: dimmed in place, why under it, and Retry. */
+    id: 'chat-people-thread-failed',
+    label: 'Chat · A thread, a send that failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="failed" />,
+  },
+  {
+    /* A mentor you have never written to: their mark and name, and a line saying to write below. */
+    id: 'chat-people-thread-new',
+    label: 'Chat · A thread never written in',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="new" />,
+  },
+  {
+    /* A guest whose brain is not built yet: the line saying when they can talk, and the box off. */
+    id: 'chat-people-thread-not-ready',
+    label: 'Chat · A thread with a guest not ready',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="not-ready" />,
+  },
+  {
+    /* A thread while it is read: on a phone the thread's pane alone, on a laptop beside the list. */
+    id: 'chat-people-thread-loading',
+    label: 'Chat · A thread loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="loading" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),

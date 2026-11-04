@@ -15,6 +15,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { cn } from '@/lib/cn';
 import { whenAgo, whenDay } from '@/lib/core/when';
 import type { Brain } from '@/lib/you/board-brain';
+import { threadHref } from '@/lib/you/chat-threads-model';
 import {
   MESSAGE_MAX,
   replyState,
@@ -152,7 +153,13 @@ export function MentorView({
         )}
 
         <section id="talk" className="scroll-mt-20 space-y-3">
-          <h2 className="text-ui font-semibold text-ink">Talk with {mentor.name}</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className="text-ui font-semibold text-ink">Talk with {mentor.name}</h2>
+            {/* The whole thread, live, is on Chat's People tab (plan #2748.6). */}
+            <Link href={threadHref(mentor.key)} className={cn(linkVariants({ tone: 'quiet' }), 'press-area text-small')}>
+              Open your thread in Chat
+            </Link>
+          </div>
           {messages.length === 0 && reply.kind === 'idle' && (
             <p className="text-ui text-ink-muted">
               {mentor.canTalk
@@ -276,7 +283,13 @@ function MessageRow({
   return (
     <li className={cn('flex gap-2.5', mine && 'justify-end')}>
       {!mine && <MentorMark mentorKey={mentor.key} name={mentor.name} kind={mentor.kind} size="sm" className="mt-0.5" />}
-      <div className={cn('max-w-prose space-y-1.5', mine && 'ml-10 rounded-card bg-sunken px-3 py-2 sm:ml-20')}>
+      <div
+        className={cn(
+          'max-w-prose space-y-1.5 rounded-card px-3 py-2',
+          // Each side on its own ground, so no message sits bare on the page.
+          mine ? 'ml-10 bg-sunken sm:ml-20' : 'mr-10 bg-surface sm:mr-20',
+        )}
+      >
         <p className="whitespace-pre-line text-ui text-ink">
           <LinkedText text={message.text} refs={false} />
         </p>

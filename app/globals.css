@@ -2153,6 +2153,25 @@ body[data-keyhints] .keyhint {
   }
 }
 
+/* A person typing in a thread (plan #2748.6): three dots that rise and dim
+ * in turn, each started a little after the one before. */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.typing-dot {
+  animation: typing-dot 1.2s var(--ease-sway) infinite;
+}
+
 a:has([data-link-pending]),
 tr:has([data-link-pending]) {
   cursor: progress;

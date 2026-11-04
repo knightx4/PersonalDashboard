@@ -56,6 +56,13 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'A messaging app: People and Dash as two tabs, each mentor a row with a round avatar, their name, the last thing said in two lines, the time, and a dot when it is unread, unread rows in bolder type.',
     from: '2748.1',
   },
+  'chat-people-thread': {
+    pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
+    link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
+    source: 'docs/references/chat-people/chat.html',
+    why: 'The same mockup, for an open thread: the person\'s initials in their colour on a bar above the messages, quiet day labels, your bubbles filled on the right and theirs on the left with the corners tucked inside a run, and the box fixed at the foot.',
+    from: '2748.6',
+  },
   'ask-page-new': {
     pictures: ['docs/references/chat-people/chat-laptop.png', 'docs/references/chat-people/chat-phone.png'],
     link: 'https://claude.ai/artifact/MWcoovKzv1JbZuw5LFvJwS',
