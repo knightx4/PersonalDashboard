@@ -210,16 +210,21 @@ const SEAT_AREAS: Record<string, string> = {
   dreamer: 'Ambitions',
 };
 
+/** The longest area kept whole, so "<area> · usually replies right away" fits one line on a phone. */
+const AREA_MAX = 12;
+
 /**
- * A mentor's area in a word or two: a seat's from the list above, anyone
- * else's the first phrase of their focus ("Practical habits, thrift, …" is
- * "Practical habits"), or nothing when that phrase is long.
+ * A mentor's area in a word, as the reference's "Money": a seat's from the
+ * list above, anyone else's the first phrase of their focus, cut to its
+ * last word when that phrase is long ("Practical habits, thrift, …" is
+ * "Habits"), or nothing when even that is long.
  */
 export function seatAreaOf(advisor: { key: string; kind: 'seat' | 'guest'; focus: string | null }): string {
   if (advisor.kind === 'seat' && SEAT_AREAS[advisor.key]) return SEAT_AREAS[advisor.key];
   const first = (advisor.focus ?? '').split(/[,.:;]/)[0]?.trim() ?? '';
-  if (!first || first.length > 32) return '';
-  return first[0].toUpperCase() + first.slice(1);
+  const area = first.length > AREA_MAX ? (first.split(/\s+/).at(-1) ?? '') : first;
+  if (!area || area.length > AREA_MAX) return '';
+  return area[0].toUpperCase() + area.slice(1);
 }
 
 /** The search as kept: trimmed and cut to the box's length, or null for nothing to look for. */

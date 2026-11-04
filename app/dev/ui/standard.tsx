@@ -194,6 +194,24 @@ function MomentRow({ moment, outlines }: { moment: Moment; outlines: OutlineInde
 }
 
 /**
+ * One workspace's moments as the catalogue lists them, for the gallery's
+ * dev-ui-moments, since the whole page photographs taller than a browser
+ * shot can reach and the catalogue sits near its foot.
+ */
+export function WorkspaceMoments({ workspace, label }: { workspace: Moment['workspace']; label: string }) {
+  const moments = MOMENTS.filter((moment) => moment.workspace === workspace);
+  return (
+    <CardSection title={label} meta={`${moments.length} of ${MOMENTS_PER_WORKSPACE}`}>
+      <ul className="divide-y divide-border">
+        {moments.map((moment) => (
+          <MomentRow key={moment.name} moment={moment} outlines={new Map()} />
+        ))}
+      </ul>
+    </CardSection>
+  );
+}
+
+/**
  * Every colour below is a utility class, never `style={{ background:
  * 'var(--color-x)' }}`.
  *

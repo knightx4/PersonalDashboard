@@ -116,7 +116,7 @@ describe('the People tab model', () => {
 
   it('names a mentor’s area in a word or two and says how soon they answer', () => {
     expect(seatAreaOf({ key: 'cfo', kind: 'seat', focus: 'Six to twelve months: spending' })).toBe('Money');
-    expect(seatAreaOf({ key: 'franklin', kind: 'guest', focus: 'Practical habits, thrift, hard work.' })).toBe('Practical habits');
+    expect(seatAreaOf({ key: 'franklin', kind: 'guest', focus: 'Practical habits, thrift, hard work.' })).toBe('Habits');
     expect(seatAreaOf({ key: 'x', kind: 'guest', focus: null })).toBe('');
     expect(threadDetail({ about: 'Money', canTalk: true })).toBe('Money · usually replies right away');
     expect(threadDetail({ about: '', canTalk: false })).toBe('Not ready to talk yet');
