@@ -281,7 +281,18 @@ export function ChatArrivalMomentSurface() {
   ];
   return (
     <ChatShell path="/chat">
-      <ChatArrivalDemo before={CHAT_PEOPLE} after={after} timezone={ZONE} now={NOW} />
+      <ChatArrivalDemo
+        before={CHAT_PEOPLE}
+        after={after}
+        timezone={ZONE}
+        now={NOW}
+        open={{
+          key: FRANKLIN.key,
+          thread: (
+            <ThreadView person={FRANKLIN} chatId={FRANKLIN.chatId} page={{ messages: THREAD, hasOlder: false }} typingUntil={null} timezone={ZONE} now={NOW} live={false} />
+          ),
+        }}
+      />
     </ChatShell>
   );
 }

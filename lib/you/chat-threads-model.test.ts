@@ -106,8 +106,8 @@ describe('the People tab model', () => {
   });
 
   it('times a thread as a texting app does: the clock, Yesterday, the weekday, the date', () => {
-    expect(threadTime('2026-11-03T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('7:12');
-    expect(threadTime('2026-11-03T00:05:00Z', { timeZone: ZONE, now: NOW })).toBe('12:05');
+    expect(threadTime('2026-11-03T07:12:00Z', { timeZone: ZONE, now: NOW })).toMatch(/^7:12\sAM$/u);
+    expect(threadTime('2026-11-03T00:05:00Z', { timeZone: ZONE, now: NOW })).toMatch(/^12:05\sAM$/u);
     expect(threadTime('2026-11-02T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Yesterday');
     expect(threadTime('2026-11-01T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Sun');
     expect(threadTime('2026-10-27T07:12:00Z', { timeZone: ZONE, now: NOW })).toBe('Oct 27');

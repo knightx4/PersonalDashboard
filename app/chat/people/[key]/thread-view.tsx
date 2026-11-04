@@ -330,9 +330,6 @@ export function ThreadView({
           )}
         </p>
       )}
-      {!hasOlder && messages.length > 0 && (
-        <p className="mb-2 self-center text-small text-ink-muted">The start of your thread with {person.name}</p>
-      )}
       {empty && <EmptyThread person={person} />}
       {blocks.map((block) =>
         block.kind === 'day' ? (

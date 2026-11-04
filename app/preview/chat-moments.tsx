@@ -86,11 +86,14 @@ export function ChatArrivalDemo({
   after,
   timezone,
   now,
+  open = null,
 }: {
   before: readonly PersonRow[];
   after: readonly PersonRow[];
   timezone: string;
   now: number;
+  /** The newest thread, open beside the list on a laptop as /chat opens it, and its person's key. */
+  open?: { key: string; thread: React.ReactNode } | null;
 }) {
   const [arrived, setArrived] = useState(false);
   return (
@@ -98,7 +101,9 @@ export function ChatArrivalDemo({
       <GalleryButton onClick={() => setArrived(!arrived)} demo="chat-arrival">
         {arrived ? 'Start again' : 'A text arrives first'}
       </GalleryButton>
-      <PeopleView rows={arrived ? after : before} timezone={timezone} now={now} live={false} />
+      <PeopleView rows={arrived ? after : before} current={open?.key ?? null} newest={Boolean(open)} timezone={timezone} now={now} live={false}>
+        {open?.thread}
+      </PeopleView>
     </>
   );
 }

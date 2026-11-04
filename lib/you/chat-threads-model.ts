@@ -1,4 +1,4 @@
-import { whenDay, zoneDay, zoneParts } from '@/lib/core/when';
+import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
 
 /**
@@ -178,7 +178,7 @@ function dayDiff(a: string, b: string): number {
 
 /**
  * A thread's time in the list, as a texting app writes it (the reference):
- * the clock today ("7:12"), "Yesterday", the short weekday within the week
+ * the clock today ("7:12 AM"), "Yesterday", the short weekday within the week
  * ("Sun"), and the month and day before that ("Oct 29"), with the year when
  * it is not this one.
  */
@@ -186,10 +186,8 @@ export function threadTime(at: string, options: { timeZone: string; now: number 
   const day = zoneDay(at, options.timeZone);
   const today = zoneDay(options.now, options.timeZone);
   const diff = dayDiff(today, day);
-  if (diff <= 0) {
-    const p = zoneParts(at, options.timeZone);
-    return `${p.hour % 12 || 12}:${String(p.minute).padStart(2, '0')}`;
-  }
+  // Today's clock keeps its AM or PM, as every time in the app does.
+  if (diff <= 0) return whenTime(at, options);
   if (diff === 1) return 'Yesterday';
   const [y, m, d] = day.split('-').map(Number);
   if (diff <= 6) return SHORT_WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];

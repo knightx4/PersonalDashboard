@@ -441,13 +441,13 @@ function Memory({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-start justify-end gap-x-3 gap-y-1">
-                  <p className="min-w-[min(100%,16rem)] flex-1 text-ui text-ink">
+                <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+                  <p className="min-w-0 flex-1 basis-0 text-ui text-ink">
                     <span className="text-small text-ink-muted">{MEMORY_KIND_LABELS[line.kind]} · </span>
                     {line.text}
                   </p>
                   {confirming !== line.id && (
-                    <div className="flex shrink-0 items-start gap-1">
+                    <div className="-mr-2 -mt-1 flex shrink-0 items-start">
                       <Button
                         type="button"
                         variant="ghost"

@@ -8,7 +8,6 @@ import { buttonVariants } from '@/components/ui/button';
 import { ADD_HREF } from '@/lib/you/people-cards-model';
 import { PersonMark } from '@/components/patterns/messaging';
 import { Input } from '@/components/ui/field';
-import { SectionLabel } from '@/components/ui/section-heading';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
@@ -104,12 +103,8 @@ export function PeopleList({
 }) {
   useLiveThreads(live);
   const now = useTypingClock(rows, start, live);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   useRowArrival(listRef, rows);
-  // A row with a message or typing is a thread; the rest wait under their own label.
-  const started = (row: PersonRow) => Boolean(row.last) || isTyping(row.typingUntil, now);
-  const talking = rows.filter(started);
-  const waiting = rows.filter((row) => !started(row));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
@@ -133,30 +128,15 @@ export function PeopleList({
         </form>
       </div>
       {hits ? (
-        <SearchResults hits={hits} query={query ?? ''} timezone={timezone} now={now} />
+        <SearchResults hits={hits} query={query ?? ''} current={current} wide={currentWide} timezone={timezone} now={now} />
       ) : (
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {talking.length > 0 && (
-            <ul>
-              {talking.map((row) => (
-                <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
-              ))}
-            </ul>
-          )}
-          {waiting.length > 0 && (
-            <>
-              {/* Mentors never written to wait below the threads, so no line of theirs reads as a message. */}
-              <SectionLabel as="h3" className={cn('px-2 pb-1', talking.length > 0 ? 'pt-4' : 'pt-1')}>
-                Not written to yet
-              </SectionLabel>
-              <ul>
-                {waiting.map((row) => (
-                  <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+        // One run, as the reference: the threads newest first, then those never
+        // written to, whose quiet "Say hello" is never a line of theirs (sortPeople).
+        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          {rows.map((row) => (
+            <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -211,7 +191,23 @@ function PersonItem({
   );
 }
 
-function SearchResults({ hits, query, timezone, now }: { hits: readonly SearchHit[]; query: string; timezone: string; now: number }) {
+function SearchResults({
+  hits,
+  query,
+  current,
+  wide,
+  timezone,
+  now,
+}: {
+  hits: readonly SearchHit[];
+  query: string;
+  /** The key of the open thread: its first result is lit, as the open row is. */
+  current: string | null;
+  wide: boolean;
+  timezone: string;
+  now: number;
+}) {
+  const lit = hits.find((hit) => hit.key === current)?.id ?? null;
   if (hits.length === 0) {
     return (
       <div className="px-4 py-2">
@@ -235,7 +231,11 @@ function SearchResults({ hits, query, timezone, now }: { hits: readonly SearchHi
           <li key={hit.id}>
             <Link
               href={threadHref(hit.key)}
-              className="grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken"
+              aria-current={hit.id === lit && !wide ? 'page' : undefined}
+              className={cn(
+                'grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken',
+                hit.id === lit && (wide ? 'min-[720px]:bg-accent-tint' : 'bg-accent-tint hover:bg-accent-tint'),
+              )}
             >
               <PersonMark initials={personInitials(hit.name)} colour={hit.colour} />
               <span className="min-w-0">
