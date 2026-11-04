@@ -171,6 +171,13 @@ const questionRow = (over: Record<string, unknown> = {}) => ({
     'An offer in finance by 31 March 2027 without savings falling below £3,000.',
   decide_by: '2026-11-06',
   lean: 'C',
+  option_order: {
+    hiring_manager: ['B', 'C', 'A'],
+    mentor: ['A', 'B', 'C'],
+    skeptic: ['C', 'A', 'B'],
+    cfo: ['B', 'A', 'C'],
+    dreamer: ['C', 'B', 'A'],
+  },
   premortem,
   tripwire,
   ...over,

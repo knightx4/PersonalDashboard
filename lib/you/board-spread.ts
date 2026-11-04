@@ -76,6 +76,26 @@ export function forecastsOf(
   });
 }
 
+/** The advisors who sit on the decision and have not answered yet, in the board's order. */
+export function waitingOf(
+  question: DebateQuestion,
+  advisors: readonly DebateAdvisor[],
+  forecasts: readonly AdvisorForecast[],
+): DebateAdvisor[] {
+  const answered = new Set(forecasts.map((f) => f.advisor.key));
+  return advisors.filter((a) => question.seated.includes(a.key) && !answered.has(a.key));
+}
+
+/** An answer without the row ids it cites in brackets ("[c41d0a2e]"), which mean nothing on the page. */
+export function withoutCitations(text: string): string {
+  return text.replace(/\s*\[[0-9a-f]{6,}[^\]]*\](?!\()/gi, '');
+}
+
+/** A tripwire's condition without the table it is read from ("…, in job_search.applications."). */
+export function plainCondition(condition: string): string {
+  return condition.replace(/,?\s+(?:in|from)\s+[a-z_]+\.[a-z_]+(?=\.?$)/i, '');
+}
+
 /** The weighted mean per option the verdict gives, or the plain mean while there is no verdict. */
 export function meanOf(
   question: DebateQuestion,
@@ -144,6 +164,7 @@ export function headline(
   question: DebateQuestion,
   forecasts: readonly AdvisorForecast[],
   running: boolean,
+  seated = 0,
 ): string {
   const letter = leadingOption(question, forecasts);
   if (!forecasts.length || !letter) {
@@ -153,7 +174,8 @@ export function headline(
   const agreement = agreementOn(forecasts, letter);
   const n = forecasts.length;
   if (running) {
-    return `${n === 1 ? 'One advisor has' : `${n} advisors have`} answered so far, and ${letter} leads at ${pct(mean)}.`;
+    const who = seated > n ? `${n} of ${seated} advisors have` : n === 1 ? 'One advisor has' : `${n} advisors have`;
+    return `${who} answered so far, and ${letter} leads at ${pct(mean)}.`;
   }
   if (n === 1) return `${forecasts[0].advisor.name} gives ${letter} the best chance, ${pct(mean)}.`;
   const opening = `The advisors give ${letter} the best chance, ${pct(mean)}`;
@@ -230,14 +252,14 @@ export function stackDots<T extends { p: number }>(dots: readonly T[], gap = 0.1
 }
 
 /** "80,000 to 95,000 salary", or short as "80K–95K salary"; "0 to 4 people". */
-export function rangeText(range: ForecastRange, short = false): string {
+export function rangeText(range: ForecastRange, short = false, unit = true): string {
   const n = (v: number) =>
     short && Math.abs(v) >= 1000
       ? new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v)
       : v.toLocaleString('en-GB', { maximumFractionDigits: 2 });
   const span =
     range.low === range.high ? n(range.low) : `${n(range.low)}${short ? '–' : ' to '}${n(range.high)}`;
-  return range.unit ? `${span} ${range.unit}` : span;
+  return range.unit && unit ? `${span} ${range.unit}` : span;
 }
 
 /** An advisor's profile at their track record, where this decision is listed. */

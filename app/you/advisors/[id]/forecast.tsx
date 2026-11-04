@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { IconButton } from '@/components/ui/icon-button';
 import Link, { linkVariants } from '@/components/ui/link';
@@ -26,8 +26,12 @@ import {
   stackDots,
   steelmanOf,
   theExchange,
+  plainCondition,
+  waitingOf,
+  withoutCitations,
   type AdvisorForecast,
 } from '@/lib/you/board-spread';
+import { buttonVariants } from '@/components/ui/button';
 import { AdvisorAvatar } from '../advisor-avatar';
 import { VerdictAndDecision, type DecideAction } from './decision';
 import type { MakeProps } from './make';
@@ -91,6 +95,8 @@ export function ForecastDecision({
   const lean = leanReplies(question);
   const opened = question.turns.filter((t) => t.round === 1);
   const finished = !running;
+  const waiting = running ? waitingOf(question, advisors, forecasts) : [];
+  const undecided = finished && question.verdict !== null && question.decision === null;
 
   return (
     <section aria-labelledby={headingId} className="space-y-6" data-board-question-debate data-board-forecast>
@@ -112,10 +118,10 @@ export function ForecastDecision({
           )}
         </div>
         <p className="text-title font-semibold text-ink [overflow-wrap:anywhere]" data-board-headline>
-          {headline(question, forecasts, running)}
+          {headline(question, forecasts, running, question.seated.length)}
         </p>
-        <MeasureLine question={question} />
         <SpreadCard
+          waiting={waiting}
           question={question}
           forecasts={forecasts}
           letter={letter}
@@ -146,12 +152,12 @@ export function ForecastDecision({
 
       {steelman && (
         <section aria-labelledby={`${headingId}-steelman`} className="space-y-2">
-          <SectionHeading id={`${headingId}-steelman`} as="h3" title="The other side, argued" />
-          <p className="text-ui text-ink-muted">
-            Every advisor put the most points on the same option, so{' '}
-            {byId.get(steelman.brief.advisorId)?.name ?? 'one advisor'} was asked to argue for the one
-            nobody backed. It is a brief, not their own view.
-          </p>
+          <SectionHeading
+            id={`${headingId}-steelman`}
+            as="h3"
+            title="The other side, argued"
+            count={letter ? `every advisor bet most on ${letter}` : undefined}
+          />
           <Conversation
             turns={[steelman.brief, ...(steelman.answer ? [steelman.answer] : [])]}
             byId={byId}
@@ -172,16 +178,36 @@ export function ForecastDecision({
         </section>
       )}
 
+      {undecided && question.verdict?.recommended && (
+        <div
+          className={cn(
+            cardVariants(),
+            'sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom)+0.5rem)] z-over-link sm:hidden',
+            'flex items-center justify-between gap-3 border border-border px-4 py-2.5',
+          )}
+          data-board-decide-bar
+        >
+          <span className="min-w-0 text-ui text-ink">
+            The advisors recommend <span className="font-semibold">{question.verdict.recommended}</span>
+          </span>
+          <a href={`#decide-${question.id}`} className={buttonVariants({ size: 'sm' })}>
+            Decide
+          </a>
+        </div>
+      )}
+
       {finished && (question.verdict || question.decision) && (
-        <VerdictAndDecision
-          question={question}
-          advisors={advisors}
-          decide={decide}
-          editing={decideOpen}
-          error={decideError}
-          make={make}
-          makeFailed={makeFailed}
-        />
+        <div id={`decide-${question.id}`} className="scroll-mt-24">
+          <VerdictAndDecision
+            question={question}
+            advisors={advisors}
+            decide={decide}
+            editing={decideOpen}
+            error={decideError}
+            make={make}
+            makeFailed={makeFailed}
+          />
+        </div>
       )}
 
       {opened.length > 0 && (
@@ -193,14 +219,14 @@ export function ForecastDecision({
   );
 }
 
-/** "Measured by …, by 14 Nov 2026 · Hard to undo". */
+/** "Success: … · Hard to undo", at the head of the spread. */
 function MeasureLine({ question }: { question: DebateQuestion }) {
   const parts = [
     question.door === 'one_way' ? 'hard to undo' : question.door === 'two_way' ? 'easy to undo' : null,
   ].filter(Boolean);
   if (!question.successMeasure && !parts.length) return null;
   return (
-    <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">
+    <p className="card-pad-x border-b border-border py-3 text-ui text-ink-muted [overflow-wrap:anywhere]">
       {question.successMeasure && (
         <>
           <span className="font-medium text-ink">Success:</span> {question.successMeasure}
@@ -216,6 +242,7 @@ const capital = (words: string) => words.charAt(0).toUpperCase() + words.slice(1
 
 /** The strip of avatars along 0 to 100% for the leading option, and one line from each advisor. */
 function SpreadCard({
+  waiting,
   question,
   forecasts,
   letter,
@@ -223,6 +250,8 @@ function SpreadCard({
   running,
   openDot,
 }: {
+  /** Who sits on it and has not answered, while the meeting runs. */
+  waiting: readonly DebateAdvisor[];
   question: DebateQuestion;
   forecasts: readonly AdvisorForecast[];
   letter: string | null;
@@ -245,17 +274,14 @@ function SpreadCard({
 
   return (
     <Card padding="none" data-board-spread>
+      <MeasureLine question={question} />
       <div className="card-pad space-y-3">
-        <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
-          {letter ? (
-            <>
-              Chance that <span className="font-semibold text-ink">{letter}</span>
-              {optionText && <>, {optionText},</>} meets your measure
-            </>
-          ) : (
-            'Each advisor’s forecast lands on this line as they finish.'
-          )}
-        </p>
+        {letter && (
+          <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
+            Chance that <span className="font-semibold text-ink">{letter}</span>
+            {optionText && <>, {optionText},</>} meets your measure
+          </p>
+        )}
         <div className="relative" style={{ paddingInline: DOT / 2 }}>
           <div className="relative" style={{ height: rows * (DOT + 6) + 4 }}>
             {/* The line itself, along the foot of the dots. */}
@@ -271,7 +297,10 @@ function SpreadCard({
               {placed.map(({ forecast, p, row }) => (
                 <li
                   key={forecast.advisor.id}
-                  className="absolute -translate-x-1/2"
+                  className={cn(
+                    'absolute -translate-x-1/2 transition-opacity duration-quick',
+                    open && open !== forecast.advisor.key && 'opacity-25',
+                  )}
                   style={{ left: `${p * 100}%`, bottom: 4 + row * (DOT + 6) }}
                 >
                   <DotButton
@@ -311,6 +340,21 @@ function SpreadCard({
               ? 'They answer blind, each from their own evidence, and land on the line one by one.'
               : 'The advisors gave no probability for this decision.'}
           </p>
+        )}
+        {waiting.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-board-waiting>
+            <span className="text-small text-ink-muted">Still answering</span>
+            <ul className="flex flex-wrap items-center gap-2" aria-label="Still answering">
+              {waiting.map((a) => (
+                <li key={a.id} className="flex items-center gap-1.5 text-small text-ink-muted">
+                  <span className="rounded-full border border-dashed border-border-strong p-0.5 opacity-60">
+                    <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
+                  </span>
+                  {a.name}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -432,7 +476,7 @@ function DotPopover({
       {forecast.assessment && (
         <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">Answering: {forecast.assessment}</p>
       )}
-      {forecast.opening && <Prose markdown={forecast.opening.text} className="text-ui" />}
+      {forecast.opening && <Prose markdown={withoutCitations(forecast.opening.text)} className="text-ui" />}
       {forecast.changeMind && (
         <p className="text-ui text-ink [overflow-wrap:anywhere]">
           <span className="text-ink-muted">What would change their mind: </span>
@@ -454,6 +498,10 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
     const ranked = Object.entries(budget).sort((x, y) => y[1] - x[1]);
     return ranked[0] && (!ranked[1] || ranked[1][1] < ranked[0][1]) ? ranked[0][0] : null;
   };
+  const units = new Set(
+    forecasts.flatMap((f) => Object.values(f.ranges ?? {}).map((r) => r.unit ?? '')),
+  );
+  const oneUnit = units.size === 1 ? [...units][0] : null;
   return (
     <Card padding="none" data-board-options>
       <ol className="card-pad space-y-2 border-b border-border">
@@ -505,7 +553,7 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
                         )}
                         {range && (
                           <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
-                            {rangeText(range, true)}
+                            {rangeText(range, true, oneUnit === null)}
                           </span>
                         )}
                       </dd>
@@ -519,7 +567,7 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
       </ul>
       <p className="card-pad-x border-t border-border py-2 text-small text-ink-muted">
         For each advisor and option: their chance that it meets your measure, the points of 100 they bet
-        on it, and their 90% range. In bold, the option each bet most on. Beside each option above, the
+        on it, and their 90% range{oneUnit ? `, ${oneUnit}` : ''}. In bold, the option each bet most on. Beside each option above, the
         weighted chance.
       </p>
     </Card>
@@ -547,6 +595,7 @@ function Conversation({
       {turns.map((turn) => {
         const advisor = byId.get(turn.advisorId);
         const right = turn.advisorId !== first;
+        const brief = /^Arguing for ([A-Z]), which nobody backed:/.exec(turn.text);
         const moved = turn.probabilities
           ? question.options
               .filter((o) => typeof turn.probabilities?.[o.letter] === 'number')
@@ -571,9 +620,10 @@ function Conversation({
             <Card padding="standard" className={cn('min-w-0 flex-1 space-y-1.5', right ? 'sm:ml-12' : 'sm:mr-12')}>
               <p className="text-small font-medium text-ink-muted">
                 {advisor?.name ?? 'An advisor'}
+                {brief && <span className="font-normal">{` · a brief for ${brief[1]}, which nobody backed, not their own view`}</span>}
                 {moved && <span className="tabular font-normal"> · moves to {moved}</span>}
               </p>
-              <Prose markdown={turn.text.replace(/^Arguing for [A-Z], which nobody backed:\s*/, '')} />
+              <Prose markdown={withoutCitations(turn.text.replace(/^Arguing for [A-Z], which nobody backed:\s*/, ''))} />
               <Evidence receipts={turn.receipts} written={[turn.text]} />
             </Card>
           </li>
@@ -621,7 +671,7 @@ function PremortemCard({ question, advisors }: { question: DebateQuestion; advis
             {wire.status === 'tripped' && ', tripped'}
             {wire.status === 'cleared' && ', cleared'}
           </p>
-          <p className="text-body text-ink [overflow-wrap:anywhere]">{wire.condition}</p>
+          <p className="text-body text-ink [overflow-wrap:anywhere]">{plainCondition(wire.condition)}</p>
           {wire.fact && <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">{wire.fact}</p>}
           <p className="text-ui text-ink-muted">If it trips, the decision goes back to the advisors.</p>
         </div>

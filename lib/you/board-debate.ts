@@ -127,6 +127,8 @@ export type DebateQuestion = {
   lean: string | null;
   premortem: PremortemStory[];
   tripwire: Tripwire | null;
+  /** The advisors who sit on it, by key, from the order each was shown the options in; empty before plan #2581.8. */
+  seated: string[];
   verdict: BoardVerdict | null;
   /** What the person did with the verdict (plan #2561.6); null while they have not. */
   decision: QuestionDecision | null;
@@ -330,6 +332,7 @@ export function debateFrom(
         lean: /^[A-Z]$/.test(text(row.lean)) ? text(row.lean) : null,
         premortem: premortemOf(row.premortem),
         tripwire: tripwireOf(row.tripwire),
+        seated: Object.keys(record(row.option_order) ?? {}),
         verdict: verdictOf(row.verdict),
         decision: decisionFromRow(row),
         made: [],
@@ -351,6 +354,7 @@ export function debateFrom(
     questions.flatMap((q) => [
       ...(q.verdict?.scores.map((s) => s.advisor) ?? []),
       ...(q.verdict?.forecasts.map((f) => f.advisor) ?? []),
+      ...q.seated,
     ]),
   );
   const advisors = advisorRows
@@ -479,7 +483,7 @@ export async function loadMeetingDebate(
     client
       .from('board_questions')
       .select(
-        'id, question, options, status, verdict, decided_option, decision_note, decided_at, created_at, door, success_measure, decide_by, lean, premortem, tripwire',
+        'id, question, options, status, verdict, decided_option, decision_note, decided_at, created_at, door, success_measure, decide_by, lean, premortem, tripwire, option_order',
       )
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),

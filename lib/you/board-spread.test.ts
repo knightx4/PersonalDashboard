@@ -12,6 +12,9 @@ import {
   theExchange,
   rangeText,
   advisorDecisionHref,
+  plainCondition,
+  waitingOf,
+  withoutCitations,
 } from '@/lib/you/board-spread';
 
 const Q = 'q1';
@@ -123,6 +126,24 @@ it('gives a unanimous decision its steelman and no exchange', () => {
   const q = debate.questions[0];
   expect(theExchange(q)).toEqual([]);
   expect(steelmanOf(q)?.answer?.text).toBe('Skeptic, it does not hold.');
+});
+
+it('names who is still answering, and cleans what the page quotes', () => {
+  const debate = debateFrom(
+    [question({ option_order: { mentor: ['A', 'B'], skeptic: ['B', 'A'], cfo: ['A', 'B'] } })],
+    [turn({ advisor_id: 'a1', probabilities: { A: 0.7, B: 0.3 }, blind: true })],
+    advisors,
+  );
+  const q = debate.questions[0];
+  const forecasts = forecastsOf(q, debate.advisors);
+  expect(waitingOf(q, debate.advisors, forecasts).map((a) => a.key)).toEqual(['skeptic', 'cfo']);
+  expect(headline(q, forecasts, true, q.seated.length)).toBe('1 of 3 advisors have answered so far, and A leads at 70%.');
+  expect(withoutCitations('forty-two on side projects [c41d0a2e]. And [a note](/x).')).toBe(
+    'forty-two on side projects. And [a note](/x).',
+  );
+  expect(plainCondition('Fewer than five sent by 1 Dec, in job_search.applications.')).toBe(
+    'Fewer than five sent by 1 Dec.',
+  );
 });
 
 describe('stackDots', () => {
