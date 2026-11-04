@@ -85,10 +85,8 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   },
   vault: {
     sections: [
-      { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-      { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
-      { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-      { href: '/vault/maya', label: 'Maya', icon: 'maya' },
+      // One room since Inbox and Triage folded into Now (plan #1496.9).
+      { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
     ],
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',

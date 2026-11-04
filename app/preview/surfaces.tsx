@@ -3415,10 +3415,17 @@ const youSections: NavSection[] = [
   { href: '/you/council', label: 'Council', icon: 'board' },
 ];
 
-const triageCrumbs = [
-  { label: 'Vault', href: '/vault' },
-  { label: 'Quick note triage', href: '/vault/triage' },
-];
+/**
+ * The Vault's Now page heading, as the page draws it: the triage deck and
+ * the Inbox sit on that page since plan #1496.9.
+ */
+const vaultNowHeader = (
+  <PageHeader
+    title="Vault"
+    description="alex-rivera/notes · main"
+    actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+  />
+);
 
 /**
  * The deck's lesson written with a prediction (plan #2522.6), asked or
@@ -5821,10 +5828,16 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'vault-inbox',
-    label: 'Vault · Inbox',
+    label: 'Vault · Now, what is on you',
     module: 'vault',
-    width: 'page',
-    render: () => <VaultInboxSurface />,
+    width: 'narrow',
+    render: () => (
+      <>
+        {vaultNowHeader}
+        <VaultInboxSurface />
+        <QuickNoteRow waiting={3} writable />
+      </>
+    ),
   },
   {
     id: 'learn-inbox',
@@ -6942,7 +6955,7 @@ export const SURFACES: readonly Surface[] = [
      * with its suggested notes, a search, and a note of its own; Leave for
      * later is the forward press. The list of all waiting folds below. */
     id: 'vault-triage',
-    label: 'Vault · Quick note triage',
+    label: 'Vault · Now, quick notes and the triage deck',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6954,8 +6967,9 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable onVault />
       </div>
     ),
   },
@@ -6963,13 +6977,14 @@ export const SURFACES: readonly Surface[] = [
     /* Make it a note of its own, pressed (note 24fd1e02): the name field,
      * filled with the name the first line gives it, ready to change. */
     id: 'vault-triage-naming',
-    label: 'Vault · Quick note triage · Naming a new note',
+    label: 'Vault · Now, triage naming a new note',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable naming />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable naming onVault />
       </div>
     ),
   },
@@ -6977,7 +6992,7 @@ export const SURFACES: readonly Surface[] = [
     /* Triage on its second note (plan #1931.5): the first is left for later,
      * so Previous sits beside the forward press. */
     id: 'vault-triage-previous',
-    label: 'Vault · Quick note triage, Previous',
+    label: 'Vault · Now, triage on its second note',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6988,21 +7003,23 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable second />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable second onVault />
       </div>
     ),
   },
   {
     /* Triage with nothing waiting: the deck's last word. */
     id: 'vault-triage-empty',
-    label: 'Vault · Quick note triage, empty',
+    label: 'Vault · Now, every quick note filed',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview empty writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={0} writable />
+        <TriagePreview empty writable onVault />
       </>
     ),
   },
@@ -7010,13 +7027,14 @@ export const SURFACES: readonly Surface[] = [
     /* Triage under a vault token that can only read: the reason in place of
      * the buttons, and the suggestions as links. */
     id: 'vault-triage-read-only',
-    label: 'Vault · Quick note triage, read-only token',
+    label: 'Vault · Now, triage with a read-only token',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable={false} />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable={false} />
+        <TriagePreview writable={false} onVault />
       </div>
     ),
   },

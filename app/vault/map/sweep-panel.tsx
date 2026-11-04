@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Note } from '@/components/ui/note';
 import type { SweepOutcome } from '@/lib/vault/map/sweep';
-import type { SweepView } from '@/lib/vault/map/sweep-read';
+import { SWEEP_PAUSED, type SweepView } from '@/lib/vault/map/sweep-read';
 import { startSweep, stopSweep } from './actions';
 import { whenDate } from '@/lib/core/when';
 
@@ -34,6 +34,8 @@ const OUTCOME_LINES: { outcome: SweepOutcome; label: string }[] = [
 const dayOf = (iso: string) => whenDate(iso, { timeZone: 'UTC', month: 'long', year: 'never' });
 
 export function SweepAction({ sweep }: { sweep: SweepView | null }) {
+  // Paused, there is nothing a press could start (SWEEP_PAUSED).
+  if (SWEEP_PAUSED) return null;
   const running = sweep?.status === 'running';
   return (
     <form action={running ? stopSweep : startSweep}>
@@ -44,7 +46,19 @@ export function SweepAction({ sweep }: { sweep: SweepView | null }) {
   );
 }
 
+/** What the page says while the sweep's clock is off. */
+export const SWEEP_PAUSED_LINE =
+  'Sweeps are paused, so no notes are read into the map in the background. What earlier sweeps wrote stays here, and a note’s own Map section still adds to it.';
+
 export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
+  if (SWEEP_PAUSED) {
+    return (
+      <div className="mb-4 space-y-2">
+        <p className="text-ui text-ink-muted">{SWEEP_PAUSED_LINE}</p>
+        {sweep && <SweepHistory sweep={sweep} />}
+      </div>
+    );
+  }
   if (!sweep) {
     return (
       <p className="mb-4 text-ui text-ink-muted">
@@ -56,6 +70,15 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
     );
   }
 
+  return (
+    <div className="mb-4">
+      <SweepHistory sweep={sweep} />
+    </div>
+  );
+}
+
+/** The last sweep's line, opening to what it reached and what happened to each note. */
+function SweepHistory({ sweep }: { sweep: SweepView }) {
   const total = sweep.notesTotal;
   const reachedLine =
     total === null
@@ -73,7 +96,7 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
   const lines = OUTCOME_LINES.filter(({ outcome }) => (sweep.outcomes[outcome] ?? 0) > 0);
 
   return (
-    <div className="mb-4">
+    <>
       {/* The error stays out of the fold: a sweep that could not continue is
           not something to find by opening a line. */}
       {sweep.lastError && (
@@ -135,12 +158,12 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
           </div>
         )}
 
-        {sweep.status === 'done' && (
+        {sweep.status === 'done' && !SWEEP_PAUSED && (
           <p className="mt-2 text-small text-ink-muted">
             A new sweep sends only the notes that are new, changed or failed since this one.
           </p>
         )}
       </Disclosure>
-    </div>
+    </>
   );
 }

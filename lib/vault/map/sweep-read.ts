@@ -9,6 +9,15 @@ import type { SweepOutcome } from '@/lib/vault/map/sweep';
  * a broken read must not look like a vault that has never been swept.
  */
 
+/**
+ * The sweep is paused (plan #1496.9): its five-minute clock, 'map-sweep-tick',
+ * is set inactive by vault migration 0042, so a sweep started now would never
+ * move. The page offers no Sweep press and says so; the map keeps what
+ * earlier sweeps and each note's own Map section wrote. Set this back to
+ * false in the same change that sets the job active again.
+ */
+export const SWEEP_PAUSED: boolean = true;
+
 export type SweepStatus = 'running' | 'stopped' | 'done';
 
 export type SweepView = {

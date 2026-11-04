@@ -39,11 +39,8 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
   vault: [
+    // Inbox and Triage folded into Now, Map and Maya frozen (plan #1496.9).
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-    { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
-    { href: '/vault/triage', label: 'Triage', icon: 'triage' },
-    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
   you: [
     { href: '/you/personality', label: 'Personality', icon: 'personality' },

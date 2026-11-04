@@ -147,8 +147,8 @@ describe('queueRow', () => {
   it('says how many and opens the queue’s page', () => {
     expect(queueRow('vault-triage', 3)).toMatchObject({
       title: '3 quick notes to file',
-      href: '/vault/triage',
-      verbs: [{ label: 'File them', href: '/vault/triage' }],
+      href: '/vault#triage',
+      verbs: [{ label: 'File them', href: '/vault#triage' }],
     });
     expect(queueRow('vault-triage', 1)?.title).toBe('1 quick note to file');
     expect(queueRow('shopping-review', 2)?.section).toBe('review');

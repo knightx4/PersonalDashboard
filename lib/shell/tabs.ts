@@ -75,14 +75,12 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
+  // One room (plan #1496.9): the Inbox's rows and the quick notes to triage
+  // sit on Now, and /vault/inbox and /vault/triage open it. Map and Maya were
+  // frozen, unopened for a month: their pages still open from a bookmark or a
+  // note, with no tab.
   vault: [
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-    { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
-    // The quick notes waiting in the Inbox folder, on a tab of their own (note
-    // aee95195). The Inbox also lists them as one row that opens this page.
-    { href: '/vault/triage', label: 'Triage', icon: 'triage' },
-    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
   // A subject, an idea, a quiz, an essay and a reading are reached through
   // their list, so they light its tab through `alsoMatches` rather than having
