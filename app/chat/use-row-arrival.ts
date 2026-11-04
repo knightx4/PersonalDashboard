@@ -46,7 +46,7 @@ export function useRowArrival(
         const risen = at !== was.at;
         // It rides over the rows it passes as one solid row, so no two rows' words overlap.
         if (risen) {
-          el.style.zIndex = '1';
+          el.classList.add('z-over-link');
           el.style.backgroundColor = 'var(--c-surface)';
         }
         const run = el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], {
@@ -54,7 +54,7 @@ export function useRowArrival(
           easing: EASE.outSoft,
         });
         const settle = () => {
-          el.style.zIndex = '';
+          el.classList.remove('z-over-link');
           el.style.backgroundColor = '';
         };
         run.finished.then(settle).catch(settle);

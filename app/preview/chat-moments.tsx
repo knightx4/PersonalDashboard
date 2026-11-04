@@ -119,7 +119,7 @@ function GalleryButton({
     <div
       className={
         over
-          ? 'fixed top-[calc(env(safe-area-inset-top)+5rem)] right-8 z-30 min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
+          ? 'fixed top-[calc(env(safe-area-inset-top)+5rem)] right-8 z-status min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
           : 'mb-3'
       }
     >
