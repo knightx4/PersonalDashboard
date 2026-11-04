@@ -554,12 +554,16 @@ import {
   ProjectsSearchEmptySurface,
   ProjectsSurface,
 } from './projects-surfaces';
+import { GoalPageErrorSurface } from './goal-page-error-surface';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
   GoalStepsTabSurface,
   GoalActivitySurface,
+  GoalDashboardPageSurface,
+  GoalFilesTabSurface,
+  GoalPageLoadingSurface,
   FileSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
@@ -5922,15 +5926,57 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAreaSurface />,
   },
   {
-    /* A goal's page on its Overview tab (plan #1671), in the tabbed detail
-     * pattern: the path, title and done-when, the properties column, then
-     * Dash's status card, the number and its readings, Waiting on you, one
-     * Learn goal linked and a file. */
+    /* A goal's page on its Dashboard tab (plan #2778.4) before Dash has laid
+     * out its tiles: the done-when, the Now / Next / Later strip, Dash's
+     * status card, the line offering Dash lay it out, the number, Waiting on
+     * you, and Dash's card with the newest files beside them. */
     id: 'goals-page-top',
-    label: 'Goal · the Overview tab',
+    label: 'Goal · the Dashboard tab with no tiles yet',
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* A goal's Dashboard with its tiles (plan #2778.4): the strip, the
+     * status, the figures, the line of the balance, the table and the
+     * tracker, with Dash's card (a run going) and Recent files beside them. */
+    id: 'goal-dashboard-page',
+    label: 'Goal · the Dashboard tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface />,
+  },
+  {
+    /* The same Dashboard with Ask Dash open in Dash's card. */
+    id: 'goal-dashboard-page-ask',
+    label: 'Goal · asking Dash from the Dashboard',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface asking />,
+  },
+  {
+    /* A goal's page while it loads, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-loading',
+    label: 'Goal · loading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageLoadingSurface />,
+  },
+  {
+    /* A goal's page when it could not be read, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-error',
+    label: 'Goal · could not be loaded',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageErrorSurface />,
+  },
+  {
+    /* A goal's Work & files tab (plan #2778.4): Dash's work, then every file. */
+    id: 'goals-page-files',
+    label: 'Goal · the Work & files tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface />,
   },
   {
     /* A passive goal's page (plan #2503.2): the switch in the header on
@@ -5960,9 +6006,9 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The same frame on its Steps tab: the step tree and its stages. */
+    /* The same frame on its Plan tab: the step tree and its stages. */
     id: 'goals-page-steps',
-    label: 'Goal · the Steps tab',
+    label: 'Goal · the Plan tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalStepsTabSurface />,
@@ -5971,7 +6017,7 @@ export const SURFACES: readonly Surface[] = [
     /* A goal closing with the Steps tab open (plan #1672): the hexagon in the
      * title completes with its ring, then the steps fold into one line. */
     id: 'goals-page-close',
-    label: 'Goal · closing it on the Steps tab',
+    label: 'Goal · closing it on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
@@ -5985,7 +6031,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* A step Dash finished, on the Steps tab (plan #1672). */
     id: 'goals-page-arrival',
-    label: 'Goal · a step Dash finished, on the Steps tab',
+    label: 'Goal · a step Dash finished, on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
@@ -5997,10 +6043,10 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPageArrivalDemo />,
   },
   {
-    /* The same frame on its Activity tab: the steps closed, the runs and
+    /* The same frame on its History tab: the steps closed, the runs and
      * the goal's comments. */
     id: 'goals-page-activity',
-    label: 'Goal · the Activity tab',
+    label: 'Goal · the History tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalActivitySurface />,

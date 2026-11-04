@@ -220,6 +220,38 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and wide cards for a table with its numbers lined up right. The slots and the grid of programs are new kinds of tile, so they should read as members of the same family: a slots tile like a number tile with its row of slots under the figure, and the grid like the loans table with yes/no columns as marks.',
     from: '2778.3',
   },
+  'goal-dashboard-page': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, as a whole page: the Dashboard, Plan, Work & files and History tabs, then a row of three Now, Next and Later cards (Now faintly tinted, each with a small label, the step and a muted line with See the plan), then the tiles on the left with a column on the right holding a Dash is on card (what Dash is working on, the last thing it finished, and an Ask Dash box) and a Recent files card of three files with All files. On a phone it is one column: the strip, the tiles, Dash\'s card, the files. The mockup has no properties column; this page keeps the tabbed detail pattern\'s, so Dash\'s card and the files sit between the tiles and it.',
+    from: '2778.4',
+  },
+  'goal-dashboard-page-ask': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778, whose Dash is on card ends with an Ask Dash box (\'Ask Dash to figure something out…\' and an Ask button). Here that box is open inside the card, as quietly as the mockup draws it.',
+    from: '2778.4',
+  },
+  'goals-page-top': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778: the strip of Now, Next and Later, then the goal\'s parts on the left with Dash is on and Recent files in a column on the right. Here the goal has no tiles laid out yet, so one card says so and offers Dash lay it out where the tiles would be.',
+    from: '2778.4',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */

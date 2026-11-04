@@ -210,6 +210,17 @@ export function GoalDashboardTilesSurface() {
   return <DashboardTiles goalId={GOAL} views={views(LOANS_TILES, DATA)} />;
 }
 
+/** The loans goal's id and its tiles, for the whole goal page in the gallery (plan #2778.4). */
+export const LOANS_GOAL_ID = GOAL;
+
+/** The loans goal's tiles as on its Dashboard: the figures, the line of the balance, the table and the tracker. */
+export function loansDashboardViews(): TileView[] {
+  return views(
+    LOANS_TILES.filter((tile) => !(tile.type === 'chart' && tile.style === 'bar')),
+    DATA,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // An apartment goal (plan #2778.3): a card per room, each with its steps.
 // Shaped like a real tidying goal (how many rooms, how many steps in each,

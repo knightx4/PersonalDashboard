@@ -35,7 +35,7 @@ export function GoalPageCloseDemo() {
   const [closed, setClosed] = useState(false);
   return (
     <div className="space-y-4">
-      <SetTab tab="steps" />
+      <SetTab tab="plan" />
       <Button
         variant="secondary"
         size="sm"
@@ -62,7 +62,7 @@ export function GoalPageArrivalDemo() {
   const [visit, setVisit] = useState(0);
   return (
     <div className="space-y-4">
-      <SetTab tab="steps" />
+      <SetTab tab="plan" />
       <Button
         variant="secondary"
         size="sm"
