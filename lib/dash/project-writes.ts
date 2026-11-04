@@ -122,7 +122,7 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
   const db = await ctx.db('public');
 
   let parentId: string | null = null;
-  let module: string | null = null;
+  let scope: string | null = null;
   if (args.under !== undefined && args.under !== null && args.under !== '') {
     const number = Number(String(args.under).replace(/^#/, '').split('.')[0]);
     const ref = typeof args.under === 'string' && /^[0-9a-f-]{36}$/i.test(args.under) ? args.under : null;
@@ -132,18 +132,18 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
     const parent = data as { id: string; module: string | null } | null;
     if (!parent) throw new Refused(`No step on the plan is numbered ${String(args.under)}. Look it up with read_dev_row or find_dev_text.`);
     parentId = parent.id;
-    module = parent.module;
+    scope = parent.module;
   } else if (typeof args.module === 'string' && args.module.trim()) {
-    module = args.module.trim();
-    if (!(MODULE_IDS as readonly string[]).includes(module)) {
-      throw new Refused(`"${module}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
+    scope = args.module.trim();
+    if (!(MODULE_IDS as readonly string[]).includes(scope)) {
+      throw new Refused(`"${scope}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
     }
   }
 
-  const position = await nextPlanPosition(db, ctx.userId, module as never, parentId);
+  const position = await nextPlanPosition(db, ctx.userId, scope as never, parentId);
   const written = await insertPlanItem(db, {
     userId: ctx.userId,
-    module,
+    module: scope,
     parentId,
     title,
     detail,
