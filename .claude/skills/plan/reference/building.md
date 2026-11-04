@@ -479,6 +479,16 @@ do.** The page shows the title in a list and the detail in a box labelled
 "What to set up", so instructions written as the title leave that box saying
 nothing the heading did not.
 
+**Never write a setup step to have the person check finished work.** Listening
+to output and giving a verdict, trying a build in another app, or confirming
+something works on their machine are not setup. If nothing you are building is
+stopped, there is no setup step to write. The person said on 4 November 2026
+that they do not want these asks and will raise anything they notice
+themselves (#2738 and #2739 were the examples). Write what you could not verify
+in the closing note of the step you finished, as one plain line, and close it.
+If a later step cannot be built without the person's judgment, that is a
+decision, not a setup step.
+
 A setup step is never yours. It closes when the person says they have done it,
 on `/dev/plan` or in the Dash tab's "Waiting on you", and it carries no commit.
 `start` refuses one, the same as a decision, and `next --claude` never lists
