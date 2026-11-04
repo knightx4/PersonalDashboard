@@ -1522,6 +1522,8 @@ body,
   --color-fill-ink: var(--c-fill-ink);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
+  /* Their bubbles in a thread: the pane with a little ink mixed in, so a step darker than it in a light room and a step lighter in a dark one, as the chat reference draws them (#ece8de on #fdfbf5, #2a2925 on #1d1d1a). */
+  --color-them: color-mix(in oklab, var(--c-surface) 92%, var(--c-ink));
   /* The three voices of a conversation (see the voice-* utilities). */
   --color-voice-you: var(--c-ink);
   --color-voice-dash: var(--c-canvas);

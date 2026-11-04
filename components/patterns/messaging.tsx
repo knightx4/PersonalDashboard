@@ -1,7 +1,6 @@
 import { BackLink } from '@/components/shell/back-link';
 import type { Crumb } from '@/components/shell/breadcrumb';
 import { PageWide } from '@/components/shell/page-width';
-import { chipVariants } from '@/components/ui/chip';
 import Link from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -63,6 +62,8 @@ export function Messaging({
         aria-label={label}
         className={cn(
           'flex min-w-0 flex-col overflow-hidden bg-surface max-[719px]:sheet max-[719px]:rounded-card',
+          // On a phone the list's pane runs down to the dock, as the reference's does, however few rows it holds.
+          'max-[719px]:min-h-[calc(100dvh-var(--dock-h)-env(safe-area-inset-bottom)-7.5rem)]',
           'min-[720px]:border-r min-[720px]:border-border',
           PANE_H,
           open && 'max-[719px]:hidden',
@@ -129,7 +130,7 @@ export function MessagingThread({
           {avatar}
           <div className="min-w-0 flex-1">
             {typeof name === 'string' ? <h1 className="truncate text-body font-semibold text-ink">{name}</h1> : name}
-            {detail && <p className="truncate text-small text-ink-muted">{detail}</p>}
+            {detail && <p className="line-clamp-2 text-small text-ink-muted min-[720px]:truncate">{detail}</p>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
@@ -142,7 +143,7 @@ export function MessagingThread({
       >
         {children}
       </div>
-      <div className="shrink-0 px-3 pt-2 pb-3">{box}</div>
+      <div className="shrink-0 border-t border-border px-3 pt-2.5 pb-3">{box}</div>
     </div>
   );
 }
@@ -239,7 +240,7 @@ export function MessageBubble({
       className={cn(
         arriving && 'message-in',
         'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body',
-        from === 'you' ? 'bg-accent text-fill-ink' : 'bg-sunken text-ink',
+        from === 'you' ? 'bg-accent text-fill-ink' : 'bg-them text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
         !last && (from === 'you' ? 'rounded-br-control' : 'rounded-bl-control'),
       )}
@@ -249,12 +250,16 @@ export function MessageBubble({
   );
 }
 
-/** A row a message points at, such as the to do it is about: a small outlined chip under its bubble. */
+/**
+ * A row a message points at, such as the to do it is about: a small chip
+ * under its bubble, outlined with no fill as the reference's, so it stays
+ * lighter than the bubbles in either room.
+ */
 export function MessageLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link
       href={href}
-      className={cn(chipVariants({ tone: 'neutral' }), 'press-area my-0.5 max-w-full hover:text-ink')}
+      className="press-area my-0.5 inline-flex max-w-full items-center gap-1.5 rounded-pill border border-border px-2.5 py-0.5 text-small text-ink-muted hover:text-ink" /* ui-ok: an outlined chip on one line, the reference's link under a bubble, not a box that groups anything */
     >
       <span aria-hidden>↳</span>
       <span className="truncate">{children}</span>
@@ -273,7 +278,7 @@ export function MessageNote({ tone = 'quiet', children }: { tone?: 'quiet' | 'da
 export function TypingBubble({ name }: { name: string }) {
   return (
     <div className="typing-in mb-2 self-start" role="status" aria-label={`${name} is typing`}>
-      <span className="flex items-center gap-1 rounded-pane bg-sunken px-3.5 py-3.5">
+      <span className="flex items-center gap-1 rounded-pane bg-them px-3.5 py-3.5">
         {[0, 1, 2].map((i) => (
           <span
             key={i}

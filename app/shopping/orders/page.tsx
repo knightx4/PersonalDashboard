@@ -1,6 +1,7 @@
 import { Receipt } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { countReviewItems } from '@/lib/review/load';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { redirect } from 'next/navigation';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
@@ -120,7 +121,7 @@ export default async function OrdersPage({
   const tagId = parseTagId(params.tag);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants, tags, inboxCount, displayCurrency, people] =
+  const [{ data: profile }, merchants, tags, inboxCount, displayCurrency, people, reviewCount] =
     await Promise.all([
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
       loadUserMerchants(supabase, user.id),
@@ -128,6 +129,8 @@ export default async function OrdersPage({
       countConnectedInboxes(core, user.id),
       loadDisplayCurrency(supabase, user.id),
       loadPeople(core, user.id),
+      // The review queue folded into Now (plan #1496.8): its way in is here.
+      countReviewItems(supabase, core, user.id).catch(() => undefined),
     ]);
   const personId = parsePersonFilter(params.person, people);
   const byPerson = peopleById(people);
@@ -408,6 +411,9 @@ export default async function OrdersPage({
             ))}
           </RailGroup>
         )}
+        <RailGroup label="Queue">
+          <RailItem label="To review" count={reviewCount} href="/shopping/orders/review" />
+        </RailGroup>
         <RailGroup label="Status">
           <RailItem
             label="Any"

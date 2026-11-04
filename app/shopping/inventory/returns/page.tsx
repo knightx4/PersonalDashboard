@@ -6,7 +6,7 @@ import {
   parseReturnsGroup,
   parseReturnsView,
 } from '@/lib/returns/load';
-import { ReturnsPageView } from './returns-view';
+import { ReturnsPageView } from '@/app/shopping/returns/returns-view';
 
 export const metadata = { title: 'Returns' };
 

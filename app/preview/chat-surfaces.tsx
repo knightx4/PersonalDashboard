@@ -37,7 +37,7 @@ export const CHAT_PEOPLE: PersonRow[] = [
     key: 'benjamin-franklin',
     name: 'Benjamin Franklin',
     colour: MENTOR_PALETTE[1],
-    about: 'Money and habits',
+    about: 'Habits',
     unread: true,
     last: { role: 'advisor', text: 'What is actually in the way?', at: '2026-11-03T07:12:00Z' },
   }),
@@ -46,7 +46,7 @@ export const CHAT_PEOPLE: PersonRow[] = [
     key: 'cfo',
     name: 'The CFO',
     colour: MENTOR_PALETTE[7],
-    about: 'Can you afford it, and what does it cost you later?',
+    about: 'Money',
     unread: true,
     last: {
       role: 'advisor',
@@ -59,7 +59,7 @@ export const CHAT_PEOPLE: PersonRow[] = [
     key: 'mentor',
     name: 'The Mentor',
     colour: MENTOR_PALETTE[2],
-    about: 'What would someone who has done this before tell you?',
+    about: 'Career',
     last: { role: 'person', text: 'I keep replaying the review with Dana.', at: '2026-11-01T21:05:00Z' },
   }),
   person({
@@ -67,16 +67,16 @@ export const CHAT_PEOPLE: PersonRow[] = [
     key: 'alexandrina',
     name: 'Dr Alexandrina Featherstonehaugh-Wetherby',
     colour: MENTOR_PALETTE[4],
-    about: 'Health and sleep',
+    about: 'Health',
     last: { role: 'advisor', text: 'Then explain to me what you did get. Sloppy is fine.', at: '2026-10-30T12:00:00Z' },
   }),
-  person({ id: 'm4', key: 'skeptic', name: 'The Skeptic', colour: MENTOR_PALETTE[5], about: 'What would have to be true for this to be a mistake?', chatId: null }),
+  person({ id: 'm4', key: 'skeptic', name: 'The Skeptic', colour: MENTOR_PALETTE[5], about: 'Pushes back', chatId: null }),
   person({
     id: 'm5',
     key: 'richard-feynman',
     name: 'Richard Feynman',
     colour: MENTOR_PALETTE[3],
-    about: 'Can you explain it to a twelve-year-old?',
+    about: 'Physics',
     canTalk: false,
     chatId: null,
   }),
@@ -288,7 +288,18 @@ export function ChatArrivalMomentSurface() {
   ];
   return (
     <ChatShell path="/chat">
-      <ChatArrivalDemo before={CHAT_PEOPLE} after={after} timezone={ZONE} now={NOW} />
+      <ChatArrivalDemo
+        before={CHAT_PEOPLE}
+        after={after}
+        timezone={ZONE}
+        now={NOW}
+        open={{
+          key: FRANKLIN.key,
+          thread: (
+            <ThreadView person={FRANKLIN} chatId={FRANKLIN.chatId} page={{ messages: THREAD, hasOlder: false }} typingUntil={null} timezone={ZONE} now={NOW} live={false} />
+          ),
+        }}
+      />
     </ChatShell>
   );
 }

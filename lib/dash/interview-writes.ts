@@ -182,7 +182,7 @@ async function addInterviewRound(ctx: DashWriteContext, args: Args): Promise<Das
     rest: ` as round ${roundNumber} of ${roleTitle}${when}`,
     href,
     where: 'Open the role',
-    paths: [href, '/jobs/interviews', '/jobs'],
+    paths: [href, '/jobs/pipeline', '/jobs'],
   };
   return {
     ok: true,
@@ -319,7 +319,7 @@ async function linkRoundEmail(ctx: DashWriteContext, args: Args): Promise<DashWr
     rest: ` of ${roleTitle}`,
     href,
     where: 'Open the role',
-    paths: [href, '/jobs/interviews', '/jobs'],
+    paths: [href, '/jobs/pipeline', '/jobs'],
   };
   return {
     ok: true,
@@ -400,7 +400,7 @@ async function writePrepNote(ctx: DashWriteContext, args: Args): Promise<DashWri
     rest: ` of ${roleTitle}`,
     href,
     where: 'Open the role',
-    paths: [href, '/jobs/interviews', '/jobs'],
+    paths: [href, '/jobs/pipeline', '/jobs'],
   };
   return {
     ok: true,

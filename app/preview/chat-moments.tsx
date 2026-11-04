@@ -87,19 +87,24 @@ export function ChatArrivalDemo({
   after,
   timezone,
   now,
+  open = null,
 }: {
   before: readonly PersonRow[];
   after: readonly PersonRow[];
   timezone: string;
   now: number;
+  /** The newest thread, open beside the list on a laptop as /chat opens it, and its person's key. */
+  open?: { key: string; thread: React.ReactNode } | null;
 }) {
   const [arrived, setArrived] = useState(false);
   return (
     <>
-      <GalleryButton onClick={() => setArrived(!arrived)} demo="chat-arrival">
+      <GalleryButton onClick={() => setArrived(!arrived)} demo="chat-arrival" over={open ? 'wide' : false}>
         {arrived ? 'Start again' : 'A text arrives first'}
       </GalleryButton>
-      <PeopleView rows={arrived ? after : before} timezone={timezone} now={now} live={false} />
+      <PeopleView rows={arrived ? after : before} current={open?.key ?? null} newest={Boolean(open)} timezone={timezone} now={now} live={false}>
+        {open?.thread}
+      </PeopleView>
     </>
   );
 }
@@ -112,8 +117,12 @@ function GalleryButton({
 }: {
   onClick: () => void;
   demo: string;
-  /** Held over the thread's bar, which on a phone is a fixed pane that would cover a button in the page. */
-  over?: boolean;
+  /**
+   * Held over the thread's bar, which on a phone is a fixed pane that would
+   * cover a button in the page; 'wide' only from laptop width, where a button
+   * in the page would push the window's pane past the foot of the screen.
+   */
+  over?: boolean | 'wide';
   children: React.ReactNode;
 }) {
   // Down is drawn from the pointer's own event, so the frame the finger lands in already shows the press.
@@ -123,9 +132,11 @@ function GalleryButton({
     // Quiet grey text with no outline there, so nothing in the bar is heavier than the person's name.
     <div
       className={
-        over
-          ? 'fixed top-[calc(env(safe-area-inset-top)+5.25rem)] right-8 z-status min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
-          : 'mb-3'
+        over === 'wide'
+          ? 'mb-3 min-[720px]:fixed min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28 min-[720px]:z-status min-[720px]:mb-0'
+          : over
+            ? 'fixed top-[calc(env(safe-area-inset-top)+5.25rem)] right-8 z-status min-[720px]:top-[calc(env(safe-area-inset-top)+6.25rem)] min-[720px]:right-28'
+            : 'mb-3'
       }
     >
       <Button

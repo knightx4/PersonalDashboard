@@ -62,7 +62,7 @@ export async function loadShoppingBrief(
       // Imports the parser was not sure of: an order whose totals did not add
       // up, or an email it could not match. "Things" said none of that.
       text: `${plural(reviewCount, 'import')} to check`,
-      href: '/shopping/review',
+      href: '/shopping/orders/review',
       tone: 'caution',
     };
   }
@@ -86,7 +86,7 @@ export async function loadShoppingBrief(
   if (closing > 0) {
     return {
       text: `${plural(closing, 'return window')} close${closing === 1 ? 's' : ''} this week`,
-      href: '/shopping/returns',
+      href: '/shopping/inventory/returns',
       tone: 'caution',
     };
   }
