@@ -5,7 +5,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { dashModelFor } from '@/lib/dash/model-choice';
-import { threadDashInRequest } from '@/lib/talk/ask-request';
+import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
 import { loadNote } from '@/lib/you/council';
@@ -18,7 +18,7 @@ import { canTalkOf } from '@/lib/you/people-cards-model';
  * app/api/chat/messages both come here. The message is saved and the typing
  * claimed before the request answers; the reply is written after it, with
  * `after`, as the signed-in person, so their own row level security covers
- * every read and write and Dash's lookups run as they do in Ask.
+ * every read and write, and Dash's lookups and changes run as they do in Ask.
  */
 
 export type SendInRequest = { error: string | null; saved: boolean; chatId?: string; messageId?: string; mentorKey?: string };
@@ -51,7 +51,7 @@ export async function sendMentorMessageInRequest(
 async function replyInRequest(userId: string, chatId: string): Promise<void> {
   const client = await createYouClient();
   try {
-    const [core, settings, dash] = await Promise.all([createCoreClient(), loadAccountSettings(userId), threadDashInRequest(userId)]);
+    const [core, settings, dash] = await Promise.all([createCoreClient(), loadAccountSettings(userId), peopleDashInRequest(userId)]);
     await replyToMentor({
       client,
       userId,
@@ -60,6 +60,8 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       model: await dashModelFor(core, userId),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       execute: dash.execute,
+      // Ask Dash's own actions, kept as this mentor's (plan #2854.2).
+      act: dash,
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
       claimed: true,
     });

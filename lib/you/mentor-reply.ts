@@ -6,6 +6,7 @@ import { DASH_TOOLS } from '@/lib/dash/registry';
 import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
+import { PEOPLE_ACTION_RULES, PEOPLE_TOOLS, peopleActing, type PeopleDash } from '@/lib/you/people-actions';
 import {
   ACK_AFTER_MS,
   ACK_MAX_TOKENS,
@@ -30,9 +31,10 @@ export * from '@/lib/you/mentor-reply-model';
  * The send saves the message and claims the chat's typing dots
  * (`claimTyping`), so the thread shows the mentor typing within a second.
  * Then, after the page has its answer, `replyToMentor` reads what the mentor
- * knows (lib/you/chat-context.ts), streams the reply through Dash's loop with
- * Dash's lookups and none of its writes, and saves each bubble as soon as a
- * blank line closes it. Typing is renewed while it works and cleared when it
+ * knows (lib/you/chat-context.ts), streams the reply through Dash's loop and
+ * saves each bubble as soon as a blank line closes it. With `act` the mentor
+ * has Ask Dash's tools and rules, so a text can add a todo or a plan step
+ * (plan #2854.2, lib/you/people-actions.ts); without it, only the lookups. Typing is renewed while it works and cleared when it
  * is done. A message sent while the mentor is typing is saved and answered
  * when the reply in hand is finished, by the same run.
  *
@@ -57,6 +59,11 @@ export type MentorReplyInput = {
   anthropicApiKey: string | null | undefined;
   /** Dash's lookups, run as the person. */
   execute: DashExecutor;
+  /**
+   * Ask Dash's writes, proposals and paid presses, run as the person (plan
+   * #2854.2). Absent: the mentor only looks things up.
+   */
+  act?: PeopleDash;
   /** Keeps what the calls cost; never throws. */
   recordSpend: (operation: MentorSpendOperation, reports: SpendReport[]) => Promise<void>;
   /** True when the send already claimed the typing dots for this run. */
@@ -270,10 +277,16 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     });
   }, input.ackAfterMs ?? ACK_AFTER_MS);
 
+  // Whatever the mentor changes is kept under the text being answered, naming them.
+  const acting = input.act
+    ? peopleActing(input.act, { advisorId: ctx.mentor.id, chatId, messageId: answering.id })
+    : null;
   const voice: DashVoice = {
     model: input.model,
-    system: `${ctx.layers.persona.text}\n\n${REPLY_RULES}`,
-    tools: MENTOR_LOOKUPS,
+    system: acting
+      ? `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_ACTION_RULES}`
+      : `${ctx.layers.persona.text}\n\n${REPLY_RULES}`,
+    tools: acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS,
     maxTokens: REPLY_MAX_TOKENS,
   };
   const rest = (['memory', 'episodes', 'recall', 'live'] as const).map((layer) => ctx.layers[layer].text).filter(Boolean);
@@ -287,6 +300,7 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       today: zoneDay(at, timeZone),
       contextBlocks: rest,
       execute: input.execute,
+      ...(acting ? { write: acting.write, propose: acting.propose, queue: acting.queue } : {}),
       anthropicApiKey: input.anthropicApiKey ?? '',
       client: anthropic,
       onSpend: (report) => spent['mentor-reply'].push(report),
