@@ -2132,7 +2132,7 @@ const calendarEntries: Record<string, CalendarEntry[]> = {
       eventId: null,
       feedEventId: null,
       title: 'Return window closes — Sony WH-1000XM5',
-      href: '/shopping/returns',
+      href: '/shopping/inventory/returns',
       done: false,
     },
   ],

@@ -655,7 +655,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review': ['/news/review'],
   'news-review-empty': ['/news/review'],
   'news-review-failed': ['/news/review'],
-  'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
+  'core-cost-hint': ['/shopping/sell', '/shopping/orders/review', '/account/spend'],
   // The $ naming the routine a button hands work to (plan #2459.1).
   'core-routine-hint': ['/dev/plan', '/goals', '/jobs', '/you'],
   'core-spend-estimates': ['/account/spend'],
@@ -955,7 +955,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'finances-settings-saving': ['/finances/settings'],
   'finances-settings-error': ['/finances/settings'],
   'shopping-order': ['/shopping/orders/[id]'],
-  'shopping-returns': ['/shopping/returns'],
+  'shopping-returns': ['/shopping/inventory/returns'],
   'shopping-saved': ['/shopping/saved'],
   'shopping-list-adds': ['/shopping/orders', '/shopping/inventory'],
   'shopping-saved-item': ['/shopping/saved/[id]'],

@@ -134,7 +134,7 @@ export function changePaths(change: DashChange): string[] {
       return ['/goals', `/goals/${change.input.parentId}`];
     case 'mark_returned':
       return [
-        '/shopping/returns',
+        '/shopping/inventory/returns',
         '/shopping/inventory',
         `/shopping/inventory/${change.input.id}`,
         '/shopping/orders',
@@ -162,7 +162,7 @@ export function changePaths(change: DashChange): string[] {
       return [
         '/shopping/inventory',
         '/shopping/sell',
-        '/shopping/returns',
+        '/shopping/inventory/returns',
         '/finances/spending',
         ...rows.flatMap((row) => (typeof row.id === 'string' ? [`/shopping/inventory/${row.id}`] : [])),
       ];
