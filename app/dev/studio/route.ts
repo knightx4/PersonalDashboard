@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/auth/server';
 import { publicEnv } from '@/lib/env';
+import { projectNotesUrl } from '@/lib/project-notes/keys';
 import { deviceLabel, STUDIO_APP_URL, studioHandoffUrl } from '@/lib/studio/handoff';
 
 /**
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     url: env.NEXT_PUBLIC_SUPABASE_URL,
     key: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     token,
+    notes: projectNotesUrl(request.nextUrl.origin, 'music-pipeline'),
   });
   const response = NextResponse.redirect(target);
   response.headers.set('Cache-Control', 'no-store');
