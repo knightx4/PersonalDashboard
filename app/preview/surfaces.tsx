@@ -1,5 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { GuessedAlready } from './lesson-predict-seed';
+import { NowSurface } from './now-surfaces';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import { LearnGoSurface } from './learn-go-surfaces';
@@ -11499,6 +11500,40 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <ProjectPlanSurface refused />,
+  },
+  {
+    /* What is running now, at the top of a project's page and Dev's plan
+     * (plan #2800.3): a session that reports and one read from its pushes. */
+    id: 'dev-now',
+    label: 'Dev · Now, sessions working',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="working" />,
+  },
+  {
+    /* Hidden part: a session waiting on you, with its question's choices to
+     * answer there, and one whose need has no choices. */
+    id: 'dev-now-waiting',
+    label: 'Dev · Now, waiting on you',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="waiting" />,
+  },
+  {
+    /* Hidden part: the stale mark, no report for twenty minutes. */
+    id: 'dev-now-stale',
+    label: 'Dev · Now, a session gone quiet',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="stale" />,
+  },
+  {
+    /* Hidden part: nothing running, with the last finished session. */
+    id: 'dev-now-empty',
+    label: 'Dev · Now, nothing running',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="empty" />,
   },
   {
     id: 'dev-raised',

@@ -52,6 +52,9 @@ import { threadRef } from '@/lib/thread/subjects';
 import { repoKey } from '@/lib/plan/github';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { ProjectMainLine } from './project-main-line';
+import { NowSection } from './now-section';
+import { loadNow } from '@/lib/plan/now-load';
+import { outlineIndex } from '@/lib/plan/ref';
 
 /** The project whose page offers "Open studio" (lib/studio/handoff.ts). */
 const STUDIO_PROJECT = 'music-pipeline';
@@ -291,6 +294,19 @@ export async function renderPlanPage({
     ? { repo: repoKey(project.repo), check: await loadMainCheck(repoKey(project.repo)) }
     : null;
   const renderedAt = Date.now();
+  // What is running now, at the top of the page (plan #2800.3): the sessions'
+  // own reports, and the push-based reading for runs that have not reported.
+  const now = await loadNow({
+    supabase,
+    userId: user.id,
+    items: data.items,
+    outlines: outlineIndex(everything.flatMap((section) => section.nodes)),
+    lastRuns,
+    started,
+    liveness,
+    scope: project?.id ?? null,
+    now: renderedAt,
+  });
 
   return (
     <YourInitialProvider initial={initial}>
@@ -324,6 +340,7 @@ export async function renderPlanPage({
             : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />
+      <NowSection list={now} />
       {projectMain && (
         <ProjectMainLine check={projectMain.check} repo={projectMain.repo} now={renderedAt} />
       )}
