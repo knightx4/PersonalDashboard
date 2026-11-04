@@ -270,6 +270,17 @@ points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
+/**
+ * Ask's rules for making changes, from "YOU MAKE THE CHANGES" through the
+ * delete proposal, word for word: what the people on People act by (plan
+ * #2854.2, lib/you/people-actions.ts), so a change has one set of rules
+ * wherever it is asked for. Read out of SYSTEM so the two cannot drift.
+ */
+export const ASK_ACTION_RULES = SYSTEM.slice(
+  SYSTEM.indexOf('YOU MAKE THE CHANGES THEY ASK FOR'),
+  SYSTEM.indexOf('ANYTHING ELSE THEY ASK YOU TO DO, HAND ON'),
+).trim();
+
 /** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 

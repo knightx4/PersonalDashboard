@@ -4,6 +4,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { claimTyping, MENTOR_LOOKUPS, REPLY_RULES, replyToMentor, type MentorSpendOperation } from './mentor-reply';
 import { sendMentorText } from './mentor-send';
+import { PEOPLE_ACTION_RULES } from './people-actions';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -205,6 +206,23 @@ describe('replyToMentor', () => {
     expect(tools).toContain('todos');
     expect(tools).not.toContain('show_chart');
     expect(tools.at(-1)).toBe('answer');
+  });
+
+  it("acts with Ask Dash's tools and rules when it is given them (plan #2854.2)", async () => {
+    const looking = anthropicStub(['Sure.']);
+    await run(world(), looking.stub).promise;
+    const lookupsOnly = (looking.streamed[0].tools as { name: string }[]).map((t) => t.name);
+    expect(lookupsOnly).not.toContain('add_todo');
+
+    const acting = anthropicStub(['Done, Friday it is.']);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn() };
+    await run(world(), acting.stub, { act }).promise;
+    const tools = (acting.streamed[0].tools as { name: string }[]).map((t) => t.name);
+    expect(tools).toEqual(expect.arrayContaining(['todos', 'add_todo', 'add_plan_step', 'propose_build', 'propose_delete']));
+    expect(tools).not.toContain('hand_off');
+    expect(tools).not.toContain('show_chart');
+    const system = (acting.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
+    expect(system).toContain(PEOPLE_ACTION_RULES);
   });
 
   it('saves the first bubble while the rest is still being written', async () => {
